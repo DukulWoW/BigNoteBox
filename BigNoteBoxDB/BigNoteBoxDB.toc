@@ -1,0 +1,10 @@
+## Interface: 120000, 120001, 120005, 120007
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r |cffaaaaaaDB|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: Notes database for BigNoteBox — stores all your notes safely.
+## Author: Dukul
+## Version: 1.0.0
+## SavedVariables: BigNoteBoxNotesDB
+## OptionalDeps: BigNoteBox
+
+BigNoteBoxDB.lua

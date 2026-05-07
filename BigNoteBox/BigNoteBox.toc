@@ -1,0 +1,90 @@
+## Interface: 120000, 120001, 120005, 120007
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: A notepad companion to BigChatBox — send notes to chat, capture chat as notes
+## Author: Dukul
+## Version: 1.7.0
+## SavedVariables: BigNoteBoxDB
+## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB
+## AddonCompartmentFunc: BNB_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: BNB_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: BNB_OnAddonCompartmentLeave
+
+# Bootstrap
+Init.lua
+UserImages\UserImages.lua
+
+# Libraries
+libs\libs.xml
+libs\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
+
+# Locales
+Locales\enUS.lua
+
+# Core systems (order matters!)
+Core\Database.lua
+Core\Events.lua
+Core\SlashCommands.lua
+Core\NoteManager.lua
+Core\Initialize.lua
+
+# UI
+UI\Widgets.lua
+UI\Fonts.lua
+UI\SkinSystem.lua
+UI\MainWindow.lua
+UI\MainWindowSkin.lua
+UI\NoteList.lua
+UI\NoteEditor.lua
+UI\FocusEditor.lua
+UI\RichPreview.lua
+UI\StickyNote.lua
+UI\SendToChat.lua
+UI\ConfigWindow.lua
+UI\MainConfigSkin.lua
+UI\TrashWindow.lua
+UI\DangerZone.lua
+UI\TagManager.lua
+UI\OptionsPanel.lua
+Assets\Icons\IconManifest.lua
+UI\NoteConfig.lua
+UI\ReferenceBox.lua
+UI\Sidebar.lua
+UI\HistoryWindow.lua
+UI\NoteHistoryPanel.lua
+UI\HistoryCompareWindow.lua
+UI\AlarmWindow.lua
+UI\AlarmOverview.lua
+UI\OkPhrases.lua
+UI\WhatsNew.lua
+UI\WhatsNewData.lua
+UI\FeatureList.lua
+UI\FeatureListData.lua
+UI\SetupWizard.lua
+UI\NewNoteDialog.lua
+UI\RichNote.xml
+
+# Features
+Features\RandomQuotes.lua
+Features\UndoManager.lua
+Features\NoteHistory.lua
+Features\ContextNotes.lua
+Features\ChatCapture.lua
+Features\DragDrop.lua
+Features\InsertInfo.lua
+Features\PopupAnchor.lua
+Features\ZonePicker.lua
+Features\QuickNote.lua
+Features\AlarmManager.lua
+Features\TagTree.lua
+Features\FocusOrbit.lua
+Features\AdvancedMode.lua
+Features\HtmlTemplate.lua
+Features\ShareNote.lua
+Features\InspectNote.lua
+Features\TargetNote.lua
+Features\DirectSend.lua
+Features\MigrateNotes.lua
+
+# Minimap
+Minimap\Minimap.lua

@@ -1,0 +1,14 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!--
+        BNBSimpleHTMLTemplate — base template for rich note rendering.
+        SimpleHTML requires font slots to be defined in XML; they cannot be
+        created purely at runtime via SetFontObject. We seed with stock WoW
+        fonts here and override with BNB custom fonts after frame creation.
+    -->
+    <SimpleHTML name="BNBSimpleHTMLTemplate" virtual="true">
+        <FontString inherits="GameFontHighlight"/>
+        <FontStringHeader1 inherits="GameFontNormalHuge"/>
+        <FontStringHeader2 inherits="GameFontNormalLarge"/>
+        <FontStringHeader3 inherits="GameFontHighlightLarge"/>
+    </SimpleHTML>
+</Ui>
