@@ -76,6 +76,7 @@ Features\PopupAnchor.lua
 Features\ZonePicker.lua
 Features\QuickNote.lua
 Features\AlarmManager.lua
+Features\TaskManager.lua
 Features\TagTree.lua
 Features\FocusOrbit.lua
 Features\AdvancedMode.lua

@@ -926,7 +926,35 @@ local function BuildAppearanceTab(sf, ct)
     end)
     y = y - (22 + ROW_GAP)
 
-    -- Randomize skin on login/reload
+    -- Window opacity slider (0.0 - 1.0, step 0.05, default 0.97)
+    local skinOpacityLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    skinOpacityLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    skinOpacityLbl:SetHeight(ROW_H); skinOpacityLbl:SetJustifyH("LEFT")
+    skinOpacityLbl:SetText("Window opacity")
+    y = y - (ROW_H + 2)
+
+    local skinOpacitySl = BNB.CreateFloatSlider(ct,
+        nil, 0.0, 1.0, db.skinBgAlpha or 0.97, 0.01, 0.97,
+        function(v)
+            db.skinBgAlpha = v
+            if db.skinMode and BNB.ApplyMainWindowSkin then
+                BNB.ApplyMainWindowSkin()
+            end
+        end)
+    skinOpacitySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    skinOpacitySl:SetWidth(CONTENT_W)
+    y = y - (36 + ROW_GAP)
+
+    local skinOpacityReset = BNB.CreateButton(nil, ct, "Reset", 52, 20)
+    skinOpacityReset:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    skinOpacityReset:SetScript("OnClick", function()
+        db.skinBgAlpha = nil
+        skinOpacitySl:SetValue(0.97)
+        if db.skinMode and BNB.ApplyMainWindowSkin then
+            BNB.ApplyMainWindowSkin()
+        end
+    end)
+    y = y - (22 + ROW_GAP)
     local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -997,6 +1025,18 @@ local function BuildAppearanceTab(sf, ct)
         if skinBrightnessSl.PlusBtn  then skinBrightnessSl.PlusBtn:SetEnabled(enabled)  end
         skinBrightnessReset:SetEnabled(enabled)
         skinBrightnessReset:SetAlpha(alpha)
+
+        -- Opacity slider follows same enabled state as brightness
+        skinOpacityLbl:SetAlpha(alpha)
+        skinOpacitySl:SetAlpha(alpha)
+        skinOpacitySl:EnableMouse(enabled)
+        if skinOpacitySl.Slider then
+            skinOpacitySl.Slider:EnableMouse(enabled)
+        end
+        if skinOpacitySl.MinusBtn then skinOpacitySl.MinusBtn:SetEnabled(enabled) end
+        if skinOpacitySl.PlusBtn  then skinOpacitySl.PlusBtn:SetEnabled(enabled)  end
+        skinOpacityReset:SetEnabled(enabled)
+        skinOpacityReset:SetAlpha(alpha)
     end
     RefreshBrightnessVisibility()
 
@@ -1025,6 +1065,7 @@ local function BuildAppearanceTab(sf, ct)
         if skinPresetDD then skinPresetDD:GenerateMenu() end
         if skinPresetCycleBtn then skinPresetCycleBtn:SetText(CurrentPresetLabel()) end
         if skinBrightnessSl then skinBrightnessSl:SetValue(db.skinBrightness or 1.0) end
+        if skinOpacitySl    then skinOpacitySl:SetValue(db.skinBgAlpha or 0.97) end
         RefreshBrightnessVisibility()
     end
 

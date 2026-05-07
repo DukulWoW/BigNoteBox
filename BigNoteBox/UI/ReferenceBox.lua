@@ -42,6 +42,14 @@ local MODEL_SPLIT_DEFAULT = 0.30   -- items get 30%, model gets 70% of scroll ar
 local MODEL_SPLIT_MIN_PX  = 60     -- minimum item area height in px
 local MODEL_MIN_H         = 150    -- minimum model frame height in px
 
+-- ── Task panel constants ──────────────────────────────────────────────────────
+local TASK_HDR_H            = 24     -- height of the task panel header row
+local TASK_ROW_H            = 24     -- height of each task row
+local TASK_SUBROW_H         = 22     -- height of sub-task rows
+local TASK_SPLIT_MIN_PX     = 60     -- minimum px for either task or attachment pane
+local TASK_CB_SCALE         = 0.65   -- UICheckButtonTemplate scale ~17px
+local ADD_TASKS_H           = 40     -- reserved strip height for the wide Add Tasks button
+
 local QUALITY_COLORS = {
     [0]={r=0.62,g=0.62,b=0.62}, [1]={r=1.00,g=1.00,b=1.00},
     [2]={r=0.12,g=1.00,b=0.00}, [3]={r=0.00,g=0.44,b=0.87},
@@ -61,6 +69,12 @@ local _pendingQuests = {}   -- questID → true
 local _modelHidden   = {}   -- noteID  → true (session-only, resets on /reload)
 local _gearViewTmog  = {}   -- noteID  → true = showing transmog, false/nil = regular
 
+-- ── Task panel state ──────────────────────────────────────────────────────────
+-- "attachments" = show attachments pane (default when no tasks)
+-- "model"       = show model viewer (option C toggle, inspect notes only)
+local _rbMode        = "attachments"
+local _taskRows      = {}   -- pool of task row frames
+
 local RenderList               -- forward declaration
 local SyncRefBoxHeight         -- forward declaration (defined near PositionFrame)
 local EnsureSpellDataListener  -- forward declaration (defined after EnsureItemInfoListener)
@@ -69,6 +83,10 @@ local GetQuestTitle            -- forward declaration
 local UpdateModelViewer        -- forward declaration
 local BuildModelViewer         -- forward declaration
 local ApplyModelLayout         -- forward declaration
+local RenderTaskPanel          -- forward declaration
+local ApplyTaskLayout          -- forward declaration
+local UpdateDynamicTitle       -- forward declaration
+local UpdateModeStrip          -- forward declaration
 
 -- ── DB helpers ────────────────────────────────────────────────────────────────
 local function DB()  return BigNoteBoxDB     end
@@ -1273,7 +1291,7 @@ RenderList = function()
     -- (~48px tall). Advance y to clear it so gear headers don't overlap.
     if count == 0 then y = y - 48 end
     local note = _noteID and BNB.GetNote(_noteID)
-    if note and note.source == "inspect" then
+    if note and note.source == "inspect" and _rbMode == "model" then
         local gearShow    = (BigNoteBoxDB and BigNoteBoxDB.inspectNoteGearShow) or "both"
         local tmogItems   = note.inspectTransmogItems
         local regItems    = note.inspectGearItems
@@ -1368,8 +1386,582 @@ RenderList = function()
     -- Resize the window to fit content (clamped to main window height)
     SyncRefBoxHeight()
 
-    -- Show/hide model viewer for inspect notes
+    -- Render task panel and reposition layout panes
+    if RenderTaskPanel then RenderTaskPanel() end
+    ApplyTaskLayout(rbFrame)
+    UpdateDynamicTitle()
+
+    -- Show/hide model viewer for inspect notes (must run last — owns BOTTOMRIGHT)
     UpdateModelViewer()
+end
+
+-- ── External Model/Tasks toggle strip ────────────────────────────────────────
+-- Sits BELOW the RefBox frame, outside it. Only shown for inspect/target notes.
+-- Mirrors the Editor/View tab strip pattern from NoteEditor.lua.
+local _modeStrip = nil   -- the external strip frame
+
+local function BuildExternalModeStrip()
+    if _modeStrip then return _modeStrip end
+
+    local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeStrip", UIParent)
+    strip:SetHeight(28)
+    strip:Hide()
+
+    local function OnModeClick(mode)
+        _rbMode = mode
+        if rbFrame then
+            RenderTaskPanel()
+            ApplyTaskLayout(rbFrame)
+            UpdateModelViewer()
+            UpdateDynamicTitle()
+            UpdateModeStrip()
+        end
+    end
+
+    local modelBtn = BNB.CreateButton(nil, strip, "Model", 1, 24)
+    modelBtn:SetPoint("TOPLEFT",  strip, "TOPLEFT",  0, -2)
+    modelBtn:SetPoint("TOPRIGHT", strip, "TOPLEFT",  math.floor(RBW / 2) - 1, -2)
+    modelBtn:SetScript("OnClick", function() OnModeClick("model") end)
+
+    local tasksBtn = BNB.CreateButton(nil, strip, "Tasks", 1, 24)
+    tasksBtn:SetPoint("TOPLEFT",  strip, "TOPLEFT",  math.floor(RBW / 2) + 1, -2)
+    tasksBtn:SetPoint("TOPRIGHT", strip, "TOPRIGHT", 0, -2)
+    tasksBtn:SetScript("OnClick", function() OnModeClick("attachments") end)
+
+    strip._modelBtn = modelBtn
+    strip._tasksBtn = tasksBtn
+    _modeStrip = strip
+    return strip
+end
+
+-- Reposition the external strip below rbFrame.
+local function PositionModeStrip()
+    if not _modeStrip or not rbFrame then return end
+    _modeStrip:ClearAllPoints()
+    _modeStrip:SetPoint("TOPLEFT",  rbFrame, "BOTTOMLEFT",  0, 0)
+    _modeStrip:SetPoint("TOPRIGHT", rbFrame, "BOTTOMRIGHT", 0, 0)
+end
+
+-- Update button alpha to reflect active mode.
+function UpdateModeStrip()
+    if not _modeStrip then return end
+    local hasModel = IsInspectNote(_noteID)
+    _modeStrip:SetShown(hasModel)
+    if not hasModel then return end
+    local mb = _modeStrip._modelBtn
+    local tb = _modeStrip._tasksBtn
+    if mb then
+        mb:SetEnabled(_rbMode ~= "model")
+        mb:SetAlpha(_rbMode == "model" and 0.45 or 1.0)
+    end
+    if tb then
+        tb:SetEnabled(_rbMode ~= "attachments")
+        tb:SetAlpha(_rbMode == "attachments" and 0.45 or 1.0)
+    end
+end
+
+-- ApplyTaskLayout: positions all panes based on note content and _rbMode.
+-- UpdateModelViewer must be called AFTER this when model is involved.
+ApplyTaskLayout = function(f)
+    if not f then return end
+    local sf      = f._scrollFrame
+    local taskPnl = f._taskPanel
+    local sp      = f._taskSplitter
+    local addWide = f._addTasksWide
+
+    local hasTasks   = BNB.Task and BNB.Task.HasTasks(_noteID)
+    local hasModel   = IsInspectNote(_noteID)
+    local hasAtts    = _noteID and (function()
+        local note = BNB.GetNote(_noteID)
+        return note and note.attachments and #note.attachments > 0
+    end)()
+    local isSkin     = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local titleH     = isSkin and SK_RB_TITLE_H or TITLE_H
+    local contentTop = -(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
+    local botPad     = BOTTOM_PAD
+
+    -- Update external mode strip button states
+    UpdateModeStrip()
+
+    -- Hide wide add-tasks button by default
+    if addWide then addWide:Hide() end
+
+    -- ── STATE: inspect/target note, model mode ────────────────────────────────
+    if hasModel and _rbMode == "model" then
+        if taskPnl then taskPnl:Hide() end
+        if sp      then sp:Hide()      end
+        if sf then
+            sf:ClearAllPoints()
+            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
+            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, botPad)
+        end
+        return  -- UpdateModelViewer runs after and splits the scroll area
+    end
+
+    -- ── STATE: no tasks exist ─────────────────────────────────────────────────
+    if not hasTasks then
+        if taskPnl then taskPnl:Hide() end
+        if sp      then sp:Hide()      end
+        -- Scroll frame leaves room for the Add Tasks button at the bottom
+        if sf then
+            sf:ClearAllPoints()
+            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
+            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, botPad + ADD_TASKS_H)
+        end
+        -- Wide "Add Tasks" button pinned just above the bottom edge
+        if addWide then
+            addWide:ClearAllPoints()
+            addWide:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,  botPad + 4)
+            addWide:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, botPad + 4)
+            addWide:SetHeight(26)
+            addWide:Show()
+        end
+        return
+    end
+
+    -- ── Tasks exist: splitter only when attachments also present ──────────────
+    local useSplitter = hasAtts
+
+    local db    = BigNoteBoxDB
+    local ratio = (db and db.taskSplitRatio and _noteID and db.taskSplitRatio[_noteID])
+        or 0.5
+    local totalH = math.max(0,
+        (f:GetHeight() or 300) - math.abs(contentTop) - botPad)
+
+    local taskH
+    if useSplitter then
+        taskH = math.max(TASK_SPLIT_MIN_PX,
+            math.min(totalH - TASK_SPLIT_MIN_PX,
+                math.floor(totalH * (1.0 - ratio))))
+    else
+        taskH = totalH
+    end
+
+    local taskTop = contentTop - (useSplitter and (totalH - taskH) or 0)
+                    - (useSplitter and 4 or 0)
+
+    if taskPnl then
+        taskPnl:Show()
+        taskPnl:ClearAllPoints()
+        taskPnl:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, taskTop)
+        taskPnl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, taskTop)
+        taskPnl:SetHeight(taskH)
+    end
+
+    -- Attachment empty-state strip height (shown even with no attachments)
+    local ATT_EMPTY_H = 60   -- tall enough for "Drag items here" message
+
+    if useSplitter then
+        if sp then
+            sp:ClearAllPoints()
+            sp:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, taskTop)
+            sp:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, taskTop)
+            sp:Show()
+        end
+        if sf then
+            sf:ClearAllPoints()
+            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
+            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,
+                botPad + taskH + 4)
+        end
+    else
+        -- No attachments: give a fixed strip at the top for the empty label,
+        -- task panel takes the rest below it.
+        if sp then sp:Hide() end
+        local attStripH = ATT_EMPTY_H
+        if sf then
+            sf:ClearAllPoints()
+            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
+            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,
+                botPad + taskH)
+            sf:SetHeight(attStripH)
+        end
+        -- Reposition task panel to sit below the attachment strip
+        if taskPnl then
+            taskPnl:ClearAllPoints()
+            taskPnl:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, contentTop - attStripH)
+            taskPnl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, contentTop - attStripH)
+            taskPnl:SetHeight(totalH - attStripH)
+        end
+    end
+end
+
+-- BuildTaskPanel: creates the task panel frame + splitter. Called once per build.
+local function BuildTaskPanel(f)
+    -- Task panel container (sits at the BOTTOM, below attachment scroll)
+    local pnl = CreateFrame("Frame", nil, f)
+    pnl:SetFrameLevel(f:GetFrameLevel() + 50)  -- above attachment rows and gear
+    pnl:Hide()
+    f._taskPanel = pnl
+
+    -- Inner scroll frame for task rows
+    local tsf = CreateFrame("ScrollFrame", nil, pnl, "ScrollFrameTemplate")
+    tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    0, 0)
+    tsf:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -SCROLL_PAD, 0)
+    if tsf.ScrollBar then
+        tsf.ScrollBar:SetAlpha(0)
+        tsf:HookScript("OnScrollRangeChanged", function(_, _, yr)
+            tsf.ScrollBar:SetAlpha((yr or 0) > 1 and 1.0 or 0)
+        end)
+    end
+    local tsc = CreateFrame("Frame", nil, tsf)
+    tsc:SetWidth(tsf:GetWidth()); tsc:SetHeight(1)
+    tsf:SetScrollChild(tsc)
+    tsf:SetScript("OnSizeChanged", function(self) tsc:SetWidth(self:GetWidth()) end)
+    f._taskScrollFrame = tsf
+    f._taskScrollChild = tsc
+
+    -- Wide "Add Tasks" button — shown when note has no tasks yet (states 1, 4)
+    local addWide = BNB.CreateButton(nil, f, "+ Add Tasks", RBW - PAD * 2, 26)
+    addWide:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, BOTTOM_PAD + 4)
+    addWide:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, BOTTOM_PAD + 4)
+    addWide:SetFrameLevel(f:GetFrameLevel() + 70)  -- above task panel (f+50) and splitter (f+60)
+    addWide:Hide()
+    addWide:SetScript("OnClick", function()
+        if not _noteID or not BNB.Task then return end
+        BNB.Task.AddTask(_noteID, "")
+        RenderTaskPanel()
+        ApplyTaskLayout(rbFrame)
+        UpdateModelViewer()
+        UpdateDynamicTitle()
+        UpdateModeStrip()
+        for _, row in ipairs(_taskRows) do
+            if row._editBox then
+                row._editBox:SetFocus()
+                break
+            end
+        end
+    end)
+    f._addTasksWide = addWide
+
+    -- Splitter drag bar (between attachments above and tasks below)
+    -- 1px visual line with dot pattern, 8px click target, above all content.
+    -- No SetCursor — produces black box on some clients (same as list/editor divider).
+    local sp = CreateFrame("Button", nil, f)
+    sp:SetHeight(8)
+    sp:SetFrameLevel(f:GetFrameLevel() + 60)
+    sp:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
+    sp:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
+    sp:Hide()
+
+    -- Main 1px line
+    local spTex = sp:CreateTexture(nil, "ARTWORK")
+    spTex:SetHeight(1)
+    spTex:SetPoint("TOPLEFT",  sp, "TOPLEFT",  0, -4)
+    spTex:SetPoint("TOPRIGHT", sp, "TOPRIGHT", 0, -4)
+
+    -- Dot indicators centred on the line (matches note list/editor vertical divider style)
+    local spDots = sp:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    spDots:SetPoint("CENTER", sp, "CENTER", 0, 0)
+    spDots:SetText("- - - - -")
+    spDots:SetTextColor(0.40, 0.40, 0.45)
+
+    local function ApplySplitterColor()
+        local db = BigNoteBoxDB
+        if db and db.skinMode and BNB.GetSkinPreset and BNB.SkinBorderOf then
+            local p = BNB.GetSkinPreset()
+            local br, bg_, bb = BNB.SkinBorderOf(p)
+            spTex:SetColorTexture(br, bg_, bb, 0.8)
+            spDots:SetTextColor(br * 0.7, bg_ * 0.7, bb * 0.7)
+        else
+            spTex:SetColorTexture(0.25, 0.25, 0.28, 1.0)
+            spDots:SetTextColor(0.40, 0.40, 0.45)
+        end
+    end
+    ApplySplitterColor()
+
+    sp:SetScript("OnEnter", function() spTex:SetColorTexture(0.55, 0.55, 0.65, 1.0) end)
+    sp:SetScript("OnLeave", function() ApplySplitterColor() end)
+
+    local dragging = false
+    sp:SetScript("OnMouseDown", function(self, btn)
+        if btn ~= "LeftButton" then return end
+        dragging = true
+        self:SetScript("OnUpdate", function()
+            if not dragging then self:SetScript("OnUpdate", nil); return end
+            local _, cy = GetCursorPosition()
+            local scale = f:GetEffectiveScale()
+            cy = cy / scale
+            local fTop = f:GetTop()
+            local fBot = f:GetBottom()
+            if not fTop or not fBot then return end
+            local isSkin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+            local titleH = isSkin and SK_RB_TITLE_H or TITLE_H
+            local contentTop = fTop -
+                math.abs(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
+            local hasModel  = IsInspectNote(_noteID)
+            local footerH   = BOTTOM_PAD
+            local totalH    = contentTop - fBot - footerH
+            if totalH < 1 then return end
+            -- ratio = attachment fraction (1 - task fraction)
+            local attH  = math.max(TASK_SPLIT_MIN_PX,
+                math.min(totalH - TASK_SPLIT_MIN_PX, contentTop - cy))
+            local ratio = attH / totalH   -- attachment fraction stored
+            local db = BigNoteBoxDB
+            if db and db.taskSplitRatio and _noteID then
+                db.taskSplitRatio[_noteID] = ratio
+            end
+            ApplyTaskLayout(f)
+        end)
+    end)
+    sp:SetScript("OnMouseUp", function(self)
+        dragging = false
+        self:SetScript("OnUpdate", nil)
+    end)
+    f._taskSplitter = sp
+end
+
+-- ── Task panel renderer ───────────────────────────────────────────────────────
+-- Renders task rows into f._taskScrollChild. Called from RenderList.
+RenderTaskPanel = function()
+    if not rbFrame then return end
+    local tsc = rbFrame._taskScrollChild
+    if not tsc then return end
+
+    -- Release existing task row widgets
+    for _, tr in ipairs(_taskRows) do tr:Hide() end
+    _taskRows = {}
+
+    local hasTasks = BNB.Task and BNB.Task.HasTasks(_noteID)
+    local taskPnl  = rbFrame._taskPanel
+
+    -- No tasks: hide task panel, ApplyTaskLayout shows the wide button instead
+    if not hasTasks then
+        if taskPnl then taskPnl:Hide() end
+        return
+    end
+
+    -- Tasks exist: ensure panel is visible (ApplyTaskLayout positions it)
+    if taskPnl then taskPnl:Show() end
+
+    local db           = BigNoteBoxDB
+    local completedPos = (db and db.taskCompletedPosition) or "bottom"
+    local T            = BNB.Task
+    local done, total  = T.GetCompletionCount(_noteID)
+
+    -- ── Header row ──────────────────────────────────────────────────────────
+    -- "Tasks" label + completion badge + add button + clear completed button
+    local hdr = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    hdr:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  PAD, -4)
+    hdr:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -40, -4)
+    hdr:SetHeight(TASK_HDR_H - 4)
+    hdr:SetJustifyH("LEFT")
+    hdr:SetText("Tasks")
+    _taskRows[#_taskRows + 1] = hdr
+
+    local badgeClr = T.GetBadgeColor(_noteID)
+    local badge = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    badge:SetTextColor(badgeClr.r, badgeClr.g, badgeClr.b)
+    badge:SetText(total > 0 and (done .. "/" .. total) or "")
+    _taskRows[#_taskRows + 1] = badge
+
+    -- Add task (+) button — top-right of header
+    local addBtn = CreateFrame("Button", nil, tsc)
+    addBtn:SetSize(18, 18)
+    addBtn:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -4, -3)
+    local addN = addBtn:CreateTexture(nil, "ARTWORK"); addN:SetAllPoints()
+    addN:SetTexture(ASSETS .. "Buttons\\bt-plus-normal")
+    local addH = addBtn:CreateTexture(nil, "ARTWORK"); addH:SetAllPoints()
+    addH:SetTexture(ASSETS .. "Buttons\\bt-plus-hover"); addH:Hide()
+    local addP = addBtn:CreateTexture(nil, "ARTWORK"); addP:SetAllPoints()
+    addP:SetTexture(ASSETS .. "Buttons\\bt-plus-press"); addP:Hide()
+    addBtn:SetScript("OnEnter", function() addH:Show(); addN:Hide() end)
+    addBtn:SetScript("OnLeave", function() addH:Hide(); addN:Show() end)
+    addBtn:SetScript("OnMouseDown", function() addP:Show(); addN:Hide(); addH:Hide() end)
+    addBtn:SetScript("OnMouseUp",   function() addP:Hide(); addN:Show() end)
+    addBtn:SetScript("OnClick", function()
+        if not _noteID then return end
+        local taskID = BNB.Task.AddTask(_noteID, "")
+        if taskID then
+            RenderTaskPanel()
+            ApplyTaskLayout(rbFrame)
+            for _, row in ipairs(_taskRows) do
+                if row._taskID == taskID and row._editBox then
+                    row._editBox:SetFocus()
+                    break
+                end
+            end
+        end
+    end)
+    _taskRows[#_taskRows + 1] = addBtn
+
+    -- Badge sits to the left of the add button, vertically centred with hdr
+    badge:SetPoint("RIGHT", addBtn, "LEFT", -4, 0)
+    badge:SetPoint("TOP",   tsc,   "TOP",   0, -4)
+
+    -- "Clear completed" button — only when any tasks are done
+    local hasDone = done > 0
+    if hasDone then
+        local clrBtn = BNB.CreateButton(nil, tsc, "Clear done", 72, 16)
+        clrBtn:SetPoint("RIGHT", addBtn, "LEFT", -26, 0)
+        clrBtn:SetPoint("TOP",   tsc,   "TOP",  0, -4)
+        clrBtn:SetScript("OnClick", function()
+            if _noteID then T.ClearCompleted(_noteID) end
+        end)
+        _taskRows[#_taskRows + 1] = clrBtn
+    end
+
+    -- ── Task rows ────────────────────────────────────────────────────────────
+    local y       = -(TASK_HDR_H + 2)
+    local indent  = T.SUBTASK_INDENT or 14
+    local contentW = (rbFrame:GetWidth() or RBW) - SCROLL_PAD - PAD * 2
+
+    -- Gather top-level tasks, sort completed to bottom if configured
+    local topLevel = T.GetTopLevel(_noteID)
+    if completedPos == "bottom" then
+        local active, completed = {}, {}
+        for _, t in ipairs(topLevel) do
+            if t.completed then completed[#completed + 1] = t
+            else                active[#active + 1] = t end
+        end
+        topLevel = {}
+        for _, t in ipairs(active)    do topLevel[#topLevel + 1] = t end
+        for _, t in ipairs(completed) do topLevel[#topLevel + 1] = t end
+    end
+
+    local function RenderTaskRow(task, isSubTask)
+        local rowH  = isSubTask and TASK_SUBROW_H or TASK_ROW_H
+        local xOff  = isSubTask and indent or 0
+        local clr   = T.GetTaskColor(task)
+
+        local row = CreateFrame("Button", nil, tsc)
+        row:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  PAD + xOff, y)
+        row:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -PAD, y)
+        row:SetHeight(rowH)
+        row._taskID = task.id
+        _taskRows[#_taskRows + 1] = row
+
+        -- Checkbox (scaled UICheckButtonTemplate)
+        local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        cb:SetScale(TASK_CB_SCALE)
+        cb:SetChecked(task.completed)
+        cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+        cb:SetScript("OnClick", function(self)
+            if _noteID then T.ToggleTask(_noteID, task.id) end
+        end)
+        row._cb = cb
+
+        -- Task text / inline editbox
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("LEFT",  cb,  "RIGHT", 2,  0)
+        lbl:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+        lbl:SetHeight(rowH)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetWordWrap(false)
+        lbl:SetTextColor(clr.r, clr.g, clr.b)
+        lbl:SetText(task.text ~= "" and task.text or "(empty)")
+
+        -- Inline edit box (hidden until clicked)
+        local eb = CreateFrame("EditBox", nil, row, "BackdropTemplate")
+        BNB.EnsureBackdrop(eb)
+        BNB.SetBackdrop(eb, 0.06, 0.06, 0.08, 0.95, 0.20, 0.20, 0.25, 1)
+        eb:SetPoint("LEFT",  cb,  "RIGHT", 2,  0)
+        eb:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+        eb:SetHeight(rowH - 2)
+        eb:SetAutoFocus(false)
+        eb:SetMultiLine(false)
+        eb:SetMaxLetters(500)
+        eb:SetFontObject("GameFontNormalSmall")
+        eb:SetTextInsets(4, 4, 1, 1)
+        eb:Hide()
+        row._editBox = eb
+
+        lbl:SetScript("OnMouseDown", function()
+            lbl:Hide()
+            eb:SetText(task.text)
+            eb:Show()
+            eb:SetFocus()
+        end)
+        eb:SetScript("OnEnterPressed", function(self)
+            local newText = self:GetText()
+            if newText == "" then
+                -- Delete task if committed with empty text
+                BNB.Task.DeleteTask(_noteID, task.id)
+            else
+                T.UpdateTask(_noteID, task.id, { text = newText })
+                task.text = newText
+                lbl:SetText(newText)
+                self:Hide(); lbl:Show()
+            end
+            self:ClearFocus()
+        end)
+        eb:SetScript("OnEscapePressed", function(self)
+            if task.text == "" then
+                -- Escape on a never-saved empty task removes it
+                BNB.Task.DeleteTask(_noteID, task.id)
+            else
+                self:Hide(); lbl:Show()
+            end
+            self:ClearFocus()
+        end)
+        eb:SetScript("OnEditFocusLost", function(self)
+            if self:IsShown() then
+                -- Focus lost without Enter/Escape — save if non-empty, delete if empty
+                local newText = self:GetText()
+                if newText == "" then
+                    BNB.Task.DeleteTask(_noteID, task.id)
+                else
+                    T.UpdateTask(_noteID, task.id, { text = newText })
+                    task.text = newText
+                    lbl:SetText(newText)
+                    self:Hide(); lbl:Show()
+                end
+            end
+        end)
+
+        -- Sub-task expand toggle (bt-right = collapsed, bt-down = expanded)
+        local subTasks = T.GetSubTasks(_noteID, task.id)
+        if not isSubTask then
+            local togBtn = CreateFrame("Button", nil, row)
+            togBtn:SetSize(14, 14)
+            togBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            local togN = togBtn:CreateTexture(nil, "ARTWORK"); togN:SetAllPoints()
+            togN:SetTexture(ASSETS .. "Buttons\\bt-right-normal")
+            row._expanded = #subTasks > 0
+            if row._expanded then
+                togN:SetTexture(ASSETS .. "Buttons\\bt-down-normal")
+            end
+            togBtn:SetAlpha(#subTasks > 0 and 1.0 or 0.3)
+            togBtn:SetScript("OnClick", function()
+                row._expanded = not row._expanded
+                togN:SetTexture(ASSETS .. "Buttons\\" ..
+                    (row._expanded and "bt-down-normal" or "bt-right-normal"))
+                RenderTaskPanel()
+                ApplyTaskLayout(rbFrame)
+            end)
+            row._togBtn = togBtn
+        end
+
+        -- Right-click context menu
+        row:RegisterForClicks("RightButtonUp")
+        row:SetScript("OnClick", function(_, btn)
+            BNB.ShowTaskContextMenu(row, _noteID, task.id)
+        end)
+
+        y = y - rowH - 2
+
+        -- Sub-tasks (one level only, only if expanded)
+        if not isSubTask and row._expanded then
+            for _, sub in ipairs(subTasks) do
+                RenderTaskRow(sub, true)
+            end
+        end
+    end
+
+    for _, task in ipairs(topLevel) do
+        RenderTaskRow(task, false)
+    end
+
+    -- Set scroll child height
+    local tsf = rbFrame._taskScrollFrame
+    tsc:SetHeight(math.max(math.abs(y) + 4, tsf and tsf:GetHeight() or 60))
+end
+
+-- Stub for ShowTaskContextMenu — wired properly when context menu system is built
+if not BNB.ShowTaskContextMenu then
+    BNB.ShowTaskContextMenu = function(anchor, noteID, taskID)
+        -- TODO: full context menu (Edit, Delete, Add sub-task, Reset, Situation, Share, Duplicate)
+    end
 end
 
 -- ── Build window (ButtonFrameTemplate — matches TrashWindow/NoteConfig) ────────
@@ -1483,11 +2075,14 @@ local function BuildReferenceBox()
     emptyLabel:SetText(L["REFBOX_EMPTY"])
     f._emptyLabel = emptyLabel
 
+
     WireDragDrop(f); WireDragDrop(sc)
 
     f._scrollFrame = sf; f._scrollChild = sc
 
     BuildModelViewer(f)
+    BuildTaskPanel(f)
+    BuildExternalModeStrip()
 
     f:SetScript("OnShow", function()
         EnsureItemInfoListener(); InstallShiftHooks(); RenderList()
@@ -1627,11 +2222,14 @@ local function BuildReferenceBoxSkin()
     emptyLabel:SetText(L["REFBOX_EMPTY"])
     f._emptyLabel = emptyLabel
 
+
     WireDragDrop(f); WireDragDrop(sc)
 
     f._scrollFrame = sf; f._scrollChild = sc
 
     BuildModelViewer(f)
+    BuildTaskPanel(f)
+    BuildExternalModeStrip()
 
     f:SetScript("OnShow", function()
         EnsureItemInfoListener(); InstallShiftHooks(); RenderList()
@@ -1664,8 +2262,8 @@ SyncRefBoxHeight = function()
     local titleH = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and SK_RB_TITLE_H or TITLE_H
     local chrome = titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4 + BOTTOM_PAD + 12
 
-    -- For inspect notes, always fill the main window height to give room for the model
-    if IsInspectNote(_noteID) then
+    -- For inspect notes OR notes with tasks, always fill the main window height
+    if IsInspectNote(_noteID) or (BNB.Task and BNB.Task.HasTasks(_noteID)) then
         local maxH = (BNB.mainFrame and BNB.mainFrame:GetHeight())
         local desired = (maxH and maxH > 100) and maxH or 700
         local cur = rbFrame:GetHeight()
@@ -1961,6 +2559,18 @@ UpdateModelViewer = function()
 
     if not mdl then return end
 
+    -- Suppress model whenever we're in tasks/attachments mode on an inspect note
+    if isInspect and _rbMode == "attachments" then
+        mdl:Hide()
+        if ph      then ph:Hide()      end
+        if ll      then ll:Hide()      end
+        if hideBtn then hideBtn:Hide() end
+        if showBtn then showBtn:Hide() end
+        if gearBtn then gearBtn:Hide() end
+        if gearLbl then gearLbl:Hide() end
+        return
+    end
+
     -- Not an inspect/target-model note — hide everything, restore scroll frame
     if not isInspect then
         mdl:Hide()
@@ -2161,6 +2771,7 @@ local function PositionFrame()
         rbFrame:SetPoint("CENTER", UIParent, "CENTER", -200, 0)
     end
     SyncRefBoxHeight()
+    PositionModeStrip()
 end
 
 local function HookMainWindowResize()
@@ -2168,25 +2779,49 @@ local function HookMainWindowResize()
     BNB.mainFrame:HookScript("OnSizeChanged", function(self)
         if rbFrame and rbFrame:IsShown() then SyncRefBoxHeight() end
     end)
+    -- Keep the external mode strip anchored below rbFrame after any move/resize
+    if rbFrame then
+        rbFrame:HookScript("OnSizeChanged", function()
+            PositionModeStrip()
+        end)
+    end
 end
 
-local function SetTitle(noteID)
+-- Returns the dynamic title string based on what the current note contains.
+UpdateDynamicTitle = function()
     if not rbFrame then return end
+    local hasTasks   = BNB.Task and BNB.Task.HasTasks(_noteID)
+    local hasModel   = IsInspectNote(_noteID)
+    local note       = _noteID and BNB.GetNote(_noteID)
+    local hasAtts    = note and note.attachments and #note.attachments > 0
+
     local title
-    if noteID then
-        local note = BNB.GetNote(noteID)
-        local name = note and note.title ~= "" and note.title or "(untitled)"
-        if #name > 22 then name = name:sub(1, 22) .. "..." end
-        title = string.format(L["REFBOX_TITLE_NOTE"], name)
+    if hasTasks and hasModel then
+        if _rbMode == "model" then
+            title = "Tasks + Model"
+        else
+            title = "Tasks + Reference"
+        end
+    elseif hasTasks and hasAtts then
+        title = "Tasks + Reference"
+    elseif hasTasks then
+        title = "Tasks"
+    elseif hasModel then
+        title = "Reference + Model"
     else
         title = L["REFBOX_TITLE"]
     end
-    -- ButtonFrameTemplate frames have :SetTitle(); skin frames use _titleLbl
+
     if rbFrame.SetTitle then
         rbFrame:SetTitle(title)
     elseif rbFrame._titleLbl then
         rbFrame._titleLbl:SetText(title)
     end
+end
+
+local function SetTitle(noteID)
+    -- Kept for compatibility — just delegates to UpdateDynamicTitle.
+    UpdateDynamicTitle()
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
@@ -2199,15 +2834,31 @@ function BNB.OpenReferenceBox(noteID)
             rbFrame = BuildReferenceBox()
         end
         HookMainWindowResize()
+        -- Re-render task panel whenever tasks change for the open note
+        if BNB.Task and BNB.Task.RegisterCallback then
+            BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
+                if rbFrame and rbFrame:IsShown() and changedNoteID == _noteID then
+                    RenderTaskPanel()
+                    ApplyTaskLayout(rbFrame)
+                    UpdateDynamicTitle()
+                end
+            end)
+        end
     end
     _noteID = noteID or BNB._currentNoteID
+    -- Reset to model mode on every note switch for inspect notes
+    _rbMode = IsInspectNote(_noteID) and "model" or "attachments"
     SetTitle(_noteID)
     PositionFrame()
+    BuildExternalModeStrip()
+    PositionModeStrip()
+    UpdateModeStrip()
     if not rbFrame:IsShown() then rbFrame:Show() else RenderList() end
 end
 
 function BNB.CloseReferenceBox()
     if rbFrame then rbFrame:Hide() end
+    if _modeStrip then _modeStrip:Hide() end
 end
 
 function BNB.ToggleReferenceBox()
@@ -2269,10 +2920,13 @@ function BNB.SyncReferenceBox(noteID)
     if rbFrame and rbFrame:IsShown() then
         local atts = GetAttachments(noteID)
         if DB().refboxAutoOpen and (not atts or #atts == 0) and not isTargetWithModel and not isInspectModel then
-            -- New note has no attachments and no model — close rather than show empty
             rbFrame:Hide()
+            if _modeStrip then _modeStrip:Hide() end
             return
         end
+        -- Reset mode for new note
+        _rbMode = IsInspectNote(noteID) and "model" or "attachments"
+        UpdateModeStrip()
         SetTitle(noteID)
         RenderList()
     end

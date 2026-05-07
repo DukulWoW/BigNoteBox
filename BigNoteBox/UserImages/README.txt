@@ -72,5 +72,5 @@ Important notes
 
 - WoW cannot scan folders automatically, so every image must be listed manually in UserImages.lua
 - Changes to UserImages.lua require a /reload or game restart to take effect
-- Very large images may affect performance -- keep dimensions reasonable
+- Very large images may affect performance -- keep dimensions and file size reasonable
 - Full paths (Interface\AddOns\...) still work if you prefer them or have an older manifest

@@ -592,6 +592,37 @@ function BNB.CheckContextualNotes()
             end
         end
     end)
+
+    -- Notify TaskManager so per-task situations are evaluated in the same pass.
+    if BNB.Task and BNB.Task.OnContextChanged then
+        BNB.Task.OnContextChanged()
+    end
+end
+
+-- Expose the context matching function so TaskManager can evaluate per-task
+-- situations using the same logic as note contexts.
+-- ctx is a context string e.g. "zone:stormwind city", "player:Arthas".
+BNB._taskContextMatch = function(ctx)
+    if not ctx or ctx == "" then return false end
+    local kind, value = ctx:match("^(%w+):(.+)$")
+    if not kind or not value then return false end
+    value = value:lower()
+    if kind == "zone" or kind == "instance" then
+        local curKind, curVal = GetCurrentZone()
+        return curKind == kind and curVal:lower() == value
+    elseif kind == "subzone" then
+        local curSub = GetSubZoneText and GetSubZoneText() or ""
+        return curSub:lower() == value
+    elseif kind == "player" then
+        local tgt = GetCurrentPlayer()
+        if tgt then
+            tgt = tgt:lower()
+            local valName = value:match("^([^-]+)") or value
+            if tgt == value or tgt == valName then return true end
+        end
+        return false
+    end
+    return false
 end
 
 -- ── Context string builder (used by NoteConfig Situation tab) ──────────────────
