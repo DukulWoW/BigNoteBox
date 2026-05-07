@@ -17,6 +17,7 @@ BNB.OK_PHRASES = {
     "As you wish, champion",
     "For the king!",
     "By Elune!",
+    "Mmmrrgmgrrrgmmll!",
     "The Light guides us",
     "Ishnu-alah!",
     "Zug zug",
