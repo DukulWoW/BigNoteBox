@@ -7,7 +7,7 @@
   <img src="https://media.forgecdn.net/attachments/1632/900/dark-mode-png.png" />
 </div>
 
-# About
+# ℹ️ About
 
 BigNoteBox is a full in-game notepad companion for World of Warcraft.
 
@@ -17,7 +17,7 @@ It supports context-aware surfacing, sticky notes, tagging, alarms, rich formatt
 
 ---
 
-## Downloads
+## ⬇️ Downloads
 
 You can download BigNoteBox from the official sources below:
 
@@ -122,7 +122,7 @@ Time-based reminders attached to notes.
 
 ---
 
-# 🚨 Contextual Surfacing
+# 🔔 Contextual Surfacing
 
 Notes appear when relevant in gameplay.
 
@@ -259,7 +259,7 @@ Quick access controls.
 
 ---
 
-# Danger Zone
+# 🚨 Danger Zone
 
 Advanced reset tools.
 
