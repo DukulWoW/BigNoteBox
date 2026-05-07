@@ -54,6 +54,11 @@ function BNB.GetSkinBrightness()
     return (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or 1.0
 end
 
+-- Returns the window background opacity (0.0 - 1.0, default 0.97).
+function BNB.GetSkinBgAlpha()
+    return (BigNoteBoxDB and BigNoteBoxDB.skinBgAlpha) or 0.97
+end
+
 -- Returns r, g, b for a preset body colour at the given lift level,
 -- scaled by the current brightness multiplier.
 function BNB.SkinColourOf(preset, lifted)
@@ -154,7 +159,7 @@ function BNB.ApplyMainWindowSkin()
         for _, t in ipairs(list) do
             if t.frame and t.frame.SetBackdropColor then
                 local r, g, b = BNB.SkinColourOf(preset, t.lifted)
-                t.frame:SetBackdropColor(r, g, b, 0.97)
+                t.frame:SetBackdropColor(r, g, b, BNB.GetSkinBgAlpha())
                 local br, bg_, bb = BNB.SkinBorderOf(preset)
                 if t.strip then
                     t.frame:SetBackdropBorderColor(r, g, b, 0)
@@ -235,7 +240,7 @@ function BNB.CreateSkinFrame(parent, lifted, name, isMain)
     local r, g, b = BNB.SkinColourOf(preset, lifted)
     local br, bg_, bb = BNB.SkinBorderOf(preset)
     local f = BNB.CreateBackdropFrame("Frame", name, parent)
-    BNB.SetBackdrop(f, r, g, b, 0.97, br, bg_, bb, 1)
+    BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg_, bb, 1)
     if isMain then
         RegisterMain(f, lifted, false)
     else
@@ -248,7 +253,7 @@ function BNB.CreateSkinStrip(parent, lifted, isMain)
     local preset = BNB.GetSkinPreset()
     local r, g, b = BNB.SkinColourOf(preset, lifted)
     local f = BNB.CreateBackdropFrame("Frame", nil, parent)
-    BNB.SetBackdrop(f, r, g, b, 0.97, r, g, b, 0)
+    BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), r, g, b, 0)
     if isMain then
         RegisterMain(f, lifted, true)
     else

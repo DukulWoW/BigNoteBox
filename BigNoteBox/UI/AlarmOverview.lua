@@ -17,9 +17,22 @@ local POPUP_PAD = 12
 
 local _popupFrame = nil
 
-local function BuildPopupInner(f)
-    -- Shared widget construction for both normal and skin popup frames.
-    -- f is already created and sized by the caller.
+local function BuildPopup()
+    if _popupFrame then return _popupFrame end
+
+    -- Use sticky-note style: dark bg, default border, slight transparency
+    local f = BNB.CreateBackdropFrame("Frame", "BNBAlarmPopupFrame", UIParent)
+    f:SetSize(POPUP_W, 10)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function() f:StartMoving() end)
+    f:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
+    -- Sticky note background: dark with slight transparency and border
+    BNB.SetBackdrop(f, 0.07, 0.07, 0.09, 0.96, 0.35, 0.35, 0.38, 1)
+    f:Hide()
 
     -- Icon (32x32)
     local iconTx = f:CreateTexture(nil, "ARTWORK")
@@ -65,14 +78,7 @@ local function BuildPopupInner(f)
     div:SetHeight(1)
     div:SetPoint("TOPLEFT",  f, "TOPLEFT",  POPUP_PAD, -POPUP_PAD - 42)
     div:SetPoint("TOPRIGHT", f, "TOPRIGHT", -POPUP_PAD, -POPUP_PAD - 42)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        div:SetColorTexture(br, bg_, bb, 0.9)
-        BNB.RegisterSkinRule(div, 0.9)
-    else
-        div:SetColorTexture(0.28, 0.28, 0.30, 1)
-    end
+    div:SetColorTexture(0.28, 0.28, 0.30, 1)
 
     -- Snooze row: button + dropdown
     local snoozeEntries = {
@@ -135,55 +141,13 @@ local function BuildPopupInner(f)
     f._dismissBtn = dismissBtn
 
     f:SetHeight(POPUP_PAD + 42 + 32 + 32 + POPUP_PAD)
-end
 
-local function BuildPopup()
-    if _popupFrame then return _popupFrame end
-
-    local f = BNB.CreateBackdropFrame("Frame", "BNBAlarmPopupFrame", UIParent)
-    f:SetSize(POPUP_W, 10)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:SetMovable(true); f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function() f:StartMoving() end)
-    f:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-    BNB.SetBackdrop(f, 0.07, 0.07, 0.09, 0.96, 0.35, 0.35, 0.38, 1)
-    f:Hide()
-
-    BuildPopupInner(f)
     _popupFrame = f
     return f
-end
-
-local function BuildPopupSkin()
-    if _popupFrame then return _popupFrame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBAlarmPopupFrame", false)
-    _G["BNBAlarmPopupFrame"] = f
-    f:SetSize(POPUP_W, 10)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:SetMovable(true); f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function() f:StartMoving() end)
-    f:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-    f:Hide()
-
-    BuildPopupInner(f)
-    _popupFrame = f
-    return f
-end
-
-local function GetOrBuildPopup()
-    if _popupFrame then return _popupFrame end
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        return BuildPopupSkin()
-    else
-        return BuildPopup()
-    end
 end
 
 function AP.Show(noteID, alarm, missedList)
-    local f    = GetOrBuildPopup()
+    local f    = BuildPopup()
     local note = BNB.GetNote and BNB.GetNote(noteID)
     if not note then return end
 
@@ -285,6 +249,7 @@ local _ovMultiSel  = {}  -- { [noteID] = true }
 local _ovSelectBtn    = nil   -- "Select" (normal) / "Cancel" (select mode)
 local _ovSelectAllBtn = nil   -- "Select All" (select mode only)
 local _ovDeleteSelBtn = nil   -- "Delete (N)" (select mode only)
+local _ovFootDiv      = nil   -- footer separator line
 
 local function UpdateOvDeleteLabel()
     if not _ovDeleteSelBtn then return end
@@ -428,6 +393,7 @@ local function BuildOverview()
     footDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  OV_PAD, OV_FOOT_H)
     footDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -OV_PAD, OV_FOOT_H)
     footDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
+    _ovFootDiv = footDiv
 
     local BW1 = OV_W - OV_PAD * 2
     local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
@@ -541,6 +507,7 @@ local function BuildOverviewSkin()
     local footDiv = BNB.CreateDivider(footHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
     footDiv:SetPoint("TOPLEFT",  footHost, "TOPLEFT",  0, 0)
     footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
+    _ovFootDiv = footHost   -- hide the host to hide the divider
 
     local BW1 = OV_W - OV_PAD * 2
     local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
@@ -848,10 +815,11 @@ function AO.Refresh()
         end
     end
 
-    -- Sync Select button visibility based on whether alarms exist
+    -- Sync Select button and footer divider visibility based on whether alarms exist
     if not _ovMultiMode and _ovSelectBtn then
         _ovSelectBtn:SetShown(#entries > 0)
     end
+    if _ovFootDiv then _ovFootDiv:SetShown(#entries > 0) end
 
     -- Empty state
     if #entries == 0 then

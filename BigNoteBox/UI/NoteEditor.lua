@@ -3456,7 +3456,6 @@ local function ApplyTagStripCollapse(strip, collapsed)
         if strip._addInput then
             if (strip._inputRow or 1) > 1 then
                 strip._addInput:Hide()
-                hiddenCount = hiddenCount + 1  -- count the input slot as one hidden item
             end
         end
         strip:SetHeight(CHIP_ROW_H)

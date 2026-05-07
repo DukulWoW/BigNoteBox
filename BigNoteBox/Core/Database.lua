@@ -45,8 +45,8 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 4   -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 12  -- bump + add block to MigrateSettingsDB()
+local NOTES_SCHEMA_VERSION    = 5   -- bump + add block to MigrateNotesDB()
+local SETTINGS_SCHEMA_VERSION = 13  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS
@@ -154,6 +154,13 @@ function BNB.MigrateNotesDB()
     if v < 4 then
         -- nil is treated as "curated" at runtime; no data migration needed
         v = 4
+    end
+
+    -- ++ v4 -> v5: introduce note.tasks and note.taskList +++++++++++++++++++++
+    -- Both fields default to nil at runtime (no tasks = no fields).
+    -- No data migration needed — absence of the fields is the correct default.
+    if v < 5 then
+        v = 5
     end
 
     ndb.dbVersion = NOTES_SCHEMA_VERSION
@@ -267,6 +274,22 @@ local function MigrateSettingsDB()
         if db.richH3Size          == nil then db.richH3Size          = 16    end
         if db.richBodySize        == nil then db.richBodySize        = 12    end
         v = 12
+    end
+
+    -- ++ v12 -> v13: task system settings ++++++++++++++++++++++++++++++++++++++
+    if v < 13 then
+        -- "Remove on complete" vs keep dimmed. Default: keep (false = keep).
+        if db.taskRemoveOnComplete   == nil then db.taskRemoveOnComplete   = false end
+        -- Default sticky view for notes that have tasks. "tasks" = show tasks.
+        if db.taskStickyDefault      == nil then db.taskStickyDefault      = "tasks" end
+        -- Where completed tasks appear in the list. "bottom" = push to bottom.
+        if db.taskCompletedPosition  == nil then db.taskCompletedPosition  = "bottom" end
+        -- Whether the task panel is expanded by default in RefBox.
+        if db.taskPanelExpanded      == nil then db.taskPanelExpanded      = true  end
+        -- Per-note task/attachment split ratio: { [noteID] = 0.0..1.0 }
+        -- 0.5 = equal split; 1.0 = tasks take all; 0.0 = attachments take all.
+        if db.taskSplitRatio         == nil then db.taskSplitRatio         = {}    end
+        v = 13
     end
 
     db.dbVersion = SETTINGS_SCHEMA_VERSION
