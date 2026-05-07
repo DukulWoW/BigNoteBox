@@ -21,9 +21,9 @@ It supports context-aware surfacing, sticky notes, tagging, alarms, rich formatt
 
 You can download BigNoteBox from the official sources below:
 
-- <a href="https://addons.wago.io/addons/bignotebox" target="_blank">Wago</a>  
-- <a href="https://www.curseforge.com/wow/addons/bignotebox" target="_blank">CurseForge</a>  
-- <a href="https://www.wowinterface.com/downloads/info27121-BigNoteBox.html" target="_blank">WoWInterface</a>  
+- <a href="https://addons.wago.io/addons/bignotebox" target="_blank">Wago</a>
+- <a href="https://www.curseforge.com/wow/addons/bignotebox" target="_blank">CurseForge</a>
+- <a href="https://www.wowinterface.com/downloads/info27121-BigNoteBox.html" target="_blank">WoWInterface</a>
 
 ## ⚠️ Warning
 
