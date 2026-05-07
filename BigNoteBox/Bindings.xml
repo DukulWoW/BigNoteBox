@@ -1,0 +1,20 @@
+<Bindings>
+    <Binding name="BIGNOTEBOXOPEN" category="BigNoteBox" default="CTRL-N" runOnUp="false">
+        BNB_KeybindToggle()
+    </Binding>
+    <Binding name="BIGNOTEBOXQUICKNOTE" category="BigNoteBox" default="" runOnUp="false">
+        BNB_KeybindQuickNote()
+    </Binding>
+    <Binding name="BIGNOTEBOXNEWNOTE" category="BigNoteBox" default="" runOnUp="false">
+        BNB_KeybindNewNote()
+    </Binding>
+    <Binding name="BIGNOTEBOXHIDESTICKIES" category="BigNoteBox" default="CTRL-H" runOnUp="false">
+        BNB_KeybindHideStickies()
+    </Binding>
+    <Binding name="BIGNOTEBOXTOGGLERV" category="BigNoteBox" default="" runOnUp="false">
+        BNB_KeybindToggleRichView()
+    </Binding>
+    <Binding name="BIGNOTEBOXNOTEONTARGET" category="BigNoteBox" default="" runOnUp="false">
+        BNB_KeybindTargetNote()
+    </Binding>
+</Bindings>
