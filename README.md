@@ -3,6 +3,8 @@
   <br><br>
   <h1>BigNoteBox</h1>
   <b>By Dukul</b>
+  <br><br>
+  <img src="https://media.forgecdn.net/attachments/1632/900/dark-mode-png.png" />
 </div>
 
 # About
