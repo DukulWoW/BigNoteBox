@@ -54,6 +54,7 @@ UI\HistoryWindow.lua
 UI\NoteHistoryPanel.lua
 UI\HistoryCompareWindow.lua
 UI\AlarmWindow.lua
+UI\TaskEditWindow.lua
 UI\AlarmOverview.lua
 UI\OkPhrases.lua
 UI\WhatsNew.lua
