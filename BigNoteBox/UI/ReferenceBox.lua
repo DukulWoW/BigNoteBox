@@ -1931,6 +1931,14 @@ RenderTaskPanel = function()
         cb:SetScript("OnClick", function(self)
             if _noteID then T.ToggleTask(_noteID, task.id) end
         end)
+        -- Route right-clicks on the checkbox to the context menu
+        cb:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        cb:HookScript("OnClick", function(_, btn)
+            if btn == "RightButton" then
+                cb:SetChecked(task.completed)  -- undo the toggle
+                BNB.ShowTaskContextMenu(row, _noteID, task.id)
+            end
+        end)
         row._cb = cb
 
         -- Task text / inline editbox
@@ -1958,7 +1966,11 @@ RenderTaskPanel = function()
         eb:Hide()
         row._editBox = eb
 
-        lbl:SetScript("OnMouseDown", function()
+        lbl:SetScript("OnMouseDown", function(_, btn)
+            if btn == "RightButton" then
+                BNB.ShowTaskContextMenu(row, _noteID, task.id)
+                return
+            end
             lbl:Hide()
             eb:SetText(task.text)
             eb:Show()
@@ -2000,6 +2012,11 @@ RenderTaskPanel = function()
                 end
             end
         end)
+        eb:SetScript("OnMouseUp", function(_, btn)
+            if btn == "RightButton" then
+                BNB.ShowTaskContextMenu(row, _noteID, task.id)
+            end
+        end)
 
         -- Sub-task expand toggle (bt-right = collapsed, bt-down = expanded)
         local subTasks = T.GetSubTasks(_noteID, task.id)
@@ -2021,13 +2038,21 @@ RenderTaskPanel = function()
                 RenderTaskPanel()
                 ApplyTaskLayout(rbFrame)
             end)
+            togBtn:SetScript("OnMouseUp", function(_, btn)
+                if btn == "RightButton" then
+                    BNB.ShowTaskContextMenu(row, _noteID, task.id)
+                end
+            end)
             row._togBtn = togBtn
         end
 
-        -- Right-click context menu
-        row:RegisterForClicks("RightButtonUp")
-        row:SetScript("OnClick", function(_, btn)
-            BNB.ShowTaskContextMenu(row, _noteID, task.id)
+        -- Right-click context menu (OnMouseUp — same pattern as attachment rows;
+        -- RegisterForClicks+OnClick on Buttons inside ScrollFrameTemplate scroll
+        -- children does not reliably receive right-clicks on retail).
+        row:SetScript("OnMouseUp", function(_, btn)
+            if btn == "RightButton" then
+                BNB.ShowTaskContextMenu(row, _noteID, task.id)
+            end
         end)
 
         y = y - rowH - 2
@@ -2049,11 +2074,151 @@ RenderTaskPanel = function()
     tsc:SetHeight(math.max(math.abs(y) + 4, tsf and tsf:GetHeight() or 60))
 end
 
--- Stub for ShowTaskContextMenu — wired properly when context menu system is built
-if not BNB.ShowTaskContextMenu then
-    BNB.ShowTaskContextMenu = function(anchor, noteID, taskID)
-        -- TODO: full context menu (Edit, Delete, Add sub-task, Reset, Situation, Share, Duplicate)
+-- ── Task context menu (WowStyle1DropdownTemplate — matches attachment rows) ──
+local _taskCtxDropdown
+function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
+    if not noteID or not taskID then return end
+    local T = BNB.Task
+    if not T then return end
+    local task = T.FindTask(noteID, taskID)
+    if not task then return end
+
+    if not _taskCtxDropdown then
+        _taskCtxDropdown = CreateFrame("DropdownButton", "BNBTaskCtxDropdown",
+            UIParent, "WowStyle1DropdownTemplate")
+        _taskCtxDropdown:SetSize(1, 1); _taskCtxDropdown:SetAlpha(0)
     end
+    _taskCtxDropdown:ClearAllPoints()
+    _taskCtxDropdown:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 0, 0)
+
+    local isTopLevel = not task.parentID
+    local L = BNB.L or {}
+
+    _taskCtxDropdown:SetupMenu(function(_, root)
+        -- Edit task...
+        root:CreateButton(L["TASK_CTX_EDIT"] or "Edit task...", function()
+            if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
+                BNB.TaskEditWindow.Open(noteID, taskID, anchor)
+            end
+        end)
+
+        -- Add sub-task (top-level only, one nesting level)
+        if isTopLevel then
+            root:CreateButton(L["TASK_CTX_ADD_SUB"] or "Add sub-task", function()
+                local subID = T.AddTask(noteID, "", taskID)
+                if subID and RenderTaskPanel then
+                    RenderTaskPanel()
+                    ApplyTaskLayout(rbFrame)
+                    -- Focus the new empty sub-task's inline editbox
+                    for _, tr in ipairs(_taskRows) do
+                        if tr._taskID == subID and tr._editBox then
+                            local lbl2 = ({ tr:GetRegions() })[1]
+                            if lbl2 and lbl2.Hide then lbl2:Hide() end
+                            tr._editBox:SetText("")
+                            tr._editBox:Show()
+                            tr._editBox:SetFocus()
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+
+        -- Duplicate
+        root:CreateButton(L["TASK_CTX_DUPLICATE"] or "Duplicate", function()
+            local newID = T.AddTask(noteID, task.text, task.parentID)
+            if newID then
+                local changes = {}
+                if task.resetType then changes.resetType = task.resetType end
+                if task.resetEvery then changes.resetEvery = task.resetEvery end
+                if task.situation then changes.situation = task.situation end
+                if next(changes) then T.UpdateTask(noteID, newID, changes) end
+                if RenderTaskPanel then
+                    RenderTaskPanel()
+                    ApplyTaskLayout(rbFrame)
+                end
+            end
+        end)
+
+        root:CreateDivider()
+
+        -- Set reset (radio submenu)
+        local resetSub = root:CreateButton(L["TASK_CTX_RESET"] or "Set reset")
+        local RESETS = {
+            { label = L["TASK_CTX_RESET_NONE"]   or "None",   value = nil    },
+            { label = L["TASK_CTX_RESET_DAILY"]  or "Daily",  value = "daily"  },
+            { label = L["TASK_CTX_RESET_WEEKLY"] or "Weekly", value = "weekly" },
+        }
+        for _, entry in ipairs(RESETS) do
+            resetSub:CreateRadio(entry.label,
+                function() return task.resetType == entry.value end,
+                function()
+                    if entry.value then
+                        T.UpdateTask(noteID, taskID, { resetType = entry.value })
+                    else
+                        T.UpdateTask(noteID, taskID, { _clear = {"resetType", "resetEvery", "lastReset"} })
+                    end
+                end)
+        end
+
+        -- Set situation (radio submenu with live-detected values)
+        local sitSub = root:CreateButton(L["TASK_CTX_SITUATION"] or "Set situation")
+        sitSub:CreateRadio(L["TASK_CTX_SIT_NONE"] or "None (global)",
+            function() return not task.situation end,
+            function()
+                T.UpdateTask(noteID, taskID, { _clear = {"situation"} })
+            end)
+
+        local curZone = GetZoneText and GetZoneText() or ""
+        if curZone ~= "" then
+            sitSub:CreateRadio("Zone: " .. curZone,
+                function() return task.situation == ("zone:" .. curZone) end,
+                function()
+                    T.UpdateTask(noteID, taskID, { situation = "zone:" .. curZone })
+                end)
+        end
+
+        local curSub = GetSubZoneText and GetSubZoneText() or ""
+        if curSub ~= "" then
+            sitSub:CreateRadio("Sub-zone: " .. curSub,
+                function() return task.situation == ("subzone:" .. curSub) end,
+                function()
+                    T.UpdateTask(noteID, taskID, { situation = "subzone:" .. curSub })
+                end)
+        end
+
+        local curInst = GetInstanceInfo and select(1, GetInstanceInfo()) or ""
+        local isInstance = GetInstanceInfo and select(2, GetInstanceInfo())
+        if curInst ~= "" and isInstance and isInstance ~= "none" then
+            sitSub:CreateRadio("Instance: " .. curInst,
+                function() return task.situation == ("instance:" .. curInst) end,
+                function()
+                    T.UpdateTask(noteID, taskID, { situation = "instance:" .. curInst })
+                end)
+        end
+
+        local targetName = UnitName("target")
+        if targetName and UnitIsPlayer("target") then
+            sitSub:CreateRadio("Player: " .. targetName,
+                function() return task.situation == ("player:" .. targetName) end,
+                function()
+                    T.UpdateTask(noteID, taskID, { situation = "player:" .. targetName })
+                end)
+        end
+
+        root:CreateDivider()
+
+        -- Delete
+        local delLabel = "|cffFF6666" .. (L["TASK_CTX_DELETE"] or "Delete") .. "|r"
+        root:CreateButton(delLabel, function()
+            T.DeleteTask(noteID, taskID)
+            if RenderTaskPanel then
+                RenderTaskPanel()
+                ApplyTaskLayout(rbFrame)
+            end
+        end)
+    end)
+    _taskCtxDropdown:OpenMenu()
 end
 
 -- ── Build window (ButtonFrameTemplate — matches TrashWindow/NoteConfig) ────────
