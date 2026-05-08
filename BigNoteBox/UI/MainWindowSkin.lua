@@ -552,7 +552,6 @@ function BNB.CreateMainWindowSkin()
 
     local configBtn = TBIcon(TOPBAR.."tp-cog", "Settings (/bnb config)", -(8+24),
         function()
-            if BNB.CloseReferenceBox then BNB.CloseReferenceBox() end
             if BNB.OpenConfig        then BNB.OpenConfig()        end
         end)
     BNB._toolbarConfigBtn = configBtn
