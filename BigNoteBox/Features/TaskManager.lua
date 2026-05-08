@@ -1,5 +1,5 @@
 -- BigNoteBox Features/TaskManager.lua
--- Task system — data layer, reset logic, situation hooks.
+-- Task system -- data layer, reset logic, situation hooks.
 --
 -- Public API (all on BNB.Task):
 --   BNB.Task.GetList(noteID)                  -> taskList or nil
@@ -32,14 +32,14 @@ local T = BNB.Task
 -- WoW weekly reset: Tuesday 07:00 UTC. Lua os.date %w: 0=Sun,1=Mon,2=Tue...
 local WEEKLY_RESET_DOW  = 2      -- Tuesday (0-indexed, Sun=0)
 local WEEKLY_RESET_HOUR = 7      -- 07:00 UTC
-local DAILY_RESET_HOUR  = 3      -- 03:00 server time (approx)
+local DAILY_RESET_HOUR  = 7      -- 07:00 UTC (matches WoW daily reset)
 
 -- Completion display colours
 local COLOR_DONE   = { r = 0.45, g = 0.45, b = 0.48 }  -- greyed text
 local COLOR_ACTIVE = { r = 1.00, g = 1.00, b = 1.00 }  -- normal text
 local COLOR_ALL_DONE = { r = 0.40, g = 0.85, b = 0.40 } -- green badge
 
--- Sub-task indent (px) — used by ReferenceBox renderer
+-- Sub-task indent (px) -- used by ReferenceBox renderer
 T.SUBTASK_INDENT = 14
 
 --------------------------------------------------------------------------------
@@ -60,14 +60,14 @@ local function Fire(event, ...)
 end
 
 --------------------------------------------------------------------------------
--- HELPERS — note access
+-- HELPERS -- note access
 --------------------------------------------------------------------------------
 local function GetNoteRaw(noteID)
     return BNB.GetNote and BNB.GetNote(noteID)
 end
 
 -- Returns mutable reference to note.tasks (creates if absent).
--- IMPORTANT: callers must never replace the array reference — mutate in place
+-- IMPORTANT: callers must never replace the array reference -- mutate in place
 -- or call BNB.UpdateNote to persist the whole field.
 local function GetOrCreateTasksTable(noteID)
     local note = GetNoteRaw(noteID)
@@ -108,7 +108,7 @@ end
 -- QUERY
 --------------------------------------------------------------------------------
 
--- Returns note.taskList (may be nil if never initialised — that's fine).
+-- Returns note.taskList (may be nil if never initialised -- that's fine).
 function T.GetList(noteID)
     local note = GetNoteRaw(noteID)
     return note and note.taskList
@@ -201,8 +201,11 @@ function T.AddTask(noteID, text, parentID)
         end
     end
 
-    -- Inherit note-level taskList defaults for resetType.
-    local tl = GetOrCreateTaskList(noteID)
+    -- Inherit note-level taskList defaults for resetType (read-only, don't
+    -- create taskList as a side effect -- it's only needed if the user
+    -- explicitly configures list-level settings).
+    local note = GetNoteRaw(noteID)
+    local tl = note and note.taskList
 
     local task = {
         id         = NewTaskID(),
@@ -260,16 +263,22 @@ function T.ToggleTask(noteID, taskID)
     Fire("TasksChanged", noteID)
 end
 
--- Delete a task and all its sub-tasks.
+-- Delete a task and all its descendants (recursive).
 function T.DeleteTask(noteID, taskID)
     local tasks = GetOrCreateTasksTable(noteID)
     if not tasks then return end
 
-    -- Collect IDs to remove: the task itself + all children.
+    -- Collect IDs to remove: the task itself + all descendants.
+    -- Loop until no new children are found (handles deeper nesting).
     local toRemove = { [taskID] = true }
-    for _, t in ipairs(tasks) do
-        if t.parentID == taskID then
-            toRemove[t.id] = true
+    local found = true
+    while found do
+        found = false
+        for _, t in ipairs(tasks) do
+            if t.parentID and toRemove[t.parentID] and not toRemove[t.id] then
+                toRemove[t.id] = true
+                found = true
+            end
         end
     end
 
@@ -316,8 +325,8 @@ function T.MoveTask(noteID, taskID, newOrder)
 end
 
 -- Clear completed tasks. Behaviour depends on db.taskRemoveOnComplete:
---   false (default) → uncheck all completed tasks
---   true            → delete all completed tasks
+--   false (default) -> uncheck all completed tasks
+--   true            -> delete all completed tasks
 function T.ClearCompleted(noteID)
     local tasks = GetOrCreateTasksTable(noteID)
     if not tasks then return end
@@ -326,14 +335,21 @@ function T.ClearCompleted(noteID)
     local remove = db and db.taskRemoveOnComplete
 
     if remove then
-        -- Delete all completed tasks (and their children if any).
+        -- Delete all completed tasks (and their descendants).
         local toRemove = {}
         for _, t in ipairs(tasks) do
             if t.completed then toRemove[t.id] = true end
         end
-        -- Also remove children of completed parents.
-        for _, t in ipairs(tasks) do
-            if t.parentID and toRemove[t.parentID] then toRemove[t.id] = true end
+        -- Also remove descendants of completed parents.
+        local found = true
+        while found do
+            found = false
+            for _, t in ipairs(tasks) do
+                if t.parentID and toRemove[t.parentID] and not toRemove[t.id] then
+                    toRemove[t.id] = true
+                    found = true
+                end
+            end
         end
         for i = #tasks, 1, -1 do
             if toRemove[tasks[i].id] then table.remove(tasks, i) end
@@ -369,9 +385,9 @@ end
 
 -- Returns the UTC timestamp for the most recent weekly WoW reset before `now`.
 local function LastWeeklyReset(now)
-    local t = date("*t", now)
+    local t = date("!*t", now)  -- UTC
     -- Walk backwards from today to find the last Tuesday 07:00 UTC.
-    local dow = t.wday - 1  -- convert: Lua wday 1=Sun → 0=Sun, 2=Mon → 1, etc.
+    local dow = t.wday - 1  -- convert: Lua wday 1=Sun -> 0=Sun, 2=Mon -> 1, etc.
     local daysSince = (dow - WEEKLY_RESET_DOW + 7) % 7
     if daysSince == 0 and (t.hour < WEEKLY_RESET_HOUR or
         (t.hour == WEEKLY_RESET_HOUR and t.min == 0 and t.sec == 0)) then
@@ -390,7 +406,7 @@ end
 
 -- Returns the UTC timestamp for the most recent daily reset before `now`.
 local function LastDailyReset(now)
-    local t = date("*t", now)
+    local t = date("!*t", now)  -- UTC
     local resetToday = time({
         year  = t.year,
         month = t.month,
@@ -400,7 +416,7 @@ local function LastDailyReset(now)
         sec   = 0,
     })
     if now < resetToday then
-        -- Before today's reset — use yesterday's.
+        -- Before today's reset -- use yesterday's.
         return resetToday - 86400
     end
     return resetToday
@@ -486,10 +502,8 @@ end
 -- Per-task situation uses the same context string format as note.context:
 --   "zone:stormwind city", "instance:mythic", "player:Arthas", "subzone:..."
 --
--- Evaluation reuses ContextNotes' internal helpers via BNB._taskContextCheck
+-- Evaluation reuses ContextNotes' internal helpers via BNB._taskContextMatch
 -- (set up below). If ContextNotes isn't loaded yet we fall back gracefully.
-
-local _lastSituationNoteID = nil  -- note currently open in editor
 
 -- Called by ContextNotes after it finishes its own evaluation pass, or directly
 -- when zone/target changes. Checks all tasks across all notes for situation hits.
@@ -522,7 +536,7 @@ function T.OnContextChanged()
 
     if #hits == 0 then return end
 
-    -- Show toast for each hit (deduplicated per note — show at most one toast
+    -- Show toast for each hit (deduplicated per note -- show at most one toast
     -- row per note to avoid flooding).
     if BNB.ShowTaskToast then
         BNB.ShowTaskToast(hits)
@@ -532,20 +546,9 @@ end
 --------------------------------------------------------------------------------
 -- DAILY TICKER
 --------------------------------------------------------------------------------
--- Fires CheckResets once per in-game day (checked every 60 seconds).
-local _lastResetCheck = 0
-
+-- Fires CheckResets every 60 seconds via C_Timer (zero-cost between ticks).
 local function SetupTicker()
-    local ticker = CreateFrame("Frame")
-    ticker:SetScript("OnUpdate", function(_, elapsed)
-        local now = time()
-        -- Only check once per minute, and only if a full day has passed
-        -- since the last check.
-        if now - _lastResetCheck >= 60 then
-            _lastResetCheck = now
-            T.CheckResets()
-        end
-    end)
+    C_Timer.NewTicker(60, function() T.CheckResets() end)
 end
 
 --------------------------------------------------------------------------------

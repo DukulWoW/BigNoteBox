@@ -327,7 +327,6 @@ function BNB.CreateMainWindow()
         "Settings (/bnb config)",
         -(30),
         function()
-            if BNB.CloseReferenceBox then BNB.CloseReferenceBox() end
             if BNB.OpenConfig then BNB.OpenConfig() end
         end)
     BNB._toolbarConfigBtn = configBtn
