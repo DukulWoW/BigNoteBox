@@ -1412,6 +1412,16 @@ RenderList = function()
             UpdateModelViewer()
         end
     end)
+    -- Second delayed pass — on first open the frame geometry may not have
+    -- settled after one tick, leaving the task panel transparent until the
+    -- splitter is moved. This ensures the layout (and thus the opaque
+    -- ButtonFrameTemplate chrome behind the task area) is correct.
+    C_Timer.After(0.05, function()
+        if rbFrame and rbFrame:IsShown() then
+            ApplyTaskLayout(rbFrame)
+            UpdateModelViewer()
+        end
+    end)
 end
 
 -- ── External Model/Tasks toggle strip ────────────────────────────────────────
@@ -1638,9 +1648,9 @@ local function BuildTaskPanel(f)
     f._taskPanel = pnl
 
     -- Opaque background so attachment content behind doesn't bleed through.
-    -- Inset 3px on left/right so it doesn't overlap the refbox window borders.
+    -- Inset 6px on left/right so it doesn't overlap the refbox window borders.
     local bg = pnl:CreateTexture(nil, "BACKGROUND")
-    bg:SetPoint("TOPLEFT",     pnl, "TOPLEFT",      3, 0)
+    bg:SetPoint("TOPLEFT",     pnl, "TOPLEFT",      6, 0)
     bg:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT",  -3, 0)
     local isSkin = BigNoteBoxDB and BigNoteBoxDB.skinMode
     if isSkin then
@@ -1648,14 +1658,29 @@ local function BuildTaskPanel(f)
         local r, g, b = BNB.SkinColourOf(preset, false)
         bg:SetColorTexture(r, g, b, BNB.GetSkinBgAlpha())
     else
-        -- Match ButtonFrameTemplate body
-        bg:SetColorTexture(0.07, 0.07, 0.07, 0.97)
+        -- Transparent in normal mode so the ButtonFrameTemplate chrome
+        -- paints through — matches the attachment area above.
+        bg:SetColorTexture(0, 0, 0, 0)
     end
     pnl._bg = bg
 
+    -- Keep bg colour in sync when preset or brightness changes.
+    if BNB.RegisterSkinBackdrop then
+        BNB.RegisterSkinBackdrop(function()
+            local isSkin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+            if isSkin then
+                local preset = BNB.GetSkinPreset()
+                local r, g, b = BNB.SkinColourOf(preset, false)
+                bg:SetColorTexture(r, g, b, BNB.GetSkinBgAlpha())
+            else
+                bg:SetColorTexture(0, 0, 0, 0)
+            end
+        end)
+    end
+
     -- Inner scroll frame for task rows
     local tsf = CreateFrame("ScrollFrame", nil, pnl, "ScrollFrameTemplate")
-    tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    0, 0)
+    tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    3, 0)
     tsf:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -SCROLL_PAD, 0)
     if tsf.ScrollBar then
         tsf.ScrollBar:SetAlpha(0)

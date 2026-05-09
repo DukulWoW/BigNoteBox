@@ -221,8 +221,8 @@ local function BuildContent(f, ct, saveBtn)
 
     -- Situation value row (hidden when type is "none")
     local valueRow = CreateFrame("Frame", nil, ct)
-    valueRow:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
-    valueRow:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
+    valueRow:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    valueRow:SetWidth(TW_CW)
     valueRow:SetHeight(TW_ROW)
     valueRow:Hide()
     _sitValueRow = valueRow
@@ -353,7 +353,7 @@ local function BuildWindow()
 
     local f = CreateFrame("Frame", "BNBTaskEditWindow", UIParent, "ButtonFrameTemplate")
     f:SetSize(TW_W, TW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
+    f:SetFrameStrata("DIALOG")
     f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
@@ -361,7 +361,6 @@ local function BuildWindow()
 
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
     f:SetAlpha(0.95)
     f:SetTitle("Edit Task")
     if f.CloseButton then
@@ -432,7 +431,7 @@ local function BuildWindowSkin()
     local f = BNB.CreateSkinFrame(UIParent, false, "BNBTaskEditWindow", false)
     _G["BNBTaskEditWindow"] = f
     f:SetSize(TW_W, TW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
+    f:SetFrameStrata("DIALOG")
     f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
@@ -506,7 +505,7 @@ local function BuildWindowSkin()
     -- Content
     BuildContent(f, ct, saveBtn)
 
-    f:SetScript("OnShow", function()
+    f:HookScript("OnShow", function()
         if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
     end)
 
@@ -580,6 +579,10 @@ local function DoOpen(noteID, taskID, anchorFrame)
     _noteID = noteID; _taskID = taskID
     Populate(noteID, taskID)
     f:Show(); f:Raise()
+    -- Ensure skin colours are current (covers preset changes while window was hidden)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.ApplyMainWindowSkin then
+        BNB.ApplyMainWindowSkin()
+    end
     return f
 end
 
