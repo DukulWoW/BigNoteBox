@@ -1753,6 +1753,81 @@ local function BuildFeaturesTab(sf, ct)
             "Adds a \"Boss\" tag for world bosses and skull-level (level ??) targets.")
     end
 
+    -- ── Tasks ────────────────────────────────────────────────────────────────────
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, "Tasks")
+
+    y = AddCheck(ct, y, "Remove completed tasks immediately",
+        function() return BigNoteBoxDB and BigNoteBoxDB.taskRemoveOnComplete == true end,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.taskRemoveOnComplete = v end
+        end,
+        "When checked, completing a task is permanent -- it is removed from the list right away. When unchecked, completed tasks are greyed out and stay in the list until you clear them manually.")
+
+    -- Completed tasks position dropdown
+    do
+        local cpLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        cpLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        cpLbl:SetText("Completed tasks position:")
+        cpLbl:SetHeight(ROW_H)
+        y = y - ROW_H - 2
+
+        local CP_ITEMS = {
+            { key = "bottom", label = "Move to bottom" },
+            { key = "inline", label = "Keep in place"  },
+        }
+
+        local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+
+        if useDD then
+            local cpDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+            cpDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            cpDD:SetWidth(CONTENT_W)
+            cpDD:SetupMenu(function(_, root)
+                for _, item in ipairs(CP_ITEMS) do
+                    local iv = item.key
+                    root:CreateRadio(item.label,
+                        function()
+                            return (BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom") == iv
+                        end,
+                        function()
+                            if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = iv end
+                            cpDD:GenerateMenu()
+                            if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+                        end)
+                end
+            end)
+            cpDD:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("Completed tasks position", 1, 1, 1)
+                GameTooltip:AddLine("Move to bottom: completed tasks sink to the bottom of the list.", 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine("Keep in place: completed tasks stay where they are and are greyed out.", 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            cpDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            y = y - 32
+        else
+            -- Fallback: cycling button
+            local function GetCpLabel()
+                local v = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom"
+                for _, item in ipairs(CP_ITEMS) do if item.key == v then return item.label end end
+                return CP_ITEMS[1].label
+            end
+            local cpBtn = BNB.CreateButton(nil, ct, GetCpLabel(), CONTENT_W, 24)
+            cpBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            cpBtn:SetScript("OnClick", function(self)
+                local cur = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom"
+                local next = cur == "bottom" and "inline" or "bottom"
+                if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = next end
+                local lbl = next == "bottom" and "Move to bottom" or "Keep in place"
+                self:SetText(lbl)
+                if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+            end)
+            y = y - 30
+        end
+    end
+
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_FOCUS_ORBIT_HEADER"])
 

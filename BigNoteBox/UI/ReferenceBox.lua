@@ -78,6 +78,7 @@ local _gearViewTmog  = {}   -- noteID  → true = showing transmog, false/nil = 
 local _rbMode        = "attachments"
 local _taskRows      = {}   -- pool of task row frames
 local _taskCallbackRegistered = false  -- ensures TasksChanged callback is registered once
+local _collapsedTasks = {}  -- taskID → true when user has collapsed that parent row
 
 local RenderList               -- forward declaration
 local SyncRefBoxHeight         -- forward declaration (defined near PositionFrame)
@@ -1624,10 +1625,13 @@ ApplyTaskLayout = function(f)
         local attStripH = ATT_EMPTY_H
         if sf then
             sf:ClearAllPoints()
-            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
-            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,
-                botPad + taskH)
+            sf:SetPoint("TOPLEFT", f, "TOPLEFT", 0, contentTop)
+            sf:SetPoint("TOPRIGHT", f, "TOPRIGHT", -SCROLL_PAD, contentTop)
             sf:SetHeight(attStripH)
+            -- Sync scroll child so its height never exceeds the frame,
+            -- preventing a spurious scrollbar from appearing.
+            local sc = f._scrollChild
+            if sc then sc:SetHeight(attStripH) end
         end
         -- Reposition task panel to sit below the attachment strip
         if taskPnl then
@@ -1817,6 +1821,28 @@ RegisterTaskCallback = function()
     _taskCallbackRegistered = true
     BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
         if rbFrame and rbFrame:IsShown() and changedNoteID == _noteID then
+            if BNB.Task then
+                for _, task in ipairs(BNB.Task.GetTasks(_noteID)) do
+                    if not task.parentID then
+                        local subs = BNB.Task.GetSubTasks(_noteID, task.id)
+                        if #subs > 0 then
+                            if task.completed then
+                                -- Auto-collapse fully completed parents
+                                local allDone = true
+                                for _, sub in ipairs(subs) do
+                                    if not sub.completed then allDone = false; break end
+                                end
+                                if allDone then
+                                    _collapsedTasks[task.id] = true
+                                end
+                            else
+                                -- Auto-expand parents that are no longer completed
+                                _collapsedTasks[task.id] = nil
+                            end
+                        end
+                    end
+                end
+            end
             RenderTaskPanel()
             ApplyTaskLayout(rbFrame)
             UpdateDynamicTitle()
@@ -1857,20 +1883,21 @@ RenderTaskPanel = function()
     local done, total  = T.GetCompletionCount(_noteID)
 
     -- ── Header row ──────────────────────────────────────────────────────────
-    -- "Tasks" label + completion badge + add button + clear completed button
+    -- "Tasks (done/total)" label + add button + clear/delete buttons
+    -- Count top-level tasks only for the headline counter.
+    local topDone, topTotal = 0, 0
+    for _, t in ipairs(T.GetTopLevel(_noteID)) do
+        topTotal = topTotal + 1
+        if t.completed then topDone = topDone + 1 end
+    end
     local hdr = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hdr:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  PAD, -4)
     hdr:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -40, -4)
     hdr:SetHeight(TASK_HDR_H - 4)
     hdr:SetJustifyH("LEFT")
-    hdr:SetText("Tasks")
+    local hdrClr = (topTotal > 0 and topDone == topTotal) and "|cff66dd66" or ""
+    hdr:SetText("Tasks " .. hdrClr .. "(" .. topDone .. "/" .. topTotal .. ")|r")
     _taskRows[#_taskRows + 1] = hdr
-
-    local badgeClr = T.GetBadgeColor(_noteID)
-    local badge = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    badge:SetTextColor(badgeClr.r, badgeClr.g, badgeClr.b)
-    badge:SetText(total > 0 and (done .. "/" .. total) or "")
-    _taskRows[#_taskRows + 1] = badge
 
     -- Add task (+) button — top-right of header
     local addBtn = CreateFrame("Button", nil, tsc)
@@ -1882,8 +1909,14 @@ RenderTaskPanel = function()
     addH:SetTexture(ASSETS .. "Buttons\\bt-plus-hover"); addH:Hide()
     local addP = addBtn:CreateTexture(nil, "ARTWORK"); addP:SetAllPoints()
     addP:SetTexture(ASSETS .. "Buttons\\bt-plus-press"); addP:Hide()
-    addBtn:SetScript("OnEnter", function() addH:Show(); addN:Hide() end)
-    addBtn:SetScript("OnLeave", function() addH:Hide(); addN:Show() end)
+    addBtn:SetScript("OnEnter", function(self)
+        addH:Show(); addN:Hide()
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Add task", 1, 1, 1)
+        GameTooltip:AddLine("Adds a new empty task to this note.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    addBtn:SetScript("OnLeave", function() addH:Hide(); addN:Show(); GameTooltip:Hide() end)
     addBtn:SetScript("OnMouseDown", function() addP:Show(); addN:Hide(); addH:Hide() end)
     addBtn:SetScript("OnMouseUp",   function() addP:Hide(); addN:Show() end)
     addBtn:SetScript("OnClick", function()
@@ -1902,20 +1935,42 @@ RenderTaskPanel = function()
     end)
     _taskRows[#_taskRows + 1] = addBtn
 
-    -- Badge sits to the left of the add button, vertically centred with hdr
-    badge:SetPoint("RIGHT", addBtn, "LEFT", -4, 0)
-    badge:SetPoint("TOP",   tsc,   "TOP",   0, -4)
-
-    -- "Clear completed" button — only when any tasks are done
+    -- "Clear done" and "Delete done" buttons — only when any tasks are done
     local hasDone = done > 0
     if hasDone then
-        local clrBtn = BNB.CreateButton(nil, tsc, "Clear done", 72, 16)
-        clrBtn:SetPoint("RIGHT", addBtn, "LEFT", -26, 0)
+        local BTN_W = 60
+        local BTN_H = 16
+        local BTN_GAP = 4
+
+        local clrBtn = BNB.CreateButton(nil, tsc, "Clear", BTN_W, BTN_H)
+        clrBtn:SetPoint("RIGHT", addBtn, "LEFT", -(BTN_W + BTN_GAP + BTN_GAP), 0)
         clrBtn:SetPoint("TOP",   tsc,   "TOP",  0, -4)
         clrBtn:SetScript("OnClick", function()
             if _noteID then T.ClearCompleted(_noteID) end
         end)
+        clrBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("Uncheck completed tasks", 1, 1, 1)
+            GameTooltip:AddLine("Removes the checkmark from all completed tasks so you can do them again.", 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        clrBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         _taskRows[#_taskRows + 1] = clrBtn
+
+        local delBtn = BNB.CreateButton(nil, tsc, "Delete", BTN_W, BTN_H)
+        delBtn:SetPoint("RIGHT", addBtn, "LEFT", -BTN_GAP, 0)
+        delBtn:SetPoint("TOP",   tsc,   "TOP",  0, -4)
+        delBtn:SetScript("OnClick", function()
+            if _noteID then T.DeleteCompleted(_noteID) end
+        end)
+        delBtn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine("Delete completed tasks", 1, 1, 1)
+            GameTooltip:AddLine("Permanently removes all completed tasks from the list.", 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        delBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        _taskRows[#_taskRows + 1] = delBtn
     end
 
     -- ── Task rows ────────────────────────────────────────────────────────────
@@ -1974,7 +2029,18 @@ RenderTaskPanel = function()
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
         lbl:SetTextColor(clr.r, clr.g, clr.b)
-        lbl:SetText(task.text ~= "" and task.text or "(empty)")
+        -- For top-level tasks with sub-tasks, prefix with (done/total)
+        local lblText = task.text ~= "" and task.text or "(empty)"
+        if not isSubTask then
+            local subs = T.GetSubTasks(_noteID, task.id)
+            if #subs > 0 then
+                local subDone = 0
+                for _, s in ipairs(subs) do if s.completed then subDone = subDone + 1 end end
+                local cntClr = (subDone == #subs) and "|cff66dd66" or "|cffaaaaaa"
+                lblText = cntClr .. "(" .. subDone .. "/" .. #subs .. ")|r " .. lblText
+            end
+        end
+        lbl:SetText(lblText)
 
         -- Inline edit box (hidden until clicked)
         local eb = CreateFrame("EditBox", nil, row, "BackdropTemplate")
@@ -1991,6 +2057,14 @@ RenderTaskPanel = function()
         eb:Hide()
         row._editBox = eb
 
+        lbl:SetScript("OnEnter", function(self)
+            if self:IsTruncated() then
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(task.text, 1, 1, 1, true)
+                GameTooltip:Show()
+            end
+        end)
+        lbl:SetScript("OnLeave", function() GameTooltip:Hide() end)
         lbl:SetScript("OnMouseDown", function(_, btn)
             if btn == "RightButton" then
                 BNB.ShowTaskContextMenu(row, _noteID, task.id)
@@ -2043,25 +2117,65 @@ RenderTaskPanel = function()
             end
         end)
 
-        -- Sub-task expand toggle (bt-right = collapsed, bt-down = expanded)
+        -- Sub-task toggle / add button (top-level tasks only).
+        -- No sub-tasks : dim >  → click adds an empty sub-task and focuses it.
+        -- Has sub-tasks, expanded  : full v  → click collapses.
+        -- Has sub-tasks, collapsed : full >  → click expands.
         local subTasks = T.GetSubTasks(_noteID, task.id)
         if not isSubTask then
+            local hasSubTasks = #subTasks > 0
+            -- Collapse state persists across re-renders via _collapsedTasks.
+            -- Default: expanded when sub-tasks exist, irrelevant when none.
+            row._expanded = hasSubTasks and not _collapsedTasks[task.id]
+
             local togBtn = CreateFrame("Button", nil, row)
             togBtn:SetSize(14, 14)
             togBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
             local togN = togBtn:CreateTexture(nil, "ARTWORK"); togN:SetAllPoints()
-            togN:SetTexture(ASSETS .. "Buttons\\bt-right-normal")
-            row._expanded = #subTasks > 0
-            if row._expanded then
-                togN:SetTexture(ASSETS .. "Buttons\\bt-down-normal")
+
+            local function UpdateTogBtn()
+                if hasSubTasks then
+                    togN:SetTexture(ASSETS .. "Buttons\\" ..
+                        (row._expanded and "bt-down-normal" or "bt-right-normal"))
+                    togBtn:SetAlpha(1.0)
+                else
+                    -- No sub-tasks: always > at low alpha (add affordance)
+                    togN:SetTexture(ASSETS .. "Buttons\\bt-right-normal")
+                    togBtn:SetAlpha(0.3)
+                end
             end
-            togBtn:SetAlpha(#subTasks > 0 and 1.0 or 0.3)
+            UpdateTogBtn()
+
             togBtn:SetScript("OnClick", function()
-                row._expanded = not row._expanded
-                togN:SetTexture(ASSETS .. "Buttons\\" ..
-                    (row._expanded and "bt-down-normal" or "bt-right-normal"))
-                RenderTaskPanel()
-                ApplyTaskLayout(rbFrame)
+                if hasSubTasks then
+                    -- Toggle collapse/expand, persist state
+                    row._expanded = not row._expanded
+                    if row._expanded then
+                        _collapsedTasks[task.id] = nil
+                    else
+                        _collapsedTasks[task.id] = true
+                    end
+                    RenderTaskPanel()
+                    ApplyTaskLayout(rbFrame)
+                else
+                    -- No sub-tasks: add one and focus its inline editbox
+                    local subID = T.AddTask(_noteID, "", task.id)
+                    if subID then
+                        _collapsedTasks[task.id] = nil  -- ensure parent is expanded
+                        RenderTaskPanel()
+                        ApplyTaskLayout(rbFrame)
+                        for _, tr in ipairs(_taskRows) do
+                            if tr._taskID == subID and tr._editBox then
+                                local lbl2 = ({ tr:GetRegions() })[1]
+                                if lbl2 and lbl2.Hide then lbl2:Hide() end
+                                tr._editBox:SetText("")
+                                tr._editBox:Show()
+                                tr._editBox:SetFocus()
+                                break
+                            end
+                        end
+                    end
+                end
             end)
             togBtn:SetScript("OnMouseUp", function(_, btn)
                 if btn == "RightButton" then
@@ -2069,6 +2183,55 @@ RenderTaskPanel = function()
                 end
             end)
             row._togBtn = togBtn
+
+            -- Situation / reset indicator icons — shown left of the toggle button.
+            -- Each icon opens the TaskEditWindow for this task.
+            -- Layout (right-to-left): [togBtn] [resetIcon?] [sitIcon?]
+            local iconSize = 12
+            local iconGap  = 2
+            local iconRight = -4 - 14 - iconGap  -- start left of togBtn
+
+            local function MakeIndicatorIcon(texPath, anchorRight, tip)
+                local ico = CreateFrame("Button", nil, row)
+                ico:SetSize(iconSize, iconSize)
+                ico:SetPoint("RIGHT", row, "RIGHT", anchorRight, 0)
+                local tx = ico:CreateTexture(nil, "ARTWORK")
+                tx:SetAllPoints()
+                tx:SetTexture(texPath)
+                ico:SetAlpha(0.75)
+                ico:SetScript("OnEnter", function(self)
+                    self:SetAlpha(1.0)
+                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                    GameTooltip:AddLine(tip, 1, 1, 1)
+                    GameTooltip:AddLine("Click to edit.", 0.8, 0.8, 0.8)
+                    GameTooltip:Show()
+                end)
+                ico:SetScript("OnLeave", function(self)
+                    self:SetAlpha(0.75); GameTooltip:Hide()
+                end)
+                ico:SetScript("OnClick", function()
+                    if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
+                        BNB.TaskEditWindow.Open(_noteID, task.id, row)
+                    end
+                end)
+                _taskRows[#_taskRows + 1] = ico
+                return ico
+            end
+
+            if task.situation and task.situation ~= "" then
+                MakeIndicatorIcon(
+                    ASSETS .. "UI\\ui-situation",
+                    iconRight,
+                    "Situation: " .. task.situation)
+                iconRight = iconRight - iconSize - iconGap
+            end
+            if task.resetType and task.resetType ~= "" and task.resetType ~= "none" then
+                local resetTip = task.resetType == "daily" and "Reset: Daily" or "Reset: Weekly"
+                MakeIndicatorIcon(
+                    ASSETS .. "UI\\ui-repeat",
+                    iconRight,
+                    resetTip)
+            end
         end
 
         -- Right-click context menu (OnMouseUp — same pattern as attachment rows;

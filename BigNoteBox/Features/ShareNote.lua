@@ -26,6 +26,7 @@ local PAD           = 12
 -- Dropdown option definitions
 local SHARE_OPTIONS = {
     { key = "basic",      label = "Title and body" },
+    { key = "tasks",      label = "Title, body and tasks" },
     { key = "refbox",     label = "Title, body and refbox" },
     { key = "tags",       label = "Title, body, tags and refbox" },
     { key = "icon",       label = "Title, body, tags, icon and refbox" },
@@ -34,6 +35,7 @@ local SHARE_OPTIONS = {
 }
 local SHARE_FIELDS = {
     basic      = { "title", "body", "richMode" },
+    tasks      = { "title", "body", "richMode", "tasks", "taskList" },
     refbox     = { "title", "body", "richMode", "attachments" },
     tags       = { "title", "body", "richMode", "attachments", "tags" },
     icon       = { "title", "body", "richMode", "attachments", "tags", "icon", "iconSource" },
@@ -53,6 +55,7 @@ local SHARE_FIELDS = {
         "source", "targetNpcID", "targetPlayerKey", "targetIsPet",
         "inspectRaceID", "inspectSexID",
         "inspectGearItems", "inspectTransmogItems",
+        "tasks", "taskList",
     },
 }
 

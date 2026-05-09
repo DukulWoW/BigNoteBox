@@ -42,11 +42,12 @@ local _isPopulating = false
 
 -- Widget refs
 local _textEB, _resetDD, _sitTypeDD, _sitValueRow, _sitValueEb
-local _sitUseCurBtn, _sitBrowseBtn
+local _sitUseCurBtn, _sitBrowseBtn, _sitClearBtn
 local _saveBtn
 
 -- Situation state
 local _selSitType = "none"
+local _pendingText = ""  -- backing store for task text label/editbox
 
 -- ---------------------------------------------------------------------------
 -- HELPERS
@@ -156,17 +157,54 @@ end
 local function BuildContent(f, ct, saveBtn)
     local y = -4
 
-    -- Section: Task text
+    -- Section: Task text — shows as a plain label; click to enter edit mode.
     SectionHdr(ct, "Task text", y); y = y - TW_LBL - 2
+
+    local textLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    textLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 6, y)
+    textLbl:SetPoint("TOPRIGHT", ct, "TOPRIGHT", -6, y)
+    textLbl:SetHeight(TW_ROW)
+    textLbl:SetJustifyH("LEFT")
+    textLbl:SetWordWrap(false)
+    textLbl:SetTextColor(0.9, 0.9, 0.9)
+
     local textEB = BNB.CreateBackdropFrame("EditBox", nil, ct)
     textEB:SetSize(TW_CW, TW_ROW); textEB:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     textEB:SetAutoFocus(false); textEB:SetMaxLetters(500)
-    BNB.AddPlaceholder(textEB, "What needs to be done...")
     textEB:SetFontObject("GameFontNormalSmall")
-    textEB:HookScript("OnTextChanged", function() MarkDirty() end)
-    textEB:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    textEB:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    textEB:SetScript("OnEnterPressed", function(self)
+        local t = self:GetText()
+        _pendingText = t
+        textLbl:SetText(t ~= "" and t or "|cff888888(empty)|r")
+        self:Hide(); textLbl:Show()
+        self:ClearFocus()
+        MarkDirty()
+    end)
+    textEB:SetScript("OnEscapePressed", function(self)
+        self:SetText(_pendingText)
+        self:Hide(); textLbl:Show()
+        self:ClearFocus()
+    end)
+    textEB:SetScript("OnEditFocusLost", function(self)
+        if self:IsShown() then
+            local t = self:GetText()
+            _pendingText = t
+            textLbl:SetText(t ~= "" and t or "|cff888888(empty)|r")
+            self:Hide(); textLbl:Show()
+            MarkDirty()
+        end
+    end)
+    textEB:Hide()
     _textEB = textEB
+    _textEB._lbl = textLbl  -- store for Populate
+
+    textLbl:SetScript("OnMouseDown", function()
+        textLbl:Hide()
+        textEB:SetText(_pendingText)
+        textEB:Show()
+        textEB:SetFocus()
+    end)
+
     y = y - TW_ROW - TW_SECT_GAP
 
     -- Section: Reset
@@ -178,8 +216,18 @@ local function BuildContent(f, ct, saveBtn)
         { label = "Daily",  value = "daily"  },
         { label = "Weekly", value = "weekly" },
     }
-    local resetDD = MakeDD(ct, resetEntries, "none", nil)
+    local resetDD = MakeDD(ct, resetEntries, "none", nil, TW_CW)
     resetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    -- Tooltip on the dropdown container frame
+    resetDD:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Task reset schedule", 1, 1, 1)
+        GameTooltip:AddLine("None: task stays completed until you uncheck it manually.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Daily: resets at the WoW daily reset (time varies by region).", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Weekly: resets at the WoW weekly reset (varies by region).", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    resetDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _resetDD = resetDD
     y = y - TW_ROW - TW_SECT_GAP
 
@@ -285,7 +333,7 @@ local function BuildContent(f, ct, saveBtn)
     _sitBrowseBtn = browseBtn
     y = y - TW_ROW - TW_GAP
 
-    -- "Use Current" button
+    -- "Use Current" + "Clear Current" buttons
     local useCurBtn = BNB.CreateButton(nil, ct, "Use Current", 90, 20)
     useCurBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     useCurBtn:SetScript("OnClick", function()
@@ -303,6 +351,36 @@ local function BuildContent(f, ct, saveBtn)
         MarkDirty()
     end)
     _sitUseCurBtn = useCurBtn
+
+    local clrCurBtn = BNB.CreateButton(nil, ct, "Clear", 60, 20)
+    clrCurBtn:SetPoint("LEFT", useCurBtn, "RIGHT", 6, 0)
+    clrCurBtn:SetScript("OnClick", function()
+        if _sitValueEb then _sitValueEb:SetText("") end
+        if _sitTypeDD  then _sitTypeDD:SetSelected("none") end
+        _selSitType = "none"
+        if _sitValueRow then _sitValueRow:Hide() end
+        MarkDirty()
+    end)
+    clrCurBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine("Clear situation", 1, 1, 1)
+        GameTooltip:AddLine("Removes the context binding from this task.", 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    clrCurBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Enable/disable Clear based on whether a situation value is set
+    local function UpdateClrCur()
+        local hasVal = _sitValueEb and _sitValueEb:GetText() ~= ""
+        local hasSit = _selSitType and _selSitType ~= "none"
+        clrCurBtn:SetEnabled(hasVal or hasSit)
+    end
+    if _sitValueEb then
+        _sitValueEb:HookScript("OnTextChanged", function() UpdateClrCur() end)
+    end
+    clrCurBtn:SetEnabled(false)  -- disabled until populated
+    _sitClearBtn = clrCurBtn
+
     y = y - 24 - TW_GAP
 
     -- Record content height for scroll
@@ -316,7 +394,7 @@ local function BuildContent(f, ct, saveBtn)
         if not task then TW.Close(); return end
 
         -- Text
-        local newText = _textEB and _textEB:GetRealText() or ""
+        local newText = _pendingText or ""
         local changes = { text = newText }
         local clears  = {}
 
@@ -361,6 +439,7 @@ local function BuildWindow()
 
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
+    if f.Inset then f.Inset:Hide() end
     f:SetAlpha(0.95)
     f:SetTitle("Edit Task")
     if f.CloseButton then
@@ -525,8 +604,17 @@ local function Populate(noteID, taskID)
 
     _isPopulating = true
 
-    -- Text
-    if _textEB then _textEB:SetRealText(task.text or "") end
+    -- Text: store in _pendingText via the editbox backing store, show via label.
+    if _textEB then
+        local txt = task.text or ""
+        _pendingText = txt
+        _textEB:SetText(txt)
+        _textEB:Hide()
+        if _textEB._lbl then
+            _textEB._lbl:SetText(txt ~= "" and txt or "|cff888888(empty)|r")
+            _textEB._lbl:Show()
+        end
+    end
 
     -- Reset
     local rv = task.resetType or "none"
@@ -556,6 +644,11 @@ local function Populate(noteID, taskID)
                 if _sitBrowseBtn then _sitBrowseBtn:Show() end
             end
         end
+    end
+
+    -- Update Clear Current button state
+    if _sitClearBtn then
+        _sitClearBtn:SetEnabled(sitType ~= "none" or sitVal ~= "")
     end
 
     _isDirty = false
@@ -605,7 +698,7 @@ end
 function TW.Close()
     if _frame then _frame:Hide() end
     if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
-    _noteID = nil; _taskID = nil; _isDirty = false
+    _noteID = nil; _taskID = nil; _isDirty = false; _pendingText = ""
 end
 
 function TW.IsOpen()    return _frame and _frame:IsShown() end
