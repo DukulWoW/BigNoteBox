@@ -22,16 +22,23 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.6.9",
+    version = "1.7.0",
     entries = {
-		"|cff66bb6aAdded:|r You can now migrate notes from PurpleNotes, SimpleNote, QuickNote and OneWoW Notes",
-		"|cff66bb6aAdded:|r Three new font outline options: \"SLUG\", \"SLUG Outline\", and \"SLUG Thick Outline\" that use WoW's Slug Text Rendering for smoother, crisper font edges. Available for normal notes and rich note editor in the Appearance tab",
-		"|cff66bb6aAdded:|r Rich note view mode now renders with slug outline for crisper view",
-		"|cff66bb6aAdded:|r Fun little stats view on the main config general tab showing how many notes you have and how much space they are taking up",
-		"|cff66bb6aAdded:|r There is now a \"More features\" button in \"main config > general\" that shows all(?) features in BNB",
-		"|cff66bb6aChange:|r Increased max open sticky notes from 20 to 50",
-		"|cff66bb6aFixed:|r The Danger Zone overlay wouldn't properly go away when the window was closed",
-		"|cff66bb6aFixed:|r Exporting notes should now export all fields. Was missing a bunch",
-		"|cff66bb6aFixed:|r Sharing notes should now share all field if done with the \"Everything\" option",
+        "|cff66bb6aNew:|r Task system! Add tasks and sub-tasks to any note",
+        "|cff66bb6aNew:|r Tasks can have daily or weekly auto-reset (set in the task edit window)",
+        "|cff66bb6aNew:|r Tasks can be bound to a situation (zone, instance, player) (set in the task edit window)",
+        "|cff66bb6aNew:|r Sub-tasks can collapse and expand",
+        "|cff66bb6aNew:|r Task panel in the Reference Box with header, footer, and splitter",
+        "|cff66bb6aNew:|r Sticky notes can show task view instead of note body (toggle with the task button in the sticky header)",
+        "|cff66bb6aNew:|r Task view in sticky notes with live checkbox toggling",
+        "|cff66bb6aNew:|r Task filter button in the note list",
+        "|cff66bb6aNew:|r Task icon shown in note list rows for notes with tasks",
+        "|cff66bb6aNew:|r Tasks added as a share tier in the share system",
+        "|cff66bb6aNew:|r Global reset and situation icons in sticky note task footer",
+        "|cff66bb6aNew:|r Task list spacing setting -- Compact, Normal, Spacious (Config > Features > Tasks)",
+        "|cff66bb6aNew:|r Stone background texture added to sticky note appearance (Sticky Settings > Appearance)",
+        "|cff66bb6aChange:|r Background opacity in sticky notes can now be set to 0 (Sticky Settings > Appearance)",
+        "|cff66bb6aChange:|r Sticky note task footer shows Tasks and Sub-tasks counts separately",
+        "|cff66bb6aChange:|r Task toggle buttons match the Reference Box style",
     },
 }

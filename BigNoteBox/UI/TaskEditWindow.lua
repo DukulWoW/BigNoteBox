@@ -394,22 +394,26 @@ local function BuildContent(f, ct, saveBtn)
         if _isGlobal then
             local note = BNB.GetNote(_noteID)
             if not note then TW.Close(); return end
-            note.taskList = note.taskList or {}
-            local tl = note.taskList
+            -- Build changes table and use T.UpdateList so TasksChanged fires,
+            -- keeping all subscribers (sticky note footer, etc.) in sync.
             local rv = _resetDD and _resetDD:GetSelected() or "none"
-            if rv == "none" then
-                tl.resetType = nil; tl.resetEvery = nil
-            else
-                tl.resetType = rv
-            end
             local sv = _sitValueEb and _sitValueEb:GetText() or ""
             sv = sv:match("^%s*(.-)%s*$") or ""
-            if _selSitType == "none" or sv == "" then
-                tl.situation = nil
+            local changes = {}
+            local clear   = {}
+            if rv == "none" then
+                clear[#clear+1] = "resetType"
+                clear[#clear+1] = "resetEvery"
             else
-                tl.situation = _selSitType .. ":" .. sv
+                changes.resetType = rv
             end
-            if BNB.SaveDB then BNB.SaveDB() end
+            if _selSitType == "none" or sv == "" then
+                clear[#clear+1] = "situation"
+            else
+                changes.situation = _selSitType .. ":" .. sv
+            end
+            if #clear > 0 then changes._clear = clear end
+            T.UpdateList(_noteID, changes)
             if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
             TW.Close()
             return

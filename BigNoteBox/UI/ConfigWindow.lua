@@ -1828,6 +1828,95 @@ local function BuildFeaturesTab(sf, ct)
         end
     end
 
+    -- Task row spacing dropdown
+    do
+        local spLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        spLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        spLbl:SetText("Task list spacing:")
+        spLbl:SetHeight(ROW_H)
+        y = y - ROW_H - 2
+
+        local SP_ITEMS = {
+            { key = "compact",  label = "Compact"  },
+            { key = "normal",   label = "Normal"   },
+            { key = "spacious", label = "Spacious" },
+        }
+
+        local function OnSpacingChanged()
+            if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+            -- Refresh any open sticky note task views
+            if BNB.Sticky and BNB._stickyFrames then
+                for noteID, f in pairs(BNB._stickyFrames) do
+                    if f._taskViewActive then
+                        local SN = BNB.Sticky
+                        if SN.RefreshTaskView then SN.RefreshTaskView(noteID)
+                        elseif SN.RefreshNote  then SN.RefreshNote(noteID) end
+                    end
+                end
+            end
+        end
+
+        local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+        if useDD then
+            local spDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+            spDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            spDD:SetWidth(CONTENT_W)
+            spDD:SetupMenu(function(_, root)
+                for _, item in ipairs(SP_ITEMS) do
+                    local iv = item.key
+                    root:CreateRadio(item.label,
+                        function()
+                            return (BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal") == iv
+                        end,
+                        function()
+                            if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = iv end
+                            spDD:GenerateMenu()
+                            OnSpacingChanged()
+                        end)
+                end
+            end)
+            spDD:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine("Task list spacing", 1, 1, 1)
+                GameTooltip:AddLine("Compact: tighter rows for more tasks on screen.", 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine("Normal: default spacing.", 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine("Spacious: roomier rows, easier to tap on touch screens.", 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            spDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            y = y - 32
+        else
+            local function GetSpLabel()
+                local v = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+                for _, item in ipairs(SP_ITEMS) do if item.key == v then return item.label end end
+                return "Normal"
+            end
+            local spBtn = BNB.CreateButton(nil, ct, GetSpLabel(), CONTENT_W, 24)
+            spBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            spBtn:SetScript("OnClick", function(self)
+                local cur = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+                local idx = 1
+                for i, item in ipairs(SP_ITEMS) do if item.key == cur then idx = i; break end end
+                idx = (idx % #SP_ITEMS) + 1
+                if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = SP_ITEMS[idx].key end
+                self:SetText(SP_ITEMS[idx].label)
+                OnSpacingChanged()
+            end)
+            y = y - 30
+        end
+    end
+
+    -- Default sticky view for notes with tasks
+    y = AddCheck(ct, y, "Open sticky notes in task view by default",
+        function() return (BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or "tasks") == "tasks" end,
+        function(v)
+            if BigNoteBoxDB then
+                BigNoteBoxDB.taskStickyDefault = v and "tasks" or "note"
+            end
+        end,
+        "When a sticky note has tasks, open it showing the task list. Uncheck to always open showing the note body instead.")
+
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_FOCUS_ORBIT_HEADER"])
 

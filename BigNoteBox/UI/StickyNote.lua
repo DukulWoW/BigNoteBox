@@ -70,6 +70,13 @@ local DEFAULT_CFG = {
 local openFrames = {}
 BNB._stickyFrames = openFrames
 
+-- Per-note collapse state for sticky task rows: _stickyCollapsed[noteID][taskID] = true
+-- Persists across re-renders; cleared when the sticky is closed.
+local _stickyCollapsed = {}
+
+-- Guard so TasksChanged callback is registered only once.
+local _stickyTaskCallbackRegistered = false
+
 -- ── DB helpers ────────────────────────────────────────────────────────────────
 local function DB()       return BigNoteBoxDB end
 local function StickyDB() return BigNoteBoxDB and BigNoteBoxDB.postits or {} end
@@ -132,6 +139,8 @@ end
 -- Add new textures here as assets are created; no other file needs changing.
 local BG_TEXTURES = {
     { key = "none",         label = "None" },
+    { key = "bg-stone",     label = "Stone",
+      path = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga", tile = true },
     { key = "bgtexture-01", label = "Old white used paper",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
     { key = "bgtexture-02", label = "Plain white paper",
@@ -1328,7 +1337,7 @@ local function PopulateStickySettings(noteID)
             end
         end)
     plainOnlyWidgets[#plainOnlyWidgets+1] = textOpacitySl
-    MakeSlider(ct2, "Background opacity %", 10, 100,
+    MakeSlider(ct2, "Background opacity %", 0, 100,
         math.floor((cfg.alpha or 0.96) * 100),
         function(v)
             cfg.alpha = v/100; SaveCfg(noteID, cfg)
@@ -2711,6 +2720,313 @@ local function BuildIconBadge(f, noteID, note)
     return (ICON_SZ - ICON_INSET) - HEADER_BORDER_PAD + 6
 end
 
+-- ── Sticky task view ──────────────────────────────────────────────────────────
+local TASK_FOOTER_H = 20   -- height of the completion counter strip
+
+-- Reads the persisted view preference for a sticky, falling back to the global
+-- default. Returns "tasks" or "note".
+local function GetStickyViewPref(noteID)
+    local rec = noteID and StickyDB()[noteID]
+    local saved = rec and rec.view
+    if saved == "tasks" or saved == "note" then return saved end
+    local def = BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or "tasks"
+    return def
+end
+
+-- Save which view the sticky is currently in.
+local function SaveStickyView(noteID, view)
+    local db = DB(); if not db then return end
+    db.postits = db.postits or {}
+    db.postits[noteID] = db.postits[noteID] or {}
+    db.postits[noteID].view = view
+end
+
+-- Render (or re-render) the task list into f._taskScroll / f._taskContent.
+-- Called on first show and whenever TasksChanged fires for this noteID.
+local function RenderStickyTasks(noteID)
+    local f = openFrames[noteID]; if not f or not f._taskContent then return end
+    local ct = f._taskContent
+
+    -- Clear previous rows
+    for _, child in ipairs({ct:GetChildren()}) do child:Hide(); child:SetParent(nil) end
+    for _, region in ipairs({ct:GetRegions()}) do region:Hide(); region:SetParent(nil) end
+    ct._rows = {}
+
+    if not (BNB.Task and BNB.Task.HasTasks(noteID)) then
+        ct:SetHeight(1)
+        if f._taskFooterLbl then f._taskFooterLbl:SetText("") end
+        return
+    end
+
+    local INDENT    = BNB.Task.SUBTASK_INDENT or 14
+    local CB_SZ     = 14
+    local PAD_L     = 4
+    local PAD_R     = 6
+    -- Row height and gap driven by BigNoteBoxDB.taskSpacing
+    local _sp = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+    local ROW_H, SUB_ROW_H, ROW_GAP
+    if _sp == "compact"  then ROW_H, SUB_ROW_H, ROW_GAP = 18, 16, 1
+    elseif _sp == "spacious" then ROW_H, SUB_ROW_H, ROW_GAP = 30, 28, 4
+    else ROW_H, SUB_ROW_H, ROW_GAP = 22, 20, 2 end
+    local collapsed = _stickyCollapsed[noteID] or {}
+    _stickyCollapsed[noteID] = collapsed
+
+    local y = -4
+    local rows = {}
+
+    local function AddRow(task, depth)
+        local indent = depth * INDENT
+        local row = CreateFrame("Frame", nil, ct)
+        row:SetHeight(ROW_H)
+        row:SetPoint("TOPLEFT",  ct, "TOPLEFT",  PAD_L + indent, y)
+        row:SetPoint("TOPRIGHT", ct, "TOPRIGHT", -PAD_R, y)
+        row._taskID = task.id
+        row._depth  = depth
+        local rowH = (depth > 0) and SUB_ROW_H or ROW_H
+        row:SetHeight(rowH)
+
+        -- Checkbox
+        local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        cb:SetSize(CB_SZ, CB_SZ)
+        cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+        cb:SetChecked(task.completed and true or false)
+        cb:SetScript("OnClick", function(self)
+            if BNB.Task and BNB.Task.ToggleTask then
+                BNB.Task.ToggleTask(noteID, task.id)
+            end
+        end)
+        -- Stop click from bubbling to the row's collapse handler
+        cb:SetScript("OnMouseDown", function(_, btn)
+            if btn == "LeftButton" then
+                -- consume; let CheckButton handle it
+            end
+        end)
+
+        -- Toggle button: bt-right (collapsed) / bt-down (expanded), matches RefBox.
+        -- Hidden entirely for leaf tasks (no sub-tasks) — not functional in sticky.
+        local SN_ASSETS  = "Interface\\AddOns\\BigNoteBox\\Assets\\"
+        local SN_BTN_A   = SN_ASSETS .. "Buttons\\"
+        local SN_UI_A    = SN_ASSETS .. "UI\\"
+        local hasSubs    = BNB.Task.GetSubTasks and #BNB.Task.GetSubTasks(noteID, task.id) > 0
+        local isCollapsed = collapsed[task.id]
+        local TOG_SZ     = 14
+        local ICO_SZ     = 12
+        local ICO_GAP    = 2
+
+        local togBtn = CreateFrame("Button", nil, row)
+        togBtn:SetSize(TOG_SZ, TOG_SZ)
+        togBtn:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        togBtn:SetFrameLevel(row:GetFrameLevel() + 3)
+        local togTex = togBtn:CreateTexture(nil, "ARTWORK"); togTex:SetAllPoints()
+        if hasSubs then
+            togTex:SetTexture(SN_BTN_A .. (isCollapsed and "bt-right-normal" or "bt-down-normal"))
+            togBtn:SetAlpha(1.0)
+            local function DoCollapse()
+                if collapsed[task.id] then collapsed[task.id] = nil
+                else collapsed[task.id] = true end
+                RenderStickyTasks(noteID)
+            end
+            togBtn:SetScript("OnClick", DoCollapse)
+            togBtn:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(collapsed[task.id] and "Expand sub-tasks" or "Collapse sub-tasks", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            togBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            -- Invisible hit area covering the row (except checkbox) for tap-to-collapse
+            local hitBtn = CreateFrame("Button", nil, row)
+            hitBtn:SetPoint("TOPLEFT",     row, "TOPLEFT",     CB_SZ + 2, 0)
+            hitBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0,         0)
+            hitBtn:SetFrameLevel(row:GetFrameLevel() + 2)  -- below togBtn (+3)
+            hitBtn:SetScript("OnClick", DoCollapse)
+        else
+            togBtn:Hide()  -- no sub-tasks: hide the toggle entirely
+        end
+
+        -- Left-to-right icon chain after togBtn: [R?] [S?]
+        -- Each anchors LEFT to the previous element's RIGHT.
+        local leftAnchor = togBtn  -- label will anchor to the last icon (or togBtn if none)
+
+        local hasRst = task.resetType and task.resetType ~= "" and task.resetType ~= "none"
+        if hasRst then
+            local rstIco = CreateFrame("Button", nil, row)
+            rstIco:SetSize(ICO_SZ, ICO_SZ)
+            rstIco:SetPoint("LEFT", leftAnchor, "RIGHT", ICO_GAP, 0)
+            rstIco:SetFrameLevel(row:GetFrameLevel() + 3)
+            local rstTx = rstIco:CreateTexture(nil, "ARTWORK"); rstTx:SetAllPoints()
+            rstTx:SetTexture(SN_UI_A .. "ui-repeat")
+            rstIco:SetAlpha(0.8)
+            local resetTip = task.resetType == "daily" and "Reset: Daily" or "Reset: Weekly"
+            rstIco:SetScript("OnEnter", function(self)
+                self:SetAlpha(1.0)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(resetTip, 1, 1, 1)
+                GameTooltip:AddLine("Click to edit task.", 0.8, 0.8, 0.8)
+                GameTooltip:Show()
+            end)
+            rstIco:SetScript("OnLeave", function(self) self:SetAlpha(0.8); GameTooltip:Hide() end)
+            rstIco:SetScript("OnClick", function()
+                if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
+                    BNB.TaskEditWindow.Open(noteID, task.id, row)
+                end
+            end)
+            leftAnchor = rstIco
+        end
+
+        local hasSit = task.situation and task.situation ~= ""
+        if hasSit then
+            local sitIco = CreateFrame("Button", nil, row)
+            sitIco:SetSize(ICO_SZ, ICO_SZ)
+            sitIco:SetPoint("LEFT", leftAnchor, "RIGHT", ICO_GAP, 0)
+            sitIco:SetFrameLevel(row:GetFrameLevel() + 3)
+            local sitTx = sitIco:CreateTexture(nil, "ARTWORK"); sitTx:SetAllPoints()
+            sitTx:SetTexture(SN_UI_A .. "ui-situation")
+            sitIco:SetAlpha(0.8)
+            sitIco:SetScript("OnEnter", function(self)
+                self:SetAlpha(1.0)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine("Situation: " .. task.situation, 1, 1, 1)
+                GameTooltip:AddLine("Click to edit task.", 0.8, 0.8, 0.8)
+                GameTooltip:Show()
+            end)
+            sitIco:SetScript("OnLeave", function(self) self:SetAlpha(0.8); GameTooltip:Hide() end)
+            sitIco:SetScript("OnClick", function()
+                if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
+                    BNB.TaskEditWindow.Open(noteID, task.id, row)
+                end
+            end)
+            leftAnchor = sitIco
+        end
+
+        -- Task text label — anchors from last icon (or togBtn if no icons)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("LEFT",  leftAnchor, "RIGHT", ICO_GAP, 0)
+        lbl:SetPoint("RIGHT", row,        "RIGHT", 0,       0)
+        lbl:SetJustifyH("LEFT"); lbl:SetMaxLines(1); lbl:SetWordWrap(false)
+        local col = BNB.Task.GetTaskColor(task)
+        lbl:SetTextColor(col.r, col.g, col.b)
+        lbl:SetText(task.text or "")
+
+        -- Tooltip on truncation
+        lbl:SetScript("OnEnter", function(self)
+            if self:IsTruncated() then
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(task.text or "", 1, 1, 1, true)
+                GameTooltip:Show()
+            end
+        end)
+        lbl:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+        row._cb  = cb
+        row._lbl = lbl
+        rows[#rows + 1] = row
+        y = y - rowH - ROW_GAP
+        return row
+    end
+
+    local topLevel = BNB.Task.GetTopLevel(noteID)
+    for _, task in ipairs(topLevel) do
+        AddRow(task, 0)
+        if not collapsed[task.id] then
+            local subs = BNB.Task.GetSubTasks(noteID, task.id)
+            for _, sub in ipairs(subs) do
+                AddRow(sub, 1)
+            end
+        end
+    end
+
+    local contentH = math.abs(y) + 4
+    ct:SetHeight(math.max(contentH, f._taskScroll:GetHeight()))
+    ct._rows = rows
+
+    -- Update footer completion counter
+    if f._taskFooterLbl then
+        local tasks = BNB.Task.GetTasks(noteID)
+        local topDone, topTotal = 0, 0
+        local subDone, subTotal = 0, 0
+        for _, t in ipairs(tasks) do
+            if t.parentID then
+                subTotal = subTotal + 1
+                if t.completed then subDone = subDone + 1 end
+            else
+                topTotal = topTotal + 1
+                if t.completed then topDone = topDone + 1 end
+            end
+        end
+        local allDone = (topTotal > 0 and topDone == topTotal)
+            and (subTotal == 0 or subDone == subTotal)
+        local txt = topDone .. "/" .. topTotal .. " Tasks"
+        if subTotal > 0 then
+            txt = txt .. " - " .. subDone .. "/" .. subTotal .. " Sub-tasks"
+        end
+        f._taskFooterLbl:SetText(txt)
+        if allDone then
+            f._taskFooterLbl:SetTextColor(0.4, 0.85, 0.4)
+        else
+            f._taskFooterLbl:SetTextColor(0.65, 0.65, 0.65)
+        end
+    end
+
+    -- Show/hide global reset and situation icons in footer
+    local tl = BNB.Task.GetList(noteID)
+    local hasGlobalRst = tl and tl.resetType and tl.resetType ~= "" and tl.resetType ~= "none"
+    local hasGlobalSit = tl and tl.situation and tl.situation ~= ""
+    if f._taskFtrRstIco then
+        if hasGlobalRst then f._taskFtrRstIco:Show() else f._taskFtrRstIco:Hide() end
+    end
+    if f._taskFtrSitIco then
+        if hasGlobalSit then f._taskFtrSitIco:Show() else f._taskFtrSitIco:Hide() end
+    end
+end
+
+-- Switch the sticky between task view and note view.
+-- view = "tasks" or "note". Saves preference to DB.
+local function SN_SetTaskView(noteID, view)
+    local f = openFrames[noteID]; if not f then return end
+    local showTasks = (view == "tasks") and BNB.Task and BNB.Task.HasTasks(noteID)
+
+    -- When switching to tasks, render first so content is ready
+    if showTasks then
+        RenderStickyTasks(noteID)
+        f._bodyScroll:Hide()
+        f._richScroll:Hide()
+        f._taskScroll:Show()
+        f._taskFooter:Show()
+    else
+        f._taskViewActive = false
+        f._taskScroll:Hide()
+        f._taskFooter:Hide()
+        -- Restore note view via RefreshNote (handles plain/rich correctly)
+        SN.RefreshNote(noteID)
+    end
+
+    f._taskViewActive = showTasks
+    SaveStickyView(noteID, showTasks and "tasks" or "note")
+
+    -- Update tasks button tooltip
+    if f._tasksHdrBtn then
+        -- tooltip updates dynamically in OnEnter; nothing to do here
+    end
+end
+
+-- Expose so SN.Open and external callers can use it after SN is defined.
+-- Forward-declared; assigned after SN table exists below.
+
+-- Register TasksChanged callback once so open stickies re-render on data changes.
+local function EnsureStickyTaskCallback()
+    if _stickyTaskCallbackRegistered then return end
+    if not (BNB.Task and BNB.Task.RegisterCallback) then return end
+    _stickyTaskCallbackRegistered = true
+    BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
+        local f = changedNoteID and openFrames[changedNoteID]
+        if not f then return end
+        if f._taskViewActive then
+            RenderStickyTasks(changedNoteID)
+        end
+        -- Also update the tasks button tooltip state dynamically (via OnEnter)
+    end)
+end
+
 -- ── Build a sticky note frame ─────────────────────────────────────────────────
 local function CreateStickyFrame(noteID)
     local note = BNB.GetNote(noteID)
@@ -2928,7 +3244,52 @@ local function CreateStickyFrame(noteID)
     end)
     f._alarmHdrBtn = alarmHdrBtn
 
-    -- Wire the overlay fade and resize handle via OnUpdate poll.
+    -- slot 6 = tasks: toggle task view / create first task
+    local tasksHdrBtn = HdrBtn(6, "bt-tasks", "Create Task", function()
+        local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
+        if not hasTasks then
+            -- No tasks: open main window, select note, open RefBox, add task
+            if not BNB.mainFrame then
+                if BNB.CreateMainWindow then BNB.CreateMainWindow() end
+            end
+            if BNB.mainFrame then
+                BNB.mainFrame:Show()
+                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                if BNB.SelectNote      then BNB.SelectNote(noteID) end
+            end
+            local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
+            if taskID then
+                if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+                -- Defer long enough for RefBox to open and RenderTaskPanel to
+                -- complete before we try to focus the new task's editbox.
+                C_Timer.After(0.2, function()
+                    if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
+                end)
+            end
+        else
+            -- Has tasks: toggle between task view and note view
+            local newView = f._taskViewActive and "note" or "tasks"
+            SN_SetTaskView(noteID, newView)
+        end
+    end)
+    tasksHdrBtn:SetScript("OnEnter", function(self)
+        local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
+        local tip
+        if not hasTasks then
+            tip = "Create Task"
+        elseif f._taskViewActive then
+            tip = "Show Note"
+        else
+            tip = "Show Tasks"
+        end
+        FadeBtns(1)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(tip, 1, 1, 1)
+        GameTooltip:Show()
+        local c = f._cfg
+        ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
+    end)
+    f._tasksHdrBtn = tasksHdrBtn
     -- OnEnter/OnLeave on the root are unreliable when the frame is fully covered
     -- by child frames (front, header, body) — the cursor may never "touch" the
     -- root's own hit rect, so Leave events can be swallowed.  Polling each frame
@@ -3033,7 +3394,106 @@ local function CreateStickyFrame(noteID)
 
     ForwardHover(richScroll, f)
 
-    -- ── Resize handle ─────────────────────────────────────────────────────────
+    -- ── Task scroll frame ─────────────────────────────────────────────────────
+    -- Sibling to _bodyScroll and _richScroll. Shown only when task view is active.
+    -- Anchored identically to _bodyScroll but bottom leaves room for the footer.
+    local taskScroll = CreateFrame("ScrollFrame", nil, front, "ScrollFrameTemplate")
+    taskScroll:SetPoint("TOPLEFT",     header, "BOTTOMLEFT",  PAD,       -PAD)
+    taskScroll:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22), PAD + TASK_FOOTER_H + 2)
+    taskScroll:Hide()
+    f._taskScroll = taskScroll
+
+    local taskSB = taskScroll.ScrollBar
+    if taskSB then
+        taskSB:SetAlpha(0)
+        taskScroll:HookScript("OnScrollRangeChanged", function(_, _, yRange)
+            taskSB:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
+        end)
+        pcall(function() ForwardHoverRecursive(taskSB, f) end)
+    end
+
+    local taskContent = CreateFrame("Frame", nil, taskScroll)
+    taskContent:SetWidth(1); taskContent:SetHeight(1)
+    taskScroll:SetScrollChild(taskContent)
+    f._taskContent = taskContent
+
+    -- Keep content width synced with scroll frame
+    taskScroll:SetScript("OnSizeChanged", function(self)
+        local w = self:GetWidth()
+        if w and w > 0 then taskContent:SetWidth(w) end
+    end)
+    ForwardHover(taskScroll, f)
+
+    -- Task footer: completion counter pinned below the scroll frame
+    local taskFooter = CreateFrame("Frame", nil, front)
+    taskFooter:SetHeight(TASK_FOOTER_H)
+    taskFooter:SetPoint("BOTTOMLEFT",  front, "BOTTOMLEFT",  PAD,       PAD)
+    taskFooter:SetPoint("BOTTOMRIGHT", front, "BOTTOMRIGHT", -(PAD+22), PAD)
+    taskFooter:Hide()
+    f._taskFooter = taskFooter
+
+    local taskFooterLbl = taskFooter:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    taskFooterLbl:SetPoint("LEFT",  taskFooter, "LEFT",  0, 0)
+    taskFooterLbl:SetPoint("RIGHT", taskFooter, "RIGHT", -(12 + 4 + 12 + 4), 0)
+    taskFooterLbl:SetJustifyH("LEFT")
+    taskFooterLbl:SetTextColor(0.65, 0.65, 0.65)
+    taskFooterLbl:SetText("")
+    f._taskFooterLbl = taskFooterLbl
+
+    -- Global reset icon (ui-repeat) — shown when note.taskList.resetType is set
+    -- Anchored to the RIGHT of the footer; situation icon to its left.
+    local FTR_ICO_SZ  = 12
+    local FTR_ICO_PAD = 4
+    local FTR_UI = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
+
+    local ftrRstIco = CreateFrame("Frame", nil, taskFooter)
+    ftrRstIco:SetSize(FTR_ICO_SZ, FTR_ICO_SZ)
+    ftrRstIco:SetPoint("RIGHT", taskFooter, "RIGHT", 0, 0)
+    ftrRstIco:EnableMouse(true)
+    local ftrRstTx = ftrRstIco:CreateTexture(nil, "ARTWORK"); ftrRstTx:SetAllPoints()
+    ftrRstTx:SetTexture(FTR_UI .. "ui-repeat")
+    ftrRstIco:SetAlpha(0.6)
+    ftrRstIco:Hide()
+    ftrRstIco:SetScript("OnEnter", function(self)
+        self:SetAlpha(1.0)
+        local tl = BNB.Task and BNB.Task.GetList(noteID)
+        local rt = tl and tl.resetType
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Global task reset", 1, 1, 1)
+        if rt == "daily" then
+            GameTooltip:AddLine("All tasks in this note reset daily.", 0.78, 0.78, 0.78, true)
+        elseif rt == "weekly" then
+            GameTooltip:AddLine("All tasks in this note reset weekly.", 0.78, 0.78, 0.78, true)
+        end
+        GameTooltip:Show()
+    end)
+    ftrRstIco:SetScript("OnLeave", function(self) self:SetAlpha(0.6); GameTooltip:Hide() end)
+    f._taskFtrRstIco = ftrRstIco
+
+    -- Global situation icon (ui-situation) — shown when note.taskList.situation is set
+    local ftrSitIco = CreateFrame("Frame", nil, taskFooter)
+    ftrSitIco:SetSize(FTR_ICO_SZ, FTR_ICO_SZ)
+    ftrSitIco:SetPoint("RIGHT", ftrRstIco, "LEFT", -FTR_ICO_PAD, 0)
+    ftrSitIco:EnableMouse(true)
+    local ftrSitTx = ftrSitIco:CreateTexture(nil, "ARTWORK"); ftrSitTx:SetAllPoints()
+    ftrSitTx:SetTexture(FTR_UI .. "ui-situation")
+    ftrSitIco:SetAlpha(0.6)
+    ftrSitIco:Hide()
+    ftrSitIco:SetScript("OnEnter", function(self)
+        self:SetAlpha(1.0)
+        local tl = BNB.Task and BNB.Task.GetList(noteID)
+        local sit = tl and tl.situation
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine("Global task situation", 1, 1, 1)
+        if sit and sit ~= "" then
+            GameTooltip:AddLine("Tasks are bound to: " .. sit, 0.78, 0.78, 0.78, true)
+        end
+        GameTooltip:Show()
+    end)
+    ftrSitIco:SetScript("OnLeave", function(self) self:SetAlpha(0.6); GameTooltip:Hide() end)
+    f._taskFtrSitIco = ftrSitIco
+
+    ForwardHover(taskFooter, f)
     AddResizeHandle(f, noteID)
 
     -- ── Minimized tile ────────────────────────────────────────────────────────
@@ -3042,34 +3502,59 @@ local function CreateStickyFrame(noteID)
     -- ── Geometry + content ────────────────────────────────────────────────────
     LoadGeometry(noteID, f)
 
-    -- Initial content: rich notes go through SN.RefreshNote (deferred) so the
-    -- layout engine has resolved frame widths before SetHTML is called.
-    -- Plain notes (or rich notes with plainText override) set text directly.
+    -- Always populate note content at build time so switching back from task
+    -- view always has something to show. Rich notes need a deferred render
+    -- (GetWidth() is 0 on the same tick as Show()); plain notes set text now.
     local initCfg = GetCfg(noteID)
-    if BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note) and not initCfg.richPlainText then
-        -- bodyEb stays hidden; RefreshNote will show richScroll instead.
-        -- Defer so GetWidth() returns a real value after the first layout pass.
-        C_Timer.After(0, function()
-            SN.RefreshNote(noteID)
-        end)
-    else
+    local initIsRich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
+                       and not initCfg.richPlainText
+    if not initIsRich then
         local body = note.body or ""
         if initCfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
             body = BNB.AdvancedMode.StripMarkup(body)
         end
         bodyEb:SetText(body)
-        -- Force scroll to top after layout settles
-        local function ScrollTop()
-            if sf2 and sf2:IsVisible() then sf2:SetVerticalScroll(0) end
-        end
-        C_Timer.After(0.05, ScrollTop)
-        C_Timer.After(0.15, ScrollTop)
-        C_Timer.After(0.3,  ScrollTop)
     end
 
     ApplyConfig(f, noteID)
-    f._noteID    = noteID
-    f._minimized = false
+    f._noteID        = noteID
+    f._minimized     = false
+    f._taskViewActive = false
+
+    -- Determine initial view.
+    local initView = GetStickyViewPref(noteID)
+    local openInTasks = initView == "tasks" and BNB.Task and BNB.Task.HasTasks(noteID)
+
+    if openInTasks then
+        -- Defer one tick so frame geometry is resolved, then switch to task view.
+        -- Plain note text is already in bodyEb above; rich note content will be
+        -- populated by RefreshNote when the user switches back to note view.
+        C_Timer.After(0, function()
+            if openFrames[noteID] == f then
+                SN_SetTaskView(noteID, "tasks")
+            end
+        end)
+    else
+        -- Note view: populate rich content now (deferred), plain already set.
+        if initIsRich then
+            C_Timer.After(0, function()
+                if openFrames[noteID] == f then
+                    SN.RefreshNote(noteID)
+                end
+            end)
+        else
+            local function ScrollTop()
+                if sf2 and sf2:IsVisible() then sf2:SetVerticalScroll(0) end
+            end
+            C_Timer.After(0.05, ScrollTop)
+            C_Timer.After(0.15, ScrollTop)
+            C_Timer.After(0.3,  ScrollTop)
+        end
+    end
+
+    -- Ensure the TasksChanged callback is wired after first frame is built.
+    EnsureStickyTaskCallback()
+
     return f
 end
 
@@ -3190,6 +3675,8 @@ end
 
 function SN.Close(noteID)
     local f = openFrames[noteID]; if not f then return end
+    -- Clear per-note task collapse state
+    _stickyCollapsed[noteID] = nil
     -- Dismiss alarm if it is active (fired but not yet dismissed) when sticky closes.
     -- Uses IsAlarmActive rather than IsGlowing so it works regardless of glow timing.
     if BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID) then
@@ -3334,6 +3821,14 @@ function SN.CloseSettings()
     CloseStickySettings()
 end
 
+-- Re-render the task view for a sticky (called when spacing setting changes).
+function SN.RefreshTaskView(noteID)
+    local f = openFrames[noteID]
+    if f and f._taskViewActive then
+        RenderStickyTasks(noteID)
+    end
+end
+
 -- Refresh the Situation tab of the sticky settings window if it is currently
 -- open for the given noteID. Called by NoteConfig whenever it saves a
 -- situation-related field so both windows stay in sync.
@@ -3363,6 +3858,14 @@ function SN.RefreshNote(noteID)
         f._titleLbl:SetPoint("RIGHT", f._headerBar, "RIGHT", -PAD,      0)
     end
     if f._bodyEb then
+        -- If task view is currently active, don't clobber it — just update
+        -- the title and badge above which we've already done.
+        if f._taskViewActive then
+            -- Re-render tasks in case text/completion changed
+            RenderStickyTasks(noteID)
+            ApplyConfig(f, noteID)
+            return
+        end
         local stickyCfg = GetCfg(noteID)
         local renderRich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
                            and not stickyCfg.richPlainText
