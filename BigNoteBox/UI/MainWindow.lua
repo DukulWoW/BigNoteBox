@@ -98,6 +98,11 @@ function BNB.CreateMainWindow()
         self:StopMovingOrSizing()
         SaveWindowPos(self)
     end)
+    -- When the main window is clicked/raised, bring all visible BNB windows
+    -- to the front together so none get left behind other frames.
+    f:SetScript("OnMouseDown", function()
+        if BNB.RaiseBNBWindows then BNB.RaiseBNBWindows() end
+    end)
 
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
@@ -809,6 +814,16 @@ function BNB.CreateMainWindow()
         -- If NoteConfig is open, close it next
         local nc = _G["BigNoteBoxNoteConfigFrame"]
         if nc and nc:IsShown() then nc:Hide(); return end
+        -- If Task Edit Window is open, close it before RefBox
+        local tew = _G["BNBTaskEditWindow"]
+        if tew and tew:IsShown() then
+            if BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
+                BNB.TaskEditWindow.Close()
+            else
+                tew:Hide()
+            end
+            return
+        end
         -- If Reference Box is open, close it next
         local rb = _G["BigNoteBoxReferenceBoxFrame"]
         if rb and rb:IsShown() then rb:Hide(); return end
@@ -1126,6 +1141,41 @@ function BNB.CloseCompanionWindows()
     local ao = _G["BNBAlarmOverviewFrame"]
     if ao and ao:IsShown() then ao:Hide() end
     if BNB.NewNoteDialog and BNB.NewNoteDialog.Close then BNB.NewNoteDialog.Close() end
+end
+
+-- Raise all currently-visible BNB frames together so clicking the main window
+-- never leaves companion windows stranded behind other addon frames.
+local BNB_RAISE_FRAMES = {
+    "BigNoteBoxFrame",
+    "BigNoteBoxReferenceBoxFrame",
+    "BigNoteBoxNoteConfigFrame",
+    "BigNoteBoxConfigFrame",
+    "BigNoteBoxTrashFrame",
+    "BigNoteBoxTagManagerFrame",
+    "BigNoteBoxCopyMoveFrame",
+    "BigNoteBoxExportFrame",
+    "BigNoteBoxHistoryFrame",
+    "BigNoteBoxHistoryCompareFrame",
+    "BigNoteBoxNoteHistoryFrame",
+    "BigNoteBoxStickySettingsFrame",
+    "BNBAlarmWindow",
+    "BNBAlarmOverviewFrame",
+    "BNBShareFrame",
+    "BNBSharePreviewFrame",
+    "BNBImportFrame",
+    "BNBTaskEditWindow",
+    "BNBSidebarIconPickerFrame",
+    "BigNoteBoxTagManagerFrame",
+    "BigNoteBoxSendDialog",
+    "BigNoteBoxSendConfirm",
+}
+function BNB.RaiseBNBWindows()
+    for _, name in ipairs(BNB_RAISE_FRAMES) do
+        local fr = _G[name]
+        if fr and fr:IsShown() then
+            pcall(function() fr:Raise() end)
+        end
+    end
 end
 
 --------------------------------------------------------------------------------

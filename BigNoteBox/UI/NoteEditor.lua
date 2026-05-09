@@ -2977,9 +2977,26 @@ local function BuildToolbar(parent)
         BNB._editorRefBoxBtn = refboxBtn
     end
 
+    -- Tasks button — adds a task to the current note (same as + button in RefBox)
+    do
+        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", "Add task to this note")
+        tasksBtn:SetPoint("LEFT", bar, "LEFT", 70, 0)
+        tasksBtn:SetScript("OnClick", function()
+            local id = BNB._currentNoteID; if not id then return end
+            local taskID = BNB.Task and BNB.Task.AddTask(id, "")
+            if taskID then
+                if BNB.OpenReferenceBox then BNB.OpenReferenceBox(id) end
+                C_Timer.After(0.05, function()
+                    if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
+                end)
+            end
+        end)
+        bar._tasksBtn = tasksBtn
+    end
+
     -- Delete
     local delBtn = MakeIconBtn(bar, "Actionbar\\ab-delete", L["BTN_DELETE_NOTE"])
-    delBtn:SetPoint("LEFT", bar, "LEFT", 70, 0)
+    delBtn:SetPoint("LEFT", bar, "LEFT", 102, 0)
     delBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -3004,7 +3021,7 @@ local function BuildToolbar(parent)
 
     -- Duplicate
     local dupBtn = MakeIconBtn(bar, "Actionbar\\ab-duplicate", "Duplicate this note")
-    dupBtn:SetPoint("LEFT", bar, "LEFT", 102, 0)
+    dupBtn:SetPoint("LEFT", bar, "LEFT", 134, 0)
     dupBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local src = BNB.GetNote(id);   if not src then return end
@@ -3026,7 +3043,7 @@ local function BuildToolbar(parent)
 
     -- Copy to clipboard — copies title + body silently via editbox trick
     local copyBtn = MakeIconBtn(bar, "Actionbar\\ab-copy", L["BTN_COPY_NOTE"])
-    copyBtn:SetPoint("LEFT", bar, "LEFT", 134, 0)
+    copyBtn:SetPoint("LEFT", bar, "LEFT", 166, 0)
     copyBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -3043,7 +3060,7 @@ local function BuildToolbar(parent)
     -- lock.tga   = note is unlocked → click to lock it persistently.
     -- unlock.tga = note is locked   → click to unlock it persistently.
     local lockBtn, lockTx = MakeIconBtn(bar, "Actionbar\\ab-lock", "")   -- tip set dynamically below
-    lockBtn:SetPoint("LEFT", bar, "LEFT", 196, 0)
+    lockBtn:SetPoint("LEFT", bar, "LEFT", 228, 0)
     lockBtn:Hide()
     lockBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
@@ -3082,7 +3099,7 @@ local function BuildToolbar(parent)
     -- Sticky Note pin button — offset 132, always visible
     local pinBtn = CreateFrame("Button", nil, bar)
     pinBtn:SetSize(24, 24)
-    pinBtn:SetPoint("LEFT", bar, "LEFT", 166, 0)
+    pinBtn:SetPoint("LEFT", bar, "LEFT", 198, 0)
     local pinTx = pinBtn:CreateTexture(nil, "ARTWORK")
     pinTx:SetAllPoints()
     pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Actionbar\\ab-stickynote")
