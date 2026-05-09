@@ -284,6 +284,8 @@ local function MigrateSettingsDB()
         if db.taskStickyDefault      == nil then db.taskStickyDefault      = "tasks" end
         -- Where completed tasks appear in the list. "bottom" = push to bottom.
         if db.taskCompletedPosition  == nil then db.taskCompletedPosition  = "bottom" end
+        -- Row spacing in task lists. "normal" = default, "compact", "spacious".
+        if db.taskSpacing            == nil then db.taskSpacing            = "normal" end
         -- Whether the task panel is expanded by default in RefBox.
         if db.taskPanelExpanded      == nil then db.taskPanelExpanded      = true  end
         -- Per-note task/attachment split ratio: { [noteID] = 0.0..1.0 }

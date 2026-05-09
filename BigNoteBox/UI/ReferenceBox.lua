@@ -47,12 +47,18 @@ local SK_RB_TITLE_H         = 28
 
 -- ── Task panel constants ──────────────────────────────────────────────────────
 local TASK_HDR_H            = 24     -- height of the task panel header row
-local TASK_ROW_H            = 24     -- height of each task row
-local TASK_SUBROW_H         = 22     -- height of sub-task rows
 local TASK_SPLIT_MIN_PX     = 60     -- minimum px for either task or attachment pane
 local TASK_CB_SCALE         = 0.65   -- UICheckButtonTemplate scale ~17px
 local ADD_TASKS_H           = 40     -- reserved strip height for the wide Add Tasks button
 local TASK_FOOTER_H         = 26     -- height of Clear/Delete footer strip
+
+-- Returns { rowH, subRowH, gap } based on BigNoteBoxDB.taskSpacing.
+local function GetTaskSpacing()
+    local s = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+    if s == "compact"  then return 18, 16, 1 end
+    if s == "spacious" then return 30, 28, 4 end
+    return 24, 22, 2   -- normal (original values)
+end
 
 local QUALITY_COLORS = {
     [0]={r=0.62,g=0.62,b=0.62}, [1]={r=1.00,g=1.00,b=1.00},
@@ -1702,9 +1708,20 @@ local function BuildTaskPanel(f)
         end)
     end
 
-    -- Inner scroll frame for task rows — leaves TASK_FOOTER_H at bottom for footer
+    -- Fixed header label on pnl (not tsc) so it doesn't scroll with task rows.
+    -- Created once at build time; RenderTaskPanel updates its text each render.
+    local pnlHdrLbl = pnl:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    pnlHdrLbl:SetPoint("TOPLEFT",  pnl, "TOPLEFT",  PAD + 3, -4)
+    pnlHdrLbl:SetPoint("TOPRIGHT", pnl, "TOPRIGHT", -4,      -4)
+    pnlHdrLbl:SetHeight(TASK_HDR_H - 4)
+    pnlHdrLbl:SetJustifyH("LEFT")
+    pnlHdrLbl:SetText("")
+    f._taskHdrLbl = pnlHdrLbl
+
+    -- Inner scroll frame for task rows — top is offset by TASK_HDR_H so the
+    -- fixed header above is not overlapped; TASK_FOOTER_H at bottom for footer.
     local tsf = CreateFrame("ScrollFrame", nil, pnl, "ScrollFrameTemplate")
-    tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    3, 0)
+    tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    3, -TASK_HDR_H)
     tsf:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -SCROLL_PAD, TASK_FOOTER_H)
     if tsf.ScrollBar then
         tsf.ScrollBar:SetAlpha(0)
@@ -1953,15 +1970,11 @@ RenderTaskPanel = function()
     if     globalRst == "daily"  then hdrPrefix = "Daily Tasks"
     elseif globalRst == "weekly" then hdrPrefix = "Weekly Tasks" end
 
-    -- Header label (FontString on tsc — display only)
-    local hdrLbl = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hdrLbl:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  PAD, -4)
-    hdrLbl:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -4,  -4)
-    hdrLbl:SetHeight(TASK_HDR_H - 4)
-    hdrLbl:SetJustifyH("LEFT")
-    local hdrClr = (topTotal > 0 and topDone == topTotal) and "|cff66dd66" or ""
-    hdrLbl:SetText(hdrPrefix .. " " .. hdrClr .. "(" .. topDone .. "/" .. topTotal .. ")|r")
-    _taskRows[#_taskRows + 1] = hdrLbl
+    -- Update the fixed header label on pnl (created at build time, doesn't scroll)
+    if rbFrame._taskHdrLbl then
+        local hdrClr = (topTotal > 0 and topDone == topTotal) and "|cff66dd66" or ""
+        rbFrame._taskHdrLbl:SetText(hdrPrefix .. " " .. hdrClr .. "(" .. topDone .. "/" .. topTotal .. ")|r")
+    end
 
     -- Invisible right-click hit area no longer needed — [GR][GS] icons handle global editing.
 
@@ -2040,7 +2053,7 @@ RenderTaskPanel = function()
         "No global reset set. Click to add one.")
 
     -- ── Task rows ────────────────────────────────────────────────────────────
-    local y       = -(TASK_HDR_H + 2)
+    local y       = -4   -- small top pad; header is now fixed on pnl, not tsc
     local indent  = T.SUBTASK_INDENT or 14
     local contentW = (rbFrame:GetWidth() or RBW) - SCROLL_PAD - PAD * 2
 
@@ -2058,6 +2071,7 @@ RenderTaskPanel = function()
     end
 
     local function RenderTaskRow(task, isSubTask)
+        local TASK_ROW_H, TASK_SUBROW_H, TASK_ROW_GAP = GetTaskSpacing()
         local rowH  = isSubTask and TASK_SUBROW_H or TASK_ROW_H
         local xOff  = isSubTask and indent or 0
         local clr   = T.GetTaskColor(task)
@@ -2401,7 +2415,7 @@ RenderTaskPanel = function()
             end
         end)
 
-        y = y - rowH - 2
+        y = y - rowH - TASK_ROW_GAP
 
         -- Sub-tasks (one level only, only if expanded)
         if not isSubTask and row._expanded then

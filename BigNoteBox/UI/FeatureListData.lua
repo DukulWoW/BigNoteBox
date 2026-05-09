@@ -123,6 +123,29 @@ BNB.FEATURE_LIST = {
         },
     },
 
+    -- ── Tasks ────────────────────────────────────────────────────────────────
+    {
+        header = "Tasks",
+        blurb  = "Add a task list to any note and track your progress without leaving " ..
+                 "the game. Tasks live inside the Reference Box alongside your note, " ..
+                 "and can also be shown directly in sticky notes for at-a-glance tracking.",
+        items  = {
+            "Add tasks and sub-tasks to any note",
+            "Check and uncheck tasks to track progress",
+            "Sub-tasks collapse and expand to keep things tidy",
+            "Reorder tasks by dragging",
+            "Set daily or weekly auto-reset per task or for the whole note",
+            "Bind tasks to a situation so they reset when you leave a zone, instance, or player",
+            "Task panel in the Reference Box with a completion counter and splitter",
+            "Sticky notes can show task view instead of the note body",
+            "Live checkbox toggling directly in sticky note task view",
+            "Global reset and situation shown as icons in the sticky note footer",
+            "Task filter in the note list to show only notes with tasks",
+            "Task list spacing: Compact, Normal, or Spacious (Config > Features > Tasks)",
+            "Tasks included as a tier in the note share system",
+        },
+    },
+
     -- ── Alarms ───────────────────────────────────────────────────────────────
     {
         header = "Alarms",
