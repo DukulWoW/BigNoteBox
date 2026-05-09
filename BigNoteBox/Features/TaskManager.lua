@@ -240,6 +240,11 @@ function T.UpdateTask(noteID, taskID, changes)
 end
 
 -- Toggle completed state on a task.
+-- Propagation rules:
+--   Completing a parent   → completes all sub-tasks too.
+--   Uncompleting a parent → uncompletes all sub-tasks too.
+--   Completing a sub-task → if it is the last incomplete sibling, completes the parent.
+--   Uncompleting a sub-task → uncompletes the parent (can't be done with undone children).
 function T.ToggleTask(noteID, taskID)
     local task = T.FindTask(noteID, taskID)
     if not task then return end
@@ -248,17 +253,64 @@ function T.ToggleTask(noteID, taskID)
     local removeOnComplete = db and db.taskRemoveOnComplete
 
     if not task.completed then
-        -- Completing the task
+        -- ── Completing ───────────────────────────────────────────────────────
         task.completed = true
-        if removeOnComplete then
-            -- Delete immediately
-            T.DeleteTask(noteID, taskID)
-            return  -- DeleteTask already fires callback and persists
+
+        if not task.parentID then
+            -- Parent: complete all sub-tasks first
+            local subs = T.GetSubTasks(noteID, taskID)
+            for _, sub in ipairs(subs) do
+                sub.completed = true
+            end
         end
+
+        if removeOnComplete then
+            -- DeleteTask handles the task + all descendants recursively.
+            -- For a sub-task we also need to check if the parent should now
+            -- be deleted, so do that check before deleting this task.
+            if task.parentID then
+                local allDone = true
+                for _, sib in ipairs(T.GetSubTasks(noteID, task.parentID)) do
+                    if not sib.completed then allDone = false; break end
+                end
+                if allDone then
+                    -- Delete the parent (and all its descendants including this task).
+                    T.DeleteTask(noteID, task.parentID)
+                    return  -- DeleteTask fires callback and persists
+                end
+            end
+            T.DeleteTask(noteID, taskID)
+            return  -- DeleteTask fires callback and persists
+        end
+
+        -- Not removing: check if last sub-task just completed the parent
+        if task.parentID then
+            local allDone = true
+            for _, sib in ipairs(T.GetSubTasks(noteID, task.parentID)) do
+                if not sib.completed then allDone = false; break end
+            end
+            if allDone then
+                local parent = T.FindTask(noteID, task.parentID)
+                if parent then parent.completed = true end
+            end
+        end
+
     else
-        -- Uncompleting
+        -- ── Uncompleting ─────────────────────────────────────────────────────
         task.completed = false
+
+        if not task.parentID then
+            -- Parent unchecked: uncheck all sub-tasks
+            for _, sub in ipairs(T.GetSubTasks(noteID, taskID)) do
+                sub.completed = false
+            end
+        else
+            -- Sub-task unchecked: uncheck parent too
+            local parent = T.FindTask(noteID, task.parentID)
+            if parent then parent.completed = false end
+        end
     end
+
     Persist(noteID)
     Fire("TasksChanged", noteID)
 end
@@ -335,25 +387,8 @@ function T.ClearCompleted(noteID)
     local remove = db and db.taskRemoveOnComplete
 
     if remove then
-        -- Delete all completed tasks (and their descendants).
-        local toRemove = {}
-        for _, t in ipairs(tasks) do
-            if t.completed then toRemove[t.id] = true end
-        end
-        -- Also remove descendants of completed parents.
-        local found = true
-        while found do
-            found = false
-            for _, t in ipairs(tasks) do
-                if t.parentID and toRemove[t.parentID] and not toRemove[t.id] then
-                    toRemove[t.id] = true
-                    found = true
-                end
-            end
-        end
-        for i = #tasks, 1, -1 do
-            if toRemove[tasks[i].id] then table.remove(tasks, i) end
-        end
+        T.DeleteCompleted(noteID)
+        return
     else
         -- Uncheck all completed tasks.
         for _, t in ipairs(tasks) do
@@ -365,7 +400,36 @@ function T.ClearCompleted(noteID)
     Fire("TasksChanged", noteID)
 end
 
--- Update task list-level settings (stored in note.taskList).
+-- Always deletes completed tasks and their descendants, regardless of
+-- the taskRemoveOnComplete setting. Used by the "Delete done" button.
+function T.DeleteCompleted(noteID)
+    local tasks = GetOrCreateTasksTable(noteID)
+    if not tasks then return end
+
+    local toRemove = {}
+    for _, t in ipairs(tasks) do
+        if t.completed then toRemove[t.id] = true end
+    end
+    -- Also remove descendants of completed parents.
+    local found = true
+    while found do
+        found = false
+        for _, t in ipairs(tasks) do
+            if t.parentID and toRemove[t.parentID] and not toRemove[t.id] then
+                toRemove[t.id] = true
+                found = true
+            end
+        end
+    end
+    for i = #tasks, 1, -1 do
+        if toRemove[tasks[i].id] then table.remove(tasks, i) end
+    end
+
+    Persist(noteID)
+    Fire("TasksChanged", noteID)
+end
+
+-- Move a task to a new order position-- Update task list-level settings (stored in note.taskList).
 function T.UpdateList(noteID, changes)
     local tl = GetOrCreateTaskList(noteID)
     if not tl then return end

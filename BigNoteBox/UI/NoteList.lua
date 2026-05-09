@@ -229,6 +229,9 @@ function BNB.SetListCollapsed(collapsed)
     if BNB._favBtn then
         if collapsed then BNB._favBtn:Hide() else BNB._favBtn:Show() end
     end
+    if BNB._taskFilterBtn then
+        if collapsed then BNB._taskFilterBtn:Hide() else BNB._taskFilterBtn:Show() end
+    end
     if BNB._tagTreeBtn then
         if collapsed then BNB._tagTreeBtn:Hide() else BNB._tagTreeBtn:Show() end
     end
@@ -313,7 +316,8 @@ local function GetAllTags()
     return list
 end
 
-local _favFilterActive = false   -- module-level; reset on window close
+local _favFilterActive  = false   -- module-level; reset on window close
+local _taskFilterActive = false   -- module-level; show only notes with tasks
 
 local function SetFavFilter(active, favBtn, outerClear)
     _favFilterActive = active
@@ -330,9 +334,9 @@ local function BuildSearchBar(parent)
     -- Layout (left → right):
     --   [# tagTreeBtn] [bar: search text ... innerX ] [★ favBtn] [outerX]
     -- bar shrinks left to leave room for the tag tree button, and right for fav/reset.
-    local OUTER_BTN  = 18   -- size of each outside button (fav, reset)
-    local OUTER_GAP  = 4    -- gap between bar, star, outerX
-    local OUTER_ROOM = OUTER_BTN + OUTER_GAP + OUTER_BTN + OUTER_GAP  -- 44px
+    local OUTER_BTN  = 18   -- size of each outside button (fav, tasks, reset)
+    local OUTER_GAP  = 4    -- gap between bar, star, tasks, outerX
+    local OUTER_ROOM = OUTER_BTN + OUTER_GAP + OUTER_BTN + OUTER_GAP + OUTER_BTN + OUTER_GAP  -- 66px
     local TREE_BTN   = 18   -- tag tree button size
     local TREE_GAP   = 4    -- gap between tag tree button and bar left edge
 
@@ -460,24 +464,58 @@ local function BuildSearchBar(parent)
     end)
     BNB._favBtn = favBtn   -- stored so MainWindow OnHide and collapse can reset it
 
+    -- ── Task filter button (notes with tasks only) ─────────────────
+    local taskFilterBtn = CreateFrame("Button", nil, parent)
+    taskFilterBtn:SetSize(OUTER_BTN, OUTER_BTN)
+    taskFilterBtn:SetPoint("LEFT", favBtn, "RIGHT", OUTER_GAP, 0)
+    local taskFilterTx = taskFilterBtn:CreateTexture(nil, "ARTWORK")
+    taskFilterTx:SetAllPoints()
+    taskFilterTx:SetTexture(ASSETS .. "UI\\ui-tasks")
+    taskFilterBtn._tx = taskFilterTx
+    taskFilterBtn:SetAlpha(0.35)
+    pcall(function() taskFilterTx:SetDesaturated(true) end)
+    local function SetTaskFilter(active)
+        _taskFilterActive = active
+        BNB._taskFilterActive = active
+        taskFilterBtn:SetAlpha(active and 1.0 or 0.35)
+        pcall(function() taskFilterTx:SetDesaturated(not active) end)
+        if BNB._applyOuterClearState then BNB._applyOuterClearState() end
+        BNB.RefreshNoteList()
+    end
+    taskFilterBtn:SetScript("OnClick", function()
+        SetTaskFilter(not _taskFilterActive)
+    end)
+    taskFilterBtn:SetScript("OnEnter", function(self)
+        self:SetAlpha(1.0)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(_taskFilterActive and "Show all notes" or "Show notes with tasks only", 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    taskFilterBtn:SetScript("OnLeave", function(self)
+        self:SetAlpha(_taskFilterActive and 1.0 or 0.35)
+        GameTooltip:Hide()
+    end)
+    BNB._taskFilterBtn = taskFilterBtn
+    BNB._setTaskFilter = SetTaskFilter
+
     -- ── Outer reset: resets everything (editbox + tag filter + fav filter) ─────
     local outerClear = CreateFrame("Button", nil, parent)
     outerClear:SetSize(OUTER_BTN, OUTER_BTN)
-    outerClear:SetPoint("LEFT", favBtn, "RIGHT", OUTER_GAP, 0)
+    outerClear:SetPoint("LEFT", taskFilterBtn, "RIGHT", OUTER_GAP, 0)
     local oTex = outerClear:CreateTexture(nil, "ARTWORK")
     oTex:SetAllPoints()
     oTex:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-reset")
 
     -- Active (lit) only when something is actually filtering; grey otherwise.
     local function ApplyOuterClearState()
-        local active = _favFilterActive or (currentFilter ~= "")
+        local active = _favFilterActive or _taskFilterActive or (currentFilter ~= "")
         outerClear:SetAlpha(active and 1.0 or 0.40)
         pcall(function() oTex:SetDesaturated(not active) end)
     end
     ApplyOuterClearState()
 
     outerClear:SetScript("OnEnter", function(self)
-        local active = _favFilterActive or (currentFilter ~= "")
+        local active = _favFilterActive or _taskFilterActive or (currentFilter ~= "")
         if active then self:SetAlpha(1.0) end
         pcall(function() oTex:SetDesaturated(false) end)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -495,6 +533,7 @@ local function BuildSearchBar(parent)
         innerClear:Hide()
         if _tagAC then _tagAC:Hide() end
         SetFavFilter(false, favBtn, nil)
+        if BNB._setTaskFilter then BNB._setTaskFilter(false) end
         ApplyOuterClearState()
         BNB.RefreshNoteList()
     end)

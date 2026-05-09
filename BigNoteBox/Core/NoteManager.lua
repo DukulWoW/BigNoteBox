@@ -388,6 +388,7 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
     local lower    = filterText and filterText ~= "" and filterText:lower() or nil
     local lowerTag = tagFilter and tagFilter:lower() or nil
     local favOnly  = BNB._favFilterActive == true
+    local taskOnly = BNB._taskFilterActive == true
 
     -- Sidebar filter: "all" = no scope restriction,
     -- "global" = only global-scoped notes,
@@ -416,10 +417,14 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
             local passFav  = true
             local passText = true
             local passTag  = true
+            local passTask = true
 
             if passScope then
                 if favOnly then
                     passFav = note.favorited == true
+                end
+                if taskOnly then
+                    passTask = BNB.Task and BNB.Task.HasTasks(id) or false
                 end
                 if lower then
                     local titleMatch = note.title and note.title:lower():find(lower, 1, true)
@@ -434,7 +439,7 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
                 end
             end
 
-            if passScope and passFav and passText and passTag then
+            if passScope and passFav and passTask and passText and passTag then
                 results[#results + 1] = note
             -- Always include the currently selected new (empty) note so it
             -- stays visible in the list while the user is setting it up,
