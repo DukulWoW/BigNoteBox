@@ -767,6 +767,25 @@ local function ShowNoteContextMenu(btn, noteID)
                     end)
                 end
             end
+            do
+                local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
+                local taskLabel = hasTasks and "Add task" or "Create task"
+                root:CreateButton(taskLabel, function()
+                    if BNB.SelectNote then BNB.SelectNote(noteID) end
+                    C_Timer.After(0.05, function()
+                        if not BNB._currentNoteID then return end
+                        local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
+                        if taskID then
+                            if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+                            C_Timer.After(0.05, function()
+                                if BNB.FocusTaskEditBox then
+                                    BNB.FocusTaskEditBox(taskID)
+                                end
+                            end)
+                        end
+                    end)
+                end)
+            end
 
             root:CreateDivider()
 
@@ -1209,8 +1228,18 @@ local function CreateListEntry(parent)
     lockIcon:Hide()
     btn._lockIcon = lockIcon
 
+    -- Task icon: small ui-tasks.tga shown when note has tasks.
+    -- Sits to the left of the lock icon (or title if no lock). Shown/hidden in refresh.
+    local taskIcon = btn:CreateTexture(nil, "OVERLAY")
+    taskIcon:SetSize(11, 11)
+    taskIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", textLeft, -8)
+    taskIcon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-tasks")
+    taskIcon:SetAlpha(0.7)
+    taskIcon:Hide()
+    btn._taskIcon = taskIcon
+
     local titleLbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    -- Title left anchor shifts right by 16px when lock icon is shown (set dynamically in refresh)
+    -- Title left anchor shifts right by 13px per shown prefix icon (task/lock).
     titleLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  textLeft, -6)
     titleLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -6)
     titleLbl:SetJustifyH("LEFT")
@@ -1588,24 +1617,33 @@ local function PopulateEntry(btn, note, selected, collapsed)
     local textLeft = PAD_L + ICON_SIZE + 10
     local isNoteLocked = (note.locked == true)
         or (note.locked == nil and BigNoteBoxDB.lockNotes == true)
+    -- Task icon and lock icon: each shifts the title right by 13px.
+    local hasTasks = BNB.Task and BNB.Task.HasTasks(note.id) or false
+    local showTaskIcon = hasTasks and not collapsed
+    local showLockIcon = isNoteLocked and not collapsed
+    local iconOffset = textLeft
+    if btn._taskIcon then
+        if showTaskIcon then
+            btn._taskIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", iconOffset, -8)
+            btn._taskIcon:Show()
+            iconOffset = iconOffset + 13
+        else
+            btn._taskIcon:Hide()
+        end
+    end
     if btn._lockIcon then
-        if isNoteLocked and not collapsed then
+        if showLockIcon then
+            btn._lockIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", iconOffset, -8)
             btn._lockIcon:Show()
-            -- Shift title right past the lock icon (12px icon + 4px gap = 16px)
-            if btn._titleLbl then
-                btn._titleLbl:ClearAllPoints()
-                btn._titleLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  textLeft + 16, -6)
-                btn._titleLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -6)
-            end
+            iconOffset = iconOffset + 13
         else
             btn._lockIcon:Hide()
-            -- Restore normal title position
-            if btn._titleLbl then
-                btn._titleLbl:ClearAllPoints()
-                btn._titleLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  textLeft, -6)
-                btn._titleLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -6)
-            end
         end
+    end
+    if btn._titleLbl then
+        btn._titleLbl:ClearAllPoints()
+        btn._titleLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  iconOffset, -6)
+        btn._titleLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -6)
     end
 
     -- Scope badge: class icon of the owning character on character-scoped notes
@@ -2083,5 +2121,17 @@ end
 BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    end
+end)
+
+-- Refresh the note list when tasks change so the task icon (ui-tasks) in the
+-- note list row appears/disappears as tasks are added or removed.
+C_Timer.After(0, function()
+    if BNB.Task and BNB.Task.RegisterCallback then
+        BNB.Task.RegisterCallback("TasksChanged", function()
+            if BNB.mainFrame and BNB.mainFrame:IsShown() then
+                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+            end
+        end)
     end
 end)

@@ -2145,14 +2145,14 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (22 + ROW_GAP)
 
         -- Max attachments slider
-        local rbMaxSlider = BNB.CreateSlider(ct, "Max attachments per note", 1, 50,
-            db.refboxMaxItems or 20, nil,
+        local rbMaxSlider = BNB.CreateSlider(ct, "Max attachments per note", 1, 100,
+            db.refboxMaxItems or 50, nil,
             function(v) db.refboxMaxItems = v end)
         rbMaxSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         rbMaxSlider:SetWidth(CONTENT_W)
         rbMaxSlider:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Maximum number of items and spells that can be attached to a single note (default: 20).", 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine("Maximum number of items and spells that can be attached to a single note (default: 50).", 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
         rbMaxSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)

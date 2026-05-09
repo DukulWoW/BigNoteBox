@@ -39,6 +39,7 @@ local _noteID       = nil
 local _taskID       = nil
 local _isDirty      = false
 local _isPopulating = false
+local _isGlobal     = false  -- true when editing note-level task defaults
 
 -- Widget refs
 local _textEB, _resetDD, _sitTypeDD, _sitValueRow, _sitValueEb
@@ -157,19 +158,25 @@ end
 local function BuildContent(f, ct, saveBtn)
     local y = -4
 
-    -- Section: Task text — shows as a plain label; click to enter edit mode.
-    SectionHdr(ct, "Task text", y); y = y - TW_LBL - 2
+    -- Section: Task text -- shows as a plain label; click to enter edit mode.
+    -- Hidden in global mode (editing note-level defaults has no task text).
+    local textSection = CreateFrame("Frame", nil, ct)
+    textSection:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
+    textSection:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
+    textSection:SetHeight(TW_LBL + 2 + TW_ROW + TW_SECT_GAP)
+    SectionHdr(textSection, "Task text", 0)
 
-    local textLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    textLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 6, y)
-    textLbl:SetPoint("TOPRIGHT", ct, "TOPRIGHT", -6, y)
+    local textLbl = textSection:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    textLbl:SetPoint("TOPLEFT",  textSection, "TOPLEFT",  6, -(TW_LBL + 2))
+    textLbl:SetPoint("TOPRIGHT", textSection, "TOPRIGHT", -6, -(TW_LBL + 2))
     textLbl:SetHeight(TW_ROW)
     textLbl:SetJustifyH("LEFT")
     textLbl:SetWordWrap(false)
     textLbl:SetTextColor(0.9, 0.9, 0.9)
 
-    local textEB = BNB.CreateBackdropFrame("EditBox", nil, ct)
-    textEB:SetSize(TW_CW, TW_ROW); textEB:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    local textEB = BNB.CreateBackdropFrame("EditBox", nil, textSection)
+    textEB:SetSize(TW_CW, TW_ROW)
+    textEB:SetPoint("TOPLEFT", textSection, "TOPLEFT", 0, -(TW_LBL + 2))
     textEB:SetAutoFocus(false); textEB:SetMaxLetters(500)
     textEB:SetFontObject("GameFontNormalSmall")
     textEB:SetScript("OnEnterPressed", function(self)
@@ -196,7 +203,7 @@ local function BuildContent(f, ct, saveBtn)
     end)
     textEB:Hide()
     _textEB = textEB
-    _textEB._lbl = textLbl  -- store for Populate
+    _textEB._lbl = textLbl
 
     textLbl:SetScript("OnMouseDown", function()
         textLbl:Hide()
@@ -205,30 +212,39 @@ local function BuildContent(f, ct, saveBtn)
         textEB:SetFocus()
     end)
 
-    y = y - TW_ROW - TW_SECT_GAP
+    y = y - (TW_LBL + 2 + TW_ROW + TW_SECT_GAP)
 
     -- Section: Reset
     SectionHdr(ct, "Reset", y); y = y - TW_LBL - 2
     SmallLbl(ct, "Automatically re-check after a period.", y)
     y = y - TW_LBL - 4
-    local resetEntries = {
+
+    local resetEntriesTask = {
+        { label = "None (Global)", value = "global" },
+        { label = "None",          value = "none"   },
+        { label = "Daily",         value = "daily"  },
+        { label = "Weekly",        value = "weekly" },
+    }
+    local resetEntriesGlobal = {
         { label = "None",   value = "none"   },
         { label = "Daily",  value = "daily"  },
         { label = "Weekly", value = "weekly" },
     }
-    local resetDD = MakeDD(ct, resetEntries, "none", nil, TW_CW)
+    local resetDD = MakeDD(ct, resetEntriesTask, "global", nil, TW_CW)
     resetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    -- Tooltip on the dropdown container frame
     resetDD:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Task reset schedule", 1, 1, 1)
-        GameTooltip:AddLine("None: task stays completed until you uncheck it manually.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Daily: resets at the WoW daily reset (time varies by region).", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("None (Global): follows the note's global reset setting.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("None: no reset even if a global reset is set on the note.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Daily: resets at the WoW daily reset (varies by region).", 0.8, 0.8, 0.8, true)
         GameTooltip:AddLine("Weekly: resets at the WoW weekly reset (varies by region).", 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     resetDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _resetDD = resetDD
+    resetDD._entriesTask   = resetEntriesTask
+    resetDD._entriesGlobal = resetEntriesGlobal
     y = y - TW_ROW - TW_SECT_GAP
 
     -- Section: Situation
@@ -236,68 +252,67 @@ local function BuildContent(f, ct, saveBtn)
     SmallLbl(ct, "Bind this task to a context.", y)
     y = y - TW_LBL - 4
 
-    -- Situation type dropdown
-    local sitTypeEntries = {}
+    local sitEntriesTask = {}
     for i, label in ipairs(SIT_LABELS) do
-        sitTypeEntries[i] = { label = label, value = SIT_TYPES[i] }
+        sitEntriesTask[i] = { label = label, value = SIT_TYPES[i] }
+    end
+    local sitEntriesGlobal = {}
+    for i = 1, #SIT_TYPES do
+        local lbl2 = (i == 1) and "None" or SIT_LABELS[i]
+        sitEntriesGlobal[i] = { label = lbl2, value = SIT_TYPES[i] }
     end
 
-    local function OnSitTypeChanged(newType)
-        _selSitType = newType
-        if newType == "none" then
-            _sitValueRow:Hide()
+    local function OnSitTypeChanged(v)
+        _selSitType = v
+        if v == "none" then
+            if _sitValueRow then _sitValueRow:Hide() end
         else
-            _sitValueRow:Show()
-            local labelStr = "Value:"
-            if newType == "zone"     then labelStr = "Zone:"
-            elseif newType == "subzone"  then labelStr = "Sub-zone:"
-            elseif newType == "instance" then labelStr = "Instance:"
-            elseif newType == "player"   then labelStr = "Player:" end
-            _sitValueRow._lbl:SetText(labelStr)
-            if newType == "player" then
-                if _sitBrowseBtn then _sitBrowseBtn:Hide() end
-            else
-                if _sitBrowseBtn then _sitBrowseBtn:Show() end
+            if _sitValueRow then
+                _sitValueRow:Show()
+                local labelStr = "Zone:"
+                if v == "subzone"  then labelStr = "Sub-zone:"
+                elseif v == "instance" then labelStr = "Instance:"
+                elseif v == "player"   then labelStr = "Player:" end
+                _sitValueRow._lbl:SetText(labelStr)
+                if v == "player" then
+                    if _sitBrowseBtn then _sitBrowseBtn:Hide() end
+                else
+                    if _sitBrowseBtn then _sitBrowseBtn:Show() end
+                end
             end
         end
     end
 
-    local sitTypeDD = MakeDD(ct, sitTypeEntries, "none", OnSitTypeChanged)
+    local sitTypeDD = MakeDD(ct, sitEntriesTask, "none", OnSitTypeChanged, TW_CW)
     sitTypeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    sitTypeDD._entriesTask   = sitEntriesTask
+    sitTypeDD._entriesGlobal = sitEntriesGlobal
     _sitTypeDD = sitTypeDD
     y = y - TW_ROW - TW_GAP
 
-    -- Situation value row (hidden when type is "none")
     local valueRow = CreateFrame("Frame", nil, ct)
     valueRow:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    valueRow:SetWidth(TW_CW)
-    valueRow:SetHeight(TW_ROW)
-    valueRow:Hide()
+    valueRow:SetWidth(TW_CW); valueRow:SetHeight(TW_ROW); valueRow:Hide()
     _sitValueRow = valueRow
 
     local valueLbl = valueRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     valueLbl:SetPoint("LEFT", valueRow, "LEFT", 0, 0)
-    valueLbl:SetWidth(65); valueLbl:SetJustifyH("LEFT")
-    valueLbl:SetTextColor(0.78, 0.78, 0.78)
-    valueLbl:SetText("Value:")
+    valueLbl:SetWidth(44); valueLbl:SetJustifyH("LEFT")
+    valueLbl:SetText("Zone:"); valueLbl:SetHeight(TW_ROW)
     valueRow._lbl = valueLbl
 
-    local valueEb = CreateFrame("EditBox", nil, valueRow, "BackdropTemplate")
-    BNB.EnsureBackdrop(valueEb)
-    valueEb:SetPoint("LEFT", valueLbl, "RIGHT", 6, 0)
-    valueEb:SetPoint("RIGHT", valueRow, "RIGHT", -26, 0)
-    valueEb:SetHeight(20)
-    valueEb:SetFontObject("GameFontNormal")
-    valueEb:SetAutoFocus(false); valueEb:SetMaxLetters(128)
+    local valueEb = BNB.CreateBackdropFrame("EditBox", nil, valueRow)
+    valueEb:SetPoint("LEFT",  valueRow, "LEFT",  46, 0)
+    valueEb:SetPoint("RIGHT", valueRow, "RIGHT", -28, 0)
+    valueEb:SetHeight(TW_ROW - 4)
+    valueEb:SetAutoFocus(false); valueEb:SetMaxLetters(200)
+    valueEb:SetFontObject("GameFontNormalSmall")
     valueEb:SetTextInsets(4, 4, 0, 0)
-    valueEb:SetTextColor(1, 1, 1)
-    BNB.SetBackdropDark(valueEb)
+    valueEb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     valueEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    valueEb:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
     valueEb:HookScript("OnTextChanged", function() MarkDirty() end)
     _sitValueEb = valueEb
 
-    -- Browse button (zone picker)
     local browseBtn = CreateFrame("Button", nil, valueRow)
     browseBtn:SetSize(20, 20)
     browseBtn:SetPoint("RIGHT", valueRow, "RIGHT", 0, 0)
@@ -305,35 +320,22 @@ local function BuildContent(f, ct, saveBtn)
     browseTx:SetAllPoints()
     browseTx:SetTexture(ASSETS .. "Overlay/ov-situation")
     browseBtn:SetScript("OnEnter", function(self)
-        self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine("Browse zones and instances", 1, 1, 1)
         GameTooltip:Show()
     end)
-    browseBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(0.7); GameTooltip:Hide()
-    end)
-    browseBtn:SetAlpha(0.7)
+    browseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     browseBtn:SetScript("OnClick", function()
-        if BNB.ZonePicker then
-            if BNB.ZonePicker.IsShown and BNB.ZonePicker.IsShown() then
-                BNB.ZonePicker.Close()
-            else
-                BNB.ZonePicker.Open(valueRow, function(name, kind)
-                    valueEb:SetText(name)
-                    if kind and kind ~= _selSitType then
-                        _selSitType = kind
-                        sitTypeDD:SetSelected(kind)
-                    end
-                    MarkDirty()
-                end)
-            end
+        if BNB.ZonePicker and BNB.ZonePicker.Open then
+            BNB.ZonePicker.Open(function(name)
+                valueEb:SetText(name or "")
+                MarkDirty()
+            end, browseBtn)
         end
     end)
     _sitBrowseBtn = browseBtn
     y = y - TW_ROW - TW_GAP
 
-    -- "Use Current" + "Clear Current" buttons
     local useCurBtn = BNB.CreateButton(nil, ct, "Use Current", 90, 20)
     useCurBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     useCurBtn:SetScript("OnClick", function()
@@ -369,7 +371,6 @@ local function BuildContent(f, ct, saveBtn)
     end)
     clrCurBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Enable/disable Clear based on whether a situation value is set
     local function UpdateClrCur()
         local hasVal = _sitValueEb and _sitValueEb:GetText() ~= ""
         local hasSit = _selSitType and _selSitType ~= "none"
@@ -378,37 +379,64 @@ local function BuildContent(f, ct, saveBtn)
     if _sitValueEb then
         _sitValueEb:HookScript("OnTextChanged", function() UpdateClrCur() end)
     end
-    clrCurBtn:SetEnabled(false)  -- disabled until populated
+    clrCurBtn:SetEnabled(false)
     _sitClearBtn = clrCurBtn
-
     y = y - 24 - TW_GAP
 
-    -- Record content height for scroll
-    ct._contentH = math.abs(y) + 8
+    ct._contentH   = math.abs(y) + 8
+    ct._textSection = textSection
 
     -- ── SAVE HANDLER ─────────────────────────────────────────────────────────
     saveBtn:SetScript("OnClick", function()
         local T = BNB.Task
-        if not T or not _noteID or not _taskID then TW.Close(); return end
+        if not T or not _noteID then TW.Close(); return end
+
+        if _isGlobal then
+            local note = BNB.GetNote(_noteID)
+            if not note then TW.Close(); return end
+            note.taskList = note.taskList or {}
+            local tl = note.taskList
+            local rv = _resetDD and _resetDD:GetSelected() or "none"
+            if rv == "none" then
+                tl.resetType = nil; tl.resetEvery = nil
+            else
+                tl.resetType = rv
+            end
+            local sv = _sitValueEb and _sitValueEb:GetText() or ""
+            sv = sv:match("^%s*(.-)%s*$") or ""
+            if _selSitType == "none" or sv == "" then
+                tl.situation = nil
+            else
+                tl.situation = _selSitType .. ":" .. sv
+            end
+            if BNB.SaveDB then BNB.SaveDB() end
+            if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+            TW.Close()
+            return
+        end
+
+        if not _taskID then TW.Close(); return end
         local task = T.FindTask(_noteID, _taskID)
         if not task then TW.Close(); return end
 
-        -- Text
         local newText = _pendingText or ""
         local changes = { text = newText }
         local clears  = {}
 
-        -- Reset
-        local rv = _resetDD and _resetDD:GetSelected() or "none"
-        if rv == "none" then
+        local rv = _resetDD and _resetDD:GetSelected() or "global"
+        if rv == "global" then
             clears[#clears + 1] = "resetType"
+            clears[#clears + 1] = "resetEvery"
+            clears[#clears + 1] = "lastReset"
+        elseif rv == "none" then
+            changes.resetType = "none"
             clears[#clears + 1] = "resetEvery"
             clears[#clears + 1] = "lastReset"
         else
             changes.resetType = rv
+            clears[#clears + 1] = "lastReset"
         end
 
-        -- Situation
         local sv = _sitValueEb and _sitValueEb:GetText() or ""
         sv = sv:match("^%s*(.-)%s*$") or ""
         if _selSitType == "none" or sv == "" then
@@ -494,9 +522,10 @@ local function BuildWindow()
 
     -- Content
     BuildContent(f, ct, saveBtn)
+    f._ct = ct
 
     f:Hide()
-    tinsert(UISpecialFrames, "BNBTaskEditWindow")
+    -- ESC handled by MainWindow.lua OnKeyDown
     _frame = f
     return f
 end
@@ -583,13 +612,14 @@ local function BuildWindowSkin()
 
     -- Content
     BuildContent(f, ct, saveBtn)
+    f._ct = ct
 
     f:HookScript("OnShow", function()
         if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
     end)
 
     f:Hide()
-    tinsert(UISpecialFrames, "BNBTaskEditWindow")
+    -- ESC handled by MainWindow.lua OnKeyDown
     _frame = f
     return f
 end
@@ -597,14 +627,91 @@ end
 -- ---------------------------------------------------------------------------
 -- POPULATE
 -- ---------------------------------------------------------------------------
+local function PopulateGlobal(noteID)
+    _isPopulating = true
+    _isGlobal = true
+
+    -- Swap dropdowns to global entries (no "None (Global)" option)
+    if _resetDD and _resetDD._entriesGlobal then
+        _resetDD:SetSelected("none")  -- will be overwritten below
+        -- Rebuild MakeDD isn't possible post-build, but we can update _selected
+        -- and the display. We stored entries on the dd object.
+        if _resetDD._dd then
+            _resetDD._dd._selected = "none"
+        end
+    end
+    if _sitTypeDD and _sitTypeDD._entriesGlobal then
+        _sitTypeDD:SetSelected("none")
+    end
+
+    -- Read note.taskList
+    local note = BNB.GetNote(noteID)
+    local tl = note and note.taskList
+
+    -- Reset
+    local rv = (tl and tl.resetType) or "none"
+    if _resetDD then _resetDD:SetSelected(rv) end
+
+    -- Situation
+    local sitType, sitVal = ParseSituation(tl and tl.situation)
+    _selSitType = sitType
+    if _sitTypeDD then _sitTypeDD:SetSelected(sitType) end
+    if _sitValueEb then _sitValueEb:SetText(sitVal) end
+
+    -- Hide text section
+    local ct = _frame and _frame._ct
+    if ct and ct._textSection then
+        ct._textSection:Hide()
+    end
+
+    -- Show/hide value row
+    if sitType == "none" then
+        if _sitValueRow then _sitValueRow:Hide() end
+    else
+        if _sitValueRow then
+            _sitValueRow:Show()
+            local labelStr = sitType == "zone" and "Zone:"
+                or sitType == "subzone" and "Sub-zone:"
+                or sitType == "instance" and "Instance:"
+                or "Player:"
+            _sitValueRow._lbl:SetText(labelStr)
+            if sitType == "player" then
+                if _sitBrowseBtn then _sitBrowseBtn:Hide() end
+            else
+                if _sitBrowseBtn then _sitBrowseBtn:Show() end
+            end
+        end
+    end
+
+    if _sitClearBtn then
+        _sitClearBtn:SetEnabled(sitType ~= "none" or sitVal ~= "")
+    end
+
+    _isDirty = false
+    if _saveBtn then _saveBtn:SetEnabled(true) end  -- always editable in global mode
+    _isPopulating = false
+end
+
 local function Populate(noteID, taskID)
     local T = BNB.Task; if not T then return end
     local task = T.FindTask(noteID, taskID)
     if not task then return end
 
     _isPopulating = true
+    _isGlobal = false
 
-    -- Text: store in _pendingText via the editbox backing store, show via label.
+    -- Show text section (may have been hidden by a previous global open)
+    local ct = _frame and _frame._ct
+    if ct and ct._textSection then ct._textSection:Show() end
+
+    -- Swap reset dropdown back to per-task entries
+    if _resetDD then
+        local rv = task.resetType
+        -- nil resetType means "global" (inheriting note defaults)
+        _resetDD:SetSelected(rv or "global")
+    end
+
+    -- Text
     if _textEB then
         local txt = task.text or ""
         _pendingText = txt
@@ -616,27 +723,21 @@ local function Populate(noteID, taskID)
         end
     end
 
-    -- Reset
-    local rv = task.resetType or "none"
-    if _resetDD then _resetDD:SetSelected(rv) end
-
     -- Situation
     local sitType, sitVal = ParseSituation(task.situation)
     _selSitType = sitType
     if _sitTypeDD then _sitTypeDD:SetSelected(sitType) end
     if _sitValueEb then _sitValueEb:SetText(sitVal) end
 
-    -- Show/hide value row
     if sitType == "none" then
         if _sitValueRow then _sitValueRow:Hide() end
     else
         if _sitValueRow then
             _sitValueRow:Show()
-            local labelStr = "Value:"
-            if sitType == "zone"     then labelStr = "Zone:"
-            elseif sitType == "subzone"  then labelStr = "Sub-zone:"
-            elseif sitType == "instance" then labelStr = "Instance:"
-            elseif sitType == "player"   then labelStr = "Player:" end
+            local labelStr = sitType == "zone" and "Zone:"
+                or sitType == "subzone" and "Sub-zone:"
+                or sitType == "instance" and "Instance:"
+                or "Player:"
             _sitValueRow._lbl:SetText(labelStr)
             if sitType == "player" then
                 if _sitBrowseBtn then _sitBrowseBtn:Hide() end
@@ -646,7 +747,6 @@ local function Populate(noteID, taskID)
         end
     end
 
-    -- Update Clear Current button state
     if _sitClearBtn then
         _sitClearBtn:SetEnabled(sitType ~= "none" or sitVal ~= "")
     end
@@ -659,6 +759,17 @@ end
 -- ---------------------------------------------------------------------------
 -- OPEN / CLOSE
 -- ---------------------------------------------------------------------------
+local function SetTitle(isGlobal)
+    if not _frame then return end
+    if isGlobal then
+        if _frame.SetTitle then _frame:SetTitle("Note Task Defaults")
+        elseif _frame._titleLbl then _frame._titleLbl:SetText("Note Task Defaults") end
+    else
+        if _frame.SetTitle then _frame:SetTitle("Edit Task")
+        elseif _frame._titleLbl then _frame._titleLbl:SetText("Edit Task") end
+    end
+end
+
 local function DoOpen(noteID, taskID, anchorFrame)
     if not _frame then
         if BigNoteBoxDB and BigNoteBoxDB.skinMode then
@@ -671,8 +782,28 @@ local function DoOpen(noteID, taskID, anchorFrame)
 
     _noteID = noteID; _taskID = taskID
     Populate(noteID, taskID)
+    SetTitle(false)
     f:Show(); f:Raise()
-    -- Ensure skin colours are current (covers preset changes while window was hidden)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.ApplyMainWindowSkin then
+        BNB.ApplyMainWindowSkin()
+    end
+    return f
+end
+
+local function DoOpenGlobal(noteID, anchorFrame)
+    if not _frame then
+        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+            BuildWindowSkin()
+        else
+            BuildWindow()
+        end
+    end
+    local f = _frame
+
+    _noteID = noteID; _taskID = nil
+    PopulateGlobal(noteID)
+    SetTitle(true)
+    f:Show(); f:Raise()
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.ApplyMainWindowSkin then
         BNB.ApplyMainWindowSkin()
     end
@@ -682,6 +813,22 @@ end
 function TW.Open(noteID, taskID, anchorFrame)
     if not noteID or not taskID then return end
     local f = DoOpen(noteID, taskID, anchorFrame)
+    f:ClearAllPoints()
+    if anchorFrame and anchorFrame.GetWidth then
+        local scrW = UIParent:GetWidth()
+        local cx   = anchorFrame:GetCenter()
+        local aw   = anchorFrame:GetWidth()
+        local right = ((cx or 0) + (aw or 0) / 2 + 8 + TW_W) <= scrW
+        if right then f:SetPoint("LEFT",  anchorFrame, "RIGHT",  8, 0)
+        else          f:SetPoint("RIGHT", anchorFrame, "LEFT",  -8, 0) end
+    else
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    end
+end
+
+function TW.OpenGlobal(noteID, anchorFrame)
+    if not noteID then return end
+    local f = DoOpenGlobal(noteID, anchorFrame)
     f:ClearAllPoints()
     if anchorFrame and anchorFrame.GetWidth then
         local scrW = UIParent:GetWidth()

@@ -487,11 +487,23 @@ local function LastDailyReset(now)
 end
 
 -- Check and apply resets for a single task. Returns true if the task was reset.
-local function CheckTaskReset(task, now)
-    if not task.resetType then return false end
+-- resetType nil  = inherit from note.taskList.resetType ("None (Global)" in UI)
+-- resetType "none" = explicit opt-out, never resets even if note has a global
+local function CheckTaskReset(task, now, noteTaskList)
+    -- Resolve effective reset type: task-level overrides note-level
+    local effectiveReset = task.resetType
+    if effectiveReset == nil then
+        -- Inherit from note-level default
+        effectiveReset = noteTaskList and noteTaskList.resetType or nil
+    elseif effectiveReset == "none" then
+        -- Explicit opt-out
+        return false
+    end
+    if not effectiveReset then return false end
+
     local lastReset = task.lastReset or 0
 
-    if task.resetType == "daily" then
+    if effectiveReset == "daily" then
         local resetTime = LastDailyReset(now)
         if lastReset < resetTime and task.completed then
             task.completed = false
@@ -499,7 +511,7 @@ local function CheckTaskReset(task, now)
             return true
         end
 
-    elseif task.resetType == "weekly" then
+    elseif effectiveReset == "weekly" then
         local resetTime = LastWeeklyReset(now)
         if lastReset < resetTime and task.completed then
             task.completed = false
@@ -507,18 +519,17 @@ local function CheckTaskReset(task, now)
             return true
         end
 
-    elseif task.resetType == "date" then
+    elseif effectiveReset == "date" then
         local rd = task.resetDate
         if rd and now >= rd and lastReset < rd and task.completed then
             task.completed = false
             task.lastReset = now
-            -- One-time reset: clear the reset fields so it doesn't fire again.
             task.resetType = nil
             task.resetDate = nil
             return true
         end
 
-    elseif task.resetType == "days" then
+    elseif effectiveReset == "days" then
         local every = task.resetEvery or 1
         local nextReset = lastReset + (every * 86400)
         if now >= nextReset and task.completed then
@@ -542,8 +553,9 @@ function T.CheckResets()
     for noteID, note in pairs(ndb.notes) do
         if note.tasks and #note.tasks > 0 then
             local dirty = false
+            local tl = note.taskList  -- note-level defaults (may be nil)
             for _, task in ipairs(note.tasks) do
-                if CheckTaskReset(task, now) then
+                if CheckTaskReset(task, now, tl) then
                     dirty = true
                 end
             end
