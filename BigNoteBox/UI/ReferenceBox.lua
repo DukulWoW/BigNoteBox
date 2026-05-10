@@ -1740,8 +1740,8 @@ local function BuildTaskPanel(f)
     -- Permanent pnl children so they don't scroll with tasks and are always visible.
     local footerBtnH = TASK_FOOTER_H - 2
     local clrFooter = BNB.CreateButton(nil, pnl, "Clear", 0, footerBtnH)
-    clrFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOMLEFT",  3, 1)
-    clrFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOM",       0, 1)
+    clrFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOMLEFT",  6, 3)
+    clrFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOM",      -2, 3)
     clrFooter:SetScript("OnClick", function()
         if _noteID then BNB.Task.ClearCompleted(_noteID) end
     end)
@@ -1755,8 +1755,8 @@ local function BuildTaskPanel(f)
     f._taskClrBtn = clrFooter
 
     local delFooter = BNB.CreateButton(nil, pnl, "Delete", 0, footerBtnH)
-    delFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOM",       0, 1)
-    delFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -3, 1)
+    delFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOM",       2, 3)
+    delFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -6, 3)
     delFooter:SetScript("OnClick", function()
         if _noteID then BNB.Task.DeleteCompleted(_noteID) end
     end)
@@ -2118,6 +2118,10 @@ RenderTaskPanel = function()
                 for _, s in ipairs(subs) do if s.completed then subDone = subDone + 1 end end
                 local cntClr = (subDone == #subs) and "|cff66dd66" or "|cffaaaaaa"
                 lblText = cntClr .. "(" .. subDone .. "/" .. #subs .. ")|r " .. lblText
+                -- When collapsed, append sub-task count so it's visible without expanding
+                if _collapsedTasks[task.id] then
+                    lblText = lblText .. " |cff888888(" .. #subs .. ")|r"
+                end
             end
         end
         lbl:SetText(lblText)
