@@ -120,6 +120,7 @@ BNB.FEATURE_LIST = {
             "Toggle between rendered view and raw markup per sticky",
             "Stickies persist across sessions and are restored on login",
             "Drag to reposition; resize from any corner or edge",
+            "Sticky Notes have a Focus Mode which hides everything but the note/task and background",
         },
     },
 
