@@ -421,6 +421,18 @@ local function ApplyConfig(frame, noteID)
     if frame._taskFooter then
         frame._taskFooter:SetAlpha(focusMode and 0.0 or 1.0)
     end
+    -- Snap scrollbar alpha to match focus mode immediately.
+    -- In focus mode they start hidden; OnUpdate lerps them in on hover.
+    -- In normal mode restore from _hasRange so they re-appear if needed.
+    if frame._bodySB then
+        frame._bodySB:SetAlpha(focusMode and 0.0 or (frame._bodySB._hasRange and 1.0 or 0))
+    end
+    if frame._richSB then
+        frame._richSB:SetAlpha(focusMode and 0.0 or (frame._richSB._hasRange and 1.0 or 0))
+    end
+    if frame._taskSB then
+        frame._taskSB:SetAlpha(focusMode and 0.0 or (frame._taskSB._hasRange and 1.0 or 0))
+    end
     -- Re-anchor scroll frames when focus mode changes.
     -- TOPLEFT is now anchored to front (not header BOTTOMLEFT) via AnchorScrollTop
     -- to avoid WoW's stale-reflow bug when header height is collapsed to 0.
@@ -3088,6 +3100,16 @@ end
 
 -- Switch the sticky between task view and note view.
 -- view = "tasks" or "note". Saves preference to DB.
+-- Swap the texture set on a header button built by HdrBtn.
+-- Relies on _n/_h/_p refs stored at build time.
+local SN_BTN_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
+local function SetHdrBtnTex(btn, texName)
+    if not (btn and btn._n) then return end
+    btn._n:SetTexture(SN_BTN_PATH .. texName .. "-normal")
+    btn._h:SetTexture(SN_BTN_PATH .. texName .. "-hover")
+    btn._p:SetTexture(SN_BTN_PATH .. texName .. "-press")
+end
+
 local function SN_SetTaskView(noteID, view)
     local f = openFrames[noteID]; if not f then return end
     local showTasks = (view == "tasks") and BNB.Task and BNB.Task.HasTasks(noteID)
@@ -3110,9 +3132,11 @@ local function SN_SetTaskView(noteID, view)
     f._taskViewActive = showTasks
     SaveStickyView(noteID, showTasks and "tasks" or "note")
 
-    -- Update tasks button tooltip
+    -- Swap the toggle button icon to reflect the view you can switch TO:
+    --   showing tasks  -> bt-note  (click will return to note)
+    --   showing note   -> bt-tasks (click will go to tasks)
     if f._tasksHdrBtn then
-        -- tooltip updates dynamically in OnEnter; nothing to do here
+        SetHdrBtnTex(f._tasksHdrBtn, showTasks and "bt-note" or "bt-tasks")
     end
 end
 
@@ -3271,6 +3295,9 @@ local function CreateStickyFrame(noteID)
         pressTx:SetAllPoints()
         pressTx:SetTexture(ASSETS .. texName .. "-press")
         pressTx:Hide()
+
+        -- Store refs so textures can be swapped without rebuilding the button
+        btn._n = normalTx; btn._h = hoverTx; btn._p = pressTx
 
         -- Start hidden; will be shown by FadeBtns when root is hovered
         btn:SetAlpha(0)
@@ -3460,10 +3487,13 @@ local function CreateStickyFrame(noteID)
                 vis:SetPoint("BOTTOMRIGHT", f._frontFace, "BOTTOMRIGHT", -(fp+22), botY)
             end
 
-            -- Animate title, icon and task footer alpha
+            -- Animate title, icon, task footer, and scrollbar alpha
             if f._titleLbl   then f._titleLbl:SetAlpha(_focusLerp) end
             if f._iconFrame  then f._iconFrame:SetAlpha(_focusLerp) end
             if f._taskFooter then f._taskFooter:SetAlpha(_focusLerp) end
+            if f._bodySB then f._bodySB:SetAlpha(_focusLerp * (f._bodySB._hasRange and 1 or 0)) end
+            if f._richSB then f._richSB:SetAlpha(_focusLerp * (f._richSB._hasRange and 1 or 0)) end
+            if f._taskSB then f._taskSB:SetAlpha(_focusLerp * (f._taskSB._hasRange and 1 or 0)) end
 
             -- Animate border alpha
             local borderA = _focusLerp
@@ -3520,12 +3550,22 @@ local function CreateStickyFrame(noteID)
         pcall(function() ForwardHoverRecursive(sf2.ScrollBar, f) end)
         -- Dim the scrollbar when there is nothing to scroll, restore when needed.
         -- Uses alpha only — never Show/Hide, which fights ScrollFrameTemplate.
+        -- _hasRange tracks whether content is scrollable so the focus lerp can
+        -- multiply against it rather than setting alpha directly here.
         sf2.ScrollBar:SetAlpha(0)
+        sf2.ScrollBar._hasRange = false
         sf2:HookScript("OnScrollRangeChanged", function(_, _, yRange)
             if sf2.ScrollBar then
-                sf2.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
+                sf2.ScrollBar._hasRange = (yRange or 0) > 1
+                -- Alpha is now driven by OnUpdate when in focus mode.
+                -- In normal mode set it directly here as before.
+                local fm = f._cfg and f._cfg.focusMode
+                if not fm then
+                    sf2.ScrollBar:SetAlpha(sf2.ScrollBar._hasRange and 1.0 or 0)
+                end
             end
         end)
+        f._bodySB = sf2.ScrollBar
     end
 
     -- ── Rich render scroll frame ──────────────────────────────────────────────
@@ -3541,10 +3581,16 @@ local function CreateStickyFrame(noteID)
     local richSB = richScroll.ScrollBar
     if richSB then
         richSB:SetAlpha(0)
+        richSB._hasRange = false
         richScroll:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            richSB:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
+            richSB._hasRange = (yRange or 0) > 1
+            local fm = f._cfg and f._cfg.focusMode
+            if not fm then
+                richSB:SetAlpha(richSB._hasRange and 1.0 or 0)
+            end
         end)
         pcall(function() ForwardHoverRecursive(richSB, f) end)
+        f._richSB = richSB
     end
 
     local richRender = BNB.AdvancedMode.CreateRenderFrame(nil, richScroll)
@@ -3586,10 +3632,16 @@ local function CreateStickyFrame(noteID)
     local taskSB = taskScroll.ScrollBar
     if taskSB then
         taskSB:SetAlpha(0)
+        taskSB._hasRange = false
         taskScroll:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            taskSB:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
+            taskSB._hasRange = (yRange or 0) > 1
+            local fm = f._cfg and f._cfg.focusMode
+            if not fm then
+                taskSB:SetAlpha(taskSB._hasRange and 1.0 or 0)
+            end
         end)
         pcall(function() ForwardHoverRecursive(taskSB, f) end)
+        f._taskSB = taskSB
     end
 
     local taskContent = CreateFrame("Frame", nil, taskScroll)

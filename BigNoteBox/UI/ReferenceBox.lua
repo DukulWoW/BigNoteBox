@@ -2436,6 +2436,11 @@ RenderTaskPanel = function()
     -- Set scroll child height
     local tsf = rbFrame._taskScrollFrame
     tsc:SetHeight(math.max(math.abs(y) + 4, tsf and tsf:GetHeight() or 60))
+
+    -- Disable Clear/Delete buttons when there are no completed tasks to act on.
+    local hasCompleted = done > 0
+    if rbFrame._taskClrBtn then rbFrame._taskClrBtn:SetEnabled(hasCompleted) end
+    if rbFrame._taskDelBtn then rbFrame._taskDelBtn:SetEnabled(hasCompleted) end
 end
 
 -- Public helper: focus the inline editbox of a specific task row.
