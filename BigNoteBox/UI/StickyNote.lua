@@ -34,6 +34,8 @@ local HEADER_BORDER_PAD = 6
 local HEADER_H   = 28
 local MINI_SIZE  = 40
 local PAD        = 10
+local FOCUS_PAD  = 4    -- reduced padding in focus mode
+local TASK_FOOTER_H = 20   -- height of the sticky note task footer strip
 local FLIP_TIME  = 0.18   -- seconds for settings fade-in/out
 
 local COL_HEADER = { 0.10, 0.10, 0.13 }
@@ -139,45 +141,29 @@ end
 -- Add new textures here as assets are created; no other file needs changing.
 local BG_TEXTURES = {
     { key = "none",         label = "None" },
-    { key = "bg-stone",     label = "Stone",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga", tile = true },
+    { key = "bg-stone",     label = "Stone",          tile = true,
+      path = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga" },
     { key = "bgtexture-01", label = "Old white used paper",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
-    { key = "bgtexture-02", label = "Plain white paper",
+    { key = "bgtexture-02", label = "Damaged Stone",  tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-02.tga" },
-    { key = "bgtexture-03", label = "White canvas paper",
+    { key = "bgtexture-03", label = "Black Marble",   tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-03.tga" },
     { key = "bgtexture-04", label = "Golden paper",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-04.tga" },
     { key = "bgtexture-05", label = "Old Dutch paper",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-05.tga" },
-    { key = "bgtexture-06", label = "Old brown paper",
+    { key = "bgtexture-06", label = "Parchment",      tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-06.tga" },
-    { key = "bgtexture-07", label = "Rough paper",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-07.tga" },
-    { key = "bgtexture-08", label = "Creased paper",   tile = true,
+    { key = "bgtexture-08", label = "Creased paper",  tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-08.tga" },
-    { key = "bgtexture-09", label = "Cork board",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-09.tga" },
-    { key = "bgtexture-10", label = "Recycled paper",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-10.tga" },
-    { key = "bgtexture-11", label = "White marble",    tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-11.tga" },
     { key = "bgtexture-12", label = "Dark marble",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-12.tga" },
-    { key = "bgtexture-13", label = "Oak panel",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-13.tga" },
-    { key = "bgtexture-14", label = "Mahogany",        tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-14.tga" },
-    { key = "bgtexture-15", label = "Slate stone",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-15.tga" },
     { key = "bgtexture-16", label = "Sandstone",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-16.tga" },
     { key = "bgtexture-17", label = "Worn leather",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-17.tga" },
-    { key = "bgtexture-18", label = "Aged vellum",
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-18.tga" },
-    { key = "bgtexture-19", label = "Dark granite",  tile = true,
+    { key = "bgtexture-19", label = "Dark granite",   tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-19.tga" },
     { key = "bgtexture-20", label = "Dark stone",
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-20.tga" },
@@ -373,6 +359,19 @@ local function ApplyBgAlpha(frame, bgAlpha, cfg)
     end
 end
 
+-- ── Scroll frame anchor helper ───────────────────────────────────────────────
+-- Anchors a scroll frame's TOPLEFT to front (the full-interior overlay) using
+-- absolute offsets computed from the current header height.  This avoids
+-- anchoring to header BOTTOMLEFT which WoW's layout engine does not reliably
+-- reflow when the header is collapsed to height 0 (focus mode).
+-- Only touches TOPLEFT; BOTTOMRIGHT is already anchored to front directly.
+local function AnchorScrollTop(sf, front, headerH, fp)
+    if not sf then return end
+    local y = -(HEADER_BORDER_PAD + headerH + fp)
+    local x = HEADER_BORDER_PAD + fp
+    sf:SetPoint("TOPLEFT", front, "TOPLEFT", x, y)
+end
+
 local function ApplyConfig(frame, noteID)
     local cfg  = GetCfg(noteID)
     local note = BNB.GetNote(noteID)
@@ -384,7 +383,9 @@ local function ApplyConfig(frame, noteID)
     local effectiveScale  = cfg.borderScale or 100
     local effectiveOffset = cfg.borderOffset or 4
     local br, bg2, bb = BorderRGB(cfg)
+    local focusMode = cfg.focusMode
     local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0 or 1
+    if focusMode then borderA = 0 end  -- border hidden in focus mode (lerped in OnUpdate on hover)
     pcall(function()
         ApplyBorderToFrame(frame, effectiveBorder, effectiveScale, effectiveOffset, cfg)
         local hasTexture = cfg.bgTexture and cfg.bgTexture ~= "none"
@@ -397,6 +398,70 @@ local function ApplyConfig(frame, noteID)
         frame:SetBackdropColor(tr, tg, tb, cfg.alpha or 0.96)
         frame:SetBackdropBorderColor(br, bg2, bb, borderA)
     end)
+
+    -- Focus mode: reset lerp to 0 (hidden) so header animates in on first hover.
+    -- Normal mode: snap lerp to 1 so header is immediately visible.
+    if frame._setFocusLerp then
+        frame._setFocusLerp(focusMode and 0.0 or 1.0)
+    end
+    -- In focus mode snap header height immediately; OnUpdate will animate from here.
+    if frame._headerBar then
+        if focusMode then
+            frame._headerBar:SetHeight(0)
+        else
+            frame._headerBar:SetHeight(HEADER_H)
+        end
+    end
+    if frame._titleLbl then
+        frame._titleLbl:SetAlpha(focusMode and 0.0 or 1.0)
+    end
+    if frame._iconFrame then
+        frame._iconFrame:SetAlpha(focusMode and 0.0 or 1.0)
+    end
+    if frame._taskFooter then
+        frame._taskFooter:SetAlpha(focusMode and 0.0 or 1.0)
+    end
+    -- Re-anchor scroll frames when focus mode changes.
+    -- TOPLEFT is now anchored to front (not header BOTTOMLEFT) via AnchorScrollTop
+    -- to avoid WoW's stale-reflow bug when header height is collapsed to 0.
+    local _refreshNoteID = frame._noteID
+    local prevFocusMode  = frame._lastFocusMode
+    local curFocusMode   = focusMode and true or false
+    frame._lastFocusMode = curFocusMode
+    if prevFocusMode ~= curFocusMode then
+        local front = frame._frontFace
+        local fp    = focusMode and FOCUS_PAD or PAD
+        local hH    = focusMode and 0 or HEADER_H
+        if frame._bodyScroll and front then
+            frame._bodyScroll:ClearAllPoints()
+            AnchorScrollTop(frame._bodyScroll, front, hH, fp)
+            frame._bodyScroll:SetPoint("BOTTOMRIGHT", front, "BOTTOMRIGHT", -(fp+22),  fp)
+        end
+        if frame._richScroll and front then
+            frame._richScroll:ClearAllPoints()
+            AnchorScrollTop(frame._richScroll, front, hH, fp)
+            frame._richScroll:SetPoint("BOTTOMRIGHT", front, "BOTTOMRIGHT", -(fp+22),  fp)
+        end
+        if frame._taskScroll and front then
+            frame._taskScroll:ClearAllPoints()
+            AnchorScrollTop(frame._taskScroll, front, hH, fp)
+            frame._taskScroll:SetPoint("BOTTOMRIGHT", front, "BOTTOMRIGHT", -(fp+22),   fp + TASK_FOOTER_H + 2)
+        end
+        if frame._taskFooter and front then
+            frame._taskFooter:ClearAllPoints()
+            frame._taskFooter:SetHeight(TASK_FOOTER_H)
+            frame._taskFooter:SetPoint("BOTTOMLEFT",  front, "BOTTOMLEFT",  fp,       fp)
+            frame._taskFooter:SetPoint("BOTTOMRIGHT", front, "BOTTOMRIGHT", -(fp+22), fp)
+        end
+        -- Defer note refresh so WoW reflows geometry before content reads GetWidth()
+        if _refreshNoteID then
+            C_Timer.After(0.05, function()
+                if openFrames[_refreshNoteID] == frame and not frame._taskViewActive then
+                    BNB.Sticky.RefreshNote(_refreshNoteID)
+                end
+            end)
+        end
+    end
     -- Apply background opacity via backdrop, keep frame alpha at 1.0
     frame:SetAlpha(1.0)
     ApplyBgAlpha(frame, cfg.alpha or 0.96, cfg)
@@ -860,6 +925,34 @@ local function PopulateStickySettings(noteID)
     -- ══════════════════════════════════════════════════════════════════════════
     ct1._y = -8
 
+    -- ── Focus mode toggle ─────────────────────────────────────────────────────
+    -- Hides title, icon and border (fade in on hover). Compact content padding.
+    -- Rich notes render as plain text. Task view uses compact row spacing.
+    do
+        local focusChk = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
+        focusChk:SetSize(24, 24)
+        focusChk:SetPoint("TOPLEFT", ct1, "TOPLEFT", -4, ct1._y)
+        focusChk:SetChecked(cfg.focusMode == true)
+        focusChk:SetScript("OnClick", function(self)
+            cfg.focusMode = self:GetChecked() and true or nil
+            SaveCfg(noteID, cfg)
+            if stickyFrame then
+                ApplyConfig(stickyFrame, noteID)
+            end
+        end)
+        local focusLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        focusLbl:SetPoint("LEFT", focusChk, "RIGHT", 4, 0)
+        focusLbl:SetText("Focus mode")
+        focusChk:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine("Focus mode", 1, 1, 1)
+            GameTooltip:AddLine("Hides the title, icon and border. They reappear on hover. Reduces content padding. Forces plain text for rich notes. Task view uses compact row spacing.", 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        focusChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        ct1._y = ct1._y - 30
+    end
+
     -- ── "Show as plain text" toggle (rich notes only) ─────────────────────────
     -- Hidden entirely for plain notes. When on, the sticky renders raw text
     -- instead of the SimpleHTML view, and text color/style controls become active.
@@ -1242,7 +1335,7 @@ local function PopulateStickySettings(noteID)
 
     Rule(ct2)
     Sec(ct2, "Background")
-    ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, "Click to pick color", function(r,g,b)
+    local bgSwatch = ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, "Click to pick color", function(r,g,b)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
         SaveCfg(noteID, cfg)
         if stickyFrame then ApplyConfig(stickyFrame, noteID) end
@@ -1252,6 +1345,7 @@ local function PopulateStickySettings(noteID)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
         SaveCfg(noteID, cfg)
         if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+        if bgSwatch and bgSwatch._tx then bgSwatch._tx:SetColorTexture(r, g, b) end
     end)
 
     -- ── Background texture picker ─────────────────────────────────────────────
@@ -2522,9 +2616,12 @@ local function AddResizeHandle(frame, noteID)
         frame._savedW = w
         frame._savedH = ht
         if frame._bodyScroll then
+            local fm = frame._cfg and frame._cfg.focusMode
+            local fp = fm and FOCUS_PAD or PAD
+            local hH = fm and 0 or HEADER_H
             frame._bodyScroll:ClearAllPoints()
-            frame._bodyScroll:SetPoint("TOPLEFT",     frame._headerBar, "BOTTOMLEFT",  PAD,       -PAD)
-            frame._bodyScroll:SetPoint("BOTTOMRIGHT", frame._frontFace, "BOTTOMRIGHT", -(PAD+22),  PAD)
+            AnchorScrollTop(frame._bodyScroll, frame._frontFace, hH, fp)
+            frame._bodyScroll:SetPoint("BOTTOMRIGHT", frame._frontFace, "BOTTOMRIGHT", -(fp+22),  fp)
         end
         SaveGeometry(noteID, frame)
         -- Hide only if cursor has left the frame entirely
@@ -2721,7 +2818,6 @@ local function BuildIconBadge(f, noteID, note)
 end
 
 -- ── Sticky task view ──────────────────────────────────────────────────────────
-local TASK_FOOTER_H = 20   -- height of the completion counter strip
 
 -- Reads the persisted view preference for a sticky, falling back to the global
 -- default. Returns "tasks" or "note".
@@ -2762,8 +2858,14 @@ local function RenderStickyTasks(noteID)
     local CB_SZ     = 14
     local PAD_L     = 4
     local PAD_R     = 6
-    -- Row height and gap driven by BigNoteBoxDB.taskSpacing
-    local _sp = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+    -- Row height and gap: focus mode forces compact; otherwise uses global setting
+    local _cfg = f._cfg
+    local _sp
+    if _cfg and _cfg.focusMode then
+        _sp = "compact"
+    else
+        _sp = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+    end
     local ROW_H, SUB_ROW_H, ROW_GAP
     if _sp == "compact"  then ROW_H, SUB_ROW_H, ROW_GAP = 18, 16, 1
     elseif _sp == "spacious" then ROW_H, SUB_ROW_H, ROW_GAP = 30, 28, 4
@@ -2905,7 +3007,12 @@ local function RenderStickyTasks(noteID)
         lbl:SetJustifyH("LEFT"); lbl:SetMaxLines(1); lbl:SetWordWrap(false)
         local col = BNB.Task.GetTaskColor(task)
         lbl:SetTextColor(col.r, col.g, col.b)
-        lbl:SetText(task.text or "")
+        local stickyLblText = task.text or ""
+        if hasSubs and isCollapsed then
+            local subs = BNB.Task.GetSubTasks(noteID, task.id)
+            stickyLblText = stickyLblText .. " |cff888888(" .. #subs .. ")|r"
+        end
+        lbl:SetText(stickyLblText)
 
         -- Tooltip on truncation
         lbl:SetScript("OnEnter", function(self)
@@ -3294,9 +3401,18 @@ local function CreateStickyFrame(noteID)
     -- by child frames (front, header, body) — the cursor may never "touch" the
     -- root's own hit rect, so Leave events can be swallowed.  Polling each frame
     -- is the standard WoW pattern for this; the IsMouseOver call is near-free.
-    local _btnsShown = false
-    f:HookScript("OnUpdate", function()
+    local _btnsShown  = false
+    local _focusLerp  = 1.0   -- 1.0 = full header visible, 0.0 = fully hidden
+    local _focusTarget = 1.0  -- target for the lerp
+    local FOCUS_SPEED  = 6.0  -- units per second (lower = slower)
+    local _lastTime    = 0
+
+    f:HookScript("OnUpdate", function(self, elapsed)
         local over = f:IsMouseOver()
+        local cfg  = f._cfg
+        local focusMode = cfg and cfg.focusMode
+
+        -- ── Button fade ───────────────────────────────────────────────────────
         if over and not _btnsShown then
             _btnsShown = true
             FadeBtns(1)
@@ -3304,7 +3420,64 @@ local function CreateStickyFrame(noteID)
             _btnsShown = false
             FadeBtns(0)
         end
-        -- Show resize handle while hovered (or while actively sizing)
+
+        -- ── Focus mode header lerp ────────────────────────────────────────────
+        if focusMode then
+            _focusTarget = over and 1.0 or 0.0
+        else
+            _focusTarget = 1.0
+        end
+
+        if _focusLerp ~= _focusTarget then
+            local delta = elapsed * FOCUS_SPEED
+            if _focusLerp < _focusTarget then
+                _focusLerp = math.min(_focusTarget, _focusLerp + delta)
+            else
+                _focusLerp = math.max(_focusTarget, _focusLerp - delta)
+            end
+
+            -- Animate header height
+            local hdr = f._headerBar
+            local h = math.floor(_focusLerp * HEADER_H + 0.5)
+            if hdr then
+                hdr:SetHeight(math.max(0, h))
+            end
+
+            -- Slide visible scroll frame TOPLEFT to track header height.
+            -- Scroll frames are anchored to front (not header) so we must
+            -- update the y-offset explicitly as the header grows/shrinks.
+            -- ClearAllPoints is safe here because it only runs during the
+            -- short lerp animation, and both anchor points are re-set.
+            local fp = FOCUS_PAD
+            local vis = f._taskViewActive and f._taskScroll
+                     or (f._richScroll and f._richScroll:IsShown() and f._richScroll)
+                     or f._bodyScroll
+            if vis and f._frontFace then
+                local botY = fp
+                if vis == f._taskScroll then botY = fp + TASK_FOOTER_H + 2 end
+                vis:ClearAllPoints()
+                AnchorScrollTop(vis, f._frontFace, h, fp)
+                vis:SetPoint("BOTTOMRIGHT", f._frontFace, "BOTTOMRIGHT", -(fp+22), botY)
+            end
+
+            -- Animate title, icon and task footer alpha
+            if f._titleLbl   then f._titleLbl:SetAlpha(_focusLerp) end
+            if f._iconFrame  then f._iconFrame:SetAlpha(_focusLerp) end
+            if f._taskFooter then f._taskFooter:SetAlpha(_focusLerp) end
+
+            -- Animate border alpha
+            local borderA = _focusLerp
+            pcall(function()
+                local br, bg2, bb = BorderRGB(cfg)
+                local effectiveBorder = cfg.borderName or (BNB.GetNote(f._noteID) and BNB.GetNote(f._noteID).borderOverride)
+                local hasBorder = effectiveBorder and effectiveBorder ~= "" and effectiveBorder ~= "None"
+                if hasBorder then
+                    f:SetBackdropBorderColor(br, bg2, bb, _focusLerp)
+                end
+            end)
+        end
+
+        -- ── Resize handle ─────────────────────────────────────────────────────
         local rh = f._resizeHandle
         if rh then
             local shouldShow = (over or rh._sizing) and not f._minimized
@@ -3313,11 +3486,18 @@ local function CreateStickyFrame(noteID)
         end
     end)
 
+    -- Store lerp state on frame so ApplyConfig can reset it
+    f._focusLerp   = function() return _focusLerp end
+    f._setFocusLerp = function(v)
+        _focusLerp  = v
+        _focusTarget = v
+    end
+
     -- ── Body scroll ───────────────────────────────────────────────────────────
     local sf2, bodyEb = BNB.CreateScrolledEditBox(
         "BigNoteBoxSN_" .. noteID:gsub("-", ""):sub(1, 10),
         front, (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13)
-    sf2:SetPoint("TOPLEFT",     header, "BOTTOMLEFT",  PAD,       -PAD)
+    sf2:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     sf2:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22),  PAD)
     f._bodyScroll = sf2
     f._bodyEb     = bodyEb
@@ -3353,7 +3533,7 @@ local function CreateStickyFrame(noteID)
     -- SimpleHTML must be in a proper Frame scroll child — parenting to an
     -- EditBox is unreliable and causes raw markup to show instead of rendering.
     local richScroll = CreateFrame("ScrollFrame", nil, front, "ScrollFrameTemplate")
-    richScroll:SetPoint("TOPLEFT",     header, "BOTTOMLEFT",  PAD,       -PAD)
+    richScroll:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     richScroll:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22),  PAD)
     richScroll:Hide()
     f._richScroll = richScroll
@@ -3398,7 +3578,7 @@ local function CreateStickyFrame(noteID)
     -- Sibling to _bodyScroll and _richScroll. Shown only when task view is active.
     -- Anchored identically to _bodyScroll but bottom leaves room for the footer.
     local taskScroll = CreateFrame("ScrollFrame", nil, front, "ScrollFrameTemplate")
-    taskScroll:SetPoint("TOPLEFT",     header, "BOTTOMLEFT",  PAD,       -PAD)
+    taskScroll:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     taskScroll:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22), PAD + TASK_FOOTER_H + 2)
     taskScroll:Hide()
     f._taskScroll = taskScroll
@@ -3863,7 +4043,6 @@ function SN.RefreshNote(noteID)
         if f._taskViewActive then
             -- Re-render tasks in case text/completion changed
             RenderStickyTasks(noteID)
-            ApplyConfig(f, noteID)
             return
         end
         local stickyCfg = GetCfg(noteID)
