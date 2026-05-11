@@ -2851,11 +2851,29 @@ end
 
 -- Render (or re-render) the task list into f._taskScroll / f._taskContent.
 -- Called on first show and whenever TasksChanged fires for this noteID.
+-- HookFocusHover: hooks OnEnter/OnLeave on a frame (and all its children
+-- recursively) to maintain f._focusHovered, a counter used by the OnUpdate
+-- focus lerp. HookScript is used so existing tooltip handlers are preserved.
+-- This is needed because f:IsMouseOver() can return false when the cursor is
+-- over scroll-child frames (WoW clips them geometrically from the parent check).
+local function HookFocusHover(child, root)
+    child:HookScript("OnEnter", function()
+        root._focusHovered = (root._focusHovered or 0) + 1
+    end)
+    child:HookScript("OnLeave", function()
+        root._focusHovered = math.max(0, (root._focusHovered or 0) - 1)
+    end)
+    for _, ch in ipairs({child:GetChildren()}) do
+        pcall(function() HookFocusHover(ch, root) end)
+    end
+end
+
 local function RenderStickyTasks(noteID)
     local f = openFrames[noteID]; if not f or not f._taskContent then return end
     local ct = f._taskContent
 
-    -- Clear previous rows
+    -- Clear previous rows; reset hover counter since old row frames are orphaned.
+    f._focusHovered = 0
     for _, child in ipairs({ct:GetChildren()}) do child:Hide(); child:SetParent(nil) end
     for _, region in ipairs({ct:GetRegions()}) do region:Hide(); region:SetParent(nil) end
     ct._rows = {}
@@ -3039,6 +3057,9 @@ local function RenderStickyTasks(noteID)
         row._cb  = cb
         row._lbl = lbl
         rows[#rows + 1] = row
+        -- Hook all children of this row into the focus-hover counter so the
+        -- OnUpdate lerp stays active while the mouse is over any task row element.
+        HookFocusHover(row, f)
         y = y - rowH - ROW_GAP
         return row
     end
@@ -3433,9 +3454,12 @@ local function CreateStickyFrame(noteID)
     local _focusTarget = 1.0  -- target for the lerp
     local FOCUS_SPEED  = 6.0  -- units per second (lower = slower)
     local _lastTime    = 0
+    -- Counter incremented by HookFocusHover on task row children so that
+    -- IsMouseOver gaps between rows don't falsely signal "not hovered".
+    f._focusHovered = 0
 
     f:HookScript("OnUpdate", function(self, elapsed)
-        local over = f:IsMouseOver()
+        local over = f:IsMouseOver() or (f._focusHovered and f._focusHovered > 0)
         local cfg  = f._cfg
         local focusMode = cfg and cfg.focusMode
 
@@ -3655,6 +3679,10 @@ local function CreateStickyFrame(noteID)
         if w and w > 0 then taskContent:SetWidth(w) end
     end)
     ForwardHover(taskScroll, f)
+    -- Gap pixels between task rows land on taskScroll/taskContent, not on any
+    -- row frame, so HookFocusHover them too to keep the counter > 0 in the gaps.
+    HookFocusHover(taskScroll,   f)
+    HookFocusHover(taskContent,  f)
 
     -- Task footer: completion counter pinned below the scroll frame
     local taskFooter = CreateFrame("Frame", nil, front)
@@ -3883,17 +3911,17 @@ function SN.Open(noteID)
     local f = CreateStickyFrame(noteID)
     if not f then return end
     openFrames[noteID] = f
-    -- Entrance fade — use LibAnimate if available, fall back to FadeTo
-    local targetAlpha = GetCfg(noteID).alpha or 0.96
+    -- Entrance fade — use LibAnimate if available, fall back to FadeTo.
+    -- Frame alpha ends at 1.0; background opacity is set via backdrop in ApplyConfig.
     f:SetAlpha(0); f:Show()
     local LA = GetLibAnimate()
     if LA then
         LA:Animate(f, "fadeIn", {
             duration    = FLIP_TIME,
-            onFinished  = function() f:SetAlpha(targetAlpha) end,
+            onFinished  = function() f:SetAlpha(1.0) end,
         })
     else
-        FadeTo(f, 0, targetAlpha, FLIP_TIME)
+        FadeTo(f, 0, 1.0, FLIP_TIME)
     end
     local db = DB()
     if db then
