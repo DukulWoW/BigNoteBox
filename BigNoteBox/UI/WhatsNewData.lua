@@ -25,6 +25,9 @@ BNB.PATCH_NOTES = {
     version = "1.7.1",
     entries = {
         "|cff66bb6aNew:|r You can now migrate notes from MyNotepad and AmmeNotepad",
+		"|cff66bb6aNew:|r Sticky Notes can now live in the ESC menu screen (Sitcky Note Config > Pin to ESC Screen )",
+		"|cff66bb6aNew:|r Sticky Notes can be set to always open in the ESC menu screen (Main Config > Features > Sticky Notes > Default to ESC screen only)",
+		"|cff66bb6aNew:|r There is an overlay by default on the ESC screen, this can be turned off in (Main Config > Features > Sticky Notes > )",
         "|cff66bb6aChange:|r ",
 		"|cff66bb6aFixed:|r ",
 

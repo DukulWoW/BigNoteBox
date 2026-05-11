@@ -2159,6 +2159,16 @@ local function BuildFeaturesTab(sf, ct)
         function(v) db.stickiesHiddenPersist = v end,
         L["CFG_STICKY_HIDE_PERSIST_TIP"])
 
+    y = AddCheck(ct, y, "Default to ESC screen only",
+        function() return db.stickyEscDefault == true end,
+        function(v) db.stickyEscDefault = v or nil end,
+        "New sticky notes will default to showing only on the ESC screen instead of in the game world. You can also control this per sticky note via the note's settings (the = button).")
+
+    y = AddCheck(ct, y, "Dim screen behind ESC sticky notes",
+        function() return db.stickyEscOverlay ~= false end,
+        function(v) db.stickyEscOverlay = v and nil or false end,
+        "Shows a dark overlay behind sticky notes when the ESC menu is open, making them easier to read. Automatically disabled if OneWoW is active to avoid double-dimming.")
+
     -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
     y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
         "BIGNOTEBOXHIDESTICKIES", "(Default: Ctrl+H)", "Show/Hide all sticky notes")

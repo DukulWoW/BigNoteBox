@@ -79,6 +79,117 @@ local _stickyCollapsed = {}
 -- Guard so TasksChanged callback is registered only once.
 local _stickyTaskCallbackRegistered = false
 
+-- ── ESC menu (GameMenuFrame) integration ──────────────────────────────────────
+-- Stickies with cfg.escOnly=true are hidden in the game world and shown only
+-- when the ESC menu is open.  We hook OnShow/OnHide on GameMenuFrame (safe,
+-- no taint) and iterate openFrames each time the menu appears or disappears.
+-- _escHookDone ensures the hook is registered exactly once across reloads.
+local _escHookDone = false
+
+-- ── ESC dim overlay ───────────────────────────────────────────────────────────
+-- A full-screen dark overlay shown behind ESC-pinned stickies (and GameMenuFrame)
+-- to help them stand out.  Mirrors the FocusEditor overlay pattern exactly.
+-- Created once and reused; color refreshes live when the skin preset changes.
+local _escOverlay = nil
+
+local function _escOverlayColor()
+    local db = BigNoteBoxDB
+    if db and db.skinMode and BNB.GetSkinPreset and BNB.SkinColourOf then
+        local preset = BNB.GetSkinPreset()
+        local r, g, b = BNB.SkinColourOf(preset, false)
+        -- Darken the skin color so it reads as a dim, not a tint.
+        -- Factor 0.4 gives roughly 40% of the already-dark base color.
+        return r * 0.4, g * 0.4, b * 0.4
+    end
+    return 0, 0, 0  -- plain black in normal mode
+end
+
+local function GetESCOverlay()
+    if _escOverlay then return _escOverlay end
+    local ov = CreateFrame("Frame", "BNBEscDimOverlay", UIParent)
+    ov:SetAllPoints(UIParent)
+    ov:SetFrameStrata("DIALOG")
+    ov:SetFrameLevel(1)   -- just above OneWoW's dim (level 0) if present
+    ov:EnableMouse(false)  -- click-through
+    local tex = ov:CreateTexture(nil, "BACKGROUND")
+    tex:SetAllPoints()
+    tex:SetColorTexture(0, 0, 0, 1)
+    ov._tex = tex
+    ov:Hide()
+    -- Refresh color live when the skin preset or brightness changes.
+    if BNB.RegisterSkinBackdrop then
+        BNB.RegisterSkinBackdrop(function()
+            if ov:IsShown() then
+                local r, g, b = _escOverlayColor()
+                ov._tex:SetColorTexture(r, g, b, 0.6)
+            end
+        end)
+    end
+    _escOverlay = ov
+    return ov
+end
+
+local function ShowESCOverlay()
+    local db = BigNoteBoxDB
+    -- Overlay disabled in config.
+    if db and db.stickyEscOverlay == false then return end
+    -- OneWoW detection: if their dim overlay exists and is visible, skip ours
+    -- to avoid double-darkening the screen.
+    if _G["OneWoWEscDimOverlay"] and _G["OneWoWEscDimOverlay"]:IsShown() then return end
+    local ov = GetESCOverlay()
+    local r, g, b = _escOverlayColor()
+    ov._tex:SetColorTexture(r, g, b, 0.6)
+    ov:Show()
+end
+
+local function HideESCOverlay()
+    if _escOverlay and _escOverlay:IsShown() then
+        _escOverlay:Hide()
+    end
+end
+
+local function EnsureESCHook()
+    if _escHookDone then return end
+    _escHookDone = true
+    -- GameMenuFrame is always available on retail Midnight; guard anyway.
+    if not GameMenuFrame then return end
+    GameMenuFrame:HookScript("OnShow", function()
+        local hasESCSticky = false
+        for _, f in pairs(openFrames) do
+            local cfg = f._cfg
+            if cfg and cfg.escOnly then
+                if not f._minimized then f:Show() end
+                f:Raise()
+                hasESCSticky = true
+            end
+        end
+        -- Only show the dim overlay when at least one ESC-pinned sticky is open.
+        if hasESCSticky then ShowESCOverlay() end
+    end)
+    GameMenuFrame:HookScript("OnHide", function()
+        for _, f in pairs(openFrames) do
+            local cfg = f._cfg
+            if cfg and cfg.escOnly then
+                f:Hide()
+                if f._miniTile then f._miniTile:Hide() end
+            end
+        end
+        HideESCOverlay()
+        -- Settings panel close is handled by SN._OnESCHide(), registered after
+        -- all locals are in scope (CloseStickySettings is defined at line ~651).
+        if SN._OnESCHide then SN._OnESCHide() end
+    end)
+end
+
+-- Close the ESC menu (if open) then call fn().  Used for header button clicks
+-- that open other BNB windows so the game menu doesn't stay open behind them.
+local function CloseESCAndDo(fn)
+    if GameMenuFrame and GameMenuFrame:IsShown() then
+        HideUIPanel(GameMenuFrame)
+    end
+    fn()
+end
+
 -- ── DB helpers ────────────────────────────────────────────────────────────────
 local function DB()       return BigNoteBoxDB end
 local function StickyDB() return BigNoteBoxDB and BigNoteBoxDB.postits or {} end
@@ -114,7 +225,7 @@ local function SaveGeometry(noteID, frame)
     rec.y         = cy and (cy * s) or 0
     rec.w         = frame._savedW or DEF_W
     rec.h         = frame._savedH or DEF_H
-    rec.shown     = frame:IsShown() and true or false
+    rec.shown     = (frame:IsShown() or frame._escOnly == true) and true or false
     rec.minimized = frame._minimized or false
 end
 
@@ -626,6 +737,20 @@ end
 local SK_SS_TITLE_H   = 28
 local SK_SS_CONTENT_Y = 58   -- SK_SS_TITLE_H(28) + SK_TAB_H(24) + 6px gap
 
+-- Registered here (after CloseStickySettings is declared) so the OnHide hook
+-- in EnsureESCHook can reach it via SN._OnESCHide().
+SN._OnESCHide = function()
+    if _stickySettingsFrame and _stickySettingsFrame:IsShown() then
+        local noteID = _stickySettingsNoteID
+        if noteID then
+            local sf = openFrames[noteID]
+            if sf and sf._escOnly then
+                CloseStickySettings()
+            end
+        end
+    end
+end
+
 local function BuildStickySettingsWindow()
     if _stickySettingsFrame then return _stickySettingsFrame end
 
@@ -965,7 +1090,52 @@ local function PopulateStickySettings(noteID)
         ct1._y = ct1._y - 30
     end
 
-    -- ── "Show as plain text" toggle (rich notes only) ─────────────────────────
+    -- ── Pin to ESC screen toggle ───────────────────────────────────────────────
+    -- When on, this sticky is hidden in the game world and only appears when the
+    -- ESC menu is open.  It is mutually exclusive with being shown in the world.
+    do
+        local escChk = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
+        escChk:SetSize(24, 24)
+        escChk:SetPoint("TOPLEFT", ct1, "TOPLEFT", -4, ct1._y)
+        escChk:SetChecked(cfg.escOnly == true)
+        escChk:SetScript("OnClick", function(self)
+            -- Tri-state: nil=unset, true=ESC-only, false=explicitly normal.
+            -- Write false (not nil) when unchecking so global default doesn't re-apply.
+            local checked = self:GetChecked() and true or false
+            cfg.escOnly = checked
+            SaveCfg(noteID, cfg)
+            local f = openFrames[noteID]
+            if f then
+                f._escOnly = checked and true or false
+                EnsureESCHook()
+                if checked then
+                    -- Switching to ESC-only: hide from world, set correct strata.
+                    f:SetFrameStrata("FULLSCREEN_DIALOG")
+                    if not (GameMenuFrame and GameMenuFrame:IsShown()) then
+                        f:Hide()
+                        if f._miniTile then f._miniTile:Hide() end
+                    end
+                else
+                    -- Switching back to normal: restore strata and show in world.
+                    f:SetFrameStrata("HIGH")
+                    if not f._minimized then
+                        f:Show(); f:Raise()
+                    end
+                end
+            end
+        end)
+        local escLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        escLbl:SetPoint("LEFT", escChk, "RIGHT", 4, 0)
+        escLbl:SetText("Pin to ESC screen")
+        escChk:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine("Pin to ESC screen", 1, 1, 1)
+            GameTooltip:AddLine("When enabled, this sticky note is hidden in the game world and only appears when the ESC menu is open. The ESC menu opens automatically when you open this sticky.", 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        escChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        ct1._y = ct1._y - 30
+    end
     -- Hidden entirely for plain notes. When on, the sticky renders raw text
     -- instead of the SimpleHTML view, and text color/style controls become active.
     local note         = BNB.GetNote(noteID)
@@ -2566,10 +2736,13 @@ local function OpenStickySettings(stickyFrame, noteID)
     -- Sticky stays at normal alpha — we want to see our changes live
     stickyFrame:SetAlpha(1.0)
 
-    -- Show settings with fade-in
+    -- Show settings with fade-in.
+    -- Raise() ensures the settings panel sits above GameMenuFrame when the
+    -- ESC menu is open — both are DIALOG strata; last-raised wins.
     local LA = GetLibAnimate()
     f:SetAlpha(0.95)
     f:Show()
+    f:Raise()
     if LA then
         LA:Animate(f, "fadeIn", {
             duration = 0.25,
@@ -3360,6 +3533,9 @@ local function CreateStickyFrame(noteID)
     f._minBtn = minBtn
 
     HdrBtn(3, "bt-settings", "Note Settings", function()
+        -- Do NOT close the ESC menu here — settings open alongside the sticky
+        -- so the user can see their changes live (OpenStickySettings raises
+        -- the settings panel strata above GameMenuFrame automatically).
         if f._minimized then SN.SetMinimized(noteID, false); return end
         if _stickySettingsFrame and _stickySettingsFrame:IsShown()
            and _stickySettingsNoteID == noteID then
@@ -3370,15 +3546,17 @@ local function CreateStickyFrame(noteID)
     end)
 
     HdrBtn(4, "bt-edit", "Open in BigNoteBox to edit", function()
-        if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
-        if not BNB.mainFrame then
-            if BNB.CreateMainWindow then BNB.CreateMainWindow() end
-        end
-        if BNB.mainFrame then
-            BNB.mainFrame:Show()
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.SelectNote      then BNB.SelectNote(noteID) end
-        end
+        CloseESCAndDo(function()
+            if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
+            if not BNB.mainFrame then
+                if BNB.CreateMainWindow then BNB.CreateMainWindow() end
+            end
+            if BNB.mainFrame then
+                BNB.mainFrame:Show()
+                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                if BNB.SelectNote      then BNB.SelectNote(noteID) end
+            end
+        end)
     end)
 
     -- slot 5 = alarm: opens alarm setter window anchored to this button
@@ -3403,26 +3581,26 @@ local function CreateStickyFrame(noteID)
     local tasksHdrBtn = HdrBtn(6, "bt-tasks", "Create Task", function()
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         if not hasTasks then
-            -- No tasks: open main window, select note, open RefBox, add task
-            if not BNB.mainFrame then
-                if BNB.CreateMainWindow then BNB.CreateMainWindow() end
-            end
-            if BNB.mainFrame then
-                BNB.mainFrame:Show()
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.SelectNote      then BNB.SelectNote(noteID) end
-            end
-            local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
-            if taskID then
-                if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
-                -- Defer long enough for RefBox to open and RenderTaskPanel to
-                -- complete before we try to focus the new task's editbox.
-                C_Timer.After(0.2, function()
-                    if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
-                end)
-            end
+            -- No tasks: close ESC menu, open main window, select note, open RefBox, add task
+            CloseESCAndDo(function()
+                if not BNB.mainFrame then
+                    if BNB.CreateMainWindow then BNB.CreateMainWindow() end
+                end
+                if BNB.mainFrame then
+                    BNB.mainFrame:Show()
+                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                    if BNB.SelectNote      then BNB.SelectNote(noteID) end
+                end
+                local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
+                if taskID then
+                    if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+                    C_Timer.After(0.2, function()
+                        if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
+                    end)
+                end
+            end)
         else
-            -- Has tasks: toggle between task view and note view
+            -- Has tasks: toggle between task view and note view (self-contained, no ESC close)
             local newView = f._taskViewActive and "note" or "tasks"
             SN_SetTaskView(noteID, newView)
         end
@@ -3893,16 +4071,30 @@ end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
 function SN.IsOpen(noteID)
-    local f = openFrames[noteID]; return f and (f:IsShown() or f._minimized) or false
+    local f = openFrames[noteID]
+    if not f then return false end
+    -- escOnly stickies are hidden in the world but are still "open" (they show
+    -- when the ESC menu opens).  f._escOnly tracks this so IsOpen is truthful.
+    return f:IsShown() or f._minimized or (f._escOnly == true)
 end
 
-function SN.Open(noteID)
+-- noESCOpen: when true, suppress ShowUIPanel(GameMenuFrame) — used by the
+-- login restore loop so reloading doesn't pop open the ESC menu.
+function SN.Open(noteID, noESCOpen)
     if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
     if not BNB.GetNote(noteID) then return end
     if openFrames[noteID] then
         local f = openFrames[noteID]
         if f._minimized then SN.SetMinimized(noteID, false)
-        else f:Show(); f:Raise() end
+        else
+            local cfg = GetCfg(noteID)
+            if cfg.escOnly then
+                EnsureESCHook()
+                if not noESCOpen then ShowUIPanel(GameMenuFrame) end
+            else
+                f:Show(); f:Raise()
+            end
+        end
         SaveGeometry(noteID, f); return
     end
     if CountOpen() >= (BigNoteBoxDB and BigNoteBoxDB.stickyMaxCount or MAX_NOTES) then
@@ -3911,18 +4103,39 @@ function SN.Open(noteID)
     local f = CreateStickyFrame(noteID)
     if not f then return end
     openFrames[noteID] = f
-    -- Entrance fade — use LibAnimate if available, fall back to FadeTo.
-    -- Frame alpha ends at 1.0; background opacity is set via backdrop in ApplyConfig.
-    f:SetAlpha(0); f:Show()
-    local LA = GetLibAnimate()
-    if LA then
-        LA:Animate(f, "fadeIn", {
-            duration    = FLIP_TIME,
-            onFinished  = function() f:SetAlpha(1.0) end,
-        })
-    else
-        FadeTo(f, 0, 1.0, FLIP_TIME)
+
+    local cfg = GetCfg(noteID)
+    -- Apply global "Default to ESC screen only" only when escOnly is nil (truly
+    -- unset).  explicit false means the user intentionally reset to normal via X.
+    if cfg.escOnly == nil then
+        local db = DB()
+        if db and db.stickyEscDefault then
+            cfg.escOnly = true
+            SaveCfg(noteID, cfg)
+        end
     end
+    EnsureESCHook()
+
+    if cfg.escOnly then
+        f._escOnly = true
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
+        f:SetAlpha(1.0)
+        f:Hide()
+        if not noESCOpen then ShowUIPanel(GameMenuFrame) end
+    else
+        f._escOnly = false
+        f:SetAlpha(0); f:Show()
+        local LA = GetLibAnimate()
+        if LA then
+            LA:Animate(f, "fadeIn", {
+                duration    = FLIP_TIME,
+                onFinished  = function() f:SetAlpha(1.0) end,
+            })
+        else
+            FadeTo(f, 0, 1.0, FLIP_TIME)
+        end
+    end
+
     local db = DB()
     if db then
         db.postits = db.postits or {}
@@ -3937,6 +4150,20 @@ function SN.Close(noteID)
     local f = openFrames[noteID]; if not f then return end
     -- Clear per-note task collapse state
     _stickyCollapsed[noteID] = nil
+    -- If this was an ESC-only sticky, clear the flag so the next open is a
+    -- regular world sticky (the X button acts as a "reset to normal" gesture).
+    -- Write explicit false (not nil) so the tri-state is respected:
+    --   nil   = unset, apply global stickyEscDefault on next open
+    --   true  = pinned to ESC screen
+    --   false = explicitly normal (ignore global default)
+    -- Persist immediately so the choice survives reload.
+    if f._escOnly then
+        f._escOnly = false
+        local cfg = GetCfg(noteID)
+        cfg.escOnly = false   -- explicit false, NOT nil
+        SaveCfg(noteID, cfg)
+        f._cfg = cfg
+    end
     -- Dismiss alarm if it is active (fired but not yet dismissed) when sticky closes.
     -- Uses IsAlarmActive rather than IsGlowing so it works regardless of glow timing.
     if BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID) then
@@ -3988,8 +4215,11 @@ function SN.HideAll()
     local db = BigNoteBoxDB
     if db then db.stickiesHidden = true end
     for _, f in pairs(openFrames) do
-        f:Hide()
-        if f._miniTile then f._miniTile:Hide() end
+        -- Skip ESC-only stickies — they have their own show/hide lifecycle.
+        if not (f._cfg and f._cfg.escOnly) then
+            f:Hide()
+            if f._miniTile then f._miniTile:Hide() end
+        end
     end
 end
 
@@ -3998,11 +4228,14 @@ function SN.ShowAll()
     local db = BigNoteBoxDB
     if db then db.stickiesHidden = false end
     for _, f in pairs(openFrames) do
-        if f._minimized then
-            -- Minimized stickies show only as tile
-            if f._miniTile then f._miniTile:Show() end
-        else
-            f:Show()
+        -- Skip ESC-only stickies — they show only when the ESC menu is open.
+        if not (f._cfg and f._cfg.escOnly) then
+            if f._minimized then
+                -- Minimized stickies show only as tile
+                if f._miniTile then f._miniTile:Show() end
+            else
+                f:Show()
+            end
         end
     end
 end
@@ -4073,7 +4306,18 @@ function SN.EnsureMinimizedForAlarm(noteID)
 end
 
 function SN.Toggle(noteID)
-    if SN.IsOpen(noteID) then SN.Close(noteID) else SN.Open(noteID) end
+    if SN.IsOpen(noteID) then
+        SN.Close(noteID)
+    else
+        -- Action bar toggle always opens as a regular world sticky.
+        -- Write explicit false so the global stickyEscDefault doesn't re-apply.
+        local cfg = GetCfg(noteID)
+        if cfg.escOnly ~= false then
+            cfg.escOnly = false
+            SaveCfg(noteID, cfg)
+        end
+        SN.Open(noteID)
+    end
 end
 
 -- Close the sticky settings panel (called by ESC handler in MainWindow)
@@ -4207,7 +4451,9 @@ function SN.RestoreSession()
     for noteID, rec in pairs(db.postits) do
         if rec and rec.shown and BNB.GetNote(noteID) then
             C_Timer.After(0.1, function()
-                SN.Open(noteID)
+                -- noESCOpen=true: suppress ShowUIPanel(GameMenuFrame) on restore
+                -- so reloading/relogging doesn't pop the ESC menu open.
+                SN.Open(noteID, true)
                 -- If the persist-hidden flag is active, immediately hide the
                 -- frame after Open() so it restores position data but stays
                 -- invisible until the player manually shows stickies again.
