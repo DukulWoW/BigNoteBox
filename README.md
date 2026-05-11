@@ -105,6 +105,8 @@ Floating always-visible notes.
 - Rich rendering support
 - Persistent across sessions
 - Up to 50 stickies supported
+- Focus Mode that hides border & icon
+- Task View to show the tasks attached to a note
 
 ---
 
@@ -145,6 +147,18 @@ Attach game data directly to notes.
 - Dressing room integration (Ctrl-click)
 - Persistent stored loadouts
 - Floating companion panel
+
+---
+
+# ✅ Tasks
+
+Add tasks to any note.
+
+- Create tasks for any note
+- Add daily/weekly reset for tasks globally for note or individually for task
+- Add sub-tasks to a task
+- Add situational awareness
+- Show tasks in sticky notes
 
 ---
 
@@ -225,7 +239,7 @@ Export notes for external use.
 Import from other note addons.
 
 Supported addons:
-Noteworthy II, TakeANote, TinyPad, Notes, QuickNotes, and more.
+Noteworthy II, TakeANote, Yet Another Notepad, Notepad, Notes, TinyPad, PurpleNotes, SimpleNote, QuickNotes, MyNotepad, AmmeNotepad and OneWoW Notes.
 
 - Automatic detection on login
 - Preview before import
