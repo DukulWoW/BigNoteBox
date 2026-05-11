@@ -27,6 +27,8 @@ BNB.PATCH_NOTES = {
         "|cff66bb6aNew:|r Sticky notes now have a focus mode. Open the sticky note settings and check Focus Mode",
         "|cff66bb6aChange:|r Removed eight background textures for sticky notes and added three new ones",
 		"|cff66bb6aChange:|r Added a separate buttons graphic to when a sitcky note is in task mode, the button that switchs back to note mode is now a note",
-		"|cff66bb6aFixed:|r The icon for the trash stat in Config > General was not showing",
+		"|cff66bb6aFixed:|r The buttons in the task window now show as disabled when there are no tasks to clear/delete both in normal mode and skin mode",
+		"|cff66bb6aFixed:|r Task mode in Sticky Notes should no longer flicker if the opacity is set to anything but 100% ",
+		"|cff66bb6aFixed:|r Setting a situation or reset on a sub-task will now correctly show the icon in the task window in refbox",
     },
 }
