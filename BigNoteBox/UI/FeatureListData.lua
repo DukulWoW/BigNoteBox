@@ -121,7 +121,7 @@ BNB.FEATURE_LIST = {
             "Stickies persist across sessions and are restored on login",
             "Drag to reposition; resize from any corner or edge",
             "Sticky Notes have a Focus Mode which hides everything but the note/task and background",
-            "Sticky Notes can be opening on the ESC menu screen. This way they don't clutter the game screen",
+            "Sticky Notes can be opened on the ESC main menu screen. This way they don't clutter the game screen",
         },
     },
 
