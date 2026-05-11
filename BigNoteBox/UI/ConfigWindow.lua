@@ -667,6 +667,7 @@ local function BuildGeneralTab(sf, ct)
     local totalBytes   = 0
     local largestBytes = 0
     local trashCount   = 0
+    local trashBytes   = 0
     local ndb = BigNoteBoxNotesDB
     if ndb then
         if ndb.notes then
@@ -678,7 +679,10 @@ local function BuildGeneralTab(sf, ct)
             end
         end
         if ndb.trash then
-            for _ in pairs(ndb.trash) do trashCount = trashCount + 1 end
+            for _, note in pairs(ndb.trash) do
+                trashCount = trashCount + 1
+                trashBytes = trashBytes + #(note.title or "") + #(note.body or "")
+            end
         end
     end
 
@@ -692,35 +696,47 @@ local function BuildGeneralTab(sf, ct)
         end
     end
 
-    local avgBytes  = noteCount > 0 and (totalBytes / noteCount) or 0
-    local histBytes = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
+    local avgBytes   = noteCount > 0 and (totalBytes / noteCount) or 0
+    local histBytes  = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
+    local totalCount = noteCount + trashCount
+    local grandTotal = totalBytes + trashBytes
 
     local GREEN = "|cff66bb6a"
     local GREY  = "|cffaaaaaa"
     local RESET = "|r"
     local SZ    = 14   -- inline icon size
 
-    local ICO_N = ASSET .. "Icons\\Notes\\INV_Misc_Note_01"  -- note count
-    local ICO_S = "Interface\\Icons\\INV_Misc_Coin_01"       -- total size
-    local ICO_A = "Interface\\Icons\\Trade_Engineering"      -- average
-    local ICO_L = "Interface\\Icons\\INV_Scroll_06"          -- largest
-    local ICO_T = "Interface\\Icons\\inv_misc_1h_bucket_b_01"-- trash
-    local ICO_H = "Interface\\Icons\\ability_spy"            -- history
+    local ICO_N  = ASSET .. "Icons\\Notes\\INV_Misc_Note_01"  -- note count
+    local ICO_S  = "Interface\\Icons\\INV_Misc_Coin_01"       -- notes size
+    local ICO_A  = "Interface\\Icons\\Trade_Engineering"      -- average
+    local ICO_T  = "Interface\\Icons\\inv_misc_1h_bucket_b_01"-- trash count
+    local ICO_TS = "Interface\\Icons\\inv_misc_bag_07"        -- trash size
+    local ICO_H  = "Interface\\Icons\\ability_spy"            -- history
+    local ICO_L  = "Interface\\Icons\\INV_Scroll_06"          -- largest
+    local ICO_TN = "Interface\\Icons\\inv_misc_lockchest02"   -- total notes
+    local ICO_GS = "Interface\\Icons\\INV_Misc_Bag_10"        -- grand total size
 
-    -- 3-column grid, 2 rows — compact single-line-height rows with no row gap
+    -- 3-column grid, 3 rows — compact single-line-height rows with no row gap
     local NCOLS = 3
     local COL   = math.floor(CONTENT_W / NCOLS)
     local STAT_H = 18  -- single row height, no extra gap between rows
 
     local stats = {
-        { icon = ICO_N, label = "Notes",        value = noteCount .. " notes" },
-        { icon = ICO_S, label = "Total size",   value = fmtSize(totalBytes) },
-        { icon = ICO_A, label = "Average size", value = fmtSize(avgBytes) },
-        { icon = ICO_L, label = "Largest note", value = fmtSize(largestBytes) },
-        { icon = ICO_T, label = "In trash",     value = trashCount .. " notes" },
-        { icon = ICO_H, label = "History size", value = fmtSize(histBytes) },
+        -- Row 1: live notes
+        { icon = ICO_N,  label = "Notes",        value = noteCount .. " notes" },
+        { icon = ICO_S,  label = "Notes size",   value = fmtSize(totalBytes) },
+        { icon = ICO_A,  label = "Average size", value = fmtSize(avgBytes) },
+        -- Row 2: trash + history
+        { icon = ICO_T,  label = "In trash",     value = trashCount .. " notes" },
+        { icon = ICO_TS, label = "Trash size",   value = fmtSize(trashBytes) },
+        { icon = ICO_H,  label = "History size", value = fmtSize(histBytes) },
+        -- Row 3: totals
+        { icon = ICO_TN, label = "Total notes",  value = totalCount .. " notes" },
+        { icon = ICO_GS, label = "Total size",   value = fmtSize(grandTotal) },
+        { icon = ICO_L,  label = "Largest note", value = fmtSize(largestBytes) },
     }
 
+    -- 3-column grid, 3 rows — render each stat at the correct col/row offset
     for i, s in ipairs(stats) do
         local col  = (i - 1) % NCOLS
         local row  = math.floor((i - 1) / NCOLS)
