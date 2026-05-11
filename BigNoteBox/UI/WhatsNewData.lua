@@ -22,7 +22,7 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.7.0",
+    version = "1.7.1",
     entries = {
         "|cff66bb6aNew:|r Sticky notes now have a focus mode. Open the sticky note settings and check Focus Mode",
         "|cff66bb6aChange:|r Removed eight background textures for sticky notes and added three new ones",
