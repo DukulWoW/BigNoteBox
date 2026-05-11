@@ -21,7 +21,7 @@ local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 BNB.Migration = BNB.Migration or {}
 local M = BNB.Migration
 
-local ADDON_KEYS  = { "NoteworthyII", "TakeANote", "YetAnotherNotepad", "Notepad", "NotepadChar", "Notes", "TinyPad", "PurpleNotes", "SimpleNote", "QuickNotes", "OneWoWNotes" }
+local ADDON_KEYS  = { "NoteworthyII", "TakeANote", "YetAnotherNotepad", "Notepad", "NotepadChar", "Notes", "TinyPad", "PurpleNotes", "SimpleNote", "QuickNotes", "OneWoWNotes", "MyNotepad", "AmmeNotepad" }
 local ADDON_NAMES = {
     NoteworthyII      = "Noteworthy II",
     TakeANote         = "TakeANote",
@@ -34,6 +34,8 @@ local ADDON_NAMES = {
     SimpleNote        = "SimpleNote",
     QuickNotes        = "QuickNotes",
     OneWoWNotes       = "OneWoW Notes",
+    MyNotepad         = "MyNotepad",
+    AmmeNotepad       = "AmmeNotepad",
 }
 -- Maps addon keys to the actual WoW addon folder name for IsAddOnLoaded.
 -- NotepadChar shares the same addon folder as Notepad.
@@ -49,6 +51,8 @@ local ADDON_LOAD_NAME = {
     SimpleNote        = "SimpleNote",
     QuickNotes        = "QuickNotes",
     OneWoWNotes       = "OneWoW_Notes",
+    MyNotepad         = "MyNotepad",
+    AmmeNotepad       = "AmmeNotepad",
 }
 
 -- Expose for use by ConfigWindow and other modules
@@ -443,6 +447,95 @@ function M.CollectPreview(sel)
         end
     end
 
+    -- MyNotepad (global pages array + optional per-character pages table)
+    if sel.MyNotepad and MyNotepadData then
+        -- Global pages
+        if MyNotepadData.pages then
+            for i, page in ipairs(MyNotepadData.pages) do
+                local body = page.text
+                if body and not body:match("^%s*$") then
+                    local title = (page.title and page.title ~= "") and page.title or ("MyNotepad " .. i)
+                    tinsert(entries, {
+                        addon       = "MyNotepad",
+                        title       = title,
+                        scope       = "global",
+                        charLabel   = "Global",
+                        tags        = { "MyNotepad" },
+                        bodyPreview = body:sub(1, 100),
+                    })
+                end
+            end
+        end
+        -- Per-character pages (keyed by character string, e.g. "Name-Realm")
+        if MyNotepadData.characterPages then
+            for ck, pages in pairs(MyNotepadData.characterPages) do
+                local matched   = MatchCharKey(ck)
+                local charLabel = matched or (ck .. " (no match - global)")
+                if type(pages) == "table" then
+                    for i, page in ipairs(pages) do
+                        local body = page.text
+                        if body and not body:match("^%s*$") then
+                            local title = (page.title and page.title ~= "") and page.title or ("MyNotepad " .. i)
+                            tinsert(entries, {
+                                addon       = "MyNotepad",
+                                title       = title,
+                                scope       = matched and "character" or "global",
+                                charLabel   = charLabel,
+                                tags        = { "MyNotepad" },
+                                bodyPreview = body:sub(1, 100),
+                            })
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- AmmeNotepad (keyed notes table, ordered by noteOrder; all global)
+    if sel.AmmeNotepad and AmmeNotepadDB and AmmeNotepadDB.notes then
+        -- Use noteOrder for consistent ordering when available
+        local order = AmmeNotepadDB.noteOrder
+        local notes = AmmeNotepadDB.notes
+        local seen  = {}
+        if order then
+            for _, id in ipairs(order) do
+                local note = notes[id]
+                if note then
+                    seen[id] = true
+                    local body = note.body
+                    if body and not body:match("^%s*$") then
+                        local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                        tinsert(entries, {
+                            addon       = "AmmeNotepad",
+                            title       = title,
+                            scope       = "global",
+                            charLabel   = "Global",
+                            tags        = { "AmmeNotepad" },
+                            bodyPreview = body:sub(1, 100),
+                        })
+                    end
+                end
+            end
+        end
+        -- Any notes not referenced by noteOrder (safety net)
+        for id, note in pairs(notes) do
+            if not seen[id] then
+                local body = note.body
+                if body and not body:match("^%s*$") then
+                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    tinsert(entries, {
+                        addon       = "AmmeNotepad",
+                        title       = title,
+                        scope       = "global",
+                        charLabel   = "Global",
+                        tags        = { "AmmeNotepad" },
+                        bodyPreview = body:sub(1, 100),
+                    })
+                end
+            end
+        end
+    end
+
     return entries
 end
 
@@ -662,6 +755,66 @@ function M.Run(sel)
         end
 
         db.migrationDone.OneWoWNotes = true
+    end
+
+    -- MyNotepad
+    if sel.MyNotepad and MyNotepadData then
+        -- Global pages
+        if MyNotepadData.pages then
+            for i, page in ipairs(MyNotepadData.pages) do
+                local body = page.text
+                if body and not body:match("^%s*$") then
+                    local title = (page.title and page.title ~= "") and page.title or ("MyNotepad " .. i)
+                    CreateMigratedNote(title, body, { "MyNotepad" }, nil)
+                end
+            end
+        end
+        -- Per-character pages
+        if MyNotepadData.characterPages then
+            for ck, pages in pairs(MyNotepadData.characterPages) do
+                local matched = MatchCharKey(ck)
+                if type(pages) == "table" then
+                    for i, page in ipairs(pages) do
+                        local body = page.text
+                        if body and not body:match("^%s*$") then
+                            local title = (page.title and page.title ~= "") and page.title or ("MyNotepad " .. i)
+                            CreateMigratedNote(title, body, { "MyNotepad" }, matched)
+                        end
+                    end
+                end
+            end
+        end
+        db.migrationDone.MyNotepad = true
+    end
+
+    -- AmmeNotepad (keyed notes table, ordered by noteOrder; all global)
+    if sel.AmmeNotepad and AmmeNotepadDB and AmmeNotepadDB.notes then
+        local order = AmmeNotepadDB.noteOrder
+        local notes = AmmeNotepadDB.notes
+        local seen  = {}
+        if order then
+            for _, id in ipairs(order) do
+                local note = notes[id]
+                if note then
+                    seen[id] = true
+                    local body = note.body
+                    if body and not body:match("^%s*$") then
+                        local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                        CreateMigratedNote(title, body, { "AmmeNotepad" }, nil)
+                    end
+                end
+            end
+        end
+        for id, note in pairs(notes) do
+            if not seen[id] then
+                local body = note.body
+                if body and not body:match("^%s*$") then
+                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    CreateMigratedNote(title, body, { "AmmeNotepad" }, nil)
+                end
+            end
+        end
+        db.migrationDone.AmmeNotepad = true
     end
 
     C_UI.Reload()

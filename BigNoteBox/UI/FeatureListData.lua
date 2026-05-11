@@ -323,6 +323,7 @@ BNB.FEATURE_LIST = {
         items  = {
             "Supported: Noteworthy II, TakeANote, Yet Another Notepad, Notepad",
             "Supported: Notes, TinyPad, PurpleNotes, SimpleNote, QuickNotes",
+            "Supported: MyNotepad, AmmeNotepad",
             "Supported: OneWoW Notes (global and per-character notes)",
             "Per-character notes are imported with their correct character scope",
             "All imported notes are tagged with the source addon name",
