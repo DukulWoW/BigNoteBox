@@ -744,7 +744,35 @@ local function ShowNoteContextMenu(btn, noteID)
                 if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
             end)
             root:CreateButton("Open as sticky note", function()
-                if BNB.Sticky and BNB.Sticky.Open then BNB.Sticky.Open(noteID) end
+                if BNB.Sticky and BNB.Sticky.Open then
+                    -- Ensure this opens as a normal world sticky.
+                    -- Write explicit false so global stickyEscDefault doesn't re-apply.
+                    local db = BigNoteBoxDB
+                    if db then
+                        db.postits = db.postits or {}
+                        db.postits[noteID] = db.postits[noteID] or {}
+                        db.postits[noteID].cfg = db.postits[noteID].cfg or {}
+                        db.postits[noteID].cfg.escOnly = false
+                    end
+                    if BNB.Sticky.IsOpen(noteID) then BNB.Sticky.Close(noteID) end
+                    BNB.Sticky.Open(noteID)
+                end
+            end)
+            root:CreateButton("Open as ESC sticky note", function()
+                if BNB.Sticky and BNB.Sticky.Open then
+                    -- Force ESC-only mode then open — SN.Open will show the ESC menu.
+                    local db = BigNoteBoxDB
+                    if db then
+                        db.postits = db.postits or {}
+                        db.postits[noteID] = db.postits[noteID] or {}
+                        db.postits[noteID].cfg = db.postits[noteID].cfg or {}
+                        db.postits[noteID].cfg.escOnly = true
+                    end
+                    -- Close the note first if already open as world sticky, so
+                    -- SN.Open rebuilds it with the correct strata.
+                    if BNB.Sticky.IsOpen(noteID) then BNB.Sticky.Close(noteID) end
+                    BNB.Sticky.Open(noteID)
+                end
             end)
             do
                 local n3 = BNB.GetNote(noteID)
