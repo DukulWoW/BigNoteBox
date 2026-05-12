@@ -3,7 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: A notepad companion to BigChatBox — send notes to chat, capture chat as notes
 ## Author: Dukul
-## Version: 1.7.2
+## Version: 1.7.3
 ## SavedVariables: BigNoteBoxDB
 ## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB
 ## AddonCompartmentFunc: BNB_OnAddonCompartmentClick
@@ -30,6 +30,7 @@ Core\Initialize.lua
 
 # UI
 UI\Widgets.lua
+UI\IconsAC.lua
 UI\Fonts.lua
 UI\SkinSystem.lua
 UI\MainWindow.lua
@@ -47,6 +48,7 @@ UI\DangerZone.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua
 Assets\Icons\IconManifest.lua
+UI\BlizzardIconList.lua
 UI\NoteConfig.lua
 UI\ReferenceBox.lua
 UI\Sidebar.lua

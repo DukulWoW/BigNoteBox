@@ -46,7 +46,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 5   -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 13  -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 14  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS
@@ -292,6 +292,13 @@ local function MigrateSettingsDB()
         -- 0.5 = equal split; 1.0 = tasks take all; 0.0 = attachments take all.
         if db.taskSplitRatio         == nil then db.taskSplitRatio         = {}    end
         v = 13
+    end
+
+    -- ++ v13 -> v14: Blizzard icon autocomplete toggle ++++++++++++++++++++++++
+    if v < 14 then
+        -- Off by default — user must opt in via Advanced tab.
+        if db.blizzardIconComplete == nil then db.blizzardIconComplete = false end
+        v = 14
     end
 
     db.dbVersion = SETTINGS_SCHEMA_VERSION

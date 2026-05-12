@@ -438,6 +438,16 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
         }
     end
 
+    if not StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] then
+        StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
+            text = "Blizzard icon autocomplete has been disabled.\nThe icon list (~2 MB) will be freed after a reload.",
+            button1 = "Reload Now",
+            button2 = "Later",
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+            OnAccept = function() C_UI.Reload() end,
+        }
+    end
+
     local function OnKeyCaptured(btn, key)
         if _KB_MODIFIER_KEYS[key] then return end
         if key == "ESCAPE" or InCombatLockdown() then StopCapture(btn); return end
@@ -2150,9 +2160,9 @@ local function BuildFeaturesTab(sf, ct)
     end
 
     y = AddSlider(ct, y, "Max open sticky notes", 1, 50,
-        function() return db.stickyMaxCount or 10 end,
+        function() return db.stickyMaxCount or 20 end,
         function(v) db.stickyMaxCount = v end,
-        "Maximum number of sticky notes that can be open at the same time (default: 10).")
+        "Maximum number of sticky notes that can be open at the same time (default: 20).")
 
     y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
         function() return db.stickiesHiddenPersist == true end,
@@ -2606,6 +2616,26 @@ local function BuildAdvancedTab(sf, ct)
         function() return db.hideLoginMessage == true end,
         function(v) db.hideLoginMessage = v end,
         "Suppress the \"BigNoteBox v... loaded\" chat message on login.")
+
+    AddRule(ct, y); y = y - 18
+    y = AddHeader(ct, y, "Icons")
+
+    y = AddCheck(ct, y, "Enable full Blizzard icon autocomplete list",
+        function() return db.blizzardIconComplete == true end,
+        function(v)
+            db.blizzardIconComplete = v
+            if v then
+                -- Enable: promote the list into BNB.BlizzardIconList right now
+                -- so the user can use it immediately without a reload.
+                if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList() end
+            else
+                -- Disable: nil the list (GC will reclaim it shortly).
+                -- Prompt for reload so the raw table is also freed.
+                BNB.BlizzardIconList = nil
+                StaticPopup_Show("BNB_BLZICON_AC_DISABLE")
+            end
+        end,
+        "Loads ~32,000 Blizzard icon names for autocomplete suggestions in\nthe Blizzard Icon fields. Uses ~2 MB of memory. Off by default.\nDisabling frees memory after a reload.")
 
     -- ── Migrate section (only shown if any supported addon is installed) ─────────
     if BNB.Migration and BNB.Migration.HasAny() then

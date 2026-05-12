@@ -1529,6 +1529,16 @@ local function BuildAppearanceTab(panel)
     local ICON_SECTION_H = math.max(BNB_PANE_H, BLZ_PANE_H)
     y = y - ICON_SECTION_H - 4
 
+    -- Icon autocomplete — attached here, AFTER all SetScript/AddPlaceholder calls
+    -- above, so repeated AddPlaceholder calls in SyncIconTab and the Use Default
+    -- handler cannot overwrite our hooks (SetScript clears HookScript handlers).
+    if BNB.AttachIconAutocomplete then
+        BNB.AttachIconAutocomplete(blzEb, function(name)
+            ApplyBlzName(name)
+            blzApply:SetEnabled(true); blzApply:SetAlpha(1.0)
+        end)
+    end
+
     -- Refresh all border controls when switching notes (called by OpenNoteConfig/SyncNoteConfig)
     panel._refreshAppearance = function()
         local n    = GetNote()
