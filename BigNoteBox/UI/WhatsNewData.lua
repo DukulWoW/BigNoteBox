@@ -25,7 +25,8 @@ BNB.PATCH_NOTES = {
     version = "1.7.3",
     entries = {
         "|cff66bb6aNew:|r Blizzard icon fields (Note config and Rich Note Ico tag) now support autocomplete search across 32,000+ icons",
-        "|cff66bb6aNew:|r Type any part of an icon name to get suggestions with live previews. You can scroll the list with arrow keys and mouse wheel.",
-        "|cff66bb6aNew:|r Enable the icon list feature in Main Config > Advanced > Icons (off by default). This feature uses ~2 MB of memory.",
+        "|cff66bb6aNew:|r Type any part of an icon name to get suggestions with live previews. You can scroll the list with arrow keys and mouse wheel",
+        "|cff66bb6aNew:|r Enable the icon list feature in Main Config > Advanced > Icons (off by default). This feature uses ~2 MB of memory",
+        "|cff66bb6aChange:|r Default amount of max sticky notes changed from 10 to 20"
     },
 }
