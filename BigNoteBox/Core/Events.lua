@@ -38,6 +38,9 @@ BNB.RegisterEvent("ADDON_LOADED", function(event, addonName)
         -- DB init happens here so it's available before PLAYER_LOGIN
         BNB.InitializeDB()
         BNB._addonLoaded = true
+        -- Promote (or discard) the Blizzard icon list based on db setting.
+        -- Must run after InitializeDB() so BigNoteBoxDB is available.
+        if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList() end
     elseif addonName == "BigNoteBoxDB" then
         -- BigNoteBoxDB loaded after BigNoteBox (unusual but possible).
         -- Notes are now in memory — initialise them and clear the unavailable flag.

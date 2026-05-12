@@ -1270,6 +1270,14 @@ function BNB.OpenIcoDialog(insertFn)
             end
         end)
 
+        -- Icon autocomplete (only active when db.blizzardIconComplete is on)
+        if BNB.AttachIconAutocomplete then
+            BNB.AttachIconAutocomplete(nameEb, function(name)
+                -- onSelect: refresh the shared preview panel.
+                RefreshIcoPreview("Interface\\Icons\\" .. name)
+            end)
+        end
+
         -- Size field on tab 2 (same position as tab 1, parented to panel2)
         -- Writes through to f._sizeEb2; Insert reads whichever tab is active.
         local sizeEb2 = CreateFrame("EditBox", nil, panel2,

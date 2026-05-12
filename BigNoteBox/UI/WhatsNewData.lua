@@ -22,12 +22,10 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.7.2",
+    version = "1.7.3",
     entries = {
-        "|cff66bb6aNew:|r You can now migrate notes from MyNotepad and AmmeNotepad",
-		"|cff66bb6aNew:|r Sticky Notes can now live in the ESC menu screen (Sitcky Note Config > Pin to ESC Screen )",
-		"|cff66bb6aNew:|r Sticky Notes can be set to always open in the ESC menu screen (Main Config > Features > Sticky Notes > Default to ESC screen only)",
-		"|cff66bb6aNew:|r There is an overlay by default on the ESC screen, this can be turned off (Main Config > Features > Sticky Notes > Dim screen behind ESC sticky notes)",
-        "|cff66bb6afixed:|r Dropdown menues i Sticky Note settings rendered below the window",
+        "|cff66bb6aNew:|r Blizzard icon fields (Note config and Rich Note Ico tag) now support autocomplete search across 32,000+ icons",
+        "|cff66bb6aNew:|r Type any part of an icon name to get suggestions with live previews. You can scroll the list with arrow keys and mouse wheel.",
+        "|cff66bb6aNew:|r Enable the icon list feature in Main Config > Advanced > Icons (off by default). This feature uses ~2 MB of memory.",
     },
 }
