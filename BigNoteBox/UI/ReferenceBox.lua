@@ -2090,8 +2090,8 @@ RenderTaskPanel = function()
         cb:SetScale(TASK_CB_SCALE)
         cb:SetChecked(task.completed)
         cb:SetPoint("LEFT", row, "LEFT", 0, 0)
-        cb:SetScript("OnClick", function(self)
-            if _noteID then T.ToggleTask(_noteID, task.id) end
+        cb:SetScript("OnClick", function(self, btn)
+            if btn ~= "RightButton" and _noteID then T.ToggleTask(_noteID, task.id) end
         end)
         -- Route right-clicks on the checkbox to the context menu
         cb:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -2583,7 +2583,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
                 function() return task.resetType == entry.value end,
                 function()
                     if entry.value then
-                        T.UpdateTask(noteID, taskID, { resetType = entry.value })
+                        T.UpdateTask(noteID, taskID, { resetType = entry.value, _clear = {"lastReset"} })
                     else
                         T.UpdateTask(noteID, taskID, { _clear = {"resetType", "resetEvery", "lastReset"} })
                     end
