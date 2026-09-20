@@ -251,32 +251,32 @@ end
 -- Each entry: { key, label, path }. "none" is always first (plain colour).
 -- Add new textures here as assets are created; no other file needs changing.
 local BG_TEXTURES = {
-    { key = "none",         label = "None" },
-    { key = "bg-stone",     label = "Stone",          tile = true,
+    { key = "none",         label = L["STICKY_BG_NONE"] },
+    { key = "bg-stone",     label = L["STICKY_BG_STONE"],          tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga" },
-    { key = "bgtexture-01", label = "Old white used paper",
+    { key = "bgtexture-01", label = L["STICKY_BG_OLD_WHITE_PAPER"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
-    { key = "bgtexture-02", label = "Damaged Stone",  tile = true,
+    { key = "bgtexture-02", label = L["STICKY_BG_DAMAGED_STONE"],  tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-02.tga" },
-    { key = "bgtexture-03", label = "Black Marble",   tile = true,
+    { key = "bgtexture-03", label = L["STICKY_BG_BLACK_MARBLE"],   tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-03.tga" },
-    { key = "bgtexture-04", label = "Golden paper",
+    { key = "bgtexture-04", label = L["STICKY_BG_GOLDEN_PAPER"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-04.tga" },
-    { key = "bgtexture-05", label = "Old Dutch paper",
+    { key = "bgtexture-05", label = L["STICKY_BG_OLD_DUTCH_PAPER"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-05.tga" },
-    { key = "bgtexture-06", label = "Parchment",      tile = true,
+    { key = "bgtexture-06", label = L["STICKY_BG_PARCHMENT"],      tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-06.tga" },
-    { key = "bgtexture-08", label = "Creased paper",  tile = true,
+    { key = "bgtexture-08", label = L["STICKY_BG_CREASED_PAPER"],  tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-08.tga" },
-    { key = "bgtexture-12", label = "Dark marble",
+    { key = "bgtexture-12", label = L["STICKY_BG_DARK_MARBLE"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-12.tga" },
-    { key = "bgtexture-16", label = "Sandstone",
+    { key = "bgtexture-16", label = L["STICKY_BG_SANDSTONE"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-16.tga" },
-    { key = "bgtexture-17", label = "Worn leather",
+    { key = "bgtexture-17", label = L["STICKY_BG_WORN_LEATHER"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-17.tga" },
-    { key = "bgtexture-19", label = "Dark granite",   tile = true,
+    { key = "bgtexture-19", label = L["STICKY_BG_DARK_GRANITE"],   tile = true,
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-19.tga" },
-    { key = "bgtexture-20", label = "Dark stone",
+    { key = "bgtexture-20", label = L["STICKY_BG_DARK_STONE"],
       path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-20.tga" },
 }
 
@@ -785,7 +785,7 @@ local function BuildStickySettingsWindow()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Sticky Note Settings")
+        titleLbl:SetText(L["STICKY_SETTINGS_TITLE"])
         f._titleLbl = titleLbl
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() CloseStickySettings() end)
@@ -814,7 +814,7 @@ local function BuildStickySettingsWindow()
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
         f:SetAlpha(0.95)
-        f:SetTitle("Sticky Note Settings")
+        f:SetTitle(L["STICKY_SETTINGS_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() CloseStickySettings() end)
         end
@@ -1079,11 +1079,11 @@ local function PopulateStickySettings(noteID)
         end)
         local focusLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         focusLbl:SetPoint("LEFT", focusChk, "RIGHT", 4, 0)
-        focusLbl:SetText("Focus mode")
+        focusLbl:SetText(L["STICKY_FOCUS_MODE_LABEL"])
         focusChk:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Focus mode", 1, 1, 1)
-            GameTooltip:AddLine("Hides the title, icon and border. They reappear on hover. Reduces content padding. Forces plain text for rich notes. Task view uses compact row spacing.", 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["STICKY_FOCUS_MODE_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["STICKY_FOCUS_MODE_TIP"], 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
         focusChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1126,11 +1126,11 @@ local function PopulateStickySettings(noteID)
         end)
         local escLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         escLbl:SetPoint("LEFT", escChk, "RIGHT", 4, 0)
-        escLbl:SetText("Pin to ESC screen")
+        escLbl:SetText(L["STICKY_ESC_PIN_LABEL"])
         escChk:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine("Pin to ESC screen", 1, 1, 1)
-            GameTooltip:AddLine("When enabled, this sticky note is hidden in the game world and only appears when the ESC menu is open. The ESC menu opens automatically when you open this sticky.", 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["STICKY_ESC_PIN_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["STICKY_ESC_PIN_TIP"], 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
         escChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1150,7 +1150,7 @@ local function PopulateStickySettings(noteID)
 
         richPlainChkLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         richPlainChkLbl:SetPoint("LEFT", richPlainChk, "RIGHT", 2, 0)
-        richPlainChkLbl:SetText("Show rich note as plain text")
+        richPlainChkLbl:SetText(L["STICKY_RICH_PLAIN_LABEL"])
         richPlainChkLbl:SetTextColor(0.9, 0.9, 0.9)
 
         ct1._y = ct1._y - 30
@@ -1161,13 +1161,13 @@ local function PopulateStickySettings(noteID)
     -- ── Text color ────────────────────────────────────────────────────────────
     -- Greyed out when the note is rich AND "show as plain text" is off,
     -- because the color has no effect on SimpleHTML rendering in that state.
-    Sec(ct1, "Text color")
+    Sec(ct1, L["STICKY_TEXT_COLOR"])
 
     local textColorWidgets = {}  -- collect for alpha/mouse toggling
     local plainOnlyWidgets = {}  -- font, font-size, text-style, text-opacity: inactive for rich notes
 
     local tcBtn = ColorBtn(ct1, cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88,
-        "Click to pick color", function(r, g, b)
+        L["STICKY_CLICK_PICK_COLOR"], function(r, g, b)
             cfg.textR, cfg.textG, cfg.textB = r, g, b
             SaveCfg(noteID, cfg)
             if stickyFrame and stickyFrame._bodyEb then
@@ -1176,7 +1176,7 @@ local function PopulateStickySettings(noteID)
         end)
     textColorWidgets[#textColorWidgets+1] = tcBtn
 
-    SubLbl(ct1, "Quick pick:")
+    SubLbl(ct1, L["STICKY_QUICK_PICK_LABEL"])
     -- Snapshot children before ColorGrid so we can collect only what it adds
     local beforeChildren = {}
     for _, c in ipairs({ct1:GetChildren()}) do beforeChildren[c] = true end
@@ -1229,8 +1229,8 @@ local function PopulateStickySettings(noteID)
         end)
         richPlainChk:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine("Show rich note as plain text", 1, 1, 1)
-            GameTooltip:AddLine("Renders the note body as plain text instead of formatted rich text. Useful for copying or editing the raw markup.", 0.78, 0.78, 0.78, true)
+            GameTooltip:AddLine(L["STICKY_RICH_PLAIN_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["STICKY_RICH_PLAIN_TIP"], 0.78, 0.78, 0.78, true)
             GameTooltip:Show()
         end)
         richPlainChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1305,7 +1305,7 @@ local function PopulateStickySettings(noteID)
     ct1._y = ct1._y - gridRows * (PH_FONT + PG_FONT) + PG_FONT
     HLStickyFonts()
 
-    local fontSizeSl = MakeSlider(ct1, "Font size", 8, 24,
+    local fontSizeSl = MakeSlider(ct1, L["STICKY_FONT_SIZE"], 8, 24,
         cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13,
         function(v)
             cfg.fontSize = v; SaveCfg(noteID, cfg)
@@ -1317,7 +1317,7 @@ local function PopulateStickySettings(noteID)
     plainOnlyWidgets[#plainOnlyWidgets+1] = fontSizeSl
 
     Rule(ct1)
-    Hdr(ct1, "Text style")
+    Hdr(ct1, L["STICKY_TEXT_STYLE"])
 
     -- Line height
     local LH_STICKY = {
@@ -1333,7 +1333,7 @@ local function PopulateStickySettings(noteID)
         cfg.lineHeight = val; SaveCfg(noteID, cfg)
     end
 
-    SubLbl(ct1, "Line height:")
+    SubLbl(ct1, L["STICKY_LINE_HEIGHT_LABEL"])
     local useNativeLH = C_XMLUtil and C_XMLUtil.GetTemplateInfo
         and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
     if useNativeLH then
@@ -1369,26 +1369,30 @@ local function PopulateStickySettings(noteID)
     end
 
     -- Text alignment
-    SubLbl(ct1, "Text alignment:")
-    local ALIGN_OPTIONS = { "Left", "Center", "Right" }
-    local ALIGN_MAP     = { Left="LEFT", Center="CENTER", Right="RIGHT" }
-    local ALIGN_RMAP    = { LEFT="Left", CENTER="Center", RIGHT="Right" }
-    local function GetAlignLabel() return ALIGN_RMAP[cfg.textAlign or "LEFT"] or "Left" end
+    SubLbl(ct1, L["STICKY_TEXT_ALIGN_LABEL"])
+    -- ALIGN_KEYS holds the WoW native justify constants that cfg.textAlign is actually
+    -- saved as (unaffected by locale); ALIGN_LABELS is the translatable display text,
+    -- looked up by that same key. Keeping these separate (unlike the old single
+    -- display-string-doubles-as-key array) means a translated label can never break
+    -- the saved value or the ALIGN_MAP lookup.
+    local ALIGN_KEYS   = { "LEFT", "CENTER", "RIGHT" }
+    local ALIGN_LABELS = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
+    local function GetAlignLabel() return ALIGN_LABELS[cfg.textAlign or "LEFT"] or ALIGN_LABELS.LEFT end
     local useNativeAlign = useNativeLH
     if useNativeAlign then
         local alignDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
         alignDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
         alignDD:SetWidth(SETTINGS_CW)
         alignDD:SetupMenu(function(_, root)
-            for _, opt in ipairs(ALIGN_OPTIONS) do
-                local o = opt
-                root:CreateRadio(o,
-                    function() return GetAlignLabel() == o end,
+            for _, key in ipairs(ALIGN_KEYS) do
+                local k = key
+                root:CreateRadio(ALIGN_LABELS[k],
+                    function() return (cfg.textAlign or "LEFT") == k end,
                     function()
-                        cfg.textAlign = ALIGN_MAP[o]; SaveCfg(noteID, cfg)
+                        cfg.textAlign = k; SaveCfg(noteID, cfg)
                         alignDD:GenerateMenu()
                         if stickyFrame and stickyFrame._bodyEb then
-                            pcall(function() stickyFrame._bodyEb:SetJustifyH(ALIGN_MAP[o]) end)
+                            pcall(function() stickyFrame._bodyEb:SetJustifyH(k) end)
                         end
                     end)
             end
@@ -1399,15 +1403,15 @@ local function PopulateStickySettings(noteID)
         local alignBtn = BNB.CreateButton(nil, ct1, GetAlignLabel(), SETTINGS_CW, 22)
         alignBtn:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
         alignBtn:SetScript("OnClick", function(self)
-            local cur = GetAlignLabel()
+            local cur = cfg.textAlign or "LEFT"
             local idx = 1
-            for i, o in ipairs(ALIGN_OPTIONS) do if o == cur then idx = i; break end end
-            idx = (idx % #ALIGN_OPTIONS) + 1
-            local opt = ALIGN_OPTIONS[idx]
-            cfg.textAlign = ALIGN_MAP[opt]; SaveCfg(noteID, cfg)
-            self:SetText(opt)
+            for i, k in ipairs(ALIGN_KEYS) do if k == cur then idx = i; break end end
+            idx = (idx % #ALIGN_KEYS) + 1
+            local key = ALIGN_KEYS[idx]
+            cfg.textAlign = key; SaveCfg(noteID, cfg)
+            self:SetText(ALIGN_LABELS[key])
             if stickyFrame and stickyFrame._bodyEb then
-                pcall(function() stickyFrame._bodyEb:SetJustifyH(ALIGN_MAP[opt]) end)
+                pcall(function() stickyFrame._bodyEb:SetJustifyH(key) end)
             end
         end)
         ct1._y = ct1._y - 28
@@ -1415,7 +1419,7 @@ local function PopulateStickySettings(noteID)
     end
 
     -- Font outline
-    SubLbl(ct1, "Font outline:")
+    SubLbl(ct1, L["STICKY_FONT_OUTLINE_LABEL"])
     local function GetOutlineLabel() return cfg.fontOutline or "None" end
     local useNativeOutline = useNativeLH
     if useNativeOutline then
@@ -1481,7 +1485,7 @@ local function PopulateStickySettings(noteID)
     }
 
     local randBtn = BNB.CreateButton(nil, ct2,
-        "Randomize Sticky Note Colors", SETTINGS_CW, 26)
+        L["STICKY_RANDOMIZE_COLORS_BTN"], SETTINGS_CW, 26)
     randBtn:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
     randBtn:SetScript("OnClick", function()
         local bg = BG_PALETTE[math.random(#BG_PALETTE)]
@@ -1517,12 +1521,12 @@ local function PopulateStickySettings(noteID)
 
     Rule(ct2)
     Sec(ct2, "Background")
-    local bgSwatch = ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, "Click to pick color", function(r,g,b)
+    local bgSwatch = ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, L["STICKY_CLICK_PICK_COLOR"], function(r,g,b)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
         SaveCfg(noteID, cfg)
         if stickyFrame then ApplyConfig(stickyFrame, noteID) end
     end)
-    SubLbl(ct2, "Quick pick:")
+    SubLbl(ct2, L["STICKY_QUICK_PICK_LABEL"])
     ColorGrid(ct2, function(r,g,b)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
         SaveCfg(noteID, cfg)
@@ -1535,7 +1539,7 @@ local function PopulateStickySettings(noteID)
     -- the slider is built (same Lua 5.1 upvalue pattern as SyncBorderSliders).
     local SyncColorizeSlider
 
-    SubLbl(ct2, "Background texture:")
+    SubLbl(ct2, L["STICKY_BG_TEXTURE_LABEL"])
     local curTexKey   = cfg.bgTexture or "none"
     local curTexLabel = BgTextureLabel(curTexKey)
 
@@ -1585,7 +1589,7 @@ local function PopulateStickySettings(noteID)
 
     -- "Colorize texture %" — lerps the backdrop tint between raw paper (0%, white
     -- tint) and the full chosen colour (100%). Greyed out when texture is "None".
-    local slColorize = MakeSlider(ct2, "Colorize texture %", 0, 100,
+    local slColorize = MakeSlider(ct2, L["STICKY_COLORIZE_TEXTURE_PCT"], 0, 100,
         math.floor((cfg.bgColorOpacity or 1.0) * 100),
         function(v)
             cfg.bgColorOpacity = v / 100
@@ -1603,8 +1607,8 @@ local function PopulateStickySettings(noteID)
     SyncColorizeSlider(curTexKey)
 
     Rule(ct2)
-    Sec(ct2, "Opacity")
-    local textOpacitySl = MakeSlider(ct2, "Text opacity %", 10, 100,
+    Sec(ct2, L["STICKY_OPACITY_SECTION"])
+    local textOpacitySl = MakeSlider(ct2, L["STICKY_TEXT_OPACITY_PCT"], 10, 100,
         math.floor((cfg.textAlpha or 1.0) * 100),
         function(v)
             cfg.textAlpha = v/100; SaveCfg(noteID, cfg)
@@ -1613,7 +1617,7 @@ local function PopulateStickySettings(noteID)
             end
         end)
     plainOnlyWidgets[#plainOnlyWidgets+1] = textOpacitySl
-    MakeSlider(ct2, "Background opacity %", 0, 100,
+    MakeSlider(ct2, L["STICKY_BG_OPACITY_PCT"], 0, 100,
         math.floor((cfg.alpha or 0.96) * 100),
         function(v)
             cfg.alpha = v/100; SaveCfg(noteID, cfg)
@@ -1668,7 +1672,7 @@ local function PopulateStickySettings(noteID)
     end
 
     -- Border Thickness slider
-    local slThickness = MakeSlider(ct2, "Border thickness %", 1, 200, cfg.borderScale or 100,
+    local slThickness = MakeSlider(ct2, L["STICKY_BORDER_THICKNESS_PCT"], 1, 200, cfg.borderScale or 100,
         function(v)
             cfg.borderScale = math.floor(v)
             SaveCfg(noteID, cfg)
@@ -1676,7 +1680,7 @@ local function PopulateStickySettings(noteID)
         end)
 
     -- Border Offset slider
-    local slOffset = MakeSlider(ct2, "Border offset px", 0, 12, cfg.borderOffset or 2,
+    local slOffset = MakeSlider(ct2, L["STICKY_BORDER_OFFSET_PX"], 0, 12, cfg.borderOffset or 2,
         function(v)
             cfg.borderOffset = math.floor(v)
             SaveCfg(noteID, cfg)
@@ -1756,12 +1760,12 @@ local function PopulateStickySettings(noteID)
     local SitRefreshWaypointDisplay
 
     -- ── Header ────────────────────────────────────────────────────────────────
-    SitHdr("Contextual Binding")
+    SitHdr(L["STICKY_CONTEXTUAL_BINDING_HDR"])
     local sitDesc = ct3:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitDesc:SetPoint("TOPLEFT",  ct3, "TOPLEFT",  SIT_PAD, ct3._y)
     sitDesc:SetPoint("TOPRIGHT", ct3, "TOPRIGHT", 0, ct3._y)
     sitDesc:SetTextColor(0.60, 0.60, 0.60)
-    sitDesc:SetText("This note will surface when you enter\nthe matching zone, instance, or area.")
+    sitDesc:SetText(L["STICKY_SIT_DESC"])
     sitDesc:SetJustifyH("LEFT"); sitDesc:SetWordWrap(true)
     ct3._y = ct3._y - 36
     SitRule()
@@ -1777,7 +1781,7 @@ local function PopulateStickySettings(noteID)
 
     -- ── Bind-type dropdown ────────────────────────────────────────────────────
     local SIT_TYPES       = { "none", "zone", "subzone", "instance", "player" }
-    local SIT_TYPE_LABELS = { "None (global)", "Zone", "Sub-zone", "Instance", "Player" }
+    local SIT_TYPE_LABELS = { L["TASK_CTX_SIT_NONE"], L["STICKY_KIND_ZONE"], L["STICKY_KIND_SUBZONE"], L["STICKY_KIND_INSTANCE"], L["STICKY_KIND_PLAYER"] }
     local sitSelType      = "none"
 
     local function SitGetTypeLabel(t)
@@ -1841,7 +1845,7 @@ local function PopulateStickySettings(noteID)
     local sitValueLbl = sitValueRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitValueLbl:SetPoint("LEFT", sitValueRow, "LEFT", 0, 0)
     sitValueLbl:SetWidth(65); sitValueLbl:SetJustifyH("LEFT")
-    sitValueLbl:SetTextColor(0.78, 0.78, 0.78); sitValueLbl:SetText("Value:")
+    sitValueLbl:SetTextColor(0.78, 0.78, 0.78); sitValueLbl:SetText(L["STICKY_SIT_VALUE_LABEL"])
 
     local sitValueEb = CreateFrame("EditBox", nil, sitValueRow,
         "BackdropTemplate")
@@ -1863,8 +1867,8 @@ local function PopulateStickySettings(noteID)
     sitBrowseBtn:SetScript("OnEnter", function(self)
         self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Browse zones and instances", 1, 1, 1)
-        GameTooltip:AddLine("Click to open the zone browser", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_BODY"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     sitBrowseBtn:SetScript("OnLeave", function(self)
@@ -1961,15 +1965,15 @@ local function PopulateStickySettings(noteID)
     end)
 
     -- ── Use Current / Apply / Clear ───────────────────────────────────────────
-    local sitUseCurrentBtn = BNB.CreateButton(nil, ct3, "Use Current", 90, 20)
+    local sitUseCurrentBtn = BNB.CreateButton(nil, ct3, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 20)
     sitUseCurrentBtn:SetPoint("TOPLEFT", sitValueRow, "BOTTOMLEFT", 0, -4)
     sitUseCurrentBtn:Hide()
 
-    local sitSaveCtxBtn = BNB.CreateButton(nil, ct3, "Apply", 60, 22)
+    local sitSaveCtxBtn = BNB.CreateButton(nil, ct3, L["STICKY_SIT_APPLY_BTN"], 60, 22)
     sitSaveCtxBtn:SetPoint("TOPLEFT", sitUseCurrentBtn, "TOPRIGHT", 8, 0)
     sitSaveCtxBtn:Hide()
 
-    local sitClearCtxBtn = BNB.CreateButton(nil, ct3, "Clear", 52, 22)
+    local sitClearCtxBtn = BNB.CreateButton(nil, ct3, L["STICKY_SIT_CLEAR_BTN"], 52, 22)
     sitClearCtxBtn:SetPoint("TOPLEFT", sitSaveCtxBtn, "TOPRIGHT", 6, 0)
     sitClearCtxBtn:Hide()
 
@@ -1988,11 +1992,11 @@ local function PopulateStickySettings(noteID)
 
     -- ── Display mode dropdown ─────────────────────────────────────────────────
     local SIT_DISPLAY_MODES  = { "popup", "sticky", "both" }
-    local SIT_DISPLAY_LABELS = { "Show popup notification", "Show as sticky note", "Both -- popup and sticky" }
+    local SIT_DISPLAY_LABELS = { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] }
     local sitSelDisplay = "popup"
 
     local SIT_LEAVE_MODES  = { "keep", "bt-minimize", "hide" }
-    local SIT_LEAVE_LABELS = { "Keep open", "Minimize", "Hide" }
+    local SIT_LEAVE_LABELS = { L["STICKY_LEAVE_KEEP"], L["STICKY_LEAVE_MINIMIZE"], L["STICKY_LEAVE_HIDE"] }
     local sitSelLeave = "keep"
 
     local sitDispDiv = ct3:CreateTexture(nil, "ARTWORK")
@@ -2011,7 +2015,7 @@ local function PopulateStickySettings(noteID)
 
     local sitDispLabel = ct3:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitDispLabel:SetPoint("TOPLEFT", sitDispDiv, "BOTTOMLEFT", 0, -6)
-    sitDispLabel:SetText("When triggered, show as:")
+    sitDispLabel:SetText(L["STICKY_SIT_DISPLAY_LABEL"])
     sitDispLabel:SetTextColor(0.78, 0.78, 0.78); sitDispLabel:Hide()
 
     local function SitGetDispLabel(m)
@@ -2111,7 +2115,7 @@ local function PopulateStickySettings(noteID)
 
     local sitLeaveLabel = ct3:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitLeaveLabel:SetPoint("TOPLEFT", sitLeaveDiv, "BOTTOMLEFT", 0, -6)
-    sitLeaveLabel:SetText("When you leave the area:")
+    sitLeaveLabel:SetText(L["STICKY_SIT_LEAVE_LABEL"])
     sitLeaveLabel:SetTextColor(0.78, 0.78, 0.78); sitLeaveLabel:Hide()
 
     local useNativeLeave3 = useNativeDisp3
@@ -2174,7 +2178,7 @@ local function PopulateStickySettings(noteID)
     end
 
     -- ── Refresh current-binding label ─────────────────────────────────────────
-    local SIT_KIND_LABELS = { zone="Zone", subzone="Sub-zone", instance="Instance", player="Player" }
+    local SIT_KIND_LABELS = { zone=L["STICKY_KIND_ZONE"], subzone=L["STICKY_KIND_SUBZONE"], instance=L["STICKY_KIND_INSTANCE"], player=L["STICKY_KIND_PLAYER"] }
     local SIT_BIND_MAX_W  = SETTINGS_CW - SIT_PAD * 2
     local SIT_BIND_DEF_SZ = 20
     local SIT_BIND_MIN_SZ = 11
@@ -2186,7 +2190,7 @@ local function PopulateStickySettings(noteID)
             local kind, value
             if BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
             local kindLabel = SIT_KIND_LABELS[kind] or kind or "?"
-            sitCurBindHeader:SetText("Currently bound to " .. kindLabel .. ":")
+            sitCurBindHeader:SetText(string.format(L["STICKY_SIT_BOUND_TO_FMT"], kindLabel))
             sitCurBindValue:SetText(value or "?")
             local path = sitCurBindValue:GetFont()
             if path then
@@ -2218,10 +2222,10 @@ local function PopulateStickySettings(noteID)
         sitBrowseBtn:SetShown(needsValue and canBrowse)
         SitHideAC()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
-        if t == "zone"     then sitValueLbl:SetText("Zone:")
-        elseif t == "subzone"  then sitValueLbl:SetText("Sub-zone:")
-        elseif t == "instance" then sitValueLbl:SetText("Instance:")
-        elseif t == "player"   then sitValueLbl:SetText("Player:")
+        if t == "zone"     then sitValueLbl:SetText(L["STICKY_SIT_ZONE_LABEL"])
+        elseif t == "subzone"  then sitValueLbl:SetText(L["STICKY_SIT_SUBZONE_LABEL"])
+        elseif t == "instance" then sitValueLbl:SetText(L["STICKY_SIT_INSTANCE_LABEL"])
+        elseif t == "player"   then sitValueLbl:SetText(L["STICKY_SIT_PLAYER_LABEL"])
         end
     end
 
@@ -2253,7 +2257,7 @@ local function PopulateStickySettings(noteID)
         if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         if BNB.SyncNoteConfig      then BNB.SyncNoteConfig(noteID) end
-        BNB:Print("Context binding saved.")
+        BNB:Print(L["STICKY_CONTEXT_BINDING_SAVED"])
     end)
 
     -- ── Clear ─────────────────────────────────────────────────────────────────
@@ -2306,7 +2310,7 @@ local function PopulateStickySettings(noteID)
 
     local sitWpHdr = ct3:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sitWpHdr:SetPoint("TOPLEFT", sitWpDiv, "BOTTOMLEFT", 0, -6)
-    sitWpHdr:SetTextColor(1, 0.82, 0, 1); sitWpHdr:SetText("Waypoint"); sitWpHdr:Hide()
+    sitWpHdr:SetTextColor(1, 0.82, 0, 1); sitWpHdr:SetText(L["STICKY_WP_HEADER"]); sitWpHdr:Hide()
 
     local sitWpStatusTag = ct3:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitWpStatusTag:SetPoint("LEFT", sitWpHdr, "RIGHT", 6, 0); sitWpStatusTag:Hide()
@@ -2341,7 +2345,7 @@ local function PopulateStickySettings(noteID)
             BNB.SetBackdrop(fp, 0.08, 0.08, 0.11, 0.96, 0.35, 0.35, 0.38, 1)
             local ptitle = fp:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             ptitle:SetPoint("TOPLEFT", fp, "TOPLEFT", 14, -12)
-            ptitle:SetTextColor(1, 0.82, 0); ptitle:SetText("Waypoint Support")
+            ptitle:SetTextColor(1, 0.82, 0); ptitle:SetText(L["STICKY_WP_SUPPORT_TITLE"])
             local pclose = CreateFrame("Button", nil, fp); pclose:SetSize(20, 20)
             pclose:SetPoint("TOPRIGHT", fp, "TOPRIGHT", -6, -6)
             local pcloseLbl = pclose:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -2358,29 +2362,29 @@ local function PopulateStickySettings(noteID)
             fp._descLbl:SetTextColor(0.78, 0.78, 0.78)
             local linksHdr = fp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             linksHdr:SetPoint("TOPLEFT", fp._descLbl, "BOTTOMLEFT", 0, -14)
-            linksHdr:SetText("Recommended addons:"); linksHdr:SetTextColor(1, 1, 1)
-            local wpuiBtn = BNB.CreateButton(nil, fp, "WaypointUI (CurseForge)", 200, 22)
+            linksHdr:SetText(L["STICKY_WP_RECOMMENDED_ADDONS"]); linksHdr:SetTextColor(1, 1, 1)
+            local wpuiBtn = BNB.CreateButton(nil, fp, L["STICKY_WP_BTN_WAYPOINTUI"], 200, 22)
             wpuiBtn:SetPoint("TOPLEFT", linksHdr, "BOTTOMLEFT", 0, -6)
             wpuiBtn:SetScript("OnClick", function()
-                BNB:Print("Get WaypointUI: |cffffff00https://www.curseforge.com/wow/addons/waypointui|r")
+                BNB:Print(L["STICKY_WP_GET_WAYPOINTUI"])
             end)
-            local ttBtn2 = BNB.CreateButton(nil, fp, "TomTom (CurseForge)", 200, 22)
+            local ttBtn2 = BNB.CreateButton(nil, fp, L["STICKY_WP_BTN_TOMTOM"], 200, 22)
             ttBtn2:SetPoint("TOPLEFT", wpuiBtn, "BOTTOMLEFT", 0, -4)
             ttBtn2:SetScript("OnClick", function()
-                BNB:Print("Get TomTom: |cffffff00https://www.curseforge.com/wow/addons/tomtom|r")
+                BNB:Print(L["STICKY_WP_GET_TOMTOM"])
             end)
             sitWpInfoPopup = fp
         end
         local fp = sitWpInfoPopup
         if SitHasWPAddon() then
             fp._statusLbl:SetText("|cff66ff66Waypoint addon detected.|r")
-            fp._descLbl:SetText("Full waypoint support is available.")
+            fp._descLbl:SetText(L["STICKY_WP_FULL_SUPPORT"])
         elseif SitHasRetailPin() then
             fp._statusLbl:SetText("|cffffaa00Using built-in map pin (basic).|r")
-            fp._descLbl:SetText("Install an addon below for the full experience.")
+            fp._descLbl:SetText(L["STICKY_WP_INSTALL_FOR_FULL"])
         else
             fp._statusLbl:SetText("|cffff5555No waypoint support detected.|r")
-            fp._descLbl:SetText("Install one of the addons below to enable waypoints.")
+            fp._descLbl:SetText(L["STICKY_WP_INSTALL_TO_ENABLE"])
         end
         fp:ClearAllPoints()
         if _stickySettingsFrame then
@@ -2399,7 +2403,7 @@ local function PopulateStickySettings(noteID)
     sitWpInfoHit:SetScript("OnEnter", function(self)
         sitWpInfoLbl:SetText("|cffbbddff?|r")
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Click for waypoint addon info", 0.55, 0.85, 1); GameTooltip:Show()
+        GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1); GameTooltip:Show()
     end)
     sitWpInfoHit:SetScript("OnLeave", function()
         sitWpInfoLbl:SetText("|cff88bbff?|r"); GameTooltip:Hide()
@@ -2410,17 +2414,17 @@ local function PopulateStickySettings(noteID)
     sitWpDesc:SetPoint("TOPRIGHT", ct3,       "TOPRIGHT",    0, 0)
     sitWpDesc:SetJustifyH("LEFT"); sitWpDesc:SetWordWrap(true)
     sitWpDesc:SetTextColor(0.60, 0.60, 0.60)
-    sitWpDesc:SetText("Pin your current map position to this note.\nUse Navigate to send it to TomTom or the map.")
+    sitWpDesc:SetText(L["STICKY_WP_DESC"])
     sitWpDesc:Hide()
 
     local SIT_BTN_W = 72; local SIT_BTN_H = 22; local SIT_BTN_GAP = 6
-    local sitWpPinBtn   = BNB.CreateButton(nil, ct3, "Pin Here", SIT_BTN_W, SIT_BTN_H)
+    local sitWpPinBtn   = BNB.CreateButton(nil, ct3, L["STICKY_WP_BTN_PIN_HERE"], SIT_BTN_W, SIT_BTN_H)
     sitWpPinBtn:SetPoint("TOPLEFT", sitWpDesc, "BOTTOMLEFT", 0, -6); sitWpPinBtn:Hide()
-    local sitWpNavBtn   = BNB.CreateButton(nil, ct3, "Navigate", SIT_BTN_W, SIT_BTN_H)
+    local sitWpNavBtn   = BNB.CreateButton(nil, ct3, L["STICKY_WP_BTN_NAVIGATE"], SIT_BTN_W, SIT_BTN_H)
     sitWpNavBtn:SetPoint("LEFT", sitWpPinBtn, "RIGHT", SIT_BTN_GAP, 0); sitWpNavBtn:Hide()
-    local sitWpClearBtn = BNB.CreateButton(nil, ct3, "Clear WP",  SIT_BTN_W, SIT_BTN_H)
+    local sitWpClearBtn = BNB.CreateButton(nil, ct3, L["STICKY_WP_BTN_CLEAR"],  SIT_BTN_W, SIT_BTN_H)
     sitWpClearBtn:SetPoint("TOPLEFT", sitWpPinBtn, "BOTTOMLEFT", 0, -SIT_BTN_GAP); sitWpClearBtn:Hide()
-    local sitWpManualBtn = BNB.CreateButton(nil, ct3, "Manual", SIT_BTN_W, SIT_BTN_H)
+    local sitWpManualBtn = BNB.CreateButton(nil, ct3, L["STICKY_WP_BTN_MANUAL"], SIT_BTN_W, SIT_BTN_H)
     sitWpManualBtn:SetPoint("LEFT", sitWpClearBtn, "RIGHT", SIT_BTN_GAP, 0); sitWpManualBtn:Hide()
 
     -- Manual coord row
@@ -2432,7 +2436,7 @@ local function PopulateStickySettings(noteID)
 
     local sitWpXLbl = sitWpManualRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitWpXLbl:SetPoint("LEFT", sitWpManualRow, "LEFT", 0, 0)
-    sitWpXLbl:SetText("X:"); sitWpXLbl:SetTextColor(0.78, 0.78, 0.78); sitWpXLbl:SetWidth(14)
+    sitWpXLbl:SetText(L["STICKY_WP_X_LABEL"]); sitWpXLbl:SetTextColor(0.78, 0.78, 0.78); sitWpXLbl:SetWidth(14)
     local sitWpXEb = CreateFrame("EditBox", nil, sitWpManualRow, "BackdropTemplate")
     BNB.EnsureBackdrop(sitWpXEb); BNB.SetBackdropDark(sitWpXEb)
     sitWpXEb:SetPoint("LEFT", sitWpXLbl, "RIGHT", 2, 0); sitWpXEb:SetSize(52, 20)
@@ -2440,13 +2444,13 @@ local function PopulateStickySettings(noteID)
     sitWpXEb:SetMaxLetters(8); sitWpXEb:SetNumeric(false); sitWpXEb:SetTextInsets(3,3,0,0)
     local sitWpYLbl = sitWpManualRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitWpYLbl:SetPoint("LEFT", sitWpXEb, "RIGHT", 6, 0)
-    sitWpYLbl:SetText("Y:"); sitWpYLbl:SetTextColor(0.78, 0.78, 0.78); sitWpYLbl:SetWidth(14)
+    sitWpYLbl:SetText(L["STICKY_WP_Y_LABEL"]); sitWpYLbl:SetTextColor(0.78, 0.78, 0.78); sitWpYLbl:SetWidth(14)
     local sitWpYEb = CreateFrame("EditBox", nil, sitWpManualRow, "BackdropTemplate")
     BNB.EnsureBackdrop(sitWpYEb); BNB.SetBackdropDark(sitWpYEb)
     sitWpYEb:SetPoint("LEFT", sitWpYLbl, "RIGHT", 2, 0); sitWpYEb:SetSize(52, 20)
     sitWpYEb:SetFontObject("GameFontNormalSmall"); sitWpYEb:SetAutoFocus(false)
     sitWpYEb:SetMaxLetters(8); sitWpYEb:SetNumeric(false); sitWpYEb:SetTextInsets(3,3,0,0)
-    local sitWpSaveManualBtn = BNB.CreateButton(nil, sitWpManualRow, "Set", 38, 20)
+    local sitWpSaveManualBtn = BNB.CreateButton(nil, sitWpManualRow, L["STICKY_WP_BTN_SET"], 38, 20)
     sitWpSaveManualBtn:SetPoint("LEFT", sitWpYEb, "RIGHT", 4, 0)
 
     -- WP status label
@@ -2462,7 +2466,7 @@ local function PopulateStickySettings(noteID)
         if wp and wp.x and wp.y then
             local title = wp.title or wp.label or ""
             local coordStr = string.format("%.1f, %.1f", wp.x, wp.y)
-            sitWpStatusLbl:SetText("Waypoint:\n" .. (title ~= "" and title .. "\n" or "") .. coordStr)
+            sitWpStatusLbl:SetText(L["STICKY_WP_STATUS_LABEL"] .. "\n" .. (title ~= "" and title .. "\n" or "") .. coordStr)
             sitWpStatusLbl:Show()
         else
             sitWpStatusLbl:SetText(""); sitWpStatusLbl:Hide()
@@ -2475,7 +2479,7 @@ local function PopulateStickySettings(noteID)
     sitWpLeaveChk:SetPoint("TOPLEFT", sitWpClearBtn, "BOTTOMLEFT", -4, -8); sitWpLeaveChk:Hide()
     local sitWpLeaveChkLbl = sitWpLeaveChk:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     sitWpLeaveChkLbl:SetPoint("LEFT", sitWpLeaveChk, "RIGHT", 2, 0)
-    sitWpLeaveChkLbl:SetText("Remove waypoint on zone leave")
+    sitWpLeaveChkLbl:SetText(L["STICKY_WP_LEAVE_REMOVE_LABEL"])
     sitWpLeaveChkLbl:SetTextColor(0.78, 0.78, 0.78)
     sitWpLeaveChk:SetScript("OnClick", function(self)
         if self:GetChecked() then
@@ -2487,7 +2491,7 @@ local function PopulateStickySettings(noteID)
     end)
     sitWpLeaveChk:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("When you leave the zone, automatically remove the waypoint.", 0.85, 0.85, 0.85, true)
+        GameTooltip:AddLine(L["STICKY_WP_LEAVE_REMOVE_TIP"], 0.85, 0.85, 0.85, true)
         GameTooltip:Show()
     end)
     sitWpLeaveChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2510,10 +2514,10 @@ local function PopulateStickySettings(noteID)
             sitWpClearBtn:SetEnabled(avail); sitWpManualBtn:SetEnabled(avail)
             sitWpLeaveChk:SetEnabled(avail)
             if avail then
-                sitWpDesc:SetText("Pin your current map position to this note.\nUse Navigate to send it to TomTom or the map.")
+                sitWpDesc:SetText(L["STICKY_WP_DESC"])
                 sitWpDesc:SetTextColor(0.60, 0.60, 0.60)
             else
-                sitWpDesc:SetText("Install a waypoint addon to enable this feature.")
+                sitWpDesc:SetText(L["STICKY_WP_INSTALL_ADDON_FEATURE"])
                 sitWpDesc:SetTextColor(0.65, 0.40, 0.35)
             end
         else
@@ -2555,7 +2559,7 @@ local function PopulateStickySettings(noteID)
     end)
     sitWpManualBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Enter coordinates manually", 1, 1, 1); GameTooltip:Show()
+        GameTooltip:AddLine(L["STICKY_WP_MANUAL_TIP"], 1, 1, 1); GameTooltip:Show()
     end)
     sitWpManualBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     sitWpSaveManualBtn:SetScript("OnClick", SitCommitManualCoords)
@@ -2582,8 +2586,8 @@ local function PopulateStickySettings(noteID)
     end)
     sitWpPinBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Pin current location", 1, 1, 1)
-        GameTooltip:AddLine("Saves your current map coordinates to this note.", 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(L["STICKY_WP_PIN_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_PIN_TIP_BODY"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     sitWpPinBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2622,8 +2626,8 @@ local function PopulateStickySettings(noteID)
     end)
     sitWpNavBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Navigate to waypoint", 1, 1, 1)
-        GameTooltip:AddLine("Send the stored waypoint to your map or waypoint addon.", 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(L["STICKY_WP_NAV_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_NAV_TIP_BODY"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     sitWpNavBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2635,7 +2639,7 @@ local function PopulateStickySettings(noteID)
     end)
     sitWpClearBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Remove waypoint from this note", 1, 1, 1); GameTooltip:Show()
+        GameTooltip:AddLine(L["STICKY_WP_REMOVE_TIP"], 1, 1, 1); GameTooltip:Show()
     end)
     sitWpClearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
@@ -2691,9 +2695,9 @@ local function PopulateStickySettings(noteID)
     local note = BNB.GetNote(noteID)
     local noteName = (note and note.title ~= "") and note.title or L["UNTITLED"]
     if f._titleLbl then
-        f._titleLbl:SetText("Settings: " .. noteName)
+        f._titleLbl:SetText(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
     elseif f.SetTitle then
-        f:SetTitle("Settings: " .. noteName)
+        f:SetTitle(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
     end
 end
 
@@ -2850,8 +2854,8 @@ local function CreateMiniTile(frame, noteID, note)
         ApplyBgAlpha(frame, math.max(0.95, c and c.alpha or 0.95), c)
         GameTooltip:SetOwner(tile, "ANCHOR_RIGHT")
         GameTooltip:AddLine(note.title ~= "" and note.title or L["UNTITLED"], 1, 0.82, 0)
-        GameTooltip:AddLine("Left click to restore sticky note",  0.6, 0.6, 0.6)
-        GameTooltip:AddLine("Right click to close sticky note",   0.6, 0.6, 0.6)
+        GameTooltip:AddLine(L["STICKY_MINI_LEFTCLICK_TIP"],  0.6, 0.6, 0.6)
+        GameTooltip:AddLine(L["STICKY_MINI_RIGHTCLICK_TIP"],   0.6, 0.6, 0.6)
         GameTooltip:Show()
     end)
     tile:SetScript("OnLeave", function()
@@ -2895,13 +2899,13 @@ local function CreateMiniTile(frame, noteID, note)
                 tile._ctxDD:ClearAllPoints()
                 tile._ctxDD:SetPoint("TOPLEFT", tile, "TOPRIGHT", 0, 0)
                 tile._ctxDD:SetupMenu(function(_, root)
-                    root:CreateButton("|cffff9900Dismiss Alarm|r", function()
+                    root:CreateButton("|cffff9900" .. L["STICKY_CTX_DISMISS_ALARM"] .. "|r", function()
                         if BNB.Alarm and BNB.Alarm.Dismiss then
                             BNB.Alarm.Dismiss(noteID)
                         end
                     end)
                     root:CreateDivider()
-                    root:CreateButton("Close Sticky", function()
+                    root:CreateButton(L["STICKY_CTX_CLOSE"], function()
                         SN.Close(noteID)
                     end)
                 end)
@@ -3134,7 +3138,7 @@ local function RenderStickyTasks(noteID)
             togBtn:SetScript("OnClick", DoCollapse)
             togBtn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine(collapsed[task.id] and "Expand sub-tasks" or "Collapse sub-tasks", 1, 1, 1)
+                GameTooltip:AddLine(collapsed[task.id] and L["STICKY_EXPAND_SUBTASKS"] or L["STICKY_COLLAPSE_SUBTASKS"], 1, 1, 1)
                 GameTooltip:Show()
             end)
             togBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -3166,7 +3170,7 @@ local function RenderStickyTasks(noteID)
                 self:SetAlpha(1.0)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
                 GameTooltip:AddLine(resetTip, 1, 1, 1)
-                GameTooltip:AddLine("Click to edit task.", 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(L["STICKY_TASK_CLICK_EDIT_TIP"], 0.8, 0.8, 0.8)
                 GameTooltip:Show()
             end)
             rstIco:SetScript("OnLeave", function(self) self:SetAlpha(0.8); GameTooltip:Hide() end)
@@ -3190,8 +3194,8 @@ local function RenderStickyTasks(noteID)
             sitIco:SetScript("OnEnter", function(self)
                 self:SetAlpha(1.0)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine("Situation: " .. task.situation, 1, 1, 1)
-                GameTooltip:AddLine("Click to edit task.", 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(string.format(L["STICKY_TASK_SITUATION_FMT"], task.situation), 1, 1, 1)
+                GameTooltip:AddLine(L["STICKY_TASK_CLICK_EDIT_TIP"], 0.8, 0.8, 0.8)
                 GameTooltip:Show()
             end)
             sitIco:SetScript("OnLeave", function(self) self:SetAlpha(0.8); GameTooltip:Hide() end)
@@ -3511,7 +3515,7 @@ local function CreateStickyFrame(noteID)
             local dynTip = tip
             if btn == f._alarmHdrBtn then
                 local n = BNB.GetNote and BNB.GetNote(noteID)
-                dynTip = (n and n.alarm) and "Edit alarm" or "Set alarm for this note"
+                dynTip = (n and n.alarm) and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
             end
             GameTooltip:AddLine(dynTip, 1, 1, 1); GameTooltip:Show()
             local c = f._cfg
@@ -3527,12 +3531,12 @@ local function CreateStickyFrame(noteID)
     -- slot 1 = close, slot 2 = minimize, slot 3 = settings, slot 4 = edit
     HdrBtn(1, "bt-close", L["STICKY_UNPIN_TIP"], function() SN.Close(noteID) end)
 
-    local minBtn = HdrBtn(2, "bt-minimize", "Minimize to icon", function()
+    local minBtn = HdrBtn(2, "bt-minimize", L["STICKY_MINIMIZE_TO_ICON_TIP"], function()
         SN.SetMinimized(noteID, not f._minimized)
     end)
     f._minBtn = minBtn
 
-    HdrBtn(3, "bt-settings", "Note Settings", function()
+    HdrBtn(3, "bt-settings", L["STICKY_NOTE_SETTINGS_TIP"], function()
         -- Do NOT close the ESC menu here — settings open alongside the sticky
         -- so the user can see their changes live (OpenStickySettings raises
         -- the settings panel strata above GameMenuFrame automatically).
@@ -3545,7 +3549,7 @@ local function CreateStickyFrame(noteID)
         end
     end)
 
-    HdrBtn(4, "bt-edit", "Open in BigNoteBox to edit", function()
+    HdrBtn(4, "bt-edit", L["STICKY_OPEN_TO_EDIT_TIP"], function()
         CloseESCAndDo(function()
             if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
             if not BNB.mainFrame then
@@ -3561,7 +3565,7 @@ local function CreateStickyFrame(noteID)
 
     -- slot 5 = alarm: opens alarm setter window anchored to this button
     -- Assets: Assets/UI/sn-alarm-normal.tga + sn-alarm-hover.tga
-    local alarmHdrBtn = HdrBtn(5, "bt-alarm", "Set alarm for this note", function()
+    local alarmHdrBtn = HdrBtn(5, "bt-alarm", L["STICKY_SET_ALARM_TIP"], function()
         local note = BNB.GetNote and BNB.GetNote(noteID)
         local alarm = note and note.alarm
         -- If alarm glow is actively running, clicking the button dismisses it.
@@ -3578,7 +3582,7 @@ local function CreateStickyFrame(noteID)
     f._alarmHdrBtn = alarmHdrBtn
 
     -- slot 6 = tasks: toggle task view / create first task
-    local tasksHdrBtn = HdrBtn(6, "bt-tasks", "Create Task", function()
+    local tasksHdrBtn = HdrBtn(6, "bt-tasks", L["STICKY_CREATE_TASK_TIP"], function()
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         if not hasTasks then
             -- No tasks: close ESC menu, open main window, select note, open RefBox, add task
@@ -3609,11 +3613,11 @@ local function CreateStickyFrame(noteID)
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         local tip
         if not hasTasks then
-            tip = "Create Task"
+            tip = L["STICKY_CREATE_TASK_TIP"]
         elseif f._taskViewActive then
-            tip = "Show Note"
+            tip = L["STICKY_SHOW_NOTE_TIP"]
         else
-            tip = "Show Tasks"
+            tip = L["STICKY_SHOW_TASKS_TIP"]
         end
         FadeBtns(1)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -3897,11 +3901,11 @@ local function CreateStickyFrame(noteID)
         local tl = BNB.Task and BNB.Task.GetList(noteID)
         local rt = tl and tl.resetType
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Global task reset", 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_TASK_GLOBAL_RESET_TIP_TITLE"], 1, 1, 1)
         if rt == "daily" then
-            GameTooltip:AddLine("All tasks in this note reset daily.", 0.78, 0.78, 0.78, true)
+            GameTooltip:AddLine(L["STICKY_TASK_RESET_DAILY_TIP"], 0.78, 0.78, 0.78, true)
         elseif rt == "weekly" then
-            GameTooltip:AddLine("All tasks in this note reset weekly.", 0.78, 0.78, 0.78, true)
+            GameTooltip:AddLine(L["STICKY_TASK_RESET_WEEKLY_TIP"], 0.78, 0.78, 0.78, true)
         end
         GameTooltip:Show()
     end)
@@ -3922,9 +3926,9 @@ local function CreateStickyFrame(noteID)
         local tl = BNB.Task and BNB.Task.GetList(noteID)
         local sit = tl and tl.situation
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Global task situation", 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_TASK_GLOBAL_SIT_TIP_TITLE"], 1, 1, 1)
         if sit and sit ~= "" then
-            GameTooltip:AddLine("Tasks are bound to: " .. sit, 0.78, 0.78, 0.78, true)
+            GameTooltip:AddLine(string.format(L["STICKY_TASK_BOUND_TO_FMT"], sit), 0.78, 0.78, 0.78, true)
         end
         GameTooltip:Show()
     end)
