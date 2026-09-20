@@ -316,14 +316,14 @@ local function BuildGeneralTab(sf, ct)
     local y = -4
     local _cbPinned, _cbFavorited
 
-    y, _cbPinned = Check(panel, y, "Pin to top of note list",
+    y, _cbPinned = Check(panel, y, L["NC_PIN_TOP_LABEL"],
         function() local n=GetNote(); return n and n.pinned==true end,
         function(v) Save({pinned=v}); if BNB.RefreshNoteList then BNB.RefreshNoteList() end end,
-        "Pinned notes always appear at the top of the list regardless of sort order.")
+        L["NC_PIN_TOP_TIP"])
     y = y - 2
 
     -- Favorite ─────────────────────────────────────────────────────────────────
-    y, _cbFavorited = Check(panel, y, "Mark as favorite",
+    y, _cbFavorited = Check(panel, y, L["NC_FAVORITE_LABEL"],
         function() local n=GetNote(); return n and n.favorited==true end,
         function(v)
             if v then
@@ -335,15 +335,15 @@ local function BuildGeneralTab(sf, ct)
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end
         end,
-        "Favorite notes show a star overlay and can be sorted to the top.")
+        L["NC_FAVORITE_TIP"])
     y = y - 4
 
     -- Rich note ────────────────────────────────────────────────────────────────
     y = Rule(panel, y) - 4
-    y = Hdr(panel, y, "Note type")
+    y = Hdr(panel, y, L["NC_HDR_NOTE_TYPE"])
 
     local _cbRich
-    y, _cbRich = Check(panel, y, "Rich note (markup formatting)",
+    y, _cbRich = Check(panel, y, L["NC_RICH_NOTE_LABEL"],
         function() local n=GetNote(); return n and n.richMode==true end,
         function(v)
             if not _noteID then return end
@@ -369,16 +369,16 @@ local function BuildGeneralTab(sf, ct)
                 end
             end
         end,
-        "Rich notes support formatted markup: {h1} headers, {img} images,\n{icon} icons, {col} colours and {link} links.\n\nDisabling will remove all formatting tags from the note body.")
+        L["NC_RICH_NOTE_TIP"])
     y = y - 4
     y = Rule(panel, y) - 4
-    y = Hdr(panel, y, "Title color")
+    y = Hdr(panel, y, L["NC_HDR_TITLE_COLOR"])
 
     y = BNB.BuildColorGrid(panel, y, CW_SCROLL, function(r, g, b)
         Save({titleColor = {r=r, g=g, b=b}})
     end)
 
-    local cpBtn = BNB.CreateButton(nil, panel, "Custom color", 96, 22)
+    local cpBtn = BNB.CreateButton(nil, panel, L["NC_CUSTOM_COLOR_BTN"], 96, 22)
     cpBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     cpBtn:SetScript("OnClick", function()
         local note = GetNote()
@@ -387,7 +387,7 @@ local function BuildGeneralTab(sf, ct)
         local cb = (note and note.titleColor and note.titleColor.b) or 1
         OpenColorPicker(cr, cg, cb, function(r, g, b) Save({titleColor = {r=r, g=g, b=b}}) end)
     end)
-    local resetClr = BNB.CreateButton(nil, panel, "Reset", 60, 22)
+    local resetClr = BNB.CreateButton(nil, panel, L["RESET"], 60, 22)
     resetClr:SetPoint("LEFT", cpBtn, "RIGHT", 6, 0)
     resetClr:SetScript("OnClick", function()
         if not _noteID then return end
@@ -533,7 +533,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- Font size slider
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,"Font size")
+    y = Hdr(panel,y,L["STICKY_FONT_SIZE"])
 
     local function GetNoteFontSize()
         local n = GetNote(); return (n and n.fontSize) or 12
@@ -584,7 +584,7 @@ local function BuildGeneralTab(sf, ct)
     end
 
     -- Reset to default button
-    local fsResetBtn = BNB.CreateButton(nil, panel, "Reset to default", 110, 20)
+    local fsResetBtn = BNB.CreateButton(nil, panel, L["NC_RESET_TO_DEFAULT_BTN"], 110, 20)
     fsResetBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     fsResetBtn:SetScript("OnClick", function()
         if not _noteID then return end
@@ -609,15 +609,18 @@ local function BuildGeneralTab(sf, ct)
 
     -- E — Text alignment (applies to main editor body)
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,"Text alignment")
+    y = Hdr(panel,y,L["NC_HDR_TEXT_ALIGNMENT"])
 
-    local ALIGN_OPTIONS_NC = { "Left", "Center", "Right" }
-    local ALIGN_MAP_NC     = { Left="LEFT", Center="CENTER", Right="RIGHT" }
-    local ALIGN_RMAP_NC    = { LEFT="Left", CENTER="Center", RIGHT="Right" }
+    -- ALIGN_KEYS_NC holds the WoW native justify constants that note.textAlign is
+    -- actually saved as (unaffected by locale); ALIGN_LABELS_NC is the translatable
+    -- display text, looked up by that same key. See StickyNote.lua's identical fix
+    -- (ALL-08) for why the old display-string-doubles-as-key shape is unsafe.
+    local ALIGN_KEYS_NC   = { "LEFT", "CENTER", "RIGHT" }
+    local ALIGN_LABELS_NC = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
 
     local function GetNoteAlignLabel()
         local note = GetNote()
-        return ALIGN_RMAP_NC[(note and note.textAlign) or "LEFT"] or "Left"
+        return ALIGN_LABELS_NC[(note and note.textAlign) or "LEFT"] or ALIGN_LABELS_NC.LEFT
     end
     local function ApplyNoteAlign(align)
         Save({textAlign = align})
@@ -634,12 +637,15 @@ local function BuildGeneralTab(sf, ct)
         alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
         alignDD:SetWidth(CW_SCROLL)
         alignDD:SetupMenu(function(_, root)
-            for _, opt in ipairs(ALIGN_OPTIONS_NC) do
-                local o = opt
-                root:CreateRadio(o,
-                    function() return GetNoteAlignLabel() == o end,
+            for _, key in ipairs(ALIGN_KEYS_NC) do
+                local k = key
+                root:CreateRadio(ALIGN_LABELS_NC[k],
                     function()
-                        ApplyNoteAlign(ALIGN_MAP_NC[o])
+                        local note = GetNote()
+                        return ((note and note.textAlign) or "LEFT") == k
+                    end,
+                    function()
+                        ApplyNoteAlign(k)
                         alignDD:GenerateMenu()
                     end)
             end
@@ -649,13 +655,14 @@ local function BuildGeneralTab(sf, ct)
         local alignBtn = BNB.CreateButton(nil, panel, GetNoteAlignLabel(), CW_SCROLL, 22)
         alignBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
         alignBtn:SetScript("OnClick", function(self)
-            local cur = GetNoteAlignLabel()
+            local note = GetNote()
+            local cur = (note and note.textAlign) or "LEFT"
             local idx = 1
-            for i, o in ipairs(ALIGN_OPTIONS_NC) do if o == cur then idx = i; break end end
-            idx = (idx % #ALIGN_OPTIONS_NC) + 1
-            local opt = ALIGN_OPTIONS_NC[idx]
-            ApplyNoteAlign(ALIGN_MAP_NC[opt])
-            self:SetText(opt)
+            for i, k in ipairs(ALIGN_KEYS_NC) do if k == cur then idx = i; break end end
+            idx = (idx % #ALIGN_KEYS_NC) + 1
+            local key = ALIGN_KEYS_NC[idx]
+            ApplyNoteAlign(key)
+            self:SetText(ALIGN_LABELS_NC[key])
         end)
         y = y - 28
     end
@@ -734,14 +741,14 @@ local function BuildGeneralTab(sf, ct)
     local BTN_W = 110
 
     -- Default button — clears per-note override, follows global setting
-    local defaultBtn = BNB.CreateButton(nil, panel, "Default", BTN_W, 22)
+    local defaultBtn = BNB.CreateButton(nil, panel, L["NC_DEFAULT_BTN"], BTN_W, 22)
     defaultBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     defaultBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         local globalLocked = BigNoteBoxDB and BigNoteBoxDB.lockNotes == true
-        GameTooltip:AddLine("Follow the global lock setting (Config → Features).\n"
-            .. "Currently global is: "
-            .. (globalLocked and "|cffff9900Locked|r" or "|cff66bb6aUnlocked|r"),
+        GameTooltip:AddLine(L["NC_LOCK_FOLLOW_GLOBAL_TIP"]
+            .. "\n" .. L["NC_LOCK_CURRENTLY_GLOBAL_IS"]
+            .. (globalLocked and "|cffff9900" .. L["NC_LOCK_LOCKED"] .. "|r" or "|cff66bb6a" .. L["NC_LOCK_UNLOCKED"] .. "|r"),
             0.85, 0.85, 0.85, true)
         GameTooltip:Show()
     end)
@@ -749,16 +756,16 @@ local function BuildGeneralTab(sf, ct)
     lockBtns[#lockBtns+1] = { btn = defaultBtn, val = nil }
 
     -- Single Lock / Unlock toggle button — label changes based on current state
-    local toggleBtn = BNB.CreateButton(nil, panel, "Lock", BTN_W, 22)
+    local toggleBtn = BNB.CreateButton(nil, panel, L["NC_LOCK_LOCK_BTN"], BTN_W, 22)
     toggleBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", BTN_W + 6, y)
     toggleBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         local note = GetNote()
         local cur  = note and note.locked
         if cur == true then
-            GameTooltip:AddLine("Click to unlock this note.\nIt will open in edit mode regardless of the global setting.", 0.85, 0.85, 0.85, true)
+            GameTooltip:AddLine(L["NC_LOCK_CLICK_UNLOCK_TIP"], 0.85, 0.85, 0.85, true)
         else
-            GameTooltip:AddLine("Click to lock this note.\nIt will open in read-only mode regardless of the global setting.", 0.85, 0.85, 0.85, true)
+            GameTooltip:AddLine(L["NC_LOCK_CLICK_LOCK_TIP"], 0.85, 0.85, 0.85, true)
         end
         GameTooltip:Show()
     end)
@@ -772,9 +779,9 @@ local function BuildGeneralTab(sf, ct)
         defaultBtn:SetEnabled(cur ~= nil)
         -- Toggle button label reflects what clicking it will DO next
         if cur == true then
-            toggleBtn:SetText("Unlock")
+            toggleBtn:SetText(L["NC_LOCK_UNLOCK_BTN"])
         else
-            toggleBtn:SetText("Lock")
+            toggleBtn:SetText(L["NC_LOCK_LOCK_BTN"])
         end
     end
 
@@ -807,7 +814,7 @@ local function BuildGeneralTab(sf, ct)
 
     y = Rule(panel,y) - 4
     -- ── Scope (Global / This character) ───────────────────────────────────────
-    y = Hdr(panel, y, "Note visibility")
+    y = Hdr(panel, y, L["NC_HDR_NOTE_VISIBILITY"])
 
     -- Two-button toggle: [Global]  [This character ▾]
     -- Below them: Send to Alt dropdown (only shown when scope is character-scoped)
@@ -1072,10 +1079,10 @@ local function BuildAppearanceTab(panel)
     local y = -4
 
     -- Border dropdown
-    y = Hdr(panel, y, "Border")
+    y = Hdr(panel, y, L["NC_HDR_BORDER"])
     local note0   = GetNote()
     local curBord = (note0 and note0.borderOverride) or "None"
-    local bDrop = CreateDropdown(panel, "Border style",
+    local bDrop = CreateDropdown(panel, L["NC_BORDER_STYLE_LABEL"],
         LSMBorderList, curBord,
         function(name)
             if name == "None" then
@@ -1097,7 +1104,7 @@ local function BuildAppearanceTab(panel)
 
     local bsLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     bsLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    bsLbl:SetTextColor(0.78, 0.78, 0.78); bsLbl:SetText("Border Thickness")
+    bsLbl:SetTextColor(0.78, 0.78, 0.78); bsLbl:SetText(L["NC_BORDER_THICKNESS_LABEL"])
     y = y - 14
 
     local bsVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1146,7 +1153,7 @@ local function BuildAppearanceTab(panel)
 
     local boLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     boLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    boLbl:SetTextColor(0.78, 0.78, 0.78); boLbl:SetText("Border Offset")
+    boLbl:SetTextColor(0.78, 0.78, 0.78); boLbl:SetText(L["NC_BORDER_OFFSET_LABEL"])
     y = y - 14
 
     local boVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1191,7 +1198,7 @@ local function BuildAppearanceTab(panel)
 
     local bbLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     bbLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    bbLbl:SetTextColor(0.78, 0.78, 0.78); bbLbl:SetText("Border Brightness")
+    bbLbl:SetTextColor(0.78, 0.78, 0.78); bbLbl:SetText(L["NC_BORDER_BRIGHTNESS_LABEL"])
     y = y - 14
 
     local bbVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1236,8 +1243,8 @@ local function BuildAppearanceTab(panel)
     -- ── Tab buttons ──────────────────────────────────────────────────────────
     local TAB_W  = math.floor((CW - 4) / 2)
     local TAB_H  = 22
-    local tabBNB = BNB.CreateButton(nil, panel, "BNB Icons",     TAB_W, TAB_H)
-    local tabBLZ = BNB.CreateButton(nil, panel, "Blizzard Icon", TAB_W, TAB_H)
+    local tabBNB = BNB.CreateButton(nil, panel, L["NC_TAB_BNB_ICONS"],     TAB_W, TAB_H)
+    local tabBLZ = BNB.CreateButton(nil, panel, L["NC_TAB_BLIZZARD_ICON"], TAB_W, TAB_H)
     tabBNB:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     tabBLZ:SetPoint("TOPLEFT", panel, "TOPLEFT", TAB_W + 4, y)
     y = y - TAB_H - 6
@@ -1259,21 +1266,21 @@ local function BuildAppearanceTab(panel)
     sEb:SetPoint("TOPLEFT", sBg, "TOPLEFT", 4, 0)
     sEb:SetPoint("BOTTOMRIGHT", sBg, "BOTTOMRIGHT", -24, 0)
     sEb:SetFontObject("GameFontNormal"); sEb:SetAutoFocus(false); sEb:SetMaxLetters(60)
-    BNB.AddPlaceholder(sEb, "Search icons...", 0.4, 0.4, 0.4)
+    BNB.AddPlaceholder(sEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.4, 0.4, 0.4)
 
     -- Clear (X) button
     local sClear = CreateFrame("Button", nil, sBg)
     sClear:SetSize(18, 18)
     sClear:SetPoint("RIGHT", sBg, "RIGHT", -2, 0)
     local sClearLbl = sClear:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sClearLbl:SetAllPoints(); sClearLbl:SetText("x")
+    sClearLbl:SetAllPoints(); sClearLbl:SetText(L["NC_CLEAR_X"])
     sClearLbl:SetTextColor(0.65, 0.65, 0.65)
     sClear:Hide()
     sClear:SetScript("OnEnter", function() sClearLbl:SetTextColor(1, 0.4, 0.4) end)
     sClear:SetScript("OnLeave", function() sClearLbl:SetTextColor(0.65, 0.65, 0.65) end)
     sClear:SetScript("OnClick", function()
         sEb:SetText(""); sEb._showingPlaceholder = false
-        BNB.AddPlaceholder(sEb, "Search icons...", 0.4, 0.4, 0.4)
+        BNB.AddPlaceholder(sEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.4, 0.4, 0.4)
         _filter = ""; sClear:Hide()
         RefreshIconGrid()
     end)
@@ -1332,7 +1339,7 @@ local function BuildAppearanceTab(panel)
 
     -- Use Default / Random buttons
     local btnW = math.floor((CW - 4) / 2)
-    local clrBtn = BNB.CreateButton(nil, bnbPane, "Use Default", btnW, 22)
+    local clrBtn = BNB.CreateButton(nil, bnbPane, L["NC_USE_DEFAULT_BTN"], btnW, 22)
     clrBtn:SetPoint("TOPLEFT", bnbPane, "TOPLEFT", 0, -(28 + AREA_H + 4))
     clrBtn:SetScript("OnClick", function()
         if not _noteID then return end
@@ -1351,7 +1358,7 @@ local function BuildAppearanceTab(panel)
         RefreshIconGrid(true)
     end)
 
-    local rndBtn = BNB.CreateButton(nil, bnbPane, "Random", btnW, 22)
+    local rndBtn = BNB.CreateButton(nil, bnbPane, L["NC_RANDOM_BTN"], btnW, 22)
     rndBtn:SetPoint("TOPLEFT", bnbPane, "TOPLEFT", btnW + 4, -(28 + AREA_H + 4))
     rndBtn:SetScript("OnClick", function()
         if not _noteID then return end
@@ -1374,7 +1381,7 @@ local function BuildAppearanceTab(panel)
     local blzLbl = blzPane:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     blzLbl:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, 0)
     blzLbl:SetTextColor(0.78, 0.78, 0.78)
-    blzLbl:SetText("Icon name (e.g. INV_Sword_01)")
+    blzLbl:SetText(L["NC_ICON_NAME_LABEL"])
 
     -- Name input
     local blzBg = BNB.CreateBackdropFrame("Frame", nil, blzPane); BNB.SetBackdropDark(blzBg)
@@ -1383,7 +1390,7 @@ local function BuildAppearanceTab(panel)
     blzEb:SetPoint("TOPLEFT",     blzBg, "TOPLEFT",     6, -2)
     blzEb:SetPoint("BOTTOMRIGHT", blzBg, "BOTTOMRIGHT", -6,  2)
     blzEb:SetFontObject("GameFontNormal"); blzEb:SetAutoFocus(false); blzEb:SetMaxLetters(128)
-    BNB.AddPlaceholder(blzEb, "Icon name...", 0.4, 0.4, 0.4)
+    BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
 
     -- Preview icon (64x64)
     local PREV_SZ   = 64
@@ -1402,16 +1409,16 @@ local function BuildAppearanceTab(panel)
     blzInfo:SetPoint("TOPRIGHT", blzPane, "TOPRIGHT", 0, -(16 + 24 + PREV_PAD))
     blzInfo:SetTextColor(0.55, 0.55, 0.55)
     blzInfo:SetJustifyH("LEFT"); blzInfo:SetWordWrap(true)
-    blzInfo:SetText("Type an icon name and press Enter.\n\nFor icon names:\n|cff66bb6awowhead.com/icons|r")
+    blzInfo:SetText(L["NC_ICON_NAME_INFO"])
 
     -- Apply / Clear buttons for Blizzard tab
     local BLZ_BTN_Y = -(16 + 24 + PREV_PAD + PREV_SZ + 4 + 6)
-    local blzApply = BNB.CreateButton(nil, blzPane, "Apply", btnW, 22)
+    local blzApply = BNB.CreateButton(nil, blzPane, L["STICKY_SIT_APPLY_BTN"], btnW, 22)
     blzApply:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, BLZ_BTN_Y)
     blzApply:SetEnabled(false)
     blzApply:SetAlpha(0.4)
 
-    local blzClear = BNB.CreateButton(nil, blzPane, "Use Default", btnW, 22)
+    local blzClear = BNB.CreateButton(nil, blzPane, L["NC_USE_DEFAULT_BTN"], btnW, 22)
     blzClear:SetPoint("TOPLEFT", blzPane, "TOPLEFT", btnW + 4, BLZ_BTN_Y)
     blzClear:SetEnabled(false)
     blzClear:SetAlpha(0.4)
@@ -1477,7 +1484,7 @@ local function BuildAppearanceTab(panel)
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
         blzEb:SetText(""); blzEb._showingPlaceholder = false
-        BNB.AddPlaceholder(blzEb, "Icon name...", 0.4, 0.4, 0.4)
+        BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
         blzPreviewTex:SetTexture(nil)
         SetIconTab("bnb")
         RefreshIconGrid(true)
@@ -1512,7 +1519,7 @@ local function BuildAppearanceTab(panel)
             blzEb:SetText(name)
             blzEb._showingPlaceholder = (name == "")
             if name == "" then
-                BNB.AddPlaceholder(blzEb, "Icon name...", 0.4, 0.4, 0.4)
+                BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
             end
             ApplyBlzName(name)
             local hasText = name ~= ""
@@ -1576,14 +1583,14 @@ local function BuildSituationTab(panel)
     local hdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hdr:SetPoint("TOPLEFT", panel, "TOPLEFT", PAD, y)
     hdr:SetTextColor(1, 0.82, 0, 1)
-    hdr:SetText("Contextual Binding")
+    hdr:SetText(L["STICKY_CONTEXTUAL_BINDING_HDR"])
     y = y - 20
 
     local desc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     desc:SetPoint("TOPLEFT",  panel, "TOPLEFT",  PAD, y)
     desc:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -PAD, y)
     desc:SetTextColor(0.60, 0.60, 0.60)
-    desc:SetText("This note will surface when you enter\nthe matching zone, instance, or area.")
+    desc:SetText(L["STICKY_SIT_DESC"])
     desc:SetJustifyH("LEFT")
     desc:SetWordWrap(true)
     y = y - 36
@@ -1605,7 +1612,7 @@ local function BuildSituationTab(panel)
 
     -- Bind-type dropdown — WowStyle1 or cycling button fallback
     local TYPES       = { "none", "zone", "subzone", "instance", "player" }
-    local TYPE_LABELS = { "None (global)", "Zone", "Sub-zone", "Instance", "Player" }
+    local TYPE_LABELS = { L["TASK_CTX_SIT_NONE"], L["STICKY_KIND_ZONE"], L["STICKY_KIND_SUBZONE"], L["STICKY_KIND_INSTANCE"], L["STICKY_KIND_PLAYER"] }
     local selType     = "none"
     local SelectType  -- forward-declared below
 
@@ -1678,7 +1685,7 @@ local function BuildSituationTab(panel)
     valueLbl:SetWidth(65)
     valueLbl:SetJustifyH("LEFT")
     valueLbl:SetTextColor(0.78, 0.78, 0.78)
-    valueLbl:SetText("Value:")
+    valueLbl:SetText(L["STICKY_SIT_VALUE_LABEL"])
 
     local valueEb = CreateFrame("EditBox", nil, valueRow,
         "BackdropTemplate")
@@ -1705,8 +1712,8 @@ local function BuildSituationTab(panel)
     browseBtn:SetScript("OnEnter", function(self)
         self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Browse zones and instances", 1, 1, 1)
-        GameTooltip:AddLine("Click to open the zone browser", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_BODY"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     browseBtn:SetScript("OnLeave", function(self)
@@ -1824,17 +1831,17 @@ local function BuildSituationTab(panel)
     end)
 
     -- "Use current" button — fills in value from player's current environment
-    local useCurrentBtn = BNB.CreateButton(nil, panel, "Use Current", 90, 20)
+    local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 20)
     useCurrentBtn:SetPoint("TOPLEFT",  valueRow, "BOTTOMLEFT", 0, -4)
     useCurrentBtn:Hide()
 
     -- Save button
-    local saveCtxBtn = BNB.CreateButton(nil, panel, "Apply", 60, 22)
+    local saveCtxBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_APPLY_BTN"], 60, 22)
     saveCtxBtn:SetPoint("TOPLEFT", useCurrentBtn, "TOPRIGHT", 8, 0)
     saveCtxBtn:Hide()
 
     -- Clear button
-    local clearCtxBtn = BNB.CreateButton(nil, panel, "Clear", 52, 22)
+    local clearCtxBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_CLEAR_BTN"], 52, 22)
     clearCtxBtn:SetPoint("TOPLEFT", saveCtxBtn, "TOPRIGHT", 6, 0)
     clearCtxBtn:Hide()
 
@@ -1863,11 +1870,11 @@ local function BuildSituationTab(panel)
     -- ── Display mode dropdown (popup vs sticky) ──────────────────────────────
     -- Shown only when a situation type other than "none" is selected.
     local DISPLAY_MODES  = { "popup", "sticky", "both" }
-    local DISPLAY_LABELS = { "Show popup notification", "Show as sticky note", "Both — popup and sticky" }
+    local DISPLAY_LABELS = { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] }
     local selDisplay = "popup"
 
     local LEAVE_MODES  = { "keep", "minimize", "hide" }
-    local LEAVE_LABELS = { "Keep open", "Minimize", "Hide" }
+    local LEAVE_LABELS = { L["STICKY_LEAVE_KEEP"], L["STICKY_LEAVE_MINIMIZE"], L["STICKY_LEAVE_HIDE"] }
     local selLeave = "keep"
 
     local dispDiv = panel:CreateTexture(nil, "ARTWORK")
@@ -1886,7 +1893,7 @@ local function BuildSituationTab(panel)
 
     local dispLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     dispLabel:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, -6)
-    dispLabel:SetText("When triggered, show as:")
+    dispLabel:SetText(L["STICKY_SIT_DISPLAY_LABEL"])
     dispLabel:SetTextColor(0.78, 0.78, 0.78)
     dispLabel:Hide()
 
@@ -1990,7 +1997,7 @@ local function BuildSituationTab(panel)
 
     local leaveLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     leaveLabel:SetPoint("TOPLEFT", leaveDiv, "BOTTOMLEFT", 0, -6)
-    leaveLabel:SetText("When you leave the area:")
+    leaveLabel:SetText(L["STICKY_SIT_LEAVE_LABEL"])
     leaveLabel:SetTextColor(0.78, 0.78, 0.78)
     leaveLabel:Hide()
 
@@ -2074,7 +2081,7 @@ local function BuildSituationTab(panel)
             local kind, value
             if BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
             local kindLabel = KIND_LABELS[kind] or kind or "?"
-            curBindHeader:SetText("Currently bound to " .. kindLabel .. ":")
+            curBindHeader:SetText(string.format(L["STICKY_SIT_BOUND_TO_FMT"], kindLabel))
             local txt = value or "?"
             curBindValue:SetText(txt)
             -- Reset to default size, then shrink if too wide
@@ -2115,13 +2122,13 @@ local function BuildSituationTab(panel)
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
 
         if t == "zone" then
-            valueLbl:SetText("Zone:")
+            valueLbl:SetText(L["STICKY_SIT_ZONE_LABEL"])
         elseif t == "subzone" then
-            valueLbl:SetText("Sub-zone:")
+            valueLbl:SetText(L["STICKY_SIT_SUBZONE_LABEL"])
         elseif t == "instance" then
-            valueLbl:SetText("Instance:")
+            valueLbl:SetText(L["STICKY_SIT_INSTANCE_LABEL"])
         elseif t == "player" then
-            valueLbl:SetText("Player:")
+            valueLbl:SetText(L["STICKY_SIT_PLAYER_LABEL"])
         end
     end
 
@@ -2154,7 +2161,7 @@ local function BuildSituationTab(panel)
         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         if BNB.Sticky and BNB.Sticky.RefreshSettingsSituation then BNB.Sticky.RefreshSettingsSituation(id) end
-        BNB:Print("Context binding saved.")
+        BNB:Print(L["STICKY_CONTEXT_BINDING_SAVED"])
     end)
 
     -- ── Clear ─────────────────────────────────────────────────────────────────
@@ -2217,7 +2224,7 @@ local function BuildSituationTab(panel)
     local wpHdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     wpHdr:SetPoint("TOPLEFT", wpDiv, "BOTTOMLEFT", 0, -6)
     wpHdr:SetTextColor(1, 0.82, 0, 1)
-    wpHdr:SetText("Waypoint")
+    wpHdr:SetText(L["STICKY_WP_HEADER"])
     wpHdr:Hide()
 
     -- Status label: "(Addon installed)" / "(Enhanced)" / "(Basic)" / "(Addon required)"
@@ -2269,7 +2276,7 @@ local function BuildSituationTab(panel)
             local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
             title:SetTextColor(1, 0.82, 0)
-            title:SetText("Waypoint Support")
+            title:SetText(L["STICKY_WP_SUPPORT_TITLE"])
 
             -- Close button
             local closeBtn = CreateFrame("Button", nil, f)
@@ -2295,44 +2302,44 @@ local function BuildSituationTab(panel)
             -- Addon links header
             local linksHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             linksHdr:SetPoint("TOPLEFT", f._descLbl, "BOTTOMLEFT", 0, -14)
-            linksHdr:SetText("Recommended addons:")
+            linksHdr:SetText(L["STICKY_WP_RECOMMENDED_ADDONS"])
             linksHdr:SetTextColor(1, 1, 1)
             f._linksHdr = linksHdr
 
             -- WaypointUI link button
-            local wpuiBtn = BNB.CreateButton(nil, f, "WaypointUI (CurseForge)", 200, 22)
+            local wpuiBtn = BNB.CreateButton(nil, f, L["STICKY_WP_BTN_WAYPOINTUI"], 200, 22)
             wpuiBtn:SetPoint("TOPLEFT", linksHdr, "BOTTOMLEFT", 0, -6)
             wpuiBtn:SetScript("OnClick", function()
                 local url = "https://www.curseforge.com/wow/addons/waypointui"
                 if C_System and C_System.SetClipboard then
                     C_System.SetClipboard(url)
-                    BNB:Print("URL copied: |cffffff00" .. url .. "|r")
+                    BNB:Print(string.format(L["NC_WP_URL_COPIED_FMT"], url))
                 else
-                    BNB:Print("Get WaypointUI: |cffffff00" .. url .. "|r")
+                    BNB:Print(string.format(L["NC_WP_GET_WAYPOINTUI_FMT"], url))
                 end
             end)
             wpuiBtn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine("Click to copy URL", 0.55, 0.85, 1)
+                GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 0.55, 0.85, 1)
                 GameTooltip:Show()
             end)
             wpuiBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
             -- TomTom link button
-            local ttBtn = BNB.CreateButton(nil, f, "TomTom (CurseForge)", 200, 22)
+            local ttBtn = BNB.CreateButton(nil, f, L["STICKY_WP_BTN_TOMTOM"], 200, 22)
             ttBtn:SetPoint("TOPLEFT", wpuiBtn, "BOTTOMLEFT", 0, -4)
             ttBtn:SetScript("OnClick", function()
                 local url = "https://www.curseforge.com/wow/addons/tomtom"
                 if C_System and C_System.SetClipboard then
                     C_System.SetClipboard(url)
-                    BNB:Print("URL copied: |cffffff00" .. url .. "|r")
+                    BNB:Print(string.format(L["NC_WP_URL_COPIED_FMT"], url))
                 else
-                    BNB:Print("Get TomTom: |cffffff00" .. url .. "|r")
+                    BNB:Print(string.format(L["NC_WP_GET_TOMTOM_FMT"], url))
                 end
             end)
             ttBtn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine("Click to copy URL", 0.55, 0.85, 1)
+                GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 0.55, 0.85, 1)
                 GameTooltip:Show()
             end)
             ttBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2344,13 +2351,13 @@ local function BuildSituationTab(panel)
         local f = wpInfoPopup
         if HasWPAddon() then
             f._statusLbl:SetText("|cff66ff66Waypoint addon detected.|r")
-            f._descLbl:SetText("Full waypoint support is available:\n• Arrow navigation to your destination\n• Auto-waypoints when entering a bound zone\n• Multiple waypoints (TomTom)")
+            f._descLbl:SetText(L["NC_WP_FULL_SUPPORT_DETAIL"])
         elseif HasRetailPin() then
             f._statusLbl:SetText("|cffffaa00Using built-in map pin (basic).|r")
-            f._descLbl:SetText("The game's built-in map pin works but has limitations:\n• Only one waypoint at a time\n• No directional arrow on-screen\n\nInstall an addon below for the full experience.")
+            f._descLbl:SetText(L["NC_WP_BASIC_PIN_DETAIL"])
         else
             f._statusLbl:SetText("|cffff5555No waypoint support detected.|r")
-            f._descLbl:SetText("Your WoW client has no built-in waypoint system.\nInstall one of the addons below to enable waypoints,\narrow navigation, and auto-waypoints on zone entry.")
+            f._descLbl:SetText(L["NC_WP_NO_SUPPORT_DETAIL"])
         end
 
         -- Position near the NoteConfig window
@@ -2373,7 +2380,7 @@ local function BuildSituationTab(panel)
     wpInfoHit:SetScript("OnEnter", function(self)
         wpInfoLbl:SetText("|cffbbddff?|r")
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Click for waypoint addon info", 0.55, 0.85, 1)
+        GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
         GameTooltip:Show()
     end)
     wpInfoHit:SetScript("OnLeave", function()
@@ -2386,7 +2393,7 @@ local function BuildSituationTab(panel)
     wpDesc:SetPoint("TOPRIGHT", panel,  "TOPRIGHT",   -PAD, 0)
     wpDesc:SetJustifyH("LEFT"); wpDesc:SetWordWrap(true)
     wpDesc:SetTextColor(0.60, 0.60, 0.60)
-    wpDesc:SetText("Pin your current map position to this note.\nUse Navigate to send it to TomTom or the map.")
+    wpDesc:SetText(L["STICKY_WP_DESC"])
     wpDesc:Hide()
 
     -- 2×2 button grid:
@@ -2396,19 +2403,19 @@ local function BuildSituationTab(panel)
     local BTN_H = 22
     local BTN_GAP = 6
 
-    local wpPinBtn = BNB.CreateButton(nil, panel, "Pin Here", BTN_W, BTN_H)
+    local wpPinBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_PIN_HERE"], BTN_W, BTN_H)
     wpPinBtn:SetPoint("TOPLEFT", wpDesc, "BOTTOMLEFT", 0, -6)
     wpPinBtn:Hide()
 
-    local wpNavBtn = BNB.CreateButton(nil, panel, "Navigate", BTN_W, BTN_H)
+    local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
     wpNavBtn:SetPoint("LEFT", wpPinBtn, "RIGHT", BTN_GAP, 0)
     wpNavBtn:Hide()
 
-    local wpClearBtn = BNB.CreateButton(nil, panel, "Clear WP", BTN_W, BTN_H)
+    local wpClearBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_CLEAR"], BTN_W, BTN_H)
     wpClearBtn:SetPoint("TOPLEFT", wpPinBtn, "BOTTOMLEFT", 0, -(BTN_GAP))
     wpClearBtn:Hide()
 
-    local wpManualBtn = BNB.CreateButton(nil, panel, "Manual", BTN_W, BTN_H)
+    local wpManualBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_MANUAL"], BTN_W, BTN_H)
     wpManualBtn:SetPoint("LEFT", wpClearBtn, "RIGHT", BTN_GAP, 0)
     wpManualBtn:Hide()
 
@@ -2421,7 +2428,7 @@ local function BuildSituationTab(panel)
 
     local wpXLbl = wpManualRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpXLbl:SetPoint("LEFT", wpManualRow, "LEFT", 0, 0)
-    wpXLbl:SetText("X:")
+    wpXLbl:SetText(L["STICKY_WP_X_LABEL"])
     wpXLbl:SetTextColor(0.78, 0.78, 0.78)
     wpXLbl:SetWidth(14)
 
@@ -2436,7 +2443,7 @@ local function BuildSituationTab(panel)
 
     local wpYLbl = wpManualRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpYLbl:SetPoint("LEFT", wpXEb, "RIGHT", 6, 0)
-    wpYLbl:SetText("Y:")
+    wpYLbl:SetText(L["STICKY_WP_Y_LABEL"])
     wpYLbl:SetTextColor(0.78, 0.78, 0.78)
     wpYLbl:SetWidth(14)
 
@@ -2449,7 +2456,7 @@ local function BuildSituationTab(panel)
     wpYEb:SetAutoFocus(false); wpYEb:SetMaxLetters(8)
     wpYEb:SetNumeric(false); wpYEb:SetTextInsets(3,3,0,0)
 
-    local wpSaveManualBtn = BNB.CreateButton(nil, wpManualRow, "Set", 38, 20)
+    local wpSaveManualBtn = BNB.CreateButton(nil, wpManualRow, L["STICKY_WP_BTN_SET"], 38, 20)
     wpSaveManualBtn:SetPoint("LEFT", wpYEb, "RIGHT", 4, 0)
 
     wpManualBtn:SetScript("OnClick", function()
@@ -2467,7 +2474,7 @@ local function BuildSituationTab(panel)
     end)
     wpManualBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Enter coordinates manually", 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_MANUAL_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     wpManualBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2518,7 +2525,7 @@ local function BuildSituationTab(panel)
     wpLeaveChk:Hide()
     local wpLeaveChkLbl = wpLeaveChk:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpLeaveChkLbl:SetPoint("LEFT", wpLeaveChk, "RIGHT", 2, 0)
-    wpLeaveChkLbl:SetText("Remove waypoint on zone leave")
+    wpLeaveChkLbl:SetText(L["STICKY_WP_LEAVE_REMOVE_LABEL"])
     wpLeaveChkLbl:SetTextColor(0.78, 0.78, 0.78)
     wpLeaveChk:SetScript("OnClick", function(self)
         if not _noteID then return end
@@ -2530,7 +2537,7 @@ local function BuildSituationTab(panel)
     end)
     wpLeaveChk:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("When you leave the zone this note is bound to,\nautomatically remove the waypoint from the map.", 0.85, 0.85, 0.85, true)
+        GameTooltip:AddLine(L["NC_WP_LEAVE_REMOVE_TIP"], 0.85, 0.85, 0.85, true)
         GameTooltip:Show()
     end)
     wpLeaveChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2556,9 +2563,9 @@ local function BuildSituationTab(panel)
             local title = wp.title or wp.label or ""
             local coordStr = string.format("%.1f, %.1f", wp.x, wp.y)
             if title ~= "" then
-                wpStatusLbl:SetText("Waypoint:\n" .. title .. "\n" .. coordStr)
+                wpStatusLbl:SetText(L["STICKY_WP_STATUS_LABEL"] .. "\n" .. title .. "\n" .. coordStr)
             else
-                wpStatusLbl:SetText("Waypoint:\n" .. coordStr)
+                wpStatusLbl:SetText(L["STICKY_WP_STATUS_LABEL"] .. "\n" .. coordStr)
             end
             wpStatusLbl:Show()
         else
@@ -2586,10 +2593,10 @@ local function BuildSituationTab(panel)
             wpManualBtn:SetEnabled(avail)
             wpLeaveChk:SetEnabled(avail)
             if avail then
-                wpDesc:SetText("Pin your current map position to this note.\nUse Navigate to send it to TomTom or the map.")
+                wpDesc:SetText(L["STICKY_WP_DESC"])
                 wpDesc:SetTextColor(0.60, 0.60, 0.60)
             else
-                wpDesc:SetText("Install a waypoint addon to enable this feature.\nWe recommend WaypointUI or TomTom (click ? for links).")
+                wpDesc:SetText(L["NC_WP_INSTALL_ADDON_FEATURE"])
                 wpDesc:SetTextColor(0.65, 0.40, 0.35)
             end
         else
@@ -2620,8 +2627,8 @@ local function BuildSituationTab(panel)
     end)
     wpPinBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Pin current location", 1, 1, 1)
-        GameTooltip:AddLine("Saves your current map coordinates to this note.", 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(L["STICKY_WP_PIN_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_PIN_TIP_BODY"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     wpPinBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2673,8 +2680,8 @@ local function BuildSituationTab(panel)
     end)
     wpNavBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Navigate to waypoint", 1, 1, 1)
-        GameTooltip:AddLine("Send the stored waypoint to your map or waypoint addon.", 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(L["STICKY_WP_NAV_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_NAV_TIP_BODY"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     wpNavBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2687,7 +2694,7 @@ local function BuildSituationTab(panel)
     end)
     wpClearBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Remove waypoint from this note", 1, 1, 1)
+        GameTooltip:AddLine(L["STICKY_WP_REMOVE_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     wpClearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2769,7 +2776,7 @@ local function CreateNoteConfigWindow()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Note Settings")
+        titleLbl:SetText(L["STICKY_NOTE_SETTINGS_TIP"])
         f._titleLbl = titleLbl
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
@@ -2788,7 +2795,7 @@ local function CreateNoteConfigWindow()
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
         f:SetAlpha(0.95)
-        f:SetTitle("Note Settings")
+        f:SetTitle(L["STICKY_NOTE_SETTINGS_TIP"])
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
     end
     tinsert(UISpecialFrames, "BigNoteBoxNoteConfigFrame")
@@ -2871,7 +2878,7 @@ end
 function BNB.OpenNoteConfig(noteID)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local note=noteID and BNB.GetNote(noteID)
-    if not note then BNB:Print("No note selected."); return end
+    if not note then BNB:Print(L["NC_NO_NOTE_SELECTED"]); return end
 
     if ncFrame and ncFrame:IsShown() and _noteID==noteID then ncFrame:Hide(); return end
     _noteID=noteID
