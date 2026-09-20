@@ -1,7 +1,7 @@
 ## Interface: 120000, 120001, 120005, 120007
 ## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
-## Notes: A notepad companion to BigChatBox — send notes to chat, capture chat as notes
+## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
 ## Author: Dukul
 ## Version: 1.7.4
 ## SavedVariables: BigNoteBoxDB
