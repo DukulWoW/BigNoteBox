@@ -92,11 +92,27 @@ BNB.FONTS = {
         mono    = false,
         preview = "Aa Bb Cc Dd Ee",
     },
+    {
+        -- Uses WoW's locale-installed font, resolved at login via GameFontNormal:GetFont().
+        -- On zhCN/zhTW/koKR/jaJP clients this resolves to a CJK-capable font.
+        id      = "wow",
+        label   = "WoW Default",
+        regular = "Fonts\\FRIZQT__.TTF",   -- overwritten in InitFonts(); placeholder only
+        bold    = "Fonts\\FRIZQT__.TTF",
+        mono    = false,
+        preview = "Aa Bb Cc Dd Ee",
+        _isWoW  = true,
+    },
 }
 
 -- Quick lookup by id
 local _byID = {}
 for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
+
+local function GetWoWFontPath()
+    local ok, path = pcall(function() return GameFontNormal:GetFont() end)
+    return (ok and path and path ~= "") and path or "Fonts\\FRIZQT__.TTF"
+end
 
 function BNB.GetFontDef(id)
     -- _byID keys are font id strings for bundled fonts and raw .ttf paths for LSM fonts.
@@ -158,6 +174,16 @@ function BNB.InitFonts()
     BNB.FontTitleFredoka    = Make("BNB_TitleFredoka",    BASE.."Fredoka-Bold.ttf",              20)
     BNB.FontBodyPlaywrite   = Make("BNB_BodyPlaywrite",   BASE.."PlaywriteIE-Regular.ttf",       DEFAULT_SIZE)
     BNB.FontTitlePlaywrite  = Make("BNB_TitlePlaywrite",  BASE.."PlaywriteIE-Regular.ttf",       20)
+
+    -- ── WoW Default font path resolution ────────────────────────────────────────
+    -- GameFontNormal:GetFont() returns the locale-appropriate path installed by WoW.
+    -- On zhCN/zhTW/koKR/jaJP this is a CJK-capable font; on English it is FRIZQT__.
+    local wowDef = _byID["wow"]
+    if wowDef then
+        local resolved = GetWoWFontPath()
+        wowDef.regular = resolved
+        wowDef.bold    = resolved
+    end
 
     -- ── LibSharedMedia font registration ────────────────────────────────────────
     -- Only runs if the user has opted in via Advanced tab (db.lsmFonts = true).

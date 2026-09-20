@@ -1,6 +1,12 @@
 # Claude Code project context (local only)
 CLAUDE.md
 FILEMAP.md
+_docs/
+_todo.md
+_todo-now.md
+_todo-done.md
+_todo-sessions.md
+dump/
 
 # Reference files
 _reference/

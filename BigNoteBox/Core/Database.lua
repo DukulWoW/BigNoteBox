@@ -337,7 +337,16 @@ local function InitSettingsDB()
 
     -- Font / display
     if db.fontSize    == nil then db.fontSize   = defaults.fontSize end
-    if db.fontChoice  == nil then db.fontChoice = "notoserif"       end
+    if db.fontChoice  == nil then
+        -- On first install, default to WoW's locale font for CJK clients so
+        -- Chinese/Korean/Japanese text is immediately readable without manual setup.
+        local locale = GetLocale and GetLocale() or ""
+        if locale == "zhCN" or locale == "zhTW" or locale == "koKR" or locale == "jaJP" then
+            db.fontChoice = "wow"
+        else
+            db.fontChoice = "notoserif"
+        end
+    end
     if db.lineHeight  == nil then db.lineHeight = "1.0"             end
 
     -- Feature flags
