@@ -9,6 +9,9 @@
 ## AddonCompartmentFunc: BNB_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: BNB_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: BNB_OnAddonCompartmentLeave
+## X-Curse-Project-ID: 1492673
+## X-WoWI-ID: 27121
+## X-Wago-ID: n6VL4WGd
 
 # Bootstrap
 Init.lua
