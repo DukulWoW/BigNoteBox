@@ -40,13 +40,13 @@ local _multiMode = false
 
 -- Date helper
 local function FormatDeleted(ts)
-    if not ts then return "Unknown" end
+    if not ts then return L["TW_TIME_UNKNOWN"] end
     local delta = time() - ts
-    if delta < 60        then return "Just now"
-    elseif delta < 3600  then return math.floor(delta / 60)   .. "m ago"
-    elseif delta < 86400 then return math.floor(delta / 3600) .. "h ago"
-    elseif delta < 86400 * 2 then return "Yesterday"
-    else   return math.floor(delta / 86400) .. "d ago"
+    if delta < 60        then return L["TW_TIME_JUST_NOW"]
+    elseif delta < 3600  then return string.format(L["TW_TIME_MIN_AGO_FMT"], math.floor(delta / 60))
+    elseif delta < 86400 then return string.format(L["TW_TIME_HOUR_AGO_FMT"], math.floor(delta / 3600))
+    elseif delta < 86400 * 2 then return L["TW_TIME_YESTERDAY"]
+    else   return string.format(L["TW_TIME_DAY_AGO_FMT"], math.floor(delta / 86400))
     end
 end
 
@@ -83,13 +83,13 @@ local function UpdateInfoLbl(n)
     if not _infoLbl then return end
     local days = BigNoteBoxDB and BigNoteBoxDB.trashRetainDays
     if days == nil then days = 30 end
-    local line1 = days == 0 and "Trash disabled"
-               or days == 1 and "Kept 1 day"
-               or              "Kept " .. days .. " days"
+    local line1 = days == 0 and L["TW_INFO_DISABLED"]
+               or days == 1 and L["TW_INFO_KEPT_1_DAY"]
+               or              string.format(L["TW_INFO_KEPT_DAYS_FMT"], days)
     local line2
-    if n == 0 then     line2 = "Empty"
-    elseif n == 1 then line2 = "1 note in trash"
-    else               line2 = n .. " notes in trash"
+    if n == 0 then     line2 = L["TW_INFO_EMPTY"]
+    elseif n == 1 then line2 = L["TW_INFO_ONE_NOTE"]
+    else               line2 = string.format(L["TW_INFO_N_NOTES_FMT"], n)
     end
     _infoLbl:SetText(line1 .. "\n" .. line2)
 end
@@ -159,20 +159,20 @@ local function GetRow(parent, index)
     row._previewLbl = previewLbl
 
     -- Action buttons (bottom of row): View | Restore | Delete | Sure?
-    local viewBtn = BNB.CreateButton(nil, row, "View", 52, 20)
+    local viewBtn = BNB.CreateButton(nil, row, L["TW_ROW_VIEW_BTN"], 52, 20)
     viewBtn:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", TEXT_LEFT, 6)
     row._viewBtn = viewBtn
 
-    local restoreBtn = BNB.CreateButton(nil, row, "Restore", 72, 20)
+    local restoreBtn = BNB.CreateButton(nil, row, L["TW_ROW_RESTORE_BTN"], 72, 20)
     restoreBtn:SetPoint("LEFT", viewBtn, "RIGHT", 6, 0)
     row._restoreBtn = restoreBtn
 
-    local permDelBtn = BNB.CreateButton(nil, row, "|cffff4444Delete|r", 60, 20)
+    local permDelBtn = BNB.CreateButton(nil, row, L["TW_ROW_DELETE_BTN"], 60, 20)
     permDelBtn:SetPoint("LEFT", restoreBtn, "RIGHT", 6, 0)
     row._permDelBtn = permDelBtn
 
     -- "Sure?" confirm button — appears right of Delete for 3s, then hides
-    local sureBtn = BNB.CreateButton(nil, row, "|cffff4444Sure?|r", 52, 20)
+    local sureBtn = BNB.CreateButton(nil, row, L["TW_ROW_SURE_BTN"], 52, 20)
     sureBtn:SetPoint("LEFT", permDelBtn, "RIGHT", 4, 0)
     sureBtn:Hide()
     row._sureBtn = sureBtn
@@ -249,14 +249,14 @@ function BNB.PopulateTrashWindow()
 
         -- Title
         row._titleLbl:SetText(
-            (note.title and note.title ~= "") and note.title or "|cff666666(untitled)|r")
+            (note.title and note.title ~= "") and note.title or L["TW_UNTITLED"])
 
         -- Date
         row._dateLbl:SetText(FormatDeleted(note.deletedAt))
 
         -- Preview
         local bodyStr = note.body or ""
-        row._previewLbl:SetText(bodyStr ~= "" and bodyStr or "|cff444444(no content)|r")
+        row._previewLbl:SetText(bodyStr ~= "" and bodyStr or L["TW_NO_CONTENT"])
 
         -- Selection highlight
         if row._selHi then
@@ -291,7 +291,7 @@ function BNB.PopulateTrashWindow()
             row._viewBtn:SetScript("OnClick", function()
                 local note = item.note
                 if not note then return end
-                local title = (note.title and note.title ~= "") and note.title or "(Untitled)"
+                local title = (note.title and note.title ~= "") and note.title or L["TW_VIEW_UNTITLED"]
                 local body  = note.body or ""
                 -- Reuse a simple resizable backdrop frame
                 if not _twFrame._viewPopup then
@@ -324,10 +324,10 @@ function BNB.PopulateTrashWindow()
                     bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
                     bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
                     vp._bodyFs = bodyFs; vp._bodyCt = ct
-                    local restoreVpBtn = BNB.CreateButton(nil, vp, "Restore", 90, 24)
+                    local restoreVpBtn = BNB.CreateButton(nil, vp, L["TW_ROW_RESTORE_BTN"], 90, 24)
                     restoreVpBtn:SetPoint("BOTTOM", vp, "BOTTOM", -48, 10)
                     vp._restoreVpBtn = restoreVpBtn
-                    local closeBtn = BNB.CreateButton(nil, vp, "Close", 80, 24)
+                    local closeBtn = BNB.CreateButton(nil, vp, L["CLOSE"], 80, 24)
                     closeBtn:SetPoint("BOTTOM", vp, "BOTTOM", 50, 10)
                     closeBtn:SetScript("OnClick", function() vp:Hide() end)
                     tinsert(UISpecialFrames, "BNBTrashViewPopup")
@@ -416,7 +416,7 @@ local function BuildTrashWindow()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
-    f:SetTitle("Trash")
+    f:SetTitle(L["TW_TITLE"])
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function()
@@ -449,7 +449,7 @@ local function BuildTrashWindow()
     local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     emptyLbl:SetPoint("TOP", child, "TOP", 0, -20)
     emptyLbl:SetWidth(CONTENT_W); emptyLbl:SetJustifyH("CENTER")
-    emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText("Trash is empty.")
+    emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText(L["TW_EMPTY_STATE"])
     emptyLbl:Hide()
     _emptyLbl = emptyLbl
 
@@ -460,33 +460,33 @@ local function BuildTrashWindow()
     rule:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, BOTTOM_STRIP_H - 1)
 
     -- ── Normal mode: Empty Trash | Select ────────────────────────────────────
-    local emptyBtn = BNB.CreateButton(nil, f, "Empty Trash", 110, 26)
+    local emptyBtn = BNB.CreateButton(nil, f, L["TW_EMPTY_BTN"], 110, 26)
     emptyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     emptyBtn:SetEnabled(false)
     emptyBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_EMPTY_TRASH") end)
     emptyBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Permanently delete all trashed notes", 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["TW_EMPTY_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     emptyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _emptyBtn = emptyBtn
 
-    local selectBtn = BNB.CreateButton(nil, f, "Select", 72, 26)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 72, 26)
     selectBtn:SetPoint("LEFT", emptyBtn, "RIGHT", 6, 0)
     selectBtn:SetEnabled(false)
     selectBtn:SetScript("OnClick", function() SetTrashMultiMode(true) end)
     selectBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Select notes to restore or delete in bulk", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_SELECT_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _selectBtn = selectBtn
 
     -- ── Select mode: Restore selected | Delete selected | Cancel ──────────────
-    local restoreSelBtn = BNB.CreateButton(nil, f, "Restore selected", 110, 26)
+    local restoreSelBtn = BNB.CreateButton(nil, f, L["TW_RESTORE_SEL_BTN"], 110, 26)
     restoreSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     restoreSelBtn:SetEnabled(false)
     restoreSelBtn:SetScript("OnClick", function()
@@ -499,14 +499,14 @@ local function BuildTrashWindow()
     end)
     restoreSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Move selected notes back to your note list", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_RESTORE_SEL_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     restoreSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     restoreSelBtn:Hide()
     _restoreSelBtn = restoreSelBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, "|cffff4444Delete selected|r", 110, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
     deleteSelBtn:SetScript("OnClick", function()
@@ -521,20 +521,20 @@ local function BuildTrashWindow()
     end)
     deleteSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Permanently delete selected notes", 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     deleteSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     deleteSelBtn:Hide()
     _deleteSelBtn = deleteSelBtn
 
-    local cancelSelBtn = BNB.CreateButton(nil, f, "Cancel", 68, 26)
+    local cancelSelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 68, 26)
     cancelSelBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
     cancelSelBtn:SetScript("OnClick", function() SetTrashMultiMode(false) end)
     cancelSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Exit selection mode", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANCEL_SEL_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     cancelSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -584,7 +584,7 @@ local function BuildTrashWindowSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Trash")
+    titleLbl:SetText(L["TW_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function()
         if _multiMode then SetTrashMultiMode(false) end
@@ -614,7 +614,7 @@ local function BuildTrashWindowSkin()
     local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     emptyLbl:SetPoint("TOP", child, "TOP", 0, -20)
     emptyLbl:SetWidth(CONTENT_W); emptyLbl:SetJustifyH("CENTER")
-    emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText("Trash is empty.")
+    emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText(L["TW_EMPTY_STATE"])
     emptyLbl:Hide()
     _emptyLbl = emptyLbl
 
@@ -628,33 +628,33 @@ local function BuildTrashWindowSkin()
     footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
 
     -- ── Normal mode: Empty Trash | Select ────────────────────────────────────
-    local emptyBtn = BNB.CreateButton(nil, f, "Empty Trash", 110, 26)
+    local emptyBtn = BNB.CreateButton(nil, f, L["TW_EMPTY_BTN"], 110, 26)
     emptyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     emptyBtn:SetEnabled(false)
     emptyBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_EMPTY_TRASH") end)
     emptyBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Permanently delete all trashed notes", 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["TW_EMPTY_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     emptyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _emptyBtn = emptyBtn
 
-    local selectBtn = BNB.CreateButton(nil, f, "Select", 72, 26)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 72, 26)
     selectBtn:SetPoint("LEFT", emptyBtn, "RIGHT", 6, 0)
     selectBtn:SetEnabled(false)
     selectBtn:SetScript("OnClick", function() SetTrashMultiMode(true) end)
     selectBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Select notes to restore or delete in bulk", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_SELECT_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _selectBtn = selectBtn
 
     -- ── Select mode: Restore selected | Delete selected | Cancel ──────────────
-    local restoreSelBtn = BNB.CreateButton(nil, f, "Restore selected", 110, 26)
+    local restoreSelBtn = BNB.CreateButton(nil, f, L["TW_RESTORE_SEL_BTN"], 110, 26)
     restoreSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     restoreSelBtn:SetEnabled(false)
     restoreSelBtn:SetScript("OnClick", function()
@@ -667,14 +667,14 @@ local function BuildTrashWindowSkin()
     end)
     restoreSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Move selected notes back to your note list", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_RESTORE_SEL_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     restoreSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     restoreSelBtn:Hide()
     _restoreSelBtn = restoreSelBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, "|cffff4444Delete selected|r", 110, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
     deleteSelBtn:SetScript("OnClick", function()
@@ -689,20 +689,20 @@ local function BuildTrashWindowSkin()
     end)
     deleteSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Permanently delete selected notes", 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     deleteSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     deleteSelBtn:Hide()
     _deleteSelBtn = deleteSelBtn
 
-    local cancelSelBtn = BNB.CreateButton(nil, f, "Cancel", 68, 26)
+    local cancelSelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 68, 26)
     cancelSelBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
     cancelSelBtn:SetScript("OnClick", function() SetTrashMultiMode(false) end)
     cancelSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Exit selection mode", 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANCEL_SEL_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     cancelSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)

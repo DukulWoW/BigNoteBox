@@ -191,14 +191,14 @@ BNB.ApplyListMode = ApplyListMode
 -- (WoW convention: first is unnumbered, subsequent get a number from 2 up.)
 --------------------------------------------------------------------------------
 local function GetNextQuickNoteTitle()
-    local base = "Quick Note"
+    local base = L["NL_QUICK_NOTE_BTN"]
     local taken = {}
     for _, note in pairs(BigNoteBoxNotesDB.notes or {}) do
         local t = note.title or ""
         if t == base then
             taken[1] = true
         else
-            local n = t:match("^Quick Note (%d+)$")
+            local n = t:match("^" .. base .. " (%d+)$")
             if n then taken[tonumber(n)] = true end
         end
     end
@@ -452,9 +452,9 @@ local function BuildSearchBar(parent)
     favBtn:SetScript("OnEnter", function(self)
         self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(_favFilterActive and "Show all notes" or "Show favourites only", 1, 1, 1)
+        GameTooltip:AddLine(_favFilterActive and L["NL_FAV_SHOW_ALL"] or L["NL_FAV_SHOW_FAV_ONLY"], 1, 1, 1)
         if currentFilter ~= "" then
-            GameTooltip:AddLine("Active with current search filter", 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(L["NL_FAV_ACTIVE_WITH_FILTER"], 0.78, 0.78, 0.78)
         end
         GameTooltip:Show()
     end)
@@ -488,7 +488,7 @@ local function BuildSearchBar(parent)
     taskFilterBtn:SetScript("OnEnter", function(self)
         self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(_taskFilterActive and "Show all notes" or "Show notes with tasks only", 1, 1, 1)
+        GameTooltip:AddLine(_taskFilterActive and L["NL_FAV_SHOW_ALL"] or L["NL_TASK_SHOW_TASKS_ONLY"], 1, 1, 1)
         GameTooltip:Show()
     end)
     taskFilterBtn:SetScript("OnLeave", function(self)
@@ -519,7 +519,7 @@ local function BuildSearchBar(parent)
         if active then self:SetAlpha(1.0) end
         pcall(function() oTex:SetDesaturated(false) end)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Reset all filters", 1, 1, 1)
+        GameTooltip:AddLine(L["NL_RESET_FILTERS_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     outerClear:SetScript("OnLeave", function(self)
@@ -721,7 +721,7 @@ local function ShowNoteContextMenu(btn, noteID)
         if not n then return end
         local content = (n.title and n.title ~= "" and (n.title .. "\n") or "")
                      .. (n.body or "")
-        BNB:Print(L["BTN_COPY_NOTE_CLASSIC"] or "Note selected — press Ctrl+C to copy.")
+        BNB:Print(L["BTN_COPY_NOTE_CLASSIC"])
         if BNB.ShowClipboardHint then BNB.ShowClipboardHint(content) end
     end
 
@@ -737,13 +737,13 @@ local function ShowNoteContextMenu(btn, noteID)
             root:CreateTitle(title)
 
             -- Open
-            root:CreateButton("Open note", function()
+            root:CreateButton(L["NL_CTX_OPEN"], function()
                 BNB.SaveCurrentNote(); BNB.SelectNote(noteID)
             end)
-            root:CreateButton("Open note settings", function()
+            root:CreateButton(L["NL_CTX_OPEN_SETTINGS"], function()
                 if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
             end)
-            root:CreateButton("Open as sticky note", function()
+            root:CreateButton(L["NL_CTX_OPEN_STICKY"], function()
                 if BNB.Sticky and BNB.Sticky.Open then
                     -- Ensure this opens as a normal world sticky.
                     -- Write explicit false so global stickyEscDefault doesn't re-apply.
@@ -758,7 +758,7 @@ local function ShowNoteContextMenu(btn, noteID)
                     BNB.Sticky.Open(noteID)
                 end
             end)
-            root:CreateButton("Open as ESC sticky note", function()
+            root:CreateButton(L["NL_CTX_OPEN_ESC_STICKY"], function()
                 if BNB.Sticky and BNB.Sticky.Open then
                     -- Force ESC-only mode then open — SN.Open will show the ESC menu.
                     local db = BigNoteBoxDB
@@ -777,7 +777,7 @@ local function ShowNoteContextMenu(btn, noteID)
             do
                 local n3 = BNB.GetNote(noteID)
                 local hasAlarm = n3 and n3.alarm ~= nil
-                local alarmLabel = hasAlarm and "Edit alarm" or "Create alarm"
+                local alarmLabel = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"]
                 root:CreateButton(alarmLabel, function()
                     if BNB.SelectNote then BNB.SelectNote(noteID) end
                     C_Timer.After(0.05, function()
@@ -787,7 +787,7 @@ local function ShowNoteContextMenu(btn, noteID)
                     end)
                 end)
                 if hasAlarm then
-                    root:CreateButton("|cffff4444Remove alarm|r", function()
+                    root:CreateButton(L["NL_CTX_REMOVE_ALARM"], function()
                         if BNB.Alarm and BNB.Alarm.ClearAlarm then
                             BNB.Alarm.ClearAlarm(noteID)
                         end
@@ -797,7 +797,7 @@ local function ShowNoteContextMenu(btn, noteID)
             end
             do
                 local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
-                local taskLabel = hasTasks and "Add task" or "Create task"
+                local taskLabel = hasTasks and L["NL_CTX_ADD_TASK"] or L["NL_CTX_CREATE_TASK"]
                 root:CreateButton(taskLabel, function()
                     if BNB.SelectNote then BNB.SelectNote(noteID) end
                     C_Timer.After(0.05, function()
@@ -821,24 +821,24 @@ local function ShowNoteContextMenu(btn, noteID)
             local n = BNB.GetNote(noteID)
             if n then
                 if n.pinned then
-                    root:CreateButton("Unpin from top", function()
+                    root:CreateButton(L["NL_CTX_UNPIN"], function()
                         BNB.UpdateNote(noteID, { pinned = false })
                         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     end)
                 else
-                    root:CreateButton("Pin to top", function()
+                    root:CreateButton(L["NL_CTX_PIN"], function()
                         BNB.UpdateNote(noteID, { pinned = true })
                         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     end)
                 end
                 -- Favorite / Unfavorite
                 if n.favorited then
-                    root:CreateButton("Remove from favorites", function()
+                    root:CreateButton(L["NL_CTX_UNFAV"], function()
                         BNB.UpdateNote(noteID, { _clear = {"favorited"} })
                         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     end)
                 else
-                    root:CreateButton("Add to favorites", function()
+                    root:CreateButton(L["NL_CTX_FAV"], function()
                         BNB.UpdateNote(noteID, { favorited = true })
                         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     end)
@@ -851,14 +851,14 @@ local function ShowNoteContextMenu(btn, noteID)
                 local isLocked = (n2.locked == true)
                     or (n2.locked == nil and BigNoteBoxDB.lockNotes == true)
                 if isLocked then
-                    root:CreateButton("Unlock note", function()
+                    root:CreateButton(L["NL_CTX_UNLOCK"], function()
                         BNB.UpdateNote(noteID, { locked = false })
                         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
                         if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
                         if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
                     end)
                 else
-                    root:CreateButton("Lock note", function()
+                    root:CreateButton(L["NL_CTX_LOCK"], function()
                         BNB.UpdateNote(noteID, { locked = true })
                         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
                         if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
@@ -867,11 +867,11 @@ local function ShowNoteContextMenu(btn, noteID)
                 end
             end
 
-            root:CreateButton("Duplicate", function() DuplicateNote(noteID) end)
+            root:CreateButton(L["NL_CTX_DUPLICATE"], function() DuplicateNote(noteID) end)
 
             -- Copy/Move to character (sidebar feature)
             if BNB.Sidebar and BNB.Sidebar.IsEnabled() then
-                root:CreateButton("Copy / Move to...", function()
+                root:CreateButton(L["NL_CTX_COPY_MOVE"], function()
                     if BNB.OpenCopyMovePopup then
                         BNB.OpenCopyMovePopup(noteID, "copy")
                     end
@@ -882,11 +882,11 @@ local function ShowNoteContextMenu(btn, noteID)
             if BNB.AdvancedMode then
                 local isRich = BNB.AdvancedMode.IsRich(note)
                 if isRich then
-                    root:CreateButton("Convert to regular note", function()
+                    root:CreateButton(L["NL_CTX_CONVERT_PLAIN"], function()
                         BNB.AdvancedMode.ConvertToPlain(noteID)
                     end)
                 else
-                    root:CreateButton("Convert to rich note", function()
+                    root:CreateButton(L["NL_CTX_CONVERT_RICH"], function()
                         BNB.AdvancedMode.ConvertToRich(noteID)
                     end)
                 end
@@ -916,27 +916,27 @@ local function ShowNoteContextMenu(btn, noteID)
             root:CreateDivider()
 
             -- Share / Export / copy
-            root:CreateButton("Share note", function()
+            root:CreateButton(L["NL_CTX_SHARE"], function()
                 if BNB.OpenShareWindow then BNB.OpenShareWindow(noteID) end
             end)
-            root:CreateButton("Export note (JSON)", function()
+            root:CreateButton(L["NL_CTX_EXPORT_JSON"], function()
                 if BNB.ExportNoteJSON then BNB.ExportNoteJSON(noteID) end
             end)
-            root:CreateButton("Export note (MD)", function()
+            root:CreateButton(L["NL_CTX_EXPORT_MD"], function()
                 if BNB.ExportNoteMD then BNB.ExportNoteMD(noteID) end
             end)
-            root:CreateButton("Export note (HTML)", function()
+            root:CreateButton(L["NL_CTX_EXPORT_HTML"], function()
                 if BNB.ExportNoteHTML then BNB.ExportNoteHTML(noteID) end
             end)
-            root:CreateButton("Copy to clipboard", CopyBody)
+            root:CreateButton(L["NL_CTX_COPY_CLIPBOARD"], CopyBody)
 
             root:CreateDivider()
 
             -- Trash / delete
             if BNB.TrashEnabled and BNB.TrashEnabled() then
-                root:CreateButton("Move to trash", DoTrash)
+                root:CreateButton(L["NL_CTX_TRASH"], DoTrash)
             end
-            root:CreateButton("|cffff4444Delete permanently|r", DoDeletePerm)
+            root:CreateButton(L["NL_CTX_DELETE_PERM"], DoDeletePerm)
         end)
         _ctxDropdown:OpenMenu()
 end
@@ -1025,15 +1025,15 @@ local function UpdateMultiActionBtns(n)
     local label = n > 0 and ("(" .. n .. ")") or "(0)"
     local en    = n > 0
     if BNB._multiDeleteBtn then
-        BNB._multiDeleteBtn:SetText("Delete " .. label)
+        BNB._multiDeleteBtn:SetText(string.format(L["MULTI_DELETE_FMT"], label))
         BNB._multiDeleteBtn:SetEnabled(en)
     end
     if BNB._multiCopyMoveBtn then
-        BNB._multiCopyMoveBtn:SetText("Copy / Move " .. label)
+        BNB._multiCopyMoveBtn:SetText(string.format(L["MULTI_COPYMOVE_FMT"], label))
         BNB._multiCopyMoveBtn:SetEnabled(en)
     end
     if BNB._multiExportBtn then
-        BNB._multiExportBtn:SetText("Export " .. label)
+        BNB._multiExportBtn:SetText(string.format(L["MULTI_EXPORT_FMT"], label))
         BNB._multiExportBtn:SetEnabled(en)
     end
 end
@@ -1063,7 +1063,7 @@ function BNB.SetMultiMode(enabled)
         BNB._multiSelectAllBtn:SetShown(enabled)
     end
     if BNB._multiSelBtn then
-        BNB._multiSelBtn:SetText(enabled and "Cancel" or "Select")
+        BNB._multiSelBtn:SetText(enabled and L["CANCEL"] or L["MW_SELECT_BTN"])
     end
     -- Show/hide right-side toolbar icons to avoid overlap with action buttons
     if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(enabled) end
@@ -1828,7 +1828,7 @@ function BNB.RefreshNoteList()
     local entryIdx = 0
     if #pinned > 0 then
         if not collapsed then
-            local hdr = GetSectionHeader("_pinnedHdr", "|cffFFD700— PINNED —|r")
+            local hdr = GetSectionHeader("_pinnedHdr", L["NL_HDR_PINNED"])
             hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -totalH)
             hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -totalH)
             hdr:Show()
@@ -1876,7 +1876,7 @@ function BNB.RefreshNoteList()
     -- Always show "— Notes (X) —" header
     if not collapsed then
         local hdr2 = GetSectionHeader("_regularHdr",
-            "|cff888888— Notes (" .. #regular .. ") —|r")
+            string.format(L["NL_HDR_REGULAR_FMT"], #regular))
         hdr2:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -totalH)
         hdr2:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -totalH)
         hdr2:Show()
@@ -2058,7 +2058,7 @@ function BNB.BuildNoteList()
         self:SetAlpha(0.85)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(
-            BNB._listCollapsed and "Expand note list" or "Collapse to icons only",
+            BNB._listCollapsed and L["NL_COLLAPSE_EXPAND_TIP"] or L["NL_COLLAPSE_TIP"],
             1, 1, 1)
         GameTooltip:Show()
     end)
@@ -2074,21 +2074,21 @@ function BNB.BuildNoteList()
     newBtn:SetScript("OnClick", function() BNB.CreateNewNote() end)
     newBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("New Note", 1, 1, 1)
-        GameTooltip:AddLine("Create a new note and open it in the editor.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["NL_NEW_NOTE_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NL_NEW_NOTE_TIP_SUB"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     newBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _newBtn = newBtn
 
     -- Quick Note (right button, anchored between newBtn and colBtn)
-    local qBtn = BNB.CreateButton(nil, pane, "Quick Note", 80, btnH)
+    local qBtn = BNB.CreateButton(nil, pane, L["NL_QUICK_NOTE_BTN"], 80, btnH)
     qBtn:SetPoint("BOTTOMLEFT",  newBtn, "BOTTOMRIGHT", 4,  0)
     qBtn:SetPoint("BOTTOMRIGHT", colBtn, "BOTTOMLEFT",  -4, 0)
     qBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Quick Note", 1, 1, 1)
-        GameTooltip:AddLine("Creates a titled note and opens it for editing.\nTitle is auto-generated (Quick Note, Quick Note 2, ...).", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["NL_QUICK_NOTE_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["NL_QUICK_NOTE_TIP_SUB"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     qBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2120,7 +2120,7 @@ function BNB.BuildNoteList()
         -- Label tiers based on half width
         if halfW >= 70 then
             _newBtn:SetText(L["BTN_NEW_NOTE"])
-            _qBtn:SetText("Quick Note")
+            _qBtn:SetText(L["NL_QUICK_NOTE_BTN"])
         elseif halfW >= 28 then
             _newBtn:SetText("+NN")
             _qBtn:SetText("QN")

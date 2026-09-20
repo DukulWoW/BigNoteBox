@@ -8,6 +8,7 @@
 
 local ADDON_NAME = "BigNoteBox"
 local BNB        = BigNoteBox
+local L          = BNB.L
 
 local function CreateOptionsPanel()
     local panel   = CreateFrame("Frame", "BigNoteBoxOptionsPanel", UIParent)
@@ -20,21 +21,21 @@ local function CreateOptionsPanel()
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge3")
     title:SetPoint("TOP", logo, "BOTTOM", 0, -8)
-    title:SetText("|cff66bb6aBigNoteBox|r")
+    title:SetText(L["OPT_TITLE"])
 
     local version = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     version:SetPoint("TOP", title, "BOTTOM", 0, -4)
-    version:SetText("Version: " .. (BNB.ADDON_VERSION or "1.0.0"))
+    version:SetText(string.format(L["OPT_VERSION_FMT"], BNB.ADDON_VERSION or "1.0.0"))
     version:SetTextColor(0.7, 0.7, 0.7)
 
     local author = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
     author:SetPoint("TOP", version, "BOTTOM", 0, -2)
-    author:SetText("by Dukul")
+    author:SetText(L["AUTHOR"])
     author:SetTextColor(0.55, 0.55, 0.55)
 
     local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     hint:SetPoint("TOP", author, "BOTTOM", 0, -10)
-    hint:SetText("Access options with |cffffd100/bnb config|r")
+    hint:SetText(L["OPT_HINT"])
 
     -- Button: try modern template first, fall back gracefully
     local tpl = "SharedButtonLargeTemplate"
@@ -50,7 +51,7 @@ local function CreateOptionsPanel()
     local btn = CreateFrame("Button", nil, panel, tpl)
     btn:SetSize(300, 60)
     btn:SetPoint("TOP", hint, "BOTTOM", 0, -16)
-    btn:SetText("Open Settings")
+    btn:SetText(L["OPT_OPEN_SETTINGS_BTN"])
     pcall(function() DynamicResizeButton_Resize(btn) end)
     local bfs = btn:GetFontString()
     if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 20, "") end) end

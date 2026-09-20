@@ -42,7 +42,7 @@ local _sizeLbl    = nil
 -- INTERNAL: format a unix timestamp as a short date+time string
 --------------------------------------------------------------------------------
 local function FmtSnap(ts)
-    if not ts or ts == 0 then return "Unknown" end
+    if not ts or ts == 0 then return L["HW_TIME_UNKNOWN"] end
     local db  = BigNoteBoxDB
     local use24 = db and db.use24Hour ~= false
     local d = date("%Y-%m-%d", ts)
@@ -103,11 +103,11 @@ local function BuildRow(parent, note, id, yOff)
     titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -4)
     titleLbl:SetJustifyH("LEFT")
     titleLbl:SetHeight(16)
-    titleLbl:SetText(note.title or "(untitled)")
+    titleLbl:SetText(note.title or L["HW_UNTITLED"])
 
     -- Slot count
     local n   = SlotCount(id)
-    local sub = n == 1 and "1 snapshot" or (n .. " snapshots")
+    local sub = n == 1 and L["HW_SNAPSHOT_ONE"] or string.format(L["HW_SNAPSHOT_N_FMT"], n)
     local subLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     subLbl:SetPoint("TOPLEFT",  row, "TOPLEFT", TEXT_LEFT,   -22)
     subLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -22)
@@ -299,7 +299,7 @@ local function BuildHistoryWindowSkin()
     clearBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["HISTORY_CLEAR_ALL_TIP"], 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["HW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -324,7 +324,7 @@ local function BuildHistoryWindowSkin()
         StaticPopupDialogs["BNB_HISTORY_CLEAR_ALL"] = {
             text          = L["HISTORY_CLEAR_ALL_CONFIRM"],
             button1       = L["HISTORY_OVERRIDE_OVERRIDE"],
-            button2       = "Cancel",
+            button2       = L["CANCEL"],
             OnAccept      = function()
                 local ndb = BigNoteBoxNotesDB
                 if ndb and ndb.notes then
@@ -413,7 +413,7 @@ local function BuildHistoryWindow()
     clearBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["HISTORY_CLEAR_ALL_TIP"], 1, 1, 1)
-        GameTooltip:AddLine("This cannot be undone.", 0.8, 0.4, 0.4, true)
+        GameTooltip:AddLine(L["HW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
         GameTooltip:Show()
     end)
     clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -439,7 +439,7 @@ local function BuildHistoryWindow()
         StaticPopupDialogs["BNB_HISTORY_CLEAR_ALL"] = {
             text          = L["HISTORY_CLEAR_ALL_CONFIRM"],
             button1       = L["HISTORY_OVERRIDE_OVERRIDE"],
-            button2       = "Cancel",
+            button2       = L["CANCEL"],
             OnAccept      = function()
                 local ndb = BigNoteBoxNotesDB
                 if ndb and ndb.notes then

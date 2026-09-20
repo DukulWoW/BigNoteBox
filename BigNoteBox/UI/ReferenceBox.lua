@@ -284,10 +284,10 @@ local function ResolveAttachment(att)
         end
         local questIcon = "Interface\\GossipFrame\\AvailableQuestIcon"
         local typeLabel = (unknown and not att.title)
-            and (L["REFBOX_TYPE_QUEST"] .. " (unknown)")
+            and string.format(L["REFBOX_TYPE_QUEST_UNKNOWN_FMT"], L["REFBOX_TYPE_QUEST"])
             or L["REFBOX_TYPE_QUEST"]
         return {
-            name      = title or ("Quest " .. att.id),
+            name      = title or string.format(L["REFBOX_QUEST_FALLBACK_FMT"], att.id),
             icon      = questIcon,
             qr        = 1.00, qg = 0.82, qb = 0.00,
             typeLabel = typeLabel,
@@ -440,11 +440,11 @@ local function ShowTooltip(anchor, att)
             GameTooltip:SetHyperlink("quest:" .. att.id .. ":0")
         else
             -- Quest not in log — show manual info tooltip
-            GameTooltip:AddLine(att.title or ("Quest " .. att.id), 1, 0.82, 0)
-            GameTooltip:AddLine("Quest ID: " .. att.id, 0.78, 0.78, 0.78)
-            GameTooltip:AddLine("Not in your quest log.", 0.55, 0.55, 0.55)
+            GameTooltip:AddLine(att.title or string.format(L["REFBOX_QUEST_FALLBACK_FMT"], att.id), 1, 0.82, 0)
+            GameTooltip:AddLine(string.format(L["REFBOX_TT_QUESTID_FMT"], att.id), 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(L["REFBOX_TT_NOT_IN_LOG"], 0.55, 0.55, 0.55)
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Right-click to copy Wowhead URL.", 0.55, 0.82, 0.55)
+            GameTooltip:AddLine(L["REFBOX_TT_COPY_WOWHEAD"], 0.55, 0.82, 0.55)
         end
     end
     GameTooltip:Show()
@@ -1465,12 +1465,12 @@ local function BuildExternalModeStrip()
         end
     end
 
-    local modelBtn = BNB.CreateButton(nil, strip, "Model", 1, 24)
+    local modelBtn = BNB.CreateButton(nil, strip, L["REFBOX_STRIP_MODEL"], 1, 24)
     modelBtn:SetPoint("TOPLEFT",  strip, "TOPLEFT",  0, -2)
     modelBtn:SetPoint("TOPRIGHT", strip, "TOPLEFT",  math.floor(RBW / 2) - 1, -2)
     modelBtn:SetScript("OnClick", function() OnModeClick("model") end)
 
-    local tasksBtn = BNB.CreateButton(nil, strip, "Tasks", 1, 24)
+    local tasksBtn = BNB.CreateButton(nil, strip, L["REFBOX_STRIP_TASKS"], 1, 24)
     tasksBtn:SetPoint("TOPLEFT",  strip, "TOPLEFT",  math.floor(RBW / 2) + 1, -2)
     tasksBtn:SetPoint("TOPRIGHT", strip, "TOPRIGHT", 0, -2)
     tasksBtn:SetScript("OnClick", function() OnModeClick("attachments") end)
@@ -1739,7 +1739,7 @@ local function BuildTaskPanel(f)
     -- Fixed footer: Clear and Delete buttons spanning full pnl width.
     -- Permanent pnl children so they don't scroll with tasks and are always visible.
     local footerBtnH = TASK_FOOTER_H - 2
-    local clrFooter = BNB.CreateButton(nil, pnl, "Clear", 0, footerBtnH)
+    local clrFooter = BNB.CreateButton(nil, pnl, L["REFBOX_TASK_CLEAR_BTN"], 0, footerBtnH)
     clrFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOMLEFT",  6, 3)
     clrFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOM",      -2, 3)
     clrFooter:SetScript("OnClick", function()
@@ -1747,15 +1747,15 @@ local function BuildTaskPanel(f)
     end)
     clrFooter:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Uncheck completed tasks", 1, 1, 1)
-        GameTooltip:AddLine("Removes the checkmark from all completed tasks so you can do them again.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["REFBOX_TASK_CLEAR_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["REFBOX_TASK_CLEAR_TIP_SUB"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     clrFooter:SetScript("OnLeave", function() GameTooltip:Hide() end)
     clrFooter._lbl = clrFooter._lbl or clrFooter:GetFontString()
     f._taskClrBtn = clrFooter
 
-    local delFooter = BNB.CreateButton(nil, pnl, "Delete", 0, footerBtnH)
+    local delFooter = BNB.CreateButton(nil, pnl, L["REFBOX_TASK_DELETE_BTN"], 0, footerBtnH)
     delFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOM",       2, 3)
     delFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -6, 3)
     delFooter:SetScript("OnClick", function()
@@ -1763,8 +1763,8 @@ local function BuildTaskPanel(f)
     end)
     delFooter:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Delete completed tasks", 1, 1, 1)
-        GameTooltip:AddLine("Permanently removes all completed tasks from the list.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["REFBOX_TASK_DELETE_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["REFBOX_TASK_DELETE_TIP_SUB"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     delFooter:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1772,7 +1772,7 @@ local function BuildTaskPanel(f)
     f._taskDelBtn = delFooter
 
     -- Wide "Add Tasks" button — shown when note has no tasks yet (states 1, 4)
-    local addWide = BNB.CreateButton(nil, f, "+ Add Tasks", RBW - PAD * 2, 26)
+    local addWide = BNB.CreateButton(nil, f, L["REFBOX_TASK_ADD_WIDE_BTN"], RBW - PAD * 2, 26)
     addWide:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, BOTTOM_PAD + 4)
     addWide:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, BOTTOM_PAD + 4)
     addWide:SetFrameLevel(f:GetFrameLevel() + 70)  -- above task panel (f+50) and splitter (f+60)
@@ -1968,9 +1968,9 @@ RenderTaskPanel = function()
     local globalRst  = tl2 and tl2.resetType
     local globalSit  = tl2 and tl2.situation
 
-    local hdrPrefix = "Tasks"
-    if     globalRst == "daily"  then hdrPrefix = "Daily Tasks"
-    elseif globalRst == "weekly" then hdrPrefix = "Weekly Tasks" end
+    local hdrPrefix = L["REFBOX_TASK_HDR_DEFAULT"]
+    if     globalRst == "daily"  then hdrPrefix = L["REFBOX_TASK_HDR_DAILY"]
+    elseif globalRst == "weekly" then hdrPrefix = L["REFBOX_TASK_HDR_WEEKLY"] end
 
     -- Update the fixed header label on pnl (created at build time, doesn't scroll)
     if rbFrame._taskHdrLbl then
@@ -1997,8 +1997,8 @@ RenderTaskPanel = function()
     addBtn:SetScript("OnEnter", function(self)
         addH:Show(); addN:Hide()
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Add task", 1, 1, 1)
-        GameTooltip:AddLine("Adds a new empty task to this note.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["REFBOX_TASK_ADD_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["REFBOX_TASK_ADD_TIP_SUB"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     addBtn:SetScript("OnLeave", function() addH:Hide(); addN:Show(); GameTooltip:Hide() end)
@@ -2030,7 +2030,7 @@ RenderTaskPanel = function()
             self:SetAlpha(1.0)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(isActive and tipActive or tipInactive, 1, 1, 1)
-            GameTooltip:AddLine("Click to edit note task defaults.", 0.8, 0.8, 0.8)
+            GameTooltip:AddLine(L["REFBOX_TASK_DEFAULTS_TIP"], 0.8, 0.8, 0.8)
             GameTooltip:Show()
         end)
         ico:SetScript("OnLeave", function(self)
@@ -2048,11 +2048,11 @@ RenderTaskPanel = function()
     local hasSit = globalSit and globalSit ~= ""
     local hasRst = globalRst and globalRst ~= ""
     MakeHdrIcon(ASSETS .. "UI\\ui-situation", -2, hasSit,
-        "Global situation: " .. (globalSit or ""),
-        "No global situation set. Click to add one.")
+        string.format(L["REFBOX_TASK_GLOBAL_SIT_FMT"], globalSit or ""),
+        L["REFBOX_TASK_GLOBAL_SIT_NONE"])
     MakeHdrIcon(ASSETS .. "UI\\ui-repeat", -18, hasRst,
-        "Global reset: " .. (globalRst or ""),
-        "No global reset set. Click to add one.")
+        string.format(L["REFBOX_TASK_GLOBAL_RST_FMT"], globalRst or ""),
+        L["REFBOX_TASK_GLOBAL_RST_NONE"])
 
     -- ── Task rows ────────────────────────────────────────────────────────────
     local y       = -4   -- small top pad; header is now fixed on pnl, not tsc
@@ -2300,7 +2300,7 @@ RenderTaskPanel = function()
                 subAddBtn:SetScript("OnEnter", function(self)
                     saH:Show(); saN:Hide()
                     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine("Add sub-task", 1, 1, 1)
+                    GameTooltip:AddLine(L["REFBOX_TASK_ADD_SUB_TIP"], 1, 1, 1)
                     GameTooltip:Show()
                 end)
                 subAddBtn:SetScript("OnLeave", function()
@@ -2342,7 +2342,7 @@ RenderTaskPanel = function()
                 subAddBtn:SetScript("OnEnter", function(self)
                     saH:Show(); saN:Hide()
                     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:AddLine("Add sub-task", 1, 1, 1)
+                    GameTooltip:AddLine(L["REFBOX_TASK_ADD_SUB_TIP"], 1, 1, 1)
                     GameTooltip:Show()
                 end)
                 subAddBtn:SetScript("OnLeave", function()
@@ -2390,8 +2390,8 @@ RenderTaskPanel = function()
             sitIco:SetScript("OnEnter", function(self)
                 self:SetAlpha(1.0)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine("Situation: " .. task.situation, 1, 1, 1)
-                GameTooltip:AddLine("Click to edit.", 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(string.format(L["REFBOX_TASK_SITUATION_FMT"], task.situation), 1, 1, 1)
+                GameTooltip:AddLine(L["REFBOX_TASK_CLICK_EDIT"], 0.8, 0.8, 0.8)
                 GameTooltip:Show()
             end)
             sitIco:SetScript("OnLeave", function(self) self:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -2406,7 +2406,7 @@ RenderTaskPanel = function()
 
         -- Reset icon (shown when task has a reset type set)
         if task.resetType and task.resetType ~= "" and task.resetType ~= "none" then
-            local resetTip = task.resetType == "daily" and "Reset: Daily" or "Reset: Weekly"
+            local resetTip = task.resetType == "daily" and L["REFBOX_TASK_RESET_DAILY_TIP"] or L["REFBOX_TASK_RESET_WEEKLY_TIP"]
             local rstIco = CreateFrame("Button", nil, row)
             rstIco:SetSize(iconSize, iconSize)
             rstIco:SetPoint("RIGHT", rightAnchor, "LEFT", -iconGap, 0)
@@ -2417,7 +2417,7 @@ RenderTaskPanel = function()
                 self:SetAlpha(1.0)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
                 GameTooltip:AddLine(resetTip, 1, 1, 1)
-                GameTooltip:AddLine("Click to edit.", 0.8, 0.8, 0.8)
+                GameTooltip:AddLine(L["REFBOX_TASK_CLICK_EDIT"], 0.8, 0.8, 0.8)
                 GameTooltip:Show()
             end)
             rstIco:SetScript("OnLeave", function(self) self:SetAlpha(0.75); GameTooltip:Hide() end)
@@ -2493,8 +2493,8 @@ function BNB.ShowTaskHeaderContextMenu(anchor, noteID)
     _hdrCtxDropdown:ClearAllPoints()
     _hdrCtxDropdown:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, 0)
     _hdrCtxDropdown:SetupMenu(function(_, root)
-        root:CreateTitle("Note task defaults")
-        root:CreateButton("Edit global reset and situation...", function()
+        root:CreateTitle(L["REFBOX_TASK_HDR_CTX_TITLE"])
+        root:CreateButton(L["REFBOX_TASK_HDR_CTX_EDIT"], function()
             if BNB.TaskEditWindow and BNB.TaskEditWindow.OpenGlobal then
                 BNB.TaskEditWindow.OpenGlobal(noteID, anchor)
             end
@@ -2600,7 +2600,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
 
         local curZone = GetZoneText and GetZoneText() or ""
         if curZone ~= "" then
-            sitSub:CreateRadio("Zone: " .. curZone,
+            sitSub:CreateRadio(string.format(L["REFBOX_TASK_SIT_ZONE_FMT"], curZone),
                 function() return task.situation == ("zone:" .. curZone) end,
                 function()
                     T.UpdateTask(noteID, taskID, { situation = "zone:" .. curZone })
@@ -2609,7 +2609,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
 
         local curSub = GetSubZoneText and GetSubZoneText() or ""
         if curSub ~= "" then
-            sitSub:CreateRadio("Sub-zone: " .. curSub,
+            sitSub:CreateRadio(string.format(L["REFBOX_TASK_SIT_SUBZONE_FMT"], curSub),
                 function() return task.situation == ("subzone:" .. curSub) end,
                 function()
                     T.UpdateTask(noteID, taskID, { situation = "subzone:" .. curSub })
@@ -2619,7 +2619,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         local curInst = GetInstanceInfo and select(1, GetInstanceInfo()) or ""
         local isInstance = GetInstanceInfo and select(2, GetInstanceInfo())
         if curInst ~= "" and isInstance and isInstance ~= "none" then
-            sitSub:CreateRadio("Instance: " .. curInst,
+            sitSub:CreateRadio(string.format(L["REFBOX_TASK_SIT_INSTANCE_FMT"], curInst),
                 function() return task.situation == ("instance:" .. curInst) end,
                 function()
                     T.UpdateTask(noteID, taskID, { situation = "instance:" .. curInst })
@@ -2628,7 +2628,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
 
         local targetName = UnitName("target")
         if targetName and UnitIsPlayer("target") then
-            sitSub:CreateRadio("Player: " .. targetName,
+            sitSub:CreateRadio(string.format(L["REFBOX_TASK_SIT_PLAYER_FMT"], targetName),
                 function() return task.situation == ("player:" .. targetName) end,
                 function()
                     T.UpdateTask(noteID, taskID, { situation = "player:" .. targetName })
@@ -3033,14 +3033,14 @@ BuildModelViewer = function(f)
     placeholder:SetWidth(RBW - 40)
     placeholder:SetJustifyH("CENTER")
     placeholder:SetTextColor(0.55, 0.55, 0.60)
-    placeholder:SetText("Target this player again\nto view their character model")
+    placeholder:SetText(L["REFBOX_MV_PLACEHOLDER"])
     placeholder:Hide()
 
     -- "Live" indicator label
     local liveLabel = model:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     liveLabel:SetPoint("TOPLEFT", model, "TOPLEFT", 6, -4)
     liveLabel:SetTextColor(0.3, 1.0, 0.3, 0.8)
-    liveLabel:SetText("LIVE")
+    liveLabel:SetText(L["REFBOX_MV_LIVE"])
     liveLabel:Hide()
 
     -- ── Model hide/show toggle buttons ───────────────────────────────────────
@@ -3063,8 +3063,8 @@ BuildModelViewer = function(f)
     hideBtn:SetScript("OnEnter", function(self)
         if self:IsEnabled() then hbN:Hide(); hbH:Show() end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Hide Model Viewer", 1, 1, 1)
-        GameTooltip:AddLine("Click to collapse the 3D model", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["REFBOX_MV_HIDE_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["REFBOX_MV_HIDE_TIP_SUB"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     hideBtn:SetScript("OnLeave", function() hbP:Hide(); hbH:Hide(); hbN:Show(); GameTooltip:Hide() end)
@@ -3092,8 +3092,8 @@ BuildModelViewer = function(f)
     showBtn:SetScript("OnEnter", function(self)
         if self:IsEnabled() then sbN:Hide(); sbH:Show() end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Show Model Viewer", 1, 1, 1)
-        GameTooltip:AddLine("Click to restore the 3D model", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["REFBOX_MV_SHOW_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["REFBOX_MV_SHOW_TIP_SUB"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     showBtn:SetScript("OnLeave", function() sbP:Hide(); sbH:Hide(); sbN:Show(); GameTooltip:Hide() end)
@@ -3130,10 +3130,10 @@ BuildModelViewer = function(f)
         local isTmog = _noteID and (_gearViewTmog[_noteID] ~= false)
         if self:IsEnabled() then
             GameTooltip:AddLine(isTmog and L["REFBOX_MV_GEAR_TMOG"] or L["REFBOX_MV_GEAR_REG"], 1, 1, 1)
-            GameTooltip:AddLine("Click to switch to " .. (isTmog and L["REFBOX_MV_GEAR_REG"] or L["REFBOX_MV_GEAR_TMOG"]), 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(string.format(L["REFBOX_MV_SWITCH_TO_FMT"], isTmog and L["REFBOX_MV_GEAR_REG"] or L["REFBOX_MV_GEAR_TMOG"]), 0.78, 0.78, 0.78)
         else
             GameTooltip:AddLine(L["REFBOX_MV_GEAR_TMOG"], 1, 1, 1)
-            GameTooltip:AddLine("Live mode shows actual appearance", 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(L["REFBOX_MV_LIVE_GEAR_TIP"], 0.78, 0.78, 0.78)
         end
         GameTooltip:Show()
     end)
@@ -3289,7 +3289,7 @@ UpdateModelViewer = function()
         mdl:SetFacing(0)
         if ph then ph:Hide() end
         if ll then
-            ll:SetText("LIVE")
+            ll:SetText(L["REFBOX_MV_LIVE"])
             ll:SetTextColor(0.3, 1.0, 0.3, 0.8)
             ll:Show()
         end
@@ -3362,9 +3362,9 @@ UpdateModelViewer = function()
         if ph then ph:Hide() end
         if ll then
             if not (tmog and next(tmog)) and showTmog then
-                ll:SetText("RECONSTRUCTED\n(Target this player to see their transmog)")
+                ll:SetText(L["REFBOX_MV_RECONSTRUCTED_HINT"])
             else
-                ll:SetText("RECONSTRUCTED")
+                ll:SetText(L["REFBOX_MV_RECONSTRUCTED"])
             end
             ll:SetTextColor(0.75, 0.75, 0.75, 0.8)
             ll:Show()

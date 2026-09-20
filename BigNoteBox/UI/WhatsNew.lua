@@ -48,7 +48,7 @@ local OK_BTN_PAD  = 10      -- padding above and below OK button area
 local ENTRY_PAD_X = 12      -- horizontal padding inside scroll area
 local ENTRY_GAP   = 6       -- vertical gap between entries
 local ENTRY_FONT_SIZE = 13  -- patch note entry font size in pixels (increase to fit fewer lines, decrease for more)
-local BULLET      = "|cff66bb6a·|r "   -- BNB green bullet prefix
+local BULLET      = "|cff66bb6a-|r "   -- BNB green bullet prefix
 
 -- ── Module state ──────────────────────────────────────────────────────────────
 local _frame    = nil   -- the window frame (built once, reused)
@@ -177,7 +177,7 @@ local function BuildFrameNormal(onClose)
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
-    f:SetTitle("What's new in BigNoteBox v" .. (BNB.ADDON_VERSION or "?"))
+    f:SetTitle(string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"))
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", onClose)
@@ -213,7 +213,7 @@ local function BuildFrameSkin(onClose)
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("What's new in BigNoteBox v" .. (BNB.ADDON_VERSION or "?"))
+    titleLbl:SetText(string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"))
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, onClose)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)

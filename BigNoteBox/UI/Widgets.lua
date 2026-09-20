@@ -3,6 +3,7 @@
 -- ScrollFrameTemplate scrollbars with smart hide/show.
 
 local BNB = BigNoteBox
+local L   = BNB.L
 
 --------------------------------------------------------------------------------
 -- BACKDROP DEFINITIONS
@@ -560,32 +561,32 @@ end
 --------------------------------------------------------------------------------
 BNB.COLOR_PALETTE = {
     -- Row 1 — white + black first, then class colors
-    { r=1.000, g=1.000, b=1.000, label="White"           },
-    { r=0.000, g=0.000, b=0.000, label="Black"           },
-    { r=0.769, g=0.118, b=0.227, label="Crimson Red"     },  -- Death Knight
-    { r=0.639, g=0.188, b=0.788, label="Deep Purple"     },  -- Demon Hunter
-    { r=1.000, g=0.486, b=0.039, label="Burnt Orange"    },  -- Druid
-    { r=0.200, g=0.576, b=0.498, label="Teal Green"      },  -- Evoker
-    { r=0.667, g=0.827, b=0.447, label="Sage Green"      },  -- Hunter
-    { r=0.247, g=0.780, b=0.922, label="Sky Blue"        },  -- Mage
+    { r=1.000, g=1.000, b=1.000, label=L["COLOR_WHITE"]          },
+    { r=0.000, g=0.000, b=0.000, label=L["COLOR_BLACK"]          },
+    { r=0.769, g=0.118, b=0.227, label=L["COLOR_CRIMSON_RED"]    },  -- Death Knight
+    { r=0.639, g=0.188, b=0.788, label=L["COLOR_DEEP_PURPLE"]    },  -- Demon Hunter
+    { r=1.000, g=0.486, b=0.039, label=L["COLOR_BURNT_ORANGE"]   },  -- Druid
+    { r=0.200, g=0.576, b=0.498, label=L["COLOR_TEAL_GREEN"]     },  -- Evoker
+    { r=0.667, g=0.827, b=0.447, label=L["COLOR_SAGE_GREEN"]     },  -- Hunter
+    { r=0.247, g=0.780, b=0.922, label=L["COLOR_SKY_BLUE"]       },  -- Mage
     -- Row 2 — class colors + BNB accents
-    { r=0.000, g=1.000, b=0.596, label="Mint Green"      },  -- Monk
-    { r=0.957, g=0.549, b=0.729, label="Rose Pink"       },  -- Paladin
-    { r=1.000, g=0.957, b=0.408, label="Pale Yellow"     },  -- Rogue
-    { r=0.529, g=0.533, b=0.933, label="Periwinkle"      },  -- Warlock
-    { r=0.776, g=0.608, b=0.427, label="Warm Tan"        },  -- Warrior
-    { r=0.961, g=0.902, b=0.784, label="Warm Cream"      },  -- BNB accent
-    { r=0.416, g=0.690, b=0.831, label="Soft Blue"       },  -- BNB accent
-    { r=0.478, g=0.749, b=0.541, label="Muted Green"     },  -- BNB accent
+    { r=0.000, g=1.000, b=0.596, label=L["COLOR_MINT_GREEN"]     },  -- Monk
+    { r=0.957, g=0.549, b=0.729, label=L["COLOR_ROSE_PINK"]      },  -- Paladin
+    { r=1.000, g=0.957, b=0.408, label=L["COLOR_PALE_YELLOW"]    },  -- Rogue
+    { r=0.529, g=0.533, b=0.933, label=L["COLOR_PERIWINKLE"]     },  -- Warlock
+    { r=0.776, g=0.608, b=0.427, label=L["COLOR_WARM_TAN"]       },  -- Warrior
+    { r=0.961, g=0.902, b=0.784, label=L["COLOR_WARM_CREAM"]     },  -- BNB accent
+    { r=0.416, g=0.690, b=0.831, label=L["COLOR_SOFT_BLUE"]      },  -- BNB accent
+    { r=0.478, g=0.749, b=0.541, label=L["COLOR_MUTED_GREEN"]    },  -- BNB accent
     -- Row 3 — item quality colors + BNB accents
-    { r=0.616, g=0.616, b=0.616, label="Stone Grey"      },  -- Poor
-    { r=0.118, g=1.000, b=0.000, label="Bright Green"    },  -- Uncommon
-    { r=0.000, g=0.439, b=0.867, label="Royal Blue"      },  -- Rare
-    { r=0.639, g=0.208, b=0.933, label="Vivid Purple"    },  -- Epic
-    { r=1.000, g=0.502, b=0.000, label="Flame Orange"    },  -- Legendary
-    { r=0.902, g=0.800, b=0.502, label="Antique Gold"    },  -- Artifact
-    { r=1.000, g=0.800, b=0.000, label="Gold"            },  -- BNB accent gold
-    { r=0.302, g=0.851, b=0.675, label="Aqua Teal"       },  -- BNB teal
+    { r=0.616, g=0.616, b=0.616, label=L["COLOR_STONE_GREY"]     },  -- Poor
+    { r=0.118, g=1.000, b=0.000, label=L["COLOR_BRIGHT_GREEN"]   },  -- Uncommon
+    { r=0.000, g=0.439, b=0.867, label=L["COLOR_ROYAL_BLUE"]     },  -- Rare
+    { r=0.639, g=0.208, b=0.933, label=L["COLOR_VIVID_PURPLE"]   },  -- Epic
+    { r=1.000, g=0.502, b=0.000, label=L["COLOR_FLAME_ORANGE"]   },  -- Legendary
+    { r=0.902, g=0.800, b=0.502, label=L["COLOR_ANTIQUE_GOLD"]   },  -- Artifact
+    { r=1.000, g=0.800, b=0.000, label=L["COLOR_GOLD"]           },  -- BNB accent gold
+    { r=0.302, g=0.851, b=0.675, label=L["COLOR_AQUA_TEAL"]      },  -- BNB teal
 }
 
 --------------------------------------------------------------------------------
@@ -973,7 +974,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         lbl:SetPoint("LEFT",  icon, "RIGHT", 8, 4)
         lbl:SetPoint("RIGHT", f,    "RIGHT", -8, 4)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText("Press |cff66bb6aCtrl+C|r to copy")
+        lbl:SetText(L["WIDGET_CLIPBOARD_HINT"])
         lbl:SetTextColor(0.400, 0.733, 0.416, 1)
 
         -- ── Sub-label ──────────────────────────────────────────────────────────
@@ -982,7 +983,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         sub:SetPoint("RIGHT", f,    "RIGHT", -8, -10)
         sub:SetJustifyH("LEFT")
         sub:SetTextColor(0.55, 0.55, 0.55)
-        sub:SetText("Press Esc to cancel")
+        sub:SetText(L["WIDGET_CLIPBOARD_HINT_SUB"])
 
         -- ── Main frame pulse animation ─────────────────────────────────────────
         -- Breathes the whole frame between 0.80 and 1.0 alpha.

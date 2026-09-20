@@ -534,14 +534,14 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
         btnX = btnX + 6
     end
 
-    MkBtn("H1", "Header 1", function() FocusInsertTagPair("{h1}", "{/h1}") end)
-    MkBtn("H2", "Header 2", function() FocusInsertTagPair("{h2}", "{/h2}") end)
-    MkBtn("H3", "Header 3", function() FocusInsertTagPair("{h3}", "{/h3}") end)
+    MkBtn("H1", L["FE_MK_H1"], function() FocusInsertTagPair("{h1}", "{/h1}") end)
+    MkBtn("H2", L["FE_MK_H2"], function() FocusInsertTagPair("{h2}", "{/h2}") end)
+    MkBtn("H3", L["FE_MK_H3"], function() FocusInsertTagPair("{h3}", "{/h3}") end)
     Divider()
-    MkBtn("P",  "Paragraph",          function() FocusInsertTagPair("{p}", "{/p}") end)
-    MkBtn("Pc", "Centered paragraph", function() FocusInsertTagPair("{p:c}", "{/p}") end)
-    MkBtn("Pr", "Right paragraph",    function() FocusInsertTagPair("{p:r}", "{/p}") end)
-    MkBtn("Br", "Insert line break: {br}", function() FocusInsertTag("{br}") end)
+    MkBtn("P",  L["FE_MK_P"],          function() FocusInsertTagPair("{p}", "{/p}") end)
+    MkBtn("Pc", L["FE_MK_PC"], function() FocusInsertTagPair("{p:c}", "{/p}") end)
+    MkBtn("Pr", L["FE_MK_PR"],    function() FocusInsertTagPair("{p:r}", "{/p}") end)
+    MkBtn("Br", L["FE_MK_BR"], function() FocusInsertTag("{br}") end)
     Divider()
     -- Color picker state for Col button
     local _fColActive = false
@@ -549,7 +549,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     local _fColR, _fColG, _fColB = 1, 1, 1
     local _fColHooked = false
 
-    MkBtn("Col", "Pick a colour",  function()
+    MkBtn("Col", L["FE_MK_COL"],  function()
         if not focusBodyEb then return end
         _fColActive = true
         _fColCancelled = false
@@ -577,9 +577,9 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
             end
         end
     end)
-    MkBtn("Lnk", "Link",       function() BNB.OpenLnkDialog(FocusInsertTag) end)
-    MkBtn("Ico", "Icon",       function() BNB.OpenIcoDialog(FocusInsertTag) end)
-    MkBtn("Img", "Image",      function() BNB.OpenImgDialog(FocusInsertTag) end)
+    MkBtn("Lnk", L["FE_MK_LNK"],       function() BNB.OpenLnkDialog(FocusInsertTag) end)
+    MkBtn("Ico", L["FE_MK_ICO"],       function() BNB.OpenIcoDialog(FocusInsertTag) end)
+    MkBtn("Img", L["FE_MK_IMG"],      function() BNB.OpenImgDialog(FocusInsertTag) end)
 
     -- "Live Preview" toggle — right-aligned, same pattern as main markup bar
     local previewBtn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
@@ -879,7 +879,7 @@ local function BuildFocusFrame()
     hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, TOOLBAR_H + 4)
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(0.30, 0.30, 0.30, 1)
-    hintLbl:SetText("Ctrl+Z = Undo  --  Ctrl+Y = Redo")
+    hintLbl:SetText(L["FE_UNDO_REDO_HINT"])
 
     local toolbar = CreateFrame("Frame", nil, f)
     toolbar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)
@@ -1221,7 +1221,7 @@ local function BuildFocusFrameSkin()
     hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, TOOLBAR_H + 4)
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(0.30, 0.30, 0.30, 1)
-    hintLbl:SetText("Ctrl+Z = Undo  --  Ctrl+Y = Redo")
+    hintLbl:SetText(L["FE_UNDO_REDO_HINT"])
 
     -- ── Bottom toolbar strip ──────────────────────────────────────────────────
     local toolbar = BNB.CreateSkinStrip(f, false, false)

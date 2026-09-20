@@ -27,6 +27,7 @@
 --   9. Factory Reset          — wipes everything, reloads
 
 local BNB = BigNoteBox
+local L = BNB.L
 BNB.DangerZone = BNB.DangerZone or {}
 local DZ = BNB.DangerZone
 
@@ -242,23 +243,21 @@ local function PopulateContent(ct, sf)
 
     -- ── 0. Run Setup Again ───────────────────────────────────────────────────
     -- Safe action — resets only the setup completion flag, not notes or settings.
-    y = MakeHeader(ct, y, "Setup Wizard")
-    y = MakeDesc(ct, y,
-        "Re-run the first-time setup wizard. |cff66bb6aYour notes and settings are not affected.|r "..
-        "The UI will reload.")
+    y = MakeHeader(ct, y, L["DZ_SETUP_HDR"])
+    y = MakeDesc(ct, y, L["DZ_SETUP_DESC"])
     local runSetupBtn = CreateFrame("Button", nil, ct, "UIPanelButtonTemplate")
     runSetupBtn:SetSize(180, 26)
     runSetupBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    runSetupBtn:SetText("Run Setup Again...")
+    runSetupBtn:SetText(L["DZ_SETUP_BTN"])
     runSetupBtn:SetScript("OnClick", function()
         StaticPopup_Show("BNB_RUN_SETUP_AGAIN")
     end)
 
     if not StaticPopupDialogs["BNB_RUN_SETUP_AGAIN"] then
         StaticPopupDialogs["BNB_RUN_SETUP_AGAIN"] = {
-            text    = "Setup wizard will open on your next login.\n\nReload now?",
-            button1 = "Reload",
-            button2 = "Later",
+            text    = L["DZ_SETUP_POPUP_TEXT"],
+            button1 = L["DZ_POPUP_RELOAD"],
+            button2 = L["DZ_POPUP_LATER"],
             timeout = 0, whileDead = true, hideOnEscape = true,
             OnAccept = function()
                 local db = BigNoteBoxDB
@@ -274,13 +273,11 @@ local function PopulateContent(ct, sf)
     y = y - SEC_GAP
 
     -- ── 1. Reset Settings ────────────────────────────────────────────────────
-    y = MakeHeader(ct, y, "Reset Settings")
-    y = MakeDesc(ct, y,
-        "Resets all settings to defaults. |cff66bb6aYour notes are not affected.|r "..
-        "The UI will reload.")
+    y = MakeHeader(ct, y, L["DZ_RESETSET_HDR"])
+    y = MakeDesc(ct, y, L["DZ_RESETSET_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Reset Settings...", 140,
-        "|cffff4444CONFIRM - reset|r", 160,
+        L["DZ_RESETSET_BTN"], 140,
+        L["DZ_CONFIRM_RESET"], 160,
         function()
             BigNoteBoxDB = nil
             C_UI.Reload()
@@ -289,28 +286,24 @@ local function PopulateContent(ct, sf)
 
     -- ── 2. Empty Trash ───────────────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Empty Trash")
-    y = MakeDesc(ct, y,
-        "Permanently hard-deletes all notes currently in the trash. "..
-        "|cffff4444There is no undo.|r Notes deleted this way cannot be recovered.")
+    y = MakeHeader(ct, y, L["DZ_EMPTYTRASH_HDR"])
+    y = MakeDesc(ct, y, L["DZ_EMPTYTRASH_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Empty Trash...", 130,
-        "|cffff4444CONFIRM - empty|r", 160,
+        L["DZ_EMPTYTRASH_BTN"], 130,
+        L["DZ_CONFIRM_EMPTY"], 160,
         function()
             if BNB.EmptyTrash then BNB.EmptyTrash() end
-            BNB:Print("|cffff9900Trash emptied.|r")
+            BNB:Print(L["DZ_MSG_TRASH_EMPTIED"])
         end)
     y = y - SEC_GAP
 
     -- ── 3. Clear All Session History ─────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Clear All Session History")
-    y = MakeDesc(ct, y,
-        "Removes all auto-snapshots from every note. Manual restore points are "..
-        "not affected. New snapshots will be created on your next edit session.")
+    y = MakeHeader(ct, y, L["DZ_CLEARHIST_HDR"])
+    y = MakeDesc(ct, y, L["DZ_CLEARHIST_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Clear History...", 140,
-        "|cffff4444CONFIRM - clear|r", 160,
+        L["DZ_CLEARHIST_BTN"], 140,
+        L["DZ_CONFIRM_CLEAR"], 160,
         function()
             local ndb = BigNoteBoxNotesDB
             if ndb and ndb.notes then
@@ -321,8 +314,7 @@ local function PopulateContent(ct, sf)
                         count = count + 1
                     end
                 end
-                BNB:Print(string.format(
-                    "|cffff9900Auto-snapshots cleared from %d note(s).|r", count))
+                BNB:Print(string.format(L["DZ_MSG_HISTORY_CLEARED_FMT"], count))
             end
             if BNB.RefreshHistoryWindow    then BNB.RefreshHistoryWindow()    end
             if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
@@ -332,13 +324,11 @@ local function PopulateContent(ct, sf)
 
     -- ── 4. Clear Manual Restore Points ───────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Clear Manual Restore Points")
-    y = MakeDesc(ct, y,
-        "Removes all manually saved restore points from every note. "..
-        "Auto-snapshots are not affected. |cffff4444There is no undo.|r")
+    y = MakeHeader(ct, y, L["DZ_CLEARRESTORE_HDR"])
+    y = MakeDesc(ct, y, L["DZ_CLEARRESTORE_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Clear Restore Points...", 180,
-        "|cffff4444CONFIRM - clear|r", 160,
+        L["DZ_CLEARRESTORE_BTN"], 180,
+        L["DZ_CONFIRM_CLEAR"], 160,
         function()
             local ndb = BigNoteBoxNotesDB
             if ndb and ndb.notes then
@@ -349,8 +339,7 @@ local function PopulateContent(ct, sf)
                         count = count + 1
                     end
                 end
-                BNB:Print(string.format(
-                    "|cffff9900%d manual restore point(s) cleared.|r", count))
+                BNB:Print(string.format(L["DZ_MSG_RESTORE_CLEARED_FMT"], count))
             end
             if BNB.SyncHistoryBtnState     then BNB.SyncHistoryBtnState()     end
             if BNB.SyncHistoryNoteBtnState then BNB.SyncHistoryNoteBtnState() end
@@ -361,18 +350,16 @@ local function PopulateContent(ct, sf)
 
     -- ── 5. Reset Sticky Note Layouts ─────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Reset Sticky Note Layouts")
-    y = MakeDesc(ct, y,
-        "Resets all per-note sticky settings to defaults: font, size, color, "..
-        "text alignment, outline, and position. Note content is not affected.")
+    y = MakeHeader(ct, y, L["DZ_RESETSTICKY_HDR"])
+    y = MakeDesc(ct, y, L["DZ_RESETSTICKY_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Reset Sticky Layouts...", 180,
-        "|cffff4444CONFIRM - reset|r", 160,
+        L["DZ_RESETSTICKY_BTN"], 180,
+        L["DZ_CONFIRM_RESET"], 160,
         function()
             if BigNoteBoxDB then
                 BigNoteBoxDB.postits = {}
             end
-            BNB:Print("|cffff9900Sticky note layouts reset to defaults.|r")
+            BNB:Print(L["DZ_MSG_STICKY_RESET"])
             -- Close any open sticky notes so they rebuild cleanly
             if BNB._stickyFrames then
                 for _, f in pairs(BNB._stickyFrames) do
@@ -384,21 +371,18 @@ local function PopulateContent(ct, sf)
 
     -- ── 6. Clear Migration History ───────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Clear Migration History")
-    y = MakeDesc(ct, y,
-        "Resets all migration records. The migration popup will appear again on "..
-        "next login if supported addons are detected. Use this to re-run a "..
-        "migration you want to redo.")
+    y = MakeHeader(ct, y, L["DZ_CLEARMIG_HDR"])
+    y = MakeDesc(ct, y, L["DZ_CLEARMIG_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Clear Migration History...", 200,
-        "|cffff4444CONFIRM - clear|r", 160,
+        L["DZ_CLEARMIG_BTN"], 200,
+        L["DZ_CONFIRM_CLEAR"], 160,
         function()
             local db = BigNoteBoxDB
             if db then
                 db.migrationDone     = {}
                 db.migrationDeclined = {}
             end
-            BNB:Print("|cffff9900Migration history cleared. Reloading...|r")
+            BNB:Print(L["DZ_MSG_MIGRATION_CLEARED"])
             C_Timer.After(0.5, function()
                 C_UI.Reload()
             end)
@@ -407,21 +391,18 @@ local function PopulateContent(ct, sf)
 
     -- ── 7. Remove All Characters ─────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Remove All Characters")
-    y = MakeDesc(ct, y,
-        "Clears all characters from the known characters list used for note "..
-        "scope autocomplete. Your current character is re-added automatically. "..
-        "Notes are not affected.")
+    y = MakeHeader(ct, y, L["DZ_REMOVECHARS_HDR"])
+    y = MakeDesc(ct, y, L["DZ_REMOVECHARS_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Remove All Characters...", 200,
-        "|cffff4444CONFIRM - remove|r", 160,
+        L["DZ_REMOVECHARS_BTN"], 200,
+        L["DZ_CONFIRM_REMOVE"], 160,
         function()
             local db = BigNoteBoxDB
             if db and db.knownChars then
                 db.knownChars = {}
                 if BNB.currentChar then
-                    local name  = UnitName("player") or "Unknown"
-                    local realm = GetNormalizedRealmName() or "Unknown"
+                    local name  = UnitName("player") or L["HW_TIME_UNKNOWN"]
+                    local realm = GetNormalizedRealmName() or L["HW_TIME_UNKNOWN"]
                     local _, cls = UnitClass("player")
                     db.knownChars[BNB.currentChar] = {
                         name = name, realm = realm,
@@ -429,19 +410,17 @@ local function PopulateContent(ct, sf)
                     }
                 end
             end
-            BNB:Print("|cffff9900Known characters cleared.|r")
+            BNB:Print(L["DZ_MSG_CHARS_CLEARED"])
         end)
     y = y - SEC_GAP
 
     -- ── 8. Delete All Notes ──────────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Delete All Notes")
-    y = MakeDesc(ct, y,
-        "|cffff4444WARNING:|r Permanently deletes every note. "..
-        "|cffff4444There is no undo.|r You will confirm twice.")
+    y = MakeHeader(ct, y, L["DZ_DELETEALL_HDR"])
+    y = MakeDesc(ct, y, L["DZ_DELETEALL_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Delete All Notes...", 160,
-        "|cffff4444CONFIRM - delete everything|r", 220,
+        L["DZ_DELETEALL_BTN"], 160,
+        L["DZ_CONFIRM_DELETE_ALL"], 220,
         function()
             BigNoteBoxNotesDB.notes     = {}
             BigNoteBoxNotesDB.noteOrder = {}
@@ -449,24 +428,21 @@ local function PopulateContent(ct, sf)
             if BigNoteBoxDB then BigNoteBoxDB.selectedNoteID = nil end
             if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
             if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
-            BNB:Print("|cffff4444All notes deleted.|r")
+            BNB:Print(L["DZ_MSG_ALL_NOTES_DELETED"])
         end)
     y = y - SEC_GAP
 
     -- ── 9. Factory Reset ─────────────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
-    y = MakeHeader(ct, y, "Factory Reset")
-    y = MakeDesc(ct, y,
-        "|cffff4444WARNING:|r Wipes |cffff4444everything|r — all notes, all settings, "..
-        "all characters. The addon will be in a completely fresh state after "..
-        "reload. |cffff4444There is absolutely no undo.|r You will confirm twice.")
+    y = MakeHeader(ct, y, L["DZ_FACTORY_HDR"])
+    y = MakeDesc(ct, y, L["DZ_FACTORY_DESC"])
     y, _, _ = MakeActionRow(ct, y,
-        "Factory Reset...", 140,
-        "|cffff2222CONFIRM - wipe everything|r", 220,
+        L["DZ_FACTORY_BTN"], 140,
+        L["DZ_CONFIRM_FACTORY"], 220,
         function()
             BigNoteBoxNotesDB = {}
             BigNoteBoxDB      = {}
-            BNB:Print("|cffff2222Factory reset complete. Reloading UI...|r")
+            BNB:Print(L["DZ_MSG_FACTORY_DONE"])
             C_Timer.After(0.5, function()
                 C_UI.Reload()
             end)
@@ -524,7 +500,7 @@ local function BuildWindow()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
     titleLbl:SetTextColor(1, 0.30, 0.30)
-    titleLbl:SetText("!! Danger Zone !!")
+    titleLbl:SetText(L["DZ_WINDOW_TITLE"])
 
     -- X close button in title bar
     local xBtn = CreateFrame("Button", nil, titleBar, "UIPanelCloseButton")
@@ -546,7 +522,7 @@ local function BuildWindow()
     sf:SetScrollChild(ct)
 
     -- Fixed close button anchored to the bottom of the window
-    local closeBtn = MakeRedButton(f, "Close", WIN_W - PAD * 2, 26)
+    local closeBtn = MakeRedButton(f, L["CLOSE"], WIN_W - PAD * 2, 26)
     closeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, PAD - 2)
     closeBtn:SetScript("OnClick", function() DZ.Close() end)
 

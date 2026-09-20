@@ -31,13 +31,13 @@ local CONFIRM_THRESHOLD = 3
 
 -- ── Channel definitions ────────────────────────────────────────────────────────
 local CHANNELS = {
-    { type = "SAY",     label = "Say",     r = 1.00, g = 1.00, b = 1.00 },
-    { type = "YELL",    label = "Yell",    r = 1.00, g = 0.25, b = 0.25 },
-    { type = "PARTY",   label = "Party",   r = 0.67, g = 0.67, b = 1.00 },
-    { type = "RAID",    label = "Raid",    r = 1.00, g = 0.50, b = 0.00 },
-    { type = "GUILD",   label = "Guild",   r = 0.25, g = 1.00, b = 0.25 },
-    { type = "OFFICER", label = "Officer", r = 0.25, g = 0.75, b = 0.75 },
-    { type = "WHISPER", label = "Whisper", r = 0.85, g = 0.50, b = 1.00, needsTarget = true },
+    { type = "SAY",     label = L["CHAN_SAY"],     r = 1.00, g = 1.00, b = 1.00 },
+    { type = "YELL",    label = L["CHAN_YELL"],    r = 1.00, g = 0.25, b = 0.25 },
+    { type = "PARTY",   label = L["CHAN_PARTY"],   r = 0.67, g = 0.67, b = 1.00 },
+    { type = "RAID",    label = L["CHAN_RAID"],    r = 1.00, g = 0.50, b = 0.00 },
+    { type = "GUILD",   label = L["CHAN_GUILD"],   r = 0.25, g = 1.00, b = 0.25 },
+    { type = "OFFICER", label = L["CHAN_OFFICER"], r = 0.25, g = 0.75, b = 0.75 },
+    { type = "WHISPER", label = L["CHAN_WHISPER"], r = 0.85, g = 0.50, b = 1.00, needsTarget = true },
 }
 
 local function ChanColor(ch)
@@ -119,7 +119,7 @@ end
 
 local function SendToBCB(body)
     if not (BigChatBox and BCB_OpenMultiline) then
-        BNB:Print("|cffff6666BigChatBox is not available.|r")
+        BNB:Print(L["STC_NO_BCB"])
         return
     end
     BCB_OpenMultiline()
@@ -165,7 +165,7 @@ local function CreateConfirmDialog()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Confirm Send")
+        titleLbl:SetText(L["STC_CONFIRM_SEND_TITLE"])
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
         closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -185,7 +185,7 @@ local function CreateConfirmDialog()
         f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetAlpha(0.97); f:SetTitle("Confirm Send")
+        f:SetAlpha(0.97); f:SetTitle(L["STC_CONFIRM_SEND_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
         end
@@ -225,9 +225,9 @@ local function CreateConfirmDialog()
     warnLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY - 52)
     warnLbl:SetJustifyH("LEFT"); warnLbl:SetWordWrap(true)
     warnLbl:SetTextColor(1, 0.65, 0.10)
-    warnLbl:SetText("Sending many lines rapidly may be considered\nspam and could trigger chat throttling.")
+    warnLbl:SetText(L["STC_SPAM_WARNING"])
 
-    local okBtn = BNB.CreateButton(nil, f, "Send", 90, 26)
+    local okBtn = BNB.CreateButton(nil, f, L["SEND_CONFIRM_BTN"], 90, 26)
     okBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, PAD)
     okBtn:SetScript("OnClick", function()
         if f._pendingLines and f._pendingChanType then
@@ -249,13 +249,13 @@ local function ShowConfirm(lines, chanType, target, ch)
 
     local willSplit = false
     for _, l in ipairs(lines) do if #l > WOW_MSG_LIMIT then willSplit = true; break end end
-    local extra = willSplit and "  |cffffff00(some lines will be split)|r" or ""
+    local extra = willSplit and L["STC_CONFIRM_SPLIT_HINT"] or ""
     if f._statsLbl then
-        f._statsLbl:SetText(string.format("%d line(s)  |  %d total characters%s",
+        f._statsLbl:SetText(string.format(L["STC_CONFIRM_STATS_FMT"],
             #lines, TotalChars(lines), extra))
     end
     if f._chanLbl then
-        f._chanLbl:SetText(string.format("Channel: %s%s|r%s", ChanColor(ch), ch.label,
+        f._chanLbl:SetText(string.format(L["STC_CONFIRM_CHANNEL_FMT"], ChanColor(ch), ch.label,
             (chanType == "WHISPER" and target and target ~= "") and ("  ->  " .. target) or ""))
     end
     f:ClearAllPoints(); f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
@@ -338,7 +338,7 @@ local function BuildChannelDropdown(parent, onChange)
         st:SetJustifyH("LEFT")
         local ch0 = CHANNELS[1]; st:SetText(ch0.label); st:SetTextColor(ch0.r, ch0.g, ch0.b)
         local ar = btn:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-        ar:SetPoint("RIGHT", btn, "RIGHT", -6, 0); ar:SetText("▾"); ar:SetTextColor(0.65,0.65,0.65)
+        ar:SetPoint("RIGHT", btn, "RIGHT", -6, 0); ar:SetText("v"); ar:SetTextColor(0.65,0.65,0.65)
 
         local pp = CreateFrame("Frame", nil, btn, "BackdropTemplate")
         pp:SetFrameStrata("FULLSCREEN_DIALOG"); pp:SetFrameLevel(500); pp:SetClampedToScreen(true)
@@ -432,7 +432,7 @@ local function RebuildPreview(scrollChild, lines, ch)
         pcall(function() empty:SetFont(fontPath, fontSize, "") end)
         empty:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", NUM_W + 6, -4)
         empty:SetHeight(ROW_H); empty:SetTextColor(0.45, 0.45, 0.45)
-        empty:SetText("(note is empty)"); scrollChild:SetHeight(ROW_H + 8); return
+        empty:SetText(L["STC_PREVIEW_EMPTY"]); scrollChild:SetHeight(ROW_H + 8); return
     end
 
     local expanded = ExpandLines(lines)
@@ -562,7 +562,7 @@ local function CreateSendDialog()
 
     local targetLbl = targetRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     targetLbl:SetPoint("LEFT", targetRow, "LEFT", 0, 0)
-    targetLbl:SetTextColor(0.78, 0.78, 0.78); targetLbl:SetText("Target:")
+    targetLbl:SetTextColor(0.78, 0.78, 0.78); targetLbl:SetText(L["STC_TARGET_LBL"])
 
     local targetEb = CreateFrame("EditBox", nil, targetRow,
         "BackdropTemplate")
@@ -573,7 +573,7 @@ local function CreateSendDialog()
     targetEb:SetAutoFocus(false); targetEb:SetMaxLetters(64)
     BNB.SetBackdropDark(targetEb)
     targetEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    BNB.AddPlaceholder(targetEb, "Player name", 0.38, 0.38, 0.38)
+    BNB.AddPlaceholder(targetEb, L["STC_TARGET_PLACEHOLDER"], 0.38, 0.38, 0.38)
     f._targetEb = targetEb
     y = y - 30
 
@@ -598,7 +598,7 @@ local function CreateSendDialog()
     -- Preview header
     local previewHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     previewHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
-    previewHdr:SetTextColor(0.78, 0.78, 0.78); previewHdr:SetText("Preview:")
+    previewHdr:SetTextColor(0.78, 0.78, 0.78); previewHdr:SetText(L["STC_PREVIEW_HDR"])
     y = y - 18
 
     -- Preview scroll — scrollbar renders outside ScrollFrameTemplate to the right,
@@ -676,8 +676,8 @@ local function CreateSendDialog()
     end
 
     -- Send button (send.tga)
-    local sendBtn = MakeBottomIcon("Actionbar\\ab-send", "Send to Chat",
-        "Send note lines to the selected channel.")
+    local sendBtn = MakeBottomIcon("Actionbar\\ab-send", L["STC_SEND_TIP"],
+        L["STC_SEND_TIP_SUB"])
     sendBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconLeftX, ICON_BTN_Y)
     sendBtn:SetScript("OnClick", function()
         local note = _noteID and BNB.GetNote(_noteID)
@@ -692,7 +692,7 @@ local function CreateSendDialog()
                  and f._targetEb:GetText() or "") or nil
 
         if chanType == "WHISPER" and (not target or target == "") then
-            BNB:Print("|cffff6666Please enter a target name for Whisper.|r")
+            BNB:Print(L["STC_NO_WHISPER_TARGET"])
             if f._targetEb then f._targetEb:SetFocus() end; return
         end
 
@@ -709,8 +709,8 @@ local function CreateSendDialog()
     f._sendBtn = sendBtn
 
     -- BCB button (bcb-icon.tga) — shown when BigChatBox is active
-    local bcbBtn = MakeBottomIcon("BCB\\bcb-icon", "Send to BCB Multiline Box",
-        "Opens BigChatBox multiline input with the text pre-filled so you can edit before sending.")
+    local bcbBtn = MakeBottomIcon("BCB\\bcb-icon", L["STC_BCB_TIP"],
+        L["STC_BCB_TIP_SUB"])
     bcbBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconRightX, ICON_BTN_Y)
     bcbBtn:SetScript("OnClick", function()
         local note = _noteID and BNB.GetNote(_noteID)
@@ -723,8 +723,8 @@ local function CreateSendDialog()
     f._bcbBtn = bcbBtn
 
     -- "Get BCB" promo button — shown when BigChatBox is NOT installed (same slot as bcbBtn)
-    local getBCBBtn = MakeBottomIcon("BCB\\bcb-icon", "Get BigChatBox",
-        "Install BigChatBox to enable direct multiline chat integration.")
+    local getBCBBtn = MakeBottomIcon("BCB\\bcb-icon", L["STC_GET_BCB_TIP"],
+        L["STC_GET_BCB_TIP_SUB"])
     getBCBBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconRightX, ICON_BTN_Y)
     -- Slight desaturation to hint it's inactive/promo
     getBCBBtn:SetAlpha(0.55)
@@ -732,8 +732,8 @@ local function CreateSendDialog()
         self:SetSize(ICON_HOVER, ICON_HOVER)
         self:SetAlpha(1.0)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Get BigChatBox", 1, 1, 1)
-        GameTooltip:AddLine("Install BigChatBox to enable direct multiline\nchat integration. Click to learn more.", 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(L["STC_GET_BCB_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["STC_GET_BCB_TIP_SUB2"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     getBCBBtn:SetScript("OnLeave", function(self)
@@ -765,14 +765,14 @@ local function RefreshPreview()
     if dlgFrame._statsLbl then
         local expanded = ExpandLines(lines)
         if #lines == 0 then
-            dlgFrame._statsLbl:SetText("|cffff6666Note is empty.|r")
+            dlgFrame._statsLbl:SetText(L["STC_STATS_EMPTY"])
         elseif #expanded > CONFIRM_THRESHOLD then
             dlgFrame._statsLbl:SetText(string.format(
-                "|cffffff00%d line(s) -> %d message(s), %d chars - confirmation required|r",
+                L["STC_STATS_CONFIRM_FMT"],
                 #lines, #expanded, TotalChars(lines)))
         else
             dlgFrame._statsLbl:SetText(string.format(
-                "|cff888888%d line(s) -> %d message(s), %d chars|r",
+                L["STC_STATS_NORMAL_FMT"],
                 #lines, #expanded, TotalChars(lines)))
         end
     end
@@ -800,7 +800,7 @@ function BNB.OpenSendToChat(noteID)
     if dlgFrame._targetRow  then dlgFrame._targetRow:Hide()             end
     if dlgFrame._targetEb   then
         dlgFrame._targetEb:SetText("")
-        BNB.AddPlaceholder(dlgFrame._targetEb, "Player name", 0.38, 0.38, 0.38)
+        BNB.AddPlaceholder(dlgFrame._targetEb, L["STC_TARGET_PLACEHOLDER"], 0.38, 0.38, 0.38)
     end
 
     dlgFrame:ClearAllPoints()

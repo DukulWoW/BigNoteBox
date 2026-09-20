@@ -12,6 +12,7 @@
 
 local BNB = BigNoteBox
 if not BNB then return end
+local L = BNB.L
 
 BNB.AlarmWindow = BNB.AlarmWindow or {}
 local AW = BNB.AlarmWindow
@@ -34,7 +35,8 @@ local AW_SECT_GAP = 12   -- gap between sections
 local BNB_GR, BNB_GG, BNB_GB = 0.400, 0.733, 0.416
 
 local DEFAULT_SOUND = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
-local DAY_NAMES     = { "Mon","Tue","Wed","Thu","Fri","Sat","Sun" }
+local DAY_NAMES     = { L["AW_DAY_MON"], L["AW_DAY_TUE"], L["AW_DAY_WED"], L["AW_DAY_THU"],
+                         L["AW_DAY_FRI"], L["AW_DAY_SAT"], L["AW_DAY_SUN"] }
 
 -- ---------------------------------------------------------------------------
 -- STATE
@@ -203,7 +205,7 @@ local function BuildWindow()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     f:SetAlpha(0.95)
-    f:SetTitle("Set Alarm")
+    f:SetTitle(L["AW_TITLE"])
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() AW.Close() end)
     end
@@ -219,11 +221,11 @@ local function BuildWindow()
     footerDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
 
     local bW = math.floor(AW_CW/2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, "Save", bW, 26)
+    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
     saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD, 6)
     saveBtn:SetEnabled(false)
 
-    local delBtn = BNB.CreateButton(nil, f, "Remove Alarm", bW, 26)
+    local delBtn = BNB.CreateButton(nil, f, L["AW_REMOVE_ALARM_BTN"], bW, 26)
     delBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD + bW + 8, 6)
     delBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
 
@@ -248,7 +250,7 @@ local function BuildWindow()
     f._selectTab = SelectTab
 
     local lastBtn
-    for i, text in ipairs({"General","Animation","Advanced"}) do
+    for i, text in ipairs({L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}) do
         local btn = CreateFrame("Button","BNBAlarmWindowTab"..i, f, tpl)
         btn:SetText(text)
         pcall(function()
@@ -340,7 +342,7 @@ local function BuildWindowSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Set Alarm")
+    titleLbl:SetText(L["AW_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() AW.Close() end)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -355,11 +357,11 @@ local function BuildWindowSkin()
     footerDiv:SetPoint("TOPRIGHT", footerHost, "TOPRIGHT", 0, 0)
 
     local bW = math.floor(AW_CW/2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, "Save", bW, 26)
+    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
     saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD, 6)
     saveBtn:SetEnabled(false)
 
-    local delBtn = BNB.CreateButton(nil, f, "Remove Alarm", bW, 26)
+    local delBtn = BNB.CreateButton(nil, f, L["AW_REMOVE_ALARM_BTN"], bW, 26)
     delBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD + bW + 8, 6)
     delBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
 
@@ -367,7 +369,7 @@ local function BuildWindowSkin()
 
     -- ── SKIN TABS ─────────────────────────────────────────────────────────────
     local tabPanels = {}
-    local tabCtrl = BNB.CreateSkinTabs(f, {"General","Animation","Advanced"}, function(idx)
+    local tabCtrl = BNB.CreateSkinTabs(f, {L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}, function(idx)
         for i = 1, 3 do
             if tabPanels[i] then tabPanels[i]:SetShown(i == idx) end
         end
@@ -431,22 +433,22 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local y = -4
 
     -- Section: Reminder
-    SectionHdr(ct1, "Reminder", y); y = y - AW_LBL - 2
+    SectionHdr(ct1, L["AW_SECT_REMINDER"], y); y = y - AW_LBL - 2
     local labelEB = BNB.CreateBackdropFrame("EditBox",nil,ct1)
     labelEB:SetSize(AW_CW,AW_ROW); labelEB:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
     labelEB:SetAutoFocus(false); labelEB:SetMaxLetters(80)
-    BNB.AddPlaceholder(labelEB,"Short reminder text...")
+    BNB.AddPlaceholder(labelEB,L["AW_REMINDER_PLACEHOLDER"])
     labelEB:SetFontObject("GameFontNormalSmall")
     labelEB:HookScript("OnTextChanged", function() MarkDirty() end)
     y = y - AW_ROW - AW_SECT_GAP
     Div(ct1,y); y = y - AW_GAP
 
     -- Section: Time
-    SectionHdr(ct1,"Time",y); y = y - AW_LBL - 2
-    Lbl(ct1,"Type",y); y = y - AW_LBL
+    SectionHdr(ct1,L["AW_SECT_TIME"],y); y = y - AW_LBL - 2
+    Lbl(ct1,L["AW_LBL_TYPE"],y); y = y - AW_LBL
     local timeEntries = {
-        {label="Real-world",value="real"},
-        {label="In-game",   value="ingame"},
+        {label=L["AW_TIME_REAL"],value="real"},
+        {label=L["AW_TIME_INGAME"],   value="ingame"},
     }
     local timeDDCont = MakeDD(ct1,timeEntries,"real",nil)
     timeDDCont:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
@@ -582,7 +584,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local igNote = igSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     igNote:SetPoint("TOPLEFT",igSection,"TOPLEFT",0,0)
     igNote:SetWidth(AW_CW); igNote:SetJustifyH("LEFT")
-    igNote:SetText("Server time — fires every day at this time")
+    igNote:SetText(L["AW_INGAME_NOTE"])
     igNote:SetTextColor(0.55,0.55,0.55,1)
 
     local igRow = CreateFrame("Frame",nil,igSection)
@@ -613,12 +615,12 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     Div(ct1,y); y = y - AW_GAP
 
     -- Section: Repeat
-    SectionHdr(ct1,"Repeat",y); y = y - AW_LBL - 2
+    SectionHdr(ct1,L["AW_SECT_REPEAT"],y); y = y - AW_LBL - 2
     local recurEntries={
-        {label="None",              value=nil        },
-        {label="WoW weekly reset",  value="weekly"   },
-        {label="Specific weekdays", value="weekdays" },
-        {label="Every N days",      value="interval" },
+        {label=L["AW_RECUR_NONE"],              value=nil        },
+        {label=L["AW_RECUR_WEEKLY"],  value="weekly"   },
+        {label=L["AW_RECUR_WEEKDAYS"], value="weekdays" },
+        {label=L["AW_RECUR_INTERVAL"],      value="interval" },
     }
     local recurDD = MakeDD(ct1,recurEntries,nil,nil)
     recurDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); y = y - AW_ROW - AW_GAP
@@ -638,14 +640,14 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local ndRow = CreateFrame("Frame",nil,ct1)
     ndRow:SetSize(AW_CW,AW_ROW); ndRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); ndRow:Hide()
     local ndL=ndRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    ndL:SetPoint("LEFT"); ndL:SetText("Every ")
+    ndL:SetPoint("LEFT"); ndL:SetText(L["AW_EVERY_PREFIX"])
     local ndEB=BNB.CreateBackdropFrame("EditBox",nil,ndRow)
     ndEB:SetSize(36,AW_ROW); ndEB:SetPoint("LEFT",ndRow,"LEFT",44,0)
     ndEB:SetAutoFocus(false); ndEB:SetNumeric(true); ndEB:SetMaxLetters(3)
     ndEB:SetFontObject("GameFontNormalSmall"); ndEB:SetText("7")
     ndEB:HookScript("OnTextChanged",function() MarkDirty() end)
     local ndS=ndRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    ndS:SetPoint("LEFT",ndEB,"RIGHT",4,0); ndS:SetText(" days")
+    ndS:SetPoint("LEFT",ndEB,"RIGHT",4,0); ndS:SetText(L["AW_DAYS_SUFFIX"])
 
     local function SetRecur(v)
         wdRow:SetShown(v=="weekdays"); ndRow:SetShown(v=="interval")
@@ -668,26 +670,26 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     Div(ct1,y); y = y - AW_GAP
 
     -- Section: Sound
-    SectionHdr(ct1,"Sound",y); y = y - AW_LBL - 2
+    SectionHdr(ct1,L["AW_SECT_SOUND"],y); y = y - AW_LBL - 2
     -- Silent first, then Default, then custom sounds
     local sndEntries={
-        {label="Silent",      value="silent"  },
-        {label="Default",     value="default" },
-        {label="Double hit",  value="sound01" },
-        {label="Long pop",    value="sound02" },
-        {label="Magic",       value="sound03" },
-        {label="Scream",      value="sound04" },
-        {label="Yell",        value="sound05" },
-        {label="Triple hit",  value="sound06" },
-        {label="Drum & Ding", value="sound07" },
-        {label="Xylophone",   value="sound08" },
-        {label="Tada",        value="sound09" },
-        {label="Soft dings",  value="sound10" },
+        {label=L["AW_SND_SILENT"],      value="silent"  },
+        {label=L["AW_SND_DEFAULT"],     value="default" },
+        {label=L["AW_SND_DOUBLE_HIT"],  value="sound01" },
+        {label=L["AW_SND_LONG_POP"],    value="sound02" },
+        {label=L["AW_SND_MAGIC"],       value="sound03" },
+        {label=L["AW_SND_SCREAM"],      value="sound04" },
+        {label=L["AW_SND_YELL"],        value="sound05" },
+        {label=L["AW_SND_TRIPLE_HIT"],  value="sound06" },
+        {label=L["AW_SND_DRUM_DING"], value="sound07" },
+        {label=L["AW_SND_XYLOPHONE"],   value="sound08" },
+        {label=L["AW_SND_TADA"],        value="sound09" },
+        {label=L["AW_SND_SOFT_DINGS"],  value="sound10" },
     }
     local sDDW = AW_CW - 56
     local soundDD = MakeDD(ct1,sndEntries,"default",nil,sDDW)
     soundDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
-    local testSnd=BNB.CreateButton(nil,ct1,"Test",50,AW_ROW)
+    local testSnd=BNB.CreateButton(nil,ct1,L["AW_TEST_BTN"],50,AW_ROW)
     testSnd:SetPoint("TOPLEFT",ct1,"TOPLEFT",sDDW+6,y)
     testSnd:SetScript("OnClick",function()
         local p=SoundPath(soundDD:GetSelected()); if p then PlaySoundFile(p,"Master") end
@@ -700,37 +702,37 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     -- ================================================================
     local y2 = -4
 
-    SectionHdr(ct2,"Glow",y2); y2 = y2 - AW_LBL - 2
+    SectionHdr(ct2,L["AW_SECT_GLOW"],y2); y2 = y2 - AW_LBL - 2
 
-    Lbl(ct2,"Type",y2); y2 = y2 - AW_LBL
+    Lbl(ct2,L["AW_LBL_TYPE"],y2); y2 = y2 - AW_LBL
     local gtEntries={
-        {label="Default",  value=nil},
-        {label="Pixel",    value=1  },
-        {label="AutoCast", value=2  },
-        {label="Border",   value=3  },
-        {label="Proc",     value=4  },
+        {label=L["AW_GLOW_DEFAULT"],  value=nil},
+        {label=L["AW_GLOW_PIXEL"],    value=1  },
+        {label=L["AW_GLOW_AUTOCAST"], value=2  },
+        {label=L["AW_GLOW_BORDER"],   value=3  },
+        {label=L["AW_GLOW_PROC"],     value=4  },
     }
     local glowTypeDD=MakeDD(ct2,gtEntries,nil,nil)
     glowTypeDD:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2); y2 = y2 - AW_ROW - AW_GAP
 
-    Lbl(ct2,"Mode",y2); y2 = y2 - AW_LBL
+    Lbl(ct2,L["AW_LBL_MODE"],y2); y2 = y2 - AW_LBL
     local gmEntries={
-        {label="Default",        value=nil          },
-        {label="Continuous",     value="continuous" },
-        {label="Pulse (10s)",    value="pulse"      },
-        {label="Once (10s)",     value="once"       },
+        {label=L["AW_GLOW_DEFAULT"],        value=nil          },
+        {label=L["AW_GLOWMODE_CONTINUOUS"],     value="continuous" },
+        {label=L["AW_GLOWMODE_PULSE"],    value="pulse"      },
+        {label=L["AW_GLOWMODE_ONCE"],     value="once"       },
     }
     local glowModeDD=MakeDD(ct2,gmEntries,nil,nil)
     glowModeDD:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2); y2 = y2 - AW_ROW - AW_GAP
 
-    Lbl(ct2,"Color",y2); y2 = y2 - AW_LBL
+    Lbl(ct2,L["AW_LBL_COLOR"],y2); y2 = y2 - AW_LBL
     local swatchBtn=BNB.CreateBackdropFrame("Button",nil,ct2)
     swatchBtn:SetSize(AW_ROW,AW_ROW); swatchBtn:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
     local swTx=swatchBtn:CreateTexture(nil,"OVERLAY"); swTx:SetAllPoints()
     swTx:SetColorTexture(BNB_GR,BNB_GG,BNB_GB,1)
     local glowColorVal=nil
 
-    local rstCol=BNB.CreateButton(nil,ct2,"Reset to default",AW_CW-AW_ROW-6,AW_ROW)
+    local rstCol=BNB.CreateButton(nil,ct2,L["AW_RESET_TO_DEFAULT_BTN"],AW_CW-AW_ROW-6,AW_ROW)
     rstCol:SetPoint("TOPLEFT",ct2,"TOPLEFT",AW_ROW+6,y2)
     rstCol:SetScript("OnClick",function()
         glowColorVal=nil; swTx:SetColorTexture(BNB_GR,BNB_GG,BNB_GB,1); MarkDirty()
@@ -790,17 +792,17 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local pixelPanel = CreateFrame("Frame",nil,ct2)
     pixelPanel:SetSize(AW_CW, SL_ROW*3); pixelPanel:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
 
-    local pixelLinesSL = MakeParamSlider(pixelPanel,"Lines",1,20,8,0,
+    local pixelLinesSL = MakeParamSlider(pixelPanel,L["AW_PARAM_LINES"],1,20,8,0,
         function(v) pixelPanel._pixelLinesSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end)
     pixelPanel._pixelLinesSL = pixelLinesSL
 
-    local pixelFreqSL = MakeParamSlider(pixelPanel,"Frequency",-100,100,25,-SL_ROW,
+    local pixelFreqSL = MakeParamSlider(pixelPanel,L["AW_PARAM_FREQUENCY"],-100,100,25,-SL_ROW,
         function(v) pixelPanel._pixelFreqSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end, fmtF2)
     pixelPanel._pixelFreqSL = pixelFreqSL
 
-    local pixelLengthSL = MakeParamSlider(pixelPanel,"Length",1,30,10,-SL_ROW*2,
+    local pixelLengthSL = MakeParamSlider(pixelPanel,L["AW_PARAM_LENGTH"],1,30,10,-SL_ROW*2,
         function(v) pixelPanel._pixelLengthSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end)
     pixelPanel._pixelLengthSL = pixelLengthSL
@@ -810,17 +812,17 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local acPanel = CreateFrame("Frame",nil,ct2)
     acPanel:SetSize(AW_CW, SL_ROW*3); acPanel:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
 
-    local acParticlesSL = MakeParamSlider(acPanel,"Particles",1,12,4,0,
+    local acParticlesSL = MakeParamSlider(acPanel,L["AW_PARAM_PARTICLES"],1,12,4,0,
         function(v) acPanel._acParticlesSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end)
     acPanel._acParticlesSL = acParticlesSL
 
-    local acFreqSL = MakeParamSlider(acPanel,"Frequency",-100,100,13,-SL_ROW,
+    local acFreqSL = MakeParamSlider(acPanel,L["AW_PARAM_FREQUENCY"],-100,100,13,-SL_ROW,
         function(v) acPanel._acFreqSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end, fmtF2)
     acPanel._acFreqSL = acFreqSL
 
-    local acScaleSL = MakeParamSlider(acPanel,"Scale",5,30,10,-SL_ROW*2,
+    local acScaleSL = MakeParamSlider(acPanel,L["AW_PARAM_SCALE"],5,30,10,-SL_ROW*2,
         function(v) acPanel._acScaleSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end, fmtF1)
     acPanel._acScaleSL = acScaleSL
@@ -830,7 +832,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local borderPanel = CreateFrame("Frame",nil,ct2)
     borderPanel:SetSize(AW_CW, SL_ROW); borderPanel:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
 
-    local borderDurSL = MakeParamSlider(borderPanel,"Pulse duration (s)",10,200,70,0,
+    local borderDurSL = MakeParamSlider(borderPanel,L["AW_PARAM_PULSE_DURATION"],10,200,70,0,
         function(v) borderPanel._borderDurSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end, fmtF2)
     borderPanel._borderDurSL = borderDurSL
@@ -840,7 +842,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local procPanel = CreateFrame("Frame",nil,ct2)
     procPanel:SetSize(AW_CW, SL_ROW); procPanel:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
 
-    local procDurSL = MakeParamSlider(procPanel,"Duration (s)",10,500,100,0,
+    local procDurSL = MakeParamSlider(procPanel,L["AW_PARAM_DURATION"],10,500,100,0,
         function(v) procPanel._procDurSL._rawVal=v; MarkDirty()
             if not _isPopulating and f._restartPreview then f._restartPreview() end end, fmtF2)
     procPanel._procDurSL = procDurSL
@@ -888,7 +890,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
 
     -- ── Preview (continuous — runs while tab is visible) ─────────────────────
     -- Placed at the bottom so param sliders have full width above.
-    SectionHdr(ct2,"Preview",y2); y2 = y2 - AW_LBL - 2
+    SectionHdr(ct2,L["AW_SECT_PREVIEW"],y2); y2 = y2 - AW_LBL - 2
 
     local PREV_ICON_SZ = 48
     local previewHost = CreateFrame("Frame",nil,ct2)
@@ -973,7 +975,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local y3 = -4
 
     -- Section: Snooze
-    SectionHdr(ct3,"Snooze",y3); y3 = y3 - AW_LBL - 2
+    SectionHdr(ct3,L["AW_SECT_SNOOZE"],y3); y3 = y3 - AW_LBL - 2
 
     local snoozeEnableCB=CreateFrame("CheckButton",nil,ct3,"UICheckButtonTemplate")
     snoozeEnableCB:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3+2)
@@ -981,28 +983,28 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     snoozeEnableCB:HookScript("OnClick",function() MarkDirty() end)
     local snoozeEnableLbl=ct3:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
     snoozeEnableLbl:SetPoint("LEFT",snoozeEnableCB,"RIGHT",2,0)
-    snoozeEnableLbl:SetText("Enable snooze")
+    snoozeEnableLbl:SetText(L["AW_ENABLE_SNOOZE"])
     snoozeEnableLbl:SetTextColor(0.85,0.85,0.85,1)
     y3 = y3 - 28 - AW_GAP
 
-    Lbl(ct3,"Interval",y3); y3 = y3 - AW_LBL
+    Lbl(ct3,L["AW_LBL_INTERVAL"],y3); y3 = y3 - AW_LBL
     local snzEntries={
-        {label="1 minute",  value=1 },
-        {label="5 minutes", value=5 },
-        {label="10 minutes",value=10},
-        {label="15 minutes",value=15},
-        {label="30 minutes",value=30},
-        {label="60 minutes",value=60},
+        {label=L["AW_SNZ_1MIN"],  value=1 },
+        {label=L["AW_SNZ_5MIN"], value=5 },
+        {label=L["AW_SNZ_10MIN"],value=10},
+        {label=L["AW_SNZ_15MIN"],value=15},
+        {label=L["AW_SNZ_30MIN"],value=30},
+        {label=L["AW_SNZ_60MIN"],value=60},
     }
     local snoozeIntervalDD=MakeDD(ct3,snzEntries,5,nil)
     snoozeIntervalDD:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3); y3 = y3 - AW_ROW - AW_GAP
 
-    Lbl(ct3,"Repeat",y3); y3 = y3 - AW_LBL
+    Lbl(ct3,L["AW_SECT_REPEAT"],y3); y3 = y3 - AW_LBL
     local snzRepEntries={
-        {label="1 time",  value=1},
-        {label="3 times", value=3},
-        {label="5 times", value=5},
-        {label="Forever", value=0},
+        {label=L["AW_REP_1TIME"],  value=1},
+        {label=L["AW_REP_3TIMES"], value=3},
+        {label=L["AW_REP_5TIMES"], value=5},
+        {label=L["AW_REP_FOREVER"], value=0},
     }
     local snoozeRepeatDD=MakeDD(ct3,snzRepEntries,0,nil)
     snoozeRepeatDD:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3); y3 = y3 - AW_ROW - AW_SECT_GAP
@@ -1019,11 +1021,11 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     Div(ct3,y3); y3 = y3 - AW_GAP
 
     -- Section: On Fire behaviour
-    SectionHdr(ct3,"On Fire",y3); y3 = y3 - AW_LBL - 2
+    SectionHdr(ct3,L["AW_SECT_ON_FIRE"],y3); y3 = y3 - AW_LBL - 2
     local fmEntries={
-        {label="Alarm popup (default)",          value="popup"    },
-        {label="Open sticky note",               value="sticky"   },
-        {label="Minimized sticky with animation",value="minimized"},
+        {label=L["AW_FIRE_POPUP"],          value="popup"    },
+        {label=L["AW_FIRE_STICKY"],               value="sticky"   },
+        {label=L["AW_FIRE_MINIMIZED"],value="minimized"},
     }
     local fireModeDD=MakeDD(ct3,fmEntries,"popup",nil)
     fireModeDD:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3); y3 = y3 - AW_ROW - AW_SECT_GAP
@@ -1031,21 +1033,21 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     Div(ct3,y3); y3 = y3 - AW_GAP
 
     -- Section: Combat
-    SectionHdr(ct3,"Combat",y3); y3 = y3 - AW_LBL - 2
+    SectionHdr(ct3,L["AW_SECT_COMBAT"],y3); y3 = y3 - AW_LBL - 2
 
-    Lbl(ct3,"During combat",y3); y3 = y3 - AW_LBL
+    Lbl(ct3,L["AW_LBL_DURING_COMBAT"],y3); y3 = y3 - AW_LBL
     local cbtEntries={
-        {label="Fire immediately",       value="fire" },
-        {label="Wait for combat to end", value="queue"},
+        {label=L["AW_COMBAT_FIRE"],       value="fire" },
+        {label=L["AW_COMBAT_QUEUE"], value="queue"},
     }
     local combatDD=MakeDD(ct3,cbtEntries,"queue",nil)
     combatDD:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3); y3 = y3 - AW_ROW - AW_GAP
 
-    Lbl(ct3,"After combat (if queued)",y3); y3 = y3 - AW_LBL
+    Lbl(ct3,L["AW_LBL_AFTER_COMBAT"],y3); y3 = y3 - AW_LBL
     local pstEntries={
-        {label="Fire popup immediately",value="immediate"},
-        {label="Show summary count",    value="summary"  },
-        {label="Chat message + popup",  value="chat"     },
+        {label=L["AW_POST_IMMEDIATE"],value="immediate"},
+        {label=L["AW_POST_SUMMARY"],    value="summary"  },
+        {label=L["AW_POST_CHAT"],  value="chat"     },
     }
     local postDD=MakeDD(ct3,pstEntries,"immediate",nil)
     postDD:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3); y3 = y3 - AW_ROW - AW_GAP

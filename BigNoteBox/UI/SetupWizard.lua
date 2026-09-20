@@ -219,9 +219,9 @@ end
 local function RegisterQuitDialog()
     if StaticPopupDialogs["BNB_QUIT_SETUP"] then return end
     StaticPopupDialogs["BNB_QUIT_SETUP"] = {
-        text    = "Are you sure you want to quit setup?\n\nBigNoteBox will use its default settings.",
-        button1 = "Quit setup",
-        button2 = "Keep going",
+        text    = L["SW_QUIT_CONFIRM_TEXT"],
+        button1 = L["SW_QUIT_BTN"],
+        button2 = L["SW_KEEP_GOING_BTN"],
         timeout = 0, whileDead = true, hideOnEscape = true,
         OnAccept = function()
             local db = BigNoteBoxDB
@@ -241,13 +241,13 @@ end
 -- NAVIGATION
 --------------------------------------------------------------------------------
 local PAGE_TITLES = {
-    "Welcome to BigNoteBox!",
-    "Choose your style",
-    "Choose your theme",
-    "Notes & behaviour",
-    "Keybindings",
-    "Bring your notes along",
-    "All done!",
+    L["SW_PAGE_TITLE_1"],
+    L["SW_PAGE_TITLE_2"],
+    L["SW_PAGE_TITLE_3"],
+    L["SW_PAGE_TITLE_4"],
+    L["SW_PAGE_TITLE_5"],
+    L["SW_PAGE_TITLE_6"],
+    L["SW_PAGE_TITLE_7"],
 }
 
 local function UpdateNavigation()
@@ -261,7 +261,7 @@ local function UpdateNavigation()
     if not _hasMigration and _curPage >= 6 then
         effectiveCur = _curPage - 1
     end
-    _pageCounter:SetText(effectiveCur .. " / " .. effectiveTotal)
+    _pageCounter:SetText(string.format(L["SW_PAGE_COUNTER_FMT"], effectiveCur, effectiveTotal))
 
     for i, pg in ipairs(_pages) do
         if i == _curPage then pg:Show() else pg:Hide() end
@@ -370,18 +370,18 @@ local function BuildPage1(content)
     -- Addon name
     local name = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
     name:SetPoint("TOP", logo, "BOTTOM", 0, -10)
-    name:SetText("|cff66bb6aBigNoteBox|r")
+    name:SetText(L["OPT_TITLE"])
 
     -- Version
     local ver = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     ver:SetPoint("TOP", name, "BOTTOM", 0, -4)
-    ver:SetText("v" .. BNB.ADDON_VERSION)
+    ver:SetText(string.format(L["SW_VERSION_FMT"], BNB.ADDON_VERSION))
     ver:SetTextColor(0.55, 0.55, 0.55)
 
     -- By Dukul
     local by = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     by:SetPoint("TOP", ver, "BOTTOM", 0, -2)
-    by:SetText("by Dukul")
+    by:SetText(L["AUTHOR"])
     by:SetTextColor(0.65, 0.65, 0.65)
 
     -- Welcome text
@@ -390,15 +390,11 @@ local function BuildPage1(content)
     txt:SetWidth(CW - 20)
     txt:SetJustifyH("CENTER")
     txt:SetSpacing(3)
-    txt:SetText(
-        "Welcome! This quick setup will help you get BigNoteBox configured "..
-        "just the way you like it.\n\nYou can always re-run this setup at any time "..
-        "from the |cffff0000Danger Zone|r in \"Main Config > Advanced\".\n\n"..
-        "If you don't complete setup, default values will be used.")
+    txt:SetText(L["SW_WELCOME_TEXT"])
     txt:SetTextColor(0.88, 0.88, 0.88)
 
     -- Get Started button
-    local startBtn = MakeLargeButton(f, "Get Started", 220, 50)
+    local startBtn = MakeLargeButton(f, L["SW_GET_STARTED_BTN"], 220, 50)
     startBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 30)
     startBtn:SetScript("OnClick", function() GoToPage(2) end)
 
@@ -415,7 +411,7 @@ local function BuildPage2(content)
 
     local y = -4
     local _, ny = MakeLabel(f, y,
-        "Choose how BigNoteBox looks. You can change this later in Settings.",
+        L["SW_SKIN_CHOICE_LBL"],
         nil, 0.75, 0.75, 0.75)
     y = ny - 4
 
@@ -469,8 +465,8 @@ local function BuildPage2(content)
         return btn
     end
 
-    local normalBtn = MakeImageChoice("Normal Mode",  "setup-normal", "normal", 0)
-    local skinBtn   = MakeImageChoice("Skin Mode",    "setup-skin",   "skin",   IMG_W + GAP)
+    local normalBtn = MakeImageChoice(L["SW_NORMAL_MODE"],  "setup-normal", "normal", 0)
+    local skinBtn   = MakeImageChoice(L["SW_SKIN_MODE"],    "setup-skin",   "skin",   IMG_W + GAP)
     f._normalBtn = normalBtn
     f._skinBtn   = skinBtn
     y = y - (IMG_H + 28 + 12)
@@ -480,9 +476,7 @@ local function BuildPage2(content)
     desc:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
     desc:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     desc:SetJustifyH("LEFT"); desc:SetWordWrap(true); desc:SetSpacing(2)
-    desc:SetText(
-        "|cffffd100Normal Mode:|r Classic WoW window style that fits perfectly with the default UI.\n\n"..
-        "|cffffd100Skin Mode:|r A custom themed skin with coloured accents and its own style. Allows you to choose a color and brightness.")
+    desc:SetText(L["SW_SKIN_CHOICE_DESC"])
     desc:SetTextColor(0.75, 0.75, 0.75)
 
     -- Store getter for Next handler
@@ -520,9 +514,9 @@ local function BuildPage3(content)
     local sf, ct = MakeScrollContent(f)
     local y = -4
 
-    y = MakeHeader(ct, y, "Theme colour")
+    y = MakeHeader(ct, y, L["SW_THEME_COLOR_HDR"])
     local _, ny = MakeLabel(ct, y,
-        "Choose a colour preset for the skin. You can change this at any time in Settings > Appearance.",
+        L["SW_THEME_COLOR_DESC"],
         nil, 0.65, 0.65, 0.65)
     y = ny
 
@@ -533,11 +527,11 @@ local function BuildPage3(content)
         "earthen", "argent", "oled",
     }
     local PRESET_LABELS = {
-        obsidian   = "Obsidian",   void     = "Void",       dragonfire = "Dragonfire",
-        arcane     = "Arcane",     fel      = "Fel",         titan      = "Titan",
-        icecrown   = "Icecrown",   holy     = "Holy",        azshara    = "Azshara",
-        ragnaros   = "Ragnaros",   earthen  = "Earthen",    argent     = "Argent",
-        oled       = "OLED (pure black)",
+        obsidian   = L["SW_PRESET_OBSIDIAN"],   void     = L["SW_PRESET_VOID"],       dragonfire = L["SW_PRESET_DRAGONFIRE"],
+        arcane     = L["SW_PRESET_ARCANE"],     fel      = L["SW_PRESET_FEL"],         titan      = L["SW_PRESET_TITAN"],
+        icecrown   = L["SW_PRESET_ICECROWN"],   holy     = L["SW_PRESET_HOLY"],        azshara    = L["SW_PRESET_AZSHARA"],
+        ragnaros   = L["SW_PRESET_RAGNAROS"],   earthen  = L["SW_PRESET_EARTHEN"],    argent     = L["SW_PRESET_ARGENT"],
+        oled       = L["SW_PRESET_OLED"],
     }
     local dd, ddy = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.skinPreset) or "obsidian"
@@ -558,16 +552,16 @@ local function BuildPage3(content)
     y = ddy - 4
 
     y = MakeRule(ct, y)
-    y = MakeHeader(ct, y, "Brightness")
+    y = MakeHeader(ct, y, L["SW_BRIGHTNESS_HDR"])
     local _, ny2 = MakeLabel(ct, y,
-        "Adjusts how bright or dark the skin appears.",
+        L["SW_BRIGHTNESS_DESC"],
         nil, 0.65, 0.65, 0.65)
     y = ny2
 
     -- Brightness slider — float 0.5–3.0, step 0.05, default 1.0
     -- Matches main config → Appearance → Skins → Skin brightness exactly.
     local curBrt = (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or 1.0
-    local sl = BNB.CreateFloatSlider(ct, "Brightness", 0.5, 3.0, curBrt, 0.05, 1.0,
+    local sl = BNB.CreateFloatSlider(ct, L["SW_BRIGHTNESS_SLIDER"], 0.5, 3.0, curBrt, 0.05, 1.0,
         function(v)
             if BigNoteBoxDB then BigNoteBoxDB.skinBrightness = v end
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
@@ -579,16 +573,16 @@ local function BuildPage3(content)
     y = y - 44
 
     y = MakeRule(ct, y)
-    y = MakeHeader(ct, y, "Random theme")
+    y = MakeHeader(ct, y, L["SW_RANDOM_THEME_HDR"])
 
     local _, cb = MakeCheck(ct, y,
-        "Randomize theme on login / reload",
+        L["SW_RANDOMIZE_CHECK"],
         function() return BigNoteBoxDB and BigNoteBoxDB.skinRandomize == true end,
         function(v) if BigNoteBoxDB then BigNoteBoxDB.skinRandomize = v end end)
     y = y - 32
 
     local _, ny3 = MakeLabel(ct, y,
-        "Picks a random colour preset each time you log in or reload.",
+        L["SW_RANDOMIZE_DESC"],
         nil, 0.55, 0.55, 0.55)
     y = ny3
 
@@ -608,9 +602,9 @@ local function BuildPage4(content)
     local y = -4
 
     -- ── Font picker ──────────────────────────────────────────────────────────
-    y = MakeHeader(ct, y, "Note font")
+    y = MakeHeader(ct, y, L["SW_NOTE_FONT_HDR"])
     local _, ny = MakeLabel(ct, y,
-        "Applies to the note editor and normal note display.",
+        L["SW_NOTE_FONT_DESC"],
         nil, 0.65, 0.65, 0.65)
     y = ny
 
@@ -707,7 +701,7 @@ local function BuildPage4(content)
     end
 
     -- Font size slider
-    local fssl = BNB.CreateSlider(ct, "Font size", 9, 22,
+    local fssl = BNB.CreateSlider(ct, L["SW_FONT_SIZE_SLIDER"], 9, 22,
         (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13,
         13,
         function(v)
@@ -721,7 +715,7 @@ local function BuildPage4(content)
                 end
             end
         end,
-        function(v) return math.floor(v) .. "pt" end)
+        function(v) return string.format(L["NND_PT_SUFFIX_FMT"], math.floor(v)) end)
     fssl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     fssl:SetWidth(CW - 36)
     y = y - 44
@@ -737,7 +731,7 @@ local function BuildPage4(content)
     previewLbl:SetPoint("RIGHT", previewBox, "RIGHT", -10, 0)
     previewLbl:SetJustifyH("CENTER")
     previewLbl:SetTextColor(0.75, 0.75, 0.75, 1)
-    previewLbl:SetText("Azeroth awaits!")
+    previewLbl:SetText(L["NND_PREVIEW_SAMPLE"])
     -- Initialise font once BNB fonts are ready
     C_Timer.After(0.05, function()
         local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
@@ -751,17 +745,17 @@ local function BuildPage4(content)
 
     -- ── List display mode ────────────────────────────────────────────────────
     y = MakeRule(ct, y)
-    y = MakeHeader(ct, y, "Note list display")
+    y = MakeHeader(ct, y, L["SW_LIST_DISPLAY_HDR"])
 
     local _, ny3 = MakeLabel(ct, y,
-        "Controls how notes appear in the list.",
+        L["SW_LIST_DISPLAY_DESC"],
         nil, 0.65, 0.65, 0.65)
     y = ny3
 
     local MODE_ITEMS = {
-        { key="normal",   label="Normal",   icon=32, preview="2 preview lines" },
-        { key="compact",  label="Compact",  icon=16, preview="No preview" },
-        { key="spacious", label="Spacious", icon=42, preview="3 preview lines" },
+        { key="normal",   label=L["SW_MODE_NORMAL"],   icon=32, preview=L["SW_MODE_NORMAL_PREVIEW"] },
+        { key="compact",  label=L["SW_MODE_COMPACT"],  icon=16, preview=L["SW_MODE_COMPACT_PREVIEW"] },
+        { key="spacious", label=L["SW_MODE_SPACIOUS"], icon=42, preview=L["SW_MODE_SPACIOUS_PREVIEW"] },
     }
     local MODE_BTN_W = math.floor((CW - 16 - 8) / 3)
     local _modeBtns  = {}
@@ -832,13 +826,13 @@ local function BuildPage4(content)
 
     -- ── Sidebar placement ────────────────────────────────────────────────────
     y = MakeRule(ct, y)
-    y = MakeHeader(ct, y, "Character sidebar placement")
+    y = MakeHeader(ct, y, L["SW_SIDEBAR_PLACEMENT_HDR"])
 
     local sideDD, sideY = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.sidebarSide) or "right"
         local items = {
-            { key="right", label="Right (default)" },
-            { key="left",  label="Left" },
+            { key="right", label=L["SW_SIDEBAR_RIGHT"] },
+            { key="left",  label=L["SW_SIDEBAR_LEFT"] },
         }
         for _, item in ipairs(items) do
             local k = item.key
@@ -856,15 +850,15 @@ local function BuildPage4(content)
 
     -- ── Combat behaviour ────────────────────────────────────────────────────
     y = MakeRule(ct, y)
-    y = MakeHeader(ct, y, "When entering combat")
+    y = MakeHeader(ct, y, L["SW_COMBAT_HDR"])
 
     local combatDD, combatY = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.combatAction) or "nothing"
         local items = {
-            { key="nothing",          label="Do nothing" },
-            { key="hide_no_stickies", label="Hide everything except sticky notes" },
-            { key="hide_minimize",    label="Hide everything, minimize sticky notes" },
-            { key="hide_all",         label="Hide everything" },
+            { key="nothing",          label=L["SW_COMBAT_NOTHING"] },
+            { key="hide_no_stickies", label=L["SW_COMBAT_HIDE_NO_STICKIES"] },
+            { key="hide_minimize",    label=L["SW_COMBAT_HIDE_MINIMIZE"] },
+            { key="hide_all",         label=L["SW_COMBAT_HIDE_ALL"] },
         }
         for _, item in ipairs(items) do
             local k = item.key
@@ -883,16 +877,15 @@ local function BuildPage4(content)
     local lsmAvail = LibStub and LibStub("LibSharedMedia-3.0", true) ~= nil
     if lsmAvail then
         y = MakeRule(ct, y)
-        y = MakeHeader(ct, y, "LibSharedMedia fonts")
+        y = MakeHeader(ct, y, L["SW_LSM_HDR"])
 
         local _, ny4 = MakeLabel(ct, y,
-            "Enable access to fonts registered by other addons via LibSharedMedia-3.0. "..
-            "This will take effect after setup completes and the UI reloads.",
+            L["SW_LSM_DESC"],
             nil, 0.65, 0.65, 0.65)
         y = ny4
 
         local _, cb = MakeCheck(ct, y,
-            "Enable LibSharedMedia fonts",
+            L["SW_LSM_CHECK"],
             function() return BigNoteBoxDB and BigNoteBoxDB.lsmFonts == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.lsmFonts = v end end)
         y = y - 32
@@ -914,8 +907,7 @@ local function BuildPage5(content)
     local y = -4
 
     local _, ny = MakeLabel(ct, y,
-        "Set your keybindings for BigNoteBox. Left-click a button to capture a key. "..
-        "Right-click to unbind.",
+        L["SW_KEYBINDS_DESC"],
         nil, 0.75, 0.75, 0.75)
     y = ny - 4
 
@@ -923,11 +915,11 @@ local function BuildPage5(content)
         LSHIFT=true, RSHIFT=true, LCTRL=true, RCTRL=true, LALT=true, RALT=true,
     }
     local KEYBINDS = {
-        { action="BIGNOTEBOXOPEN",         label="Open BigNoteBox",         hint="Default: CTRL-N" },
-        { action="BIGNOTEBOXQUICKNOTE",    label="Create quick note",        hint="Default: none" },
-        { action="BIGNOTEBOXNEWNOTE",      label="Create new note",          hint="Default: none" },
-        { action="BIGNOTEBOXHIDESTICKIES", label="Show / hide sticky notes", hint="Default: CTRL-H" },
-        { action="BIGNOTEBOXTOGGLERV",     label="Open rich note editor",    hint="Default: none" },
+        { action="BIGNOTEBOXOPEN",         label=L["SW_KB_OPEN"],         hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-N") },
+        { action="BIGNOTEBOXQUICKNOTE",    label=L["SW_KB_QUICKNOTE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXNEWNOTE",      label=L["SW_KB_NEWNOTE"],          hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXHIDESTICKIES", label=L["SW_KB_HIDESTICKIES"], hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-H") },
+        { action="BIGNOTEBOXTOGGLERV",     label=L["SW_KB_RICHEDITOR"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
     }
 
     -- Register conflict popup once
@@ -1085,13 +1077,13 @@ local function BuildPage6(content)
     end
 
     local _, ny = MakeLabel(f, y,
-        "BigNoteBox noticed you have other note addons installed:",
+        L["SW_MIGRATION_INTRO"],
         nil, 0.88, 0.88, 0.88)
     y = ny - 2
 
     -- List detected addons
     for _, name in ipairs(detected) do
-        local _, ay = MakeLabel(f, y, "|cff66bb6a* " .. name .. "|r", nil, 1, 1, 1)
+        local _, ay = MakeLabel(f, y, string.format(L["SW_MIGRATION_BULLET_FMT"], name), nil, 1, 1, 1)
         y = ay - 0
     end
     y = y - 10
@@ -1099,13 +1091,12 @@ local function BuildPage6(content)
     y = MakeRule(f, y)
 
     local _, ny2 = MakeLabel(f, y,
-        "Once you finish setup, BigNoteBox will offer to bring your existing notes across. "..
-        "It is a |cffffd100copy|r, not a move — your notes in other addons are never touched.",
+        L["SW_MIGRATION_COPY_NOTE"],
         nil, 0.80, 0.80, 0.80)
     y = ny2 - 8
 
     local _, ny3 = MakeLabel(f, y,
-        "You can also trigger migration at any time from |cffffd100Settings > Advanced > Migration|r.",
+        L["SW_MIGRATION_LATER_NOTE"],
         nil, 0.60, 0.60, 0.60)
     y = ny3
 
@@ -1125,17 +1116,17 @@ local function BuildPage7(content)
     local thanks = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
     thanks:SetPoint("TOP", f, "TOP", 0, y)
     thanks:SetWidth(CW); thanks:SetJustifyH("CENTER")
-    thanks:SetText("|cff66bb6aThanks for installing BigNoteBox!|r")
+    thanks:SetText(L["SW_THANKS"])
     y = y - 40
 
     local tips = {
-        "|cffffd100/bnb|r — open settings at any time.",
-        "Right-click the minimap button for quick options.",
-        "Drag items, spells, or quests onto a note to attach them.",
-        "Found a bug or have a suggestion? Leave a comment on CurseForge!",
+        L["SW_TIP_1"],
+        L["SW_TIP_2"],
+        L["SW_TIP_3"],
+        L["SW_TIP_4"],
     }
     for _, tip in ipairs(tips) do
-        local _, ny = MakeLabel(f, y, "|cff888888-|r " .. tip, nil, 0.80, 0.80, 0.80)
+        local _, ny = MakeLabel(f, y, string.format(L["SW_TIP_BULLET_FMT"], tip), nil, 0.80, 0.80, 0.80)
         y = ny - 2
     end
 
@@ -1146,10 +1137,10 @@ local function BuildPage7(content)
     urlLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     urlLbl:SetJustifyH("CENTER")
     urlLbl:SetTextColor(0.50, 0.50, 0.50)
-    urlLbl:SetText("CurseForge page — click the button below to copy the URL:")
+    urlLbl:SetText(L["SW_CF_URL_LBL"])
     y = y - 20
 
-    local cfBtn = BNB.CreateButton(nil, f, "Copy CurseForge URL", 200, 24)
+    local cfBtn = BNB.CreateButton(nil, f, L["SW_COPY_CF_URL_BTN"], 200, 24)
     cfBtn:SetPoint("TOPLEFT", f, "TOPLEFT", math.floor((CW - 200) / 2), y)
     cfBtn:SetScript("OnClick", function()
         if BNB.ShowClipboardHint then
@@ -1164,10 +1155,10 @@ local function BuildPage7(content)
     siteLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     siteLbl:SetJustifyH("CENTER")
     siteLbl:SetTextColor(0.50, 0.50, 0.50)
-    siteLbl:SetText("Check out my other addons at dukul.net:")
+    siteLbl:SetText(L["SW_SITE_LBL"])
     y = y - 20
 
-    local siteBtn = BNB.CreateButton(nil, f, "Copy dukul.net", 200, 24)
+    local siteBtn = BNB.CreateButton(nil, f, L["SW_COPY_SITE_BTN"], 200, 24)
     siteBtn:SetPoint("TOPLEFT", f, "TOPLEFT", math.floor((CW - 200) / 2), y)
     siteBtn:SetScript("OnClick", function()
         if BNB.ShowClipboardHint then
@@ -1182,10 +1173,10 @@ local function BuildPage7(content)
     rnote:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 114)
     rnote:SetJustifyH("CENTER")
     rnote:SetTextColor(0.5, 0.5, 0.5)
-    rnote:SetText("A reload is required to apply your settings.")
+    rnote:SetText(L["SW_RELOAD_NOTE"])
 
     -- Finish & Open BigNoteBox (top button)
-    local foBtn = MakeLargeButton(f, "Finish & Open BigNoteBox", CW, 50)
+    local foBtn = MakeLargeButton(f, L["SW_FINISH_OPEN_BTN"], CW, 50)
     foBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 58)
     foBtn:SetScript("OnClick", function()
         local db = BigNoteBoxDB
@@ -1199,7 +1190,7 @@ local function BuildPage7(content)
     end)
 
     -- Finish (bottom button)
-    local finBtn = MakeLargeButton(f, "Finish", CW, 50)
+    local finBtn = MakeLargeButton(f, L["SW_FINISH_BTN"], CW, 50)
     finBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 4)
     finBtn:SetScript("OnClick", function()
         local db = BigNoteBoxDB
@@ -1316,7 +1307,7 @@ local function BuildWizardFrame()
         BNB.SetBackdrop(navStrip, 0.08, 0.08, 0.10, 0.50, 0.28, 0.28, 0.30, 0)
     end
 
-    _prevBtn = BNB.CreateButton(nil, navStrip, "< Previous", 120, 28)
+    _prevBtn = BNB.CreateButton(nil, navStrip, L["SW_PREV_BTN"], 120, 28)
     _prevBtn:SetPoint("LEFT", navStrip, "LEFT", 12, 0)
     _prevBtn:SetScript("OnClick", function()
         local target = _curPage - 1
@@ -1331,7 +1322,7 @@ local function BuildWizardFrame()
         GoToPage(target)
     end)
 
-    _nextBtn = BNB.CreateButton(nil, navStrip, "Next >", 120, 28)
+    _nextBtn = BNB.CreateButton(nil, navStrip, L["SW_NEXT_BTN"], 120, 28)
     _nextBtn:SetPoint("RIGHT", navStrip, "RIGHT", -12, 0)
     _nextBtn:SetScript("OnClick", function()
         local pg = _pages[_curPage]
@@ -1376,7 +1367,7 @@ local function BuildWizardFrame()
         if event == "PLAYER_REGEN_DISABLED" and self:IsShown() then
             self._hiding = true; self:Hide(); self._hiding = false
             HideOverlay(); StopCamera()
-            BNB:Print("|cffff9900Setup wizard hidden during combat. It will reappear when combat ends.|r")
+            BNB:Print(L["SW_COMBAT_HIDDEN"])
         end
     end)
 

@@ -11,6 +11,7 @@
 
 local BNB = BigNoteBox
 if not BNB then return end
+local L = BNB.L
 
 BNB.NewNoteDialog = BNB.NewNoteDialog or {}
 local NND = BNB.NewNoteDialog
@@ -114,7 +115,7 @@ local function BuildIconPicker()
     titleLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  CELL_PAD, -6)
     titleLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -CELL_PAD, -6)
     titleLbl:SetJustifyH("CENTER")
-    titleLbl:SetText("Choose Icon")
+    titleLbl:SetText(L["NND_CHOOSE_ICON"])
 
     local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     closeBtn:SetSize(20, 20)
@@ -269,7 +270,7 @@ local function BuildDialog()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("New Note")
+        titleLbl:SetText(L["NND_TITLE"])
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() NND.Close() end)
         closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -289,7 +290,7 @@ local function BuildDialog()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetTitle("New Note")
+        f:SetTitle(L["NND_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() NND.Close() end)
         end
@@ -319,7 +320,7 @@ local function BuildDialog()
     iconHi:SetAllPoints(); iconHi:SetColorTexture(1, 1, 1, 0.15)
     iconBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Click to choose icon", 1, 1, 1)
+        GameTooltip:AddLine(L["NND_ICON_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -358,7 +359,7 @@ local function BuildDialog()
         if _createBtn then _createBtn:SetEnabled(text ~= "") end
     end)
 
-    BNB.AddPlaceholder(titleEB, "Note title...", 0.40, 0.40, 0.40)
+    BNB.AddPlaceholder(titleEB, L["NND_TITLE_PLACEHOLDER"], 0.40, 0.40, 0.40)
     _titleEB = titleEB
 
     -- ── COLUMN ANCHORS ───────────────────────────────────────────────────────
@@ -376,7 +377,7 @@ local function BuildDialog()
     local fontHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fontHdr:SetPoint("TOPLEFT", colL, "TOPLEFT", 0, 0)
     fontHdr:SetWidth(COL_L_W); fontHdr:SetJustifyH("LEFT")
-    fontHdr:SetText("Font")
+    fontHdr:SetText(L["NND_FONT_HDR"])
     fontHdr:SetTextColor(0.8, 0.8, 0.8, 1)
 
     local leftY  = -18
@@ -459,7 +460,7 @@ local function BuildDialog()
     local colorHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     colorHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     colorHdr:SetWidth(COL_R_W); colorHdr:SetJustifyH("LEFT")
-    colorHdr:SetText("Title colour")
+    colorHdr:SetText(L["NND_TITLE_COLOR_HDR"])
     colorHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
@@ -522,7 +523,7 @@ local function BuildDialog()
     local sizeHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sizeHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sizeHdr:SetWidth(COL_R_W); sizeHdr:SetJustifyH("LEFT")
-    sizeHdr:SetText("Font size")
+    sizeHdr:SetText(L["NND_FONT_SIZE_HDR"])
     sizeHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
@@ -539,7 +540,7 @@ local function BuildDialog()
                     MinimalSliderWithSteppersMixin.Label.Right,
                     function(v)
                         return WHITE_FONT_COLOR:WrapTextInColorCode(
-                            tostring(math.floor(v)) .. "pt")
+                            string.format(L["NND_PT_SUFFIX_FMT"], math.floor(v)))
                     end),
         })
         sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged,
@@ -566,7 +567,7 @@ local function BuildDialog()
     else
         szWidget = BNB.CreateSlider(f, "", 8, 32, defaultSize, nil,
             function(v) _selSize = v end,
-            function(v) return tostring(v) .. "pt" end)
+            function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end)
         szWidget:SetPoint("TOPLEFT",  colR, "TOPLEFT",  0, rightY)
         szWidget:SetPoint("TOPRIGHT", colR, "TOPRIGHT", 0, rightY)
     end
@@ -577,7 +578,7 @@ local function BuildDialog()
     local sampleHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sampleHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sampleHdr:SetWidth(COL_R_W); sampleHdr:SetJustifyH("LEFT")
-    sampleHdr:SetText("Sample size")
+    sampleHdr:SetText(L["NND_SAMPLE_SIZE_HDR"])
     sampleHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
@@ -594,7 +595,7 @@ local function BuildDialog()
             previewLbl:SetFont(boldPath, defaultSize, "")
         end
     end)
-    previewLbl:SetText("Azeroth awaits!")
+    previewLbl:SetText(L["NND_PREVIEW_SAMPLE"])
     _sizePreviewLbl = previewLbl
     rightY = rightY - 28
 
@@ -607,13 +608,13 @@ local function BuildDialog()
     richLbl:SetPoint("LEFT",  richCheck, "RIGHT",  4, 0)
     richLbl:SetPoint("RIGHT", f,         "RIGHT", -DLG_PAD, 0)
     richLbl:SetJustifyH("LEFT")
-    richLbl:SetText("Rich note (supports headers, images, formatting)")
+    richLbl:SetText(L["NND_RICH_CHECK_LBL"])
     richLbl:SetTextColor(0.8, 0.8, 0.8, 1)
     richCheck:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Rich note", 1, 1, 1)
+        GameTooltip:AddLine(L["NND_RICH_TIP"], 1, 1, 1)
         GameTooltip:AddLine(
-            "Rich notes support {h1} headers, {img} images,\n{col} colours, {icon} icons and {link} links.\nUse the markup toolbar in the editor to insert tags.",
+            L["NND_RICH_TIP_SUB"],
             0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
@@ -654,13 +655,13 @@ local function BuildDialog()
     end
 
     local bW = math.floor(DLG_CW / 2) - 4
-    local createBtn = BNB.CreateButton(nil, f, "Create", bW, 26)
+    local createBtn = BNB.CreateButton(nil, f, L["NND_CREATE_BTN"], bW, 26)
     createBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DLG_PAD, 8)
     createBtn:SetScript("OnClick", function() NND.Confirm() end)
     createBtn:SetEnabled(false)   -- disabled until user types a title
     _createBtn = createBtn
 
-    local cancelBtn = BNB.CreateButton(nil, f, "Cancel", bW, 26)
+    local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], bW, 26)
     cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DLG_PAD + bW + 8, 8)
     cancelBtn:SetScript("OnClick", function() NND.Close() end)
 
@@ -691,7 +692,7 @@ function NND.Open()
     -- Reset title field and disable Create
     if _titleEB then
         _titleEB:SetText("")
-        BNB.AddPlaceholder(_titleEB, "Note title...", 0.40, 0.40, 0.40)
+        BNB.AddPlaceholder(_titleEB, L["NND_TITLE_PLACEHOLDER"], 0.40, 0.40, 0.40)
     end
     if _createBtn then _createBtn:SetEnabled(false) end
 

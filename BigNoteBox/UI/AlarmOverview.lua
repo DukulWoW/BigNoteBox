@@ -5,6 +5,7 @@
 
 local BNB = BigNoteBox
 if not BNB then return end
+local L = BNB.L
 
 -- ============================================================================
 -- ALARM POPUP
@@ -82,17 +83,17 @@ local function BuildPopup()
 
     -- Snooze row: button + dropdown
     local snoozeEntries = {
-        { label = "1 min",  value = 1  },
-        { label = "5 min",  value = 5  },
-        { label = "10 min", value = 10 },
-        { label = "15 min", value = 15 },
-        { label = "30 min", value = 30 },
-        { label = "60 min", value = 60 },
+        { label = string.format(L["AO_MIN_FMT"], 1),  value = 1  },
+        { label = string.format(L["AO_MIN_FMT"], 5),  value = 5  },
+        { label = string.format(L["AO_MIN_FMT"], 10), value = 10 },
+        { label = string.format(L["AO_MIN_FMT"], 15), value = 15 },
+        { label = string.format(L["AO_MIN_FMT"], 30), value = 30 },
+        { label = string.format(L["AO_MIN_FMT"], 60), value = 60 },
     }
     local contentW = POPUP_W - POPUP_PAD * 2
 
     -- Snooze button
-    local snoozeBtn = BNB.CreateButton(nil, f, "Snooze", math.floor(contentW * 0.5) - 4, 24)
+    local snoozeBtn = BNB.CreateButton(nil, f, L["AO_SNOOZE_BTN"], math.floor(contentW * 0.5) - 4, 24)
     snoozeBtn:SetPoint("TOPLEFT", f, "TOPLEFT", POPUP_PAD, -POPUP_PAD - 52)
     f._snoozeBtn = snoozeBtn
 
@@ -107,7 +108,7 @@ local function BuildPopup()
         dd:SetHeight(24)
         dd:SetPoint("LEFT", snoozeBtn, "RIGHT", 8, 0)
         dd._selected = 5
-        dd:SetText("5 min")
+        dd:SetText(string.format(L["AO_MIN_FMT"], 5))
         dd:SetupMenu(function(_, root)
             for _, e in ipairs(snoozeEntries) do
                 root:CreateRadio(e.label,
@@ -124,7 +125,7 @@ local function BuildPopup()
         snoozeDDContainer:SetSize(snoozeDDW, 24)
         snoozeDDContainer:SetPoint("LEFT", snoozeBtn, "RIGHT", 8, 0)
         local l = snoozeDDContainer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        l:SetAllPoints(); l:SetText("5 min"); l:SetJustifyH("CENTER")
+        l:SetAllPoints(); l:SetText(string.format(L["AO_MIN_FMT"], 5)); l:SetJustifyH("CENTER")
         snoozeDDContainer._selected = 5
     end
     f._snoozeDDContainer = snoozeDDContainer
@@ -132,11 +133,11 @@ local function BuildPopup()
     -- Dismiss button
     -- Bottom row: | Open Note | Dismiss |
     local btnRowW = math.floor(contentW / 2) - 4
-    local openNoteBtn = BNB.CreateButton(nil, f, "Open Note", btnRowW, 24)
+    local openNoteBtn = BNB.CreateButton(nil, f, L["AO_OPEN_NOTE_BTN"], btnRowW, 24)
     openNoteBtn:SetPoint("TOPLEFT", f, "TOPLEFT", POPUP_PAD, -POPUP_PAD - 52 - 32)
     f._openNoteBtn = openNoteBtn
 
-    local dismissBtn = BNB.CreateButton(nil, f, "Dismiss", btnRowW, 24)
+    local dismissBtn = BNB.CreateButton(nil, f, L["AO_DISMISS_BTN"], btnRowW, 24)
     dismissBtn:SetPoint("LEFT", openNoteBtn, "RIGHT", 8, 0)
     f._dismissBtn = dismissBtn
 
@@ -161,7 +162,7 @@ function AP.Show(noteID, alarm, missedList)
     end
 
     -- Text
-    local titleText = (note.title and note.title ~= "") and note.title or "Untitled"
+    local titleText = (note.title and note.title ~= "") and note.title or L["AO_UNTITLED"]
     f._titleLbl:SetText(titleText)
     local labelText = (alarm and alarm.label and alarm.label ~= "") and alarm.label or ""
     f._labelLbl:SetText(labelText)
@@ -172,7 +173,7 @@ function AP.Show(noteID, alarm, missedList)
     if f._snoozeDDContainer._selected then
         f._snoozeDDContainer._selected = defSnooze
         if f._snoozeDDContainer.SetText then
-            f._snoozeDDContainer:SetText(defSnooze .. " min")
+            f._snoozeDDContainer:SetText(string.format(L["AO_MIN_FMT"], defSnooze))
         end
     end
 
@@ -255,7 +256,7 @@ local function UpdateOvDeleteLabel()
     if not _ovDeleteSelBtn then return end
     local n = 0
     for _ in pairs(_ovMultiSel) do n = n + 1 end
-    _ovDeleteSelBtn:SetText(n > 0 and ("Delete (" .. n .. ")") or "Delete (0)")
+    _ovDeleteSelBtn:SetText(string.format(L["AO_DELETE_FMT"], n))
     _ovDeleteSelBtn:SetEnabled(n > 0)
     if _ovDeleteSelBtn.GetFontString and _ovDeleteSelBtn:GetFontString() then
         _ovDeleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
@@ -264,20 +265,20 @@ end
 
 local function FormatFireTime(noteID)
     local t = BNB.Alarm and BNB.Alarm.GetNextFireTime(noteID)
-    if not t then return "|cffff4444Fired|r" end
+    if not t then return L["AO_FIRED"] end
     local diff = t - time()
-    if diff < 0    then return "|cffff4444Overdue|r" end
-    if diff < 60   then return "|cff66bb6a< 1 min|r" end
-    if diff < 3600 then return string.format("|cff66bb6a%d min|r", math.floor(diff / 60)) end
-    if diff < 86400 then return string.format("|cff66bb6a%dh %dm|r",
+    if diff < 0    then return L["AO_OVERDUE"] end
+    if diff < 60   then return L["AO_LT_1_MIN"] end
+    if diff < 3600 then return string.format(L["AO_MIN_LEFT_FMT"], math.floor(diff / 60)) end
+    if diff < 86400 then return string.format(L["AO_HOUR_MIN_LEFT_FMT"],
         math.floor(diff / 3600), math.floor((diff % 3600) / 60)) end
-    return string.format("|cff66bb6a%s|r", date("%Y-%m-%d %H:%M", t))
+    return string.format(L["AO_DATE_FMT"], date("%Y-%m-%d %H:%M", t))
 end
 
 -- Full timestamp for tooltip
 local function FullFireTime(noteID)
     local t = BNB.Alarm and BNB.Alarm.GetNextFireTime(noteID)
-    if not t then return "No scheduled time" end
+    if not t then return L["AO_NO_SCHEDULED_TIME"] end
     return date("%Y-%m-%d %H:%M", t)
 end
 
@@ -310,7 +311,7 @@ local function SetOvMultiMode(enabled)
     if enabled then
         -- Three-button layout: Cancel | Select All | Delete (N)
         if _ovSelectBtn then
-            _ovSelectBtn:SetText("Cancel")
+            _ovSelectBtn:SetText(L["CANCEL"])
             _ovSelectBtn:SetWidth(BW3)
             _ovSelectBtn:ClearAllPoints()
             _ovSelectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
@@ -332,7 +333,7 @@ local function SetOvMultiMode(enabled)
     else
         -- Normal mode: one full-width "Select" button (hidden when no alarms)
         if _ovSelectBtn then
-            _ovSelectBtn:SetText("Select")
+            _ovSelectBtn:SetText(L["MW_SELECT_BTN"])
             _ovSelectBtn:SetWidth(BW1)
             _ovSelectBtn:ClearAllPoints()
             _ovSelectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
@@ -363,7 +364,7 @@ local function BuildOverview()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
-    f:SetTitle("Alarms")
+    f:SetTitle(L["MW_ALARM_TIP"])
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -398,14 +399,14 @@ local function BuildOverview()
     local BW1 = OV_W - OV_PAD * 2
     local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
 
-    local selectBtn = BNB.CreateButton(nil, f, "Select", BW1, 26)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], BW1, 26)
     selectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
     selectBtn:SetScript("OnClick", function()
         SetOvMultiMode(not _ovMultiMode)
     end)
     _ovSelectBtn = selectBtn
 
-    local selectAllBtn = BNB.CreateButton(nil, f, "Select All", BW3, 26)
+    local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], BW3, 26)
     selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function()
@@ -422,7 +423,7 @@ local function BuildOverview()
     end)
     _ovSelectAllBtn = selectAllBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, "Delete (0)", BW3, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, f, string.format(L["AO_DELETE_FMT"], 0), BW3, 26)
     deleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + (BW3 + 6) * 2, 14)
     deleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
     deleteSelBtn:SetEnabled(false)
@@ -477,7 +478,7 @@ local function BuildOverviewSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Alarms")
+    titleLbl:SetText(L["MW_ALARM_TIP"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -512,12 +513,12 @@ local function BuildOverviewSkin()
     local BW1 = OV_W - OV_PAD * 2
     local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
 
-    local selectBtn = BNB.CreateButton(nil, f, "Select", BW1, 26)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], BW1, 26)
     selectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
     selectBtn:SetScript("OnClick", function() SetOvMultiMode(not _ovMultiMode) end)
     _ovSelectBtn = selectBtn
 
-    local selectAllBtn = BNB.CreateButton(nil, f, "Select All", BW3, 26)
+    local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], BW3, 26)
     selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function()
@@ -534,7 +535,7 @@ local function BuildOverviewSkin()
     end)
     _ovSelectAllBtn = selectAllBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, "Delete (0)", BW3, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, f, string.format(L["AO_DELETE_FMT"], 0), BW3, 26)
     deleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + (BW3 + 6) * 2, 14)
     deleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
     deleteSelBtn:SetEnabled(false)
@@ -626,7 +627,7 @@ local function MakeRow(parent)
     timeLbl:SetTextColor(0.50, 0.50, 0.50, 1)
 
     -- Reset button (shown when alarm.fired)
-    local resetBtn = BNB.CreateButton(nil, row, "Reset", 52, 16)
+    local resetBtn = BNB.CreateButton(nil, row, L["RESET"], 52, 16)
     resetBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 4)
     resetBtn:Hide()
 
@@ -705,7 +706,7 @@ function AO.Refresh()
         row._iconTx:SetTexture(iconTex)
 
         -- Title
-        local t = (note.title and note.title ~= "") and note.title or "Untitled"
+        local t = (note.title and note.title ~= "") and note.title or L["AO_UNTITLED"]
         row._titleLbl:SetText(t)
 
         -- Alarm label
@@ -765,23 +766,23 @@ function AO.Refresh()
                 local nid = noteID  -- capture for closures
                 _ovCtxDD:SetupMenu(function(_, root)
                     root:CreateTitle(t)
-                    root:CreateButton("Open Alarm", function()
+                    root:CreateButton(L["AO_CTX_OPEN_ALARM"], function()
                         if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then
                             BNB.AlarmWindow.OpenLeftOfMain(nid)
                         end
                     end)
-                    root:CreateButton("Open Note", function()
+                    root:CreateButton(L["AO_CTX_OPEN_NOTE"], function()
                         if not BNB.mainFrame then
                             if BNB.CreateMainWindow then BNB.CreateMainWindow() end
                         end
                         if BNB.mainFrame then BNB.mainFrame:Show() end
                         if BNB.SelectNote then BNB.SelectNote(nid) end
                     end)
-                    root:CreateButton("Open as Sticky Note", function()
+                    root:CreateButton(L["AO_CTX_OPEN_STICKY"], function()
                         if BNB.Sticky and BNB.Sticky.Open then BNB.Sticky.Open(nid) end
                     end)
                     root:CreateDivider()
-                    root:CreateButton("|cffff4444Delete Alarm|r", function()
+                    root:CreateButton(L["AO_CTX_DELETE_ALARM"], function()
                         local popup = StaticPopup_Show("BNB_DELETE_ALARM_CONFIRM")
                         if popup then popup.data = nid end
                     end)
@@ -827,7 +828,7 @@ function AO.Refresh()
         if not f._emptyLbl then
             f._emptyLbl = ct:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
             f._emptyLbl:SetPoint("TOP", ct, "TOP", 0, -10)
-            f._emptyLbl:SetText("No alarms set.")
+            f._emptyLbl:SetText(L["AO_EMPTY_STATE"])
             f._emptyLbl:SetTextColor(0.5, 0.5, 0.5, 1)
         end
         f._emptyLbl:Show()
@@ -859,9 +860,9 @@ end
 -- Called by AlarmManager when missed alarms are detected on login
 -- StaticPopup for alarm delete confirmation
 StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
-    text = "Delete this alarm?",
-    button1 = "Delete",
-    button2 = "Cancel",
+    text = L["AO_DELETE_CONFIRM_TEXT"],
+    button1 = L["DELETE"],
+    button2 = L["CANCEL"],
     OnAccept = function(self)
         local noteID = self.data
         if noteID and BNB.Alarm and BNB.Alarm.ClearAlarm then
@@ -885,5 +886,5 @@ function AO.ShowMissed(noteIDs)
     end
     f:Show()
     f:Raise()
-    BNB:Print(string.format("[BNB] %d alarm(s) fired while you were offline.", #noteIDs))
+    BNB:Print(string.format(L["AO_MISSED_FMT"], #noteIDs))
 end

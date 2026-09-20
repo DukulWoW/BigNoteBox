@@ -27,6 +27,7 @@
 --   BNB.Sidebar.IsEnabled()
 
 local BNB = BigNoteBox
+local L   = BNB.L
 BNB.Sidebar = BNB.Sidebar or {}
 local SB = BNB.Sidebar
 
@@ -176,9 +177,9 @@ end
 -- Tooltip text for a slot button
 local function TooltipForKey(key)
     if key == "all" then
-        return "All Notes", "Shows all notes regardless of scope."
+        return L["SB_ALL_NOTES"], L["SB_ALL_NOTES_TIP"]
     elseif key == "global" then
-        return "Global Notes", "Shows notes shared across all characters."
+        return L["SB_GLOBAL_NOTES"], L["SB_GLOBAL_NOTES_TIP"]
     else
         local charKey = key:match("^char:(.+)$")
         if charKey then
@@ -188,7 +189,7 @@ local function TooltipForKey(key)
                 local title = rec.name or charKey
                 local lines = {}
                 if rec.level then
-                    lines[#lines + 1] = "Level " .. rec.level
+                    lines[#lines + 1] = string.format(L["SB_LEVEL_FMT"], rec.level)
                 end
                 if rec.class then
                     local cls = rec.class:sub(1,1):upper() .. rec.class:sub(2):lower()
@@ -411,7 +412,7 @@ local function BuildIconPickerFrame()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Choose Icon")
+        titleLbl:SetText(L["NND_CHOOSE_ICON"])
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
         closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -433,7 +434,7 @@ local function BuildIconPickerFrame()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetTitle("Choose Icon")
+        f:SetTitle(L["NND_CHOOSE_ICON"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
         end
@@ -544,7 +545,7 @@ local function ShowSlotContextMenu(key, btn)
     dd:SetupMenu(function(_, root)
         -- Pin / Unpin
         root:CreateButton(
-            rec.slotPinned and "Unpin" or "Pin to top",
+            rec.slotPinned and L["SB_UNPIN"] or L["SB_PIN_TO_TOP"],
             function()
                 if rec.slotPinned then
                     rec.slotPinned  = false
@@ -559,8 +560,7 @@ local function ShowSlotContextMenu(key, btn)
                     local order = 1
                     while used[order] and order <= MAX_PINNED do order = order + 1 end
                     if order > MAX_PINNED then
-                        print("|cffffcc00BigNoteBox:|r Maximum of " .. MAX_PINNED
-                            .. " pinned characters reached.")
+                        print(string.format(L["SB_MAX_PINNED_FMT"], MAX_PINNED))
                         return
                     end
                     rec.slotPinned  = true
@@ -570,20 +570,20 @@ local function ShowSlotContextMenu(key, btn)
             end)
 
         -- Hide
-        root:CreateButton("Hide from sidebar", function()
+        root:CreateButton(L["SB_HIDE_FROM_SIDEBAR"], function()
             rec.slotHidden = true
             if _activeKey == key then SB.SetActive("all") end
             SB.Refresh()
         end)
 
         -- Change icon
-        root:CreateButton("Change icon", function()
+        root:CreateButton(L["SB_CHANGE_ICON"], function()
             ShowSidebarIconPicker(charKey, btn)
         end)
 
         -- Reset icon (only shown if a custom icon is set)
         if rec.slotIcon then
-            root:CreateButton("Reset icon", function()
+            root:CreateButton(L["SB_RESET_ICON"], function()
                 rec.slotIcon = nil
                 SB.Refresh()
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
@@ -723,7 +723,7 @@ function SB.Refresh()
             end
             local cnt = CountForKey(slotKey)
             if cnt > 0 then
-                GameTooltip:AddLine(cnt .. " note" .. (cnt == 1 and "" or "s"), 0.6, 0.9, 0.6)
+                GameTooltip:AddLine(cnt == 1 and L["SB_NOTE_COUNT_ONE"] or string.format(L["SB_NOTE_COUNT_N_FMT"], cnt), 0.6, 0.9, 0.6)
             end
             GameTooltip:Show()
         end)
@@ -879,7 +879,7 @@ local function BuildCopyMovePopup()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Copy / Move Note")
+        titleLbl:SetText(L["SB_COPY_MOVE_TITLE"])
         f._titleLbl = titleLbl
 
         local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
@@ -924,8 +924,8 @@ local function BuildCopyMovePopup()
     f._scrollFrame = sf
 
     local btnW = (PW - PAD * 2 - 4) / 2
-    local copyBtn = BNB.CreateButton(nil, f, "Copy", btnW, BTN_H)
-    local moveBtn = BNB.CreateButton(nil, f, "Move", btnW, BTN_H)
+    local copyBtn = BNB.CreateButton(nil, f, L["REFBOX_PICKER_COPY"], btnW, BTN_H)
+    local moveBtn = BNB.CreateButton(nil, f, L["REFBOX_PICKER_MOVE"], btnW, BTN_H)
     copyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 8)
     moveBtn:SetPoint("LEFT", copyBtn, "RIGHT", 4, 0)
     f._copyBtn = copyBtn
@@ -946,9 +946,9 @@ function BNB.OpenCopyMovePopup(noteID, mode)
 
     local f = BuildCopyMovePopup()
     if f.SetTitle then
-        f:SetTitle("Copy / Move Note")
+        f:SetTitle(L["SB_COPY_MOVE_TITLE"])
     elseif f._titleLbl then
-        f._titleLbl:SetText("Copy / Move Note")
+        f._titleLbl:SetText(L["SB_COPY_MOVE_TITLE"])
     end
 
     local sc = f._scrollChild
@@ -961,7 +961,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     local dests = {}
     local noteScope = note.scope or "global"
     if noteScope ~= "global" then
-        dests[#dests + 1] = { key = "global", label = "Global Notes" }
+        dests[#dests + 1] = { key = "global", label = L["SB_GLOBAL_NOTES"] }
     end
     for charKey, rec in pairs(db.knownChars or {}) do
         local slotKey = "char:" .. charKey
@@ -973,7 +973,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
 
     if #dests == 0 then
         f:Hide()
-        BNB:Print("|cffffcc00BigNoteBox:|r No other destinations available.")
+        BNB:Print(L["SB_NO_DESTINATIONS"])
         return
     end
 
@@ -1085,7 +1085,9 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     if not db or not ndb or not ndb.notes then return end
 
     local f = BuildCopyMovePopup()
-    local cmTitle = "Copy / Move " .. #noteIDs .. " Note" .. (#noteIDs > 1 and "s" or "")
+    local cmTitle = #noteIDs > 1
+        and string.format(L["SB_COPY_MOVE_MULTI_N_FMT"], #noteIDs)
+        or  string.format(L["SB_COPY_MOVE_MULTI_ONE_FMT"], #noteIDs)
     if f.SetTitle then
         f:SetTitle(cmTitle)
     elseif f._titleLbl then
@@ -1110,7 +1112,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     -- Build destination list: exclude scopes all selected notes are already in
     local dests = {}
     if not scopeSet["global"] then
-        dests[#dests + 1] = { key = "global", label = "Global Notes" }
+        dests[#dests + 1] = { key = "global", label = L["SB_GLOBAL_NOTES"] }
     end
     for charKey, rec in pairs(db.knownChars or {}) do
         local slotKey = "char:" .. charKey
@@ -1122,7 +1124,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
 
     if #dests == 0 then
         f:Hide()
-        BNB:Print("|cffffcc00BigNoteBox:|r No other destinations available.")
+        BNB:Print(L["SB_NO_DESTINATIONS"])
         return
     end
 

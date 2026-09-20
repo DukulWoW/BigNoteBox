@@ -10,6 +10,7 @@
 
 local BNB = BigNoteBox
 if not BNB then return end
+local L = BNB.L
 
 BNB.TaskEditWindow = BNB.TaskEditWindow or {}
 local TW = BNB.TaskEditWindow
@@ -142,7 +143,7 @@ end
 -- SITUATION helpers
 -- ---------------------------------------------------------------------------
 local SIT_TYPES  = { "none", "zone", "subzone", "instance", "player" }
-local SIT_LABELS = { "None (global)", "Zone", "Sub-zone", "Instance", "Player" }
+local SIT_LABELS = { L["TEW_SIT_NONE_GLOBAL"], L["TEW_SIT_ZONE"], L["TEW_SIT_SUBZONE"], L["TEW_SIT_INSTANCE"], L["TEW_SIT_PLAYER"] }
 
 local function ParseSituation(raw)
     if not raw or raw == "" then return "none", "" end
@@ -164,7 +165,7 @@ local function BuildContent(f, ct, saveBtn)
     textSection:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
     textSection:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
     textSection:SetHeight(TW_LBL + 2 + TW_ROW + TW_SECT_GAP)
-    SectionHdr(textSection, "Task text", 0)
+    SectionHdr(textSection, L["TEW_TASK_TEXT_HDR"], 0)
 
     local textLbl = textSection:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     textLbl:SetPoint("TOPLEFT",  textSection, "TOPLEFT",  6, -(TW_LBL + 2))
@@ -182,7 +183,7 @@ local function BuildContent(f, ct, saveBtn)
     textEB:SetScript("OnEnterPressed", function(self)
         local t = self:GetText()
         _pendingText = t
-        textLbl:SetText(t ~= "" and t or "|cff888888(empty)|r")
+        textLbl:SetText(t ~= "" and t or L["TEW_EMPTY_TEXT"])
         self:Hide(); textLbl:Show()
         self:ClearFocus()
         MarkDirty()
@@ -196,7 +197,7 @@ local function BuildContent(f, ct, saveBtn)
         if self:IsShown() then
             local t = self:GetText()
             _pendingText = t
-            textLbl:SetText(t ~= "" and t or "|cff888888(empty)|r")
+            textLbl:SetText(t ~= "" and t or L["TEW_EMPTY_TEXT"])
             self:Hide(); textLbl:Show()
             MarkDirty()
         end
@@ -215,30 +216,30 @@ local function BuildContent(f, ct, saveBtn)
     y = y - (TW_LBL + 2 + TW_ROW + TW_SECT_GAP)
 
     -- Section: Reset
-    SectionHdr(ct, "Reset", y); y = y - TW_LBL - 2
-    SmallLbl(ct, "Automatically re-check after a period.", y)
+    SectionHdr(ct, L["TEW_RESET_HDR"], y); y = y - TW_LBL - 2
+    SmallLbl(ct, L["TEW_RESET_DESC"], y)
     y = y - TW_LBL - 4
 
     local resetEntriesTask = {
-        { label = "None (Global)", value = "global" },
-        { label = "None",          value = "none"   },
-        { label = "Daily",         value = "daily"  },
-        { label = "Weekly",        value = "weekly" },
+        { label = L["TEW_RESET_GLOBAL_OPT"],     value = "global" },
+        { label = L["TASK_CTX_RESET_NONE"],      value = "none"   },
+        { label = L["TASK_CTX_RESET_DAILY"],     value = "daily"  },
+        { label = L["TASK_CTX_RESET_WEEKLY"],    value = "weekly" },
     }
     local resetEntriesGlobal = {
-        { label = "None",   value = "none"   },
-        { label = "Daily",  value = "daily"  },
-        { label = "Weekly", value = "weekly" },
+        { label = L["TASK_CTX_RESET_NONE"],   value = "none"   },
+        { label = L["TASK_CTX_RESET_DAILY"],  value = "daily"  },
+        { label = L["TASK_CTX_RESET_WEEKLY"], value = "weekly" },
     }
     local resetDD = MakeDD(ct, resetEntriesTask, "global", nil, TW_CW)
     resetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     resetDD:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Task reset schedule", 1, 1, 1)
-        GameTooltip:AddLine("None (Global): follows the note's global reset setting.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("None: no reset even if a global reset is set on the note.", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Daily: resets at the WoW daily reset (varies by region).", 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine("Weekly: resets at the WoW weekly reset (varies by region).", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TEW_RESET_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["TEW_RESET_TIP_GLOBAL"], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TEW_RESET_TIP_NONE"], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TEW_RESET_TIP_DAILY"], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TEW_RESET_TIP_WEEKLY"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     resetDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -248,8 +249,8 @@ local function BuildContent(f, ct, saveBtn)
     y = y - TW_ROW - TW_SECT_GAP
 
     -- Section: Situation
-    SectionHdr(ct, "Situation", y); y = y - TW_LBL - 2
-    SmallLbl(ct, "Bind this task to a context.", y)
+    SectionHdr(ct, L["TEW_SITUATION_HDR"], y); y = y - TW_LBL - 2
+    SmallLbl(ct, L["TEW_SITUATION_DESC"], y)
     y = y - TW_LBL - 4
 
     local sitEntriesTask = {}
@@ -258,7 +259,7 @@ local function BuildContent(f, ct, saveBtn)
     end
     local sitEntriesGlobal = {}
     for i = 1, #SIT_TYPES do
-        local lbl2 = (i == 1) and "None" or SIT_LABELS[i]
+        local lbl2 = (i == 1) and L["TEW_SIT_NONE"] or SIT_LABELS[i]
         sitEntriesGlobal[i] = { label = lbl2, value = SIT_TYPES[i] }
     end
 
@@ -269,10 +270,10 @@ local function BuildContent(f, ct, saveBtn)
         else
             if _sitValueRow then
                 _sitValueRow:Show()
-                local labelStr = "Zone:"
-                if v == "subzone"  then labelStr = "Sub-zone:"
-                elseif v == "instance" then labelStr = "Instance:"
-                elseif v == "player"   then labelStr = "Player:" end
+                local labelStr = L["TEW_VAL_LBL_ZONE"]
+                if v == "subzone"  then labelStr = L["TEW_VAL_LBL_SUBZONE"]
+                elseif v == "instance" then labelStr = L["TEW_VAL_LBL_INSTANCE"]
+                elseif v == "player"   then labelStr = L["TEW_VAL_LBL_PLAYER"] end
                 _sitValueRow._lbl:SetText(labelStr)
                 if v == "player" then
                     if _sitBrowseBtn then _sitBrowseBtn:Hide() end
@@ -298,7 +299,7 @@ local function BuildContent(f, ct, saveBtn)
     local valueLbl = valueRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     valueLbl:SetPoint("LEFT", valueRow, "LEFT", 0, 0)
     valueLbl:SetWidth(44); valueLbl:SetJustifyH("LEFT")
-    valueLbl:SetText("Zone:"); valueLbl:SetHeight(TW_ROW)
+    valueLbl:SetText(L["TEW_VAL_LBL_ZONE"]); valueLbl:SetHeight(TW_ROW)
     valueRow._lbl = valueLbl
 
     local valueEb = BNB.CreateBackdropFrame("EditBox", nil, valueRow)
@@ -321,7 +322,7 @@ local function BuildContent(f, ct, saveBtn)
     browseTx:SetTexture(ASSETS .. "Overlay/ov-situation")
     browseBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Browse zones and instances", 1, 1, 1)
+        GameTooltip:AddLine(L["TEW_BROWSE_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     browseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -336,7 +337,7 @@ local function BuildContent(f, ct, saveBtn)
     _sitBrowseBtn = browseBtn
     y = y - TW_ROW - TW_GAP
 
-    local useCurBtn = BNB.CreateButton(nil, ct, "Use Current", 90, 20)
+    local useCurBtn = BNB.CreateButton(nil, ct, L["TEW_USE_CURRENT_BTN"], 90, 20)
     useCurBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     useCurBtn:SetScript("OnClick", function()
         local val = ""
@@ -354,7 +355,7 @@ local function BuildContent(f, ct, saveBtn)
     end)
     _sitUseCurBtn = useCurBtn
 
-    local clrCurBtn = BNB.CreateButton(nil, ct, "Clear", 60, 20)
+    local clrCurBtn = BNB.CreateButton(nil, ct, L["TEW_CLEAR_BTN"], 60, 20)
     clrCurBtn:SetPoint("LEFT", useCurBtn, "RIGHT", 6, 0)
     clrCurBtn:SetScript("OnClick", function()
         if _sitValueEb then _sitValueEb:SetText("") end
@@ -365,8 +366,8 @@ local function BuildContent(f, ct, saveBtn)
     end)
     clrCurBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine("Clear situation", 1, 1, 1)
-        GameTooltip:AddLine("Removes the context binding from this task.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TEW_CLEAR_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TEW_CLEAR_TIP_SUB"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     clrCurBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -473,7 +474,7 @@ local function BuildWindow()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     f:SetAlpha(0.95)
-    f:SetTitle("Edit Task")
+    f:SetTitle(L["TEW_TITLE"])
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() TW.Close() end)
     end
@@ -492,13 +493,13 @@ local function BuildWindow()
     local bW = math.floor(TW_CW / 2) - 4
     local saveBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     saveBtn:SetSize(bW, 26); saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD, 6)
-    saveBtn:SetText("Save"); saveBtn:SetEnabled(false)
+    saveBtn:SetText(L["SAVE"]); saveBtn:SetEnabled(false)
     _saveBtn = saveBtn
 
     local cancelBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     cancelBtn:SetSize(bW, 26)
     cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD + bW + 8, 6)
-    cancelBtn:SetText("Cancel")
+    cancelBtn:SetText(L["CANCEL"])
     cancelBtn:SetScript("OnClick", function() TW.Close() end)
 
     -- Scroll panel
@@ -567,7 +568,7 @@ local function BuildWindowSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Edit Task")
+    titleLbl:SetText(L["TEW_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() TW.Close() end)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -583,12 +584,12 @@ local function BuildWindowSkin()
 
     -- Buttons
     local bW = math.floor(TW_CW / 2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, "Save", bW, 26)
+    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
     saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD, 6)
     saveBtn:SetEnabled(false)
     _saveBtn = saveBtn
 
-    local cancelBtn = BNB.CreateButton(nil, f, "Cancel", bW, 26)
+    local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], bW, 26)
     cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD + bW + 8, 6)
     cancelBtn:SetScript("OnClick", function() TW.Close() end)
 
@@ -674,10 +675,10 @@ local function PopulateGlobal(noteID)
     else
         if _sitValueRow then
             _sitValueRow:Show()
-            local labelStr = sitType == "zone" and "Zone:"
-                or sitType == "subzone" and "Sub-zone:"
-                or sitType == "instance" and "Instance:"
-                or "Player:"
+            local labelStr = sitType == "zone" and L["TEW_VAL_LBL_ZONE"]
+                or sitType == "subzone" and L["TEW_VAL_LBL_SUBZONE"]
+                or sitType == "instance" and L["TEW_VAL_LBL_INSTANCE"]
+                or L["TEW_VAL_LBL_PLAYER"]
             _sitValueRow._lbl:SetText(labelStr)
             if sitType == "player" then
                 if _sitBrowseBtn then _sitBrowseBtn:Hide() end
@@ -722,7 +723,7 @@ local function Populate(noteID, taskID)
         _textEB:SetText(txt)
         _textEB:Hide()
         if _textEB._lbl then
-            _textEB._lbl:SetText(txt ~= "" and txt or "|cff888888(empty)|r")
+            _textEB._lbl:SetText(txt ~= "" and txt or L["TEW_EMPTY_TEXT"])
             _textEB._lbl:Show()
         end
     end
@@ -738,10 +739,10 @@ local function Populate(noteID, taskID)
     else
         if _sitValueRow then
             _sitValueRow:Show()
-            local labelStr = sitType == "zone" and "Zone:"
-                or sitType == "subzone" and "Sub-zone:"
-                or sitType == "instance" and "Instance:"
-                or "Player:"
+            local labelStr = sitType == "zone" and L["TEW_VAL_LBL_ZONE"]
+                or sitType == "subzone" and L["TEW_VAL_LBL_SUBZONE"]
+                or sitType == "instance" and L["TEW_VAL_LBL_INSTANCE"]
+                or L["TEW_VAL_LBL_PLAYER"]
             _sitValueRow._lbl:SetText(labelStr)
             if sitType == "player" then
                 if _sitBrowseBtn then _sitBrowseBtn:Hide() end
@@ -766,11 +767,11 @@ end
 local function SetTitle(isGlobal)
     if not _frame then return end
     if isGlobal then
-        if _frame.SetTitle then _frame:SetTitle("Note Task Defaults")
-        elseif _frame._titleLbl then _frame._titleLbl:SetText("Note Task Defaults") end
+        if _frame.SetTitle then _frame:SetTitle(L["TEW_TITLE_GLOBAL"])
+        elseif _frame._titleLbl then _frame._titleLbl:SetText(L["TEW_TITLE_GLOBAL"]) end
     else
-        if _frame.SetTitle then _frame:SetTitle("Edit Task")
-        elseif _frame._titleLbl then _frame._titleLbl:SetText("Edit Task") end
+        if _frame.SetTitle then _frame:SetTitle(L["TEW_TITLE"])
+        elseif _frame._titleLbl then _frame._titleLbl:SetText(L["TEW_TITLE"]) end
     end
 end
 

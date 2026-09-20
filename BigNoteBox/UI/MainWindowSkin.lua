@@ -284,13 +284,13 @@ function BNB.CreateMainWindowSkin()
         else           unlockTex:Hide(); unlockHov:Show() end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         if locked then
-            GameTooltip:AddLine("Window scale is locked", 1, 1, 1)
-            GameTooltip:AddLine("Click to allow resizing", 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(L["MW_LOCK_TIP"], 1, 1, 1)
+            GameTooltip:AddLine(L["MW_LOCK_TIP_SUB"], 0.78, 0.78, 0.78)
         else
-            GameTooltip:AddLine("Window scale is unlocked", 1, 1, 1)
-            GameTooltip:AddLine("Click to lock and hide the resize handle", 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(L["MW_UNLOCK_TIP"], 1, 1, 1)
+            GameTooltip:AddLine(L["MW_UNLOCK_TIP_SUB"], 0.78, 0.78, 0.78)
         end
-        GameTooltip:AddLine("Right-click to reset window size and position", 0.55, 0.55, 0.55)
+        GameTooltip:AddLine(L["MW_LOCK_RESET_TIP"], 0.55, 0.55, 0.55)
         GameTooltip:Show()
     end)
     lockBtn:SetScript("OnLeave", function() RefreshLockBtn(); GameTooltip:Hide() end)
@@ -328,7 +328,7 @@ function BNB.CreateMainWindowSkin()
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
             if BNB._refreshSkinConfig then BNB._refreshSkinConfig() end
         end,
-        "Random skin", "Click to randomly change the skin preset and brightness")
+        L["MWS_RANDOM_SKIN_TIP"], L["MWS_RANDOM_SKIN_TIP_SUB"])
     skinChangeBtn:SetPoint("RIGHT", lockBtn, "LEFT", -4, 0)
 
     -- ── Toolbar strip (sort dropdowns + topbar icons) ─────────────────────────
@@ -341,26 +341,26 @@ function BNB.CreateMainWindowSkin()
     -- Sort + direction dropdowns and Select button
     local SORT_BTN_H = 22
     local SORT_MODES = {
-        { key="custom",   label="Custom"   },
-        { key="creation", label="Creation" },
-        { key="edited",   label="Edited"   },
-        { key="alpha",    label="A-Z"      },
-        { key="location", label="Location" },
+        { key="custom",   label=L["SORT_MODE_CUSTOM"]   },
+        { key="creation", label=L["SORT_MODE_CREATION"] },
+        { key="edited",   label=L["SORT_MODE_EDITED"]   },
+        { key="alpha",    label=L["SORT_MODE_ALPHA"]    },
+        { key="location", label=L["SORT_MODE_LOCATION"] },
     }
     local DIR_MODES = {
-        { key="desc", label="Descending" },
-        { key="asc",  label="Ascending"  },
+        { key="desc", label=L["DIR_MODE_DESC"] },
+        { key="asc",  label=L["DIR_MODE_ASC"]  },
     }
     local function CurrentSortLabel()
         for _, m in ipairs(SORT_MODES) do
             if m.key == (BigNoteBoxDB.sortBy or "creation") then return m.label end
         end
-        return "Creation"
+        return L["SORT_MODE_CREATION"]
     end
     local function IsCustomSort()  return BigNoteBoxDB.sortBy == "custom" end
     local function CurrentDirKey() return BigNoteBoxDB.sortAsc and "asc" or "desc" end
     local function CurrentDirLabel()
-        return BigNoteBoxDB.sortAsc and "Ascending" or "Descending"
+        return BigNoteBoxDB.sortAsc and L["DIR_MODE_ASC"] or L["DIR_MODE_DESC"]
     end
 
     local sortDD, sortCycleBtn, dirDD, dirCycleBtn
@@ -445,7 +445,7 @@ function BNB.CreateMainWindowSkin()
     end
 
     -- Select button
-    local selBtn = BNB.CreateButton(nil, toolBar, "Select", 52, SORT_BTN_H)
+    local selBtn = BNB.CreateButton(nil, toolBar, L["MW_SELECT_BTN"], 52, SORT_BTN_H)
     if useNativeSort then
         selBtn:SetPoint("LEFT", dirDD, "RIGHT", 6, 0)
     else
@@ -457,13 +457,13 @@ function BNB.CreateMainWindowSkin()
         local entering = not BNB._multiMode
         BNB._multiMode = entering
         if BNB.SetMultiMode then BNB.SetMultiMode(entering) end
-        selBtn:SetText(entering and "Cancel" or "Select")
+        selBtn:SetText(entering and L["CANCEL"] or L["MW_SELECT_BTN"])
         if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(entering) end
     end)
     selBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Toggle multi-select mode", 1,1,1)
-        GameTooltip:AddLine("Select notes to bulk-delete them", 0.78,0.78,0.78)
+        GameTooltip:AddLine(L["MW_SELECT_TIP"], 1,1,1)
+        GameTooltip:AddLine(L["MW_SELECT_TIP_SUB"], 0.78,0.78,0.78)
         GameTooltip:Show()
     end)
     selBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -485,31 +485,31 @@ function BNB.CreateMainWindowSkin()
         return btn
     end
 
-    local selectAllBtn = BNB.CreateButton(nil, toolBar, "Select All", 76, SORT_BTN_H)
+    local selectAllBtn = BNB.CreateButton(nil, toolBar, L["MW_SELECT_ALL_BTN"], 76, SORT_BTN_H)
     selectAllBtn:SetPoint("LEFT", selBtn, "RIGHT", 4, 0)
     selectAllBtn:SetPoint("TOP",  selBtn, "TOP",   0, 0)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function() if BNB.SelectAll then BNB.SelectAll() end end)
     selectAllBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Select all notes", 1,1,1); GameTooltip:Show()
+        GameTooltip:AddLine(L["MW_SELECT_ALL_TIP"], 1,1,1); GameTooltip:Show()
     end)
     selectAllBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._multiSelectAllBtn = selectAllBtn
 
-    local multiDelBtn = BNB.CreateButton(nil, toolBar, "Delete (0)", 90, SORT_BTN_H)
+    local multiDelBtn = BNB.CreateButton(nil, toolBar, string.format(L["MULTI_DELETE_FMT"], "(0)"), 90, SORT_BTN_H)
     multiDelBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 4, 0)
     multiDelBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
     multiDelBtn:SetEnabled(false); multiDelBtn:Hide()
     multiDelBtn:SetScript("OnClick", function() if BNB.DeleteMultiSelected then BNB.DeleteMultiSelected() end end)
     multiDelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Delete selected notes", 1,1,1); GameTooltip:Show()
+        GameTooltip:AddLine(L["MW_MULTI_DELETE_TIP"], 1,1,1); GameTooltip:Show()
     end)
     multiDelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._multiDeleteBtn = multiDelBtn
 
-    local multiCopyMoveBtn = BNB.CreateButton(nil, toolBar, "Copy / Move (0)", 120, SORT_BTN_H)
+    local multiCopyMoveBtn = BNB.CreateButton(nil, toolBar, string.format(L["MULTI_COPYMOVE_FMT"], "(0)"), 120, SORT_BTN_H)
     multiCopyMoveBtn:SetPoint("LEFT", multiDelBtn, "RIGHT", 4, 0)
     multiCopyMoveBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
     multiCopyMoveBtn:SetEnabled(false); multiCopyMoveBtn:Hide()
@@ -518,12 +518,12 @@ function BNB.CreateMainWindowSkin()
     end)
     multiCopyMoveBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Copy or move selected notes", 1,1,1); GameTooltip:Show()
+        GameTooltip:AddLine(L["MWS_MULTI_COPYMOVE_TIP"], 1,1,1); GameTooltip:Show()
     end)
     multiCopyMoveBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._multiCopyMoveBtn = multiCopyMoveBtn
 
-    local multiExportBtn = BNB.CreateButton(nil, toolBar, "Export (0)", 90, SORT_BTN_H)
+    local multiExportBtn = BNB.CreateButton(nil, toolBar, string.format(L["MULTI_EXPORT_FMT"], "(0)"), 90, SORT_BTN_H)
     multiExportBtn:SetPoint("LEFT", multiCopyMoveBtn, "RIGHT", 4, 0)
     multiExportBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
     multiExportBtn:SetEnabled(false); multiExportBtn:Hide()
@@ -535,8 +535,8 @@ function BNB.CreateMainWindowSkin()
     end)
     multiExportBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine("Export selected notes as JSON", 1,1,1)
-        GameTooltip:AddLine("Output can be re-imported via the Backup tab", 0.78,0.78,0.78)
+        GameTooltip:AddLine(L["MW_MULTI_EXPORT_TIP"], 1,1,1)
+        GameTooltip:AddLine(L["MW_MULTI_EXPORT_TIP_SUB"], 0.78,0.78,0.78)
         GameTooltip:Show()
     end)
     multiExportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -550,14 +550,14 @@ function BNB.CreateMainWindowSkin()
         return MakeIconToolbarBtn(f, toolBar, tex, tip, xOff, ICON_Y_OFF, onClick)
     end
 
-    local configBtn = TBIcon(TOPBAR.."tp-cog", "Settings (/bnb config)", -(8+24),
+    local configBtn = TBIcon(TOPBAR.."tp-cog", L["MW_CONFIG_TIP"], -(8+24),
         function()
             if BNB.OpenConfig        then BNB.OpenConfig()        end
         end)
     BNB._toolbarConfigBtn = configBtn
 
     -- Sidebar toggle button — right of cog
-    local sidebarToggleBtn = TBIcon(TOPBAR.."tp-sidebar-open", "Toggle sidebar", -8,
+    local sidebarToggleBtn = TBIcon(TOPBAR.."tp-sidebar-open", L["MW_SIDEBAR_TIP"], -8,
         function()
             if BNB.Sidebar and BNB.Sidebar.ToggleCollapsed then
                 BNB.Sidebar.ToggleCollapsed()
@@ -572,7 +572,7 @@ function BNB.CreateMainWindowSkin()
     end
     BNB.RefreshSidebarToggleBtn()
 
-    local trashBtn = TBIcon(TOPBAR.."tp-trash", "Trash  (deleted notes)", -(8+24*2),
+    local trashBtn = TBIcon(TOPBAR.."tp-trash", L["MW_TRASH_TIP"], -(8+24*2),
         function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end)
     BNB._toolbarTrashBtn = trashBtn
 
@@ -586,7 +586,7 @@ function BNB.CreateMainWindowSkin()
         function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end)
     BNB._toolbarTagsBtn = tagsBtn
 
-    local alarmOvBtn = TBIcon(TOPBAR.."tp-alarm", "Alarms", -(8+24*6),
+    local alarmOvBtn = TBIcon(TOPBAR.."tp-alarm", L["MW_ALARM_TIP"], -(8+24*6),
         function()
             if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
                 BNB.AlarmOverview.Toggle()
@@ -594,7 +594,7 @@ function BNB.CreateMainWindowSkin()
         end)
     BNB._toolbarAlarmOvBtn = alarmOvBtn
 
-    local shareTopBtn = TBIcon(TOPBAR.."tp-share", "Import a shared note", -(8+24*5),
+    local shareTopBtn = TBIcon(TOPBAR.."tp-share", L["MW_IMPORT_SHARED_TIP"], -(8+24*5),
         function()
             if BNB.OpenImportWindow then BNB.OpenImportWindow() end
         end)
@@ -603,7 +603,7 @@ function BNB.CreateMainWindowSkin()
     local importBtnTex = (BigChatBox and BigChatBox.SendDirect)
         and TOPBAR.."tp-bcb"
         or  "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
-    local importBtn = TBIcon(importBtnTex, "Send note to BigChatBox multiline input", -(8+24*7),
+    local importBtn = TBIcon(importBtnTex, L["MW_BCB_SEND_TIP"], -(8+24*7),
         function()
             if not (BigChatBox and BigChatBox.SendDirect) then
                 if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end; return
@@ -611,7 +611,7 @@ function BNB.CreateMainWindowSkin()
             local id   = BNB._currentNoteID
             local note = id and BNB.GetNote(id)
             local body = note and (note.body or "") or ""
-            if body == "" then BNB:Print("|cffff6666This note is empty.|r"); return end
+            if body == "" then BNB:Print(L["MW_NOTE_EMPTY"]); return end
             if BCB_OpenMultiline then BCB_OpenMultiline() end
             C_Timer.After(0.05, function()
                 if BigChatBox.mlEditBox then
