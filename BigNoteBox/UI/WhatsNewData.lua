@@ -22,11 +22,13 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.7.3",
+    version = "1.7.4",
     entries = {
-        "|cff66bb6aNew:|r Blizzard icon fields (Note config and Rich Note Ico tag) now support autocomplete search across 32,000+ icons",
-        "|cff66bb6aNew:|r Type any part of an icon name to get suggestions with live previews. You can scroll the list with arrow keys and mouse wheel",
-        "|cff66bb6aNew:|r Enable the icon list feature in Main Config > Advanced > Icons (off by default). This feature uses ~2 MB of memory",
-        "|cff66bb6aChange:|r Default max amount of sticky notes changed from 10 > 20"
+        "|cff66bb6aNew:|r Added a WoW Default font option that uses the game client's own font",
+        "|cff66bb6aNew:|r Chinese, Korean and Japanese clients now default to that font on first use",
+        "|cff66bb6aChange:|r Updated LibTourist, adding the new Midnight zones and delves",
+        "|cff66bb6aChange:|r Updated LibCustomGlow, fixing the alarm glow on newer clients",
+        "|cff66bb6aFixed:|r Right-clicking a task checkbox in RefBox also toggled the task",
+        "|cff66bb6aFixed:|r Changing a task's reset type kept the old reset timestamp"
     },
 }
