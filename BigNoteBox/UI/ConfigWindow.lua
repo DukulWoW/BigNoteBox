@@ -431,8 +431,8 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
     if not StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] then
         StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] = {
             text = "%s",
-            button1 = "Reload Now",
-            button2 = "Later",
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            button2 = L["CFG_LATER_BTN"],
             timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
             OnAccept = function() C_UI.Reload() end,
         }
@@ -440,9 +440,9 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
 
     if not StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] then
         StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
-            text = "Blizzard icon autocomplete has been disabled.\nThe icon list (~2 MB) will be freed after a reload.",
-            button1 = "Reload Now",
-            button2 = "Later",
+            text = L["CFG_BLZICON_DISABLED_MSG"],
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            button2 = L["CFG_LATER_BTN"],
             timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
             OnAccept = function() C_UI.Reload() end,
         }
@@ -514,7 +514,7 @@ local function BuildGeneralTab(sf, ct)
     -- Title
     local title = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge3")
     title:SetPoint("TOP", ct, "TOP", 0, y)
-    title:SetText("|cff66bb6aBigNoteBox|r")
+    title:SetText("|cff66bb6a" .. L["ADDON_NAME"] .. "|r")
     y = y - 26
 
     -- Version button — skin button style on both modes so it reads as clickable.
@@ -563,15 +563,15 @@ local function BuildGeneralTab(sf, ct)
         return d:GetStringHeight() + 22
     end
 
-    local h1 = Cell(0,      y, "Notes & Organization", "Create, search, tag and organize notes.\nPin, favourite, drag-reorder and sort.")
-    local h2 = Cell(cellX2, y, "Tags & Trash",          "Tag notes for instant filtering.\nDeleted notes go to Trash, restored any time.")
+    local h1 = Cell(0,      y, L["CFG_CELL_NOTES_HDR"], L["CFG_CELL_NOTES_DESC"])
+    local h2 = Cell(cellX2, y, L["CFG_CELL_TAGS_HDR"],          L["CFG_CELL_TAGS_DESC"])
     y = y - math.max(h1, h2) - 10
 
-    local bcbLabel = "BCB Integration"
+    local bcbLabel = L["CFG_BCB_HEADER"]
     if BigChatBox and BigChatBox.SendDirect then
         bcbLabel = bcbLabel .. " |cff66bb6a(INSTALLED)|r"
-        local h3 = Cell(0, y, bcbLabel, "Send notes line-by-line via BigChatBox.\nCapture chat input as new notes.")
-        local h4 = Cell(cellX2, y, "Contextual Surfacing",  "Notes surface automatically by zone,\ninstance or player name.")
+        local h3 = Cell(0, y, bcbLabel, L["CFG_BCB_DESC"])
+        local h4 = Cell(cellX2, y, L["CFG_CELL_CONTEXT_HDR"],  L["CFG_CELL_CONTEXT_DESC"])
         y = y - math.max(h3, h4) - 10
     else
         -- BCB not installed: draw the header manually so we can add a clickable badge
@@ -587,19 +587,19 @@ local function BuildGeneralTab(sf, ct)
         local notInstLbl = notInstBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         notInstLbl:SetAllPoints()
         notInstLbl:SetJustifyH("LEFT")
-        notInstLbl:SetText("|cff4fc3f7(NOT INSTALLED)|r")
+        notInstLbl:SetText("|cff4fc3f7" .. L["CFG_NOT_INSTALLED"] .. "|r")
         notInstBtn:SetScript("OnClick", function()
             if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
         end)
         notInstBtn:SetScript("OnEnter", function(self)
-            notInstLbl:SetText("|cff81d4fa(NOT INSTALLED)|r")
+            notInstLbl:SetText("|cff81d4fa" .. L["CFG_NOT_INSTALLED"] .. "|r")
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(L["CFG_BCB_TIP_TITLE"], 1, 1, 1)
             GameTooltip:AddLine(L["CFG_BCB_TIP_BODY"], 0.78, 0.78, 0.78)
             GameTooltip:Show()
         end)
         notInstBtn:SetScript("OnLeave", function()
-            notInstLbl:SetText("|cff4fc3f7(NOT INSTALLED)|r")
+            notInstLbl:SetText("|cff4fc3f7" .. L["CFG_NOT_INSTALLED"] .. "|r")
             GameTooltip:Hide()
         end)
 
@@ -611,15 +611,15 @@ local function BuildGeneralTab(sf, ct)
         desc3:SetText(L["CFG_BCB_DESC"])
         local h3 = desc3:GetStringHeight() + 22
 
-        local h4 = Cell(cellX2, y, "Contextual Surfacing", "Notes surface automatically by zone,\ninstance or player name.")
+        local h4 = Cell(cellX2, y, L["CFG_CELL_CONTEXT_HDR"], L["CFG_CELL_CONTEXT_DESC"])
         y = y - math.max(h3, h4) - 10
     end
 
     -- Row 3: Sticky Notes (left) + More Features button (right)
     -- The button matches the height of the left cell. Since GetStringHeight()
     -- returns 0 at build time, we use a deferred resize via C_Timer.After(0).
-    local h5 = Cell(0, y, "Sticky Notes",
-        "Float notes anywhere on screen.\nPer-note font, color, size and border.\nSet time-based alarms on any note.")
+    local h5 = Cell(0, y, L["CFG_CELL_STICKY_HDR"],
+        L["CFG_CELL_STICKY_DESC"])
 
     -- More Features button — same template trychain as OptionsPanel and WhatsNew OK button
     local moreTpl = "SharedButtonLargeTemplate"
@@ -631,7 +631,7 @@ local function BuildGeneralTab(sf, ct)
     end
     local moreBtn
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        moreBtn = BNB.CreateSkinButton(nil, ct, "More Features", cellW, 38)
+        moreBtn = BNB.CreateSkinButton(nil, ct, L["CFG_MORE_FEATURES_BTN"], cellW, 38)
     else
         moreBtn = CreateFrame("Button", nil, ct, moreTpl)
         moreBtn:SetWidth(cellW)
@@ -664,13 +664,13 @@ local function BuildGeneralTab(sf, ct)
 
     -- ── Keybindings section ───────────────────────────────────────────────────
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Keybindings")
+    y = AddHeader(ct, y, L["CFG_HDR_KEYBINDINGS"])
 
-    y = MakeKeybindRow(ct, y, L["CFG_KB_OPEN_BNB"], "BIGNOTEBOXOPEN", "(Default: Ctrl+N)", "Open / close BigNoteBox")
+    y = MakeKeybindRow(ct, y, L["CFG_KB_OPEN_BNB"], "BIGNOTEBOXOPEN", L["CFG_KB_HINT_CTRL_N"], L["CFG_KB_DESC_OPEN_BNB"])
 
     -- ── Data Summary section ──────────────────────────────────────────────────
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Data Summary")
+    y = AddHeader(ct, y, L["CFG_HDR_DATA_SUMMARY"])
 
     -- Compute stats from live notes DB
     local noteCount    = 0
@@ -698,11 +698,11 @@ local function BuildGeneralTab(sf, ct)
 
     local function fmtSize(bytes)
         if bytes >= 1024 * 1024 then
-            return string.format("%.1f MB", bytes / (1024 * 1024))
+            return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024))
         elseif bytes >= 1024 then
-            return string.format("%.1f KB", bytes / 1024)
+            return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024)
         else
-            return bytes .. " B"
+            return string.format(L["CFG_SIZE_B_FMT"], bytes)
         end
     end
 
@@ -733,17 +733,17 @@ local function BuildGeneralTab(sf, ct)
 
     local stats = {
         -- Row 1: live notes
-        { icon = ICO_N,  label = "Notes",        value = noteCount .. " notes" },
-        { icon = ICO_S,  label = "Notes size",   value = fmtSize(totalBytes) },
-        { icon = ICO_A,  label = "Average size", value = fmtSize(avgBytes) },
+        { icon = ICO_N,  label = L["CFG_STAT_NOTES"],        value = string.format(L["CFG_STAT_COUNT_FMT"], noteCount) },
+        { icon = ICO_S,  label = L["CFG_STAT_NOTES_SIZE"],   value = fmtSize(totalBytes) },
+        { icon = ICO_A,  label = L["CFG_STAT_AVG_SIZE"],     value = fmtSize(avgBytes) },
         -- Row 2: trash + history
-        { icon = ICO_T,  label = "In trash",     value = trashCount .. " notes" },
-        { icon = ICO_TS, label = "Trash size",   value = fmtSize(trashBytes) },
-        { icon = ICO_H,  label = "History size", value = fmtSize(histBytes) },
+        { icon = ICO_T,  label = L["CFG_STAT_IN_TRASH"],     value = string.format(L["CFG_STAT_COUNT_FMT"], trashCount) },
+        { icon = ICO_TS, label = L["CFG_STAT_TRASH_SIZE"],   value = fmtSize(trashBytes) },
+        { icon = ICO_H,  label = L["CFG_STAT_HISTORY_SIZE"], value = fmtSize(histBytes) },
         -- Row 3: totals
-        { icon = ICO_TN, label = "Total notes",  value = totalCount .. " notes" },
-        { icon = ICO_GS, label = "Total size",   value = fmtSize(grandTotal) },
-        { icon = ICO_L,  label = "Largest note", value = fmtSize(largestBytes) },
+        { icon = ICO_TN, label = L["CFG_STAT_TOTAL_NOTES"],  value = string.format(L["CFG_STAT_COUNT_FMT"], totalCount) },
+        { icon = ICO_GS, label = L["CFG_STAT_TOTAL_SIZE"],   value = fmtSize(grandTotal) },
+        { icon = ICO_L,  label = L["CFG_STAT_LARGEST_NOTE"], value = fmtSize(largestBytes) },
     }
 
     -- 3-column grid, 3 rows — render each stat at the correct col/row offset
@@ -810,7 +810,7 @@ local function BuildAppearanceTab(sf, ct)
     local y  = -8
 
     -- ── Skins ─────────────────────────────────────────────────────────────────
-    y = AddHeader(ct, y, "Skins")
+    y = AddHeader(ct, y, L["CFG_HDR_SKINS"])
 
     local skinDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     skinDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -843,19 +843,19 @@ local function BuildAppearanceTab(sf, ct)
 
     -- Preset dropdown (only active when skin mode is enabled)
     local SKIN_PRESETS = {
-        { key = "obsidian",   label = "Obsidian  (neutral dark)"  },
-        { key = "void",       label = "Void  (purple)"            },
-        { key = "dragonfire", label = "Dragonfire  (red)"         },
-        { key = "arcane",     label = "Arcane  (pink)"            },
-        { key = "fel",        label = "Fel  (green)"              },
-        { key = "titan",      label = "Titan  (gold)"             },
-        { key = "icecrown",   label = "Icecrown  (blue)"          },
-        { key = "holy",       label = "Holy  (warm yellow)"       },
-        { key = "azshara",    label = "Azshara  (teal)"           },
-        { key = "ragnaros",   label = "Ragnaros  (orange)"        },
-        { key = "earthen",    label = "Earthen  (brown)"          },
-        { key = "argent",     label = "Argent  (silver)"          },
-        { key = "oled",       label = "OLED  (pure black)"        },
+        { key = "obsidian",   label = L["CFG_SKIN_PRESET_OBSIDIAN"]  },
+        { key = "void",       label = L["CFG_SKIN_PRESET_VOID"]            },
+        { key = "dragonfire", label = L["CFG_SKIN_PRESET_DRAGONFIRE"]         },
+        { key = "arcane",     label = L["CFG_SKIN_PRESET_ARCANE"]            },
+        { key = "fel",        label = L["CFG_SKIN_PRESET_FEL"]              },
+        { key = "titan",      label = L["CFG_SKIN_PRESET_TITAN"]             },
+        { key = "icecrown",   label = L["CFG_SKIN_PRESET_ICECROWN"]          },
+        { key = "holy",       label = L["CFG_SKIN_PRESET_HOLY"]             },
+        { key = "azshara",    label = L["CFG_SKIN_PRESET_AZSHARA"]          },
+        { key = "ragnaros",   label = L["CFG_SKIN_PRESET_RAGNAROS"]         },
+        { key = "earthen",    label = L["CFG_SKIN_PRESET_EARTHEN"]          },
+        { key = "argent",     label = L["CFG_SKIN_PRESET_ARGENT"]           },
+        { key = "oled",       label = L["CFG_SKIN_PRESET_OLED"]             },
     }
 
     local function CurrentPresetLabel()
@@ -941,7 +941,7 @@ local function BuildAppearanceTab(sf, ct)
     skinBrightnessSl:SetWidth(CONTENT_W)
     y = y - (36 + ROW_GAP)
 
-    local skinBrightnessReset = BNB.CreateButton(nil, ct, "Reset", 52, 20)
+    local skinBrightnessReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
     skinBrightnessReset:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinBrightnessReset:SetScript("OnClick", function()
         db.skinBrightness = nil
@@ -971,7 +971,7 @@ local function BuildAppearanceTab(sf, ct)
     skinOpacitySl:SetWidth(CONTENT_W)
     y = y - (36 + ROW_GAP)
 
-    local skinOpacityReset = BNB.CreateButton(nil, ct, "Reset", 52, 20)
+    local skinOpacityReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
     skinOpacityReset:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinOpacityReset:SetScript("OnClick", function()
         db.skinBgAlpha = nil
@@ -1133,17 +1133,17 @@ local function BuildAppearanceTab(sf, ct)
     y = AddSlider(ct, y, L["CONFIG_FONT_SIZE"], 9, 22,
         function() return db.fontSize or 13 end,
         function(v) BNB.ApplyFont(nil, v) end,
-        "Font size used in the note body editor.")
+        L["CFG_FONTSIZE_TIP"])
 
     y = AddRule(ct, y) - 4
 
     -- Note list display mode — WowStyle1DropdownTemplate or cycling button fallback
-    y = AddHeader(ct, y, "Note list display mode")
+    y = AddHeader(ct, y, L["CFG_HDR_LIST_DISPLAY_MODE"])
 
     local MODE_ITEMS = {
-        { key = "normal",   label = "Normal  (32px icons, 2 preview lines)" },
-        { key = "compact",  label = "Compact  (16px icons, no preview)" },
-        { key = "spacious", label = "Spacious  (42px icons, 3 preview lines)" },
+        { key = "normal",   label = L["CFG_LISTMODE_NORMAL"] },
+        { key = "compact",  label = L["CFG_LISTMODE_COMPACT"] },
+        { key = "spacious", label = L["CFG_LISTMODE_SPACIOUS"] },
     }
 
     local useNativeDrop2 = C_XMLUtil and C_XMLUtil.GetTemplateInfo
@@ -1202,13 +1202,13 @@ local function BuildAppearanceTab(sf, ct)
     y = AddRule(ct, y) - 4
 
     -- Timestamp format dropdown (Relative at top, default)
-    y = AddHeader(ct, y, "Timestamp format")
+    y = AddHeader(ct, y, L["CFG_HDR_TIMESTAMP_FORMAT"])
 
     local DATE_FORMATS = {
-        { key = "relative",   label = "Relative  (2 days ago)" },
-        { key = "YYYY-MM-DD", label = "YYYY-MM-DD  (2026-03-19)" },
-        { key = "DD-MM-YYYY", label = "DD-MM-YYYY  (19-03-2026)" },
-        { key = "MM-DD-YYYY", label = "MM-DD-YYYY  (03-19-2026)" },
+        { key = "relative",   label = L["CFG_DATEFMT_RELATIVE"] },
+        { key = "YYYY-MM-DD", label = L["CFG_DATEFMT_YMD"] },
+        { key = "DD-MM-YYYY", label = L["CFG_DATEFMT_DMY"] },
+        { key = "MM-DD-YYYY", label = L["CFG_DATEFMT_MDY"] },
     }
     local function GetFmtLabel()
         local cur = db.dateFormat or "relative"
@@ -1261,7 +1261,7 @@ local function BuildAppearanceTab(sf, ct)
     end
 
     y = y - 4
-    y = AddCheck(ct, y, "24-hour clock  (14:30 vs 2:30 pm)",
+    y = AddCheck(ct, y, L["CFG_CHK_24H_LABEL"],
         function() return db.use24Hour ~= false end,
         function(v)
             db.use24Hour = v
@@ -1269,7 +1269,7 @@ local function BuildAppearanceTab(sf, ct)
                 BNB.LoadNoteInEditor(BNB._currentNoteID)
             end
         end,
-        "Show timestamps in 24-hour format. Uncheck for 12-hour (AM/PM).")
+        L["CFG_CHK_24H_TIP"])
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end
@@ -1281,7 +1281,7 @@ local function BuildFeaturesTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
-    y = AddHeader(ct, y, "Notes")
+    y = AddHeader(ct, y, L["CFG_HDR_NOTES"])
 
     -- New note behaviour dropdown
     do
@@ -1292,8 +1292,8 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local NEW_NOTE_ITEMS = {
-            { key = "prompt",    label = "Prompt for title (recommended)" },
-            { key = "immediate", label = "Create immediately"             },
+            { key = "prompt",    label = L["CFG_NEWNOTE_ITEM_PROMPT"] },
+            { key = "immediate", label = L["CFG_NEWNOTE_ITEM_IMMEDIATE"]             },
         }
         local curBehaviour = db.newNoteBehaviour or "prompt"
         local nnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1321,25 +1321,24 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (32 + ROW_GAP)
     end
 
-    y = AddCheck(ct, y, "Open main window on login / reload",
+    y = AddCheck(ct, y, L["CFG_CHK_OPEN_LOGIN_LABEL"],
         function() return db.openOnLogin == true end,
         function(v) db.openOnLogin = v end,
-        "Automatically open the BigNoteBox window when you log in or reload the UI.\nOff by default.")
+        L["CFG_CHK_OPEN_LOGIN_TIP"])
 
-    y = AddCheck(ct, y, "Lock notes by default",
+    y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
         function() return db.lockNotes == true end,
         function(v)
             db.lockNotes = v
             -- Refresh the editor lock state for the currently open note
             if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
         end,
-        "When enabled, notes open in read-only mode. Click the Edit button to modify a note.\n"
-        .. "Individual notes can override this in Note Settings (right-click a note).")
+        L["CFG_CHK_LOCK_NOTES_TIP"])
 
-    y = AddCheck(ct, y, "Ask before closing the note window",
+    y = AddCheck(ct, y, L["CFG_CHK_CONFIRM_CLOSE_LABEL"],
         function() return db.confirmClose == true end,
         function(v) db.confirmClose = v end,
-        "Show a confirmation popup before closing the main note window (off by default).")
+        L["CFG_CHK_CONFIRM_CLOSE_TIP"])
 
     -- Combat action dropdown
     do
@@ -1350,10 +1349,10 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local COMBAT_ITEMS = {
-            { key = "nothing",            label = "Do nothing" },
-            { key = "hide_no_stickies",   label = "Hide everything except sticky notes" },
-            { key = "hide_minimize",      label = "Hide everything, minimize sticky notes" },
-            { key = "hide_all",           label = "Hide everything" },
+            { key = "nothing",            label = L["CFG_COMBAT_ITEM_NOTHING"] },
+            { key = "hide_no_stickies",   label = L["CFG_COMBAT_ITEM_HIDE_EXCEPT_STICKY"] },
+            { key = "hide_minimize",      label = L["CFG_COMBAT_ITEM_HIDE_MINIMIZE"] },
+            { key = "hide_all",           label = L["CFG_COMBAT_ITEM_HIDE_ALL"] },
         }
         local curCombat = db.combatAction or "nothing"
         local combatDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1389,7 +1388,7 @@ local function BuildFeaturesTab(sf, ct)
     -- player can create a note directly from those game windows.
     do
         y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, "Quick Note")
+        y = AddHeader(ct, y, L["CFG_HDR_QUICK_NOTE"])
 
         -- Collect sub-widgets for greying when the master toggle is off
         local qnWidgets = {}
@@ -1401,9 +1400,7 @@ local function BuildFeaturesTab(sf, ct)
         qnEnableCb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(L["CFG_QN_ENABLE_TIP_TITLE"], 1, 1, 1)
-            GameTooltip:AddLine(
-                "Adds a small icon to quest windows, gossip frames, books, and letters\n"
-                .. "so you can create a note directly from the source.", 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_QN_ENABLE_TOOLTIP_BODY"], 0.8, 0.8, 0.8, true)
             GameTooltip:Show()
         end)
         qnEnableCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1417,12 +1414,10 @@ local function BuildFeaturesTab(sf, ct)
 
         -- On-create action dropdown (matches combat dropdown style)
         y = AddCheck(ct, y,
-            "Save rewards to note (money, XP, honor, currencies, reputation)",
+            L["CFG_CHK_QUEST_REWARDS_LABEL"],
             function() return db.saveQuestRewards ~= false end,
             function(v) db.saveQuestRewards = v end,
-            "When creating a note from a quest frame, appends any\n"
-            .. "rewards (gold, XP, honor, currencies, reputation) to\n"
-            .. "the note body below a separator line.")
+            L["CFG_CHK_QUEST_REWARDS_TIP"])
 
         local qnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         qnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -1432,9 +1427,9 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local QN_ITEMS = {
-            { key = "silent",  label = "Create silently in background" },
-            { key = "open",    label = "Create and open BigNoteBox on it" },
-            { key = "confirm", label = "Ask to confirm / edit title first" },
+            { key = "silent",  label = L["CFG_QN_ITEM_SILENT"] },
+            { key = "open",    label = L["CFG_QN_ITEM_OPEN"] },
+            { key = "confirm", label = L["CFG_QN_ITEM_CONFIRM"] },
         }
         local curQN = db.quickNoteAction or "silent"
         local qnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1482,15 +1477,13 @@ local function BuildFeaturesTab(sf, ct)
             y = y - (16 + 2)
 
             y = AddCheck(ct, y,
-                "Auto-create note when clicking DUI's Copy Text button",
+                L["CFG_CHK_DUI_AUTONOTE_LABEL"],
                 function() return db.duiAutoNote == true end,
                 function(v)
                     db.duiAutoNote = v
                     if BNB.ApplyDUIAutoNote then BNB.ApplyDUIAutoNote() end
                 end,
-                "Whenever you click the Copy Text button in Dialogue UI, BigNoteBox\n"
-                .. "automatically creates a note with the full NPC / quest text.\n"
-                .. "Uses the same action setting above (silent / open / confirm).")
+                L["CFG_CHK_DUI_AUTONOTE_TIP"])
         end
 
         -- ── Immersion subsection (only shown when Immersion is installed) ─────────
@@ -1517,7 +1510,7 @@ local function BuildFeaturesTab(sf, ct)
                 .. "The button can be dragged to any position on screen.")
 
             -- "Reset button position" button
-            local immResetBtn = BNB.CreateButton(nil, ct, "Reset button position", 160, 22)
+            local immResetBtn = BNB.CreateButton(nil, ct, L["CFG_IMM_RESET_BTN"], 160, 22)
             immResetBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
             immResetBtn:SetScript("OnClick", function()
                 if BNB.ResetImmersionBtnPos then BNB.ResetImmersionBtnPos() end
@@ -1544,7 +1537,7 @@ local function BuildFeaturesTab(sf, ct)
     -- ── Inspect Note ──────────────────────────────────────────────────────────
     do
         y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, "Inspect Note")
+        y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])
 
         -- Creation mode dropdown
         local insModeLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1554,9 +1547,9 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local INS_MODES = {
-            { key = "manual",      label = "Manual (click button to create)" },
-            { key = "auto_rich",   label = "Automatically create a Rich note" },
-            { key = "auto_normal", label = "Automatically create a Normal note" },
+            { key = "manual",      label = L["CFG_INS_ITEM_MANUAL"] },
+            { key = "auto_rich",   label = L["CFG_ITEM_AUTO_RICH"] },
+            { key = "auto_normal", label = L["CFG_ITEM_AUTO_NORMAL"] },
         }
         local curInsMode = db.inspectNoteMode or "manual"
         local insModeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1607,9 +1600,9 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local INS_TYPES = {
-            { key = "choose",        label = "Choose on click (Normal or Rich)" },
-            { key = "always_rich",   label = "Always create a Rich note" },
-            { key = "always_normal", label = "Always create a Normal note" },
+            { key = "choose",        label = L["CFG_ITEM_CHOOSE_CLICK"] },
+            { key = "always_rich",   label = L["CFG_ITEM_ALWAYS_RICH"] },
+            { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
         local curInsType = db.inspectNoteType or "choose"
         insTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1641,13 +1634,12 @@ local function BuildFeaturesTab(sf, ct)
 
         -- Add player situation checkbox
         y = AddCheck(ct, y,
-            "Add a player situation to inspect notes",
+            L["CFG_CHK_SITUATION_LABEL"],
             function() return BigNoteBoxDB and BigNoteBoxDB.inspectNoteAddSituation == true end,
             function(v)
                 if BigNoteBoxDB then BigNoteBoxDB.inspectNoteAddSituation = v end
             end,
-            "When enabled, inspect notes will automatically have a player situation set,\n"
-            .. "so contextual features (popup, sticky note) can trigger when you target that player again.")
+            L["CFG_CHK_SITUATION_TIP"])
 
         -- Gear to show dropdown
         local gearShowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1689,7 +1681,7 @@ local function BuildFeaturesTab(sf, ct)
     -- ── Target Note ───────────────────────────────────────────────────────────
     do
         y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, "Target Note")
+        y = AddHeader(ct, y, L["CFG_HDR_TARGET_NOTE"])
 
         -- Note type dropdown
         local tnTypeLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1700,9 +1692,9 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (ROW_H + 2)
 
         local TN_TYPES = {
-            { key = "choose",        label = "Choose on click (Normal or Rich)" },
-            { key = "always_rich",   label = "Always create a Rich note" },
-            { key = "always_normal", label = "Always create a Normal note" },
+            { key = "choose",        label = L["CFG_ITEM_CHOOSE_CLICK"] },
+            { key = "always_rich",   label = L["CFG_ITEM_ALWAYS_RICH"] },
+            { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
         local curTNType = db.targetNoteType or "choose"
         local tnTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
@@ -1743,52 +1735,52 @@ local function BuildFeaturesTab(sf, ct)
         subLbl:SetHeight(ROW_H - 4)
         subLbl:SetJustifyH("LEFT")
         subLbl:SetWordWrap(true)
-        subLbl:SetText("\"Target Note\" is always added. Enable any additional tags below.")
+        subLbl:SetText(L["CFG_TN_SUBLABEL"])
         subLbl:SetTextColor(0.65, 0.65, 0.65)
         y = y - (ROW_H + ROW_GAP - 2)
 
         -- Individual tag toggles
-        y = AddCheck(ct, y, "Creature Type  (e.g. Humanoid, Beast, Undead)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_TYPE_LABEL"],
             function() local v = BigNoteBoxDB and BigNoteBoxDB.targetNoteTagCreatureType; return v == nil or v == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagCreatureType = v end end,
-            "Adds the creature's type as a tag (e.g. \"Humanoid\", \"Beast\", \"Undead\").\nApplies to NPC/mob/boss targets only.")
+            L["CFG_CHK_TAG_TYPE_TIP"])
 
-        y = AddCheck(ct, y, "Creature Family  (e.g. Wolf, Spider)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_FAMILY_LABEL"],
             function() return BigNoteBoxDB and BigNoteBoxDB.targetNoteTagFamily == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagFamily = v end end,
-            "Adds the creature's family as a tag (e.g. \"Wolf\", \"Spider\").\nOnly available for Beast-type creatures. Off by default.")
+            L["CFG_CHK_TAG_FAMILY_TIP"])
 
-        y = AddCheck(ct, y, "Classification  (e.g. Elite, Rare, World Boss)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_CLASS_LABEL"],
             function() local v = BigNoteBoxDB and BigNoteBoxDB.targetNoteTagClassification; return v == nil or v == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagClassification = v end end,
-            "Adds the creature's classification as a tag (e.g. \"Elite\", \"Rare Elite\", \"World Boss\").\nNormal enemies have no classification label and add no tag.")
+            L["CFG_CHK_TAG_CLASS_TIP"])
 
-        y = AddCheck(ct, y, "Faction  (e.g. Alliance, Horde)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_FACTION_LABEL"],
             function() local v = BigNoteBoxDB and BigNoteBoxDB.targetNoteTagFaction; return v == nil or v == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagFaction = v end end,
-            "Adds the target's faction as a tag (e.g. \"Alliance\", \"Horde\").\nApplies to both player and NPC targets.")
+            L["CFG_CHK_TAG_FACTION_TIP"])
 
-        y = AddCheck(ct, y, "Zone  (where the note was created)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_ZONE_LABEL"],
             function() local v = BigNoteBoxDB and BigNoteBoxDB.targetNoteTagZone; return v == nil or v == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagZone = v end end,
-            "Adds the current zone name as a tag when the note is created.\nUseful for tracking where you encountered a mob or rare.")
+            L["CFG_CHK_TAG_ZONE_TIP"])
 
-        y = AddCheck(ct, y, "Boss  (for world bosses and skull-level targets)",
+        y = AddCheck(ct, y, L["CFG_CHK_TAG_BOSS_LABEL"],
             function() local v = BigNoteBoxDB and BigNoteBoxDB.targetNoteTagBoss; return v == nil or v == true end,
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagBoss = v end end,
-            "Adds a \"Boss\" tag for world bosses and skull-level (level ??) targets.")
+            L["CFG_CHK_TAG_BOSS_TIP"])
     end
 
     -- ── Tasks ────────────────────────────────────────────────────────────────────
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Tasks")
+    y = AddHeader(ct, y, L["CFG_HDR_TASKS"])
 
-    y = AddCheck(ct, y, "Remove completed tasks immediately",
+    y = AddCheck(ct, y, L["CFG_CHK_TASK_REMOVE_LABEL"],
         function() return BigNoteBoxDB and BigNoteBoxDB.taskRemoveOnComplete == true end,
         function(v)
             if BigNoteBoxDB then BigNoteBoxDB.taskRemoveOnComplete = v end
         end,
-        "When checked, completing a task is permanent -- it is removed from the list right away. When unchecked, completed tasks are greyed out and stay in the list until you clear them manually.")
+        L["CFG_CHK_TASK_REMOVE_TIP"])
 
     -- Completed tasks position dropdown
     do
@@ -1799,8 +1791,8 @@ local function BuildFeaturesTab(sf, ct)
         y = y - ROW_H - 2
 
         local CP_ITEMS = {
-            { key = "bottom", label = "Move to bottom" },
-            { key = "inline", label = "Keep in place"  },
+            { key = "bottom", label = L["CFG_TASK_POS_BOTTOM_SHORT"] },
+            { key = "inline", label = L["CFG_TASK_POS_KEEP_SHORT"]  },
         }
 
         local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
@@ -1846,7 +1838,7 @@ local function BuildFeaturesTab(sf, ct)
                 local cur = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom"
                 local next = cur == "bottom" and "inline" or "bottom"
                 if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = next end
-                local lbl = next == "bottom" and "Move to bottom" or "Keep in place"
+                local lbl = next == "bottom" and L["CFG_TASK_POS_BOTTOM_SHORT"] or L["CFG_TASK_POS_KEEP_SHORT"]
                 self:SetText(lbl)
                 if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
             end)
@@ -1863,9 +1855,9 @@ local function BuildFeaturesTab(sf, ct)
         y = y - ROW_H - 2
 
         local SP_ITEMS = {
-            { key = "compact",  label = "Compact"  },
-            { key = "normal",   label = "Normal"   },
-            { key = "spacious", label = "Spacious" },
+            { key = "compact",  label = L["CFG_SPACING_LABEL_COMPACT"]  },
+            { key = "normal",   label = L["CFG_SPACING_LABEL_NORMAL"]   },
+            { key = "spacious", label = L["CFG_SPACING_LABEL_SPACIOUS"] },
         }
 
         local function OnSpacingChanged()
@@ -1916,7 +1908,7 @@ local function BuildFeaturesTab(sf, ct)
             local function GetSpLabel()
                 local v = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
                 for _, item in ipairs(SP_ITEMS) do if item.key == v then return item.label end end
-                return "Normal"
+                return L["CFG_SPACING_LABEL_NORMAL"]
             end
             local spBtn = BNB.CreateButton(nil, ct, GetSpLabel(), CONTENT_W, 24)
             spBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -1934,27 +1926,26 @@ local function BuildFeaturesTab(sf, ct)
     end
 
     -- Default sticky view for notes with tasks
-    y = AddCheck(ct, y, "Open sticky notes in task view by default",
+    y = AddCheck(ct, y, L["CFG_CHK_STICKY_TASKVIEW_LABEL"],
         function() return (BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or "tasks") == "tasks" end,
         function(v)
             if BigNoteBoxDB then
                 BigNoteBoxDB.taskStickyDefault = v and "tasks" or "note"
             end
         end,
-        "When a sticky note has tasks, open it showing the task list. Uncheck to always open showing the note body instead.")
+        L["CFG_CHK_STICKY_TASKVIEW_TIP"])
 
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_FOCUS_ORBIT_HEADER"])
 
     -- Hide entire WoW UI
     y = AddCheck(ct, y,
-        "Hide entire WoW UI in focus mode",
+        L["CFG_CHK_FOCUS_HIDEUI_LABEL"],
         function() local db = BigNoteBoxDB; return db == nil or db.focusHideUI ~= false end,
         function(v)
             if BigNoteBoxDB then BigNoteBoxDB.focusHideUI = v end
         end,
-        "When enabled, the entire WoW UI is hidden while focus mode is active,\\n"
-        .. "leaving only the note editor visible. The UI is always restored on exit.")
+        L["CFG_CHK_FOCUS_HIDEUI_TIP"])
 
     -- Master orbit toggle
     local orbitCheckY = y
@@ -2033,15 +2024,15 @@ local function BuildFeaturesTab(sf, ct)
     BNB._focusOrbitRefreshUI = RefreshOrbitUI
 
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Context Popup")
+    y = AddHeader(ct, y, L["CFG_HDR_CONTEXT_POPUP"])
 
     y = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
         function() return db.contextSurface ~= false end,
         function(v) db.contextSurface = v end,
-        "Surface notes matching your current zone, instance or player target.")
+        L["CFG_CHK_CONTEXT_SURFACE_TIP"])
 
     -- "Set Popup Position" button
-    local anchorBtn = BNB.CreateButton(nil, ct, "Set Popup Position", 150, 22)
+    local anchorBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_ANCHOR_BTN"], 150, 22)
     anchorBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     anchorBtn:SetScript("OnClick", function()
         if BNB.TogglePopupAnchor then BNB.TogglePopupAnchor() end
@@ -2055,13 +2046,13 @@ local function BuildFeaturesTab(sf, ct)
     y = y - (22 + 6)
 
     -- Popup hold time slider
-    y = AddSlider(ct, y, "Show alert for (seconds)", 0, 60,
+    y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
         function() return db.popupHoldTime or 5 end,
         function(v) db.popupHoldTime = v end,
-        "How long the context popup stays on screen before fading out.\n0 = stay until manually closed (right-click to dismiss).")
+        L["CFG_SLIDER_ALERT_SECONDS_TIP"])
 
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Trash")
+    y = AddHeader(ct, y, L["CFG_HDR_TRASH"])
 
     -- ── Trash enable/disable checkbox ─────────────────────────────────────────
     -- Capture all child widget refs so we can grey them out when disabled.
@@ -2086,9 +2077,7 @@ local function BuildFeaturesTab(sf, ct)
     end)
     warnCb:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(
-            "Show a confirmation before moving a note to Trash (or permanently deleting it when trash is disabled).\n"
-            .. "Turn off for instant deletion without any prompt.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["CFG_TRASH_WARN_TIP"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     warnCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2100,7 +2089,7 @@ local function BuildFeaturesTab(sf, ct)
     y = y - (ROW_H + ROW_GAP)
 
     -- ── Retention slider ───────────────────────────────────────────────────────
-    local retainSlider = BNB.CreateSlider(ct, "Keep deleted notes for (days)", 0, 90,
+    local retainSlider = BNB.CreateSlider(ct, L["CFG_TRASH_RETAIN_SLIDER"], 0, 90,
         db.trashRetainDays ~= nil and db.trashRetainDays or 30, nil,
         function(v) db.trashRetainDays = v end)
     retainSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2108,10 +2097,7 @@ local function BuildFeaturesTab(sf, ct)
     retainSlider:EnableMouse(true)
     retainSlider:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(
-            "How long deleted notes are kept in the Trash before being permanently removed.\n"
-            .. "0 = trash disabled, deletes are permanent (no recovery).\n"
-            .. "Maximum: 90 days.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["CFG_TRASH_RETAIN_TIP"], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     retainSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -2146,7 +2132,7 @@ local function BuildFeaturesTab(sf, ct)
     ApplyTrashSection(db.trashFeature ~= false)
 
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Sticky Notes")
+    y = AddHeader(ct, y, L["CFG_CELL_STICKY_HDR"])
 
     do
         local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -2159,34 +2145,34 @@ local function BuildFeaturesTab(sf, ct)
         y = y - h - 6
     end
 
-    y = AddSlider(ct, y, "Max open sticky notes", 1, 50,
+    y = AddSlider(ct, y, L["CFG_SLIDER_MAX_STICKIES"], 1, 50,
         function() return db.stickyMaxCount or 20 end,
         function(v) db.stickyMaxCount = v end,
-        "Maximum number of sticky notes that can be open at the same time (default: 20).")
+        L["CFG_SLIDER_MAX_STICKIES_TIP"])
 
     y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
         function() return db.stickiesHiddenPersist == true end,
         function(v) db.stickiesHiddenPersist = v end,
         L["CFG_STICKY_HIDE_PERSIST_TIP"])
 
-    y = AddCheck(ct, y, "Default to ESC screen only",
+    y = AddCheck(ct, y, L["CFG_CHK_ESC_DEFAULT_LABEL"],
         function() return db.stickyEscDefault == true end,
         function(v) db.stickyEscDefault = v or nil end,
-        "New sticky notes will default to showing only on the ESC screen instead of in the game world. You can also control this per sticky note via the note's settings (the = button).")
+        L["CFG_CHK_ESC_DEFAULT_TIP"])
 
-    y = AddCheck(ct, y, "Dim screen behind ESC sticky notes",
+    y = AddCheck(ct, y, L["CFG_CHK_ESC_DIM_LABEL"],
         function() return db.stickyEscOverlay ~= false end,
         function(v) db.stickyEscOverlay = v and nil or false end,
-        "Shows a dark overlay behind sticky notes when the ESC menu is open, making them easier to read. Automatically disabled if OneWoW is active to avoid double-dimming.")
+        L["CFG_CHK_ESC_DIM_TIP"])
 
     -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
     y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
-        "BIGNOTEBOXHIDESTICKIES", "(Default: Ctrl+H)", "Show/Hide all sticky notes")
+        "BIGNOTEBOXHIDESTICKIES", L["CFG_KB_HINT_CTRL_H"], L["CFG_KB_DESC_HIDE_STICKIES"])
 
     -- ── Reference Box ─────────────────────────────────────────────────────────
     do
         y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, "Reference Box")
+        y = AddHeader(ct, y, L["CFG_HDR_REFBOX"])
 
         -- Collect widgets for greying when disabled
         local rbWidgets = {}
@@ -2216,8 +2202,8 @@ local function BuildFeaturesTab(sf, ct)
         table.insert(rbWidgets, sideDD)
 
         local SIDE_OPTIONS = {
-            { key = "left",  label = "Left  - anchor to the left of the main window" },
-            { key = "right", label = "Right - anchor to the right of the main window" },
+            { key = "left",  label = L["CFG_REFBOX_SIDE_LEFT"] },
+            { key = "right", label = L["CFG_REFBOX_SIDE_RIGHT"] },
         }
         local function RebuildSideMenu()
             sideDD:SetupMenu(function(_, root)
@@ -2249,8 +2235,8 @@ local function BuildFeaturesTab(sf, ct)
         table.insert(rbWidgets, styleDD)
 
         local STYLE_OPTIONS = {
-            { key = "normal",  label = "Normal  \226\128\148 large icon, type label, quality-coloured name" },
-            { key = "compact", label = "Compact \226\128\148 slim single-row with small icon" },
+            { key = "normal",  label = L["CFG_REFBOX_STYLE_NORMAL"] },
+            { key = "compact", label = L["CFG_REFBOX_STYLE_COMPACT"] },
         }
         local function RebuildStyleMenu()
             styleDD:SetupMenu(function(_, root)
@@ -2270,7 +2256,7 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (22 + ROW_GAP)
 
         -- Max attachments slider
-        local rbMaxSlider = BNB.CreateSlider(ct, "Max attachments per note", 1, 100,
+        local rbMaxSlider = BNB.CreateSlider(ct, L["CFG_REFBOX_MAX_SLIDER"], 1, 100,
             db.refboxMaxItems or 50, nil,
             function(v) db.refboxMaxItems = v end)
         rbMaxSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2285,21 +2271,18 @@ local function BuildFeaturesTab(sf, ct)
         y = y - (SLIDER_H + ROW_GAP)
 
         -- Auto-open when note has attachments
-        y = AddCheck(ct, y, "Auto-open when selecting a note with attachments",
+        y = AddCheck(ct, y, L["CFG_CHK_REFBOX_AUTOOPEN_LABEL"],
             function() return db.refboxAutoOpen ~= false end,
             function(v) db.refboxAutoOpen = v end,
-            "Automatically opens the Reference Box when you switch to a note that has attachments.\n"
-            .. "Does not auto-close when switching to a note with no attachments.")
+            L["CFG_CHK_REFBOX_AUTOOPEN_TIP"])
 
         -- Show ItemID / SpellID / QuestID in the game's native tooltip
-        y = AddCheck(ct, y, "Show Item/Spell/Quest IDs in tooltips (BNB: <id>)",
+        y = AddCheck(ct, y, L["CFG_CHK_REFBOX_IDS_LABEL"],
             function() return db.refboxShowIDs == true end,
             function(v)
                 db.refboxShowIDs = v
             end,
-            "Adds a \"BNB: <id>\" line in green at the bottom of item, spell and quest tooltips.\n"
-            .. "Useful if you don't have a dedicated tooltip ID addon.\n"
-            .. "Off by default.")
+            L["CFG_CHK_REFBOX_IDS_TIP"])
 
         -- Apply enabled/disabled state
         local function ApplyRBSection(enabled)
@@ -2327,7 +2310,7 @@ local function BuildFeaturesTab(sf, ct)
 
     -- Sidebar
     y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, "Character Sidebar")
+    y = AddHeader(ct, y, L["CFG_HDR_SIDEBAR"])
 
     -- Master enable checkbox (manual build to retain widget ref for greying)
     local sidebarEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
@@ -2378,8 +2361,8 @@ local function BuildFeaturesTab(sf, ct)
         subY = subY - (ROW_H + 2)
 
         local SIDE_ITEMS = {
-            { key = "right", label = "Right (default)" },
-            { key = "left",  label = "Left" },
+            { key = "right", label = L["CFG_SIDEBAR_SIDE_RIGHT"] },
+            { key = "left",  label = L["CFG_SIDEBAR_SIDE_LEFT"] },
         }
         local curSide = db.sidebarSide or "right"
         local sideDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
@@ -2416,8 +2399,8 @@ local function BuildFeaturesTab(sf, ct)
         subY = subY - (ROW_H + 2)
 
         local POS_ITEMS = {
-            { key = false, label = "Top (default)" },
-            { key = true,  label = "Bottom" },
+            { key = false, label = L["CFG_SIDEBAR_POS_TOP"] },
+            { key = true,  label = L["CFG_SIDEBAR_POS_BOTTOM"] },
         }
         local curBottom = db.sidebarAtBottom == true
         local posDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
@@ -2526,7 +2509,7 @@ local function BuildFeaturesTab(sf, ct)
             lbl:SetJustifyH("LEFT"); lbl:SetHeight(26)
             lbl:SetText((h.rec.name or h.key)
                 .. "  |cff888888(" .. (h.rec.realm or "") .. ")|r")
-            local showBtn = BNB.CreateButton(nil, row, "Show", 80, 22)
+            local showBtn = BNB.CreateButton(nil, row, L["CFG_SIDEBAR_SHOW_BTN"], 80, 22)
             showBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
             local capturedKey = h.key
             showBtn:SetScript("OnClick", function()
@@ -2605,7 +2588,7 @@ local function BuildAdvancedTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
-    y = AddHeader(ct, y, "Behavior")
+    y = AddHeader(ct, y, L["CFG_HDR_BEHAVIOR"])
 
     y = AddCheck(ct, y, L["CONFIG_SHOW_MINIMAP"],
         function() return not (db.minimapIcon and db.minimapIcon.hide) end,
@@ -2618,9 +2601,9 @@ local function BuildAdvancedTab(sf, ct)
         "Suppress the \"BigNoteBox v... loaded\" chat message on login.")
 
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Icons")
+    y = AddHeader(ct, y, L["CFG_HDR_ICONS"])
 
-    y = AddCheck(ct, y, "Enable full Blizzard icon autocomplete list",
+    y = AddCheck(ct, y, L["CFG_CHK_BLZICON_LABEL"],
         function() return db.blizzardIconComplete == true end,
         function(v)
             db.blizzardIconComplete = v
@@ -2635,12 +2618,12 @@ local function BuildAdvancedTab(sf, ct)
                 StaticPopup_Show("BNB_BLZICON_AC_DISABLE")
             end
         end,
-        "Loads ~32,000 Blizzard icon names for autocomplete suggestions in\nthe Blizzard Icon fields. Uses ~2 MB of memory. Off by default.\nDisabling frees memory after a reload.")
+        L["CFG_CHK_BLZICON_TIP"])
 
     -- ── Migrate section (only shown if any supported addon is installed) ─────────
     if BNB.Migration and BNB.Migration.HasAny() then
         AddRule(ct, y); y = y - 18
-        y = AddHeader(ct, y, "Migrate")
+        y = AddHeader(ct, y, L["CFG_HDR_MIGRATE"])
 
         local migDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         migDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2666,12 +2649,12 @@ local function BuildAdvancedTab(sf, ct)
                 local statusLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
                 statusLbl:SetPoint("LEFT", rowLbl, "RIGHT", 8, 0)
                 if isDone then
-                    statusLbl:SetText("|cff66bb6aDone|r")
+                    statusLbl:SetText("|cff66bb6a" .. L["CFG_DONE_BADGE"] .. "|r")
                 else
-                    statusLbl:SetText("|cff888888Not yet|r")
+                    statusLbl:SetText("|cff888888" .. L["CFG_NOT_YET_BADGE"] .. "|r")
                 end
 
-                local migrateRowBtn = BNB.CreateButton(nil, ct, isDone and "Migrate Again" or "Migrate", 110, 22)
+                local migrateRowBtn = BNB.CreateButton(nil, ct, isDone and L["CFG_MIGRATE_AGAIN_BTN"] or L["CFG_MIGRATE_BTN"], 110, 22)
                 migrateRowBtn:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
                 migrateRowBtn:SetScript("OnClick", function()
                     if M.ShowAddonPopup then
@@ -2686,7 +2669,7 @@ local function BuildAdvancedTab(sf, ct)
 
     -- ── Fonts section ───────────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Fonts")
+    y = AddHeader(ct, y, L["CFG_HDR_FONTS"])
 
     local lsmAvail = LibStub and LibStub("LibSharedMedia-3.0", true) ~= nil
     if lsmAvail then
@@ -2707,7 +2690,7 @@ local function BuildAdvancedTab(sf, ct)
         lsmReloadLbl:SetText(L["CFG_LSM_FONTS_RELOAD"])
         lsmReloadLbl:Hide()
 
-        local lsmReloadBtn = BNB.CreateButton(nil, ct, "Reload UI", 90, 20)
+        local lsmReloadBtn = BNB.CreateButton(nil, ct, L["CFG_RELOAD_UI_BTN"], 90, 20)
         lsmReloadBtn:SetPoint("LEFT", lsmReloadLbl, "RIGHT", 8, 0)
         lsmReloadBtn:SetScript("OnClick", function()
             C_UI.Reload()
@@ -2733,16 +2716,16 @@ local function BuildAdvancedTab(sf, ct)
 
     -- ── Keybindings section ───────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Keybindings")
+    y = AddHeader(ct, y, L["CFG_HDR_KEYBINDINGS"])
 
     y = MakeKeybindRow(ct, y, L["CFG_KB_NEW_NOTE"],
-        "BIGNOTEBOXNEWNOTE",   "(Default: unbound)", "Create new note")
+        "BIGNOTEBOXNEWNOTE",   L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_NEW_NOTE"])
     y = MakeKeybindRow(ct, y, L["CFG_KB_QUICK_NOTE"],
-        "BIGNOTEBOXQUICKNOTE", "(Default: unbound)", "Create quick note")
+        "BIGNOTEBOXQUICKNOTE", L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_QUICK_NOTE"])
 
     -- ── Danger Zone ──────────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Danger Zone")
+    y = AddHeader(ct, y, L["CFG_DANGERZONE_TIP_TITLE"])
 
     local dzDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     dzDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2753,7 +2736,7 @@ local function BuildAdvancedTab(sf, ct)
     dzDesc:SetHeight(dzDescH)
     y = y - (dzDescH + 6)
 
-    local dzBtn = BNB.CreateButton(nil, ct, "Danger Zone!", CONTENT_W, 28)
+    local dzBtn = BNB.CreateButton(nil, ct, L["CFG_DANGERZONE_BTN"], CONTENT_W, 28)
     dzBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     if dzBtn.SetBackdropColor then
         dzBtn:SetBackdropColor(0.25, 0.04, 0.04, 0.95)
@@ -2777,7 +2760,7 @@ local function BuildAdvancedTab(sf, ct)
 
         -- ── Developer section (below Danger Zone) ────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Developer")
+    y = AddHeader(ct, y, L["CFG_HDR_DEVELOPER"])
 
     local devDesc2 = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     devDesc2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2875,7 +2858,7 @@ local function BuildAdvancedTab(sf, ct)
     devWidgets2[#devWidgets2 + 1] = { cb = pseudoLocCb2, lbl = pseudoLocLbl2 }
     y = y - (ROW_H + ROW_GAP)
 
-    local toastTestBtn2 = BNB.CreateButton(nil, ct, "Fire Test Toast", 140, 22)
+    local toastTestBtn2 = BNB.CreateButton(nil, ct, L["CFG_DEV_TOAST_BTN"], 140, 22)
     toastTestBtn2:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y + 2)
     toastTestBtn2:SetScript("OnClick", function()
         if not (db.debugMode == true) then return end
@@ -2939,7 +2922,7 @@ local function BuildEditorTab(sf, ct)
     local y  = -8
 
     -- ── Formatting Toolbar ────────────────────────────────────────────────────
-    y = AddHeader(ct, y, "Formatting Toolbar")
+    y = AddHeader(ct, y, L["CFG_HDR_FORMATTING_TOOLBAR"])
 
     local tbDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     tbDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -2949,13 +2932,13 @@ local function BuildEditorTab(sf, ct)
     tbDesc:SetText(L["CFG_TOOLBAR_DESC"])
     y = y - 32
 
-    y = AddCheck(ct, y, "Show formatting toolbar in editor",
+    y = AddCheck(ct, y, L["CFG_CHK_WYSIWYG_LABEL"],
         function() return BigNoteBoxDB and BigNoteBoxDB.wysiwygBarVisible ~= false end,
         function(v)
             if BigNoteBoxDB then BigNoteBoxDB.wysiwygBarVisible = v end
             if BNB.ToggleWysiwygBar then BNB.ToggleWysiwygBar(v) end
         end,
-        "Toggle the WYSIWYG formatting toolbar (Undo, Redo, and future buttons).\nCan also be toggled with the button above the toolbar in the editor.")
+        L["CFG_CHK_WYSIWYG_TIP"])
 
     -- ── Rich Notes ───────────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
@@ -2972,7 +2955,7 @@ local function BuildEditorTab(sf, ct)
         function(v) db.richOpenInEditor = v end,
         L["CFG_RICH_OPEN_EDITOR_TIP"])
 
-    y = MakeKeybindRow(ct, y, L["CFG_KB_TOGGLE_RV"], "BIGNOTEBOXTOGGLERV", "(No default)", L["CFG_KB_TOGGLE_RV_TIP"])
+    y = MakeKeybindRow(ct, y, L["CFG_KB_TOGGLE_RV"], "BIGNOTEBOXTOGGLERV", L["CFG_KB_HINT_NONE"], L["CFG_KB_TOGGLE_RV_TIP"])
 
     -- ── Heading sizes ─────────────────────────────────────────────────────────
     -- Helper: trigger a live re-render of the currently open rich note preview.
@@ -3070,7 +3053,7 @@ local function BuildEditorTab(sf, ct)
 
     -- ── Live Preview ─────────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Live Preview")
+    y = AddHeader(ct, y, L["CFG_HDR_LIVE_PREVIEW"])
 
     do
         local lpDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -3107,7 +3090,7 @@ local function BuildEditorTab(sf, ct)
 
     local SLIDER_W = CONTENT_W - 20
     local curDebounce = db and db.previewDebounce or 0.3
-    local debounceSlider = BNB.CreateSlider(ct, "Update delay (seconds)", 1, 10,
+    local debounceSlider = BNB.CreateSlider(ct, L["CFG_PREVIEW_DELAY_SLIDER"], 1, 10,
         math.floor(curDebounce * 10 + 0.5), 3,
         function(v)
             local val = v / 10
@@ -3129,7 +3112,7 @@ local function BuildEditorTab(sf, ct)
 
     -- ── Undo / Redo ───────────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Undo / Redo")
+    y = AddHeader(ct, y, L["CFG_HDR_UNDO_REDO"])
 
     local undoDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     undoDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -3152,7 +3135,7 @@ local function BuildEditorTab(sf, ct)
 
     -- Slider width: subtract extra 20px so the 3-digit value label is never clipped.
     local SLIDER_W = CONTENT_W - 20
-    local depthSlider = BNB.CreateSlider(ct, "History depth", 10, 200,
+    local depthSlider = BNB.CreateSlider(ct, L["CFG_UNDO_DEPTH_SLIDER"], 10, 200,
         curDepth, 50,
         function(v)
             local val = math.floor(v + 0.5)
@@ -3186,7 +3169,7 @@ local function BuildEditorTab(sf, ct)
         lbl:SetHeight(h); y = y - h - 2
     end
     local curIdle = db and db.undoIdleDelay or 0.8
-    local idleSlider = BNB.CreateSlider(ct, "Idle delay (seconds)", 3, 30,
+    local idleSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_IDLE_SLIDER"], 3, 30,
         math.floor(curIdle * 10 + 0.5), 8,
         function(v)
             local val = v / 10
@@ -3218,7 +3201,7 @@ local function BuildEditorTab(sf, ct)
         lbl:SetHeight(h); y = y - h - 2
     end
     local curForced = db and db.undoForcedInterval or 3
-    local forcedSlider = BNB.CreateSlider(ct, "Forced interval (seconds)", 1, 10,
+    local forcedSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_FORCED_SLIDER"], 1, 10,
         curForced, 3,
         function(v)
             local val = math.floor(v + 0.5)
@@ -3240,7 +3223,7 @@ local function BuildEditorTab(sf, ct)
 
     -- ── Session History ───────────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, "Session History")
+    y = AddHeader(ct, y, L["CFG_HDR_SESSION_HISTORY"])
 
     local histDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     histDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -3252,7 +3235,7 @@ local function BuildEditorTab(sf, ct)
 
     -- History slots slider
     local curSlots = BigNoteBoxDB and BigNoteBoxDB.historyMaxSlots or 5
-    local slotsSlider = BNB.CreateSlider(ct, "Auto-save slots per note", 1, 20,
+    local slotsSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"], 1, 20,
         curSlots, 5,
         function(v)
             local val = math.floor(v + 0.5)
@@ -3831,13 +3814,13 @@ end
 
 -- Build <head> meta tags for Plain and Stylized modes.
 local function BuildHeadMeta(note, isStylized)
-    local title = (note.title and note.title ~= "") and HtmlEsc(note.title) or "Untitled"
-    local author = UnitName("player") or "Unknown"
-    local desc = "Note exported from BigNoteBox, a World of Warcraft addon"
+    local title = (note.title and note.title ~= "") and HtmlEsc(note.title) or L["CFG_EXPORT_UNTITLED"]
+    local author = UnitName("player") or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
+    local desc = L["CFG_EXPORT_META_DESC"]
     local m = {}
     m[#m + 1] = '<meta name="description" content="' .. desc .. '">'
     m[#m + 1] = '<meta name="author" content="' .. HtmlEsc(author) .. '">'
-    m[#m + 1] = '<meta name="generator" content="BigNoteBox (World of Warcraft addon)">'
+    m[#m + 1] = '<meta name="generator" content="' .. L["CFG_EXPORT_META_GENERATOR"] .. '">'
     m[#m + 1] = '<link rel="canonical" href="' .. BNB_URL .. '">'
     -- Open Graph
     m[#m + 1] = '<meta property="og:title" content="' .. title .. '">'
@@ -3855,7 +3838,7 @@ end
 
 -- Get the title HTML with optional colour styling.
 local function BuildTitleHtml(note)
-    local title = (note.title and note.title ~= "") and HtmlEsc(note.title) or "Untitled"
+    local title = (note.title and note.title ~= "") and HtmlEsc(note.title) or L["CFG_EXPORT_UNTITLED"]
     if note.titleColor then
         local r = math.floor((note.titleColor.r or 1) * 255 + 0.5)
         local g = math.floor((note.titleColor.g or 1) * 255 + 0.5)
@@ -3899,7 +3882,7 @@ end
 local function HtmlExportPlain(note)
     local bodyHtml, hasImages = ConvertBody(note)
     local font    = ResolveFont(note)
-    local title   = (note.title and note.title ~= "") and HtmlEsc(note.title) or "Untitled"
+    local title   = (note.title and note.title ~= "") and HtmlEsc(note.title) or L["CFG_EXPORT_UNTITLED"]
     local headMeta = BuildHeadMeta(note, false)
     local refbox  = BuildRefboxHtml(note)
     local meta    = BuildMetaHtml(note)
@@ -3984,7 +3967,7 @@ local function HtmlExportPlain(note)
         .. headMeta .. "\n"
         .. "<style>\n" .. css .. "</style>\n"
         .. "</head>\n<body>\n"
-        .. '<div class="font-controls"><button onclick="bnbFS(-2)" title="Decrease font size">-</button><button onclick="bnbFS(2)" title="Increase font size">+</button></div>\n'
+        .. '<div class="font-controls"><button onclick="bnbFS(-2)" title="' .. L["CFG_EXPORT_DECREASE_FONT"] .. '">-</button><button onclick="bnbFS(2)" title="' .. L["CFG_EXPORT_INCREASE_FONT"] .. '">+</button></div>\n'
         .. '<div class="page">\n'
         .. '<div class="page-body">\n'
         .. BuildTitleHtml(note) .. "\n"
@@ -4010,7 +3993,7 @@ local function HtmlExportStylized(note)
     if not tpl then return "<!-- Error: HtmlTemplate not loaded -->", false end
 
     local bodyHtml, hasImages = ConvertBody(note)
-    local title   = (note.title and note.title ~= "") and HtmlEsc(note.title) or "Untitled"
+    local title   = (note.title and note.title ~= "") and HtmlEsc(note.title) or L["CFG_EXPORT_UNTITLED"]
     local headMeta = BuildHeadMeta(note, true)
     local refbox  = BuildRefboxHtml(note)
     local meta    = BuildMetaHtml(note)
@@ -4776,7 +4759,7 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
             local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
             closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
 
-            local copyBtn = BNB.CreateButton(nil, f, "Copy to Clipboard", 140, 24)
+            local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
             copyBtn:SetPoint("TOP", f, "TOP", 0, -(SK_EXP_TITLE_H + 8))
             copyBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(f._eb:GetText()) end)
             f._copyBtn = copyBtn
@@ -4821,12 +4804,12 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
             ButtonFrameTemplate_HidePortrait(f)
             ButtonFrameTemplate_HideButtonBar(f)
             if f.Inset then f.Inset:Hide() end
-            f:SetTitle("BigNoteBox -- Export")
+            f:SetTitle(L["CFG_EXPORT_TITLE"])
             if f.CloseButton then
                 f.CloseButton:SetScript("OnClick", function() f:Hide() end)
             end
 
-            local copyBtn = BNB.CreateButton(nil, f, "Copy to Clipboard", 140, 24)
+            local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
             copyBtn:SetPoint("TOP", f, "TOP", 0, -58)
             copyBtn:SetScript("OnClick", function()
                 BNB.ShowClipboardHint(f._eb:GetText())
@@ -4879,9 +4862,9 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
     -- Lazy-create the HTML mode dropdown (anchored to the right of the copy button)
     if not _exportWin._htmlDD then
         local HTML_MODES = {
-            { key = "noteonly",  label = "Note only" },
-            { key = "plain",    label = "Plain HTML" },
-            { key = "stylized", label = "Stylized" },
+            { key = "noteonly",  label = L["CFG_EXPORT_HTML_NOTEONLY"] },
+            { key = "plain",    label = L["CFG_EXPORT_HTML_PLAIN"] },
+            { key = "stylized", label = L["CFG_EXPORT_HTML_STYLIZED"] },
         }
         local dd = CreateFrame("DropdownButton", nil, _exportWin, "WowStyle1DropdownTemplate")
         dd:SetPoint("LEFT", _exportWin._copyBtn, "RIGHT", 8, 0)
