@@ -1,9 +1,28 @@
 -- BigNoteBox Localization — English (Default)
 -- This file defines ALL player-visible strings. Non-English locales override
 -- only the keys they translate; missing keys fall back to English automatically.
+--
+-- Debug pseudo-locale: when BigNoteBoxDB.debugPseudoLocale is true, every L["KEY"]
+-- read is prefixed with "@@" so translated strings stand out visibly in-game. Any
+-- UI text that is NOT going through L[...] (a hardcoded literal) will show up
+-- without the marker, making it easy to spot without speaking another language.
+-- L_DATA holds the real values; BigNoteBox.L is a proxy so every read/write can be
+-- routed through the debug check without touching any call site.
 
 BigNoteBox = BigNoteBox or {}
-BigNoteBox.L = BigNoteBox.L or {}
+local L_DATA = {}
+BigNoteBox.L = setmetatable({}, {
+    __index = function(_, key)
+        local v = L_DATA[key]
+        if v ~= nil and BigNoteBoxDB and BigNoteBoxDB.debugPseudoLocale then
+            return "@@" .. v
+        end
+        return v
+    end,
+    __newindex = function(_, key, value)
+        L_DATA[key] = value
+    end,
+})
 local L = BigNoteBox.L
 
 -- ── Addon identity ────────────────────────────────────────────────────────────
@@ -482,3 +501,127 @@ L["TASK_CTX_RESET_WEEKLY"] = "Weekly"
 L["TASK_CTX_SITUATION"]    = "Set situation"
 L["TASK_CTX_SIT_NONE"]     = "None (global)"
 L["TASK_CTX_DELETE"]        = "Delete"
+
+-- ── Config window (ALL-08 sweep: SetText/AddLine/SetFormattedText literals) ────
+L["CFG_BCB_TIP_TITLE"]              = "Get BigChatBox"
+L["CFG_BCB_TIP_BODY"]               = "Click to find out more."
+L["CFG_BCB_DESC"]                   = "Send notes line-by-line via BigChatBox.\nCapture chat input as new notes."
+L["CFG_MORE_FEATURES_BTN"]          = "More Features"
+L["CFG_FEATURES_TIP_TITLE"]         = "Features in BigNoteBox"
+L["CFG_FEATURES_TIP_BODY"]          = "See everything BigNoteBox can do."
+L["CFG_SKIN_DESC"]                  = "Replaces the default window with a fully custom dark-themed frame. Requires a reload to activate or deactivate."
+L["CFG_SKIN_ENABLE"]                = "Enable skin mode"
+L["CFG_SKIN_ENABLE_TIP"]            = "Switches the main window to a custom backdrop frame.\nA reload is required to take effect."
+L["CFG_SKIN_PRESET"]                = "Skin preset"
+L["CFG_SKIN_BRIGHTNESS"]            = "Skin brightness"
+L["CFG_SKIN_OPACITY"]               = "Window opacity"
+L["CFG_SKIN_RAND_BRIGHTNESS"]       = "Randomize brightness too"
+L["CFG_SKIN_RAND_BRIGHTNESS_TIP"]   = "Also picks a random brightness (0.5-2.0) when randomizing the skin. Skipped for OLED preset."
+L["CFG_ROWHEIGHT_TIP_TITLE"]        = "Note list row height"
+L["CFG_ROWHEIGHT_NORMAL"]           = "Normal: balanced layout, icon and preview."
+L["CFG_ROWHEIGHT_COMPACT"]          = "Compact: minimal height, no preview."
+L["CFG_ROWHEIGHT_SPACIOUS"]         = "Spacious: larger icons and 3 preview lines."
+L["CFG_NEWNOTE_BEHAVIOUR"]          = "New note behaviour"
+L["CFG_NEWNOTE_PROMPT"]             = "Prompt for title: opens a creation dialog to set title, icon, font and colour before creating."
+L["CFG_NEWNOTE_IMMEDIATE"]          = "Create immediately: creates an empty note stub and opens it directly in the editor."
+L["CFG_COMBAT_LABEL"]               = "When entering combat"
+L["CFG_COMBAT_NOTHING"]             = "Do nothing: windows stay open during combat."
+L["CFG_COMBAT_HIDE_EXCEPT_STICKY"]  = "Hide everything except sticky notes: closes the main window and companions, sticky notes stay."
+L["CFG_COMBAT_HIDE_MINIMIZE"]       = "Hide everything, minimize sticky notes: closes all BNB windows and collapses sticky notes to icons."
+L["CFG_COMBAT_HIDE_ALL"]            = "Hide everything: closes all BNB windows including sticky notes."
+L["CFG_COMBAT_REOPEN"]              = "Windows reopen automatically when combat ends."
+L["CFG_QN_ENABLE_TIP_TITLE"]        = "Enable Quick Note buttons"
+L["CFG_QN_ENABLE_LABEL"]            = "Enable Quick Note (quest, gossip, books, letters)"
+L["CFG_QN_CREATE_MODE_LABEL"]       = "When creating a note from game content"
+L["CFG_QN_MODE_SILENT"]             = "Silent: note appears in your list with no interruption."
+L["CFG_QN_MODE_OPEN"]               = "Open: BigNoteBox opens and selects the new note immediately."
+L["CFG_QN_MODE_CONFIRM"]            = "Confirm: a small popup lets you edit the title before saving."
+L["CFG_DUI_HEADER"]                 = "Dialogue UI"
+L["CFG_IMMERSION_HEADER"]           = "Immersion"
+L["CFG_IMM_RESET_TIP1"]             = "Moves the Immersion quick note button"
+L["CFG_IMM_RESET_TIP2"]             = "back to its default position."
+L["CFG_INS_MODE_LABEL"]             = "When opening the inspect window"
+L["CFG_INS_MODE_TIP_TITLE"]         = "Inspect note creation mode"
+L["CFG_INS_MODE_MANUAL"]            = "Manual: a button appears on the inspect window. Click it to create a note."
+L["CFG_INS_MODE_AUTO"]              = "Automatic: a note is created every time you inspect a player."
+L["CFG_INS_TYPE_LABEL"]             = "When clicking the create note button"
+L["CFG_INS_TYPE_TIP_TITLE"]         = "Note type when clicking the button"
+L["CFG_TYPE_CHOOSE"]                = "Choose: a popup asks you to pick Normal or Rich."
+L["CFG_TYPE_ALWAYS"]                = "Always Rich/Normal: skips the popup and creates that type directly."
+L["CFG_INS_TYPE_DISABLED"]          = "Disabled when creation mode is set to automatic."
+L["CFG_TN_TYPE_LABEL"]              = "When creating a target note"
+L["CFG_TN_TYPE_TIP_TITLE"]          = "Target note type"
+L["CFG_TN_TAGS_HEADER"]             = "Tags to add to target notes"
+L["CFG_TASK_COMPLETED_POS_LABEL"]     = "Completed tasks position:"
+L["CFG_TASK_COMPLETED_POS_TIP_TITLE"] = "Completed tasks position"
+L["CFG_TASK_POS_BOTTOM"]            = "Move to bottom: completed tasks sink to the bottom of the list."
+L["CFG_TASK_POS_KEEP"]              = "Keep in place: completed tasks stay where they are and are greyed out."
+L["CFG_TASK_SPACING_LABEL"]         = "Task list spacing:"
+L["CFG_TASK_SPACING_TIP_TITLE"]     = "Task list spacing"
+L["CFG_TASK_SPACING_COMPACT"]       = "Compact: tighter rows for more tasks on screen."
+L["CFG_TASK_SPACING_NORMAL"]        = "Normal: default spacing."
+L["CFG_TASK_SPACING_SPACIOUS"]      = "Spacious: roomier rows, easier to tap on touch screens."
+L["CFG_TOAST_ANCHOR_TIP"]           = "Opens a draggable anchor to position where context\npopup notifications appear on screen."
+L["CFG_TRASH_ENABLE_LABEL"]         = "Enable Trash (recover deleted notes)"
+L["CFG_TRASH_WARN_LABEL"]           = "Warn before deleting"
+L["CFG_ALARM_DESC"]                 = "Alarms are set per-note via the alarm button in the editor toolbar or the note list right-click menu. Alarm settings, glow animation and snooze options are configured in the Set Alarm window."
+L["CFG_REFBOX_ENABLE_TIP"]          = "Show the Reference Box panel.\nAttach items and spells to your notes for quick lookup."
+L["CFG_REFBOX_ENABLE_LABEL"]        = "Enable Reference Box"
+L["CFG_REFBOX_MAX_TIP"]             = "Maximum number of items and spells that can be attached to a single note (default: 50)."
+L["CFG_SIDEBAR_ENABLE_LABEL"]       = "Enable character sidebar"
+L["CFG_SIDEBAR_AUTOSWITCH_TIP"]     = "Automatically activates the sidebar slot for the character you log in with."
+L["CFG_SIDEBAR_AUTOSWITCH_LABEL"]   = "Auto-switch to character tab on login"
+L["CFG_SIDEBAR_SIDE_LABEL"]         = "Sidebar side"
+L["CFG_SIDEBAR_SIDE_TIP"]           = "Place the sidebar on the left or right edge of the main window."
+L["CFG_SIDEBAR_STARTPOS_LABEL"]     = "Button start position"
+L["CFG_SIDEBAR_STARTPOS_TIP"]       = "Stack buttons from the top or bottom of the sidebar strip."
+L["CFG_SIDEBAR_SMALLICONS_TIP"]     = "Use smaller icons (half-size buttons)."
+L["CFG_SIDEBAR_SMALLICONS_LABEL"]   = "Use small icons (half size)"
+L["CFG_SIDEBAR_DESC"]               = "Right-click a character icon in the sidebar to pin or hide it. Pinned characters appear at the top (max 5)."
+L["CFG_SIDEBAR_HIDDEN_HEADER"]      = "Hidden characters:"
+L["CFG_SIDEBAR_HIDDEN_NONE"]        = "None"
+L["CFG_IMPORT_DESC"]                = "Import notes from other note-taking addons. Your notes in those addons are not affected."
+L["CFG_DANGERZONE_DESC"]            = "Destructive and irreversible actions: reset settings, clear history, delete notes, and more."
+L["CFG_DANGERZONE_TIP_TITLE"]       = "Danger Zone"
+L["CFG_DANGERZONE_TIP_BODY"]        = "Opens the Danger Zone window with destructive reset options."
+L["CFG_DEV_DESC"]                   = "Debug and testing tools. Not required for normal use."
+L["CFG_DEV_ACTIVATE_LABEL"]         = "Activate Debug mode"
+L["CFG_DEV_ACTIVATE_TIP"]           = "Enables debug and testing tools below.\nPrints extra info to chat when tests are active."
+L["CFG_DEV_WP_LABEL"]               = "Test waypoint system"
+L["CFG_DEV_WP_TIP"]                 = "When enabled, prints waypoint debug info to chat:"
+L["CFG_DEV_TOAST_TIP_TITLE"]        = "Fire a test context toast"
+L["CFG_DEV_TOAST_TIP_BODY"]         = "Triggers CheckContextualNotes as if you just entered your current zone."
+L["CFG_DEV_IMM_LABEL"]              = "Debug Immersion button position"
+L["CFG_DEV_IMM_TIP"]                = "When enabled, prints the saved X/Y offset to chat every time you shift-drag and release the button."
+L["CFG_TOOLBAR_DESC"]               = "A small toolbar between the timestamp and note body. Contains Undo/Redo and future formatting buttons."
+L["CFG_PREVIEW_DESC"]               = "Controls for the rich note live preview window that renders markup in real-time as you type."
+L["CFG_PREVIEW_DELAY_DESC"]         = "Update delay: how long after your last keystroke before the preview re-renders. Lower values feel snappier but may cause hitching on very long notes."
+L["CFG_PREVIEW_DELAY_TIP_TITLE"]    = "Preview update delay"
+L["CFG_PREVIEW_DELAY_TIP1"]         = "How long after your last keystroke before the live preview re-renders."
+L["CFG_PREVIEW_DELAY_TIP2"]         = "Lower = more responsive. Default: 0.3s."
+L["CFG_UNDO_DESC"]                  = "History is per-note and per-session only. Stacks are cleared on reload or logout."
+L["CFG_UNDO_DEPTH_WARN"]            = "High depth uses more memory. Keep at 50 or below if you edit many notes simultaneously in the same session."
+L["CFG_UNDO_DEPTH_TIP1"]            = "How many undo steps to keep per note."
+L["CFG_UNDO_DEPTH_TIP2"]            = "Default: 50. Higher values use more RAM per note."
+L["CFG_AUTOSAVE_IDLE_DESC"]         = "Idle delay: how long after your last keystroke before a snapshot is saved. Lower = more frequent saves."
+L["CFG_AUTOSAVE_IDLE_TIP_TITLE"]    = "Idle delay"
+L["CFG_AUTOSAVE_IDLE_TIP1"]         = "How long after your last keystroke before a snapshot is saved."
+L["CFG_AUTOSAVE_IDLE_TIP2"]         = "Lower = more frequent snapshots. Default: 0.8s."
+L["CFG_AUTOSAVE_FORCED_DESC"]       = "Forced interval: maximum time between snapshots while typing without pausing. A snapshot fires every N seconds even if you never stop."
+L["CFG_AUTOSAVE_FORCED_TIP_TITLE"]  = "Forced interval"
+L["CFG_AUTOSAVE_FORCED_TIP1"]       = "Maximum time between snapshots while typing continuously."
+L["CFG_AUTOSAVE_FORCED_TIP2"]       = "Even if you never pause, a snapshot fires every N seconds."
+L["CFG_AUTOSAVE_FORCED_TIP3"]       = "Lower = finer granularity. Default: 3s."
+L["CFG_AUTOSAVE_HIST_DESC"]         = "Auto-snapshots are saved per note on each logout or reload. History only grows when notes change."
+L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"]   = "Auto-save slots per note"
+L["CFG_AUTOSAVE_SLOTS_TIP1"]        = "How many auto-snapshots to keep per note."
+L["CFG_AUTOSAVE_SLOTS_TIP2"]        = "Older entries are dropped when the limit is reached."
+L["CFG_AUTOSAVE_SLOTS_TIP3"]        = "Default: 5."
+L["CFG_AUTOSAVE_HISTSIZE_CALC"]     = "History size: calculating..."
+L["CFG_AUTOSAVE_HISTSIZE_FMT"]      = "History size: %s across %d note(s)"
+L["CFG_UNIT_KB_FMT"]                = "%d KB"
+L["CFG_EXPORT_TITLE"]               = "BigNoteBox -- Export"
+L["CFG_EXPORT_IMG_WARN"]            = "This note contains images. Place your image files in an 'img' folder next to the HTML file."
+L["CFG_DEV_PSEUDOLOC_LABEL"]        = "Debug pseudo-locale (mark translated strings)"
+L["CFG_DEV_PSEUDOLOC_TIP_TITLE"]    = "Debug pseudo-locale"
+L["CFG_DEV_PSEUDOLOC_TIP_BODY"]     = "Prefixes every string that goes through L[...] with @@.\nAny UI text without the marker is a hardcoded literal that still needs a locale key. Requires a UI reload to fully refresh already-built windows."
