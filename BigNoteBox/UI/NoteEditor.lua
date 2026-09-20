@@ -278,7 +278,7 @@ local function BuildNoteIconRow(parent, noteItems, yOffset)
             self._iconTex:SetVertexColor(1.1, 1.1, 1.1)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(note.title or "Untitled", 1, 1, 1)
-            GameTooltip:AddLine("Click to open  |  Right-click for sticky", 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(L["NE_CLICK_OPEN_STICKY_TIP"], 0.7, 0.7, 0.7)
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function(self)
@@ -440,7 +440,7 @@ local _icoDialog
 local USER_IMG_PREFIX_DIALOG = "Interface\\AddOns\\BigNoteBox\\UserImages\\"
 
 local ALIGN_OPTS   = { "center", "left", "right" }
-local ALIGN_LABELS = { "Center", "Left", "Right" }
+local ALIGN_LABELS = { L["STICKY_ALIGN_CENTER"], L["STICKY_ALIGN_LEFT"], L["STICKY_ALIGN_RIGHT"] }
 
 local function ResolvePath(raw)
     local s = raw and raw:match("^%s*(.-)%s*$") or ""
@@ -496,11 +496,11 @@ function BNB.OpenImgDialog(insertFn)
             titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
             local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText("Insert Image"); titleLbl:SetTextColor(1, 0.82, 0)
+            titleLbl:SetText(L["NE_INSERT_IMAGE_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
             local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
             closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         else
-            f:SetTitle("Insert Image")
+            f:SetTitle(L["NE_INSERT_IMAGE_TITLE"])
             if f.CloseButton then
                 f.CloseButton:SetScript("OnClick", function() f:Hide() end)
             end
@@ -571,7 +571,7 @@ function BNB.OpenImgDialog(insertFn)
         local RefreshPreview
 
         if #userImages > 0 then
-            Lbl("Pick from UserImages")
+            Lbl(L["NE_PICK_USERIMAGES"])
             if useNativeDD then
                 pickerDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
                 pickerDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
@@ -594,7 +594,7 @@ function BNB.OpenImgDialog(insertFn)
                 curY = curY - 32
             else
                 pickerCycle = BNB.CreateButton(nil, f,
-                    selImage > 0 and pickLabels[selImage] or "-- select image --",
+                    selImage > 0 and pickLabels[selImage] or L["NE_SELECT_IMAGE_PLACEHOLDER"],
                     INNER_W, 22)
                 pickerCycle:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
                 pickerCycle:SetScript("OnClick", function(self)
@@ -620,7 +620,7 @@ function BNB.OpenImgDialog(insertFn)
         curY = curY - 4  -- gap before alignment
 
         -- ── Alignment ─────────────────────────────────────────────────────────
-        Lbl("Alignment")
+        Lbl(L["NE_ALIGNMENT_LABEL"])
 
         local selAlign = 1  -- index into ALIGN_OPTS
         local alignDD, alignCycle
@@ -658,10 +658,10 @@ function BNB.OpenImgDialog(insertFn)
         local NUM_W    = math.floor((INNER_W - NUM_GAP) / 2)
         local wLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         wLbl:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
-        wLbl:SetTextColor(0.78, 0.78, 0.78); wLbl:SetText("Width")
+        wLbl:SetTextColor(0.78, 0.78, 0.78); wLbl:SetText(L["NE_WIDTH_LABEL"])
         local hLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         hLbl:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD + NUM_W + NUM_GAP, curY)
-        hLbl:SetTextColor(0.78, 0.78, 0.78); hLbl:SetText("Height")
+        hLbl:SetTextColor(0.78, 0.78, 0.78); hLbl:SetText(L["NE_HEIGHT_LABEL"])
         curY = curY - 16
 
         local widthEb = FieldEB(NUM_W, true)
@@ -724,11 +724,11 @@ function BNB.OpenImgDialog(insertFn)
         local DH = math.abs(curY) + BTN_ROW
         f:SetSize(DW, DH)
 
-        local cancelBtn = BNB.CreateButton(nil, f, "Cancel", 90, BTN_H)
+        local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 90, BTN_H)
         cancelBtn:SetPoint("BOTTOM", f, "BOTTOM", 53, DPAD)
         cancelBtn:SetScript("OnClick", function() f:Hide() end)
 
-        local insertBtn = BNB.CreateButton(nil, f, "Insert", 90, BTN_H)
+        local insertBtn = BNB.CreateButton(nil, f, L["NE_INSERT_BTN"], 90, BTN_H)
         insertBtn:SetPoint("BOTTOM", f, "BOTTOM", -53, DPAD)
 
         -- ── Stored state ──────────────────────────────────────────────────────
@@ -822,11 +822,11 @@ function BNB.OpenLnkDialog(insertFn)
             titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
             local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText("Insert Link"); titleLbl:SetTextColor(1, 0.82, 0)
+            titleLbl:SetText(L["NE_INSERT_LINK_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
             local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
             closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         else
-            f:SetTitle("Insert Link")
+            f:SetTitle(L["NE_INSERT_LINK_TITLE"])
             if f.CloseButton then
                 f.CloseButton:SetScript("OnClick", function() f:Hide() end)
             end
@@ -864,12 +864,12 @@ function BNB.OpenLnkDialog(insertFn)
             return eb
         end
 
-        Lbl("URL")
+        Lbl(L["NE_URL_LABEL"])
         local urlEb = FieldEB(INNER_W)
         f._urlEb = urlEb
 
         curY = curY - 2
-        Lbl("Link text  (leave blank to use the URL)")
+        Lbl(L["NE_LINK_TEXT_LABEL"])
         local textEb = FieldEB(INNER_W)
         f._textEb = textEb
 
@@ -883,11 +883,11 @@ function BNB.OpenLnkDialog(insertFn)
         local DH_final = math.abs(curY) + BTN_H + DPAD * 2
         f:SetSize(DW, DH_final)
 
-        local cancelBtn = BNB.CreateButton(nil, f, "Cancel", 90, BTN_H)
+        local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 90, BTN_H)
         cancelBtn:SetPoint("BOTTOM", f, "BOTTOM", 53, DPAD)
         cancelBtn:SetScript("OnClick", function() f:Hide() end)
 
-        local insertBtn = BNB.CreateButton(nil, f, "Insert", 90, BTN_H)
+        local insertBtn = BNB.CreateButton(nil, f, L["NE_INSERT_BTN"], 90, BTN_H)
         insertBtn:SetPoint("BOTTOM", f, "BOTTOM", -53, DPAD)
         f._insertBtn = insertBtn
 
@@ -975,14 +975,14 @@ function BNB.OpenIcoDialog(insertFn)
 
             local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText("Insert Icon"); titleLbl:SetTextColor(1, 0.82, 0)
+            titleLbl:SetText(L["NE_INSERT_ICON_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
 
             local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
             closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         else
             -- Normal mode: use ButtonFrameTemplate's built-in title and close button
             if f.TitleText then
-                f.TitleText:SetText("Insert Icon")
+                f.TitleText:SetText(L["NE_INSERT_ICON_TITLE"])
             end
             if f.CloseButton then
                 f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -999,7 +999,7 @@ function BNB.OpenIcoDialog(insertFn)
         f:EnableKeyboard(true)
 
         -- ── Tabs ─────────────────────────────────────────────────────────────
-        local TAB_LABELS = { "BNB Icons", "Blizzard Icon" }
+        local TAB_LABELS = { L["NC_TAB_BNB_ICONS"], L["NC_TAB_BLIZZARD_ICON"] }
         local tabPanels  = {}
 
         local function SelectIcoTab(idx)
@@ -1085,7 +1085,7 @@ function BNB.OpenIcoDialog(insertFn)
         searchEb:SetFontObject("GameFontNormal"); searchEb:SetAutoFocus(false)
         searchEb:SetMaxLetters(64); searchEb:SetTextInsets(4, 4, 0, 0)
         searchEb:SetScript("OnEscapePressed", function() f:Hide() end)
-        BNB.AddPlaceholder(searchEb, "Search icons...", 0.40, 0.40, 0.40)
+        BNB.AddPlaceholder(searchEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.40, 0.40, 0.40)
 
         -- Size field (right ~30% of the same row, shared across tabs)
         sizeEb = CreateFrame("EditBox", nil, panel1,
@@ -1098,7 +1098,7 @@ function BNB.OpenIcoDialog(insertFn)
         sizeEb:SetMaxLetters(4); sizeEb:SetTextInsets(4, 4, 0, 0)
         sizeEb:SetNumeric(false); sizeEb:SetText("25")
         sizeEb:SetScript("OnEscapePressed", function() f:Hide() end)
-        BNB.AddPlaceholder(sizeEb, "Size", 0.40, 0.40, 0.40)
+        BNB.AddPlaceholder(sizeEb, L["NE_SIZE_LABEL"], 0.40, 0.40, 0.40)
         f._sizeEb = sizeEb
 
         -- Scroll frame for icon grid — fills all space below the search row
@@ -1211,19 +1211,19 @@ function BNB.OpenIcoDialog(insertFn)
         local searchLbl2 = panel2:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         searchLbl2:SetPoint("TOPLEFT", panel2, "TOPLEFT", DPAD, -8)
         searchLbl2:SetTextColor(0.65, 0.65, 0.65)
-        searchLbl2:SetText("Icon name")
+        searchLbl2:SetText(L["NE_ICON_NAME_LABEL2"])
 
         local sizeLbl2 = panel2:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         sizeLbl2:SetPoint("TOPLEFT", panel2, "TOPLEFT", DPAD + SEARCH_W + SIZE_GAP, -8)
         sizeLbl2:SetTextColor(0.65, 0.65, 0.65)
-        sizeLbl2:SetText("Size")
+        sizeLbl2:SetText(L["NE_SIZE_LABEL"])
 
         local descLbl = panel2:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         descLbl:SetPoint("TOPLEFT",  panel2, "TOPLEFT",  DPAD, -56)
         descLbl:SetPoint("TOPRIGHT", panel2, "TOPRIGHT", -DPAD, -56)
         descLbl:SetJustifyH("LEFT"); descLbl:SetWordWrap(true)
         descLbl:SetTextColor(0.65, 0.65, 0.65)
-        descLbl:SetText("Type any WoW icon name, e.g.  INV_Misc_Note_01")
+        descLbl:SetText(L["NE_ICON_NAME_DESC"])
 
         -- Wowhead link line
         local whLbl = panel2:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -1231,7 +1231,7 @@ function BNB.OpenIcoDialog(insertFn)
         whLbl:SetPoint("TOPRIGHT", panel2, "TOPRIGHT", -DPAD, -70)
         whLbl:SetJustifyH("LEFT")
         whLbl:SetTextColor(0.40, 0.70, 1.0)
-        whLbl:SetText("For icon names: www.wowhead.com/icons")
+        whLbl:SetText(L["NE_WOWHEAD_HINT"])
         -- Make the wowhead line clickable to copy the URL
         local whBtn = CreateFrame("Button", nil, panel2)
         whBtn:SetAllPoints(whLbl)
@@ -1240,7 +1240,7 @@ function BNB.OpenIcoDialog(insertFn)
         end)
         whBtn:SetScript("OnEnter", function()
             GameTooltip:SetOwner(whBtn, "ANCHOR_TOP")
-            GameTooltip:AddLine("Click to copy URL", 1, 1, 1)
+            GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 1, 1, 1)
             GameTooltip:Show()
         end)
         whBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1290,7 +1290,7 @@ function BNB.OpenIcoDialog(insertFn)
         sizeEb2:SetMaxLetters(4); sizeEb2:SetTextInsets(4, 4, 0, 0)
         sizeEb2:SetNumeric(false); sizeEb2:SetText("25")
         sizeEb2:SetScript("OnEscapePressed", function() f:Hide() end)
-        BNB.AddPlaceholder(sizeEb2, "Size", 0.40, 0.40, 0.40)
+        BNB.AddPlaceholder(sizeEb2, L["NE_SIZE_LABEL"], 0.40, 0.40, 0.40)
         f._sizeEb2 = sizeEb2
 
         -- ── Shared bottom section: preview + buttons ──────────────────────────
@@ -1298,16 +1298,16 @@ function BNB.OpenIcoDialog(insertFn)
 
         -- Alignment dropdown (shared — applies to both BNB icons and Blizzard icons)
         local ICO_ALIGN_ITEMS = {
-            { key = "",   label = "Inline (default)" },
-            { key = ":l", label = "Left"             },
-            { key = ":c", label = "Centre"           },
-            { key = ":r", label = "Right"            },
+            { key = "",   label = L["NE_ICO_ALIGN_INLINE"] },
+            { key = ":l", label = L["STICKY_ALIGN_LEFT"]             },
+            { key = ":c", label = L["NE_ICO_ALIGN_CENTRE"]           },
+            { key = ":r", label = L["STICKY_ALIGN_RIGHT"]            },
         }
         local _icoAlign = ""
         local alignLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         alignLbl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DPAD, BTN_H + DPAD * 2 + PREV_SIZE + 14)
         alignLbl:SetTextColor(0.65, 0.65, 0.65)
-        alignLbl:SetText("Alignment")
+        alignLbl:SetText(L["NE_ALIGNMENT_LABEL"])
         local alignDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
         alignDD:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DPAD, BTN_H + DPAD * 2 + PREV_SIZE + 2)
         alignDD:SetWidth(INNER_W)
@@ -1338,11 +1338,11 @@ function BNB.OpenIcoDialog(insertFn)
         f._prevTex = prevTex; f._prevBg = prevBg
 
         -- Buttons
-        local cancelBtn = BNB.CreateButton(nil, f, "Cancel", 90, BTN_H)
+        local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 90, BTN_H)
         cancelBtn:SetPoint("BOTTOM", f, "BOTTOM", 53, DPAD)
         cancelBtn:SetScript("OnClick", function() f:Hide() end)
 
-        local insertBtn = BNB.CreateButton(nil, f, "Insert", 90, BTN_H)
+        local insertBtn = BNB.CreateButton(nil, f, L["NE_INSERT_BTN"], 90, BTN_H)
         insertBtn:SetPoint("BOTTOM", f, "BOTTOM", -53, DPAD)
         f._insertBtn = insertBtn
 
@@ -1360,7 +1360,7 @@ function BNB.OpenIcoDialog(insertFn)
             sizeEb:SetText("25")
             sizeEb2:SetText("25")
             searchEb:SetText("")
-            BNB.AddPlaceholder(searchEb, "Search icons...", 0.40, 0.40, 0.40)
+            BNB.AddPlaceholder(searchEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.40, 0.40, 0.40)
             nameEb:SetText("")
             FilterGrid("")
             -- Clear grid selection highlights
@@ -1494,7 +1494,7 @@ local function BuildEmptyState(parent)
     hintLbl:SetPoint("TOP", quoteLbl, "BOTTOM", 0, -(LINE_PAD + 28))
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(unpack(COL_GREY))
-    hintLbl:SetText("Select a note or create a new one")
+    hintLbl:SetText(L["NE_SELECT_OR_CREATE_HINT"])
 
     -- ── Create a new note button ─────────────────────────────────────────────
     -- In skin mode use a backdrop-based skin button (avoids NineSlice tint issues).
@@ -1502,7 +1502,7 @@ local function BuildEmptyState(parent)
     local newBtn
     local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
     if skinMode then
-        newBtn = BNB.CreateSkinButton(nil, f, "Create a new note", 200, 40, 16)
+        newBtn = BNB.CreateSkinButton(nil, f, L["NE_CREATE_NEW_NOTE_BTN"], 200, 40, 16)
     else
         local tpl = "SharedButtonLargeTemplate"
         if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
@@ -1516,7 +1516,7 @@ local function BuildEmptyState(parent)
         newBtn = CreateFrame("Button", nil, f, tpl)
         newBtn:SetSize(200, 40)
         pcall(function() DynamicResizeButton_Resize(newBtn) end)
-        newBtn:SetText("Create a new note")
+        newBtn:SetText(L["NE_CREATE_NEW_NOTE_BTN"])
         local bfs = newBtn:GetFontString()
         if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 16, "") end) end
     end
@@ -1565,8 +1565,8 @@ local function BuildEmptyState(parent)
     end)
     importBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Import Notes", 1, 1, 1)
-        GameTooltip:AddLine("Paste a BigNoteBox JSON export to import notes.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["NE_IMPORT_NOTES_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_IMPORT_NOTES_TIP_BODY"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     importBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1582,8 +1582,8 @@ local function BuildEmptyState(parent)
     configBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         local cfgOpen = _G["BigNoteBoxConfigFrame"] and _G["BigNoteBoxConfigFrame"]:IsShown()
-        GameTooltip:AddLine(cfgOpen and "Close Config" or "Open Config", 1, 1, 1)
-        GameTooltip:AddLine("Open the BigNoteBox settings window.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(cfgOpen and L["NE_CLOSE_CONFIG_TIP"] or L["NE_OPEN_CONFIG_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_OPEN_CONFIG_TIP_BODY"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     configBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -1658,7 +1658,7 @@ local function BuildEmptyState(parent)
         else
             zoneName = GetZoneText()
         end
-        locHeader:SetText("Notes for " .. (zoneName or "this area"))
+        locHeader:SetText(string.format(L["NE_NOTES_FOR_FMT"], zoneName or L["NE_THIS_AREA"]))
 
         -- Calculate how many rows we have to stack, then anchor bottom-up.
         -- favRowContainer bottom = f bottom + 48
@@ -1859,12 +1859,12 @@ local function BuildTitleField(parent)
         local updated = note.updated and AbsTime(note.updated)
         if not created and not updated then return end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        if created then GameTooltip:AddLine("Created " .. created, 0.7, 0.7, 0.7) end
-        if updated then GameTooltip:AddLine("Edited "  .. updated, 0.7, 0.7, 0.7) end
-        local zone = note.coordZone or "Unknown"
-        GameTooltip:AddLine("Zone: " .. zone, 0.7, 0.7, 0.7)
+        if created then GameTooltip:AddLine(string.format(L["NE_CREATED_FMT"], created), 0.7, 0.7, 0.7) end
+        if updated then GameTooltip:AddLine(string.format(L["NE_EDITED_FMT"], updated), 0.7, 0.7, 0.7) end
+        local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
+        GameTooltip:AddLine(string.format(L["NE_ZONE_FMT"], zone), 0.7, 0.7, 0.7)
         if note.coordX and note.coordY then
-            GameTooltip:AddLine(string.format("Coords: %.2f %.2f", note.coordX, note.coordY), 0.7, 0.7, 0.7)
+            GameTooltip:AddLine(string.format(L["NE_COORDS_FMT"], note.coordX, note.coordY), 0.7, 0.7, 0.7)
         end
         GameTooltip:Show()
     end)
@@ -1949,9 +1949,9 @@ local function BuildTitleField(parent)
     -- Register the discard confirmation popup (once, idempotent).
     if not StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] then
         StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] = {
-            text      = "This note has no title. Discard it?",
-            button1   = "Discard",
-            button2   = "Keep Editing",
+            text      = L["NE_DISCARD_POPUP_TEXT"],
+            button1   = L["NE_DISCARD_BTN"],
+            button2   = L["NE_KEEP_EDITING_BTN"],
             OnAccept  = function()
                 local id = BNB._pendingNewNoteID
                 BNB._pendingNewNoteID = nil
@@ -2017,7 +2017,7 @@ local function UpdateStatsStrip(text)
     local strip = BNB._editorStatsStrip
     if not strip then return end
     if not text or text == "" then
-        strip:SetText("0 chars  •  0 words")
+        strip:SetText(L["NE_STATS_EMPTY"])
         return
     end
     local chars = #text
@@ -2033,7 +2033,7 @@ local function UpdateStatsStrip(text)
         end
         return result
     end
-    strip:SetText(fmt(chars) .. " chars  •  " .. fmt(words) .. " words")
+    strip:SetText(string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words)))
 end
 
 --------------------------------------------------------------------------------
@@ -2443,7 +2443,7 @@ local function BuildWysiwygBar(parent, tsStrip)
                     local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
                     return n and n.fontOverride
                 end)()
-                root:CreateRadio("Default (global setting)",
+                root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
                     function() return curID == nil end,
                     function() ApplyFontOverride(nil); _fontMenuDD:GenerateMenu() end)
                 -- Bundled fonts (non-LSM)
@@ -2489,18 +2489,18 @@ local function BuildWysiwygBar(parent, tsStrip)
     end)
     fontDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(fontDDBg, "ANCHOR_TOP")
-        GameTooltip:AddLine("Font type", 1, 1, 1)
-        GameTooltip:AddLine("Click to change the font for this note.", 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["NE_FONT_TYPE_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_FONT_TYPE_TIP_BODY"], 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
     end)
     fontDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- ── Font size: decrease / increase / dropdown ─────────────────────────────
-    local decBtn = WyBtn("tb-decreasesize", "Decrease font size")
+    local decBtn = WyBtn("tb-decreasesize", L["CFG_EXPORT_DECREASE_FONT"])
     decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", 4, 0)
     decBtn:SetIconEnabled(true)
 
-    local incBtn = WyBtn("tb-increasesize", "Increase font size")
+    local incBtn = WyBtn("tb-increasesize", L["CFG_EXPORT_INCREASE_FONT"])
     incBtn:SetPoint("LEFT", decBtn, "RIGHT", 2, 0)
     incBtn:SetIconEnabled(true)
 
@@ -2584,7 +2584,7 @@ local function BuildWysiwygBar(parent, tsStrip)
                 local curSz = GetCurrentFontSize()
                 for _, sz in ipairs(WY_SIZE_PRESETS) do
                     local s = sz
-                    root:CreateRadio(s .. "pt",
+                    root:CreateRadio(string.format(L["NE_FONT_SIZE_PT_FMT"], s),
                         function() return curSz == s end,
                         function() ApplyFontSize(s); _sizeMenuDD:GenerateMenu() end)
                 end
@@ -2602,14 +2602,14 @@ local function BuildWysiwygBar(parent, tsStrip)
     end)
     sizeDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(sizeBg, "ANCHOR_TOP")
-        GameTooltip:AddLine("Font size", 1, 1, 1)
-        GameTooltip:AddLine("Click to pick a preset size.", 0.7, 0.7, 0.7, true)
+        GameTooltip:AddLine(L["NE_FONT_SIZE_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_FONT_SIZE_TIP_BODY"], 0.7, 0.7, 0.7, true)
         GameTooltip:Show()
     end)
     sizeDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- tb-bulletlist: insert "  · " at the start of the cursor's current line
-    local bulletBtn = WyBtn("tb-bulletlist", "Insert bullet point at start of current line")
+    local bulletBtn = WyBtn("tb-bulletlist", L["NE_INSERT_BULLET_TIP"])
     bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", 6, 0)
     bulletBtn:SetIconEnabled(true)
     bulletBtn:SetScript("OnClick", function()
@@ -2650,17 +2650,17 @@ local function BuildWysiwygBar(parent, tsStrip)
     -- Anchored from RIGHT inward so they always hug the right edge.
 
     -- tb-notemap: waypoint at note creation coords (rightmost)
-    local mapBtn = WyBtn("tb-notemap", "Open waypoint at note location")
+    local mapBtn = WyBtn("tb-notemap", L["NE_WP_OPEN_TIP_TITLE"])
     mapBtn:SetPoint("RIGHT", bar, "RIGHT", -6, 0)
     mapBtn:SetScript("OnEnter", function(self)
         local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
         if not note or not note.coordX then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Open waypoint at note location", 1, 1, 1)
-        local zone = note.coordZone or "Unknown"
-        GameTooltip:AddLine(string.format("%s (%.2f %.2f)", zone, note.coordX, note.coordY), 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["NE_WP_OPEN_TIP_TITLE"], 1, 1, 1)
+        local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
+        GameTooltip:AddLine(string.format(L["NE_WP_ZONE_COORDS_FMT"], zone, note.coordX, note.coordY), 0.7, 0.7, 0.7)
         if not (TomTom and TomTom.AddWaypoint) then
-            GameTooltip:AddLine("Replaces current waypoint.", 0.5, 0.5, 0.5)
+            GameTooltip:AddLine(L["NE_WP_REPLACES_TIP"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
     end)
@@ -2711,7 +2711,7 @@ local function BuildWysiwygBar(parent, tsStrip)
     end
 
     -- tb-share (left of divider)
-    local shareBtn = WyBtn("tb-share", "Share this note")
+    local shareBtn = WyBtn("tb-share", L["NE_SHARE_NOTE_TIP"])
     shareBtn:SetPoint("RIGHT", shareDiv, "LEFT", -6, 0)
     shareBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
@@ -2720,7 +2720,7 @@ local function BuildWysiwygBar(parent, tsStrip)
     shareBtn:SetIconEnabled(false)
     BNB._wysiwygShareBtn = shareBtn
     -- tb-copymove (left of share button)
-    local copyMoveBtn = WyBtn("tb-copymove", "Copy or move note to another character or scope")
+    local copyMoveBtn = WyBtn("tb-copymove", L["NE_COPY_MOVE_TIP"])
     copyMoveBtn:SetPoint("RIGHT", shareBtn, "LEFT", -4, 0)
     copyMoveBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
@@ -2729,7 +2729,7 @@ local function BuildWysiwygBar(parent, tsStrip)
     BNB._wysiwygCopyMoveBtn = copyMoveBtn
 
     -- tb-alarm (left of copy/move)
-    local alarmBtn = WyBtn("tb-alarm", "Set alarm for this note")
+    local alarmBtn = WyBtn("tb-alarm", L["STICKY_SET_ALARM_TIP"])
     alarmBtn:SetPoint("RIGHT", copyMoveBtn, "LEFT", -4, 0)
     alarmBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
@@ -2976,7 +2976,7 @@ local function BuildToolbar(parent)
 
     -- Reference Box toggle
     do
-        local refboxBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-refbox", "Toggle Reference Box (item/spell attachments)")
+        local refboxBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-refbox", L["NE_TOGGLE_REFBOX_TIP"])
         refboxBtn:SetPoint("LEFT", bar, "LEFT", 38, 0)
         refboxBtn:SetScript("OnClick", function()
             if BNB.ToggleReferenceBox then BNB.ToggleReferenceBox() end
@@ -2987,7 +2987,7 @@ local function BuildToolbar(parent)
 
     -- Tasks button — adds a task to the current note (same as + button in RefBox)
     do
-        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", "Add task to this note")
+        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", L["NE_ADD_TASK_TIP"])
         tasksBtn:SetPoint("LEFT", bar, "LEFT", 70, 0)
         tasksBtn:SetScript("OnClick", function()
             local id = BNB._currentNoteID; if not id then return end
@@ -3028,7 +3028,7 @@ local function BuildToolbar(parent)
     end)
 
     -- Duplicate
-    local dupBtn = MakeIconBtn(bar, "Actionbar\\ab-duplicate", "Duplicate this note")
+    local dupBtn = MakeIconBtn(bar, "Actionbar\\ab-duplicate", L["NE_DUPLICATE_NOTE_TIP"])
     dupBtn:SetPoint("LEFT", bar, "LEFT", 134, 0)
     dupBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
@@ -3093,8 +3093,8 @@ local function BuildToolbar(parent)
         local note = id and BNB.GetNote(id)
         local isLocked = note and NoteIsLocked(note)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(isLocked and "Click to unlock this note"
-                                      or "Click to lock this note", 1, 1, 1)
+        GameTooltip:AddLine(isLocked and L["NE_CLICK_UNLOCK_TIP"]
+                                      or L["NE_CLICK_LOCK_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     lockBtn:SetScript("OnLeave", function(self)
@@ -3146,7 +3146,7 @@ local function BuildToolbar(parent)
         self:SetSize(32, 32)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SEND_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine("Send note lines to a chat channel", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["NE_SEND_TIP_BODY"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     sendBtn:SetScript("OnLeave", function(self)
@@ -3224,8 +3224,8 @@ local function RebuildTagChips(strip, tags)
         lblBtn:SetScript("OnEnter", function(self)
             lbl:SetTextColor(1, 1, 0.4)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine("Filter notes by tag: " .. capturedTag, 1, 1, 1)
-            GameTooltip:AddLine("Click again to clear filter", 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(string.format(L["NE_FILTER_BY_TAG_FMT"], capturedTag), 1, 1, 1)
+            GameTooltip:AddLine(L["NE_CLICK_CLEAR_FILTER_TIP"], 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end)
         lblBtn:SetScript("OnLeave", function()
@@ -3438,7 +3438,7 @@ local function BuildTagStrip(parent, toolbarFrame)
 
     toggleBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(toggleBtn, "ANCHOR_TOP")
-        GameTooltip:AddLine(_tagStripCollapsed and "Expand tags" or "Collapse tags", 1, 1, 1)
+        GameTooltip:AddLine(_tagStripCollapsed and L["NE_EXPAND_TAGS_TIP"] or L["NE_COLLAPSE_TAGS_TIP"], 1, 1, 1)
         GameTooltip:Show()
     end)
     toggleBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -3697,18 +3697,18 @@ function BNB.LoadNoteInEditor(id)
 
         local createdStr, updatedStr
         if isRelative then
-            createdStr = note.created and ("Created " .. FmtTime(note.created)) or ""
-            updatedStr = note.updated and ("  •  Edited " .. FmtTime(note.updated)) or ""
+            createdStr = note.created and (string.format(L["NE_CREATED_FMT"], FmtTime(note.created))) or ""
+            updatedStr = note.updated and (string.format(L["NE_TS_SEP_EDITED_FMT"], FmtTime(note.updated))) or ""
         else
-            createdStr = note.created and ("C: " .. FmtTime(note.created)) or ""
-            updatedStr = note.updated and ("  •  E: " .. FmtTime(note.updated)) or ""
+            createdStr = note.created and (string.format(L["NE_TS_CREATED_SHORT_FMT"], FmtTime(note.created))) or ""
+            updatedStr = note.updated and (string.format(L["NE_TS_SEP_EDITED_SHORT_FMT"], FmtTime(note.updated))) or ""
         end
 
         local coords
         if note.coordX and note.coordY then
-            coords = string.format("  •  %.2f %.2f", note.coordX, note.coordY)
+            coords = string.format(L["NE_TS_SEP_COORDS_FMT"], note.coordX, note.coordY)
         else
-            coords = "  •  Unknown"
+            coords = L["NE_TS_SEP_UNKNOWN"]
         end
         tsStrip:SetText(createdStr .. updatedStr .. coords)
         tsStrip:Show()
@@ -4002,11 +4002,11 @@ local function BuildMarkupBar(parent, wysiwygBar)
                 end
             end
         end)
-    MkBtn("Lnk", "Insert link — opens dialog",
+    MkBtn("Lnk", L["NE_INSERT_LINK_TIP"],
         function() BNB.OpenLnkDialog(InsertTag) end)
-    MkBtn("Ico", "Insert icon — opens picker",
+    MkBtn("Ico", L["NE_INSERT_ICON_TIP"],
         function() BNB.OpenIcoDialog(InsertTag) end)
-    MkBtn("Img", "Insert image tag with filename and size",
+    MkBtn("Img", L["NE_INSERT_IMAGE_TIP"],
         function() BNB.OpenImgDialog(InsertTag) end)
 
     -- "Live Preview" toggle — right-aligned, does not advance btnX
@@ -4099,8 +4099,8 @@ local function BuildRichTabStrip()
         return btn
     end
 
-    local editorTab = MakeRichBtn("bt-editor", "Editor mode — edit the rich note markup", 0)
-    local viewTab   = MakeRichBtn("bt-view",   "View mode — render the rich note",        36)
+    local editorTab = MakeRichBtn("bt-editor", L["NE_RICH_EDITOR_MODE_TIP"], 0)
+    local viewTab   = MakeRichBtn("bt-view",   L["NE_RICH_VIEW_MODE_TIP"],        36)
 
     strip._editorTab = editorTab
     strip._viewTab   = viewTab
