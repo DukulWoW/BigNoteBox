@@ -652,7 +652,7 @@ L["SEND_LINE_BY_LINE"]  = "Send each line as a separate message"
 L["SEND_CONFIRM"]       = "Send %d line(s) to %s?"
 L["SEND_CONFIRM_BTN"]   = "Send"
 L["SEND_NO_BCB"]        = "Sending without BigChatBox (direct mode)"
-L["SEND_EMPTY"]         = "Note is empty — nothing to send."
+L["SEND_EMPTY"]         = "Note is empty - nothing to send."
 L["SEND_COMPLETE"]      = "Sent %d line(s) to %s."
 
 -- ── Chat Capture ──────────────────────────────────────────────────────────────
@@ -673,10 +673,10 @@ L["BTN_RESET_CONFIRM"]   = "Reset All"
 
 -- ── Slash commands ────────────────────────────────────────────────────────────
 L["SLASH_HELP"]          = "|cff66bb6aBigNoteBox|r commands:"
-L["SLASH_HELP_OPEN"]     = "  /bnb — Toggle note window"
-L["SLASH_HELP_NEW"]      = "  /bnb new — Create a new note"
-L["SLASH_HELP_RESET"]    = "  /bnb reset — Reset all settings"
-L["SLASH_HELP_CONFIG"]   = "  /bnb config — Open settings"
+L["SLASH_HELP_OPEN"]     = "  /bnb - Toggle note window"
+L["SLASH_HELP_NEW"]      = "  /bnb new - Create a new note"
+L["SLASH_HELP_RESET"]    = "  /bnb reset - Reset all settings"
+L["SLASH_HELP_CONFIG"]   = "  /bnb config - Open settings"
 L["SLASH_RESET_DONE"]    = "All settings reset to defaults."
 L["SLASH_NOTE_CREATED"]  = "New note created."
 
@@ -717,7 +717,7 @@ L["BACKUP_BTN_EXPORT"]         = "Export to Clipboard"
 L["BACKUP_BTN_COPY_DONE"]      = "Copied! (%d notes)"
 L["BACKUP_BTN_COPY_FALLBACK"]  = "Select all and press Ctrl+C to copy."
 L["BACKUP_IMPORT_HEADER"]      = "Import Notes"
-L["BACKUP_IMPORT_DESC"]        = "Paste an exported BigNoteBox backup below, then click Import. Imported notes are added alongside your existing notes — nothing is overwritten."
+L["BACKUP_IMPORT_DESC"]        = "Paste an exported BigNoteBox backup below, then click Import. Imported notes are added alongside your existing notes - nothing is overwritten."
 L["BACKUP_BTN_IMPORT"]         = "Import"
 L["BACKUP_IMPORT_OK"]          = "Imported %d note(s) successfully."
 L["BACKUP_IMPORT_NONE"]        = "Nothing to import — paste is empty or unrecognized."
@@ -756,7 +756,7 @@ L["TAG_MGR_MERGE_NOTE"]  = "Tip: rename a tag to an existing name to merge them.
 -- ── Focus Mode ────────────────────────────────────────────────────────────────
 L["FOCUS_MODE_TIP"]      = "Focus Mode"
 L["FOCUS_MODE_TIP_SUB"]  = "Hide the note list and tools — just the note"
-L["FOCUS_MODE_TITLE"]    = "BigNoteBox — Focus"
+L["FOCUS_MODE_TITLE"]    = "BigNoteBox - Focus"
 L["FOCUS_RESTORE_BTN"]   = "Restore"
 L["FOCUS_RESTORE_TIP"]   = "Exit Focus Mode and return to the main window"
 
@@ -1030,7 +1030,7 @@ L["CFG_SKIN_RANDOMIZE_TIP"]     = "Randomly picks a different skin preset each t
 L["RICH_MARKUP_TAB_EDITOR"]     = "Editor"
 L["RICH_MARKUP_TAB_VIEW"]       = "View"
 L["MARKUP_PREVIEW_BTN"]         = "Live Preview"
-L["MARKUP_PREVIEW_TIP"]         = "Toggle the live preview window — renders the rich note as you type."
+L["MARKUP_PREVIEW_TIP"]         = "Toggle the live preview window - renders the rich note as you type."
 L["RICH_PREVIEW_TITLE"]         = "Live Preview"
 
 -- Direct Send (Features/DirectSend.lua)
