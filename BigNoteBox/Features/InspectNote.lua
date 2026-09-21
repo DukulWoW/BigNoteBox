@@ -248,8 +248,8 @@ local function GatherInspectData()
             local itemName, _, quality, ilvl, _, _, _, _, _, iconTex = C_Item.GetItemInfo(itemID)
             local link = GetInventoryItemLink("target", slot.id)
             local actualIlvl = ilvl
-            if link and GetDetailedItemLevelInfo then
-                local effIlvl = GetDetailedItemLevelInfo(link)
+            if link and C_Item.GetDetailedItemLevelInfo then
+                local effIlvl = C_Item.GetDetailedItemLevelInfo(link)
                 if effIlvl and effIlvl > 0 then actualIlvl = effIlvl end
             end
             local entry = {
