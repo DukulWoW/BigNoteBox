@@ -1,0 +1,42 @@
+name: Release
+
+# A v* tag push is the whole release: the packager builds the zip and uploads it
+# to CurseForge, WoWInterface and Wago, and cuts the GitHub release that Wago
+# fetches from. Run it manually (workflow_dispatch) to build WITHOUT uploading
+# anywhere - that is the safe way to check the zip layout.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # The packager reads tags and history to work out the version and
+          # the commit range; a shallow clone gives it neither.
+          fetch-depth: 0
+
+      - name: Package
+        uses: BigWigsMods/packager@v2
+        env:
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+          # The packager expects CF_API_KEY; the repo secret is named CF_API_TOKEN.
+          CF_API_KEY: ${{ secrets.CF_API_TOKEN }}
+          WOWI_API_TOKEN: ${{ secrets.WOWI_API_TOKEN }}
+          WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+        with:
+          # -d skips every upload. Manual runs are always dry.
+          args: ${{ github.event_name == 'workflow_dispatch' && '-d' || '' }}
+
+      - name: Keep the zip for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: .release/*.zip
+          if-no-files-found: error
