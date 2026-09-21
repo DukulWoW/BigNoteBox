@@ -51,7 +51,13 @@ jobs:
           WOWI_API_TOKEN: ${{ github.event_name == 'push' && secrets.WOWI_API_TOKEN || '' }}
           WAGO_API_TOKEN: ${{ github.event_name == 'push' && secrets.WAGO_API_TOKEN || '' }}
         with:
-          args: ${{ inputs.mode == 'dry' && '-d' || '' }}
+          # -n "<file name>:<upload label>". The label is what CurseForge, WoWInterface
+          # and Wago display as the release name; the packager's default is the bare
+          # version ("v1.7.4"), while every release before automation read
+          # "BigNoteBox v1.7.4". The file name part is the packager's own default.
+          args: >-
+            -n "{package-name}-{project-version}:{package-name} {project-version}"
+            ${{ inputs.mode == 'dry' && '-d' || '' }}
 
       - name: Keep the build for inspection
         if: always()
