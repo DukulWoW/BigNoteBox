@@ -34,9 +34,15 @@ jobs:
           # -d skips every upload. Manual runs are always dry.
           args: ${{ github.event_name == 'workflow_dispatch' && '-d' || '' }}
 
-      - name: Keep the zip for inspection
+      - name: Keep the build for inspection
         uses: actions/upload-artifact@v4
         with:
           name: package
-          path: .release/*.zip
+          path: |
+            .release/*.zip
+            .release/*.md
+            .release/*.txt
+          # .release is a dotted directory, and upload-artifact v4 skips hidden
+          # paths unless told otherwise - without this the step finds nothing.
+          include-hidden-files: true
           if-no-files-found: error
