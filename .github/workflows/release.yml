@@ -54,9 +54,11 @@ jobs:
           # -n "<file name>:<upload label>". The label is what CurseForge, WoWInterface
           # and Wago display as the release name; the packager's default is the bare
           # version ("v1.7.4"), while every release before automation read
-          # "BigNoteBox v1.7.4". The file name part is the packager's own default.
+          # "BigNoteBox v1.7.4". A space is not possible: release.sh runs the label
+          # through filename_filter, which turns anything outside [A-Za-z0-9._!-]
+          # into "_". A hyphen is the closest it allows.
           args: >-
-            -n "{package-name}-{project-version}:{package-name} {project-version}"
+            -n "{package-name}-{project-version}:{package-name}-{project-version}"
             ${{ inputs.mode == 'dry' && '-d' || '' }}
 
       - name: Keep the build for inspection
