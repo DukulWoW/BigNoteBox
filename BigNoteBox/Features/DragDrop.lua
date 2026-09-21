@@ -36,7 +36,7 @@ local function BuildCursorLink()
 
     if ctype == "item" then
         -- id is itemID; GetItemInfo returns the full link as return #2
-        local _, link = GetItemInfo(id)
+        local _, link = C_Item.GetItemInfo(id)
         return link  -- may be nil if not yet cached; caller should handle
 
     elseif ctype == "spell" then

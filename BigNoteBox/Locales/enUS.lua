@@ -118,6 +118,14 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "then reload your UI.\n\n" ..
     "|cffaaaaaaYour existing notes are safe and will reappear once BigNoteBoxDB is active.|r"
 
+-- ── WoW: Forever testing notice (FOR-10) ────────────────────────────────────
+L["FOREVER_TEST_NOTICE"] =
+    "|cff66bb6aBigNoteBox on WoW: Forever|r\n\n" ..
+    "This version is for testing only, while BigNoteBox is being made ready for Forever.\n\n" ..
+    "A bug on Blizzard's end currently stops the Forever beta from loading addon saved data, " ..
+    "so your notes and settings are lost every time you log out or reload. " ..
+    "BigNoteBox will not work as intended until Blizzard fixes it."
+
 -- ── Trash window ──────────────────────────────────────────────────────────────
 L["TW_TIME_UNKNOWN"]       = "Unknown"
 L["TW_TIME_JUST_NOW"]      = "Just now"
@@ -720,7 +728,7 @@ L["BACKUP_IMPORT_HEADER"]      = "Import Notes"
 L["BACKUP_IMPORT_DESC"]        = "Paste an exported BigNoteBox backup below, then click Import. Imported notes are added alongside your existing notes - nothing is overwritten."
 L["BACKUP_BTN_IMPORT"]         = "Import"
 L["BACKUP_IMPORT_OK"]          = "Imported %d note(s) successfully."
-L["BACKUP_IMPORT_NONE"]        = "Nothing to import — paste is empty or unrecognized."
+L["BACKUP_IMPORT_NONE"]        = "Nothing to import - paste is empty or unrecognized."
 L["BACKUP_IMPORT_ERR"]         = "Import failed: unrecognized format or corrupt data."
 L["BACKUP_IMPORT_VERSION_WARN"]= "Warning: export version %d is newer than this addon supports (v%d). Some data may be ignored."
 L["BACKUP_PASTE_HINT"]         = "Paste exported backup here..."
@@ -755,7 +763,7 @@ L["TAG_MGR_MERGE_NOTE"]  = "Tip: rename a tag to an existing name to merge them.
 
 -- ── Focus Mode ────────────────────────────────────────────────────────────────
 L["FOCUS_MODE_TIP"]      = "Focus Mode"
-L["FOCUS_MODE_TIP_SUB"]  = "Hide the note list and tools — just the note"
+L["FOCUS_MODE_TIP_SUB"]  = "Hide the note list and tools - just the note"
 L["FOCUS_MODE_TITLE"]    = "BigNoteBox - Focus"
 L["FOCUS_RESTORE_BTN"]   = "Restore"
 L["FOCUS_RESTORE_TIP"]   = "Exit Focus Mode and return to the main window"
@@ -789,7 +797,7 @@ L["REFBOX_TITLE"]           = "Reference Box"
 L["REFBOX_TITLE_NOTE"]      = "Refbox: %s"
 L["REFBOX_EMPTY"]           = "Drag items here,\nshift-click items, or\ntype an ID in the field above."
 L["REFBOX_COUNT"]           = "Attachments (%d/%d)"
-L["REFBOX_HINT"]            = "Drag items here · Shift-click to add"
+L["REFBOX_HINT"]            = "Drag items here - Shift-click to add"
 L["REFBOX_PLACEHOLDER"]     = "Item ID, s:Spell ID, q:Quest ID"
 L["REFBOX_ADD_BTN"]         = "Add"
 L["REFBOX_CTX_SEND"]        = "Send to chat"
@@ -879,7 +887,7 @@ BINDING_HEADER_BIGNOTEBOXOPEN         = "BigNoteBox"
 
 -- ── Config — Features > Sticky Notes ──────────────────────────────────────────
 L["CFG_STICKY_HIDE_PERSIST"]     = "Keep sticky notes hidden"
-L["CFG_STICKY_HIDE_PERSIST_TIP"] = "By default, sticky notes reappear automatically when you reload, relog, or change zones — so accidental hides are always recoverable.\n\nEnable this to make the Ctrl+H hide permanent: stickies will stay hidden until you press Ctrl+H again, even after a reload or relog."
+L["CFG_STICKY_HIDE_PERSIST_TIP"] = "By default, sticky notes reappear automatically when you reload, relog, or change zones - so accidental hides are always recoverable.\n\nEnable this to make the Ctrl+H hide permanent: stickies will stay hidden until you press Ctrl+H again, even after a reload or relog."
 L["CFG_STICKY_KEYBIND_LABEL"]    = "Show/Hide all stickies:"
 
 -- ── Keybind capture button shared strings ─────────────────────────────────────

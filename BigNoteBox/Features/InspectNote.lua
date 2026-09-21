@@ -245,7 +245,7 @@ local function GatherInspectData()
     for _, slot in ipairs(SLOT_INFO) do
         local itemID = GetInventoryItemID("target", slot.id)
         if itemID then
-            local itemName, _, quality, ilvl, _, _, _, _, _, iconTex = GetItemInfo(itemID)
+            local itemName, _, quality, ilvl, _, _, _, _, _, iconTex = C_Item.GetItemInfo(itemID)
             local link = GetInventoryItemLink("target", slot.id)
             local actualIlvl = ilvl
             if link and GetDetailedItemLevelInfo then

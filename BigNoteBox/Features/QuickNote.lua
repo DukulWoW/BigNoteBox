@@ -212,7 +212,7 @@ end
 -- We use GetItemInfo's 10th return (texture) which is available for cached items.
 local function ItemIcon(itemID)
     if not itemID then return nil end
-    local _, _, _, _, _, _, _, _, _, tex = GetItemInfo(itemID)
+    local _, _, _, _, _, _, _, _, _, tex = C_Item.GetItemInfo(itemID)
     if tex then
         -- tex is usually a numeric fileID on retail; convert to string for SetTexture
         return tostring(tex)
@@ -978,12 +978,15 @@ local function InjectQuestLogFrame()
 
     -- Hook 3: popup detail frame shown
     -- QuestLogPopupDetailFrame.questID is populated by Blizzard before this fires
-    hooksecurefunc("QuestLogPopupDetailFrame_Show", function()
-        if QuestLogPopupDetailFrame and QuestLogPopupDetailFrame.questID then
-            _questLogSelectedID = QuestLogPopupDetailFrame.questID
-        end
-        PositionQuestLogBtn()
-    end)
+    -- Retail only: Forever has hooks 1 and 2 but not this function (FOR-02).
+    if type(QuestLogPopupDetailFrame_Show) == "function" then
+        hooksecurefunc("QuestLogPopupDetailFrame_Show", function()
+            if QuestLogPopupDetailFrame and QuestLogPopupDetailFrame.questID then
+                _questLogSelectedID = QuestLogPopupDetailFrame.questID
+            end
+            PositionQuestLogBtn()
+        end)
+    end
 end
 
 local function InjectGossipFrame()

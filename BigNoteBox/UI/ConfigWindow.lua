@@ -3736,7 +3736,7 @@ local function BuildRefboxHtml(note)
     for _, a in ipairs(atts) do
         local label, url, typeLabel, qualityHex
         if a.type == "item" then
-            local name, _, quality = GetItemInfo(a.id)
+            local name, _, quality = C_Item.GetItemInfo(a.id)
             label     = name or ("Item " .. a.id)
             url       = "https://www.wowhead.com/item=" .. a.id
             typeLabel = "Item"

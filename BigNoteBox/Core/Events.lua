@@ -2,6 +2,7 @@
 -- One event frame for the entire addon instead of scattered frames per module.
 
 local BNB = BigNoteBox
+local L = BNB.L
 
 --------------------------------------------------------------------------------
 -- EVENT BUS
@@ -85,6 +86,18 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
     end)
     C_Timer.After(0.5, function()
         if BNB.Initialize then BNB.Initialize() end
+        -- Forever beta: the client never loads SavedVariables, so nothing BNB saves
+        -- survives a relog (FOR-10). Shown every login, since a "seen" flag could not
+        -- persist either. Remove once Blizzard fixes the loader.
+        if BNB.IsForever then
+            if not StaticPopupDialogs["BNB_FOREVER_NOTICE"] then
+                StaticPopupDialogs["BNB_FOREVER_NOTICE"] = {
+                    text = L["FOREVER_TEST_NOTICE"], button1 = L["OK"],
+                    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+                }
+            end
+            StaticPopup_Show("BNB_FOREVER_NOTICE")
+        end
         -- Show What's New popup if the user has updated since they last saw it.
         -- Suppressed during first-time setup so the wizard isn't interrupted.
         C_Timer.After(0.5, function()

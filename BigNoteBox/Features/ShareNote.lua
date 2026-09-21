@@ -533,7 +533,7 @@ function BNB.OpenSharePreview(data)
             for _, a in ipairs(atts) do
                 local label
                 if a.type == "item" then
-                    local name = GetItemInfo(a.id)
+                    local name = C_Item.GetItemInfo(a.id)
                     label = name and ("[" .. name .. "]") or ("Item:" .. a.id)
                 elseif a.type == "spell" then
                     local si = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(a.id)

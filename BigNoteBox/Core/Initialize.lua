@@ -218,9 +218,11 @@ function BNB.Initialize()
     -- 12. First-time setup wizard
     -- Show if setupComplete is not true. Suppresses openOnLogin during setup
     -- so the wizard is the first thing the player sees.
+    -- Skipped on Forever while its client never loads SavedVariables (FOR-10):
+    -- setupComplete cannot persist there, so the wizard would return every login.
     do
         local db = BigNoteBoxDB
-        if db and db.setupComplete ~= true then
+        if db and db.setupComplete ~= true and not BNB.IsForever then
             if BNB.ShowSetupWizard then
                 -- Suppress the normal window auto-open so setup is front and center
                 if BNB.mainFrame then BNB.mainFrame:Hide() end

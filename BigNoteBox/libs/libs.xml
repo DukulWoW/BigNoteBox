@@ -8,8 +8,6 @@
     <Include file="LibSharedMedia-3.0\lib.xml"/>
     <Script file="LibAnimate\LibAnimate.lua"/>
     <Script file="LibAnimate\Animations.lua"/>
-    <Script file="LibTourist-3.0\HereBeDragons\HereBeDragons-2.0.lua"/>
-    <Script file="LibTourist-3.0\LibTourist-3.0.lua"/>
     <Script file="LibSerialize\LibSerialize.lua"/>
     <Script file="LibDeflate\LibDeflate.lua"/>
 

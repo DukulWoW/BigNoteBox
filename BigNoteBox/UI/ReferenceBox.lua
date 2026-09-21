@@ -194,7 +194,7 @@ end
 -- ── Data resolution ───────────────────────────────────────────────────────────
 local function ResolveAttachment(att)
     if att.type == "item" then
-        local name, _, quality, _, _, _, _, _, _, iconTex = GetItemInfo(att.id)
+        local name, _, quality, _, _, _, _, _, _, iconTex = C_Item.GetItemInfo(att.id)
         if not name then
             C_Item.RequestLoadItemDataByID(att.id)
             _pendingItems[att.id] = true
@@ -456,7 +456,7 @@ end
 -- For spells: construct the standard light-blue spell link manually.
 local function BuildAttachmentLink(att)
     if att.type == "item" then
-        local _, itemLink = GetItemInfo(att.id)
+        local _, itemLink = C_Item.GetItemInfo(att.id)
         return itemLink
     elseif att.type == "spell" then
         local name
@@ -804,7 +804,7 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
                 local note2 = NDB() and NDB().notes and NDB().notes[noteID]
                 local att2  = note2 and note2.attachments and note2.attachments[attIndex]
                 if not att2 then return end
-                local _, link = GetItemInfo(att2.id)
+                local _, link = C_Item.GetItemInfo(att2.id)
                 if link then DressUpItemLink(link) end
             end)
         end
@@ -856,7 +856,7 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
 
         -- Try in dressing room
         root:CreateButton(L["REFBOX_CTX_DRESSUP"], function()
-            local _, link = GetItemInfo(gearEntry.id)
+            local _, link = C_Item.GetItemInfo(gearEntry.id)
             if link then DressUpItemLink(link) end
         end)
 
@@ -1273,7 +1273,7 @@ RenderList = function()
             row:SetScript("OnClick", function(self, btn)
                 if btn == "LeftButton" then
                     if IsControlKeyDown() and att2.type == "item" then
-                        local _, link = GetItemInfo(att2.id)
+                        local _, link = C_Item.GetItemInfo(att2.id)
                         if link then DressUpItemLink(link) end
                     else
                         SendAttachmentToChat(att2)
@@ -1360,7 +1360,7 @@ RenderList = function()
                 if btn == "LeftButton" then
                     if IsControlKeyDown() then
                         -- Ctrl+click: open WoW dressing room with this item.
-                        local link = GetItemInfo(gearEntry.id) and select(2, GetItemInfo(gearEntry.id))
+                        local link = C_Item.GetItemInfo(gearEntry.id) and select(2, C_Item.GetItemInfo(gearEntry.id))
                         if link then DressUpItemLink(link) end
                     else
                         SendAttachmentToChat(att)
@@ -3659,7 +3659,7 @@ do
         if not id or id <= 0 then return end
         AddIDLine(tooltip, "ItemID", id)
         local icon = C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)
-                  or select(10, GetItemInfo(id))
+                  or select(10, C_Item.GetItemInfo(id))
         if icon then
             AddIDLine(tooltip, "IconID", icon)
         end
