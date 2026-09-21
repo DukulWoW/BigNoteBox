@@ -1,9 +1,4 @@
-# BigNoteBox changelog
-
-This file is what the packager sends to CurseForge, WoWInterface and Wago as the release
-description. Replace its contents with section 3 of the release's
-`_filearchive\BigNoteBox_vX.Y.Z.md` before tagging, so all six destinations carry the same
-wording.
+# BigNoteBox v1.7.4
 
 ## New
 - Added a "WoW Default" font option that uses the game client's own font
