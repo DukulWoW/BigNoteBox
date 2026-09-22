@@ -28,10 +28,16 @@ Only change the text on the right side. The key on the left (`"SAVE"`) must stay
 
 ### Adding a new language
 
-Copy `zhCN.lua` to a new file named after the WoW locale code (`zhTW.lua`, `koKR.lua`, `deDE.lua` and so on). Change the check near the top to that code:
+Copy `enUS.lua` to a new file named after the WoW locale code (`zhTW.lua`, `koKR.lua`, `deDE.lua` and so on). `enUS.lua` always has every key, so you start from the complete list.
+
+The top of `enUS.lua` sets up the locale system, and that part must not be copied. In your new file, delete everything above the first `L["..."]` line and put this there instead, with your own locale code:
 
 ```lua
+-- BigNoteBox Localization -- Traditional Chinese (zhTW)
+
 if GetLocale() ~= "zhTW" then return end
+
+local L = BigNoteBox.L
 ```
 
 Then translate. Say in your pull request that it is a new file, and Dukul will add it to the TOC files.
