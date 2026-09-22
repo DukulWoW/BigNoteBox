@@ -1399,6 +1399,8 @@ L["CFG_KB_DESC_QUICK_NOTE"]         = "创建快速笔记"
 -- ── Config window (ALL-08 sweep pass 5: last stragglers + HTML export strings) ──
 L["CFG_FONTSIZE_TIP"]               = "笔记正文编辑器中使用的字体大小。"
 L["CFG_FONT_CJK_HINT"]              = "以上字体不包含中文或韩文字符。如果你的笔记使用中文或韩文，请选择 WoW Default。在此客户端上，按钮和菜单始终使用 WoW Default。"
+L["CFG_SKIN_MODE_ON_MSG"]           = "皮肤模式已启用。你必须重新加载 UI 才能使更改生效。"
+L["CFG_SKIN_MODE_OFF_MSG"]          = "皮肤模式已禁用。你必须重新加载 UI 才能使更改生效。"
 L["CFG_CHK_QUEST_REWARDS_LABEL"]    = "将奖励保存到笔记 (金钱、经验、荣誉、货币、声望)"
 L["CFG_CHK_QUEST_REWARDS_TIP"]      = "从任务框架创建笔记时，将任何\n奖励 (金币、经验、荣誉、货币、声望) 附加到\n笔记正文的分隔线下方。"
 L["CFG_CHK_DUI_AUTONOTE_LABEL"]     = "点击 DUI 的复制文本按钮时自动创建笔记"

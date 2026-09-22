@@ -1096,8 +1096,8 @@ local function BuildAppearanceTab(sf, ct)
         db.skinMode = newVal
         RefreshSkinControls()
         local msg = newVal
-            and "Skin mode enabled. You must reload UI for changes to take effect."
-            or  "Skin mode disabled. You must reload UI for changes to take effect."
+            and L["CFG_SKIN_MODE_ON_MSG"]
+            or  L["CFG_SKIN_MODE_OFF_MSG"]
         StaticPopup_Show("BNB_SKIN_MODE_TOGGLE", msg)
     end)
 

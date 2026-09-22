@@ -14,7 +14,8 @@ local L_DATA = {}
 BigNoteBox.L = setmetatable({}, {
     __index = function(_, key)
         local v = L_DATA[key]
-        if v ~= nil and BigNoteBoxDB and BigNoteBoxDB.debugPseudoLocale then
+        -- Strings only: some keys hold tables (WELCOME_WEEKDAYS, WELCOME_MONTHS).
+        if type(v) == "string" and BigNoteBoxDB and BigNoteBoxDB.debugPseudoLocale then
             return "@@" .. v
         end
         return v
@@ -1428,6 +1429,8 @@ L["CFG_KB_DESC_QUICK_NOTE"]         = "Create quick note"
 -- ── Config window (ALL-08 sweep pass 5: last stragglers + HTML export strings) ──
 L["CFG_FONTSIZE_TIP"]               = "Font size used in the note body editor."
 L["CFG_FONT_CJK_HINT"]              = "The fonts above have no Chinese or Korean characters. Pick WoW Default if your notes are in Chinese or Korean. Buttons and menus always use WoW Default on this client."
+L["CFG_SKIN_MODE_ON_MSG"]           = "Skin mode enabled. You must reload UI for changes to take effect."
+L["CFG_SKIN_MODE_OFF_MSG"]          = "Skin mode disabled. You must reload UI for changes to take effect."
 L["CFG_CHK_QUEST_REWARDS_LABEL"]    = "Save rewards to note (money, XP, honor, currencies, reputation)"
 L["CFG_CHK_QUEST_REWARDS_TIP"]      = "When creating a note from a quest frame, appends any\nrewards (gold, XP, honor, currencies, reputation) to\nthe note body below a separator line."
 L["CFG_CHK_DUI_AUTONOTE_LABEL"]     = "Auto-create note when clicking DUI's Copy Text button"
