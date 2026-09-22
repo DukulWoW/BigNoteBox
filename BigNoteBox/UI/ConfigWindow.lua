@@ -4591,23 +4591,11 @@ local function BuildBackupTab(sf, ct)
             exportStatus:SetText(L["BACKUP_IMPORT_NONE"])
             return
         end
-        -- Try clipboard first; if text is very long, fall back to editbox
-        local ok = pcall(function()
-            if C_System and C_System.SetClipboard then
-                C_System.SetClipboard(text)
-            else
-                error("no clipboard")
-            end
-        end)
-        if ok then
-            exportStatus:SetTextColor(0.55, 0.82, 0.55)
-            exportStatus:SetText(string.format(L["BACKUP_BTN_COPY_DONE"], n))
-        else
-            -- Fallback: open a scrollable editbox window
-            BNB.OpenExportWindow(text)
-            exportStatus:SetTextColor(0.78, 0.78, 0.78)
-            exportStatus:SetText(L["BACKUP_BTN_COPY_FALLBACK"])
-        end
+        -- C_System.SetClipboard is nil on retail and Forever (ALL-21), so the
+        -- export always goes to the scrollable editbox window for a manual copy
+        BNB.OpenExportWindow(text)
+        exportStatus:SetTextColor(0.78, 0.78, 0.78)
+        exportStatus:SetText(L["BACKUP_BTN_COPY_FALLBACK"])
     end)
     y = y - 40
 

@@ -1016,6 +1016,20 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         end
 
         f._dismiss = Dismiss
+
+        -- Close with the frame it is anchored to. Without this, closing the
+        -- window behind the copy box stranded it on screen: the helper had lost
+        -- focus, so ESC never reached it (ALL-21)
+        f:SetScript("OnUpdate", function(self)
+            if self._anchor and not self._anchor:IsVisible() then Dismiss() end
+        end)
+
+        -- Click the box to close it: a fallback for any other path that
+        -- leaves it up without keyboard focus. Mouse only, so Ctrl+C routing
+        -- to the helper editbox is unaffected
+        f:EnableMouse(true)
+        f:SetScript("OnMouseDown", function() Dismiss() end)
+
         BNB._clipboardHint = f
     end
 
@@ -1062,6 +1076,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
     -- ── 4. Position below anchorFrame if given, otherwise near cursor ──────────
     local hw, hh = 220, 48
     hint:ClearAllPoints()
+    hint._anchor = anchorFrame
     if anchorFrame then
         -- Anchor centred below the button that triggered the hint
         hint:SetPoint("TOP", anchorFrame, "BOTTOM", 0, -6)

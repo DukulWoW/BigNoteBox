@@ -2233,16 +2233,16 @@ local function BuildSituationTab(panel)
     local function RefreshWPStatusTag()
         if HasWPAddon() then
             if HasRetailPin() then
-                wpStatusTag:SetText("(Enhanced)")
+                wpStatusTag:SetText(L["STICKY_WP_TAG_ENHANCED"])
             else
-                wpStatusTag:SetText("(Addon installed)")
+                wpStatusTag:SetText(L["STICKY_WP_TAG_ADDON"])
             end
             wpStatusTag:SetTextColor(0.4, 1, 0.4)
         elseif HasRetailPin() then
-            wpStatusTag:SetText("(Basic)")
+            wpStatusTag:SetText(L["STICKY_WP_TAG_BASIC"])
             wpStatusTag:SetTextColor(0.85, 0.70, 0.2)
         else
-            wpStatusTag:SetText("(Addon required)")
+            wpStatusTag:SetText(L["STICKY_WP_TAG_REQUIRED"])
             wpStatusTag:SetTextColor(0.85, 0.30, 0.25)
         end
     end
@@ -2308,13 +2308,7 @@ local function BuildSituationTab(panel)
             local wpuiBtn = BNB.CreateButton(nil, f, L["STICKY_WP_BTN_WAYPOINTUI"], 200, 22)
             wpuiBtn:SetPoint("TOPLEFT", linksHdr, "BOTTOMLEFT", 0, -6)
             wpuiBtn:SetScript("OnClick", function()
-                local url = "https://www.curseforge.com/wow/addons/waypointui"
-                if C_System and C_System.SetClipboard then
-                    C_System.SetClipboard(url)
-                    BNB:Print(string.format(L["NC_WP_URL_COPIED_FMT"], url))
-                else
-                    BNB:Print(string.format(L["NC_WP_GET_WAYPOINTUI_FMT"], url))
-                end
+                BNB.ShowClipboardHint("https://www.curseforge.com/wow/addons/waypointui", wpuiBtn)
             end)
             wpuiBtn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -2327,13 +2321,7 @@ local function BuildSituationTab(panel)
             local ttBtn = BNB.CreateButton(nil, f, L["STICKY_WP_BTN_TOMTOM"], 200, 22)
             ttBtn:SetPoint("TOPLEFT", wpuiBtn, "BOTTOMLEFT", 0, -4)
             ttBtn:SetScript("OnClick", function()
-                local url = "https://www.curseforge.com/wow/addons/tomtom"
-                if C_System and C_System.SetClipboard then
-                    C_System.SetClipboard(url)
-                    BNB:Print(string.format(L["NC_WP_URL_COPIED_FMT"], url))
-                else
-                    BNB:Print(string.format(L["NC_WP_GET_TOMTOM_FMT"], url))
-                end
+                BNB.ShowClipboardHint("https://www.curseforge.com/wow/addons/tomtom", ttBtn)
             end)
             ttBtn:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -2342,19 +2330,35 @@ local function BuildSituationTab(panel)
             end)
             ttBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+            -- ESC closes one window at a time: copy box, then this popup, then
+            -- NoteConfig via UISpecialFrames (ALL-21). A keyboard-enabled frame gets
+            -- keys before the copy box's focused editbox, so close the box here
+            -- first, the same way MainWindow's ESC chain does
+            f:EnableKeyboard(true)
+            f:SetScript("OnKeyDown", function(self, key)
+                if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
+                self:SetPropagateKeyboardInput(false)
+                local ch = BNB._clipboardHint
+                if ch and ch:IsShown() and ch._dismiss then
+                    ch._dismiss()
+                else
+                    self:Hide()
+                end
+            end)
+
             wpInfoPopup = f
         end
 
         -- Update dynamic content
         local f = wpInfoPopup
         if HasWPAddon() then
-            f._statusLbl:SetText("|cff66ff66Waypoint addon detected.|r")
+            f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_ADDON"] .. "|r")
             f._descLbl:SetText(L["NC_WP_FULL_SUPPORT_DETAIL"])
         elseif HasRetailPin() then
-            f._statusLbl:SetText("|cffffaa00Using built-in map pin (basic).|r")
+            f._statusLbl:SetText("|cffffaa00" .. L["STICKY_WP_STATUS_BASIC"] .. "|r")
             f._descLbl:SetText(L["NC_WP_BASIC_PIN_DETAIL"])
         else
-            f._statusLbl:SetText("|cffff5555No waypoint support detected.|r")
+            f._statusLbl:SetText("|cffff5555" .. L["STICKY_WP_STATUS_NONE"] .. "|r")
             f._descLbl:SetText(L["NC_WP_NO_SUPPORT_DETAIL"])
         end
 
@@ -2673,7 +2677,7 @@ local function BuildSituationTab(panel)
         if not handled then
             local wayStr = string.format("/way %s %.1f %.1f %s",
                 wp.label or GetRealZoneText() or "", wp.x, wp.y, wpTitle)
-            BNB:Print("|cffff6666No waypoint addon detected.|r Copy: |cffffff00" .. wayStr .. "|r")
+            BNB:Print(string.format(L["STICKY_WP_NO_ADDON_COPY_FMT"], wayStr))
         end
     end)
     wpNavBtn:SetScript("OnEnter", function(self)
@@ -2798,9 +2802,11 @@ local function CreateNoteConfigWindow()
     end
     tinsert(UISpecialFrames, "BigNoteBoxNoteConfigFrame")
 
-    -- Close ZonePicker whenever NoteConfig hides (any path: close btn, ESC, main window close)
+    -- Close ZonePicker and the waypoint info popup whenever NoteConfig hides (any path: close btn, ESC, main window close)
     f:HookScript("OnHide", function()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
+        -- The waypoint info popup is parented to UIParent, so it would outlive NoteConfig
+        if BNBWaypointInfoPopup then BNBWaypointInfoPopup:Hide() end
     end)
 
     local tabDefs = {
