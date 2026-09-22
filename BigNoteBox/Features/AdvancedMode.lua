@@ -197,6 +197,27 @@ function AM.OutlineFlagStr(fontOutline)
     return ""  -- None or any drop shadow variant
 end
 
+-- Display label for a stored fontOutline value. The stored value stays English on
+-- purpose: it is compared as a key everywhere and travels between locales in shared
+-- notes, so only what the dropdown shows is translated. Unknown values pass through.
+local OUTLINE_LABEL_KEYS = {
+    ["None"]                  = "OUTLINE_NONE",
+    ["Outline"]               = "OUTLINE_OUTLINE",
+    ["Thick Outline"]         = "OUTLINE_THICK",
+    ["Monochrome Outline"]    = "OUTLINE_MONO",
+    ["SLUG"]                  = "OUTLINE_SLUG",
+    ["SLUG Outline"]          = "OUTLINE_SLUG_OUTLINE",
+    ["SLUG Thick Outline"]    = "OUTLINE_SLUG_THICK",
+    ["Drop Shadow"]           = "OUTLINE_SHADOW",
+    ["Strong Drop Shadow"]    = "OUTLINE_SHADOW_STRONG",
+    ["Strongest Drop Shadow"] = "OUTLINE_SHADOW_STRONGEST",
+}
+function AM.OutlineLabel(fontOutline)
+    local o = fontOutline or "None"
+    local key = OUTLINE_LABEL_KEYS[o]
+    return (key and BNB.L and BNB.L[key]) or o
+end
+
 local function GetOrCreateFontObj(key, path, size, flags)
     -- Include flags in cache key so outline changes don't reuse a stale object.
     local cacheKey = key .. (flags ~= "" and ("_" .. flags) or "")

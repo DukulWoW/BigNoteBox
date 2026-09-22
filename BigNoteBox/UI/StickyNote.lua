@@ -1432,7 +1432,7 @@ local function PopulateStickySettings(noteID)
         outlineDD:SetupMenu(function(_, root)
             for _, opt in ipairs(OUTLINE_OPTIONS) do
                 local o = opt
-                root:CreateRadio(o,
+                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
                     function() return GetOutlineLabel() == o end,
                     function()
                         cfg.fontOutline = o; SaveCfg(noteID, cfg)
@@ -1444,7 +1444,8 @@ local function PopulateStickySettings(noteID)
         ct1._y = ct1._y - 36
         plainOnlyWidgets[#plainOnlyWidgets+1] = outlineDD
     else
-        local outlineBtn = BNB.CreateButton(nil, ct1, GetOutlineLabel(), SETTINGS_CW, 22)
+        local outlineBtn = BNB.CreateButton(nil, ct1,
+            BNB.AdvancedMode.OutlineLabel(GetOutlineLabel()), SETTINGS_CW, 22)
         outlineBtn:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
         outlineBtn:SetScript("OnClick", function(self)
             local cur = GetOutlineLabel()
@@ -1453,7 +1454,7 @@ local function PopulateStickySettings(noteID)
             idx = (idx % #OUTLINE_OPTIONS) + 1
             local opt = OUTLINE_OPTIONS[idx]
             cfg.fontOutline = opt; SaveCfg(noteID, cfg)
-            self:SetText(opt)
+            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
             if stickyFrame then ApplyOutlineToEditBox(stickyFrame._bodyEb, opt) end
         end)
         ct1._y = ct1._y - 28

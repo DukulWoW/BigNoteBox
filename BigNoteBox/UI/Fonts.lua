@@ -18,6 +18,8 @@
 --   BNB.GetFontDef(id)   — returns the def table for a given id
 --   BNB.GetBodyFont()    — returns (path, size) for the current DB choice
 --   BNB.GetBoldFont()    — returns bold path for the current DB choice
+--   BNB.GetUIFont() / BNB.GetUIBoldFont() — same, but WoW's locale font on CJK
+--                          clients when the choice is a bundled (Latin-only) TTF
 --   BNB.ApplyFont(id, size) — saves choice + applies to all live widgets
 --   BNB.InitFonts()      — called once on login; creates WoW Font objects
 
@@ -221,6 +223,32 @@ function BNB.GetBoldFont()
     local def = BNB.GetFontDef(choice)
     return def.bold
 end
+
+-- ── UI chrome fonts (ALL-22) ──────────────────────────────────────────────────
+-- Buttons, the welcome greeting and other interface text show translated strings,
+-- so they must be able to draw the client's script. None of the bundled TTFs carry
+-- CJK glyphs: on a zhCN/zhTW/koKR client they render every label as boxes. There,
+-- chrome falls back to WoW's own locale font unless the user picked WoW Default or
+-- an LSM font (which may well be CJK-capable). Note text keeps the chosen font.
+function BNB.IsCJKClient()
+    local locale = GetLocale and GetLocale() or ""
+    return locale == "zhCN" or locale == "zhTW" or locale == "koKR"
+end
+
+-- Returns (regular, bold). The WoW font is read live rather than from the "wow"
+-- def, whose paths are a Latin placeholder until InitFonts has run.
+local function ChromePaths()
+    local db  = BigNoteBoxDB
+    local def = BNB.GetFontDef(db and db.fontChoice or "notoserif")
+    if def._isWoW or (BNB.IsCJKClient() and not def._isLSM) then
+        local p = GetWoWFontPath()
+        return p, p
+    end
+    return def.regular, def.bold
+end
+
+function BNB.GetUIFont()     return (ChromePaths()) end
+function BNB.GetUIBoldFont() return select(2, ChromePaths()) end
 
 -- ── Deferred font object creation ─────────────────────────────────────────────
 -- Called from Initialize.lua AFTER PLAYER_LOGIN so WoW's font renderer has

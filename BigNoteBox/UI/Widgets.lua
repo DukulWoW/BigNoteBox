@@ -146,7 +146,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     local function ApplyLabelFont()
         if not BNB._fontsInitialised then return false end
         local ok = pcall(function()
-            local path = BNB.GetBodyFont and select(1, BNB.GetBodyFont())
+            local path = BNB.GetUIFont and BNB.GetUIFont()
             if path then lbl:SetFont(path, fontSize, "") end
         end)
         return ok

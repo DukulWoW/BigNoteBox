@@ -399,7 +399,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- Font ─────────────────────────────────────────────────────────────────────
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,"Font")
+    y = Hdr(panel,y,L["NC_HDR_FONT"])
 
     -- Font card picker — 2-column grid (matches sticky note settings layout)
     local PH     = 38    -- card height
@@ -667,7 +667,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- F — Font outline (applies to main editor body)
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,"Font outline")
+    y = Hdr(panel,y,L["NC_HDR_FONT_OUTLINE"])
 
     local OUTLINE_OPTIONS_NC = {
         "None", "Outline", "Thick Outline", "Monochrome Outline",
@@ -709,7 +709,7 @@ local function BuildGeneralTab(sf, ct)
         outlineDD:SetupMenu(function(_, root)
             for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
                 local o = opt
-                root:CreateRadio(o,
+                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
                     function() return GetNoteOutlineLabel() == o end,
                     function()
                         ApplyNoteOutline(o)
@@ -719,7 +719,8 @@ local function BuildGeneralTab(sf, ct)
         end)
         y = y - 36
     else
-        local outlineBtn = BNB.CreateButton(nil, panel, GetNoteOutlineLabel(), CW_SCROLL, 22)
+        local outlineBtn = BNB.CreateButton(nil, panel,
+            BNB.AdvancedMode.OutlineLabel(GetNoteOutlineLabel()), CW_SCROLL, 22)
         outlineBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
         outlineBtn:SetScript("OnClick", function(self)
             local cur = GetNoteOutlineLabel()
@@ -728,12 +729,12 @@ local function BuildGeneralTab(sf, ct)
             idx = (idx % #OUTLINE_OPTIONS_NC) + 1
             local opt = OUTLINE_OPTIONS_NC[idx]
             ApplyNoteOutline(opt)
-            self:SetText(opt)
+            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
         end)
         y = y - 28
     end
 
-    y = Hdr(panel,y,"Lock")
+    y = Hdr(panel,y,L["NC_HDR_LOCK"])
 
     local lockBtns = {}
     local BTN_W = 110
@@ -1236,7 +1237,7 @@ local function BuildAppearanceTab(panel)
 
     -- Icon section with BNB Icons / Blizzard Icon tabs
     y = Rule(panel, y) - 4
-    y = Hdr(panel, y, "Icon")
+    y = Hdr(panel, y, L["NC_HDR_ICON"])
 
     -- ── Tab buttons ──────────────────────────────────────────────────────────
     local TAB_W  = math.floor((CW - 4) / 2)

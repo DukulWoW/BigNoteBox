@@ -1107,6 +1107,17 @@ local function BuildAppearanceTab(sf, ct)
     y = BuildFontPicker(ct, y)
     y = y - 4
 
+    -- CJK clients (ALL-22): the bundled fonts have no CJK glyphs, so say which one does.
+    if BNB.IsCJKClient and BNB.IsCJKClient() then
+        local hint = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        hint:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        hint:SetWidth(CONTENT_W)
+        hint:SetJustifyH("LEFT")
+        hint:SetTextColor(0.65, 0.65, 0.65)
+        hint:SetText(L["CFG_FONT_CJK_HINT"])
+        y = y - math.ceil(hint:GetStringHeight() or 12) - 8
+    end
+
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on
     y = BuildLSMFontDropdown(ct, y,
         -- getter: returns the current global font choice if it is an LSM font, else nil
