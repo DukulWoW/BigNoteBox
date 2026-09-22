@@ -2882,6 +2882,22 @@ local function BuildAdvancedTab(sf, ct)
     devWidgets2[#devWidgets2 + 1] = { cb = toastTestBtn2, lbl = nil }
     y = y - (ROW_H + ROW_GAP)
 
+    local setupBtn2 = BNB.CreateButton(nil, ct, L["CFG_DEV_SETUP_BTN"], 140, 22)
+    setupBtn2:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y + 2)
+    setupBtn2:SetScript("OnClick", function()
+        if not (db.debugMode == true) then return end
+        if BNB.ShowSetupWizard then BNB.ShowSetupWizard() end
+    end)
+    setupBtn2:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_DEV_SETUP_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_DEV_SETUP_TIP_BODY"], 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    setupBtn2:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    devWidgets2[#devWidgets2 + 1] = { cb = setupBtn2, lbl = nil }
+    y = y - (ROW_H + ROW_GAP)
+
     local immDbgCb2 = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     immDbgCb2:SetSize(24, 24)
     immDbgCb2:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y + 2)

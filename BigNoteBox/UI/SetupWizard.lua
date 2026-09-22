@@ -119,20 +119,24 @@ local function MakeLargeButton(parent, text, w, h)
 end
 --------------------------------------------------------------------------------
 local function GetOverlayColor()
+    -- 0.82 read as solid black on both Forever and retail (FOR-14)
+    local a = 0.5
     local db = BigNoteBoxDB
     if db and db.skinMode and BNB.GetSkinPreset and BNB.SkinColourOf then
         local p = BNB.GetSkinPreset()
         local r, g, b = BNB.SkinColourOf(p, false)
-        return r, g, b, 0.82
+        return r, g, b, a
     end
-    return 0, 0, 0, 0.82
+    return 0, 0, 0, a
 end
 
 local function GetOverlay()
     if _overlay then return _overlay end
     local ov = CreateFrame("Frame", nil, WorldFrame)
     ov:SetAllPoints(UIParent)
-    ov:SetFrameStrata("FULLSCREEN")
+    -- DIALOG, not FULLSCREEN: keeps overlay + wizard below Blizzard's FULLSCREEN_DIALOG dropdown
+    -- popups, which otherwise drew behind the wizard (FOR-03)
+    ov:SetFrameStrata("DIALOG")
     ov:SetFrameLevel(1)
     ov:EnableMouse(false)
     local tex = ov:CreateTexture(nil, "BACKGROUND")
@@ -1234,7 +1238,7 @@ local function BuildWizardFrame()
 
     f:SetSize(WIN_W, WIN_H)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    f:SetFrameStrata("FULLSCREEN_DIALOG")
+    f:SetFrameStrata("DIALOG")   -- above the DIALOG lvl 1 overlay, below dropdown popups (FOR-03)
     f:SetFrameLevel(100)
     f:SetToplevel(true)
     f:EnableMouse(true)
@@ -1376,15 +1380,20 @@ local function BuildWizardFrame()
         if self._quitting or self._hiding then return end
         -- Suppress hide, re-show after a tick, prompt
         self._hiding = true
+        -- Always ask, same as the X button: Esc (UISpecialFrames) lands here. The quit dialog's
+        -- OnAccept is the only path that tears down overlay/camera/glow (ALL-17)
         C_Timer.After(0.05, function()
-            if not (BigNoteBoxDB and BigNoteBoxDB.setupComplete) then
+            if not self:IsShown() then
                 self:Show(); self:Raise()
+                StaticPopup_Show("BNB_QUIT_SETUP")
             end
             self._hiding = false
         end)
     end)
 
-    f:Hide()
+    -- Guarded: this initial hide fires OnHide, whose timer would otherwise tear down the
+    -- overlay that ShowSetupWizard puts up right after the frame is built
+    f._hiding = true; f:Hide(); f._hiding = false
     _frame = f
     return f
 end
