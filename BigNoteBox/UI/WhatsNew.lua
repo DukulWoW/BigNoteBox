@@ -63,6 +63,15 @@ local GLOW_N     = 15
 local GLOW_FREQ  = 0.03
 local GLOW_SCALE = 1.5
 
+-- FOR-16: the library's own xOffset/yOffset are symmetric per axis (they pad
+-- left+right or top+bottom together), so asymmetric padding needs the glow
+-- frame re-anchored by hand after the library positions it flush. Forever only:
+-- its window chrome clips the glow at top and bottom, Retail's does not, and
+-- applying this there pushes the glow visibly off (that was FOR-04's bug).
+local GLOW_PAD_RIGHT  = 2
+local GLOW_PAD_TOP    = 6
+local GLOW_PAD_BOTTOM = 5
+
 local function StartGlow(f)
     if not f then return end
     if not LCG then
@@ -70,6 +79,14 @@ local function StartGlow(f)
     end
     if LCG then
         pcall(LCG.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, GLOW_KEY)
+        if BNB.IsForever then
+            local g = f["_AutoCastGlow" .. GLOW_KEY]
+            if g then
+                g:ClearAllPoints()
+                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     0,              GLOW_PAD_TOP)
+                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+            end
+        end
     end
 end
 

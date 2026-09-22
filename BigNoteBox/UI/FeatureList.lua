@@ -55,6 +55,12 @@ local GLOW_N        = 15
 local GLOW_FREQ     = 0.03
 local GLOW_SCALE    = 1.5
 local GLOW_KEY      = "bnb_featurelist"
+-- FOR-16: the library pads left+right / top+bottom symmetrically, so asymmetric
+-- clearance needs the glow frame re-anchored by hand afterward. Forever only:
+-- its window chrome clips the glow at top and bottom, Retail's does not.
+local GLOW_PAD_RIGHT  = 2
+local GLOW_PAD_TOP    = 6
+local GLOW_PAD_BOTTOM = 5
 -- Bullet prefix
 local BULLET        = "|cff66bb6a*|r "
 
@@ -91,6 +97,14 @@ local function StartGlow(f)
     local lcg = GetLCG()
     if lcg and f then
         pcall(lcg.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, GLOW_KEY)
+        if BNB.IsForever then
+            local g = f["_AutoCastGlow" .. GLOW_KEY]
+            if g then
+                g:ClearAllPoints()
+                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     0,              GLOW_PAD_TOP)
+                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+            end
+        end
     end
 end
 

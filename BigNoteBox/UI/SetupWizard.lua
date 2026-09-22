@@ -45,6 +45,13 @@ local GLOW_N         = 12    -- particles around the border
 local GLOW_FREQUENCY = 0.03  -- slow, stately rotation
 local GLOW_SCALE     = 1.3   -- larger dots
 
+-- FOR-16: the library pads left+right / top+bottom symmetrically, so asymmetric
+-- clearance needs the glow frame re-anchored by hand afterward. Forever only:
+-- its window chrome clips the glow at top and bottom, Retail's does not.
+local GLOW_PAD_RIGHT  = 2
+local GLOW_PAD_TOP    = 6
+local GLOW_PAD_BOTTOM = 5
+
 --------------------------------------------------------------------------------
 -- MODULE STATE
 --------------------------------------------------------------------------------
@@ -189,6 +196,14 @@ local function StartGlow()
     end
     pcall(lcg.AutoCastGlow_Start, _frame, {r, g, b, 0.85}, GLOW_N, GLOW_FREQUENCY, GLOW_SCALE,
           nil, nil, GLOW_KEY)
+    if BNB.IsForever then
+        local glowFrame = _frame["_AutoCastGlow" .. GLOW_KEY]
+        if glowFrame then
+            glowFrame:ClearAllPoints()
+            glowFrame:SetPoint("TOPLEFT",     _frame, "TOPLEFT",     0,              GLOW_PAD_TOP)
+            glowFrame:SetPoint("BOTTOMRIGHT", _frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+        end
+    end
 end
 
 local function StopGlow()
