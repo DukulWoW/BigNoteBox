@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a new feature or a change to an existing one.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Please check the [open issues](https://github.com/DukulWoW/BigNoteBox/issues) first, in case someone already asked for it. You can add a thumbs-up to an existing request instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like?
+      description: Describe the feature, or the change to something that already exists.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: How would you use it?
+      description: What are you trying to do in game? A real example helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Other addons or workarounds
+      description: Optional. Does another addon do this already, or how do you manage today?
+  - type: dropdown
+    id: client
+    attributes:
+      label: WoW client
+      options:
+        - Retail
+        - WoW Forever
+        - Both

@@ -1,0 +1,34 @@
+name: Translation
+description: Claim a language you want to translate, so nobody else starts the same one.
+title: "Translation: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please read the [translation guide](https://github.com/DukulWoW/BigNoteBox/blob/main/CONTRIBUTING.md) first. When you are done, send the file as a pull request and link this issue.
+  - type: dropdown
+    id: language
+    attributes:
+      label: Language
+      options:
+        - zhCN - Simplified Chinese
+        - zhTW - Traditional Chinese
+        - koKR - Korean
+        - deDE - German
+        - frFR - French
+        - esES - Spanish (Spain)
+        - esMX - Spanish (Latin America)
+        - ptBR - Portuguese (Brazil)
+        - itIT - Italian
+        - ruRU - Russian
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What will you do?
+      options:
+        - Translate a new language
+        - Finish or fix an existing translation
+    validations:
+      required: true

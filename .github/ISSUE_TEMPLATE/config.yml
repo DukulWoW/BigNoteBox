@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/DukulWoW/BigNoteBox/discussions
+    about: Ask a question, or talk through an idea before it becomes a feature request.
+  - name: FAQ
+    url: https://github.com/DukulWoW/BigNoteBox/wiki/FAQ
+    about: Answers to the questions that come up most.

@@ -32,7 +32,7 @@ Notes on the codes:
 - Portuguese (Portugal) clients report `ptBR`, so `ptBR.lua` covers both.
 - `esES` and `esMX` are separate clients. Each needs its own file.
 
-If you start a language, say so in an issue or a draft pull request, so two people do not translate the same file.
+If you start a language, claim it with a [Translation issue](https://github.com/DukulWoW/BigNoteBox/issues/new?template=3-translation.yml), so two people do not translate the same file.
 
 Each line is one key and its text:
 
