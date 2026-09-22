@@ -4,12 +4,35 @@ Thank you for helping! This page explains how to send a translation. Other kinds
 
 ## Translating
 
-All text the player sees lives in `BigNoteBox/Locales/`:
+All text the player sees lives in `BigNoteBox/Locales/`, one file per language. The file name is the locale code that WoW's `GetLocale()` returns for that game client, so the name must match exactly, capital letters included.
 
-| File | What it is |
-|---|---|
-| `enUS.lua` | English. The reference for every key. Please do not change this file. |
-| `zhCN.lua` | Simplified Chinese |
+`enUS.lua` is English and the reference for every key. Please do not change it.
+
+### Translation status
+
+Updated 2026-09-22. English has 1423 keys.
+
+| Language | File | Status |
+|---|---|---|
+| English | `enUS.lua` | Reference, always complete |
+| Simplified Chinese | `zhCN.lua` | 99% (1419 / 1423), quality check in progress |
+| Traditional Chinese | `zhTW.lua` | Not started |
+| Korean | `koKR.lua` | Not started |
+| German | `deDE.lua` | Not started |
+| French | `frFR.lua` | Not started |
+| Spanish (Spain) | `esES.lua` | Not started |
+| Spanish (Latin America) | `esMX.lua` | Not started |
+| Portuguese (Brazil) | `ptBR.lua` | Not started |
+| Italian | `itIT.lua` | Not started |
+| Russian | `ruRU.lua` | Not started |
+
+Notes on the codes:
+
+- English (UK) clients report `enUS`, so there is no `enGB.lua`.
+- Portuguese (Portugal) clients report `ptBR`, so `ptBR.lua` covers both.
+- `esES` and `esMX` are separate clients. Each needs its own file.
+
+If you start a language, say so in an issue or a draft pull request, so two people do not translate the same file.
 
 Each line is one key and its text:
 
