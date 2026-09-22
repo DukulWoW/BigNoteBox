@@ -1287,15 +1287,13 @@ local function PopulateStickySettings(noteID)
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  5, -5)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -5, -5)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(16)
-        if def.bold and def.bold ~= "" then pcall(function() nameLbl:SetFont(def.bold, 11, "") end)
-        else nameLbl:SetFontObject("GameFontNormal") end
+        BNB.SetFontSafe(nameLbl, def.bold, 11, "GameFontNormal")
         nameLbl:SetText(def.label)
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  5, 5)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -5, 5)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(12)
-        if def.regular and def.regular ~= "" then pcall(function() prevLbl:SetFont(def.regular, 10, "") end)
-        else prevLbl:SetFontObject("GameFontNormalSmall") end
+        BNB.SetFontSafe(prevLbl, def.regular, 10, "GameFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
         fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=fid, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
         plainOnlyWidgets[#plainOnlyWidgets+1] = btn

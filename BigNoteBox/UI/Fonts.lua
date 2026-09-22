@@ -109,6 +109,86 @@ BNB.FONTS = {
 local _byID = {}
 for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
 
+-- ── Early preload (ALL-16) ────────────────────────────────────────────────────
+-- The client loads a TTF lazily, when a FontString using it is first drawn. On a
+-- cold first login SetFont still returns success before the file is ready, and the
+-- string stays blank until its font is applied again; a /reload "fixes" it because
+-- the file is cached by then. Draw every bundled TTF once, right away, on a
+-- near-invisible 1px frame so the loads start before any picker is built. A hidden
+-- frame is not enough - hidden strings are never drawn, so nothing loads.
+do
+    local ok = pcall(function()
+        local pre = CreateFrame("Frame", nil, UIParent)
+        pre:SetSize(1, 1)
+        pre:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+        pre:SetAlpha(0.01)
+        local seen = {}
+        for _, def in ipairs(BNB.FONTS) do
+            if not def._isWoW then
+                for _, p in ipairs({ def.regular, def.bold }) do
+                    if p and not seen[p] then
+                        seen[p] = true
+                        local fs = pre:CreateFontString(nil, "BACKGROUND")
+                        fs:SetPoint("BOTTOMLEFT", pre, "BOTTOMLEFT", 0, 0)
+                        fs:SetFont(p, 12, "")
+                        fs:SetText("Aa")
+                    end
+                end
+            end
+        end
+        pre:Show()
+        C_Timer.After(10, function() pre:Hide() end)
+    end)
+    BNB._fontPreloadOK = ok
+end
+
+-- Sets a TTF on a FontString and survives the not-yet-loaded case. SetFont's
+-- return value cannot be trusted here (it reports success while the file is
+-- still loading), so the font is re-applied - with a size nudge and a text
+-- re-set to force a redraw - a few times after it is set, and again every time
+-- the owning frame is shown. The fallback font object goes on first so a real
+-- failure still leaves readable text. Used by every font picker.
+local REFRESH_DELAYS = { 0.2, 1.0, 3.0 }
+
+local function RefreshFont(fs)
+    local spec = fs._bnbFontSpec
+    if not spec then return end
+    pcall(fs.SetFont, fs, spec.path, spec.size + 1, "")
+    pcall(fs.SetFont, fs, spec.path, spec.size, "")
+    local t = fs:GetText() or ""
+    fs:SetText("")
+    fs:SetText(t)
+end
+
+local function ScheduleRefresh(fs)
+    for _, d in ipairs(REFRESH_DELAYS) do
+        C_Timer.After(d, function() RefreshFont(fs) end)
+    end
+end
+
+function BNB.SetFontSafe(fs, path, size, fallbackObj)
+    if not fs then return end
+    fs:SetFontObject(fallbackObj or "GameFontNormal")
+    if not path or path == "" then fs._bnbFontSpec = nil; return end
+    fs._bnbFontSpec = { path = path, size = size }
+    pcall(fs.SetFont, fs, path, size, "")
+    ScheduleRefresh(fs)
+    -- Refresh again whenever the owner is shown: picker pages are often built
+    -- hidden, so the timers above can run out before the text is ever drawn.
+    local owner = fs:GetParent()
+    if owner and owner.HookScript then
+        if not owner._bnbFontStrings then
+            owner._bnbFontStrings = {}
+            owner:HookScript("OnShow", function(self)
+                for _, f in ipairs(self._bnbFontStrings) do ScheduleRefresh(f) end
+            end)
+        end
+        local list, known = owner._bnbFontStrings, false
+        for _, f in ipairs(list) do if f == fs then known = true break end end
+        if not known then list[#list + 1] = fs end
+    end
+end
+
 local function GetWoWFontPath()
     local ok, path = pcall(function() return GameFontNormal:GetFont() end)
     return (ok and path and path ~= "") and path or "Fonts\\FRIZQT__.TTF"

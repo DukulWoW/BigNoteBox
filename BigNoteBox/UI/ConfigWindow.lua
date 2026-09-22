@@ -349,18 +349,14 @@ local function BuildFontPicker(ct, y)
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  7, -7)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -7, -7)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(18)
-        if def.bold and def.bold ~= "" then
-            pcall(function() nameLbl:SetFont(def.bold, 13, "") end)
-        else nameLbl:SetFontObject("GameFontNormal") end
+        BNB.SetFontSafe(nameLbl, def.bold, 13, "GameFontNormal")
         nameLbl:SetText(def.label)
 
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  7, 7)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -7, 7)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
-        if def.regular and def.regular ~= "" then
-            pcall(function() prevLbl:SetFont(def.regular, 11, "") end)
-        else prevLbl:SetFontObject("GameFontNormalSmall") end
+        BNB.SetFontSafe(prevLbl, def.regular, 11, "GameFontNormalSmall")
         prevLbl:SetTextColor(0.62, 0.62, 0.62); prevLbl:SetText(def.preview or "")
 
         fontPickerBtns[#fontPickerBtns + 1] = { btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def }

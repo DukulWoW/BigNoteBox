@@ -668,11 +668,8 @@ local function BuildPage4(content)
                 -- Update preview to selected font
                 if _p4PreviewLbl then
                     local sz = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
-                    if d.bold and d.bold ~= "" then
-                        pcall(function() _p4PreviewLbl:SetFont(d.bold, sz, "") end)
-                    elseif d.regular and d.regular ~= "" then
-                        pcall(function() _p4PreviewLbl:SetFont(d.regular, sz, "") end)
-                    end
+                    local p = (d.bold and d.bold ~= "") and d.bold or d.regular
+                    BNB.SetFontSafe(_p4PreviewLbl, p, sz, "GameFontNormal")
                 end
             end)
 
@@ -680,18 +677,14 @@ local function BuildPage4(content)
             nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  7, -7)
             nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -7, -7)
             nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(18)
-            if def.bold and def.bold ~= "" then
-                pcall(function() nameLbl:SetFont(def.bold, 13, "") end)
-            else nameLbl:SetFontObject("GameFontNormal") end
+            BNB.SetFontSafe(nameLbl, def.bold, 13, "GameFontNormal")
             nameLbl:SetText(def.label)
 
             local prevLbl = btn:CreateFontString(nil, "OVERLAY")
             prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  7, 7)
             prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -7, 7)
             prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
-            if def.regular and def.regular ~= "" then
-                pcall(function() prevLbl:SetFont(def.regular, 11, "") end)
-            else prevLbl:SetFontObject("GameFontNormalSmall") end
+            BNB.SetFontSafe(prevLbl, def.regular, 11, "GameFontNormalSmall")
             prevLbl:SetTextColor(0.62, 0.62, 0.62)
             prevLbl:SetText(def.preview or "")
 
@@ -740,9 +733,7 @@ local function BuildPage4(content)
     C_Timer.After(0.05, function()
         local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
         local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
-        if boldPath and boldPath ~= "" then
-            pcall(function() previewLbl:SetFont(boldPath, sz, "") end)
-        end
+        BNB.SetFontSafe(previewLbl, boldPath, sz, "GameFontNormal")
     end)
     _p4PreviewLbl = previewLbl
     y = y - 46

@@ -401,22 +401,14 @@ local function BuildDialog()
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  4, -4)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(16)
-        if def.bold and def.bold ~= "" then
-            pcall(function() nameLbl:SetFont(def.bold, 11, "") end)
-        else
-            nameLbl:SetFontObject("GameFontNormal")
-        end
+        BNB.SetFontSafe(nameLbl, def.bold, 11, "GameFontNormal")
         nameLbl:SetText(def.label)
 
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  4, 4)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -4, 4)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(11)
-        if def.regular and def.regular ~= "" then
-            pcall(function() prevLbl:SetFont(def.regular, 9, "") end)
-        else
-            prevLbl:SetFontObject("GameFontNormalSmall")
-        end
+        BNB.SetFontSafe(prevLbl, def.regular, 9, "GameFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55)
         prevLbl:SetText(def.preview or "")
 
