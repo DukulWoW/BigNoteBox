@@ -45,6 +45,13 @@ local GLOW_N         = 12    -- particles around the border
 local GLOW_FREQUENCY = 0.03  -- slow, stately rotation
 local GLOW_SCALE     = 1.3   -- larger dots
 
+-- FOR-04: library's xOffset/yOffset pad left+right / top+bottom symmetrically,
+-- so asymmetric clearance needs the glow frame re-anchored by hand afterward.
+-- Normal-mode chrome only - skin mode's chrome doesn't need it.
+local GLOW_PAD_RIGHT  = 2
+local GLOW_PAD_TOP    = 6
+local GLOW_PAD_BOTTOM = 5
+
 --------------------------------------------------------------------------------
 -- MODULE STATE
 --------------------------------------------------------------------------------
@@ -189,6 +196,12 @@ local function StartGlow()
     end
     pcall(lcg.AutoCastGlow_Start, _frame, {r, g, b, 0.85}, GLOW_N, GLOW_FREQUENCY, GLOW_SCALE,
           nil, nil, GLOW_KEY)
+    local g2 = _frame["_AutoCastGlow" .. GLOW_KEY]
+    if g2 and not (db and db.skinMode) then
+        g2:ClearAllPoints()
+        g2:SetPoint("TOPLEFT",     _frame, "TOPLEFT",     0,              GLOW_PAD_TOP)
+        g2:SetPoint("BOTTOMRIGHT", _frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+    end
 end
 
 local function StopGlow()

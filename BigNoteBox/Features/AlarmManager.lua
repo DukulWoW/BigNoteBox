@@ -34,6 +34,13 @@ local PULSE_ON        = 10      -- glow-on duration for "pulse" mode (seconds)
 local PULSE_OFF       = 10      -- glow-off duration for "pulse" mode (seconds)
 local ONCE_DURATION   = 10      -- glow duration for "once" mode (seconds)
 local GLOW_KEY        = "bnb_alarm"
+-- FOR-04: library's xOffset/yOffset pad left+right / top+bottom symmetrically,
+-- so asymmetric clearance needs the glow frame re-anchored by hand afterward.
+-- Placeholder values carried over from the WhatsNew window fix; glow targets
+-- here are icon-sized, not window-sized, so these likely need retuning.
+local GLOW_PAD_RIGHT  = 2
+local GLOW_PAD_TOP    = 6
+local GLOW_PAD_BOTTOM = 5
 local DEFAULT_SOUND   = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
 local SOUND_CHANNEL   = "Master"
 
@@ -236,6 +243,12 @@ function AM._LCGStart(frame, alarm)
     elseif gType == 2 then
         -- AutoCast: particles (def 4), frequency (def 0.125), scale
         LCG.AutoCastGlow_Start(frame, gColor, particles, frequency, acScale, nil, nil, GLOW_KEY)
+        local g = frame["_AutoCastGlow" .. GLOW_KEY]
+        if g then
+            g:ClearAllPoints()
+            g:SetPoint("TOPLEFT",     frame, "TOPLEFT",     0,              GLOW_PAD_TOP)
+            g:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+        end
     elseif gType == 3 then
         -- Pulsing border: frequency controls pulse duration (def 0.6s)
         AM._PulsingBorderStart(frame, gColor, frequency)
