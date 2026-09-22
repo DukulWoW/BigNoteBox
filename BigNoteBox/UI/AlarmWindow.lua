@@ -35,8 +35,12 @@ local AW_SECT_GAP = 12   -- gap between sections
 local BNB_GR, BNB_GG, BNB_GB = 0.400, 0.733, 0.416
 
 local DEFAULT_SOUND = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
-local DAY_NAMES     = { L["AW_DAY_MON"], L["AW_DAY_TUE"], L["AW_DAY_WED"], L["AW_DAY_THU"],
-                         L["AW_DAY_FRI"], L["AW_DAY_SAT"], L["AW_DAY_SUN"] }
+-- Keys, not resolved strings: this table is built at file load, before
+-- BigNoteBoxDB (and debugPseudoLocale) is restored, so caching L[...] results
+-- here would freeze them at their pre-SavedVariables value forever. Resolve
+-- each key through L at the two call sites below instead.
+local DAY_NAME_KEYS = { "AW_DAY_MON", "AW_DAY_TUE", "AW_DAY_WED", "AW_DAY_THU",
+                         "AW_DAY_FRI", "AW_DAY_SAT", "AW_DAY_SUN" }
 
 -- ---------------------------------------------------------------------------
 -- STATE
@@ -501,7 +505,8 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     nBtn:SetScript("OnMouseDown",function() nPress:Show(); nNorm:Hide(); nHover:Hide() end)
     nBtn:SetScript("OnMouseUp",  function() nPress:Hide(); nHover:Show() end)
 
-    for i,dn in ipairs(DAY_NAMES) do
+    for i,dnKey in ipairs(DAY_NAME_KEYS) do
+        local dn = L[dnKey]
         local dl = realSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
         dl:SetSize(CAL_CELL,CAL_H_DAYS)
         dl:SetPoint("TOPLEFT",realSection,"TOPLEFT",(i-1)*CAL_CELL,-CAL_H_HDR)
@@ -628,7 +633,8 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local wdRow = CreateFrame("Frame",nil,ct1)
     wdRow:SetSize(AW_CW,22); wdRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); wdRow:Hide()
     local wdChecks={}; local wdCW=math.floor(AW_CW/7)
-    for i,dn in ipairs(DAY_NAMES) do
+    for i,dnKey in ipairs(DAY_NAME_KEYS) do
+        local dn = L[dnKey]
         local cb=CreateFrame("CheckButton",nil,wdRow,"UICheckButtonTemplate")
         cb:SetSize(20,20); cb:SetPoint("LEFT",wdRow,"LEFT",(i-1)*wdCW,0)
         cb:HookScript("OnClick",function() MarkDirty() end)

@@ -45,13 +45,6 @@ local GLOW_N         = 12    -- particles around the border
 local GLOW_FREQUENCY = 0.03  -- slow, stately rotation
 local GLOW_SCALE     = 1.3   -- larger dots
 
--- FOR-04: library's xOffset/yOffset pad left+right / top+bottom symmetrically,
--- so asymmetric clearance needs the glow frame re-anchored by hand afterward.
--- Normal-mode chrome only - skin mode's chrome doesn't need it.
-local GLOW_PAD_RIGHT  = 2
-local GLOW_PAD_TOP    = 6
-local GLOW_PAD_BOTTOM = 5
-
 --------------------------------------------------------------------------------
 -- MODULE STATE
 --------------------------------------------------------------------------------
@@ -196,12 +189,6 @@ local function StartGlow()
     end
     pcall(lcg.AutoCastGlow_Start, _frame, {r, g, b, 0.85}, GLOW_N, GLOW_FREQUENCY, GLOW_SCALE,
           nil, nil, GLOW_KEY)
-    local g2 = _frame["_AutoCastGlow" .. GLOW_KEY]
-    if g2 and not (db and db.skinMode) then
-        g2:ClearAllPoints()
-        g2:SetPoint("TOPLEFT",     _frame, "TOPLEFT",     0,              GLOW_PAD_TOP)
-        g2:SetPoint("BOTTOMRIGHT", _frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
-    end
 end
 
 local function StopGlow()
@@ -257,19 +244,24 @@ end
 --------------------------------------------------------------------------------
 -- NAVIGATION
 --------------------------------------------------------------------------------
-local PAGE_TITLES = {
-    L["SW_PAGE_TITLE_1"],
-    L["SW_PAGE_TITLE_2"],
-    L["SW_PAGE_TITLE_3"],
-    L["SW_PAGE_TITLE_4"],
-    L["SW_PAGE_TITLE_5"],
-    L["SW_PAGE_TITLE_6"],
-    L["SW_PAGE_TITLE_7"],
+-- Keys, not resolved strings: this table is built at file load, before
+-- BigNoteBoxDB (and debugPseudoLocale) is restored, so caching L[...] results
+-- here would freeze them at their pre-SavedVariables value forever. Resolve
+-- each key through L at display time instead (UpdateNavigation).
+local PAGE_TITLE_KEYS = {
+    "SW_PAGE_TITLE_1",
+    "SW_PAGE_TITLE_2",
+    "SW_PAGE_TITLE_3",
+    "SW_PAGE_TITLE_4",
+    "SW_PAGE_TITLE_5",
+    "SW_PAGE_TITLE_6",
+    "SW_PAGE_TITLE_7",
 }
 
 local function UpdateNavigation()
     if not _frame then return end
-    _pageTitle:SetText(PAGE_TITLES[_curPage] or "")
+    local key = PAGE_TITLE_KEYS[_curPage]
+    _pageTitle:SetText((key and L[key]) or "")
 
     -- Effective total: skip page 6 if no migration addons
     local effectiveTotal = _hasMigration and NUM_PAGES or (NUM_PAGES - 1)

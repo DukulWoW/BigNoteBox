@@ -2644,7 +2644,7 @@ local function BuildAdvancedTab(sf, ct)
         -- in sync automatically whenever new addons are added to MigrateNotes.lua.
         local M = BNB.Migration
         for _, k in ipairs(M.ADDON_KEYS) do
-            if C_AddOns.IsAddOnLoaded(M.ADDON_LOAD_NAME[k] or k) then
+            if M.IsAddonAvailable(k) then
                 local displayName = M.ADDON_NAMES[k] or k
                 local isDone = db.migrationDone and db.migrationDone[k]
 
@@ -2903,6 +2903,26 @@ local function BuildAdvancedTab(sf, ct)
     end)
     setupBtn2:SetScript("OnLeave", function() GameTooltip:Hide() end)
     devWidgets2[#devWidgets2 + 1] = { cb = setupBtn2, lbl = nil }
+    y = y - (ROW_H + ROW_GAP)
+
+    local migTestBtn2 = BNB.CreateButton(nil, ct, L["CFG_DEV_MIGRATE_BTN"], 170, 22)
+    migTestBtn2:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y + 2)
+    migTestBtn2:SetScript("OnClick", function()
+        if not (db.debugMode == true) then return end
+        if BNB.Migration and BNB.Migration.SeedDebugData then
+            BNB.Migration.SeedDebugData()
+            BNB:Print("|cff88bbffFake migration data seeded for all supported addons.|r")
+            BNB.Migration.ShowPopup()
+        end
+    end)
+    migTestBtn2:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_DEV_MIGRATE_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_DEV_MIGRATE_TIP_BODY"], 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    migTestBtn2:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    devWidgets2[#devWidgets2 + 1] = { cb = migTestBtn2, lbl = nil }
     y = y - (ROW_H + ROW_GAP)
 
     local immDbgCb2 = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")

@@ -1,5 +1,6 @@
 -- BigNoteBox Features/MigrateNotes.lua
 local BNB = BigNoteBox
+local L   = BNB.L
 -- Detects NoteworthyII, TakeANote, YetAnotherNotepad, Notepad, Notes,
 -- TinyPad, PurpleNotes, SimpleNote, QuickNotes, and OneWoW Notes and
 -- offers to migrate their notes into BNB.
@@ -108,7 +109,7 @@ end
 -- ── Note creation helper ──────────────────────────────────────────────────────
 local function CreateMigratedNote(title, body, tags, charKey)
     if not body or body:match("^%s*$") then return end
-    if not title or title == "" then title = "Imported Note" end
+    if not title or title == "" then title = L["MIG_IMPORTED_NOTE_TITLE"] end
     -- Use the low-level BNB.CreateNote (returns id) not BNB.CreateNewNote
     -- which opens the interactive UI dialog and does not return an id.
     local id = BNB.CreateNote(title, body)
@@ -151,7 +152,7 @@ function M.CollectPreview(sel)
             local body = db[ck]
             if body and not body:match("^%s*$") then
                 local matched = MatchCharKey(ck)
-                local charLabel = matched or (ck .. " (no match - global)")
+                local charLabel = matched or (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], ck))
                 tinsert(entries, {
                     addon      = "NoteworthyII",
                     title      = ck,
@@ -167,9 +168,9 @@ function M.CollectPreview(sel)
         if shared and not shared:match("^%s*$") then
             tinsert(entries, {
                 addon      = "NoteworthyII",
-                title      = "Shared Notes",
+                title      = L["MIG_SHARED_NOTES_TITLE"],
                 scope      = "global",
-                charLabel  = "Global",
+                charLabel  = L["MIG_GLOBAL"],
                 tags       = { "NoteworthyII" },
                 bodyPreview = shared:sub(1, 100),
             })
@@ -179,9 +180,9 @@ function M.CollectPreview(sel)
         if quick and not quick:match("^%s*$") then
             tinsert(entries, {
                 addon      = "NoteworthyII",
-                title      = "Quick Notes",
+                title      = L["MIG_QUICK_NOTES_TITLE"],
                 scope      = "global",
-                charLabel  = "Global",
+                charLabel  = L["MIG_GLOBAL"],
                 tags       = { "NoteworthyII" },
                 bodyPreview = quick:sub(1, 100),
             })
@@ -201,9 +202,9 @@ function M.CollectPreview(sel)
                                 or  { "TakeANote" }
                             tinsert(entries, {
                                 addon      = "TakeANote",
-                                title      = (note.title and note.title ~= "") and note.title or "Imported Note",
+                                title      = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"],
                                 scope      = "global",
-                                charLabel  = "Global",
+                                charLabel  = L["MIG_GLOBAL"],
                                 tags       = tags,
                                 bodyPreview = note.text:sub(1, 100),
                             })
@@ -222,7 +223,7 @@ function M.CollectPreview(sel)
             for ck, cdata in pairs(charDB) do
                 if cdata.notes then
                     local matched = MatchCharKey(ck)
-                    local charLabel = matched or (ck .. " (no match - global)")
+                    local charLabel = matched or (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], ck))
                     -- YAN notes array is sparse (index 1 may be nil) — use pairs
                     for _, entry in pairs(cdata.notes) do
                         if entry and entry[1] and not entry[1]:match("^%s*$") then
@@ -247,12 +248,12 @@ function M.CollectPreview(sel)
         for _, note in ipairs(Notepad_Vars.Notes) do
             local body = note.Note
             if body and not body:match("^%s*$") then
-                local title = (note.Title and note.Title ~= "") and note.Title or "Imported Note"
+                local title = (note.Title and note.Title ~= "") and note.Title or L["MIG_IMPORTED_NOTE_TITLE"]
                 tinsert(entries, {
                     addon       = "Notepad",
                     title       = title,
                     scope       = "global",
-                    charLabel   = "Global",
+                    charLabel   = L["MIG_GLOBAL"],
                     tags        = { "Notepad" },
                     bodyPreview = body:sub(1, 100),
                 })
@@ -266,11 +267,11 @@ function M.CollectPreview(sel)
         local realm = GetNormalizedRealmName()
         local charKey = name and realm and (name .. "-" .. realm) or nil
         local matched = charKey and MatchCharKey(charKey)
-        local charLabel = matched or (charKey and (charKey .. " (no match - global)") or "Unknown")
+        local charLabel = matched or (charKey and (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], charKey)) or L["MIG_UNKNOWN"])
         for _, note in ipairs(Notepad_CVars.Notes) do
             local body = note.Note
             if body and not body:match("^%s*$") then
-                local title = (note.Title and note.Title ~= "") and note.Title or "Imported Note"
+                local title = (note.Title and note.Title ~= "") and note.Title or L["MIG_IMPORTED_NOTE_TITLE"]
                 tinsert(entries, {
                     addon       = "NotepadChar",
                     title       = title,
@@ -289,12 +290,12 @@ function M.CollectPreview(sel)
             if note.type == 1 then
                 local body = note.text
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     tinsert(entries, {
                         addon       = "Notes",
                         title       = title,
                         scope       = "global",
-                        charLabel   = "Global",
+                        charLabel   = L["MIG_GLOBAL"],
                         tags        = { "Notes" },
                         bodyPreview = body:sub(1, 100),
                     })
@@ -311,7 +312,7 @@ function M.CollectPreview(sel)
                     addon       = "TinyPad",
                     title       = "TinyPad " .. i,
                     scope       = "global",
-                    charLabel   = "Global",
+                    charLabel   = L["MIG_GLOBAL"],
                     tags        = { "TinyPad" },
                     bodyPreview = body:sub(1, 100),
                 })
@@ -324,12 +325,12 @@ function M.CollectPreview(sel)
         for _, note in ipairs(PurpleNotesDB.notes) do
             local body = note.text
             if body and not body:match("^%s*$") then
-                local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                 tinsert(entries, {
                     addon       = "PurpleNotes",
                     title       = title,
                     scope       = "global",
-                    charLabel   = "Global",
+                    charLabel   = L["MIG_GLOBAL"],
                     tags        = { "PurpleNotes" },
                     bodyPreview = body:sub(1, 100),
                 })
@@ -342,12 +343,12 @@ function M.CollectPreview(sel)
         for _, note in ipairs(SimpleNoteDB.notes) do
             local body = note.text
             if body and not body:match("^%s*$") then
-                local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                 tinsert(entries, {
                     addon       = "SimpleNote",
                     title       = title,
                     scope       = "global",
-                    charLabel   = "Global",
+                    charLabel   = L["MIG_GLOBAL"],
                     tags        = { "SimpleNote" },
                     bodyPreview = body:sub(1, 100),
                 })
@@ -361,7 +362,7 @@ function M.CollectPreview(sel)
         local realm = GetNormalizedRealmName()
         local charKey = name and realm and (name .. "-" .. realm) or nil
         local matched = charKey and MatchCharKey(charKey)
-        local charLabel = matched or (charKey and (charKey .. " (no match - global)") or "Unknown")
+        local charLabel = matched or (charKey and (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], charKey)) or L["MIG_UNKNOWN"])
         for i, body in ipairs(CharNotesDB) do
             if body and not body:match("^%s*$") then
                 tinsert(entries, {
@@ -386,7 +387,7 @@ function M.CollectPreview(sel)
             for _, note in pairs(globalNotes) do
                 local body = note.content
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     local tags  = { "OneWoW" }
                     if note.category and note.category ~= "" then tinsert(tags, note.category) end
                     local nt = note.noteType
@@ -402,7 +403,7 @@ function M.CollectPreview(sel)
                         addon       = "OneWoWNotes",
                         title       = title,
                         scope       = "global",
-                        charLabel   = "Global",
+                        charLabel   = L["MIG_GLOBAL"],
                         tags        = tags,
                         bodyPreview = body:sub(1, 100),
                     })
@@ -416,11 +417,11 @@ function M.CollectPreview(sel)
                 local charNotes = cdata.notes
                 if charNotes then
                     local matched   = MatchCharKey(ck)
-                    local charLabel = matched or (ck .. " (no match - global)")
+                    local charLabel = matched or (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], ck))
                     for _, note in pairs(charNotes) do
                         local body = note.content
                         if body and not body:match("^%s*$") then
-                            local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                            local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                             local tags  = { "OneWoW" }
                             if note.category and note.category ~= "" then tinsert(tags, note.category) end
                             local nt = note.noteType
@@ -459,7 +460,7 @@ function M.CollectPreview(sel)
                         addon       = "MyNotepad",
                         title       = title,
                         scope       = "global",
-                        charLabel   = "Global",
+                        charLabel   = L["MIG_GLOBAL"],
                         tags        = { "MyNotepad" },
                         bodyPreview = body:sub(1, 100),
                     })
@@ -470,7 +471,7 @@ function M.CollectPreview(sel)
         if MyNotepadData.characterPages then
             for ck, pages in pairs(MyNotepadData.characterPages) do
                 local matched   = MatchCharKey(ck)
-                local charLabel = matched or (ck .. " (no match - global)")
+                local charLabel = matched or (string.format(L["MIG_NO_MATCH_GLOBAL_FMT"], ck))
                 if type(pages) == "table" then
                     for i, page in ipairs(pages) do
                         local body = page.text
@@ -504,12 +505,12 @@ function M.CollectPreview(sel)
                     seen[id] = true
                     local body = note.body
                     if body and not body:match("^%s*$") then
-                        local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                        local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                         tinsert(entries, {
                             addon       = "AmmeNotepad",
                             title       = title,
                             scope       = "global",
-                            charLabel   = "Global",
+                            charLabel   = L["MIG_GLOBAL"],
                             tags        = { "AmmeNotepad" },
                             bodyPreview = body:sub(1, 100),
                         })
@@ -522,12 +523,12 @@ function M.CollectPreview(sel)
             if not seen[id] then
                 local body = note.body
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     tinsert(entries, {
                         addon       = "AmmeNotepad",
                         title       = title,
                         scope       = "global",
-                        charLabel   = "Global",
+                        charLabel   = L["MIG_GLOBAL"],
                         tags        = { "AmmeNotepad" },
                         bodyPreview = body:sub(1, 100),
                     })
@@ -555,11 +556,11 @@ function M.Run(sel)
         end
         local shared = ndb["shared_text"]
         if shared and not shared:match("^%s*$") then
-            CreateMigratedNote("Shared Notes", shared, { "NoteworthyII" }, nil)
+            CreateMigratedNote(L["MIG_SHARED_NOTES_TITLE"], shared, { "NoteworthyII" }, nil)
         end
         local quick = ndb["quick_text"]
         if quick and not quick:match("^%s*$") then
-            CreateMigratedNote("Quick Notes", quick, { "NoteworthyII" }, nil)
+            CreateMigratedNote(L["MIG_QUICK_NOTES_TITLE"], quick, { "NoteworthyII" }, nil)
         end
         db.migrationDone.NoteworthyII = true
     end
@@ -574,7 +575,7 @@ function M.Run(sel)
                             local tags = sel.takeANoteCategoryTags
                                 and { "TakeANote", cat.name }
                                 or  { "TakeANote" }
-                            local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                            local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                             CreateMigratedNote(title, note.text, tags, nil)
                         end
                     end
@@ -614,7 +615,7 @@ function M.Run(sel)
         for _, note in ipairs(Notepad_Vars.Notes) do
             local body = note.Note
             if body and not body:match("^%s*$") then
-                local title = (note.Title and note.Title ~= "") and note.Title or "Imported Note"
+                local title = (note.Title and note.Title ~= "") and note.Title or L["MIG_IMPORTED_NOTE_TITLE"]
                 CreateMigratedNote(title, body, { "Notepad" }, nil)
             end
         end
@@ -632,7 +633,7 @@ function M.Run(sel)
         for _, note in ipairs(Notepad_CVars.Notes) do
             local body = note.Note
             if body and not body:match("^%s*$") then
-                local title = (note.Title and note.Title ~= "") and note.Title or "Imported Note"
+                local title = (note.Title and note.Title ~= "") and note.Title or L["MIG_IMPORTED_NOTE_TITLE"]
                 CreateMigratedNote(title, body, { "Notepad" }, matched)
             end
         end
@@ -645,7 +646,7 @@ function M.Run(sel)
             if note.type == 1 then
                 local body = note.text
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     CreateMigratedNote(title, body, { "Notes" }, nil)
                 end
             end
@@ -668,7 +669,7 @@ function M.Run(sel)
         for _, note in ipairs(PurpleNotesDB.notes) do
             local body = note.text
             if body and not body:match("^%s*$") then
-                local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                 CreateMigratedNote(title, body, { "PurpleNotes" }, nil)
             end
         end
@@ -680,7 +681,7 @@ function M.Run(sel)
         for _, note in ipairs(SimpleNoteDB.notes) do
             local body = note.text
             if body and not body:match("^%s*$") then
-                local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                 CreateMigratedNote(title, body, { "SimpleNote" }, nil)
             end
         end
@@ -726,7 +727,7 @@ function M.Run(sel)
             for _, note in pairs(odb.global.notes) do
                 local body = note.content
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     local id    = CreateMigratedNote(title, body, BuildOneWoWTags(note), nil)
                     if id and note.favorite then
                         BNB.UpdateNote(id, { favorited = true })
@@ -743,7 +744,7 @@ function M.Run(sel)
                     for _, note in pairs(cdata.notes) do
                         local body = note.content
                         if body and not body:match("^%s*$") then
-                            local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                            local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                             local id    = CreateMigratedNote(title, body, BuildOneWoWTags(note), matched)
                             if id and note.favorite then
                                 BNB.UpdateNote(id, { favorited = true })
@@ -799,7 +800,7 @@ function M.Run(sel)
                     seen[id] = true
                     local body = note.body
                     if body and not body:match("^%s*$") then
-                        local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                        local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                         CreateMigratedNote(title, body, { "AmmeNotepad" }, nil)
                     end
                 end
@@ -809,7 +810,7 @@ function M.Run(sel)
             if not seen[id] then
                 local body = note.body
                 if body and not body:match("^%s*$") then
-                    local title = (note.title and note.title ~= "") and note.title or "Imported Note"
+                    local title = (note.title and note.title ~= "") and note.title or L["MIG_IMPORTED_NOTE_TITLE"]
                     CreateMigratedNote(title, body, { "AmmeNotepad" }, nil)
                 end
             end
@@ -821,9 +822,17 @@ function M.Run(sel)
 end
 
 -- ── Detection helpers ─────────────────────────────────────────────────────────
+-- M._debugForceAll is a session-only (non-persisted) flag set by SeedDebugData()
+-- below, so every supported addon is treated as installed without touching
+-- C_AddOns.IsAddOnLoaded. It resets on its own the next UI reload.
+function M.IsAddonAvailable(key)
+    if M._debugForceAll then return true end
+    return C_AddOns.IsAddOnLoaded(ADDON_LOAD_NAME[key] or key)
+end
+
 function M.HasAny()
     for _, k in ipairs(ADDON_KEYS) do
-        if C_AddOns.IsAddOnLoaded(ADDON_LOAD_NAME[k] or k) then return true end
+        if M.IsAddonAvailable(k) then return true end
     end
     return false
 end
@@ -832,15 +841,121 @@ function M.DetectAvailable()
     local db  = BigNoteBoxDB
     local out = {}
     for _, k in ipairs(ADDON_KEYS) do
-        if C_AddOns.IsAddOnLoaded(ADDON_LOAD_NAME[k] or k) then
-            local done     = db.migrationDone     and db.migrationDone[k]
-            local declined = db.migrationDeclined and db.migrationDeclined[k]
+        if M.IsAddonAvailable(k) then
+            local done     = not M._debugForceAll and db.migrationDone     and db.migrationDone[k]
+            local declined = not M._debugForceAll and db.migrationDeclined and db.migrationDeclined[k]
             if not done and not declined then
                 tinsert(out, k)
             end
         end
     end
     return out
+end
+
+-- ── Debug: fake data for testing migration without installing the source addons ──
+-- Dev-only, wired to the "Seed Fake Migration Data" button in ConfigWindow's
+-- Developer section. Populates each addon's real SavedVariables global with a
+-- couple of fake notes matching its exact on-disk schema, then flips
+-- M._debugForceAll so DetectAvailable()/HasAny() report every key as available.
+-- Existing globals are never overwritten, so this is a no-op for any addon that
+-- is actually installed. The fake globals are plain in-memory Lua tables (BNB
+-- never declares them as SavedVariables), so they vanish on the next UI reload
+-- on their own -- only the notes actually migrated into BNB persist.
+function M.SeedDebugData()
+    local name    = UnitName("player")
+    local realm   = GetNormalizedRealmName()
+    local ck      = (name and realm) and (name .. "-" .. realm) or "DebugChar-DebugRealm"
+    local fakeCk  = "Someone-SomeRealm"  -- deliberately unmatched, to exercise the "no match - global" path
+
+    if not Noteworthy_DB then
+        Noteworthy_DB = {
+            character_list = { ck, fakeCk },
+            [ck]           = "[BNB DEBUG] NoteworthyII character note.",
+            [fakeCk]       = "[BNB DEBUG] NoteworthyII character note (unmatched character).",
+            shared_text    = "[BNB DEBUG] NoteworthyII shared text.",
+            quick_text     = "[BNB DEBUG] NoteworthyII quick text.",
+        }
+    end
+
+    if not TakeANoteDB then
+        TakeANoteDB = {
+            profile = {
+                categories = {
+                    { name = "Debug", notes = {
+                        { title = "TakeANote debug note", text = "[BNB DEBUG] TakeANote note body." },
+                    } },
+                },
+            },
+        }
+    end
+
+    if not YAnotepadDB then
+        YAnotepadDB = {
+            char = {
+                [ck]     = { notes = { [1] = { "[BNB DEBUG] YetAnotherNotepad character note." } } },
+                [fakeCk] = { notes = { [1] = { "[BNB DEBUG] YetAnotherNotepad note (unmatched character)." } } },
+            },
+        }
+    end
+
+    if not Notepad_Vars then
+        Notepad_Vars = { Notes = { { Title = "Notepad debug note", Note = "[BNB DEBUG] Notepad global note." } } }
+    end
+
+    if not Notepad_CVars then
+        Notepad_CVars = { Notes = { { Title = "Notepad char debug note", Note = "[BNB DEBUG] Notepad per-character note." } } }
+    end
+
+    if not NotesData then
+        NotesData = { notes = { { type = 1, title = "Notes debug note", text = "[BNB DEBUG] Notes addon note." } } }
+    end
+
+    if not TinyPadPages then
+        TinyPadPages = { "[BNB DEBUG] TinyPad page 1." }
+    end
+
+    if not PurpleNotesDB then
+        PurpleNotesDB = { notes = { { title = "PurpleNotes debug note", text = "[BNB DEBUG] PurpleNotes note body." } } }
+    end
+
+    if not SimpleNoteDB then
+        SimpleNoteDB = { notes = { { title = "SimpleNote debug note", text = "[BNB DEBUG] SimpleNote note body." } } }
+    end
+
+    if not CharNotesDB then
+        CharNotesDB = { "[BNB DEBUG] QuickNotes entry 1." }
+    end
+
+    if not OneWoW_Notes_DB then
+        OneWoW_Notes_DB = {
+            global = { notes = {
+                debug1 = { title = "OneWoW debug note", content = "[BNB DEBUG] OneWoW global note.", category = "Debug", tags = {} },
+            } },
+            char = {
+                [ck] = { notes = {
+                    debug2 = { title = "OneWoW char debug note", content = "[BNB DEBUG] OneWoW character note.", category = "Debug", tags = {} },
+                } },
+            },
+        }
+    end
+
+    if not MyNotepadData then
+        MyNotepadData = {
+            pages = { { title = "MyNotepad debug page", text = "[BNB DEBUG] MyNotepad global page." } },
+            characterPages = {
+                [ck] = { { title = "MyNotepad char debug page", text = "[BNB DEBUG] MyNotepad character page." } },
+            },
+        }
+    end
+
+    if not AmmeNotepadDB then
+        AmmeNotepadDB = {
+            noteOrder = { "debug1" },
+            notes     = { debug1 = { title = "AmmeNotepad debug note", body = "[BNB DEBUG] AmmeNotepad note body." } },
+        }
+    end
+
+    M._debugForceAll = true
 end
 
 -- ── Preview window ────────────────────────────────────────────────────────────
@@ -867,7 +982,7 @@ local function BuildPreviewWindow()
         local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("Migration Preview")
+        titleLbl:SetText(L["MIG_PREVIEW_TITLE"])
         f._titleLbl = titleLbl
         local closeBtn = CreateFrame("Button", nil, titleBar, "UIPanelButtonTemplate")
         closeBtn:SetSize(24, 22)
@@ -883,7 +998,7 @@ local function BuildPreviewWindow()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetTitle("Migration Preview")
+        f:SetTitle(L["MIG_PREVIEW_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
         end
@@ -933,7 +1048,7 @@ local function PopulatePreview(entries)
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetWidth(CW); lbl:SetJustifyH("LEFT")
         lbl:SetTextColor(0.55, 0.55, 0.55)
-        lbl:SetText("No notes to migrate with the current selection.")
+        lbl:SetText(L["MIG_PREVIEW_EMPTY"])
         y = y - 24
     else
         for _, e in ipairs(entries) do
@@ -978,7 +1093,7 @@ local function PopulatePreview(entries)
             row:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
                 GameTooltip:AddLine(e.title, 1, 0.82, 0)
-                GameTooltip:AddLine("Tags: " .. table.concat(e.tags, ", "), 0.6, 0.6, 0.6, true)
+                GameTooltip:AddLine(string.format(L["MIG_TT_TAGS_FMT"], table.concat(e.tags, ", ")), 0.6, 0.6, 0.6, true)
                 if preview ~= "" then
                     GameTooltip:AddLine(" ", 1, 1, 1)
                     GameTooltip:AddLine(preview .. (e.bodyPreview and #e.bodyPreview == 100 and "..." or ""), 0.8, 0.8, 0.8, true)
@@ -1030,7 +1145,7 @@ function M.ShowAddonPopup(key)
         local tl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         tl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         tl:SetTextColor(1, 0.82, 0)
-        tl:SetText("Migrate " .. name)
+        tl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
         f._titleLbl = tl
         local cb2 = CreateFrame("Button", nil, titleBar, "UIPanelButtonTemplate")
         cb2:SetSize(24, 22); cb2:SetPoint("RIGHT", titleBar, "RIGHT", 0, 0)
@@ -1044,7 +1159,7 @@ function M.ShowAddonPopup(key)
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetTitle("Migrate " .. name)
+        f:SetTitle(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
         titleH = 32
     end
@@ -1063,7 +1178,7 @@ function M.ShowAddonPopup(key)
     desc:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     desc:SetWidth(CW); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
     desc:SetTextColor(0.8, 0.8, 0.8)
-    desc:SetText("This will import notes from " .. name .. " into BigNoteBox and reload the UI. Your notes in " .. name .. " are not affected.")
+    desc:SetText(string.format(L["MIG_ADDON_DESC_FMT"], name, name))
     y = y - 46
 
     -- TakeANote sub-option
@@ -1075,7 +1190,7 @@ function M.ShowAddonPopup(key)
         catCb:SetChecked(false)
         local catLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
-        catLbl:SetText("Use category names as tags")
+        catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
         catCb:SetScript("OnClick", function(self)
             sel.takeANoteCategoryTags = self:GetChecked() and true or false
         end)
@@ -1088,7 +1203,7 @@ function M.ShowAddonPopup(key)
         infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
         infoLbl:SetWidth(CW); infoLbl:SetJustifyH("LEFT"); infoLbl:SetWordWrap(true)
         infoLbl:SetTextColor(0.5, 0.5, 0.5)
-        infoLbl:SetText("Per-character notes only import for the currently logged-in character. Log in with each character to migrate their notes.")
+        infoLbl:SetText(L["MIG_PERCHAR_INFO"])
         y = y - 40
     end
 
@@ -1097,16 +1212,16 @@ function M.ShowAddonPopup(key)
     warn:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     warn:SetWidth(CW); warn:SetJustifyH("LEFT"); warn:SetWordWrap(true)
     warn:SetTextColor(1, 0.6, 0.0)
-    warn:SetText("|cffff9900Warning:|r A UI reload is required after migration.")
+    warn:SetText(L["MIG_WARN_REQUIRED"])
     y = y - 36
 
-    local previewBtn = BNB.CreateButton(nil, ct, "Preview", 100, 24)
+    local previewBtn = BNB.CreateButton(nil, ct, L["MIG_PREVIEW_BTN"], 100, 24)
     previewBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
         M.ShowPreview(sel)
     end)
 
-    local confirmBtn = BNB.CreateButton(nil, ct, "Migrate Now", 110, 24)
+    local confirmBtn = BNB.CreateButton(nil, ct, L["MIG_MIGRATE_NOW_BTN"], 110, 24)
     confirmBtn:SetPoint("BOTTOMRIGHT", ct, "BOTTOMRIGHT", -PAD, PAD)
     confirmBtn:SetScript("OnClick", function()
         f:Hide()
@@ -1147,7 +1262,7 @@ function M.ShowPopup()
         local tl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         tl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
         tl:SetTextColor(1, 0.82, 0)
-        tl:SetText("Migrate to BigNoteBox")
+        tl:SetText(L["MIG_POPUP_TITLE"])
         f._titleLbl = tl
         local xBtn = CreateFrame("Button", nil, titleBar, "UIPanelButtonTemplate")
         xBtn:SetSize(24, 22); xBtn:SetPoint("RIGHT", titleBar, "RIGHT", 0, 0)
@@ -1160,7 +1275,7 @@ function M.ShowPopup()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
-        f:SetTitle("Migrate to BigNoteBox")
+        f:SetTitle(L["MIG_POPUP_TITLE"])
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
         titleH = 32
     end
@@ -1189,7 +1304,7 @@ function M.ShowPopup()
     titleLbl:SetPoint("TOP", ct, "TOP", 0, y)
     titleLbl:SetJustifyH("CENTER")
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Migrate to BigNoteBox")
+    titleLbl:SetText(L["MIG_POPUP_TITLE"])
     y = y - 26
 
     -- "You currently have X" line
@@ -1200,7 +1315,7 @@ function M.ShowPopup()
     detectedLbl:SetWidth(CW); detectedLbl:SetJustifyH("CENTER"); detectedLbl:SetWordWrap(true)
     detectedLbl:SetTextColor(0.9, 0.9, 0.9)
     local addonList = table.concat(addonNames, ", ")
-    detectedLbl:SetText("You currently have |cff66bb6a" .. addonList .. "|r, why not move it all to BNB?")
+    detectedLbl:SetText(string.format(L["MIG_DETECTED_FMT"], addonList))
     y = y - 36
 
     -- Explanatory text
@@ -1208,7 +1323,7 @@ function M.ShowPopup()
     explainLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     explainLbl:SetWidth(CW); explainLbl:SetJustifyH("LEFT"); explainLbl:SetWordWrap(true)
     explainLbl:SetTextColor(0.7, 0.7, 0.7)
-    explainLbl:SetText("Moving your notes to BigNoteBox keeps everything in one place. Your notes in other addons are not touched as this is a copy, not a move. A UI reload is required after migration. You can safely disable and/or remove the other addons after migration.")
+    explainLbl:SetText(L["MIG_EXPLAIN"])
     y = y - 56
 
     -- Separator
@@ -1259,7 +1374,7 @@ function M.ShowPopup()
         cb:SetChecked(false)
         local cbLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         cbLbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
-        cbLbl:SetText("Migrate " .. (ADDON_NAMES[k] or k))
+        cbLbl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], (ADDON_NAMES[k] or k)))
         addonCbs[k] = cb
         y = y - 30
 
@@ -1271,7 +1386,7 @@ function M.ShowPopup()
             infoLbl:SetJustifyH("LEFT")
             infoLbl:SetWordWrap(true)
             infoLbl:SetTextColor(0.5, 0.5, 0.5)
-            infoLbl:SetText("Per-character notes only import for the currently logged-in character. Log in with each character to migrate their notes.")
+            infoLbl:SetText(L["MIG_PERCHAR_INFO"])
             y = y - 30
         end
 
@@ -1287,7 +1402,7 @@ function M.ShowPopup()
             catCb:SetAlpha(0.4)
             catLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
-            catLbl:SetText("Use category names as tags")
+            catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
             catLbl:SetTextColor(0.5, 0.5, 0.5)
             catCb:SetScript("OnClick", function(self)
                 sel.takeANoteCategoryTags = self:GetChecked() and true or false
@@ -1314,7 +1429,7 @@ function M.ShowPopup()
     y = y - 8
 
     -- Preview button (disabled until at least one addon is checked)
-    previewBtn = BNB.CreateButton(nil, ct, "Preview", 100, 24)
+    previewBtn = BNB.CreateButton(nil, ct, L["MIG_PREVIEW_BTN"], 100, 24)
     previewBtn:SetEnabled(false)
     previewBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
@@ -1327,7 +1442,7 @@ function M.ShowPopup()
     local daaLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     daaLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, daaY)
     daaLbl:SetTextColor(0.5, 0.5, 0.5)
-    daaLbl:SetText("Don't ask again:")
+    daaLbl:SetText(L["MIG_DONT_ASK_AGAIN"])
     daaY = daaY - 24
 
     for _, k in ipairs(available) do
@@ -1351,10 +1466,10 @@ function M.ShowPopup()
     warnLbl:SetPoint("BOTTOMRIGHT", ct, "BOTTOMRIGHT", -PAD, PAD + 32)
     warnLbl:SetJustifyH("RIGHT")
     warnLbl:SetTextColor(1, 0.6, 0.0)
-    warnLbl:SetText("|cffff9900Warning:|r UI will reload after migration.")
+    warnLbl:SetText(L["MIG_WARN_WILL_RELOAD"])
 
     -- Migrate Now button, pinned to bottom centre
-    migrateBtn = BNB.CreateButton(nil, ct, "Migrate Now", 120, 26)
+    migrateBtn = BNB.CreateButton(nil, ct, L["MIG_MIGRATE_NOW_BTN"], 120, 26)
     migrateBtn:SetPoint("BOTTOM", ct, "BOTTOM", 49, PAD)  -- shifts right so pair midpoint is at centre
     migrateBtn:SetEnabled(false)
     migrateBtn:SetScript("OnClick", function()
@@ -1371,7 +1486,7 @@ function M.ShowPopup()
     end)
 
     -- Cancel: anchored left of Migrate Now, together they are centred
-    local cancelBtn = BNB.CreateButton(nil, ct, "Not Now", 90, 26)
+    local cancelBtn = BNB.CreateButton(nil, ct, L["MIG_NOT_NOW_BTN"], 90, 26)
     cancelBtn:SetPoint("RIGHT", migrateBtn, "LEFT", -8, 0)
     cancelBtn:SetScript("OnClick", function()
         local db = BigNoteBoxDB
