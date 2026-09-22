@@ -26,3 +26,4 @@ ignore:
   - CLAUDE.md
   - FILEMAP.md
   - README.md
+  - CONTRIBUTING.md
