@@ -100,6 +100,14 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "然后重载您的 UI。\n\n" ..
     "|cffaaaaaa您现有的笔记很安全，一旦 BigNoteBoxDB 激活就会重新出现。|r"
 
+-- ── WoW: Forever testing notice (FOR-10) ────────────────────────────
+L["FOREVER_TEST_NOTICE"] =
+    "|cff66bb6aBigNoteBox 在 WoW: Forever 上|r\n\n" ..
+    "此版本仅供测试，BigNoteBox 正在为 Forever 做好准备。\n\n" ..
+    "暴雪方面的一个错误目前导致 Forever 测试版无法加载插件保存的数据，" ..
+    "因此每次登出或重载时，你的笔记和设置都会丢失。" ..
+    "在暴雪修复此问题之前，BigNoteBox 将无法按预期运行。"
+
 -- ── Trash window ──────────────────────────────────────────────────────────────
 L["TW_TIME_UNKNOWN"]       = "未知"
 L["TW_TIME_JUST_NOW"]      = "刚刚"
@@ -645,7 +653,7 @@ L["CAPTURE_MENU"]       = "保存到 BigNoteBox"
 
 -- ── Contextual surfacing ──────────────────────────────────────────────────────
 L["CONTEXT_BADGE"]      = "此区域有 %d 条笔记"
-L["CONTEXT_TOAST"]      = "BigNoteBox：%2$s 有 %1$d 条笔记"
+L["CONTEXT_TOAST"]      = "BigNoteBox：%d 条笔记，位于 %s"
 
 -- ── Confirmations ─────────────────────────────────────────────────────────────
 L["POPUP_DELETE_NOTE"]   = "删除笔记“%s”？此操作无法撤销。"
@@ -731,7 +739,7 @@ L["TAG_MGR_RENAME"]      = "重命名"
 L["TAG_MGR_DELETE"]      = "删除"
 L["TAG_MGR_RENAME_HINT"] = "新标签名称..."
 L["TAG_MGR_RENAME_CONFIRM"] = "将“%s”重命名为“%s”？"
-L["TAG_MGR_DELETE_CONFIRM"] = "从所有 %2$d 条笔记中移除标签“%1$s”？"
+L["TAG_MGR_DELETE_CONFIRM"] = "将标签“%s”从所有 %d 条笔记中移除？"
 L["TAG_MGR_MERGE_NOTE"]  = "提示：将标签重命名为现有名称以合并它们。"
 
 -- ── Focus Mode ────────────────────────────────────────────────────────────────
@@ -1232,7 +1240,7 @@ L["CFG_CELL_TAGS_HDR"]              = "标签与回收站"
 L["CFG_CELL_TAGS_DESC"]             = "标记笔记以进行即时过滤。\n删除的笔记进入回收站，可随时恢复。"
 L["CFG_BCB_HEADER"]                 = "BCB 集成"
 L["CFG_CELL_CONTEXT_HDR"]           = "上下文显示"
-L["CFG_CELL_CONTEXT_DESC"]          = "笔记按区域、副本或玩家名称自动显示。"
+L["CFG_CELL_CONTEXT_DESC"]          = "笔记按区域、副本或\n玩家名称自动显示。"
 L["CFG_CELL_STICKY_HDR"]            = "便签"
 L["CFG_CELL_STICKY_DESC"]           = "在屏幕上的任何位置浮动笔记。\n每个笔记的字体、颜色、大小和边框。\n在任何笔记上设置基于时间的闹钟。"
 L["CFG_HDR_KEYBINDINGS"]            = "按键绑定"
@@ -1682,3 +1690,27 @@ L["STICKY_OPEN_TO_EDIT_TIP"]        = "在 BigNoteBox 中打开以编辑"
 L["STICKY_CREATE_TASK_TIP"]         = "创建任务"
 L["STICKY_SHOW_NOTE_TIP"]           = "显示笔记"
 L["STICKY_SHOW_TASKS_TIP"]          = "显示任务"
+
+-- ── Note migration (ALL-08 sweep: Features/MigrateNotes.lua) ──────────────────
+L["MIG_IMPORTED_NOTE_TITLE"]        = "已导入笔记"
+L["MIG_SHARED_NOTES_TITLE"]         = "共享笔记"
+L["MIG_QUICK_NOTES_TITLE"]          = "快速笔记"
+L["MIG_NO_MATCH_GLOBAL_FMT"]        = "%s（无匹配项 - 全局）"
+L["MIG_GLOBAL"]                     = "全局"
+L["MIG_UNKNOWN"]                    = "未知"
+L["MIG_PREVIEW_TITLE"]              = "迁移预览"
+L["MIG_PREVIEW_EMPTY"]              = "当前选择下没有可迁移的笔记。"
+L["MIG_TT_TAGS_FMT"]                = "标签：%s"
+L["MIG_MIGRATE_ADDON_FMT"]          = "迁移 %s"
+L["MIG_POPUP_TITLE"]                = "迁移至 BigNoteBox"
+L["MIG_DETECTED_FMT"]               = "你目前拥有 |cff66bb6a%s|r，何不将其全部迁移到 BNB？"
+L["MIG_EXPLAIN"]                    = "将笔记迁移到 BigNoteBox 可将所有内容集中在一处。由于这是复制而非移动，其他插件中的笔记不会受到影响。迁移后需要重载界面。迁移完成后，你可以放心地禁用和/或移除其他插件。"
+L["MIG_ADDON_DESC_FMT"]             = "这将从 %s 导入笔记到 BigNoteBox 并重载界面。你在 %s 中的笔记不会受到影响。"
+L["MIG_MIGRATE_NOW_BTN"]            = "立即迁移"
+L["MIG_NOT_NOW_BTN"]                = "暂不迁移"
+L["MIG_PREVIEW_BTN"]                = "预览"
+L["MIG_DONT_ASK_AGAIN"]             = "不再提示："
+L["MIG_USE_CATEGORY_TAGS"]          = "将分类名称用作标签"
+L["MIG_PERCHAR_INFO"]               = "每个角色的笔记仅会导入当前登录角色的笔记。请使用每个角色登录以迁移其笔记。"
+L["MIG_WARN_REQUIRED"]              = "|cffff9900警告：|r迁移后需要重载界面。"
+L["MIG_WARN_WILL_RELOAD"]           = "|cffff9900警告：|r迁移后界面将会重载。"
