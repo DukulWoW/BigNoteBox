@@ -200,12 +200,14 @@ local fontPickerBtns = {}
 -- y          : current y offset (top of next widget)
 -- getChoice  : function() -> current font id/path or nil
 -- setChoice  : function(idOrNil) -> applies the selection
--- Returns new y offset.
-local _refreshLSMDropdown = nil   -- refreshes the LSM dropdown's closed-state text (ALL-29 fix)
+-- Returns new y offset, a refresh function for the closed-state text, and the
+-- header and control widgets (all three nil when nothing was built). The refresh
+-- is returned, not stored, so each picker keeps its own (ALL-41): NoteConfig, the
+-- sticky config and the New Note dialog build one too.
+local _refreshLSMDropdown = nil   -- this window's dropdown refresh (ALL-29 fix)
 
 local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
     local db = BigNoteBoxDB
-    _refreshLSMDropdown = nil   -- stale closure guard: rebuilt below only if lsmFonts is on
     if not (db and db.lsmFonts) then return y end
     local W = overrideW or CONTENT_W
 
@@ -249,8 +251,7 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
                     function() setChoice(path); dd:GenerateMenu() end)
             end
         end)
-        _refreshLSMDropdown = function() dd:GenerateMenu() end
-        y = y - 28
+        return y - 28, function() dd:GenerateMenu() end, hdr, dd
     else
         -- Fallback: show current LSM selection as plain text with a cycle button
         local cur = getChoice()
@@ -267,15 +268,13 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
             local next = lsmFonts[(idx % #lsmFonts) + 1]
             if next then setChoice(next.id); cycleBtn:SetText(next.label) end
         end)
-        _refreshLSMDropdown = function()
+        local function refresh()
             local c  = getChoice()
             local cd = c and BNB.GetFontDef and BNB.GetFontDef(c)
             cycleBtn:SetText((cd and cd._isLSM and cd.label) or L["CFG_LSM_FONTS_NONE"])
         end
-        y = y - 28
+        return y - 28, refresh, hdr, cycleBtn
     end
-
-    return y
 end
 
 -- Expose for NoteConfig.lua (local functions cannot cross file boundaries)
@@ -1231,7 +1230,7 @@ local function BuildAppearanceTab(sf, ct)
     end
 
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on
-    y = BuildLSMFontDropdown(ct, y,
+    y, _refreshLSMDropdown = BuildLSMFontDropdown(ct, y,
         -- getter: returns the current global font choice if it is an LSM font, else nil
         function()
             local choice = BNB.GetFontChoice()

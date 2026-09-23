@@ -55,6 +55,7 @@ local _sizePreviewLbl = nil
 local _createBtn      = nil
 local _richCheck      = nil
 local _wowCheck        = nil
+local _refreshLSM      = nil   -- LSM font dropdown closed-state refresh (ALL-41)
 
 -- ---------------------------------------------------------------------------
 -- RANDOM NOTE ICON
@@ -199,6 +200,7 @@ local function RefreshFontHighlight()
     -- highlighted, regardless of what was selected before WoW Default was ticked.
     -- Under another font set (ALL-14) that is the set's default card instead.
     local hlFont = _selFont or BNB.GetFontSetDefault()
+    if _refreshLSM then _refreshLSM() end
     for _, e in ipairs(_fontBtns) do
         local sel = (e.id == hlFont)
         if e.btn.SetBackdropColor then
@@ -387,10 +389,34 @@ local function BuildDialog()
 
     local leftY  = -18
     _fontBtns    = {}
-    -- WoW Default is offered via its own checkbox below the grid, not as a card.
-    -- Cards are the active language's font set (ALL-14), LSM fonts after them.
-    local fonts = BNB.GetPickerFonts(true)
+    -- WoW Default is offered via its own checkbox below the grid, not as a card,
+    -- and LSM fonts in a dropdown below that (ALL-41). Cards are the active
+    -- language's font set (ALL-14).
+    local fonts = BNB.GetPickerFonts()
     local cardW  = math.floor((COL_L_W - CARD_GAP) / 2)
+
+    -- A card click and an LSM dropdown pick do the same thing.
+    local function SelectFont(id)
+        _selFont = id
+        if _wowCheck then _wowCheck:SetChecked(false) end
+        RefreshFontHighlight()
+        ApplyTitleFont()
+        -- Update size preview to use the newly selected font
+        if _sizePreviewLbl then
+            pcall(function()
+                for _, d in ipairs(BNB.FONTS or {}) do
+                    if d.id == _selFont and d.bold and d.bold ~= "" then
+                        _sizePreviewLbl:SetFont(d.bold, _selSize, "")
+                        return
+                    end
+                end
+                local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
+                if boldPath and boldPath ~= "" then
+                    _sizePreviewLbl:SetFont(boldPath, _selSize, "")
+                end
+            end)
+        end
+    end
 
     for i, def in ipairs(fonts) do
         local col  = (i - 1) % 2
@@ -427,27 +453,7 @@ local function BuildDialog()
             end
         end)
         btn:SetScript("OnLeave", RefreshFontHighlight)
-        btn:SetScript("OnClick", function()
-            _selFont = defId
-            if _wowCheck then _wowCheck:SetChecked(false) end
-            RefreshFontHighlight()
-            ApplyTitleFont()
-            -- Update size preview to use the newly selected font
-            if _sizePreviewLbl then
-                pcall(function()
-                    for _, d in ipairs(BNB.FONTS or {}) do
-                        if d.id == _selFont and d.bold and d.bold ~= "" then
-                            _sizePreviewLbl:SetFont(d.bold, _selSize, "")
-                            return
-                        end
-                    end
-                    local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
-                    if boldPath and boldPath ~= "" then
-                        _sizePreviewLbl:SetFont(boldPath, _selSize, "")
-                    end
-                end)
-            end
-        end)
+        btn:SetScript("OnClick", function() SelectFont(defId) end)
         _fontBtns[#_fontBtns + 1] = { btn = btn, id = def.id, nameLbl = nameLbl }
     end
 
@@ -491,6 +497,22 @@ local function BuildDialog()
     end)
     wowCheck:SetChecked(_selFont == "wow")
     _wowCheck = wowCheck
+
+    -- LSM font dropdown (ALL-41), below the checkbox; only built when lsmFonts is on
+    -- and LSM has fonts. leftColH grows by its height so the columns stay in step.
+    if BNB._BuildLSMFontDropdown then
+        local y, refresh = BNB._BuildLSMFontDropdown(colL, -leftColH - 4,
+            function()
+                local def = _selFont and BNB.GetFontDef(_selFont)
+                return (def and def._isLSM and _selFont == def.id) and _selFont or nil
+            end,
+            SelectFont,
+            COL_L_W)
+        if refresh then
+            leftColH   = -y
+            _refreshLSM = refresh
+        end
+    end
 
     -- ── RIGHT COLUMN: title colour + font size ───────────────────────────────
     local rightY = 0

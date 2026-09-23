@@ -1252,6 +1252,7 @@ local function PopulateStickySettings(noteID)
     local CARD_W   = math.floor((SETTINGS_CW - COL_GAP) / 2)
     local fontPickerBtns = {}
     local _wowCb_sn
+    local _refreshLSM_sn   -- LSM dropdown closed-state refresh (ALL-41)
 
     local function HLStickyFonts()
         -- No override (WoW Default unticked, nothing else picked) always shows Noto
@@ -1267,11 +1268,13 @@ local function PopulateStickySettings(noteID)
             if e.nameLbl then e.nameLbl:SetTextColor(sel and 1 or 0.85, sel and 0.82 or 0.85, sel and 0 or 0.85, 1) end
         end
         if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
+        if _refreshLSM_sn then _refreshLSM_sn() end
     end
 
-    -- WoW Default has its own checkbox below the grid, not a 9th card. Cards are
-    -- the active language's font set (ALL-14), LSM fonts after them.
-    local fonts = BNB.GetPickerFonts(true)
+    -- WoW Default has its own checkbox below the grid, not a 9th card, and LSM
+    -- fonts are in a dropdown below that (ALL-41), as on the Appearance tab. Cards
+    -- are the active language's font set (ALL-14).
+    local fonts = BNB.GetPickerFonts()
     for i, def in ipairs(fonts) do
         local fid  = def.id
         local col  = (i - 1) % 2          -- 0 = left, 1 = right
@@ -1347,6 +1350,27 @@ local function PopulateStickySettings(noteID)
         plainOnlyWidgets[#plainOnlyWidgets + 1] = wowCb
         plainOnlyWidgets[#plainOnlyWidgets + 1] = wowLbl
         ct1._y = ct1._y - 24
+    end
+
+    -- LSM font dropdown (ALL-41): only built when lsmFonts is on and LSM has fonts.
+    if BNB._BuildLSMFontDropdown then
+        local y, refresh, hdr, ctrl = BNB._BuildLSMFontDropdown(ct1, ct1._y,
+            function()
+                local def = cfg.fontID and BNB.GetFontDef(cfg.fontID)
+                return (def and def._isLSM and cfg.fontID == def.id) and cfg.fontID or nil
+            end,
+            function(path)
+                cfg.fontID = path; SaveCfg(noteID, cfg)
+                if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+                HLStickyFonts()
+            end,
+            SETTINGS_CW)
+        if ctrl then
+            ct1._y = y - 4
+            _refreshLSM_sn = refresh
+            plainOnlyWidgets[#plainOnlyWidgets + 1] = hdr
+            plainOnlyWidgets[#plainOnlyWidgets + 1] = ctrl
+        end
     end
 
     HLStickyFonts()
