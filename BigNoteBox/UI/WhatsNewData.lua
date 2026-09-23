@@ -8,6 +8,10 @@
 --   2. Replace the `entries` table with your new patch notes.
 --   3. Each entry is a plain string. Prefix lines however you like:
 --        "New: ..."   "Fixed: ..."   "Changed: ..."   "Removed: ..."
+--   4. A line for one client only is a table instead of a string:
+--        { forever = true, "..." }   -- WoW Forever only
+--        { retail  = true, "..." }   -- Retail only
+--      No "WoW Forever:" prefix needed; only that client sees the line.
 --   That's it - no other files need to change for a routine version bump.
 --
 -- FORMAT RULES:
@@ -26,9 +30,9 @@ BNB.PATCH_NOTES = {
     entries = {
         "|cff66bb6aNew:|r Traditional Chinese clients get their own font picker set",
         "|cff66bb6aChange:|r Buttons now use Blizzard's current, sharper button style",
-        "|cff66bb6aChange:|r WoW Forever: sidebar slot borders match Forever's own UI art",
-        "|cff66bb6aChange:|r WoW Forever: windows use a wood-grain background",
         "|cff66bb6aFixed:|r Note settings: Use Default and Random icon buttons sat below the edge",
-        "|cff66bb6aFixed:|r WoW Forever: window borders no longer crowd the contents"
+        { forever = true, "|cff66bb6aChange:|r Sidebar slot borders match Forever's own UI art" },
+        { forever = true, "|cff66bb6aChange:|r Windows use a wood-grain background" },
+        { forever = true, "|cff66bb6aFixed:|r Window borders no longer crowd the contents" }
     },
 }

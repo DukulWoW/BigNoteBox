@@ -11,7 +11,10 @@
 -- DATA:
 --   BNB.PATCH_NOTES  (defined in UI/WhatsNewData.lua)
 --     .version  string  -- must match BNB.ADDON_VERSION to trigger auto-show
---     .entries  table   -- array of plain strings, one per bullet
+--     .entries  table   -- array, one per bullet. A plain string shows on every client;
+--                          { forever = true, "text" } / { retail = true, "text" } shows on
+--                          that client only (BNB.IsForever). A release with no lines for
+--                          this client does not auto-show.
 --
 -- PERSISTENCE:
 --   BigNoteBoxDB.lastSeenWhatsNewVersion  -- set to version on close; cleared on version bump
@@ -345,6 +348,24 @@ local function BuildWindow()
     return f
 end
 
+-- ── Entries for this client ──────────────────────────────────────────────────
+-- Drops lines tagged for the other client and unwraps tagged ones to their text.
+local function ClientEntries(entries)
+    local out = {}
+    for _, entry in ipairs(entries or {}) do
+        if type(entry) == "string" then
+            out[#out + 1] = entry
+        elseif type(entry) == "table" and type(entry[1]) == "string" then
+            local show
+            if entry.forever then show = BNB.IsForever
+            elseif entry.retail then show = not BNB.IsForever
+            else show = true end
+            if show then out[#out + 1] = entry[1] end
+        end
+    end
+    return out
+end
+
 -- ── Populate entries into the scroll content frame ────────────────────────────
 local function PopulateEntries(ct, entries)
     -- Clear old children
@@ -421,7 +442,7 @@ function WN.Open(showOverlay)
     if f._okBtn then f._okBtn:SetText(BNB.RandomOkPhrase()) end
 
     -- Populate entries and measure
-    local contentH = PopulateEntries(f._ct, data.entries)
+    local contentH = PopulateEntries(f._ct, ClientEntries(data.entries))
 
     -- Position CENTER before sizing so GetHeight() is valid when we check maxH
     f:ClearAllPoints()
@@ -466,5 +487,7 @@ function WN.CheckAndShow()
     local db = BigNoteBoxDB
     if not db then return end
     if db.lastSeenWhatsNewVersion == data.version then return end
+    -- Nothing for this client in this release (e.g. a Forever-only patch on Retail)
+    if #ClientEntries(data.entries) == 0 then return end
     WN.Open(true)
 end
