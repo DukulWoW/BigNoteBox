@@ -34,6 +34,15 @@ local PULSE_ON        = 10      -- glow-on duration for "pulse" mode (seconds)
 local PULSE_OFF       = 10      -- glow-off duration for "pulse" mode (seconds)
 local ONCE_DURATION   = 10      -- glow duration for "once" mode (seconds)
 local GLOW_KEY        = "bnb_alarm"
+
+-- Forever-only AutoCast glow clearance, icon-sized target (FOR-16). Starting
+-- point, not re-derived from the window pads above (icon frames are not
+-- ButtonFrameTemplate chrome, so BNB.CHROME_DELTA does not apply here) --
+-- re-tune against a live alarm-glowing note icon on Forever.
+local GLOW_PAD_LEFT   = 0
+local GLOW_PAD_TOP    = 2
+local GLOW_PAD_RIGHT  = 1
+local GLOW_PAD_BOTTOM = 2
 local DEFAULT_SOUND   = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
 local SOUND_CHANNEL   = "Master"
 
@@ -236,6 +245,14 @@ function AM._LCGStart(frame, alarm)
     elseif gType == 2 then
         -- AutoCast: particles (def 4), frequency (def 0.125), scale
         LCG.AutoCastGlow_Start(frame, gColor, particles, frequency, acScale, nil, nil, GLOW_KEY)
+        if BNB.IsForever then
+            local g = frame["_AutoCastGlow" .. GLOW_KEY]
+            if g then
+                g:ClearAllPoints()
+                g:SetPoint("TOPLEFT",     frame, "TOPLEFT",     -GLOW_PAD_LEFT, GLOW_PAD_TOP)
+                g:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+            end
+        end
     elseif gType == 3 then
         -- Pulsing border: frequency controls pulse duration (def 0.6s)
         AM._PulsingBorderStart(frame, gColor, frequency)

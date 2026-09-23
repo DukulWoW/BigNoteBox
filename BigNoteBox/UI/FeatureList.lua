@@ -100,9 +100,10 @@ local function StartGlow(f)
         if BNB.IsForever then
             local g = f["_AutoCastGlow" .. GLOW_KEY]
             if g then
+                local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
                 g:ClearAllPoints()
-                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     0,              GLOW_PAD_TOP)
-                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT, -GLOW_PAD_BOTTOM)
+                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
+                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
             end
         end
     end
