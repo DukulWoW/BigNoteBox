@@ -201,8 +201,11 @@ local fontPickerBtns = {}
 -- getChoice  : function() -> current font id/path or nil
 -- setChoice  : function(idOrNil) -> applies the selection
 -- Returns new y offset.
+local _refreshLSMDropdown = nil   -- refreshes the LSM dropdown's closed-state text (ALL-29 fix)
+
 local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
     local db = BigNoteBoxDB
+    _refreshLSMDropdown = nil   -- stale closure guard: rebuilt below only if lsmFonts is on
     if not (db and db.lsmFonts) then return y end
     local W = overrideW or CONTENT_W
 
@@ -246,6 +249,7 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
                     function() setChoice(path); dd:GenerateMenu() end)
             end
         end)
+        _refreshLSMDropdown = function() dd:GenerateMenu() end
         y = y - 28
     else
         -- Fallback: show current LSM selection as plain text with a cycle button
@@ -263,6 +267,11 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
             local next = lsmFonts[(idx % #lsmFonts) + 1]
             if next then setChoice(next.id); cycleBtn:SetText(next.label) end
         end)
+        _refreshLSMDropdown = function()
+            local c  = getChoice()
+            local cd = c and BNB.GetFontDef and BNB.GetFontDef(c)
+            cycleBtn:SetText((cd and cd._isLSM and cd.label) or L["CFG_LSM_FONTS_NONE"])
+        end
         y = y - 28
     end
 
@@ -346,7 +355,11 @@ local function BuildFontPicker(ct, y)
             end
         end)
         btn:SetScript("OnLeave", Highlight)
-        btn:SetScript("OnClick", function() BNB.ApplyFont(def.id, nil); Highlight() end)
+        btn:SetScript("OnClick", function()
+            BNB.ApplyFont(def.id, nil)
+            Highlight()
+            if _refreshLSMDropdown then _refreshLSMDropdown() end
+        end)
 
         local nameLbl = btn:CreateFontString(nil, "OVERLAY")
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  7, -7)
@@ -382,6 +395,7 @@ local function BuildFontPicker(ct, y)
     wowCb:SetScript("OnClick", function(self)
         BNB.ApplyFont(self:GetChecked() and "wow" or "notoserif", nil)
         Highlight()
+        if _refreshLSMDropdown then _refreshLSMDropdown() end
     end)
     local wowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     wowLbl:SetPoint("LEFT",  wowCb, "RIGHT", 4, 0)
@@ -526,24 +540,30 @@ end
 local function BuildGeneralTab(sf, ct)
     local y = -8
 
-    -- Logo
+    -- ── Header row: logo left, identity stacked beside it. The right portion of
+    -- this row is left empty on purpose — ALL-14 session 2 anchors pack-status
+    -- icons there (installed/missing font & icon packs), alongside the same
+    -- header pass.
+    local HEADER_H  = 64
+    local LOGO_SZ   = 56
+    local TEXT_X    = LOGO_SZ + 10
+
     local logo = ct:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(80, 80)
-    logo:SetPoint("TOP", ct, "TOP", 0, y)
+    logo:SetSize(LOGO_SZ, LOGO_SZ)
+    logo:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     logo:SetTexture(ASSET .. "logo")
-    y = y - 88
 
     -- Title
     local title = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge3")
-    title:SetPoint("TOP", ct, "TOP", 0, y)
+    title:SetPoint("TOPLEFT", ct, "TOPLEFT", TEXT_X, y - 2)
+    title:SetJustifyH("LEFT")
     title:SetText("|cff66bb6a" .. L["ADDON_NAME"] .. "|r")
-    y = y - 26
 
     -- Version button — skin button style on both modes so it reads as clickable.
     -- Opens the What's New window without the overlay.
     local verText = "v" .. (BNB.ADDON_VERSION or "1.0.0")
-    local ver = BNB.CreateButton(nil, ct, verText, 100, 22)
-    ver:SetPoint("TOP", ct, "TOP", 0, y)
+    local ver = BNB.CreateButton(nil, ct, verText, 80, 20)
+    ver:SetPoint("TOPLEFT", ct, "TOPLEFT", TEXT_X, y - 30)
     ver:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText(L["WHATS_NEW_VERSION_TIP"], nil, nil, nil, nil, true)
@@ -557,14 +577,130 @@ local function BuildGeneralTab(sf, ct)
             BNB.WhatsNew.Open(false)
         end
     end)
-    y = y - 28
 
     -- By-line
     local byLine = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    byLine:SetPoint("TOP", ct, "TOP", 0, y)
+    byLine:SetPoint("LEFT", ver, "RIGHT", 8, 0)
     byLine:SetText(L["AUTHOR"])
     byLine:SetTextColor(0.55, 0.55, 0.55)
-    y = y - 28
+
+    y = y - HEADER_H
+
+    -- ── Language section (ALL-14) — retail only, mirrors BigChatBox's selector ──
+    if not BNB.IsForever then
+        y = AddRule(ct, y) - 4
+        y = AddHeader(ct, y, L["CFG_HDR_LANGUAGE"])
+
+        local langDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        langDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        langDesc:SetWidth(CONTENT_W); langDesc:SetJustifyH("LEFT")
+        langDesc:SetTextColor(0.7, 0.7, 0.7)
+        langDesc:SetText(L["CFG_LANGUAGE_DESC"])
+        y = y - 18
+
+        local FLAG = ASSET .. "Flags\\"
+        -- { code, label, flag, available }  available=false -> greyed "(Coming soon)"
+        local LANG_LIST = {
+            { code = "client", label = L["LANGUAGE_CLIENT"], flag = nil,               available = true  },
+            { code = "enUS",   label = "English",            flag = FLAG.."flag-en",   available = true  },
+            { code = "zhCN",   label = "简体中文",             flag = FLAG.."flag-cn",   available = true  },
+            { code = "deDE",   label = "Deutsch",             flag = FLAG.."flag-de",   available = false },
+            { code = "frFR",   label = "Français",            flag = FLAG.."flag-fr",   available = false },
+            { code = "esES",   label = "Español",             flag = FLAG.."flag-es",   available = false },
+            { code = "ptBR",   label = "Português",           flag = FLAG.."flag-br",   available = false },
+            { code = "itIT",   label = "Italiano",            flag = FLAG.."flag-it",   available = false },
+            { code = "jaJP",   label = "日本語",               flag = FLAG.."flag-ja",   available = false },
+            { code = "koKR",   label = "한국어",               flag = FLAG.."flag-ko",   available = false },
+            { code = "zhTW",   label = "繁體中文",             flag = FLAG.."flag-tw",   available = false },
+        }
+
+        local COMING_SOON = L["LANGUAGE_COMING_SOON"]
+        local GREY        = "|cff888888"
+
+        -- entry.label for "client" is L["LANGUAGE_CLIENT"], already translated into whatever
+        -- language is active -- so on a forced-Chinese UI it reads "客户端语言" alone, with no
+        -- clue that it means "Client Language" (Kim, 2026-09-23, after seeing that on an
+        -- English client with Chinese selected). Always show the hardcoded English name too,
+        -- whenever the ACTIVE language isn't English -- forced or natural, doesn't matter.
+        local CLIENT_LABEL_EN = "Client Language"
+
+        local function MakeLangLabel(entry)
+            local label = entry.label
+            if entry.code == "client" and BNB.GetActiveLanguage and BNB.GetActiveLanguage() ~= "enUS" then
+                label = CLIENT_LABEL_EN .. " - " .. label
+            end
+            if entry.flag then
+                return "|T" .. entry.flag .. ":14:20:0:0:32:32|t " .. label
+            end
+            return label
+        end
+
+        local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
+
+        local useNativeLangDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+
+        if useNativeLangDrop then
+            local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+            langDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            langDD:SetWidth(CONTENT_W)
+            langDD:SetupMenu(function(_, root)
+                for _, entry in ipairs(LANG_LIST) do
+                    local lbl = MakeLangLabel(entry)
+                    if entry.available then
+                        root:CreateRadio(lbl,
+                            function() return curLangCode == entry.code end,
+                            function()
+                                if entry.code == curLangCode then return end
+                                BNB._pendingLangCode = entry.code
+                                StaticPopup_Show("BNB_CHANGE_LANGUAGE")
+                            end)
+                    else
+                        local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
+                            .. entry.label .. "|r  " .. COMING_SOON
+                        local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
+                        dummy:AddInitializer(function(button)
+                            if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
+                            button:SetEnabled(false)
+                            if button.highlight then button.highlight:SetAlpha(0) end
+                        end)
+                    end
+                end
+                root:SetScrollMode(30 * 20)
+            end)
+            y = y - 32
+        else
+            -- Fallback: only the available entries, as plain stacked buttons.
+            for _, entry in ipairs(LANG_LIST) do
+                if entry.available then
+                    local lb = BNB.CreateButton(nil, ct, MakeLangLabel(entry), CONTENT_W, 22)
+                    lb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+                    lb:SetScript("OnClick", function()
+                        if entry.code == curLangCode then return end
+                        BNB._pendingLangCode = entry.code
+                        StaticPopup_Show("BNB_CHANGE_LANGUAGE")
+                    end)
+                    y = y - 26
+                end
+            end
+        end
+        y = y - 6
+    end
+
+    if not StaticPopupDialogs["BNB_CHANGE_LANGUAGE"] then
+        StaticPopupDialogs["BNB_CHANGE_LANGUAGE"] = {
+            text = L["CFG_LANG_RELOAD_CONFIRM"],
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            button2 = L["CFG_LATER_BTN"],
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+            OnAccept = function()
+                BigNoteBoxLocale = (BNB._pendingLangCode == "client") and nil or BNB._pendingLangCode
+                BNB._pendingLangCode = nil
+                C_UI.Reload()
+            end,
+            OnCancel = function() BNB._pendingLangCode = nil end,
+        }
+    end
 
     -- 2×2 feature grid
     local cellGap = 12
@@ -690,104 +826,7 @@ local function BuildGeneralTab(sf, ct)
 
     y = MakeKeybindRow(ct, y, L["CFG_KB_OPEN_BNB"], "BIGNOTEBOXOPEN", L["CFG_KB_HINT_CTRL_N"], L["CFG_KB_DESC_OPEN_BNB"])
 
-    -- ── Data Summary section ──────────────────────────────────────────────────
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_DATA_SUMMARY"])
-
-    -- Compute stats from live notes DB
-    local noteCount    = 0
-    local totalBytes   = 0
-    local largestBytes = 0
-    local trashCount   = 0
-    local trashBytes   = 0
-    local ndb = BigNoteBoxNotesDB
-    if ndb then
-        if ndb.notes then
-            for _, note in pairs(ndb.notes) do
-                noteCount = noteCount + 1
-                local sz  = #(note.title or "") + #(note.body or "")
-                totalBytes = totalBytes + sz
-                if sz > largestBytes then largestBytes = sz end
-            end
-        end
-        if ndb.trash then
-            for _, note in pairs(ndb.trash) do
-                trashCount = trashCount + 1
-                trashBytes = trashBytes + #(note.title or "") + #(note.body or "")
-            end
-        end
-    end
-
-    local function fmtSize(bytes)
-        if bytes >= 1024 * 1024 then
-            return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024))
-        elseif bytes >= 1024 then
-            return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024)
-        else
-            return string.format(L["CFG_SIZE_B_FMT"], bytes)
-        end
-    end
-
-    local avgBytes   = noteCount > 0 and (totalBytes / noteCount) or 0
-    local histBytes  = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
-    local totalCount = noteCount + trashCount
-    local grandTotal = totalBytes + trashBytes
-
-    local GREEN = "|cff66bb6a"
-    local GREY  = "|cffaaaaaa"
-    local RESET = "|r"
-    local SZ    = 14   -- inline icon size
-
-    local ICO_N  = ASSET .. "Icons\\Notes\\INV_Misc_Note_01"  -- note count
-    local ICO_S  = "Interface\\Icons\\INV_Misc_Coin_01"       -- notes size
-    local ICO_A  = "Interface\\Icons\\Trade_Engineering"      -- average
-    local ICO_T  = "Interface\\Icons\\inv_misc_1h_bucket_b_01"-- trash count
-    local ICO_TS = "Interface\\Icons\\inv_misc_bag_07"        -- trash size
-    local ICO_H  = "Interface\\Icons\\ability_spy"            -- history
-    local ICO_L  = "Interface\\Icons\\INV_Scroll_06"          -- largest
-    local ICO_TN = "Interface\\Icons\\inv_misc_lockchest02"   -- total notes
-    local ICO_GS = "Interface\\Icons\\INV_Misc_Bag_10"        -- grand total size
-
-    -- 3-column grid, 3 rows — compact single-line-height rows with no row gap
-    local NCOLS = 3
-    local COL   = math.floor(CONTENT_W / NCOLS)
-    local STAT_H = 18  -- single row height, no extra gap between rows
-
-    local stats = {
-        -- Row 1: live notes
-        { icon = ICO_N,  label = L["CFG_STAT_NOTES"],        value = string.format(L["CFG_STAT_COUNT_FMT"], noteCount) },
-        { icon = ICO_S,  label = L["CFG_STAT_NOTES_SIZE"],   value = fmtSize(totalBytes) },
-        { icon = ICO_A,  label = L["CFG_STAT_AVG_SIZE"],     value = fmtSize(avgBytes) },
-        -- Row 2: trash + history
-        { icon = ICO_T,  label = L["CFG_STAT_IN_TRASH"],     value = string.format(L["CFG_STAT_COUNT_FMT"], trashCount) },
-        { icon = ICO_TS, label = L["CFG_STAT_TRASH_SIZE"],   value = fmtSize(trashBytes) },
-        { icon = ICO_H,  label = L["CFG_STAT_HISTORY_SIZE"], value = fmtSize(histBytes) },
-        -- Row 3: totals
-        { icon = ICO_TN, label = L["CFG_STAT_TOTAL_NOTES"],  value = string.format(L["CFG_STAT_COUNT_FMT"], totalCount) },
-        { icon = ICO_GS, label = L["CFG_STAT_TOTAL_SIZE"],   value = fmtSize(grandTotal) },
-        { icon = ICO_L,  label = L["CFG_STAT_LARGEST_NOTE"], value = fmtSize(largestBytes) },
-    }
-
-    -- 3-column grid, 3 rows — render each stat at the correct col/row offset
-    for i, s in ipairs(stats) do
-        local col  = (i - 1) % NCOLS
-        local row  = math.floor((i - 1) / NCOLS)
-        local xOff = col * COL
-        local yOff = y - row * STAT_H
-
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff)
-        lbl:SetWidth(COL - 4)
-        lbl:SetJustifyH("LEFT")
-        lbl:SetText(
-            "|T" .. s.icon .. ":" .. SZ .. "|t " ..
-            GREY .. s.label .. ": " .. RESET ..
-            GREEN .. s.value .. RESET
-        )
-    end
-
-    local numRows = math.ceil(#stats / NCOLS)
-    y = y - numRows * STAT_H
+    -- Data Summary moved to the bottom of the Backup tab (ALL-14).
 
     -- Content ends here. Solidarity line + rule go at the very bottom of the
     -- scroll area, anchored to the BOTTOM of the content frame so they stay
@@ -4670,7 +4709,10 @@ local function BuildBackupTab(sf, ct)
     y = y - 48
 
     -- Paste target editbox (scrollable, fixed height)
-    local PASTE_H = 140
+    -- Shrunk from 140 (ALL-14, Kim 2026-09-23): Data Summary moved to the bottom of this
+    -- tab made it taller than the window overall, so the tab itself started scrolling.
+    -- Kim, retest: bump back up to 120 -- 90 was too cramped for pasting.
+    local PASTE_H = 120
     local pasteFrame = BNB.CreateBackdropFrame("Frame", nil, ct)
     BNB.SetBackdropDark(pasteFrame)
     pasteFrame:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
@@ -4774,6 +4816,105 @@ local function BuildBackupTab(sf, ct)
         end
     end)
     y = y - 40
+
+    -- ── Data Summary section (moved here from General tab, ALL-14) ─────────────
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["CFG_HDR_DATA_SUMMARY"])
+
+    -- Compute stats from live notes DB
+    local noteCount    = 0
+    local totalBytes   = 0
+    local largestBytes = 0
+    local trashCount   = 0
+    local trashBytes   = 0
+    local ndb = BigNoteBoxNotesDB
+    if ndb then
+        if ndb.notes then
+            for _, note in pairs(ndb.notes) do
+                noteCount = noteCount + 1
+                local sz  = #(note.title or "") + #(note.body or "")
+                totalBytes = totalBytes + sz
+                if sz > largestBytes then largestBytes = sz end
+            end
+        end
+        if ndb.trash then
+            for _, note in pairs(ndb.trash) do
+                trashCount = trashCount + 1
+                trashBytes = trashBytes + #(note.title or "") + #(note.body or "")
+            end
+        end
+    end
+
+    local function fmtSize(bytes)
+        if bytes >= 1024 * 1024 then
+            return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024))
+        elseif bytes >= 1024 then
+            return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024)
+        else
+            return string.format(L["CFG_SIZE_B_FMT"], bytes)
+        end
+    end
+
+    local avgBytes   = noteCount > 0 and (totalBytes / noteCount) or 0
+    local histBytes  = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
+    local totalCount = noteCount + trashCount
+    local grandTotal = totalBytes + trashBytes
+
+    local GREEN = "|cff66bb6a"
+    local GREY  = "|cffaaaaaa"
+    local RESET = "|r"
+    local SZ    = 14   -- inline icon size
+
+    local ICO_N  = ASSET .. "Icons\\Notes\\INV_Misc_Note_01"  -- note count
+    local ICO_S  = "Interface\\Icons\\INV_Misc_Coin_01"       -- notes size
+    local ICO_A  = "Interface\\Icons\\Trade_Engineering"      -- average
+    local ICO_T  = "Interface\\Icons\\inv_misc_1h_bucket_b_01"-- trash count
+    local ICO_TS = "Interface\\Icons\\inv_misc_bag_07"        -- trash size
+    local ICO_H  = "Interface\\Icons\\ability_spy"            -- history
+    local ICO_L  = "Interface\\Icons\\INV_Scroll_06"          -- largest
+    local ICO_TN = "Interface\\Icons\\inv_misc_lockchest02"   -- total notes
+    local ICO_GS = "Interface\\Icons\\INV_Misc_Bag_10"        -- grand total size
+
+    -- 3-column grid, 3 rows — compact single-line-height rows with no row gap
+    local NCOLS = 3
+    local COL   = math.floor(CONTENT_W / NCOLS)
+    local STAT_H = 18  -- single row height, no extra gap between rows
+
+    local stats = {
+        -- Row 1: live notes
+        { icon = ICO_N,  label = L["CFG_STAT_NOTES"],        value = string.format(L["CFG_STAT_COUNT_FMT"], noteCount) },
+        { icon = ICO_S,  label = L["CFG_STAT_NOTES_SIZE"],   value = fmtSize(totalBytes) },
+        { icon = ICO_A,  label = L["CFG_STAT_AVG_SIZE"],     value = fmtSize(avgBytes) },
+        -- Row 2: trash + history
+        { icon = ICO_T,  label = L["CFG_STAT_IN_TRASH"],     value = string.format(L["CFG_STAT_COUNT_FMT"], trashCount) },
+        { icon = ICO_TS, label = L["CFG_STAT_TRASH_SIZE"],   value = fmtSize(trashBytes) },
+        { icon = ICO_H,  label = L["CFG_STAT_HISTORY_SIZE"], value = fmtSize(histBytes) },
+        -- Row 3: totals
+        { icon = ICO_TN, label = L["CFG_STAT_TOTAL_NOTES"],  value = string.format(L["CFG_STAT_COUNT_FMT"], totalCount) },
+        { icon = ICO_GS, label = L["CFG_STAT_TOTAL_SIZE"],   value = fmtSize(grandTotal) },
+        { icon = ICO_L,  label = L["CFG_STAT_LARGEST_NOTE"], value = fmtSize(largestBytes) },
+    }
+
+    -- 3-column grid, 3 rows — render each stat at the correct col/row offset
+    for i, s in ipairs(stats) do
+        local col  = (i - 1) % NCOLS
+        local row  = math.floor((i - 1) / NCOLS)
+        local xOff = col * COL
+        local yOff = y - row * STAT_H
+
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff)
+        lbl:SetWidth(COL - 4)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetText(
+            "|T" .. s.icon .. ":" .. SZ .. "|t " ..
+            GREY .. s.label .. ": " .. RESET ..
+            GREEN .. s.value .. RESET
+        )
+    end
+
+    local numRows = math.ceil(#stats / NCOLS)
+    y = y - numRows * STAT_H
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end

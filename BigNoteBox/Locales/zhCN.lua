@@ -3,7 +3,7 @@
 -- BigNoteBox.L proxy that enUS.lua creates, so any key not set here falls back
 -- to English, and the debug pseudo-locale still applies.
 
-if GetLocale() ~= "zhCN" then return end
+if BigNoteBox.GetActiveLanguage() ~= "zhCN" then return end
 
 local L = BigNoteBox.L
 
@@ -1249,6 +1249,15 @@ L["CFG_CELL_STICKY_HDR"]            = "便签"
 L["CFG_CELL_STICKY_DESC"]           = "在屏幕上的任何位置浮动笔记。\n每个笔记的字体、颜色、大小和边框。\n在任何笔记上设置基于时间的闹钟。"
 L["CFG_HDR_KEYBINDINGS"]            = "按键绑定"
 L["CFG_HDR_DATA_SUMMARY"]           = "数据摘要"
+
+-- ── Language selector (ALL-14) ───────────────────────────────────────────────
+L["CFG_HDR_LANGUAGE"]               = "语言"
+L["CFG_LANGUAGE_DESC"]              = "覆盖显示语言。需要重新加载界面。"
+L["LANGUAGE_CLIENT"]                = "客户端语言"
+L["LANGUAGE_COMING_SOON"]           = "|cff888888（即将推出）|r"
+L["CFG_LANG_RELOAD_CONFIRM"]        = "更改语言并重新加载界面？"
+L["SW_WELCOME_LANG_LBL"]            = "显示语言："
+L["SW_POPUP_WIZARD_CHANGE_LANGUAGE"] = "切换到 %s 并重新启动设置？\nBigNoteBox 将重新加载以应用新语言。"
 L["CFG_HDR_SKINS"]                  = "皮肤"
 L["CFG_SKIN_PRESET_OBSIDIAN"]       = "黑曜石 (中性深色)"
 L["CFG_SKIN_PRESET_VOID"]           = "虚空 (紫色)"

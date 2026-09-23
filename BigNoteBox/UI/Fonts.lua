@@ -231,7 +231,7 @@ end
 -- chrome falls back to WoW's own locale font unless the user picked WoW Default or
 -- an LSM font (which may well be CJK-capable). Note text keeps the chosen font.
 function BNB.IsCJKClient()
-    local locale = GetLocale and GetLocale() or ""
+    local locale = BNB.GetActiveLanguage and BNB.GetActiveLanguage() or (GetLocale and GetLocale()) or ""
     return locale == "zhCN" or locale == "zhTW" or locale == "koKR"
 end
 

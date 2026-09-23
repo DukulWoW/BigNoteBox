@@ -1254,7 +1254,9 @@ local function PopulateStickySettings(noteID)
     local _wowCb_sn
 
     local function HLStickyFonts()
-        local cur = cfg.fontID
+        -- No override (WoW Default unticked, nothing else picked) always shows Noto
+        -- Serif highlighted, regardless of what was selected before.
+        local cur = cfg.fontID or "notoserif"
         for _, e in ipairs(fontPickerBtns) do
             local sel = (e.id == cur)
             if e.btn.SetBackdropColor then

@@ -195,8 +195,11 @@ end
 -- HIGHLIGHT HELPERS
 -- ---------------------------------------------------------------------------
 local function RefreshFontHighlight()
+    -- No override (WoW Default unticked, nothing else picked) always shows Noto Serif
+    -- highlighted, regardless of what was selected before WoW Default was ticked.
+    local hlFont = _selFont or "notoserif"
     for _, e in ipairs(_fontBtns) do
-        local sel = (e.id == _selFont)
+        local sel = (e.id == hlFont)
         if e.btn.SetBackdropColor then
             if sel then
                 e.btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
@@ -630,10 +633,15 @@ local function BuildDialog()
     rightY = rightY - 28
 
     -- Rich note checkbox (full width, below both columns)
+    -- Both columns must agree on where "below both columns" is -- leftColH is a plain
+    -- height, rightY is a running y-cursor, so take the taller of the two ONCE and use
+    -- that same value both to place the checkbox and to size the dialog below it
+    -- (ALL-29 fix: the two used to disagree, so the checkbox overlapped the footer).
+    local colMaxH = math.max(math.abs(leftColH or 0), math.abs(rightY))
     local richCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
-        -(chromeTopH or 36) - ICON_SZ - 10 - math.max(math.abs(leftColH or 0), math.abs(rightY)) - 4)
+        -(chromeTopH or 36) - ICON_SZ - 10 - colMaxH - 4)
     local richLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     richLbl:SetPoint("LEFT",  richCheck, "RIGHT",  4, 0)
     richLbl:SetPoint("RIGHT", f,         "RIGHT", -DLG_PAD, 0)
@@ -658,12 +666,13 @@ local function BuildDialog()
     _selRich = richDefault
     _richCheck = richCheck
 
-    -- Adjust dialog height to fit the extra checkbox row
-    local RICH_ROW_H = 24
-    local rightColH = math.abs(rightY) + RICH_ROW_H
+    -- Adjust dialog height to fit the extra checkbox row (+8px cushion, Kim 2026-09-23:
+    -- "the window needs to be made a tiny bit taller (20px or so)" -- the real fix is
+    -- colMaxH above; this cushion covers font-metric rounding on top of that).
+    local RICH_ROW_H = 24 + 8
 
     -- ── FOOTER ───────────────────────────────────────────────────────────────
-    local totalContentH = math.max(leftColH, rightColH)
+    local totalContentH = colMaxH + RICH_ROW_H
     local chromeTopH    = skinMode and (SK_NND_TITLE_H + 8) or 36
     local dlgH = chromeTopH + ICON_SZ + 10 + totalContentH + DLG_FOOT + 8
     f:SetHeight(dlgH)

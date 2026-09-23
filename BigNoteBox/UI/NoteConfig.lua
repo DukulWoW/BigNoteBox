@@ -411,7 +411,9 @@ local function BuildGeneralTab(sf, ct)
 
     local function HLFonts()
         local note    = GetNote()
-        local current = note and note.fontOverride or nil
+        -- No override (WoW Default unticked, nothing else picked) always shows Noto
+        -- Serif highlighted, regardless of what was selected before.
+        local current = (note and note.fontOverride) or "notoserif"
         for _,e in ipairs(fontPickerBtns) do
             local sel = (e.id == current)
             if e.btn.SetBackdropColor then

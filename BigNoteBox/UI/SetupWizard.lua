@@ -65,6 +65,7 @@ local _pageTitle   = nil
 local _pageCounter = nil
 local _prevBtn     = nil
 local _nextBtn     = nil
+local _getStartedBtn = nil
 
 local function GetLCG()
     if not _lcg then
@@ -257,6 +258,27 @@ local function RegisterQuitDialog()
 end
 
 --------------------------------------------------------------------------------
+-- LANGUAGE CHANGE DIALOG (ALL-14)
+--------------------------------------------------------------------------------
+local function RegisterLangChangeDialog()
+    if StaticPopupDialogs["BNB_WIZARD_CHANGE_LANGUAGE"] then return end
+    StaticPopupDialogs["BNB_WIZARD_CHANGE_LANGUAGE"] = {
+        text    = L["SW_POPUP_WIZARD_CHANGE_LANGUAGE"],
+        button1 = L["CFG_RELOAD_NOW_BTN"],
+        button2 = L["CANCEL"],
+        timeout = 0, whileDead = true, hideOnEscape = true,
+        OnAccept = function()
+            local db = BigNoteBoxDB
+            if db then db.setupPage = 1 end
+            BigNoteBoxLocale = (BNB._pendingLangCode == "client") and nil or BNB._pendingLangCode
+            BNB._pendingLangCode = nil
+            C_UI.Reload()
+        end,
+        OnCancel = function() BNB._pendingLangCode = nil end,
+    }
+end
+
+--------------------------------------------------------------------------------
 -- NAVIGATION
 --------------------------------------------------------------------------------
 -- Keys, not resolved strings: this table is built at file load, before
@@ -294,6 +316,7 @@ local function UpdateNavigation()
     -- Page 1: hide prev/next, show Get Started button instead
     _prevBtn:SetShown(_curPage > 1)
     _nextBtn:SetShown(_curPage > 1 and _curPage < NUM_PAGES)
+    if _getStartedBtn then _getStartedBtn:SetShown(_curPage == 1) end
 end
 
 local function GoToPage(n)
@@ -385,42 +408,154 @@ local function BuildPage1(content)
     f:SetAllPoints()
     f:Hide()
 
+    -- ALL-14 fix, Kim 2026-09-23: Get Started now lives in the wizard's nav strip
+    -- (BuildWizardFrame, like Prev/Next on every other page) instead of floating inside
+    -- this page's own content, so it never competes with the language selector for
+    -- space and the nav strip is never left looking empty underneath it. That gives
+    -- page 1 the same full content area every other page gets; still wrapped in a
+    -- scroll region (matches MakeScrollContent elsewhere in this file) as a safety net
+    -- for long translations, not because it is expected to be needed.
+    local sf, ct = MakeScrollContent(f)
+
+    -- Numeric y-cursor (matches the MakeScrollContent pages elsewhere in this file) so
+    -- ct's final height can be set exactly, whatever the welcome text wraps to.
+    local y = -10
+
     -- Logo
-    local logo = f:CreateTexture(nil, "ARTWORK")
+    local logo = ct:CreateTexture(nil, "ARTWORK")
     logo:SetSize(96, 96)
-    logo:SetPoint("TOP", f, "TOP", 0, -10)
+    logo:SetPoint("TOP", ct, "TOP", 0, y)
     logo:SetTexture(ASSETS .. "logo-256")
+    y = y - 96 - 10
 
     -- Addon name
-    local name = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
-    name:SetPoint("TOP", logo, "BOTTOM", 0, -10)
+    local name = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    name:SetPoint("TOP", ct, "TOP", 0, y)
     name:SetText(L["OPT_TITLE"])
+    y = y - (name:GetStringHeight() or 20) - 4
 
     -- Version
-    local ver = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    ver:SetPoint("TOP", name, "BOTTOM", 0, -4)
+    local ver = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    ver:SetPoint("TOP", ct, "TOP", 0, y)
     ver:SetText(string.format(L["SW_VERSION_FMT"], BNB.ADDON_VERSION))
     ver:SetTextColor(0.55, 0.55, 0.55)
+    y = y - (ver:GetStringHeight() or 12) - 2
 
     -- By Dukul
-    local by = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    by:SetPoint("TOP", ver, "BOTTOM", 0, -2)
+    local by = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    by:SetPoint("TOP", ct, "TOP", 0, y)
     by:SetText(L["AUTHOR"])
     by:SetTextColor(0.65, 0.65, 0.65)
+    y = y - (by:GetStringHeight() or 12) - 24
 
     -- Welcome text
-    local txt = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    txt:SetPoint("TOP", by, "BOTTOM", 0, -24)
-    txt:SetWidth(CW - 20)
+    local txt = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    txt:SetPoint("TOP", ct, "TOP", 0, y)
+    txt:SetWidth(CW - 36)
     txt:SetJustifyH("CENTER")
     txt:SetSpacing(3)
     txt:SetText(L["SW_WELCOME_TEXT"])
     txt:SetTextColor(0.88, 0.88, 0.88)
+    y = y - (txt:GetStringHeight() or 60) - 16
 
-    -- Get Started button
-    local startBtn = MakeLargeButton(f, L["SW_GET_STARTED_BTN"], 220, 50)
-    startBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 30)
-    startBtn:SetScript("OnClick", function() GoToPage(2) end)
+    -- Language selector (ALL-14) — retail only; selecting a language reloads.
+    if not BNB.IsForever then
+        local lgLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        lgLbl:SetPoint("TOP", ct, "TOP", 0, y)
+        lgLbl:SetText(L["SW_WELCOME_LANG_LBL"])
+        y = y - (lgLbl:GetStringHeight() or 14) - 6
+
+        local FLAG = ASSETS .. "Flags\\"
+        -- { code, label, flag, available }  available=false -> greyed "(Coming soon)"
+        local LANG_LIST = {
+            { code = "client", label = L["LANGUAGE_CLIENT"], flag = nil,               available = true  },
+            { code = "enUS",   label = "English",            flag = FLAG.."flag-en",   available = true  },
+            { code = "zhCN",   label = "简体中文",             flag = FLAG.."flag-cn",   available = true  },
+            { code = "deDE",   label = "Deutsch",             flag = FLAG.."flag-de",   available = false },
+            { code = "frFR",   label = "Français",            flag = FLAG.."flag-fr",   available = false },
+            { code = "esES",   label = "Español",             flag = FLAG.."flag-es",   available = false },
+            { code = "ptBR",   label = "Português",           flag = FLAG.."flag-br",   available = false },
+            { code = "itIT",   label = "Italiano",            flag = FLAG.."flag-it",   available = false },
+            { code = "jaJP",   label = "日本語",               flag = FLAG.."flag-ja",   available = false },
+            { code = "koKR",   label = "한국어",               flag = FLAG.."flag-ko",   available = false },
+            { code = "zhTW",   label = "繁體中文",             flag = FLAG.."flag-tw",   available = false },
+        }
+
+        local COMING_SOON = L["LANGUAGE_COMING_SOON"]
+        local GREY        = "|cff888888"
+
+        -- entry.label for "client" is L["LANGUAGE_CLIENT"], already translated into whatever
+        -- language is active -- so on a forced-Chinese UI it reads "客户端语言" alone, with no
+        -- clue that it means "Client Language" (Kim, 2026-09-23). Always show the hardcoded
+        -- English name too, whenever the ACTIVE language isn't English -- forced or natural.
+        local CLIENT_LABEL_EN = "Client Language"
+
+        local function MakeLangLabel(entry)
+            local label = entry.label
+            if entry.code == "client" and BNB.GetActiveLanguage and BNB.GetActiveLanguage() ~= "enUS" then
+                label = CLIENT_LABEL_EN .. " - " .. label
+            end
+            if entry.flag then
+                return "|T" .. entry.flag .. ":14:20:0:0:32:32|t " .. label
+            end
+            return label
+        end
+
+        local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
+
+        local useNativeLangDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+
+        if useNativeLangDrop then
+            local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+            langDD:SetPoint("TOP", ct, "TOP", 0, y)
+            langDD:SetWidth(CW - 40)
+            y = y - 30
+            langDD:SetupMenu(function(_, root)
+                for _, entry in ipairs(LANG_LIST) do
+                    local lbl = MakeLangLabel(entry)
+                    if entry.available then
+                        root:CreateRadio(lbl,
+                            function() return curLangCode == entry.code end,
+                            function()
+                                if entry.code == curLangCode then return end
+                                BNB._pendingLangCode = entry.code
+                                StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
+                            end)
+                    else
+                        local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
+                            .. entry.label .. "|r  " .. COMING_SOON
+                        local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
+                        dummy:AddInitializer(function(button)
+                            if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
+                            button:SetEnabled(false)
+                            if button.highlight then button.highlight:SetAlpha(0) end
+                        end)
+                    end
+                end
+            end)
+        else
+            -- Fallback: only the available entries, as plain stacked buttons.
+            for _, entry in ipairs(LANG_LIST) do
+                if entry.available then
+                    local lb = CreateFrame("Button", nil, ct, "UIPanelButtonTemplate")
+                    lb:SetSize(CW - 40, 22)
+                    lb:SetPoint("TOP", ct, "TOP", 0, y)
+                    lb:SetText(MakeLangLabel(entry))
+                    lb:SetScript("OnClick", function()
+                        if entry.code == curLangCode then return end
+                        BNB._pendingLangCode = entry.code
+                        StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
+                    end)
+                    y = y - 26
+                end
+            end
+        end
+    end
+
+    ct:SetHeight(math.abs(y) + 16)
+
+    -- Get Started lives in the nav strip now (see BuildWizardFrame / _getStartedBtn).
 
     return f
 end
@@ -1387,6 +1522,15 @@ local function BuildWizardFrame()
         end
     end)
 
+    -- Get Started (page 1 only) -- lives in the nav strip like Prev/Next rather than
+    -- floating inside page 1's own content, so it never has to compete with page 1's
+    -- content for vertical space (ALL-14 fix, Kim 2026-09-23: the language selector
+    -- pushed page 1's content into the button and left the nav strip looking empty
+    -- and untextured underneath it).
+    _getStartedBtn = MakeLargeButton(navStrip, L["SW_GET_STARTED_BTN"], 200, NAV_H - 8)
+    _getStartedBtn:SetPoint("CENTER", navStrip, "CENTER", 0, 0)
+    _getStartedBtn:SetScript("OnClick", function() GoToPage(2) end)
+
     -- Content area
     local content = CreateFrame("Frame", nil, f)
     content:SetPoint("TOPLEFT",     f, "TOPLEFT",     PAD, contentTopInset - 6)
@@ -1444,6 +1588,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.ShowSetupWizard()
     RegisterQuitDialog()
+    RegisterLangChangeDialog()
     local f = BuildWizardFrame()
 
     -- Close all open BNB windows so setup has a clean slate

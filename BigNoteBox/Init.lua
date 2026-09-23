@@ -19,3 +19,12 @@ BNB.version = BNB.ADDON_VERSION
 -- also holds when a player loads the retail TOC as "out of date" on Forever.
 local _, _, _, _tocVersion = GetBuildInfo()
 BNB.IsForever = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE) and (_tocVersion or 0) < 100000
+
+-- Forced display language (ALL-14). BigNoteBoxLocale is its own SavedVariable so it is
+-- already loaded here, before the Locales/ files run. nil/"" /"client" = follow the WoW
+-- client locale; any other value is a forced locale code (e.g. "zhCN").
+BNB._forcedLocale = (BigNoteBoxLocale and BigNoteBoxLocale ~= "" and BigNoteBoxLocale ~= "client")
+    and BigNoteBoxLocale or nil
+function BNB.GetActiveLanguage()
+    return BNB._forcedLocale or GetLocale()
+end

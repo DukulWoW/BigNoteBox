@@ -340,7 +340,8 @@ local function InitSettingsDB()
     if db.fontChoice  == nil then
         -- On first install, default to WoW's locale font for CJK clients so
         -- Chinese/Korean/Japanese text is immediately readable without manual setup.
-        local locale = GetLocale and GetLocale() or ""
+        -- Uses the active (forced-or-client) language so a forced CJK language also defaults here.
+        local locale = (BNB.GetActiveLanguage and BNB.GetActiveLanguage()) or (GetLocale and GetLocale()) or ""
         if locale == "zhCN" or locale == "zhTW" or locale == "koKR" or locale == "jaJP" then
             db.fontChoice = "wow"
         else
