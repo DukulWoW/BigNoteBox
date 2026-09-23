@@ -22,15 +22,13 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.9.0",
+    version = "1.10.0",
     entries = {
-        "|cff66bb6aNew:|r Language selector: English or Simplified Chinese, whatever your client",
-        "|cff66bb6aNew:|r Chinese font set: WoW Hei and WoW Kai in the pickers when Chinese is active",
-        "|cff66bb6aNew:|r Font packs: BigNoteBox Fonts CN adds six Chinese fonts",
-        "|cff66bb6aFixed:|r The font picker is a clean 8-font grid again, WoW's font is a checkbox",
-        "|cff66bb6aFixed:|r LibSharedMedia fonts are a dropdown in sticky and New Note font pickers",
-        "|cff66bb6aFixed:|r Sticky note titles in Chinese or Korean showed as boxes",
-        "|cff66bb6aFixed:|r Chinese clients: deleting a tag caused an error",
-        "|cff66bb6aFixed:|r Chinese translation completed for the migration windows"
+        "|cff66bb6aNew:|r Traditional Chinese clients get their own font picker set",
+        "|cff66bb6aChange:|r Buttons now use Blizzard's current, sharper button style",
+        "|cff66bb6aChange:|r WoW Forever: sidebar slot borders match Forever's own UI art",
+        "|cff66bb6aChange:|r WoW Forever: windows use a wood-grain background",
+        "|cff66bb6aFixed:|r Note settings: Use Default and Random icon buttons sat below the edge",
+        "|cff66bb6aFixed:|r WoW Forever: window borders no longer crowd the contents"
     },
 }
