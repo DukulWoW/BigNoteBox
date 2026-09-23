@@ -96,8 +96,23 @@ local function Apply(f, d)
     end
 end
 
+-- Forever's own windows draw wood grain (atlas UI-Character-Info-General-BG,
+-- found on CharacterFrameLeftPaneHost) instead of the template's grey rock.
+-- That atlas is one fixed pane and does not tile, so this is our own 512x512
+-- tileable version of it. Retail keeps the template's Bg untouched.
+local FOREVER_BG = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-forever"
+
+local function SkinBg(f)
+    local bg = f.Bg
+    if not bg then return end
+    bg:SetTexture(FOREVER_BG, "REPEAT", "REPEAT")
+    bg:SetHorizTile(true)
+    bg:SetVertTile(true)
+end
+
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
+    if BNB.IsForever then pcall(SkinBg, f) end
     local ok, pieces = pcall(Snapshot, f)
     if not ok then return end
     _seated[f] = pieces
