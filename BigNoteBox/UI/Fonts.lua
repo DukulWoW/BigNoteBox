@@ -44,11 +44,11 @@ local DEFAULT_SIZE = 13
 
 -- Language -> font set. A language not listed here uses the Latin set. Add a line
 -- when a new CJK language ships (plus a SET_DEFAULT entry and its cards).
-local LANG_SET    = { zhCN = "hans" }
-local SET_DEFAULT = { latin = "notoserif", hans = "wowhei" }
+local LANG_SET    = { zhCN = "hans", zhTW = "hant" }
+local SET_DEFAULT = { latin = "notoserif", hans = "wowhei", hant = "wowkai_tw" }
 -- What a saved "wow" (WoW Default) choice means under a non-Latin set, where the
 -- checkbox is hidden because the set's cards are WoW's own fonts already.
-local SET_WOW_ALIAS = { hans = "wowkai" }
+local SET_WOW_ALIAS = { hans = "wowkai", hant = "wowkai_tw" }
 local GRID_MAX    = 8   -- 2x4 grid; ALL-39 makes it scroll for more
 
 -- ── Font definitions ──────────────────────────────────────────────────────────
@@ -149,6 +149,19 @@ BNB.FONTS = {
         mono    = false,
         preview = "\228\184\173\230\150\135\229\173\151\228\189\147 Aa Bb",
         set     = "hans",
+    },
+    -- ── Traditional Chinese set ("hant") ────────────────────────────────────────
+    -- Same WoW-installed font as zhCN's "wowkai" (ARKai_T.ttf serves both locales
+    -- per FORCED_LOCALE_FONT above); a separate card id so it can carry its own
+    -- SET_DEFAULT/SET_WOW_ALIAS entry independent of the hans set's.
+    {
+        id      = "wowkai_tw",
+        label   = L["FONT_WOW_KAI"],
+        regular = "Fonts\\ARKai_T.ttf",
+        bold    = "Fonts\\ARKai_T.ttf",
+        mono    = false,
+        preview = "\228\184\173\230\150\135\229\173\151\233\171\148 Aa Bb",
+        set     = "hant",
     },
 }
 
