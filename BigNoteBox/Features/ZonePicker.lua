@@ -180,12 +180,12 @@ local function BuildPicker()
     end)
 
     -- ── Tab bar: Zones | Instances ────────────────────────────────────────────
-    local tabZone = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    local tabZone = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
     tabZone:SetSize(90, TAB_H)
     tabZone:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -PAD)
     tabZone:SetText("Zones")
 
-    local tabInst = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    local tabInst = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
     tabInst:SetSize(90, TAB_H)
     tabInst:SetPoint("LEFT", tabZone, "RIGHT", 4, 0)
     tabInst:SetText("Instances")

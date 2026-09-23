@@ -3930,7 +3930,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
     -- Button helper
     local btnX = PAD
     local function MkBtn(label, tip, onClick)
-        local btn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+        local btn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
         btn:SetSize(28, 18)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetText(label)
@@ -4015,7 +4015,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
         function() BNB.OpenImgDialog(InsertTag) end)
 
     -- "Live Preview" toggle — right-aligned, does not advance btnX
-    local previewBtn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+    local previewBtn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
     previewBtn:SetSize(72, 18)
     previewBtn:SetPoint("RIGHT", bar, "RIGHT", -PAD, 0)
     previewBtn:SetText(L["MARKUP_PREVIEW_BTN"])

@@ -1345,8 +1345,9 @@ local function BuildAppearanceTab(panel)
     end)
     sEb:SetScript("OnEscapePressed", function(s) s:ClearFocus() end)
 
-    -- Grid — 8 full rows of 32px icons, scrollbar on left
-    local AREA_H = 8 * (CELL + CELL_PAD) + CELL_PAD   -- 283px
+    -- Grid — 7 full rows of 32px icons, scrollbar on left (was 8, which pushed
+    -- the Use Default / Random buttons below the window's bottom edge)
+    local AREA_H = 7 * (CELL + CELL_PAD) + CELL_PAD   -- 248px
     local SBAR_W = 20
     local iSF = CreateFrame("ScrollFrame", nil, bnbPane, "ScrollFrameTemplate")
     iconGridSF = iSF

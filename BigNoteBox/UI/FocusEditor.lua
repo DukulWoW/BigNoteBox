@@ -510,7 +510,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
 
     local btnX = 4
     local function MkBtn(label, tip, onClick)
-        local btn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+        local btn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
         btn:SetSize(28, 18)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetText(label)
@@ -582,7 +582,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     MkBtn("Img", L["FE_MK_IMG"],      function() BNB.OpenImgDialog(FocusInsertTag) end)
 
     -- "Live Preview" toggle — right-aligned, same pattern as main markup bar
-    local previewBtn = CreateFrame("Button", nil, bar, "UIPanelButtonTemplate")
+    local previewBtn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
     previewBtn:SetSize(72, 18)
     previewBtn:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
     previewBtn:SetText(L["MARKUP_PREVIEW_BTN"])
@@ -643,7 +643,7 @@ local function BuildFocusFrame()
         f.CloseButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
 
-    local restoreBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    local restoreBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
     restoreBtn:SetSize(64, 22)
     restoreBtn:SetPoint("RIGHT", f.CloseButton, "LEFT", -4, 0)
     restoreBtn:SetFrameLevel(f.CloseButton:GetFrameLevel())
@@ -984,7 +984,7 @@ local function BuildFocusFrameSkin()
     closeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Restore button
-    local restoreBtn = CreateFrame("Button", nil, titleBar, "UIPanelButtonTemplate")
+    local restoreBtn = CreateFrame("Button", nil, titleBar, BNB.PanelButtonTemplate())
     restoreBtn:SetSize(64, 22)
     restoreBtn:SetPoint("RIGHT", closeBtn, "LEFT", -4, 0)
     restoreBtn:SetText(L["FOCUS_RESTORE_BTN"])

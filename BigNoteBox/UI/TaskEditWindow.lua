@@ -492,12 +492,12 @@ local function BuildWindow()
 
     -- Buttons
     local bW = math.floor(TW_CW / 2) - 4
-    local saveBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    local saveBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
     saveBtn:SetSize(bW, 26); saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD, 6)
     saveBtn:SetText(L["SAVE"]); saveBtn:SetEnabled(false)
     _saveBtn = saveBtn
 
-    local cancelBtn = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    local cancelBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
     cancelBtn:SetSize(bW, 26)
     cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD + bW + 8, 6)
     cancelBtn:SetText(L["CANCEL"])

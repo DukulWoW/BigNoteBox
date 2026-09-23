@@ -539,7 +539,7 @@ local function BuildPage1(content)
             -- Fallback: only the available entries, as plain stacked buttons.
             for _, entry in ipairs(LANG_LIST) do
                 if entry.available then
-                    local lb = CreateFrame("Button", nil, ct, "UIPanelButtonTemplate")
+                    local lb = CreateFrame("Button", nil, ct, BNB.PanelButtonTemplate())
                     lb:SetSize(CW - 40, 22)
                     lb:SetPoint("TOP", ct, "TOP", 0, y)
                     lb:SetText(MakeLangLabel(entry))
@@ -1131,7 +1131,7 @@ local function BuildPage5(content)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(entry.label)
 
-        local kbBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        local kbBtn = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
         kbBtn:SetSize(BTN_W, 22)
         kbBtn:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yp)
         kbBtn:RegisterForClicks("AnyUp")

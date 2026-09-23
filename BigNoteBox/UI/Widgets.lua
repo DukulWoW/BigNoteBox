@@ -1,5 +1,5 @@
 -- BigNoteBox UI/Widgets.lua — Shared widget construction helpers
--- Visual style matches BCB: dark metal backdrop, UIPanelButtonTemplate buttons,
+-- Visual style matches BCB: dark metal backdrop, SharedButtonTemplate buttons,
 -- ScrollFrameTemplate scrollbars with smart hide/show.
 
 local BNB = BigNoteBox
@@ -64,14 +64,32 @@ function BNB.CreateBackdropFrame(frameType, name, parent, extraTemplate)
 end
 
 --------------------------------------------------------------------------------
--- UI PANEL BUTTON  (BCB style: UIPanelButtonTemplate — the standard WoW button)
+-- PANEL BUTTON TEMPLATE  (ALL-43)
+-- SharedButtonTemplate is the current Blizzard button: red with bronze edges
+-- on Forever, grey edges on Retail, and sharp at any size. UIPanelButtonTemplate
+-- is the old low-res one, kept only as the fallback for a client without it.
+-- Normal-mode buttons that bypass BNB.CreateButton (to stay un-skinned in skin
+-- mode) take their template from here, so every button matches.
+--------------------------------------------------------------------------------
+local _panelBtnTpl
+function BNB.PanelButtonTemplate()
+    if not _panelBtnTpl then
+        _panelBtnTpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("SharedButtonTemplate"))
+            and "SharedButtonTemplate" or "UIPanelButtonTemplate"
+    end
+    return _panelBtnTpl
+end
+
+--------------------------------------------------------------------------------
+-- UI PANEL BUTTON  (the standard WoW button, see BNB.PanelButtonTemplate)
 -- Returns: button
 --------------------------------------------------------------------------------
 function BNB.CreateButton(name, parent, text, w, h)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         return BNB.CreateSkinButton(name, parent, text, w, h)
     end
-    local btn = CreateFrame("Button", name, parent, "UIPanelButtonTemplate")
+    local btn = CreateFrame("Button", name, parent, BNB.PanelButtonTemplate())
     btn:SetSize(w or 80, h or 22)
     btn:SetText(text or "")
     return btn
