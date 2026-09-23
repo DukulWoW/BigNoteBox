@@ -290,17 +290,14 @@ local function BuildFontPicker(ct, y)
     local COL_GAP  = 6    -- horizontal gap between columns
     local CARD_W   = math.floor((CONTENT_W - COL_GAP) / 2)
     -- LSM fonts are shown in the dropdown below; WoW Default has its own checkbox
-    -- below the grid. Both are excluded from the card grid.
-    local _allFonts = BNB.FONTS or {}
-    local fonts = {}
-    for _, def in ipairs(_allFonts) do
-        if not def._isLSM and not def._isWoW then fonts[#fonts + 1] = def end
-    end
+    -- below the grid. Both are excluded from the card grid, which shows the
+    -- active language's font set (ALL-14).
+    local fonts = BNB.GetPickerFonts()
     fontPickerBtns = {}
     local _wowCb
 
     local function Highlight()
-        local cur = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
+        local cur = BNB.GetEffectiveFontID()
         for _, e in ipairs(fontPickerBtns) do
             if e.id == cur then
                 e.btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
@@ -349,7 +346,7 @@ local function BuildFontPicker(ct, y)
         btn:EnableMouse(true)
 
         btn:SetScript("OnEnter", function(self)
-            if (BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif") ~= def.id then
+            if BNB.GetEffectiveFontID() ~= def.id then
                 self:SetBackdropColor(0.10, 0.12, 0.10, 0.95)
                 self:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
             end
@@ -378,11 +375,21 @@ local function BuildFontPicker(ct, y)
         fontPickerBtns[#fontPickerBtns + 1] = { btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def }
     end
 
-    -- Advance y past the full grid
-    local gridRows = math.ceil(#fonts / 2)
+    -- Advance y past the full grid. The grid always reserves its 4 rows so a
+    -- smaller font set keeps the layout; free rows carry the font pack hint.
+    local usedRows = math.ceil(#fonts / 2)
+    local gridRows = math.max(BNB.FONT_GRID_ROWS, usedRows)
+    BNB.AddFontPackHint(ct, ct, 0, y - usedRows * (PICKER_H + GAP),
+        CONTENT_W, (gridRows - usedRows) * (PICKER_H + GAP) - GAP)
     y = y - gridRows * (PICKER_H + GAP) - 4
 
-    -- WoW Default checkbox, below the grid instead of a 9th card.
+    -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only:
+    -- the other sets' cards are WoW's own fonts. The row is kept either way.
+    if not BNB.ShowWoWFontCheckbox() then
+        y = y - (ROW_H + ROW_GAP)
+        Highlight()
+        return y
+    end
     local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     wowCb:SetSize(24, 24)
     wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
@@ -540,10 +547,8 @@ end
 local function BuildGeneralTab(sf, ct)
     local y = -8
 
-    -- ── Header row: logo left, identity stacked beside it. The right portion of
-    -- this row is left empty on purpose — ALL-14 session 2 anchors pack-status
-    -- icons there (installed/missing font & icon packs), alongside the same
-    -- header pass.
+    -- ── Header row: logo left, identity stacked beside it, pack-status icons
+    -- (installed/missing font & icon packs, ALL-14) on the right.
     local HEADER_H  = 64
     local LOGO_SZ   = 56
     local TEXT_X    = LOGO_SZ + 10
@@ -583,6 +588,47 @@ local function BuildGeneralTab(sf, ct)
     byLine:SetPoint("LEFT", ver, "RIGHT", 8, 0)
     byLine:SetText(L["AUTHOR"])
     byLine:SetTextColor(0.55, 0.55, 0.55)
+
+    -- ── Pack status icons (ALL-14), right side of the header, right to left.
+    -- Installed: full colour, tooltip "Installed, vX.Y.Z", no click. Missing: grey,
+    -- click copies the download link. Tooltips are in the pack's own language.
+    do
+        local PACK_SZ, PACK_GAP = 32, 6
+        local n = 0
+        for _, pack in ipairs(BNB.KNOWN_PACKS or {}) do
+            if BNB.IsPackRelevant(pack) then
+                local installed, ver = BNB.GetPackStatus(pack)
+                local b = CreateFrame("Button", nil, ct)
+                b:SetSize(PACK_SZ, PACK_SZ)
+                b:SetPoint("TOPRIGHT", ct, "TOPRIGHT", -n * (PACK_SZ + PACK_GAP), y - 4)
+                local tex = b:CreateTexture(nil, "ARTWORK")
+                tex:SetAllPoints()
+                tex:SetTexture(pack.icon)
+                tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                if not installed then
+                    tex:SetDesaturated(true); tex:SetAlpha(0.55)
+                    local hl = b:CreateTexture(nil, "HIGHLIGHT")
+                    hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.15)
+                    b:SetScript("OnClick", function(self)
+                        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true) end
+                    end)
+                end
+                b:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+                    GameTooltip:SetText(pack.tipTitle, 1, 0.82, 0)
+                    if installed then
+                        GameTooltip:AddLine(string.format(pack.tipInstalled, ver or "?"), 0.4, 0.8, 0.4)
+                    else
+                        GameTooltip:AddLine(pack.tipMissing, 0.9, 0.9, 0.9, true)
+                        GameTooltip:AddLine(pack.tipClick, 0.6, 0.6, 0.6, true)
+                    end
+                    GameTooltip:Show()
+                end)
+                b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                n = n + 1
+            end
+        end
+    end
 
     y = y - HEADER_H
 
@@ -1173,7 +1219,8 @@ local function BuildAppearanceTab(sf, ct)
     y = y - 4
 
     -- CJK clients (ALL-22): the bundled fonts have no CJK glyphs, so say which one does.
-    if BNB.IsCJKClient and BNB.IsCJKClient() then
+    -- Only while the Latin set shows; a CJK font set (ALL-14) has its own cards.
+    if BNB.IsCJKClient and BNB.IsCJKClient() and BNB.GetActiveFontSet() == "latin" then
         local hint = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         hint:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         hint:SetWidth(CONTENT_W)
@@ -1187,16 +1234,16 @@ local function BuildAppearanceTab(sf, ct)
     y = BuildLSMFontDropdown(ct, y,
         -- getter: returns the current global font choice if it is an LSM font, else nil
         function()
-            local choice = db and db.fontChoice
+            local choice = BNB.GetFontChoice()
             local def = choice and BNB.GetFontDef and BNB.GetFontDef(choice)
-            return (def and def._isLSM) and choice or nil
+            return (def and def._isLSM and choice == def.id) and choice or nil
         end,
-        -- setter: nil resets to notoserif (bundled cards take over); path picks LSM font
+        -- setter: nil resets to the set default (bundled cards take over); path picks LSM font
         function(path)
             if path then
                 if BNB.ApplyFont then BNB.ApplyFont(path, nil) end
             else
-                if BNB.ApplyFont then BNB.ApplyFont("notoserif", nil) end
+                if BNB.ApplyFont then BNB.ApplyFont(BNB.GetFontSetDefault(), nil) end
             end
             if _refreshFontHL then _refreshFontHL() end
         end)
@@ -3695,11 +3742,9 @@ end
 
 -- Resolve the Google Font for a note based on its fontOverride or global setting.
 local function ResolveFont(note)
-    local id = note.fontOverride
-    if not id then
-        local db = BigNoteBoxDB
-        id = db and db.fontChoice or "notoserif"
-    end
+    -- Same resolution as the editor (ALL-14): an override or global pick that
+    -- cannot be shown under the active font set exports as what is on screen.
+    local id = BNB.ResolveFontID(note.fontOverride) or BNB.GetEffectiveFontID()
     return GOOGLE_FONT_MAP[id] or DEFAULT_FONT
 end
 

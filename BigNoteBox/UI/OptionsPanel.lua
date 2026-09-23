@@ -54,7 +54,7 @@ local function CreateOptionsPanel()
     btn:SetText(L["OPT_OPEN_SETTINGS_BTN"])
     pcall(function() DynamicResizeButton_Resize(btn) end)
     local bfs = btn:GetFontString()
-    if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 20, "") end) end
+    if bfs then pcall(function() bfs:SetFont(BNB.GetLocaleFont(), 20, "") end) end
     btn:SetScript("OnClick", function()
         if BNB.OpenConfig then BNB.OpenConfig() end
     end)

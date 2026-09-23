@@ -596,7 +596,7 @@ local function ApplyConfig(frame, noteID)
         local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
         local fid = cfg.fontID
         local path
-        if fid and BNB.GetFontDef then path = BNB.GetFontDef(fid).regular
+        if fid and BNB.ResolveFontDef then path = BNB.ResolveFontDef(fid).regular
         else path = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) end
         local flags = GetOutlineFlagsAndShadow(cfg.fontOutline or "None")
         if path then pcall(function() frame._bodyEb:SetFont(path, sz, flags) end) end
@@ -1255,8 +1255,9 @@ local function PopulateStickySettings(noteID)
 
     local function HLStickyFonts()
         -- No override (WoW Default unticked, nothing else picked) always shows Noto
-        -- Serif highlighted, regardless of what was selected before.
-        local cur = cfg.fontID or "notoserif"
+        -- Serif highlighted, regardless of what was selected before. Under another
+        -- font set (ALL-14) a font from a different set counts as none.
+        local cur = BNB.ResolveFontID(cfg.fontID) or BNB.GetFontSetDefault()
         for _, e in ipairs(fontPickerBtns) do
             local sel = (e.id == cur)
             if e.btn.SetBackdropColor then
@@ -1268,12 +1269,9 @@ local function PopulateStickySettings(noteID)
         if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
     end
 
-    -- WoW Default has its own checkbox below the grid, not a 9th card.
-    local _allFonts_sn = BNB.FONTS or {}
-    local fonts = {}
-    for _, def in ipairs(_allFonts_sn) do
-        if not def._isWoW then fonts[#fonts + 1] = def end
-    end
+    -- WoW Default has its own checkbox below the grid, not a 9th card. Cards are
+    -- the active language's font set (ALL-14), LSM fonts after them.
+    local fonts = BNB.GetPickerFonts(true)
     for i, def in ipairs(fonts) do
         local fid  = def.id
         local col  = (i - 1) % 2          -- 0 = left, 1 = right
@@ -1312,11 +1310,17 @@ local function PopulateStickySettings(noteID)
         fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=fid, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
         plainOnlyWidgets[#plainOnlyWidgets+1] = btn
     end
-    -- Advance _y past the grid (ceil rows, since fonts may be odd count)
-    local gridRows = math.ceil(#fonts / 2)
+    -- Advance _y past the grid (ceil rows, since fonts may be odd count). It always
+    -- reserves its 4 rows; free rows carry the font pack hint.
+    local usedRows = math.ceil(#fonts / 2)
+    local gridRows = math.max(BNB.FONT_GRID_ROWS, usedRows)
+    local packHint = BNB.AddFontPackHint(ct1, ct1, 0, ct1._y - usedRows * (PH_FONT + PG_FONT),
+        SETTINGS_CW, (gridRows - usedRows) * (PH_FONT + PG_FONT) - PG_FONT)
+    if packHint then plainOnlyWidgets[#plainOnlyWidgets + 1] = packHint end
     ct1._y = ct1._y - gridRows * (PH_FONT + PG_FONT) + PG_FONT
 
-    -- WoW Default checkbox, below the grid instead of a 9th card.
+    -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
+    -- its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
         wowCb:SetSize(20, 20)
@@ -1339,6 +1343,7 @@ local function PopulateStickySettings(noteID)
             HLStickyFonts()
         end)
         _wowCb_sn = wowCb
+        if not BNB.ShowWoWFontCheckbox() then wowCb:Hide(); wowLbl:Hide() end
         plainOnlyWidgets[#plainOnlyWidgets + 1] = wowCb
         plainOnlyWidgets[#plainOnlyWidgets + 1] = wowLbl
         ct1._y = ct1._y - 24
@@ -3494,7 +3499,10 @@ local function CreateStickyFrame(noteID)
     titleLbl:SetPoint("RIGHT", header, "RIGHT", -PAD, 0)
     titleLbl:SetJustifyH("LEFT"); titleLbl:SetMaxLines(1); titleLbl:SetWordWrap(false)
     -- Header font size (bump this value to change the sticky note title size)
-    pcall(function() local f,s,fl = titleLbl:GetFont(); if f then titleLbl:SetFont(f, 16, fl or "") end end)
+    -- A font object, not a raw SetFont(GetFont(), 16): GetFont() returns only the
+    -- Latin file, and setting it raw drops the per-alphabet fallback, so a Chinese
+    -- or Korean note title drew as boxes. GameFontNormalLarge is the 16px sibling.
+    titleLbl:SetFontObject("GameFontNormalLarge")
     local tc = note.titleColor
     if tc then titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
     else        titleLbl:SetTextColor(unpack(COL_GOLD)) end

@@ -296,7 +296,7 @@ local function BuildWindow()
         pcall(function() DynamicResizeButton_Resize(okBtn) end)
         okBtn:SetText(BNB.RandomOkPhrase())
         local bfs = okBtn:GetFontString()
-        if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 16, "") end) end
+        if bfs then pcall(function() bfs:SetFont(BNB.GetLocaleFont(), 16, "") end) end
     end
     okBtn:SetPoint("BOTTOM", okArea, "BOTTOM", 0, 0)
     f._okBtn = okBtn

@@ -1518,7 +1518,7 @@ local function BuildEmptyState(parent)
         pcall(function() DynamicResizeButton_Resize(newBtn) end)
         newBtn:SetText(L["NE_CREATE_NEW_NOTE_BTN"])
         local bfs = newBtn:GetFontString()
-        if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 16, "") end) end
+        if bfs then pcall(function() bfs:SetFont(BNB.GetLocaleFont(), 16, "") end) end
     end
     newBtn:SetPoint("TOP", hintLbl, "BOTTOM", 0, -14)
     newBtn:SetScript("OnClick", function()
@@ -2379,13 +2379,13 @@ local function BuildWysiwygBar(parent, tsStrip)
     -- Helper: get current note's effective font label
     local function GetCurrentFontLabel()
         local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-        local fid  = note and note.fontOverride
+        local fid  = note and BNB.ResolveFontID and BNB.ResolveFontID(note.fontOverride)
         if fid and BNB.GetFontDef then
             local def = BNB.GetFontDef(fid)
             if def then return def.label end
         end
-        -- Fall back to global font choice label
-        local globalID = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
+        -- Fall back to the global font actually drawn under the active set (ALL-14)
+        local globalID = BNB.GetEffectiveFontID and BNB.GetEffectiveFontID() or "notoserif"
         if BNB.GetFontDef then
             local def = BNB.GetFontDef(globalID)
             if def then return def.label end
@@ -2413,7 +2413,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         local eb = BNB._editorBody; if not eb then return end
         local note = BNB.GetNote(id); if not note then return end
         local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
-        local def = fontID and BNB.GetFontDef and BNB.GetFontDef(fontID)
+        local def = fontID and BNB.ResolveFontDef and BNB.ResolveFontDef(fontID)
         if def then
             pcall(function() eb:SetFont(def.regular, sz, "") end)
         elseif BNB.ApplyFont then
@@ -2439,16 +2439,18 @@ local function BuildWysiwygBar(parent, tsStrip)
             _fontMenuDD:SetPoint("TOPLEFT", fontDDBg, "BOTTOMLEFT", 0, 0)
             _fontMenuDD:SetupMenu(function(_, root)
                 -- "Default" entry clears per-note override
+                -- An override that cannot be drawn under the active font set
+                -- (ALL-14) shows as Default, which is what the note displays.
                 local curID = (function()
                     local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-                    return n and n.fontOverride
+                    return n and BNB.ResolveFontID(n.fontOverride)
                 end)()
                 root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
                     function() return curID == nil end,
                     function() ApplyFontOverride(nil); _fontMenuDD:GenerateMenu() end)
-                -- Bundled fonts (non-LSM)
+                -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin
                 for _, def in ipairs(BNB.FONTS or {}) do
-                    if not def._isLSM then
+                    if not def._isLSM and BNB.ResolveFontID(def.id) == def.id then
                         local fid = def.id; local lbl = def.label
                         root:CreateRadio(lbl,
                             function() return curID == fid end,
@@ -2480,7 +2482,7 @@ local function BuildWysiwygBar(parent, tsStrip)
             -- Fallback: cycle through fonts on click
             local note  = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
             local curID = note and note.fontOverride
-            local fonts = BNB.FONTS or {}
+            local fonts = BNB.GetPickerFonts(true)
             local idx   = 0
             for i, def in ipairs(fonts) do if def.id == curID then idx = i; break end end
             idx = idx % #fonts + 1
@@ -3722,8 +3724,8 @@ function BNB.LoadNoteInEditor(id)
     -- Per-note font override
     local fontOverride = note.fontOverride
     local appliedOverride = false
-    if fontOverride and BNB.GetFontDef then
-        local def = BNB.GetFontDef(fontOverride)
+    if fontOverride and BNB.ResolveFontDef then
+        local def = BNB.ResolveFontDef(fontOverride)
         if def then
             local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
             if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, sz, "") end) end
@@ -3930,7 +3932,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetText(label)
         local fs = btn:GetFontString()
-        if fs then pcall(function() fs:SetFont(fs:GetFont(), 10, "") end) end
+        if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
         btn:SetScript("OnClick", onClick)
         btn:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -4015,7 +4017,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
     previewBtn:SetPoint("RIGHT", bar, "RIGHT", -PAD, 0)
     previewBtn:SetText(L["MARKUP_PREVIEW_BTN"])
     local pfs = previewBtn:GetFontString()
-    if pfs then pcall(function() pfs:SetFont(pfs:GetFont(), 10, "") end) end
+    if pfs then pcall(function() pfs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
     previewBtn:SetAlpha(0.45)   -- dim until a preview window is open
     previewBtn:SetScript("OnClick", function()
         if BNB.RichPreview then BNB.RichPreview.Toggle() end

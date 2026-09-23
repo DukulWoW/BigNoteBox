@@ -1445,6 +1445,11 @@ L["CFG_KB_DESC_QUICK_NOTE"]         = "Create quick note"
 -- ── Config window (ALL-08 sweep pass 5: last stragglers + HTML export strings) ──
 L["CFG_FONTSIZE_TIP"]               = "Font size used in the note body editor."
 L["CFG_FONT_CJK_HINT"]              = "The fonts above have no Chinese or Korean characters. Pick WoW Default if your notes are in Chinese or Korean. Buttons and menus always use WoW Default on this client."
+-- Chinese font set (ALL-14): card names for WoW's own installed Chinese fonts, and
+-- the line shown in the empty grid rows when the Chinese font pack is not installed.
+L["FONT_WOW_HEI"]                   = "WoW Hei"
+L["FONT_WOW_KAI"]                   = "WoW Kai"
+L["FONT_PACK_HINT_HANS"]            = "Want more Chinese fonts? Install the BigNoteBox Fonts CN pack. Click here to copy the download link."
 L["CFG_SKIN_MODE_ON_MSG"]           = "Skin mode enabled. You must reload UI for changes to take effect."
 L["CFG_SKIN_MODE_OFF_MSG"]          = "Skin mode disabled. You must reload UI for changes to take effect."
 L["CFG_CHK_QUEST_REWARDS_LABEL"]    = "Save rewards to note (money, XP, honor, currencies, reputation)"

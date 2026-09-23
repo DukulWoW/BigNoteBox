@@ -22,11 +22,34 @@
 --                          clients when the choice is a bundled (Latin-only) TTF
 --   BNB.ApplyFont(id, size) — saves choice + applies to all live widgets
 --   BNB.InitFonts()      — called once on login; creates WoW Font objects
+--
+-- Font sets (ALL-14): every card belongs to a script set ("latin", "hans"). The
+-- active language picks the set, the pickers show only that set's cards, and each
+-- set remembers its own pick. Saved choices are never rewritten: a choice that
+-- cannot be shown under the active set (wrong set, pack or LSM font gone) falls
+-- back to the set's default at display time only.
+--   BNB.GetActiveFontSet()     — "latin" or "hans"
+--   BNB.GetFontChoice()        — the stored pick for the active set (may be unusable)
+--   BNB.GetEffectiveFontID()   — the id actually drawn for the global font
+--   BNB.ResolveFontID(id)      — id if usable under the active set, else nil
+--   BNB.ResolveFontDef(id)     — def for a per-note override, or the global def
+--   BNB.GetPickerFonts(withLSM) — the cards for the active set, max 8
+--   BNB.RegisterFontPack(pack) — called by a font pack addon at load time
 
 local BNB = BigNoteBox
+local L   = BNB.L
 
 local BASE        = "Interface\\AddOns\\BigNoteBox\\Assets\\Fonts\\"
 local DEFAULT_SIZE = 13
+
+-- Language -> font set. A language not listed here uses the Latin set. Add a line
+-- when a new CJK language ships (plus a SET_DEFAULT entry and its cards).
+local LANG_SET    = { zhCN = "hans" }
+local SET_DEFAULT = { latin = "notoserif", hans = "wowhei" }
+-- What a saved "wow" (WoW Default) choice means under a non-Latin set, where the
+-- checkbox is hidden because the set's cards are WoW's own fonts already.
+local SET_WOW_ALIAS = { hans = "wowkai" }
+local GRID_MAX    = 8   -- 2x4 grid; ALL-39 makes it scroll for more
 
 -- ── Font definitions ──────────────────────────────────────────────────────────
 BNB.FONTS = {
@@ -105,11 +128,35 @@ BNB.FONTS = {
         preview = "Aa Bb Cc Dd Ee",
         _isWoW  = true,
     },
+    -- ── Simplified Chinese set ("hans") ─────────────────────────────────────────
+    -- WoW's own installed Chinese fonts, so a Chinese user never gets boxes even
+    -- without a font pack. 0 MB: every client ships them for the alphabet
+    -- fallbacks. Preview reads "Chinese font Aa Bb".
+    {
+        id      = "wowhei",
+        label   = L["FONT_WOW_HEI"],
+        regular = "Fonts\\ARHei.ttf",
+        bold    = "Fonts\\ARHei.ttf",
+        mono    = false,
+        preview = "\228\184\173\230\150\135\229\173\151\228\189\147 Aa Bb",
+        set     = "hans",
+    },
+    {
+        id      = "wowkai",
+        label   = L["FONT_WOW_KAI"],
+        regular = "Fonts\\ARKai_T.ttf",
+        bold    = "Fonts\\ARKai_T.ttf",
+        mono    = false,
+        preview = "\228\184\173\230\150\135\229\173\151\228\189\147 Aa Bb",
+        set     = "hans",
+    },
 }
 
 -- Quick lookup by id
 local _byID = {}
 for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
+
+local function SetOf(def) return def.set or "latin" end
 
 -- ── Early preload (ALL-16) ────────────────────────────────────────────────────
 -- The client loads a TTF lazily, when a FontString using it is first drawn. On a
@@ -118,14 +165,21 @@ for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
 -- the file is cached by then. Draw every bundled TTF once, right away, on a
 -- near-invisible 1px frame so the loads start before any picker is built. A hidden
 -- frame is not enough - hidden strings are never drawn, so nothing loads.
-do
-    local ok = pcall(function()
+-- Only the active set's fonts are preloaded (plus the Latin ones, which chrome may
+-- use); font packs call this again for their own files when they register.
+function BNB.GetActiveFontSet()
+    local lang = (BNB.GetActiveLanguage and BNB.GetActiveLanguage()) or (GetLocale and GetLocale()) or ""
+    return LANG_SET[lang] or "latin"
+end
+
+local function PreloadFonts(defs)
+    return pcall(function()
         local pre = CreateFrame("Frame", nil, UIParent)
         pre:SetSize(1, 1)
         pre:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
         pre:SetAlpha(0.01)
         local seen = {}
-        for _, def in ipairs(BNB.FONTS) do
+        for _, def in ipairs(defs) do
             if not def._isWoW then
                 for _, p in ipairs({ def.regular, def.bold }) do
                     if p and not seen[p] then
@@ -133,7 +187,7 @@ do
                         local fs = pre:CreateFontString(nil, "BACKGROUND")
                         fs:SetPoint("BOTTOMLEFT", pre, "BOTTOMLEFT", 0, 0)
                         fs:SetFont(p, 12, "")
-                        fs:SetText("Aa")
+                        fs:SetText(def.preview or "Aa")
                     end
                 end
             end
@@ -141,7 +195,15 @@ do
         pre:Show()
         C_Timer.After(10, function() pre:Hide() end)
     end)
-    BNB._fontPreloadOK = ok
+end
+
+do
+    local active, list = BNB.GetActiveFontSet(), {}
+    for _, def in ipairs(BNB.FONTS) do
+        local s = SetOf(def)
+        if s == "latin" or s == active then list[#list + 1] = def end
+    end
+    BNB._fontPreloadOK = PreloadFonts(list)
 end
 
 -- Sets a TTF on a FontString and survives the not-yet-loaded case. SetFont's
@@ -196,31 +258,117 @@ local function GetWoWFontPath()
     return (ok and path and path ~= "") and path or "Fonts\\FRIZQT__.TTF"
 end
 
+-- WoW's own font for the ACTIVE language. When the language is the client's own,
+-- GameFontNormal already has the right file. When a language is forced, GetFont()
+-- still reports the client's Latin file (FRIZQT on an English client) even though
+-- font objects fall back per alphabet, so a raw SetFont with it draws boxes; the
+-- forced language's file is named here instead, as BigChatBox does.
+local FORCED_LOCALE_FONT = {
+    zhCN = "Fonts\\ARKai_T.ttf", zhTW = "Fonts\\ARKai_T.ttf",
+    jaJP = "Fonts\\ARKai_T.ttf", koKR = "Fonts\\2002.ttf",
+}
+local function LocaleFontPath()
+    local lang = BNB.GetActiveLanguage and BNB.GetActiveLanguage()
+    if lang and GetLocale and lang ~= GetLocale() and FORCED_LOCALE_FONT[lang] then
+        return FORCED_LOCALE_FONT[lang]
+    end
+    return GetWoWFontPath()
+end
+
+-- WoW's own chrome font for the active language: FRIZQT on an English client, the
+-- client's CJK font on a CJK client, the forced language's file when forced. For
+-- translated text that must stay in WoW's look (big Blizzard-template buttons)
+-- but needs a raw SetFont for its size. Never hardcode FRIZQT for such text: it has
+-- no CJK glyphs, and a raw SetFont drops the font objects' per-alphabet fallback.
+function BNB.GetLocaleFont() return LocaleFontPath() end
+
 function BNB.GetFontDef(id)
     -- _byID keys are font id strings for bundled fonts and raw .ttf paths for LSM fonts.
+    -- Identity lookup only; anything that draws text uses ResolveFontDef instead.
     return _byID[id] or _byID["notoserif"]
 end
 
+-- ── Set resolution (ALL-14) ───────────────────────────────────────────────────
+function BNB.GetFontSetDefault()
+    return SET_DEFAULT[BNB.GetActiveFontSet()] or "notoserif"
+end
+
+-- The stored pick for the active set. The Latin set keeps using fontChoice; other
+-- sets live in fontChoiceBySet[set] and, until one is picked, inherit fontChoice
+-- so an existing WoW Default or LSM pick carries over (a Latin card does not
+-- resolve under them and falls to the set default).
+function BNB.GetFontChoice()
+    local db = BigNoteBoxDB
+    if not db then return nil end
+    local set = BNB.GetActiveFontSet()
+    if set == "latin" then return db.fontChoice end
+    local t = db.fontChoiceBySet
+    return (t and t[set]) or db.fontChoice
+end
+
+-- id if it can be drawn under the active set, else nil. LSM fonts follow the user
+-- across sets; "wow" maps to the set's own WoW font where the checkbox is hidden.
+function BNB.ResolveFontID(id)
+    local def = id and _byID[id]
+    if not def then return nil end
+    if def._isLSM then return id end
+    local set = BNB.GetActiveFontSet()
+    if def._isWoW then
+        if set == "latin" then return id end
+        return SET_WOW_ALIAS[set]
+    end
+    if SetOf(def) == set then return id end
+    return nil
+end
+
+function BNB.GetEffectiveFontID()
+    return BNB.ResolveFontID(BNB.GetFontChoice()) or BNB.GetFontSetDefault()
+end
+
+-- Def to draw for a per-note / per-sticky override: the override if usable, else
+-- the global effective font (the same as having no override).
+function BNB.ResolveFontDef(id)
+    local rid = BNB.ResolveFontID(id) or BNB.GetEffectiveFontID()
+    return _byID[rid] or _byID["notoserif"]
+end
+
+-- Cards for the active set, in list order, capped to the 2x4 grid. withLSM
+-- appends LSM fonts after them, for the two pickers that show LSM as cards.
+function BNB.GetPickerFonts(withLSM)
+    local set, out, lsm = BNB.GetActiveFontSet(), {}, {}
+    for _, def in ipairs(BNB.FONTS) do
+        if def._isLSM then
+            lsm[#lsm + 1] = def
+        elseif not def._isWoW and SetOf(def) == set and #out < GRID_MAX then
+            out[#out + 1] = def
+        end
+    end
+    if withLSM then
+        for _, def in ipairs(lsm) do out[#out + 1] = def end
+    end
+    return out
+end
+
+-- Rows the card grid always reserves, so a set with fewer cards keeps the layout.
+BNB.FONT_GRID_ROWS = GRID_MAX / 2
+
+-- The WoW Default checkbox only exists under the Latin set.
+function BNB.ShowWoWFontCheckbox()
+    return BNB.GetActiveFontSet() == "latin"
+end
+
 -- ── Getters ───────────────────────────────────────────────────────────────────
+-- A stored choice that no longer exists (LSM font gone, pack uninstalled) or that
+-- belongs to another set is drawn as the set default, but never written back.
 function BNB.GetBodyFont()
     local db  = BigNoteBoxDB
-    local choice = db and db.fontChoice or "notoserif"
-    -- If the stored choice is no longer in _byID the LSM font is gone (addon uninstalled
-    -- or setting disabled). Reset to the default so the editor doesn't go fontless.
-    if not _byID[choice] then
-        if db then db.fontChoice = "notoserif" end
-        choice = "notoserif"
-    end
-    local def = BNB.GetFontDef(choice)
+    local def = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
     local sz  = (db and db.fontSize) or DEFAULT_SIZE
     return def.regular, sz
 end
 
 function BNB.GetBoldFont()
-    local db  = BigNoteBoxDB
-    local choice = db and db.fontChoice or "notoserif"
-    if not _byID[choice] then choice = "notoserif" end
-    local def = BNB.GetFontDef(choice)
+    local def = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
     return def.bold
 end
 
@@ -236,12 +384,15 @@ function BNB.IsCJKClient()
 end
 
 -- Returns (regular, bold). The WoW font is read live rather than from the "wow"
--- def, whose paths are a Latin placeholder until InitFonts has run.
+-- def, whose paths are a Latin placeholder until InitFonts has run. A card from a
+-- non-Latin set (WoW Hei, a pack font) draws that set's script, so chrome uses it.
 local function ChromePaths()
-    local db  = BigNoteBoxDB
-    local def = BNB.GetFontDef(db and db.fontChoice or "notoserif")
-    if def._isWoW or (BNB.IsCJKClient() and not def._isLSM) then
-        local p = GetWoWFontPath()
+    local def = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
+    if def._isLSM or (SetOf(def) ~= "latin" and not def._isWoW) then
+        return def.regular, def.bold
+    end
+    if def._isWoW or BNB.IsCJKClient() then
+        local p = LocaleFontPath()
         return p, p
     end
     return def.regular, def.bold
@@ -286,9 +437,10 @@ function BNB.InitFonts()
     -- ── WoW Default font path resolution ────────────────────────────────────────
     -- GameFontNormal:GetFont() returns the locale-appropriate path installed by WoW.
     -- On zhCN/zhTW/koKR/jaJP this is a CJK-capable font; on English it is FRIZQT__.
+    -- A forced CJK language gets that language's file instead (LocaleFontPath).
     local wowDef = _byID["wow"]
     if wowDef then
-        local resolved = GetWoWFontPath()
+        local resolved = LocaleFontPath()
         wowDef.regular = resolved
         wowDef.bold    = resolved
     end
@@ -337,10 +489,19 @@ end
 function BNB.ApplyFont(id, size)
     local db = BigNoteBoxDB
     if not db then return end
-    if id   then db.fontChoice = id   end
+    if id then
+        -- Each set keeps its own pick (ALL-14); the Latin set is fontChoice.
+        local set = BNB.GetActiveFontSet()
+        if set == "latin" then
+            db.fontChoice = id
+        else
+            db.fontChoiceBySet = db.fontChoiceBySet or {}
+            db.fontChoiceBySet[set] = id
+        end
+    end
     if size then db.fontSize   = size end
 
-    local def      = BNB.GetFontDef(db.fontChoice)
+    local def      = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
     local sz       = db.fontSize or DEFAULT_SIZE
     local bodyPath = def.regular
     local boldPath = def.bold
@@ -359,4 +520,162 @@ function BNB.ApplyFont(id, size)
         end
     end
     if BNB.RefreshFocusFont then BNB.RefreshFocusFont() end
+end
+
+-- ── Font packs (ALL-14) ───────────────────────────────────────────────────────
+-- A font pack is a separate addon (## Dependencies: BigNoteBox) that calls this at
+-- load time, before InitFonts runs on PLAYER_LOGIN:
+--
+--   BigNoteBox.RegisterFontPack({
+--       id      = "fontscn",              -- matches its BNB.KNOWN_PACKS entry
+--       addon   = "BigNoteBox_FontsCN",   -- folder name, for the version lookup
+--       version = "1.0.0",                -- optional; read from the TOC if absent
+--       set     = "hans",                 -- which card set the fonts join
+--       fonts   = {
+--           { id = "notosanssc", label = "Noto Sans SC",
+--             regular = "Interface\\AddOns\\BigNoteBox_FontsCN\\Fonts\\NotoSansSC-Regular.ttf",
+--             bold    = "Interface\\AddOns\\BigNoteBox_FontsCN\\Fonts\\NotoSansSC-Bold.ttf",
+--             preview = "..." },
+--       },
+--   })
+--
+-- Font ids must be unique across BNB; a clashing id is skipped. Cards past the
+-- 2x4 grid are kept (menus and saved choices still see them) but not drawn as
+-- cards until ALL-39 makes the grid scroll. Returns true when the pack was taken.
+BNB._fontPacks = BNB._fontPacks or {}
+
+local function AddOnVersion(addon)
+    if addon and C_AddOns and C_AddOns.GetAddOnMetadata then
+        local ok, v = pcall(C_AddOns.GetAddOnMetadata, addon, "Version")
+        if ok and v and v ~= "" then return v end
+    end
+    return nil
+end
+
+function BNB.RegisterFontPack(pack)
+    if type(pack) ~= "table" or type(pack.id) ~= "string" or type(pack.fonts) ~= "table" then
+        return false
+    end
+    local set = pack.set or "latin"
+    if not SET_DEFAULT[set] then return false end
+
+    local added = {}
+    for _, f in ipairs(pack.fonts) do
+        if type(f) == "table" and type(f.id) == "string" and type(f.regular) == "string"
+           and not _byID[f.id] then
+            local def = {
+                id      = f.id,
+                label   = f.label or f.id,
+                regular = f.regular,
+                bold    = f.bold or f.regular,
+                mono    = f.mono and true or false,
+                preview = f.preview or "Aa Bb Cc Dd Ee",
+                set     = set,
+                _pack   = pack.id,
+            }
+            -- Keep pack cards ahead of any LSM entries InitFonts may already have added.
+            local pos = #BNB.FONTS + 1
+            for i, d in ipairs(BNB.FONTS) do
+                if d._isLSM then pos = i; break end
+            end
+            table.insert(BNB.FONTS, pos, def)
+            _byID[f.id] = def
+            added[#added + 1] = def
+        end
+    end
+
+    BNB._fontPacks[pack.id] = {
+        id      = pack.id,
+        addon   = pack.addon,
+        version = pack.version or AddOnVersion(pack.addon),
+        set     = set,
+        count   = #added,
+    }
+    if set == BNB.GetActiveFontSet() and #added > 0 then PreloadFonts(added) end
+    return true
+end
+
+-- ── Known packs ───────────────────────────────────────────────────────────────
+-- Every pack BNB knows about, for the status icons on the General tab and the
+-- empty-grid hint. The icon pack (ALL-40) joins this list when it ships; if the
+-- list grows past fonts it can move to its own file.
+-- Tooltip text is in the PACK's language whatever the UI language is, so it is
+-- data here, not locale keys. English meaning of the zhCN lines:
+--   "BigNoteBox Chinese font pack"
+--   "Install it to get more Chinese fonts and the full Chinese experience."
+--   "Click to copy the CurseForge download link."
+--   "Installed, v%s"
+BNB.KNOWN_PACKS = {
+    {
+        id       = "fontscn",
+        addon    = "BigNoteBox_FontsCN",
+        set      = "hans",
+        langs    = { zhCN = true },   -- a missing pack shows only for these languages
+        icon     = "Interface\\Icons\\INV_Misc_Book_09",   -- placeholder until Kim draws one
+        url      = "https://www.curseforge.com/wow/addons/bignotebox-fonts-cn",
+        hintKey  = "FONT_PACK_HINT_HANS",
+        tipTitle     = "BigNoteBox \228\184\173\230\150\135\229\173\151\228\189\147\229\140\133",
+        tipMissing   = "\229\174\137\232\163\133\229\144\142\229\143\175\228\189\191\231\148\168\230\155\180\229\164\154\228\184\173\230\150\135\229\173\151\228\189\147\239\188\140\232\142\183\229\190\151\229\174\140\230\149\180\231\154\132\228\184\173\230\150\135\228\189\147\233\170\140\227\128\130",
+        tipClick     = "\231\130\185\229\135\187\229\164\141\229\136\182 CurseForge \228\184\139\232\189\189\233\147\190\230\142\165\227\128\130",
+        tipInstalled = "\229\183\178\229\174\137\232\163\133\239\188\140v%s",
+    },
+}
+
+local function IsAddOnLoadedSafe(name)
+    if not name then return false end
+    if C_AddOns and C_AddOns.IsAddOnLoaded then
+        return C_AddOns.IsAddOnLoaded(name) and true or false
+    end
+    return IsAddOnLoaded and IsAddOnLoaded(name) and true or false
+end
+
+-- Returns installed (bool), version (string or nil).
+function BNB.GetPackStatus(pack)
+    local reg = BNB._fontPacks[pack.id]
+    local installed = reg ~= nil or IsAddOnLoadedSafe(pack.addon)
+    if not installed then return false, nil end
+    return true, (reg and reg.version) or AddOnVersion(pack.addon)
+end
+
+-- Installed packs always show; a missing one only when its language is the active
+-- or the client language (packs without langs always show).
+function BNB.IsPackRelevant(pack)
+    if BNB.GetPackStatus(pack) then return true end
+    if not pack.langs then return true end
+    local active = BNB.GetActiveLanguage and BNB.GetActiveLanguage()
+    local client = GetLocale and GetLocale()
+    return (active and pack.langs[active]) or (client and pack.langs[client]) or false
+end
+
+-- Empty-grid hint: under a non-Latin set with no pack fonts installed, the grid
+-- has free rows, so they carry a line saying a pack exists. Clicking it copies the
+-- download link. x/y are offsets from anchor's TOPLEFT to the first free row.
+-- Returns the hint button, or nil when there is nothing to say.
+function BNB.AddFontPackHint(parent, anchor, x, y, w, h, fontObj)
+    local set = BNB.GetActiveFontSet()
+    if set == "latin" or h < 14 then return nil end
+    for _, def in ipairs(BNB.FONTS) do
+        if def._pack and SetOf(def) == set then return nil end
+    end
+    local pack
+    for _, p in ipairs(BNB.KNOWN_PACKS) do
+        if p.set == set then pack = p; break end
+    end
+    if not pack then return nil end
+
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, y)
+    btn:SetSize(w, h)
+    local fs = btn:CreateFontString(nil, "OVERLAY", fontObj or "GameFontNormalSmall")
+    fs:SetPoint("TOPLEFT",  btn, "TOPLEFT",  4, -4)
+    fs:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
+    fs:SetTextColor(0.65, 0.65, 0.65)
+    fs:SetText(L[pack.hintKey])
+    btn:SetScript("OnEnter", function() fs:SetTextColor(1, 0.82, 0) end)
+    btn:SetScript("OnLeave", function() fs:SetTextColor(0.65, 0.65, 0.65) end)
+    btn:SetScript("OnClick", function(self)
+        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true) end
+    end)
+    return btn
 end

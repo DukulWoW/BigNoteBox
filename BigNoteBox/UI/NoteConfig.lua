@@ -412,8 +412,9 @@ local function BuildGeneralTab(sf, ct)
     local function HLFonts()
         local note    = GetNote()
         -- No override (WoW Default unticked, nothing else picked) always shows Noto
-        -- Serif highlighted, regardless of what was selected before.
-        local current = (note and note.fontOverride) or "notoserif"
+        -- Serif highlighted, regardless of what was selected before. Under another
+        -- font set (ALL-14) an override from a different set counts as none.
+        local current = BNB.ResolveFontID(note and note.fontOverride) or BNB.GetFontSetDefault()
         for _,e in ipairs(fontPickerBtns) do
             local sel = (e.id == current)
             if e.btn.SetBackdropColor then
@@ -427,12 +428,9 @@ local function BuildGeneralTab(sf, ct)
     _hlFonts = HLFonts
 
     -- LSM fonts appear in the dropdown below; WoW Default has its own checkbox
-    -- below the grid. Both are excluded from the card grid.
-    local _allFonts_nc = BNB.FONTS or {}
-    local fonts_nc = {}
-    for _, def in ipairs(_allFonts_nc) do
-        if not def._isLSM and not def._isWoW then fonts_nc[#fonts_nc + 1] = def end
-    end
+    -- below the grid. Both are excluded from the card grid, which shows the
+    -- active language's font set (ALL-14).
+    local fonts_nc = BNB.GetPickerFonts()
     for i, def in ipairs(fonts_nc) do
         local col     = (i - 1) % 2
         local gridRow = math.floor((i - 1) / 2)
@@ -473,20 +471,27 @@ local function BuildGeneralTab(sf, ct)
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
         fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
     end
-    -- Advance y past the grid
-    local gridRows_nc = math.ceil(#fonts_nc / 2)
+    -- Advance y past the grid. It always reserves its 4 rows; free rows carry the
+    -- font pack hint.
+    local usedRows_nc = math.ceil(#fonts_nc / 2)
+    local gridRows_nc = math.max(BNB.FONT_GRID_ROWS, usedRows_nc)
+    BNB.AddFontPackHint(panel, panel, 0, y - usedRows_nc * (PH + PG),
+        CW_SCROLL, (gridRows_nc - usedRows_nc) * (PH + PG) - PG)
     y = y - gridRows_nc * (PH + PG) + PG
 
-    -- WoW Default checkbox, below the grid instead of a 9th card.
+    -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
+    -- its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         wowCb:SetSize(20, 20)
         wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
+        wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         local wowLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         wowLbl:SetPoint("LEFT",  wowCb,  "RIGHT", 4, 0)
         wowLbl:SetPoint("RIGHT", panel,  "RIGHT", 0, 0)
         wowLbl:SetJustifyH("LEFT")
         wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
+        if not BNB.ShowWoWFontCheckbox() then wowLbl:Hide() end
         wowCb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
@@ -507,7 +512,7 @@ local function BuildGeneralTab(sf, ct)
             local eb = BNB._editorBody
             if eb and BNB._currentNoteID == _noteID then
                 local ov = note and note.fontOverride
-                local def = ov and BNB.GetFontDef and BNB.GetFontDef(ov)
+                local def = ov and BNB.ResolveFontDef and BNB.ResolveFontDef(ov)
                 if def then
                     pcall(function() eb:SetFont(def.regular, sz, "") end)
                 elseif BNB.ApplyFont then

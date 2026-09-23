@@ -121,7 +121,7 @@ local function MakeLargeButton(parent, text, w, h)
     pcall(function() DynamicResizeButton_Resize(btn) end)
     if btn.GetFontString then
         local bfs = btn:GetFontString()
-        if bfs then pcall(function() bfs:SetFont("Fonts\\FRIZQT__.TTF", 16, "") end) end
+        if bfs then pcall(function() bfs:SetFont(BNB.GetLocaleFont(), 16, "") end) end
     end
     return btn
 end
@@ -333,7 +333,7 @@ local function MakeLabel(parent, y, text, fontSize, r, g, b)
     fs:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
     fs:SetJustifyH("LEFT")
     fs:SetWordWrap(true)
-    if fontSize then pcall(function() fs:SetFont(STANDARD_TEXT_FONT, fontSize, "") end) end
+    if fontSize then pcall(function() fs:SetFont(BNB.GetLocaleFont(), fontSize, "") end) end
     fs:SetTextColor(r or 0.88, g or 0.88, b or 0.88)
     fs:SetText(text)
     fs:SetHeight(fs:GetStringHeight() + 4)
@@ -776,16 +776,13 @@ local function BuildPage4(content)
         local COL_GAP  = 6
         local CARD_W   = math.floor((CW - 16 - COL_GAP) / 2)
         -- WoW Default has its own checkbox below the grid, like LSM fonts below it.
-        local _allFonts = BNB.FONTS or {}
-        local fonts = {}
-        for _, def in ipairs(_allFonts) do
-            if not def._isLSM and not def._isWoW then fonts[#fonts + 1] = def end
-        end
+        -- The grid shows the active language's font set (ALL-14).
+        local fonts = BNB.GetPickerFonts()
         local _cards = {}
         local _wowCb
 
         local function HighlightCards()
-            local cur = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
+            local cur = BNB.GetEffectiveFontID()
             for _, e in ipairs(_cards) do
                 if e.id == cur then
                     e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
@@ -814,7 +811,7 @@ local function BuildPage4(content)
 
             local d = def
             btn:SetScript("OnEnter", function(self)
-                local cur = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
+                local cur = BNB.GetEffectiveFontID()
                 if cur ~= d.id then
                     self:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
                 end
@@ -849,11 +846,17 @@ local function BuildPage4(content)
             _cards[#_cards + 1] = { btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl }
         end
 
-        local gridRows = math.ceil(#fonts / 2)
+        -- The grid always reserves its 4 rows; free rows carry the font pack hint.
+        local usedRows = math.ceil(#fonts / 2)
+        local gridRows = math.max(BNB.FONT_GRID_ROWS, usedRows)
+        BNB.AddFontPackHint(ct, ct, 0, y - usedRows * (PICKER_H + GAP_V),
+            CW - 16, (gridRows - usedRows) * (PICKER_H + GAP_V) - GAP_V)
         y = y - gridRows * (PICKER_H + GAP_V) - 8
 
-        -- WoW Default checkbox, below the grid instead of a 9th card.
+        -- WoW Default checkbox, below the grid instead of a 9th card. Latin set
+        -- only; the row is kept either way so the page layout does not shift.
         local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         wowCb.text = wowCb.text or wowCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         wowCb.text:SetPoint("LEFT", wowCb, "RIGHT", 2, 0)

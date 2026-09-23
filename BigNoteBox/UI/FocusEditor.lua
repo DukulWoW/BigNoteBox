@@ -373,8 +373,8 @@ local function LoadNoteInFocus(id)
 
     -- Apply font first
     local fo = note.fontOverride
-    if fo and BNB.GetFontDef then
-        local def = BNB.GetFontDef(fo)
+    if fo and BNB.ResolveFontDef then
+        local def = BNB.ResolveFontDef(fo)
         local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
         if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, sz, "") end) end
         if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, 20, "") end) end
@@ -425,8 +425,8 @@ function BNB.RefreshFocusFont()
     local note = id and BNB.GetNote(id)
     if not note then return end
     local fo = note.fontOverride
-    if fo and BNB.GetFontDef then
-        local def = BNB.GetFontDef(fo)
+    if fo and BNB.ResolveFontDef then
+        local def = BNB.ResolveFontDef(fo)
         local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
         if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, sz, "") end) end
         if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, 20, "") end) end
@@ -515,7 +515,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetText(label)
         local fs = btn:GetFontString()
-        if fs then pcall(function() fs:SetFont(fs:GetFont(), 10, "") end) end
+        if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
         btn:SetScript("OnClick", onClick)
         btn:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -587,7 +587,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     previewBtn:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
     previewBtn:SetText(L["MARKUP_PREVIEW_BTN"])
     local pfs = previewBtn:GetFontString()
-    if pfs then pcall(function() pfs:SetFont(pfs:GetFont(), 10, "") end) end
+    if pfs then pcall(function() pfs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
     previewBtn:SetAlpha(0.45)
     previewBtn:SetScript("OnClick", function()
         if BNB.RichPreviewFocus then

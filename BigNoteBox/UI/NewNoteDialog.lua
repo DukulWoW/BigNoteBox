@@ -197,7 +197,8 @@ end
 local function RefreshFontHighlight()
     -- No override (WoW Default unticked, nothing else picked) always shows Noto Serif
     -- highlighted, regardless of what was selected before WoW Default was ticked.
-    local hlFont = _selFont or "notoserif"
+    -- Under another font set (ALL-14) that is the set's default card instead.
+    local hlFont = _selFont or BNB.GetFontSetDefault()
     for _, e in ipairs(_fontBtns) do
         local sel = (e.id == hlFont)
         if e.btn.SetBackdropColor then
@@ -387,11 +388,8 @@ local function BuildDialog()
     local leftY  = -18
     _fontBtns    = {}
     -- WoW Default is offered via its own checkbox below the grid, not as a card.
-    local _allFonts = BNB.FONTS or {}
-    local fonts = {}
-    for _, def in ipairs(_allFonts) do
-        if not def._isWoW then fonts[#fonts + 1] = def end
-    end
+    -- Cards are the active language's font set (ALL-14), LSM fonts after them.
+    local fonts = BNB.GetPickerFonts(true)
     local cardW  = math.floor((COL_L_W - CARD_GAP) / 2)
 
     for i, def in ipairs(fonts) do
@@ -453,12 +451,18 @@ local function BuildDialog()
         _fontBtns[#_fontBtns + 1] = { btn = btn, id = def.id, nameLbl = nameLbl }
     end
 
-    local fontGridRows = math.ceil(#fonts / 2)
+    -- The grid always reserves its 4 rows; free rows carry the font pack hint.
+    local usedRows     = math.ceil(#fonts / 2)
+    local fontGridRows = math.max(BNB.FONT_GRID_ROWS, usedRows)
+    BNB.AddFontPackHint(f, colL, 0, leftY - usedRows * (CARD_H + CARD_GAP),
+        COL_L_W, (fontGridRows - usedRows) * (CARD_H + CARD_GAP) - CARD_GAP)
     local WOW_CHECK_H  = 22
     local leftColH = 18 + fontGridRows * (CARD_H + CARD_GAP) - CARD_GAP + WOW_CHECK_H
 
-    -- WoW Default checkbox, below the grid instead of a 9th card.
+    -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
+    -- its row is kept either way so the dialog does not change size.
     local wowCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    wowCheck:SetShown(BNB.ShowWoWFontCheckbox())
     wowCheck:SetSize(18, 18)
     wowCheck:SetPoint("TOPLEFT", colL, "TOPLEFT", 0,
         leftY - fontGridRows * (CARD_H + CARD_GAP) + CARD_GAP - 2)
@@ -468,6 +472,7 @@ local function BuildDialog()
     wowLbl:SetJustifyH("LEFT")
     wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
     wowLbl:SetTextColor(0.8, 0.8, 0.8, 1)
+    if not BNB.ShowWoWFontCheckbox() then wowLbl:Hide() end
     wowCheck:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
