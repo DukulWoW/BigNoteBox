@@ -46,6 +46,10 @@ L["SEARCH"]       = "Search"
 L["UNTITLED"]     = "Untitled Note"
 L["NEW_NOTE"]     = "New Note"
 
+-- ── Fonts (shared) ────────────────────────────────────────────────────────────
+L["FONT_USE_WOW_DEFAULT"]     = "Use WoW's default font"
+L["FONT_USE_WOW_DEFAULT_TIP"] = "Uses your WoW UI's font instead of a bundled one. Matches your client's language automatically."
+
 -- ── Main window ───────────────────────────────────────────────────────────────
 L["WINDOW_TITLE"]       = "BigNoteBox"
 L["NOTE_LIST_EMPTY"]    = "No notes yet.\nClick New Note to get started."

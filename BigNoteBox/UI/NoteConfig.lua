@@ -407,6 +407,7 @@ local function BuildGeneralTab(sf, ct)
     local COL_GAP_F = 4  -- horizontal gap between columns
     local CARD_W_F  = math.floor((CW_SCROLL - COL_GAP_F) / 2)
     local fontPickerBtns = {}
+    local _wowCb_nc
 
     local function HLFonts()
         local note    = GetNote()
@@ -419,14 +420,16 @@ local function BuildGeneralTab(sf, ct)
             end
             if e.nameLbl then e.nameLbl:SetTextColor(sel and 1 or 0.85, sel and 0.82 or 0.85, sel and 0 or 0.85, 1) end
         end
+        if _wowCb_nc then _wowCb_nc:SetChecked(current == "wow") end
     end
     _hlFonts = HLFonts
 
-    -- LSM fonts appear in the dropdown below; exclude from the card grid.
+    -- LSM fonts appear in the dropdown below; WoW Default has its own checkbox
+    -- below the grid. Both are excluded from the card grid.
     local _allFonts_nc = BNB.FONTS or {}
     local fonts_nc = {}
     for _, def in ipairs(_allFonts_nc) do
-        if not def._isLSM then fonts_nc[#fonts_nc + 1] = def end
+        if not def._isLSM and not def._isWoW then fonts_nc[#fonts_nc + 1] = def end
     end
     for i, def in ipairs(fonts_nc) do
         local col     = (i - 1) % 2
@@ -471,6 +474,50 @@ local function BuildGeneralTab(sf, ct)
     -- Advance y past the grid
     local gridRows_nc = math.ceil(#fonts_nc / 2)
     y = y - gridRows_nc * (PH + PG) + PG
+
+    -- WoW Default checkbox, below the grid instead of a 9th card.
+    do
+        local wowCb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        wowCb:SetSize(20, 20)
+        wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
+        local wowLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        wowLbl:SetPoint("LEFT",  wowCb,  "RIGHT", 4, 0)
+        wowLbl:SetPoint("RIGHT", panel,  "RIGHT", 0, 0)
+        wowLbl:SetJustifyH("LEFT")
+        wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
+        wowCb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        wowCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        wowCb:SetScript("OnClick", function(self)
+            if self:GetChecked() then
+                Save({fontOverride = "wow"})
+            else
+                local id = _noteID
+                if id then BNB.UpdateNote(id, {_clear = {"fontOverride"}}) end
+            end
+            -- Apply live to the open editor if this note is loaded
+            local note = GetNote()
+            local sz = (note and note.fontSize)
+                or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+            local eb = BNB._editorBody
+            if eb and BNB._currentNoteID == _noteID then
+                local ov = note and note.fontOverride
+                local def = ov and BNB.GetFontDef and BNB.GetFontDef(ov)
+                if def then
+                    pcall(function() eb:SetFont(def.regular, sz, "") end)
+                elseif BNB.ApplyFont then
+                    BNB.ApplyFont()
+                end
+            end
+            HLFonts()
+            if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
+        end)
+        _wowCb_nc = wowCb
+        y = y - 24
+    end
 
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on.
     -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua.

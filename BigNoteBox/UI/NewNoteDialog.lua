@@ -54,6 +54,7 @@ local _sizeSlider     = nil
 local _sizePreviewLbl = nil
 local _createBtn      = nil
 local _richCheck      = nil
+local _wowCheck        = nil
 
 -- ---------------------------------------------------------------------------
 -- RANDOM NOTE ICON
@@ -382,7 +383,12 @@ local function BuildDialog()
 
     local leftY  = -18
     _fontBtns    = {}
-    local fonts  = BNB.FONTS or {}
+    -- WoW Default is offered via its own checkbox below the grid, not as a card.
+    local _allFonts = BNB.FONTS or {}
+    local fonts = {}
+    for _, def in ipairs(_allFonts) do
+        if not def._isWoW then fonts[#fonts + 1] = def end
+    end
     local cardW  = math.floor((COL_L_W - CARD_GAP) / 2)
 
     for i, def in ipairs(fonts) do
@@ -422,6 +428,7 @@ local function BuildDialog()
         btn:SetScript("OnLeave", RefreshFontHighlight)
         btn:SetScript("OnClick", function()
             _selFont = defId
+            if _wowCheck then _wowCheck:SetChecked(false) end
             RefreshFontHighlight()
             ApplyTitleFont()
             -- Update size preview to use the newly selected font
@@ -444,7 +451,38 @@ local function BuildDialog()
     end
 
     local fontGridRows = math.ceil(#fonts / 2)
-    local leftColH = 18 + fontGridRows * (CARD_H + CARD_GAP) - CARD_GAP
+    local WOW_CHECK_H  = 22
+    local leftColH = 18 + fontGridRows * (CARD_H + CARD_GAP) - CARD_GAP + WOW_CHECK_H
+
+    -- WoW Default checkbox, below the grid instead of a 9th card.
+    local wowCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    wowCheck:SetSize(18, 18)
+    wowCheck:SetPoint("TOPLEFT", colL, "TOPLEFT", 0,
+        leftY - fontGridRows * (CARD_H + CARD_GAP) + CARD_GAP - 2)
+    local wowLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    wowLbl:SetPoint("LEFT",  wowCheck, "RIGHT", 4, 0)
+    wowLbl:SetPoint("RIGHT", colL,     "RIGHT", 0, 0)
+    wowLbl:SetJustifyH("LEFT")
+    wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
+    wowLbl:SetTextColor(0.8, 0.8, 0.8, 1)
+    wowCheck:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    wowCheck:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    wowCheck:SetScript("OnClick", function(self)
+        if self:GetChecked() then
+            _selFont = "wow"
+            RefreshFontHighlight()
+        else
+            _selFont = nil
+            RefreshFontHighlight()
+        end
+        ApplyTitleFont()
+    end)
+    wowCheck:SetChecked(_selFont == "wow")
+    _wowCheck = wowCheck
 
     -- ── RIGHT COLUMN: title colour + font size ───────────────────────────────
     local rightY = 0
@@ -677,6 +715,7 @@ function NND.Open()
     _selSize  = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
     _selRich  = (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
     if _richCheck then _richCheck:SetChecked(_selRich) end
+    if _wowCheck  then _wowCheck:SetChecked(false) end
 
     -- Apply icon
     if _iconBtn then _iconBtn._tex:SetTexture(_selIcon) end

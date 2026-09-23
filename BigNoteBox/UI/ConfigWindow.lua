@@ -280,13 +280,15 @@ local function BuildFontPicker(ct, y)
     local GAP      = 4    -- vertical gap between rows
     local COL_GAP  = 6    -- horizontal gap between columns
     local CARD_W   = math.floor((CONTENT_W - COL_GAP) / 2)
-    -- LSM fonts are shown in the dropdown below; exclude them from the card grid.
+    -- LSM fonts are shown in the dropdown below; WoW Default has its own checkbox
+    -- below the grid. Both are excluded from the card grid.
     local _allFonts = BNB.FONTS or {}
     local fonts = {}
     for _, def in ipairs(_allFonts) do
-        if not def._isLSM then fonts[#fonts + 1] = def end
+        if not def._isLSM and not def._isWoW then fonts[#fonts + 1] = def end
     end
     fontPickerBtns = {}
+    local _wowCb
 
     local function Highlight()
         local cur = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
@@ -301,6 +303,7 @@ local function BuildFontPicker(ct, y)
                 if e.nameLbl then e.nameLbl:SetTextColor(0.85, 0.85, 0.85, 1) end
             end
         end
+        if _wowCb then _wowCb:SetChecked(cur == "wow") end
     end
     _refreshFontHL = Highlight
 
@@ -364,8 +367,31 @@ local function BuildFontPicker(ct, y)
 
     -- Advance y past the full grid
     local gridRows = math.ceil(#fonts / 2)
+    y = y - gridRows * (PICKER_H + GAP) - 4
+
+    -- WoW Default checkbox, below the grid instead of a 9th card.
+    local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    wowCb:SetSize(24, 24)
+    wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
+    wowCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    wowCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    wowCb:SetScript("OnClick", function(self)
+        BNB.ApplyFont(self:GetChecked() and "wow" or "notoserif", nil)
+        Highlight()
+    end)
+    local wowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    wowLbl:SetPoint("LEFT",  wowCb, "RIGHT", 4, 0)
+    wowLbl:SetPoint("RIGHT", ct,    "RIGHT", 0, 0)
+    wowLbl:SetJustifyH("LEFT"); wowLbl:SetHeight(ROW_H); wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
+    _wowCb = wowCb
+    y = y - (ROW_H + ROW_GAP)
+
     Highlight()
-    return y - gridRows * (PICKER_H + GAP) - 4
+    return y
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────

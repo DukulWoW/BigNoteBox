@@ -640,12 +640,14 @@ local function BuildPage4(content)
         local GAP_V    = 4
         local COL_GAP  = 6
         local CARD_W   = math.floor((CW - 16 - COL_GAP) / 2)
+        -- WoW Default has its own checkbox below the grid, like LSM fonts below it.
         local _allFonts = BNB.FONTS or {}
         local fonts = {}
         for _, def in ipairs(_allFonts) do
-            if not def._isLSM then fonts[#fonts + 1] = def end
+            if not def._isLSM and not def._isWoW then fonts[#fonts + 1] = def end
         end
         local _cards = {}
+        local _wowCb
 
         local function HighlightCards()
             local cur = BigNoteBoxDB and BigNoteBoxDB.fontChoice or "notoserif"
@@ -660,6 +662,7 @@ local function BuildPage4(content)
                     if e.nameLbl then e.nameLbl:SetTextColor(0.85, 0.85, 0.85, 1) end
                 end
             end
+            if _wowCb then _wowCb:SetChecked(cur == "wow") end
         end
 
         for i, def in ipairs(fonts) do
@@ -713,6 +716,33 @@ local function BuildPage4(content)
 
         local gridRows = math.ceil(#fonts / 2)
         y = y - gridRows * (PICKER_H + GAP_V) - 8
+
+        -- WoW Default checkbox, below the grid instead of a 9th card.
+        local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        wowCb.text = wowCb.text or wowCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        wowCb.text:SetPoint("LEFT", wowCb, "RIGHT", 2, 0)
+        wowCb.text:SetText(L["FONT_USE_WOW_DEFAULT"])
+        wowCb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        wowCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        wowCb:SetScript("OnClick", function(self)
+            BNB.ApplyFont(self:GetChecked() and "wow" or "notoserif", nil)
+            HighlightCards()
+            if _p4PreviewLbl then
+                local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+                local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
+                if boldPath and boldPath ~= "" then
+                    BNB.SetFontSafe(_p4PreviewLbl, boldPath, sz, "GameFontNormal")
+                end
+            end
+        end)
+        _wowCb = wowCb
+        y = y - 30
+
         -- Deferred highlight (fonts may not be initialised yet on first frame)
         C_Timer.After(0.05, HighlightCards)
     end

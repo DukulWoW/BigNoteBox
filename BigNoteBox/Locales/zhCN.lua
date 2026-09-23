@@ -27,6 +27,10 @@ L["SEARCH"]       = "搜索"
 L["UNTITLED"]     = "无标题笔记"
 L["NEW_NOTE"]     = "新建笔记"
 
+-- ── Fonts (shared) ────────────────────────────────────────────────────────────
+L["FONT_USE_WOW_DEFAULT"]     = "使用魔兽世界默认字体"
+L["FONT_USE_WOW_DEFAULT_TIP"] = "使用魔兽世界界面字体而非自带字体。自动匹配客户端语言。"
+
 -- ── Main window ───────────────────────────────────────────────────────────────
 L["WINDOW_TITLE"]       = "BigNoteBox"
 L["NOTE_LIST_EMPTY"]    = "暂无笔记。\n点击“新建笔记”开始。"

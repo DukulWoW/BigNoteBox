@@ -1251,6 +1251,7 @@ local function PopulateStickySettings(noteID)
     local COL_GAP  = 4    -- horizontal gap between columns
     local CARD_W   = math.floor((SETTINGS_CW - COL_GAP) / 2)
     local fontPickerBtns = {}
+    local _wowCb_sn
 
     local function HLStickyFonts()
         local cur = cfg.fontID
@@ -1262,9 +1263,15 @@ local function PopulateStickySettings(noteID)
             end
             if e.nameLbl then e.nameLbl:SetTextColor(sel and 1 or 0.85, sel and 0.82 or 0.85, sel and 0 or 0.85, 1) end
         end
+        if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
     end
 
-    local fonts = BNB.FONTS or {}
+    -- WoW Default has its own checkbox below the grid, not a 9th card.
+    local _allFonts_sn = BNB.FONTS or {}
+    local fonts = {}
+    for _, def in ipairs(_allFonts_sn) do
+        if not def._isWoW then fonts[#fonts + 1] = def end
+    end
     for i, def in ipairs(fonts) do
         local fid  = def.id
         local col  = (i - 1) % 2          -- 0 = left, 1 = right
@@ -1306,6 +1313,35 @@ local function PopulateStickySettings(noteID)
     -- Advance _y past the grid (ceil rows, since fonts may be odd count)
     local gridRows = math.ceil(#fonts / 2)
     ct1._y = ct1._y - gridRows * (PH_FONT + PG_FONT) + PG_FONT
+
+    -- WoW Default checkbox, below the grid instead of a 9th card.
+    do
+        local wowCb = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
+        wowCb:SetSize(20, 20)
+        wowCb:SetPoint("TOPLEFT", ct1, "TOPLEFT", -2, ct1._y)
+        local wowLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        wowLbl:SetPoint("LEFT",  wowCb, "RIGHT", 4, 0)
+        wowLbl:SetPoint("RIGHT", ct1,   "RIGHT", 0, 0)
+        wowLbl:SetJustifyH("LEFT")
+        wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
+        wowCb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["FONT_USE_WOW_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        wowCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        wowCb:SetScript("OnClick", function(self)
+            cfg.fontID = self:GetChecked() and "wow" or nil
+            SaveCfg(noteID, cfg)
+            if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+            HLStickyFonts()
+        end)
+        _wowCb_sn = wowCb
+        plainOnlyWidgets[#plainOnlyWidgets + 1] = wowCb
+        plainOnlyWidgets[#plainOnlyWidgets + 1] = wowLbl
+        ct1._y = ct1._y - 24
+    end
+
     HLStickyFonts()
 
     local fontSizeSl = MakeSlider(ct1, L["STICKY_FONT_SIZE"], 8, 24,
