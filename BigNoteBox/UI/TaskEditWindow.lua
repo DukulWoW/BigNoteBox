@@ -473,6 +473,7 @@ local function BuildWindow()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetAlpha(0.95)
     f:SetTitle(L["TEW_TITLE"])
     if f.CloseButton then

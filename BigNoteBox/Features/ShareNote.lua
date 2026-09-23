@@ -351,6 +351,7 @@ local function BuildSharePreviewNormal()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle("Preview Shared Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseSharePreview() end)
@@ -629,6 +630,7 @@ local function BuildShareWindowNormal()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle("Share Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseShareWindow() end)
@@ -1178,6 +1180,7 @@ local function BuildImportWindowNormal()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle("Import Shared Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseImportWindow() end)

@@ -471,6 +471,7 @@ function BNB.OpenImgDialog(insertFn)
             ButtonFrameTemplate_HidePortrait(f)
             ButtonFrameTemplate_HideButtonBar(f)
             if f.Inset then f.Inset:Hide() end
+            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         end
         -- Size set after layout is computed
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
@@ -802,6 +803,7 @@ function BNB.OpenLnkDialog(insertFn)
             ButtonFrameTemplate_HidePortrait(f)
             ButtonFrameTemplate_HideButtonBar(f)
             if f.Inset then f.Inset:Hide() end
+            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         end
         f:SetSize(DW, DH)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
@@ -952,6 +954,7 @@ function BNB.OpenIcoDialog(insertFn)
             ButtonFrameTemplate_HidePortrait(f)
             ButtonFrameTemplate_HideButtonBar(f)
             if f.Inset then f.Inset:Hide() end
+            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         end
         f:SetSize(DW, DH)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)

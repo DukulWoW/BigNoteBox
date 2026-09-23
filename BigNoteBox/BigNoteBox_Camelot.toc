@@ -34,6 +34,7 @@ Core\Initialize.lua
 
 # UI
 UI\Widgets.lua
+UI\Chrome.lua
 UI\IconsAC.lua
 UI\Fonts.lua
 UI\SkinSystem.lua

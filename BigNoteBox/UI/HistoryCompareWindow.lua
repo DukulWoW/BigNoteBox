@@ -337,6 +337,7 @@ local function BuildCompareWindow()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() BNB.CloseHistoryCompare() end)
         end

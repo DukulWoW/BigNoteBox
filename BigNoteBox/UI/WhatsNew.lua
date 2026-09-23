@@ -194,6 +194,7 @@ local function BuildFrameNormal(onClose)
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle(string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"))
 
     if f.CloseButton then

@@ -107,6 +107,7 @@ function BNB.CreateMainWindow()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetAlpha(0.95)
     f:SetTitle(L["WINDOW_TITLE"])
 
@@ -1254,6 +1255,7 @@ local function BuildBCBPromo()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetTitle(L["MW_BCB_PROMO_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)

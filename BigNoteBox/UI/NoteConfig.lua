@@ -2851,6 +2851,7 @@ local function CreateNoteConfigWindow()
         f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetAlpha(0.95)
         f:SetTitle(L["STICKY_NOTE_SETTINGS_TIP"])
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end

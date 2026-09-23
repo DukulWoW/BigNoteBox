@@ -434,6 +434,7 @@ local function BuildIconPickerFrame()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetTitle(L["NND_CHOOSE_ICON"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -902,6 +903,7 @@ local function BuildCopyMovePopup()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
         end

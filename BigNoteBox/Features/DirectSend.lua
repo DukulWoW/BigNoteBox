@@ -442,6 +442,7 @@ local function BuildPromptNormal()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle(L["DS_PROMPT_TITLE"])
     return f, 32
 end

@@ -377,6 +377,7 @@ local function BuildNoteHistoryPanel()
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
+    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetTitle(L["HISTORY_WINDOW_TITLE"])
 
     if f.CloseButton then

@@ -82,6 +82,38 @@ function BNB.RegisterSlashCommands()
                 BNB:Print("|cffffff00Usage:|r /bnb testwp status|fire|leave|auto")
             end
 
+        -- ── Developer: chrome seating (FOR-05, UI/Chrome.lua) ─────────────────
+        -- "chromeprobe" dumps the template layout; "chrome l t r b" re-seats
+        -- every window live. Nothing is saved: Forever drops SavedVariables.
+        elseif cmd:sub(1, 6) == "chrome" then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            local sub = cmd:sub(7):match("^%s*(.-)%s*$")
+            local function Report(prefix, n)
+                local d = BNB.CHROME_DELTA
+                BNB:Print(string.format("|cff88bbff%s|r l=%s t=%s r=%s b=%s%s", prefix,
+                    tostring(d.l), tostring(d.t), tostring(d.r), tostring(d.b),
+                    n and string.format("  (%d windows re-seated)", n) or ""))
+            end
+            if sub == "probe" then
+                if BNB.ChromeProbe then BNB.ChromeProbe() end
+            elseif sub == "reset" then
+                Report("Chrome delta reset to built-in:", BNB.SetChromeDelta(nil))
+            elseif sub == "" then
+                Report("Chrome delta:")
+                BNB:Print("|cffffff00Usage:|r /bnb chromeprobe  |  /bnb chrome <left> <top> <right> <bottom>  |  /bnb chrome reset")
+            else
+                local l, t, r, b = sub:match("^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)$")
+                l, t, r, b = tonumber(l), tonumber(t), tonumber(r), tonumber(b)
+                if not (l and t and r and b) then
+                    BNB:Print("|cffffff00Usage:|r /bnb chrome <left> <top> <right> <bottom>  (pixels, positive = outward)")
+                else
+                    Report("Chrome delta set:", BNB.SetChromeDelta({ l = l, t = t, r = r, b = b }))
+                end
+            end
+
         else
             if BNB.ToggleWindow then BNB.ToggleWindow() end
         end

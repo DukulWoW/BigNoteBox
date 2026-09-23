@@ -185,6 +185,7 @@ local function CreateConfirmDialog()
         f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetAlpha(0.97); f:SetTitle(L["STC_CONFIRM_SEND_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -516,6 +517,7 @@ local function CreateSendDialog()
         f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetAlpha(0.97); f:SetTitle(L["SEND_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() BNB.CloseSendToChat() end)

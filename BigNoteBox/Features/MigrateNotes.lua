@@ -998,6 +998,7 @@ local function BuildPreviewWindow()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetTitle(L["MIG_PREVIEW_TITLE"])
         if f.CloseButton then
             f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -1159,6 +1160,7 @@ function M.ShowAddonPopup(key)
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetTitle(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
         titleH = 32
@@ -1275,6 +1277,7 @@ function M.ShowPopup()
         ButtonFrameTemplate_HidePortrait(f)
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
         f:SetTitle(L["MIG_POPUP_TITLE"])
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
         titleH = 32
