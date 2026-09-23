@@ -42,7 +42,7 @@ local BTN_SZ        = 64     -- button frame size (matches sidebar-border.tga)
 -- normal mode is tuned so far; other combinations default to no offset until
 -- their own values are measured (retail normal, retail skin, Forever skin).
 local SIDE_OFFSET = {
-    forever_normal = { left = 15, right = -10 },
+    forever_normal = { left = 8, right = -8 },
 }
 
 -- Icon folders available in the sidebar icon picker (Classes, Races, Factions only).
