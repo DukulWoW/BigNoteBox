@@ -322,7 +322,7 @@ local function GetPooledBtn(idx, parent)
         -- Border texture (always shown, full button size)
         local borderTex = btn:CreateTexture(nil, "OVERLAY")
         borderTex:SetAllPoints(btn)
-        borderTex:SetTexture(ASSETS .. "Sidebar\\sb-border")
+        borderTex:SetTexture(ASSETS .. (BNB.IsForever and "Sidebar\\sb-border-forever" or "Sidebar\\sb-border"))
         -- Tint border to match skin preset in skin mode.
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
