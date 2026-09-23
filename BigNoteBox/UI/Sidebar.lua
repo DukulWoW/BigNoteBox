@@ -751,7 +751,13 @@ function SB.Refresh()
         -- Tooltip + hover overlay
         local slotKey = key  -- capture for closure
         w.btn:SetScript("OnEnter", function(self)
-            if slotKey ~= _activeKey and w.hoverTex then w.hoverTex:Show() end
+            if slotKey ~= _activeKey then
+                if w.hoverTex then w.hoverTex:Show() end
+                if w.iconTex then
+                    w.iconTex:SetDesaturated(false)
+                    w.iconTex:SetVertexColor(1, 1, 1, 1)
+                end
+            end
 
             local title, sub = TooltipForKey(slotKey)
             GameTooltip:SetOwner(self, "ANCHOR_LEFT")
@@ -767,6 +773,10 @@ function SB.Refresh()
         end)
         w.btn:SetScript("OnLeave", function()
             if w.hoverTex then w.hoverTex:Hide() end
+            if slotKey ~= _activeKey and w.iconTex then
+                w.iconTex:SetDesaturated(INACTIVE_SAT)
+                w.iconTex:SetVertexColor(INACTIVE_V, INACTIVE_V, INACTIVE_V, 1)
+            end
             GameTooltip:Hide()
         end)
 
