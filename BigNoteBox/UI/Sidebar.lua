@@ -228,6 +228,10 @@ local function ApplyActiveState(widgets, isActive)
     if widgets.activeTex then
         if isActive then widgets.activeTex:Show() else widgets.activeTex:Hide() end
     end
+    -- Active slot always wins over a lingering hover (e.g. clicked while hovered).
+    if isActive and widgets.hoverTex then
+        widgets.hoverTex:Hide()
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -331,6 +335,12 @@ local function GetPooledBtn(idx, parent)
         iconTex:SetSize(ICON_SZ, ICON_SZ)
         iconTex:SetPoint("TOPLEFT", btn, "TOPLEFT", ICON_X, ICON_Y)
 
+        -- Hover overlay (sb-hover.tga) — shown on mouseover of an inactive slot.
+        local hoverTex = btn:CreateTexture(nil, "OVERLAY", nil, -2)
+        hoverTex:SetAllPoints(btn)
+        hoverTex:SetTexture(ASSETS .. "Sidebar\\sb-hover")
+        hoverTex:Hide()
+
         -- Active overlay (sb-active.tga) — shown only on the currently active slot.
         local activeTex = btn:CreateTexture(nil, "OVERLAY", nil, -1)
         activeTex:SetAllPoints(btn)
@@ -351,7 +361,7 @@ local function GetPooledBtn(idx, parent)
         badge:SetTextColor(1, 1, 1)
         badge:Hide()
 
-        _btnPool[idx] = { btn = btn, borderTex = borderTex, iconTex = iconTex, activeTex = activeTex, badge = badge }
+        _btnPool[idx] = { btn = btn, borderTex = borderTex, iconTex = iconTex, hoverTex = hoverTex, activeTex = activeTex, badge = badge }
     end
     local w = _btnPool[idx]
     w.btn:SetParent(parent)
@@ -370,6 +380,7 @@ local function ApplyBtnLayout(w, sz, isz, ix, iy)
     local ulx,uly,urx,ury,llx,lly,lrx,lry = SidebarTexCoord()
     w.borderTex:SetTexCoord(ulx,uly,urx,ury,llx,lly,lrx,lry)
     w.activeTex:SetTexCoord(ulx,uly,urx,ury,llx,lly,lrx,lry)
+    w.hoverTex:SetTexCoord(ulx,uly,urx,ury,llx,lly,lrx,lry)
 end
 
 --------------------------------------------------------------------------------
@@ -737,9 +748,11 @@ function SB.Refresh()
             w.badge:Hide()
         end
 
-        -- Tooltip
+        -- Tooltip + hover overlay
         local slotKey = key  -- capture for closure
         w.btn:SetScript("OnEnter", function(self)
+            if slotKey ~= _activeKey and w.hoverTex then w.hoverTex:Show() end
+
             local title, sub = TooltipForKey(slotKey)
             GameTooltip:SetOwner(self, "ANCHOR_LEFT")
             GameTooltip:AddLine(title, 1, 1, 1)
@@ -752,7 +765,10 @@ function SB.Refresh()
             end
             GameTooltip:Show()
         end)
-        w.btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        w.btn:SetScript("OnLeave", function()
+            if w.hoverTex then w.hoverTex:Hide() end
+            GameTooltip:Hide()
+        end)
 
         -- Click handlers
         w.btn:SetScript("OnClick", function(self, mouseBtn)
