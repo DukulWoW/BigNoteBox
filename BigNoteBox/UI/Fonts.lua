@@ -624,7 +624,7 @@ BNB.KNOWN_PACKS = {
         addon    = "BigNoteBox_FontsCN",
         set      = "hans",
         langs    = { zhCN = true },   -- a missing pack shows only for these languages
-        icon     = "Interface\\Icons\\INV_Misc_Book_09",   -- placeholder until Kim draws one
+        icon     = "Interface\\Icons\\INV_Misc_Book_09",   -- placeholder until Dukul draws one
         url      = "https://www.curseforge.com/wow/addons/bignotebox-fonts-cn",
         hintKey  = "FONT_PACK_HINT_HANS",
         tipTitle     = "BigNoteBox \228\184\173\230\150\135\229\173\151\228\189\147\229\140\133",

@@ -694,7 +694,7 @@ local function BuildDialog()
     _selRich = richDefault
     _richCheck = richCheck
 
-    -- Adjust dialog height to fit the extra checkbox row (+8px cushion, Kim 2026-09-23:
+    -- Adjust dialog height to fit the extra checkbox row (+8px cushion, Dukul 2026-09-23:
     -- "the window needs to be made a tiny bit taller (20px or so)" -- the real fix is
     -- colMaxH above; this cushion covers font-metric rounding on top of that).
     local RICH_ROW_H = 24 + 8

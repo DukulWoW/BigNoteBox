@@ -664,7 +664,7 @@ local function BuildGeneralTab(sf, ct)
 
         -- entry.label for "client" is L["LANGUAGE_CLIENT"], already translated into whatever
         -- language is active -- so on a forced-Chinese UI it reads "客户端语言" alone, with no
-        -- clue that it means "Client Language" (Kim, 2026-09-23, after seeing that on an
+        -- clue that it means "Client Language" (Dukul, 2026-09-23, after seeing that on an
         -- English client with Chinese selected). Always show the hardcoded English name too,
         -- whenever the ACTIVE language isn't English -- forced or natural, doesn't matter.
         local CLIENT_LABEL_EN = "Client Language"
@@ -4753,9 +4753,9 @@ local function BuildBackupTab(sf, ct)
     y = y - 48
 
     -- Paste target editbox (scrollable, fixed height)
-    -- Shrunk from 140 (ALL-14, Kim 2026-09-23): Data Summary moved to the bottom of this
+    -- Shrunk from 140 (ALL-14, Dukul 2026-09-23): Data Summary moved to the bottom of this
     -- tab made it taller than the window overall, so the tab itself started scrolling.
-    -- Kim, retest: bump back up to 120 -- 90 was too cramped for pasting.
+    -- Dukul, retest: bump back up to 120 -- 90 was too cramped for pasting.
     local PASTE_H = 120
     local pasteFrame = BNB.CreateBackdropFrame("Frame", nil, ct)
     BNB.SetBackdropDark(pasteFrame)

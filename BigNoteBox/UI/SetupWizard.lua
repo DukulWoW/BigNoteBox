@@ -409,7 +409,7 @@ local function BuildPage1(content)
     f:SetAllPoints()
     f:Hide()
 
-    -- ALL-14 fix, Kim 2026-09-23: Get Started now lives in the wizard's nav strip
+    -- ALL-14 fix, Dukul 2026-09-23: Get Started now lives in the wizard's nav strip
     -- (BuildWizardFrame, like Prev/Next on every other page) instead of floating inside
     -- this page's own content, so it never competes with the language selector for
     -- space and the nav strip is never left looking empty underneath it. That gives
@@ -487,7 +487,7 @@ local function BuildPage1(content)
 
         -- entry.label for "client" is L["LANGUAGE_CLIENT"], already translated into whatever
         -- language is active -- so on a forced-Chinese UI it reads "客户端语言" alone, with no
-        -- clue that it means "Client Language" (Kim, 2026-09-23). Always show the hardcoded
+        -- clue that it means "Client Language" (Dukul, 2026-09-23). Always show the hardcoded
         -- English name too, whenever the ACTIVE language isn't English -- forced or natural.
         local CLIENT_LABEL_EN = "Client Language"
 
@@ -1529,7 +1529,7 @@ local function BuildWizardFrame()
 
     -- Get Started (page 1 only) -- lives in the nav strip like Prev/Next rather than
     -- floating inside page 1's own content, so it never has to compete with page 1's
-    -- content for vertical space (ALL-14 fix, Kim 2026-09-23: the language selector
+    -- content for vertical space (ALL-14 fix, Dukul 2026-09-23: the language selector
     -- pushed page 1's content into the button and left the nav strip looking empty
     -- and untextured underneath it).
     _getStartedBtn = MakeLargeButton(navStrip, L["SW_GET_STARTED_BTN"], 200, NAV_H - 8)
