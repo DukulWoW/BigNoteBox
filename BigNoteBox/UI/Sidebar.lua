@@ -38,6 +38,13 @@ local ASSETS        = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ICON_PATH     = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Classes\\"
 local BTN_SZ        = 64     -- button frame size (matches sidebar-border.tga)
 
+-- FOR-15: strip offset against the main window, per client/mode. Only Forever
+-- normal mode is tuned so far; other combinations default to no offset until
+-- their own values are measured (retail normal, retail skin, Forever skin).
+local SIDE_OFFSET = {
+    forever_normal = { left = 15, right = -10 },
+}
+
 -- Icon folders available in the sidebar icon picker (Classes, Races, Factions only).
 local SLOT_ICON_FOLDERS = {
     { path = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Classes\\" },
@@ -652,14 +659,31 @@ function SB.Refresh()
     local db   = BigNoteBoxDB
     local side = (db and db.sidebarSide) or "right"
     local parent = _strip:GetParent()
+
+    -- FOR-15: Forever normal mode gets its own measured offsets and draws
+    -- below the main window so its border overlaps the strip cleanly.
+    local forNormal = BNB.IsForever and not (db and db.skinMode)
+    local off = forNormal and SIDE_OFFSET.forever_normal
+    local leftOff, rightOff = 2, -2
+    if off then
+        leftOff, rightOff = off.left, off.right
+    end
+
     _strip:ClearAllPoints()
     _strip:SetWidth(BTN_SZ)  -- will be narrowed below if small icons
     if side == "left" then
-        _strip:SetPoint("TOPRIGHT",    parent, "TOPLEFT",    2,  0)
-        _strip:SetPoint("BOTTOMRIGHT", parent, "BOTTOMLEFT", 2,  0)
+        _strip:SetPoint("TOPRIGHT",    parent, "TOPLEFT",    leftOff,  0)
+        _strip:SetPoint("BOTTOMRIGHT", parent, "BOTTOMLEFT", leftOff,  0)
     else
-        _strip:SetPoint("TOPLEFT",    parent, "TOPRIGHT",    -2,  0)
-        _strip:SetPoint("BOTTOMLEFT", parent, "BOTTOMRIGHT", -2,  0)
+        _strip:SetPoint("TOPLEFT",    parent, "TOPRIGHT",    rightOff,  0)
+        _strip:SetPoint("BOTTOMLEFT", parent, "BOTTOMRIGHT", rightOff,  0)
+    end
+
+    if off and side ~= "left" then
+        -- Right side draws below the main window so its border overlaps the strip.
+        _strip:SetFrameLevel(math.max(0, parent:GetFrameLevel() - 1))
+    else
+        _strip:SetFrameLevel(parent:GetFrameLevel() + 1)
     end
 
     _strip:Show()
