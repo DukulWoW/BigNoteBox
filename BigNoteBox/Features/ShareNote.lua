@@ -835,21 +835,25 @@ local function BuildShareWindow()
     dsHdr:SetText(L["DS_SECTION_HEADER"])
     y = y - 22
 
-    -- Target editbox (InputBoxTemplate for keyboard input on retail)
+    -- Target editbox: plain EditBox filling the backdrop. InputBoxTemplate drew
+    -- a second border inside dsEbBg and its inset left the outer ring
+    -- unclickable (same fix as the Note Config icon field)
     local dsEbBg = BNB.CreateBackdropFrame("Frame", nil, f)
     BNB.SetBackdropDark(dsEbBg)
     dsEbBg:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     dsEbBg:SetWidth(CW - 70)
     dsEbBg:SetHeight(24)
 
-    local dsEb = CreateFrame("EditBox", nil, dsEbBg, "InputBoxTemplate")
-    dsEb:SetPoint("TOPLEFT",     dsEbBg, "TOPLEFT",      4,  -2)
-    dsEb:SetPoint("BOTTOMRIGHT", dsEbBg, "BOTTOMRIGHT", -4,   2)
+    local dsEb = CreateFrame("EditBox", nil, dsEbBg)
+    dsEb:SetAllPoints(dsEbBg)
+    dsEb:SetTextInsets(6, 6, 0, 0)
     dsEb:SetFontObject("GameFontNormalSmall")
     dsEb:SetAutoFocus(false)
     dsEb:SetMaxLetters(80)
     BNB.AddPlaceholder(dsEb, L["DS_TARGET_PLACEHOLDER"], 0.45, 0.45, 0.45)
     dsEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    -- Enter clears focus, as InputBoxTemplate's handler did
+    dsEb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     f._dsEb = dsEb
 
     -- Send button

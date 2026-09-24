@@ -1443,9 +1443,13 @@ local function BuildAppearanceTab(panel)
     -- Name input
     local blzBg = BNB.CreateBackdropFrame("Frame", nil, blzPane); BNB.SetBackdropDark(blzBg)
     blzBg:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, -16); blzBg:SetWidth(CW); blzBg:SetHeight(24)
-    local blzEb = CreateFrame("EditBox", nil, blzBg, "InputBoxTemplate")
-    blzEb:SetPoint("TOPLEFT",     blzBg, "TOPLEFT",     6, -2)
-    blzEb:SetPoint("BOTTOMRIGHT", blzBg, "BOTTOMRIGHT", -6,  2)
+    -- Plain EditBox filling the whole backdrop (like the editor's icon field):
+    -- InputBoxTemplate drew a second border inside blzBg, and its 6px inset
+    -- left the outer ring unclickable, so clicking the "field" did not focus it
+    -- and the placeholder stayed.
+    local blzEb = CreateFrame("EditBox", nil, blzBg)
+    blzEb:SetAllPoints(blzBg)
+    blzEb:SetTextInsets(6, 6, 0, 0)
     blzEb:SetFontObject("GameFontNormal"); blzEb:SetAutoFocus(false); blzEb:SetMaxLetters(128)
     BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
 
@@ -1467,6 +1471,21 @@ local function BuildAppearanceTab(panel)
     blzInfo:SetTextColor(0.55, 0.55, 0.55)
     blzInfo:SetJustifyH("LEFT"); blzInfo:SetWordWrap(true)
     blzInfo:SetText(L["NC_ICON_NAME_INFO"])
+
+    -- The label ends in the wowhead.com/icons link: clicking it opens the copy
+    -- box, as the same hint does in the editor's Insert icon popup. deferFocus
+    -- so this click does not pull focus back out of the copy box.
+    local blzInfoBtn = CreateFrame("Button", nil, blzPane)
+    blzInfoBtn:SetAllPoints(blzInfo)
+    blzInfoBtn:SetScript("OnClick", function(self)
+        BNB.ShowClipboardHint("www.wowhead.com/icons", self, true)
+    end)
+    blzInfoBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    blzInfoBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Apply / Clear buttons for Blizzard tab
     local BLZ_BTN_Y = -(16 + 24 + PREV_PAD + PREV_SZ + 4 + 6)
@@ -1540,8 +1559,9 @@ local function BuildAppearanceTab(panel)
         BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        blzEb:SetText(""); blzEb._showingPlaceholder = false
-        BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
+        -- SetRealText, never AddPlaceholder again: that SetScripts the focus
+        -- handlers and wipes the icon autocomplete's hooks (see CLAUDE.md)
+        blzEb:SetRealText("")
         blzPreviewTex:SetTexture(nil)
         SetIconTab("bnb")
         RefreshIconGrid(true)
@@ -1573,11 +1593,9 @@ local function BuildAppearanceTab(panel)
             local stored = n.icon or ""
             -- Strip "Interface\Icons\" prefix to get bare name for the editbox
             local name = stored:match("[^\\/]+$") or stored
-            blzEb:SetText(name)
-            blzEb._showingPlaceholder = (name == "")
-            if name == "" then
-                BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
-            end
+            -- Shows the placeholder when name is empty, without replacing the
+            -- focus handlers (AddPlaceholder would wipe the autocomplete hooks)
+            blzEb:SetRealText(name)
             ApplyBlzName(name)
             local hasText = name ~= ""
             blzApply:SetEnabled(hasText); blzApply:SetAlpha(hasText and 1.0 or 0.4)
