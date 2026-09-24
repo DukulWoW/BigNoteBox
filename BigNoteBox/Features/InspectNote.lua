@@ -885,18 +885,18 @@ local function CreateInspectButton()
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         if not _inspectReady then
-            GameTooltip:AddLine("Create a BigNoteBox note", 1, 1, 1)
+            GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
             GameTooltip:AddLine("Waiting for inspect data...", 1, 0.5, 0.25)
         else
             local tName, tRealm = BNB.UnitNameRealm("target")
             tRealm = tRealm and tRealm ~= "" and tRealm or GetNormalizedRealmName() or ""
             local existing = tName and FindExistingNote(tName, tRealm)
             if existing then
-                GameTooltip:AddLine("Open existing note", 1, 1, 1)
+                GameTooltip:AddLine(L["INSPECT_TIP_OPEN"], 1, 1, 1)
                 GameTooltip:AddLine("A note already exists for " .. tName .. ".", 0.55, 0.8, 0.55)
                 GameTooltip:AddLine("Click to view or create a duplicate.", 0.78, 0.78, 0.78)
             else
-                GameTooltip:AddLine("Create a BigNoteBox note", 1, 1, 1)
+                GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
                 GameTooltip:AddLine("from this player's inspect data.", 0.78, 0.78, 0.78)
             end
         end

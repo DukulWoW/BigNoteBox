@@ -134,71 +134,6 @@ end
 --------------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------------
-StaticPopupDialogs["BNB_RESET_ALL"] = {
-    text = L["POPUP_RESET_ALL"],
-    button1 = L["BTN_RESET_CONFIRM"],
-    button2 = L["CANCEL"],
-    OnAccept = function()
-        BigNoteBoxDB = nil   -- wipes settings only; notes are in BigNoteBoxNotesDB
-        C_UI.Reload()
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
-StaticPopupDialogs["BNB_DELETE_NOTE"] = {
-    text = L["POPUP_DELETE_NOTE"],
-    button1 = L["BTN_DELETE_CONFIRM"],
-    button2 = L["CANCEL"],
-    OnAccept = function(self)
-        local id = self.data or BNB._currentNoteID
-        if id and BNB.DeleteNote then BNB.DeleteNote(id) end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
--- Trash-aware variant: shown when trash is enabled and warn is on.
--- Text tells the player the note goes to trash rather than being gone forever.
-StaticPopupDialogs["BNB_DELETE_NOTE_TRASH"] = {
-    text = 'Move "%s" to Trash?',
-    button1 = "Move to Trash",
-    button2 = L["CANCEL"],
-    OnAccept = function(self)
-        local id = self.data or BNB._currentNoteID
-        if id and BNB.DeleteNote then BNB.DeleteNote(id) end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
-StaticPopupDialogs["BNB_DELETE_MULTI"] = {
-    text = "Delete %s selected note(s)? This cannot be undone.",
-    button1 = "Delete All",
-    button2 = L["CANCEL"],
-    OnAccept = function(self)
-        local ids = self.data
-        if not ids then return end
-        for _, id in ipairs(ids) do
-            if BNB.DeleteNote then BNB.DeleteNote(id) end
-        end
-        if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
-StaticPopupDialogs["BNB_DELETE_MULTI_TRASH"] = {
-    text = "Move %s selected note(s) to Trash?",
-    button1 = "Move to Trash",
-    button2 = L["CANCEL"],
-    OnAccept = function(self)
-        local ids = self.data
-        if not ids then return end
-        for _, id in ipairs(ids) do
-            if BNB.DeleteNote then BNB.DeleteNote(id) end
-        end
-        if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
 -- Helper: returns true when trash is active (trashRetainDays > 0).
 -- Used by delete call sites to skip the confirmation popup — moving to trash
 -- is non-destructive, so there is nothing to confirm.
@@ -209,119 +144,181 @@ function BNB.TrashEnabled()
     return days > 0
 end
 
-StaticPopupDialogs["BNB_EMPTY_TRASH"] = {
-    text = "Permanently delete all notes in Trash? This cannot be undone.",
-    button1 = "Empty Trash",
-    button2 = L["CANCEL"],
-    OnAccept = function()
-        if BNB.EmptyTrash then BNB.EmptyTrash() end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
+-- Built at PLAYER_LOGIN, not file load: L[...] must resolve after the language is
+-- known, or the popups stay in the load-time language (and the pseudo-locale misses them).
+local function BuildPopups()
+    StaticPopupDialogs["BNB_RESET_ALL"] = {
+        text = L["POPUP_RESET_ALL"],
+        button1 = L["BTN_RESET_CONFIRM"],
+        button2 = L["CANCEL"],
+        OnAccept = function()
+            BigNoteBoxDB = nil   -- wipes settings only; notes are in BigNoteBoxNotesDB
+            C_UI.Reload()
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
 
-StaticPopupDialogs["BNB_CONFIRM_CLOSE"] = {
-    text = "Close BigNoteBox?",
-    button1 = "Close",
-    button2 = L["CANCEL"],
-    OnAccept = function()
-        if BNB.mainFrame then
-            -- Bypass the confirm check on the forced hide
-            BNB.mainFrame._skipConfirm = true
-            BNB.CloseCompanionWindows()
-            BNB.mainFrame:Hide()
-            BNB.mainFrame._skipConfirm = false
-        end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
+    StaticPopupDialogs["BNB_DELETE_NOTE"] = {
+        text = L["POPUP_DELETE_NOTE"],
+        button1 = L["BTN_DELETE_CONFIRM"],
+        button2 = L["CANCEL"],
+        OnAccept = function(self)
+            local id = self.data or BNB._currentNoteID
+            if id and BNB.DeleteNote then BNB.DeleteNote(id) end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
 
--- Shown during import when the backup contains notes scoped to a different
--- character. %s1 = original character name, %s2 = current character name.
--- button1 = remap to current char, button2 = keep original scope, ESC = abort.
-StaticPopupDialogs["BNB_IMPORT_SCOPE_REMAP"] = {
-    text = "Some imported notes are set to character-only visibility.\n\n"
-        .. "Original character: |cffffcc00%s|r\n"
-        .. "Current character:  |cff66cc66%s|r\n\n"
-        .. "Character-scoped notes only appear when that specific character is logged in.\n\n"
-        .. "|cffaaaaaa- Yes - reassign to your current character\n"
-        .. "- No - keep the original character's scope\n"
-        .. "- Press Escape to cancel the import entirely|r",
-    button1 = "Yes, use current character",
-    button2 = "No, keep original",
-    OnAccept = function()
-        local p = BNB._pendingImport
-        if not p then return end
-        local n = BNB._DoImport and BNB._DoImport(p.notes, true) or 0
-        if p.status then
-            if n > 0 then
-                p.status:SetTextColor(0.55, 0.82, 0.55)
-                p.status:SetText(string.format("|cff55cc55Imported %d note(s). Character scope updated to current character.|r", n))
-            else
-                p.status:SetTextColor(0.82, 0.55, 0.55)
-                p.status:SetText("Nothing to import.")
+    -- Trash-aware variant: shown when trash is enabled and warn is on.
+    -- Text tells the player the note goes to trash rather than being gone forever.
+    StaticPopupDialogs["BNB_DELETE_NOTE_TRASH"] = {
+        text = L["POPUP_TRASH_NOTE"],
+        button1 = L["BTN_TRASH_CONFIRM"],
+        button2 = L["CANCEL"],
+        OnAccept = function(self)
+            local id = self.data or BNB._currentNoteID
+            if id and BNB.DeleteNote then BNB.DeleteNote(id) end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+
+    StaticPopupDialogs["BNB_DELETE_MULTI"] = {
+        text = L["POPUP_DELETE_MULTI"],
+        button1 = L["BTN_DELETE_ALL"],
+        button2 = L["CANCEL"],
+        OnAccept = function(self)
+            local ids = self.data
+            if not ids then return end
+            for _, id in ipairs(ids) do
+                if BNB.DeleteNote then BNB.DeleteNote(id) end
             end
-        end
-        if p.paste then p.paste:SetRealText("") end
-        BNB._pendingImport = nil
-        BNB._pendingImportForeign = nil
-    end,
-    OnCancel = function(_, reason)
-        if reason == "clicked" then
-            -- button2: keep original scope
+            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+
+    StaticPopupDialogs["BNB_DELETE_MULTI_TRASH"] = {
+        text = L["POPUP_TRASH_MULTI"],
+        button1 = L["BTN_TRASH_CONFIRM"],
+        button2 = L["CANCEL"],
+        OnAccept = function(self)
+            local ids = self.data
+            if not ids then return end
+            for _, id in ipairs(ids) do
+                if BNB.DeleteNote then BNB.DeleteNote(id) end
+            end
+            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+
+    StaticPopupDialogs["BNB_EMPTY_TRASH"] = {
+        text = L["POPUP_EMPTY_TRASH"],
+        button1 = L["BTN_EMPTY_TRASH"],
+        button2 = L["CANCEL"],
+        OnAccept = function()
+            if BNB.EmptyTrash then BNB.EmptyTrash() end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+
+    StaticPopupDialogs["BNB_CONFIRM_CLOSE"] = {
+        text = L["POPUP_CONFIRM_CLOSE"],
+        button1 = L["CLOSE"],
+        button2 = L["CANCEL"],
+        OnAccept = function()
+            if BNB.mainFrame then
+                -- Bypass the confirm check on the forced hide
+                BNB.mainFrame._skipConfirm = true
+                BNB.CloseCompanionWindows()
+                BNB.mainFrame:Hide()
+                BNB.mainFrame._skipConfirm = false
+            end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+
+    -- Shown during import when the backup contains notes scoped to a different
+    -- character. %s1 = original character name, %s2 = current character name.
+    -- button1 = remap to current char, button2 = keep original scope, ESC = abort.
+    StaticPopupDialogs["BNB_IMPORT_SCOPE_REMAP"] = {
+        text = L["POPUP_IMPORT_REMAP"],
+        button1 = L["BTN_IMPORT_REMAP_YES"],
+        button2 = L["BTN_IMPORT_REMAP_NO"],
+        OnAccept = function()
+            local p = BNB._pendingImport
+            if not p then return end
+            local n = BNB._DoImport and BNB._DoImport(p.notes, true) or 0
+            if p.status then
+                if n > 0 then
+                    p.status:SetTextColor(0.55, 0.82, 0.55)
+                    p.status:SetText(string.format(L["IMPORT_DONE_REMAP"], n))
+                else
+                    p.status:SetTextColor(0.82, 0.55, 0.55)
+                    p.status:SetText(L["IMPORT_NOTHING"])
+                end
+            end
+            if p.paste then p.paste:SetRealText("") end
+            BNB._pendingImport = nil
+            BNB._pendingImportForeign = nil
+        end,
+        OnCancel = function(_, reason)
+            if reason == "clicked" then
+                -- button2: keep original scope
+                local p = BNB._pendingImport
+                if not p then return end
+                local n = BNB._DoImport and BNB._DoImport(p.notes, false) or 0
+                if p.status then
+                    if n > 0 then
+                        p.status:SetTextColor(0.55, 0.82, 0.55)
+                        p.status:SetText(string.format(L["IMPORT_DONE_KEEP"], n))
+                    else
+                        p.status:SetTextColor(0.82, 0.55, 0.55)
+                        p.status:SetText(L["IMPORT_NOTHING"])
+                    end
+                end
+                if p.paste then p.paste:SetRealText("") end
+            end
+            -- ESC or button2 both clean up
+            BNB._pendingImport = nil
+            BNB._pendingImportForeign = nil
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        showAlert = true,
+    }
+
+    -- Confirmation popup for the same-character import path (no scope remap needed).
+    -- Fired by the Backup tab's Import button after the paste has parsed successfully
+    -- but before the notes are actually imported, so the user can back out.
+    StaticPopupDialogs["BNB_IMPORT_CONFIRM"] = {
+        text = L["POPUP_IMPORT_CONFIRM"],
+        button1 = L["IMPORT_POPUP_BTN"],
+        button2 = L["CANCEL"],
+        OnAccept = function()
             local p = BNB._pendingImport
             if not p then return end
             local n = BNB._DoImport and BNB._DoImport(p.notes, false) or 0
             if p.status then
                 if n > 0 then
                     p.status:SetTextColor(0.55, 0.82, 0.55)
-                    p.status:SetText(string.format("|cff55cc55Imported %d note(s). Original character scope kept.|r", n))
+                    p.status:SetText(string.format(L["BACKUP_IMPORT_OK"], n))
                 else
                     p.status:SetTextColor(0.82, 0.55, 0.55)
-                    p.status:SetText("Nothing to import.")
+                    p.status:SetText(L["BACKUP_IMPORT_NONE"])
                 end
             end
             if p.paste then p.paste:SetRealText("") end
-        end
-        -- ESC or button2 both clean up
-        BNB._pendingImport = nil
-        BNB._pendingImportForeign = nil
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    showAlert = true,
-}
+            BNB._pendingImport = nil
+        end,
+        OnCancel = function()
+            -- User backed out — leave paste box intact so they can edit and retry
+            BNB._pendingImport = nil
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    }
+end
 
--- Confirmation popup for the same-character import path (no scope remap needed).
--- Fired by the Backup tab's Import button after the paste has parsed successfully
--- but before the notes are actually imported, so the user can back out.
-StaticPopupDialogs["BNB_IMPORT_CONFIRM"] = {
-    text = "About to import |cffffcc00%d|r note(s) from the pasted text.\n\nContinue?",
-    button1 = "Import",
-    button2 = "Cancel",
-    OnAccept = function()
-        local p = BNB._pendingImport
-        if not p then return end
-        local n = BNB._DoImport and BNB._DoImport(p.notes, false) or 0
-        if p.status then
-            if n > 0 then
-                p.status:SetTextColor(0.55, 0.82, 0.55)
-                p.status:SetText(string.format(L["BACKUP_IMPORT_OK"], n))
-            else
-                p.status:SetTextColor(0.82, 0.55, 0.55)
-                p.status:SetText(L["BACKUP_IMPORT_NONE"])
-            end
-        end
-        if p.paste then p.paste:SetRealText("") end
-        BNB._pendingImport = nil
-    end,
-    OnCancel = function()
-        -- User backed out — leave paste box intact so they can edit and retry
-        BNB._pendingImport = nil
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-}
-
-
-
+BNB.RegisterEvent("PLAYER_LOGIN", BuildPopups)
 
 --------------------------------------------------------------------------------
 -- ADDON COMPARTMENT FRAME (global wrappers referenced in retail .toc)
