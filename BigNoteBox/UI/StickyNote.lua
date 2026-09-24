@@ -652,19 +652,44 @@ local function ForwardHover(child, root)
     end)
 end
 
--- ── Alpha crossfade helper ────────────────────────────────────────────────────
-local function FadeTo(target, fromAlpha, toAlpha, duration, onDone)
-    local elapsed = 0
-    target:SetAlpha(fromAlpha)
-    target:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / duration, 1)
-        self:SetAlpha(fromAlpha + (toAlpha - fromAlpha) * t)
-        if t >= 1 then
-            self:SetScript("OnUpdate", nil)
-            if onDone then onDone() end
+-- ── Frame fade (replaces LibAnimate, ALL-64) ──────────────────────────────────
+-- Alpha fade on a native AnimationGroup, so it never touches the frame's
+-- OnUpdate script (see the note on buttons further down).
+-- Starting a fade stops the one already running on that frame and drops its
+-- onDone: a sticky reopened while it is still fading out is not hidden by the
+-- old fade's Hide. Same contract LibAnimate had (it stopped the running
+-- animation on the frame first).
+local function FadeFrame(target, fromAlpha, toAlpha, duration, onDone)
+    local ag = target._bnbFadeAG
+    if not ag then
+        ag = target:CreateAnimationGroup()
+        ag:SetToFinalAlpha(true)
+        ag._alpha = ag:CreateAnimation("Alpha")
+        local function Complete(self)
+            self:GetParent():SetAlpha(self._toAlpha)
+            local cb = self._onDone
+            self._onDone = nil
+            if cb then cb() end
         end
-    end)
+        ag:SetScript("OnFinished", Complete)
+        -- Stopped by anything but a new fade (e.g. the frame hidden mid-fade):
+        -- land on the final alpha and run onDone, so a note is never left
+        -- half transparent
+        ag:SetScript("OnStop", function(self)
+            if not self._restarting then Complete(self) end
+        end)
+        target._bnbFadeAG = ag
+    end
+    -- A new fade replaces the running one: the old onDone never runs
+    ag._restarting = true
+    ag:Stop()
+    ag._restarting = false
+    ag._toAlpha, ag._onDone = toAlpha, onDone
+    ag._alpha:SetFromAlpha(fromAlpha)
+    ag._alpha:SetToAlpha(toAlpha)
+    ag._alpha:SetDuration(duration)
+    target:SetAlpha(fromAlpha)
+    ag:Play()
 end
 
 -- ── Settings face ─────────────────────────────────────────────────────────────
@@ -675,8 +700,7 @@ end
 -- Opening/closing crossfades front↔settings in-place (no size change).
 -- ── Detached sticky note settings window ──────────────────────────────────────
 -- A standalone ButtonFrameTemplate window (same look as the main BNB window)
--- that opens with a LibAnimate transition when the user clicks "=" on a sticky.
--- The sticky note fades/zooms out, this window fades/zooms in at the same spot.
+-- that fades in (FadeFrame) when the user clicks "=" on a sticky.
 
 local SETTINGS_W = 264   -- matches NoteConfig NCW
 local SETTINGS_TITLE_H = 60
@@ -688,10 +712,6 @@ local SETTINGS_CW = 224  -- matches NoteConfig CW_SCROLL (NCW - PAD - 28)
 
 local _stickySettingsFrame = nil   -- single reusable settings window
 local _stickySettingsNoteID = nil  -- noteID it's currently editing
-
-local function GetLibAnimate()
-    return LibStub and LibStub("LibAnimate", true)
-end
 
 local function GetBorderList()
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
@@ -726,23 +746,14 @@ local function CloseStickySettings()
     if not f or not f:IsShown() then return end
 
     local stickyFrame = noteID and openFrames[noteID]
-    local LA = GetLibAnimate()
 
     -- Apply config before restoring the sticky
     if stickyFrame and noteID then ApplyConfig(stickyFrame, noteID) end
 
-    if LA then
-        LA:Animate(f, "fadeOut", {
-            duration = 0.2,
-            onFinished = function()
-                f:Hide()
-                if stickyFrame then stickyFrame:SetAlpha(1.0) end
-            end,
-        })
-    else
+    FadeFrame(f, f:GetAlpha(), 0, 0.2, function()
         f:Hide()
         if stickyFrame then stickyFrame:SetAlpha(1.0) end
-    end
+    end)
 end
 
 local SK_SS_TITLE_H   = 28
@@ -2858,16 +2869,9 @@ local function OpenStickySettings(stickyFrame, noteID)
     -- Show settings with fade-in.
     -- Raise() ensures the settings panel sits above GameMenuFrame when the
     -- ESC menu is open — both are DIALOG strata; last-raised wins.
-    local LA = GetLibAnimate()
-    f:SetAlpha(0.95)
     f:Show()
     f:Raise()
-    if LA then
-        LA:Animate(f, "fadeIn", {
-            duration = 0.25,
-            onFinished = function() f:SetAlpha(0.95) end,
-        })
-    end
+    FadeFrame(f, 0, 0.95, 0.25)
 end
 
 -- ── Resize handle ─────────────────────────────────────────────────────────────
@@ -3774,7 +3778,7 @@ local function CreateStickyFrame(noteID)
     -- Button children do NOT inherit alpha from a parent Frame in WoW --
     -- each Button has its own independent alpha. We keep a table of every
     -- header button and set their alpha directly.
-    -- We do NOT use FadeTo/OnUpdate on buttons: SetScript("OnUpdate") on a
+    -- We do NOT fade buttons with OnUpdate: SetScript("OnUpdate") on a
     -- Button conflicts with WoW's internal click dispatch and causes the wrong
     -- OnClick to fire. Direct SetAlpha is instant and reliable.
     local _hdrBtns = {}
@@ -4477,15 +4481,7 @@ function SN.Open(noteID, noESCOpen)
     else
         f._escOnly = false
         f:SetAlpha(0); f:Show()
-        local LA = GetLibAnimate()
-        if LA then
-            LA:Animate(f, "fadeIn", {
-                duration    = FLIP_TIME,
-                onFinished  = function() f:SetAlpha(1.0) end,
-            })
-        else
-            FadeTo(f, 0, 1.0, FLIP_TIME)
-        end
+        FadeFrame(f, 0, 1.0, FLIP_TIME)
     end
 
     local db = DB()
@@ -4534,26 +4530,14 @@ function SN.Close(noteID)
         end
     end
     SaveGeometry(noteID, f)
-    -- Exit fade — use LibAnimate if available, otherwise hide immediately
-    local LA = GetLibAnimate()
-    if LA then
-        openFrames[noteID] = nil   -- remove from open set immediately so
-                                   -- re-open during fade doesn't conflict
-        local db2 = DB()
-        if db2 and db2.postits and db2.postits[noteID] then
-            db2.postits[noteID].shown = false
-        end
-        LA:Animate(f, "fadeOut", {
-            duration   = FLIP_TIME,
-            onFinished = function() f:Hide() end,
-        })
-    else
-        f:Hide(); openFrames[noteID] = nil
-        local db2 = DB()
-        if db2 and db2.postits and db2.postits[noteID] then
-            db2.postits[noteID].shown = false
-        end
+    -- Exit fade (FadeFrame, ALL-64)
+    openFrames[noteID] = nil   -- remove from open set immediately so
+                               -- re-open during fade doesn't conflict
+    local db2 = DB()
+    if db2 and db2.postits and db2.postits[noteID] then
+        db2.postits[noteID].shown = false
     end
+    FadeFrame(f, f:GetAlpha(), 0, FLIP_TIME, function() f:Hide() end)
 end
 
 function SN.CloseAll()
