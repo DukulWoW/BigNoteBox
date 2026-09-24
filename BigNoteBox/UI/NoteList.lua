@@ -853,6 +853,7 @@ local function ShowNoteContextMenu(btn, noteID)
                 if isLocked then
                     root:CreateButton(L["NL_CTX_UNLOCK"], function()
                         BNB.UpdateNote(noteID, { locked = false })
+                        if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
                         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
                         if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
                         if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
@@ -860,6 +861,7 @@ local function ShowNoteContextMenu(btn, noteID)
                 else
                     root:CreateButton(L["NL_CTX_LOCK"], function()
                         BNB.UpdateNote(noteID, { locked = true })
+                        if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
                         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
                         if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
                         if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end

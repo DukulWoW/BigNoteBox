@@ -249,7 +249,8 @@ PopulateTagManager = function()
                 row.selHi:SetShown(_multiSel[tag] == true)
                 UpdateDelSelBtn()
             else
-                _openTag = (_openTag == capturedTag) and nil or capturedTag
+                -- Not `(x) and nil or y`: that always yields y, so an open tag never closed
+                if _openTag == capturedTag then _openTag = nil else _openTag = capturedTag end
                 PopulateTagManager()
             end
         end)

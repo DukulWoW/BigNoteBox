@@ -915,6 +915,7 @@ local function BuildGeneralTab(sf, ct)
     local function DoSendToChar(charKey)
         if not _noteID then return end
         BNB.UpdateNote(_noteID, { scope = "char:" .. charKey })
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         -- Close NoteConfig — the note is no longer visible to this character
         if ncFrame then ncFrame:Hide() end
@@ -990,6 +991,7 @@ local function BuildGeneralTab(sf, ct)
     scopeGlobalBtn:SetScript("OnClick", function()
         if not _noteID then return end
         BNB.UpdateNote(_noteID, { scope = "global" })
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         RefreshScopeBtns()
     end)
@@ -997,6 +999,7 @@ local function BuildGeneralTab(sf, ct)
         if not _noteID then return end
         local cur = BNB.currentChar or "Unknown"
         BNB.UpdateNote(_noteID, { scope = "char:" .. cur })
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         RefreshScopeBtns()
     end)
@@ -2215,6 +2218,7 @@ local function BuildSituationTab(panel)
         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         if BNB.Sticky and BNB.Sticky.RefreshSettingsSituation then BNB.Sticky.RefreshSettingsSituation(id) end
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
         BNB:Print(L["STICKY_CONTEXT_BINDING_SAVED"])
     end)
 
@@ -2222,6 +2226,7 @@ local function BuildSituationTab(panel)
     clearCtxBtn:SetScript("OnClick", function()
         local id = _noteID; if not id then return end
         BNB.UpdateNote(id, { _clear = {"context", "contextDisplay", "contextLeave"} })
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
         if valueEb then valueEb:SetText("") end
         selType = "none"
         selDisplay = "popup"

@@ -1450,6 +1450,7 @@ local function BuildFeaturesTab(sf, ct)
             db.lockNotes = v
             -- Refresh the editor lock state for the currently open note
             if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
+            if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons() end
         end,
         L["CFG_CHK_LOCK_NOTES_TIP"])
 
@@ -2280,8 +2281,15 @@ local function BuildFeaturesTab(sf, ct)
 
     y = AddCheck(ct, y, L["CFG_CHK_ESC_DIM_LABEL"],
         function() return db.stickyEscOverlay ~= false end,
-        function(v) db.stickyEscOverlay = v and nil or false end,
+        -- nil = on, false = off. Not `v and nil or false`: that is always false.
+        function(v) if v then db.stickyEscOverlay = nil else db.stickyEscOverlay = false end end,
         L["CFG_CHK_ESC_DIM_TIP"])
+
+    -- On by default: nil = on, explicit false = off.
+    y = AddCheck(ct, y, L["CFG_CHK_STICKY_INLINE_EDIT_LABEL"],
+        function() return db.stickyInlineEdit ~= false end,
+        function(v) if v then db.stickyInlineEdit = nil else db.stickyInlineEdit = false end end,
+        L["CFG_CHK_STICKY_INLINE_EDIT_TIP"])
 
     -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
     y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
@@ -3075,7 +3083,23 @@ local function BuildEditorTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
+    -- ── Saving ───────────────────────────────────────────────────────────────
+    -- Save mode (ALL-52): nil = automatic, "manual" = Save button. First in
+    -- the tab because it changes how the whole editor works (Dukul, 2026-09-24).
+    -- Automatic uses the idle delay / forced interval under Undo / Redo.
+    y = AddHeader(ct, y, L["CFG_HDR_SAVING"])
+    y = AddCheck(ct, y, L["CFG_CHK_AUTOSAVE_LABEL"],
+        function() return db.saveMode ~= "manual" end,
+        function(v)
+            if v then db.saveMode = nil else db.saveMode = "manual" end
+            -- Switching to automatic saves what is pending right away
+            if v and BNB.SaveCurrentNoteQuiet then BNB.SaveCurrentNoteQuiet() end
+            if BNB.ApplySaveMode then BNB.ApplySaveMode() end
+        end,
+        L["CFG_CHK_AUTOSAVE_TIP"])
+
     -- ── Formatting Toolbar ────────────────────────────────────────────────────
+    AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_FORMATTING_TOOLBAR"])
 
     local tbDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

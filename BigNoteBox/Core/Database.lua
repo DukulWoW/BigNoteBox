@@ -46,7 +46,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 5   -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 14  -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 15  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS
@@ -56,7 +56,6 @@ BNB.defaults = {
     fontSize  = 13,
     splitX    = 240,
     settings  = {
-        autosave         = true,
         contextSurface   = true,
         bcbIntegration   = true,
         sendKeybind      = nil,
@@ -301,6 +300,15 @@ local function MigrateSettingsDB()
         v = 14
     end
 
+    -- ++ v14 -> v15: drop the dead autosave key (ALL-52) ++++++++++++++++++++++
+    if v < 15 then
+        -- "Autosave notes on switch" was never read by anything. Save behaviour
+        -- is now db.saveMode (nil = automatic, "manual"), a new key on purpose:
+        -- autosave = true was stored for users who had manual saving.
+        db.autosave = nil
+        v = 15
+    end
+
     db.dbVersion = SETTINGS_SCHEMA_VERSION
 end
 
@@ -357,7 +365,6 @@ local function InitSettingsDB()
     if db.lineHeight  == nil then db.lineHeight = "1.0"             end
 
     -- Feature flags
-    if db.autosave        == nil then db.autosave        = defaults.settings.autosave        end
     if db.contextSurface  == nil then db.contextSurface  = defaults.settings.contextSurface  end
     if db.bcbIntegration  == nil then db.bcbIntegration  = defaults.settings.bcbIntegration  end
     if db.sendKeybind     == nil then db.sendKeybind     = defaults.settings.sendKeybind      end

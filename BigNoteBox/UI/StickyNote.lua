@@ -483,6 +483,18 @@ local function AnchorScrollTop(sf, front, headerH, fp)
     sf:SetPoint("TOPLEFT", front, "TOPLEFT", x, y)
 end
 
+-- Draws the note's icon into tex, the same way the note list does: NPC notes
+-- get the NPC's face from the saved display ID (ALL-46, Features/TargetNote.lua)
+-- and keep the note icon until it is resolved.
+local STICKY_DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
+local function SetStickyNoteIcon(tex, note)
+    if not tex then return end
+    local icon = note and (BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon)
+    tex:SetTexture((icon and icon ~= "") and icon or STICKY_DEFAULT_ICON)
+    tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    if note and BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+end
+
 local function ApplyConfig(frame, noteID)
     local cfg  = GetCfg(noteID)
     local note = BNB.GetNote(noteID)
@@ -612,9 +624,7 @@ local function ApplyConfig(frame, noteID)
     -- Refresh mini tile icon texture in case the note's icon changed since the
     -- tile was first built (tile._iconTex is set at CreateMiniTile time).
     if frame._miniTile and frame._miniTile._iconTex then
-        local iconPath = (note and note.icon and note.icon ~= "") and note.icon
-                         or "Interface\\Icons\\INV_Misc_Note_06"
-        frame._miniTile._iconTex:SetTexture(iconPath)
+        SetStickyNoteIcon(frame._miniTile._iconTex, note)
     end
 end
 
@@ -632,6 +642,7 @@ local function ForwardHover(child, root)
         end
     end)
     child:SetScript("OnLeave", function()
+        if root._inlineEditing then return end   -- stays at hover alpha while editing
         local c = root._cfg
         ApplyBgAlpha(root, c and c.alpha or 0.96, c)
         -- Restore text alpha to its configured value
@@ -2330,12 +2341,14 @@ local function PopulateStickySettings(noteID)
         if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         if BNB.SyncNoteConfig      then BNB.SyncNoteConfig(noteID) end
+        SN.RefreshMarkers(noteID)
         BNB:Print(L["STICKY_CONTEXT_BINDING_SAVED"])
     end)
 
     -- ── Clear ─────────────────────────────────────────────────────────────────
     sitClearCtxBtn:SetScript("OnClick", function()
         BNB.UpdateNote(noteID, { _clear = {"context", "contextDisplay", "contextLeave"} })
+        SN.RefreshMarkers(noteID)
         if sitValueEb then sitValueEb:SetText("") end
         sitSelType = "none"; sitSelDisplay = "popup"; sitSelLeave = "keep"
         SitSetTypeText(SIT_TYPE_LABELS[1])
@@ -2945,9 +2958,7 @@ local function CreateMiniTile(frame, noteID, note)
     local iconTex = tile:CreateTexture(nil, "ARTWORK")
     iconTex:SetSize(MINI_SIZE - 8, MINI_SIZE - 8)
     iconTex:SetPoint("CENTER", tile, "CENTER")
-    iconTex:SetTexture((note.icon and note.icon ~= "") and note.icon
-                       or "Interface\\Icons\\INV_Misc_Note_06")
-    iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    SetStickyNoteIcon(iconTex, note)
     tile._iconTex = iconTex   -- stored so ApplyConfig can refresh it on icon change
 
     -- Hover alpha
@@ -3046,6 +3057,26 @@ local ICON_SZ    = 36
 local ICON_INSET = 6
 local ICON_PAD   = 2
 
+-- Situation and class markers on the icon badge, as on the note list icon.
+local function UpdateStickyMarkers(iconFrame, note)
+    if not (iconFrame and note) then return end
+    if iconFrame._situTex then
+        if note.context and note.context ~= "" then iconFrame._situTex:Show()
+        else iconFrame._situTex:Hide() end
+    end
+    if iconFrame._scopeTex then
+        local sc = note.scope
+        local path = sc and sc:match("^char:") and BNB.Sidebar and BNB.Sidebar.IconForKey
+                     and BNB.Sidebar.IconForKey(sc)
+        if path then
+            iconFrame._scopeTex:SetTexture(path)
+            iconFrame._scopeTex:Show()
+        else
+            iconFrame._scopeTex:Hide()
+        end
+    end
+end
+
 local function BuildIconBadge(f, noteID, note)
     -- Destroy existing badge if present
     if f._iconFrame then
@@ -3056,6 +3087,7 @@ local function BuildIconBadge(f, noteID, note)
         f._iconFrame:Hide()
         f._iconFrame:SetParent(nil)
         f._iconFrame = nil
+        f._badgeTex  = nil
     end
 
     if not (note.icon and note.icon ~= "") then
@@ -3080,15 +3112,36 @@ local function BuildIconBadge(f, noteID, note)
     local iconTex = iconFrame:CreateTexture(nil, "ARTWORK")
     iconTex:SetPoint("TOPLEFT",     iconFrame, "TOPLEFT",     ICON_PAD,  -ICON_PAD)
     iconTex:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -ICON_PAD,  ICON_PAD)
-    iconTex:SetTexture(note.icon)
-    iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    SetStickyNoteIcon(iconTex, note)
+    f._badgeTex = iconTex   -- re-drawn by SN.RefreshNpcPortraits
+
+    -- Markers from the note list icon (UI/NoteList.lua): situation top-right,
+    -- class icon of the owning character bottom-left. Same size ratio as the
+    -- list's OverlaySize. Shown/hidden by UpdateStickyMarkers.
+    local ovSz   = math.max(10, math.floor(ICON_SZ * 0.38))
+    local ovHost = CreateFrame("Frame", nil, iconFrame)
+    ovHost:SetAllPoints(iconFrame)
+    ovHost:SetFrameLevel(iconFrame:GetFrameLevel() + 5)   -- above the icon border
+    ovHost:EnableMouse(false)
+    local situ = ovHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    situ:SetSize(ovSz, ovSz)
+    situ:SetPoint("TOPRIGHT", iconFrame, "TOPRIGHT", 2, 2)
+    situ:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\ov-situation")
+    situ:Hide()
+    local scope = ovHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    scope:SetSize(ovSz, ovSz)
+    scope:SetPoint("BOTTOMLEFT", iconFrame, "BOTTOMLEFT", -2, -2)
+    scope:Hide()
+    iconFrame._situTex  = situ
+    iconFrame._scopeTex = scope
+    UpdateStickyMarkers(iconFrame, note)
 
     -- Left-click: toggle minimize (both when normal and when minimized)
-    -- Right-click: close the sticky note entirely (only when minimized —
-    --   when the note is open the X button in the header is used instead)
+    -- Right-click: close the sticky note entirely, open or minimized, the same
+    --   as right-clicking the mini tile (Dukul, 2026-09-24)
     iconFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     iconFrame:SetScript("OnClick", function(self, btn)
-        if btn == "RightButton" and f._minimized then
+        if btn == "RightButton" then
             SN.Close(noteID)
         elseif btn == "LeftButton" then
             SN.SetMinimized(noteID, not f._minimized)
@@ -3458,6 +3511,164 @@ local function EnsureStickyTaskCallback()
     end)
 end
 
+-- ── Inline editing ────────────────────────────────────────────────────────────
+-- Double-click the body of a plain note to edit it in the sticky. Rich notes,
+-- and rich notes shown as plain text (markup stripped, so saving the visible
+-- text would destroy it), open in the main window instead, as do locked notes.
+-- Saves once, when editing ends: Escape, a click outside the sticky, the body
+-- hiding (minimize, close, task view) or logout. On by default; turned off by
+-- BigNoteBoxDB.stickyInlineEdit == false.
+local EDIT_GLOW_KEY   = "bnbStickyEdit"
+local EDIT_GLOW_COLOR = { 0.400, 0.733, 0.416, 1 }  -- BNB green, the alarm glow default
+local DBLCLICK_TIME   = 0.35
+
+local _editLCG
+local function GetEditLCG()
+    if not _editLCG then _editLCG = LibStub and LibStub("LibCustomGlow-1.0", true) end
+    return _editLCG
+end
+
+-- Same rule as NoteIsLocked in NoteEditor.lua
+local function StickyNoteIsLocked(note)
+    if note.locked == true  then return true  end
+    if note.locked == false then return false end
+    return BigNoteBoxDB and BigNoteBoxDB.lockNotes == true
+end
+
+-- Title row: a lock before the title on locked notes, as in the note list.
+-- f._titleLeft is the offset BuildIconBadge returned (clears the icon badge).
+local TITLE_LOCK_SZ    = 14
+local TITLE_LOCK_ALPHA = 0.65
+local function LayoutStickyTitle(f, note)
+    local lbl, hdr = f._titleLbl, f._headerBar
+    if not (lbl and hdr) then return end
+    local left = f._titleLeft or PAD
+    local lock = f._titleLock
+    if lock then
+        if note and StickyNoteIsLocked(note) then
+            lock:ClearAllPoints()
+            lock:SetPoint("LEFT", hdr, "LEFT", left, 0)
+            lock:Show()
+            left = left + TITLE_LOCK_SZ + 3
+        else
+            lock:Hide()
+        end
+    end
+    lbl:ClearAllPoints()
+    lbl:SetPoint("LEFT",  hdr, "LEFT",  left, 0)
+    lbl:SetPoint("RIGHT", hdr, "RIGHT", -PAD, 0)
+end
+
+-- Open the note in the main window with the cursor in the body, ready to type.
+-- A rich note in view mode is switched to edit mode first.
+local function OpenInMainEditor(noteID)
+    CloseESCAndDo(function()
+        if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
+        if not BNB.mainFrame then
+            if BNB.CreateMainWindow then BNB.CreateMainWindow() end
+        end
+        if not BNB.mainFrame then return end
+        BNB.mainFrame:Show()
+        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+        if BNB.SelectNote      then BNB.SelectNote(noteID) end
+        -- SelectNote refuses the switch when the current note has no title
+        if BNB._currentNoteID ~= noteID then return end
+        if BNB._editorInViewMode and not BNB._editorLocked and BNB.AM_EnterEditMode then
+            BNB.AM_EnterEditMode()
+        end
+        -- Same one-tick delay as the Quick Note button; cursor at the end.
+        C_Timer.After(0.05, function()
+            local eb = BNB._editorBody
+            if eb and not BNB._editorLocked and BNB._currentNoteID == noteID then
+                eb:SetFocus()
+                eb:SetCursorPosition(#(eb:GetText() or ""))
+            end
+        end)
+    end)
+end
+
+local function EndInlineEdit(f)
+    if not (f and f._inlineEditing) then return end
+    f._inlineEditing = false   -- cleared first: ClearFocus below re-enters via OnEditFocusLost
+    local eb, noteID = f._bodyEb, f._noteID
+    local lcg = GetEditLCG()
+    if lcg then pcall(lcg.PixelGlow_Stop, f, EDIT_GLOW_KEY) end
+    eb:ClearFocus()
+    eb:SetEnabled(false)
+    eb:SetScript("OnCursorChanged", nil)
+    if not f:IsMouseOver() then
+        local c = f._cfg
+        ApplyBgAlpha(f, c and c.alpha or 0.96, c)
+        pcall(function() eb:SetAlpha(c and c.textAlpha or 1.0) end)
+    end
+
+    local note = BNB.GetNote(noteID)
+    local text = eb:GetText() or ""
+    if not note or text == (note.body or "") then return end
+    BNB.UpdateNote(noteID, { body = text })
+    -- Keep the main window in step when it holds this note
+    if BNB._currentNoteID == noteID and BNB._editorBody and BNB.LoadNoteInEditor then
+        pcall(BNB.LoadNoteInEditor, noteID)
+    end
+    if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then
+        pcall(BNB.RefreshNoteList)
+    end
+end
+
+local function StartInlineEdit(f)
+    local noteID = f._noteID
+    local note = BNB.GetNote(noteID)
+    if not note or f._inlineEditing or f._taskViewActive or f._minimized then return end
+
+    local cfg  = GetCfg(noteID)
+    local rich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
+    if not rich and cfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
+        local body = note.body or ""
+        rich = BNB.AdvancedMode.StripMarkup(body) ~= body
+    end
+    if rich or StickyNoteIsLocked(note) then OpenInMainEditor(noteID); return end
+
+    -- Unsaved edits to this note in the main window go in first, so neither
+    -- side overwrites the other. A failed save (no title) stops here.
+    if BNB._currentNoteID == noteID and BNB._dirty and BNB.SaveCurrentNote then
+        BNB.SaveCurrentNote()
+        if BNB._dirty then return end
+    end
+
+    f._inlineEditing = true
+    local eb = f._bodyEb
+    if eb:GetText() ~= (note.body or "") then eb:SetText(note.body or "") end
+    eb:SetEnabled(true)
+    if f._cursorFollow then eb:SetScript("OnCursorChanged", f._cursorFollow) end
+    local c = f._cfg
+    ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
+    pcall(function() eb:SetAlpha(math.max(0.95, c and c.textAlpha or 1.0)) end)
+    eb:SetFocus()
+    eb:SetCursorPosition(#(eb:GetText() or ""))
+    local lcg = GetEditLCG()
+    if lcg then
+        pcall(lcg.PixelGlow_Start, f, EDIT_GLOW_COLOR, 8, 0.10, 10,
+              nil, nil, nil, nil, EDIT_GLOW_KEY)
+    end
+end
+
+-- A click anywhere outside an editing sticky ends the edit (via focus loss).
+local _editWatch = CreateFrame("Frame")
+_editWatch:SetScript("OnEvent", function()
+    for _, f in pairs(openFrames) do
+        if f._inlineEditing and not f:IsMouseOver() then
+            f._bodyEb:ClearFocus()
+        end
+    end
+end)
+pcall(_editWatch.RegisterEvent, _editWatch, "GLOBAL_MOUSE_DOWN")
+
+-- Logout saves any edit still open. Through BNB.RegisterEvent so it runs
+-- before NoteHistory's logout snapshot, which then holds the new text.
+BNB.RegisterEvent("PLAYER_LOGOUT", function()
+    for _, f in pairs(openFrames) do pcall(EndInlineEdit, f) end
+end)
+
 -- ── Build a sticky note frame ─────────────────────────────────────────────────
 local function CreateStickyFrame(noteID)
     local note = BNB.GetNote(noteID)
@@ -3483,6 +3694,7 @@ local function CreateStickyFrame(noteID)
         ApplyBgAlpha(self, math.max(0.95, c and c.alpha or 0.95), c)
     end)
     f:SetScript("OnLeave", function(self)
+        if self._inlineEditing then return end
         local c = self._cfg
         ApplyBgAlpha(self, c and c.alpha or 0.96, c)
     end)
@@ -3534,6 +3746,16 @@ local function CreateStickyFrame(noteID)
     else        titleLbl:SetTextColor(unpack(COL_GOLD)) end
     titleLbl:SetText(note.title ~= "" and note.title or L["UNTITLED"])
     f._titleLbl = titleLbl
+
+    -- Lock before the title on locked notes (same asset as the note list)
+    local titleLock = header:CreateTexture(nil, "ARTWORK")
+    titleLock:SetSize(TITLE_LOCK_SZ, TITLE_LOCK_SZ)
+    titleLock:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Actionbar\\ab-lock")
+    titleLock:SetAlpha(TITLE_LOCK_ALPHA)
+    titleLock:Hide()
+    f._titleLock  = titleLock
+    f._titleLeft  = titleLeft
+    LayoutStickyTitle(f, note)
 
     -- ── Icon button overlay ───────────────────────────────────────────────────
     -- A container frame that holds all header icon buttons, parented to the header
@@ -3655,17 +3877,9 @@ local function CreateStickyFrame(noteID)
     end)
 
     HdrBtn(4, "bt-edit", L["STICKY_OPEN_TO_EDIT_TIP"], function()
-        CloseESCAndDo(function()
-            if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
-            if not BNB.mainFrame then
-                if BNB.CreateMainWindow then BNB.CreateMainWindow() end
-            end
-            if BNB.mainFrame then
-                BNB.mainFrame:Show()
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.SelectNote      then BNB.SelectNote(noteID) end
-            end
-        end)
+        -- Ends (and saves) an inline edit first, so BNB opens on the new text
+        EndInlineEdit(f)
+        OpenInMainEditor(noteID)
     end)
 
     -- slot 5 = alarm: opens alarm setter window anchored to this button
@@ -3746,7 +3960,8 @@ local function CreateStickyFrame(noteID)
     f._focusHovered = 0
 
     f:HookScript("OnUpdate", function(self, elapsed)
-        local over = f:IsMouseOver() or (f._focusHovered and f._focusHovered > 0)
+        -- Inline editing counts as hovered: buttons and header stay visible
+        local over = f._inlineEditing or f:IsMouseOver() or (f._focusHovered and f._focusHovered > 0)
         local cfg  = f._cfg
         local focusMode = cfg and cfg.focusMode
 
@@ -3800,6 +4015,7 @@ local function CreateStickyFrame(noteID)
 
             -- Animate title, icon, task footer, and scrollbar alpha
             if f._titleLbl   then f._titleLbl:SetAlpha(_focusLerp) end
+            if f._titleLock  then f._titleLock:SetAlpha(_focusLerp * TITLE_LOCK_ALPHA) end
             if f._iconFrame  then f._iconFrame:SetAlpha(_focusLerp) end
             if f._taskFooter then f._taskFooter:SetAlpha(_focusLerp) end
             if f._bodySB then f._bodySB:SetAlpha(_focusLerp * (f._bodySB._hasRange and 1 or 0)) end
@@ -3845,8 +4061,13 @@ local function CreateStickyFrame(noteID)
     bodyEb:SetEnabled(false)
     bodyEb:SetAlpha(0.90)
     -- Sticky note body is read-only — disable OnCursorChanged so SetText
-    -- doesn't auto-scroll to the cursor position (which ends up mid-note)
+    -- doesn't auto-scroll to the cursor position (which ends up mid-note).
+    -- Kept on the frame so inline editing can turn cursor-follow back on.
+    f._cursorFollow = bodyEb:GetScript("OnCursorChanged")
     bodyEb:SetScript("OnCursorChanged", nil)
+    bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
+    -- Minimize, close, task view and HideAll all hide the body: end the edit
+    sf2:HookScript("OnHide", function() EndInlineEdit(f) end)
     ForwardHover(sf2, f)
     ForwardHover(bodyEb, f)
     -- ScrollFrameTemplate scrollbar has nested children (track, thumb, buttons)
@@ -3930,6 +4151,25 @@ local function CreateStickyFrame(noteID)
     end)
 
     ForwardHover(richScroll, f)
+
+    -- Double-click on the body starts an inline edit (StartInlineEdit sends rich
+    -- and locked notes to the main window). EditBox and ScrollFrame have no
+    -- OnDoubleClick, so two left presses within DBLCLICK_TIME count as one.
+    local function OnBodyMouseDown(_, button)
+        if button ~= "LeftButton" or f._inlineEditing then return end
+        local now = GetTime()
+        if f._lastBodyClick and now - f._lastBodyClick <= DBLCLICK_TIME then
+            f._lastBodyClick = nil
+            if BigNoteBoxDB and BigNoteBoxDB.stickyInlineEdit == false then return end
+            StartInlineEdit(f)
+        else
+            f._lastBodyClick = now
+        end
+    end
+    bodyEb:HookScript("OnMouseDown", OnBodyMouseDown)
+    sf2:HookScript("OnMouseDown", OnBodyMouseDown)
+    richScroll:HookScript("OnMouseDown", OnBodyMouseDown)
+    richRender:HookScript("OnMouseDown", OnBodyMouseDown)
 
     -- ── Task scroll frame ─────────────────────────────────────────────────────
     -- Sibling to _bodyScroll and _richScroll. Shown only when task view is active.
@@ -4125,17 +4365,20 @@ function SN.SetMinimized(noteID, minimized)
         -- Hide resize handle while minimized
         if f._resizeHandle then f._resizeHandle:Hide() end
 
-        -- Position tile at the TOPRIGHT of the note (where the minimize button was)
+        -- Centre the tile on the icon badge, so the icon stays where it was
+        -- clicked. Uses the badge's slot (BuildIconBadge anchors) rather than
+        -- f._iconFrame, so a note without an icon minimizes to the same spot.
         local tile = f._miniTile
         if tile then
-            local right = f:GetRight()
-            local top   = f:GetTop()
-            local s     = f:GetEffectiveScale()
-            local us    = UIParent:GetEffectiveScale()
-            if right and top then
+            local left = f:GetLeft()
+            local top  = f:GetTop()
+            local s    = f:GetEffectiveScale()
+            local us   = UIParent:GetEffectiveScale()
+            if left and top then
+                local off = ICON_SZ / 2 - ICON_INSET   -- badge centre from the note's top-left
                 tile:ClearAllPoints()
-                tile:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT",
-                    (right * s) / us, (top * s) / us)
+                tile:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
+                    ((left + off) * s) / us, ((top - off) * s) / us)
             else
                 tile:ClearAllPoints()
                 tile:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
@@ -4154,19 +4397,19 @@ function SN.SetMinimized(noteID, minimized)
 
         f:SetSize(f._savedW or DEF_W, f._savedH or DEF_H)
 
-        -- Place note so its top-right corner aligns with the tile's top-left
-        -- (note "drops down" from the icon)
+        -- Place the note so its icon badge lands where the tile is (the
+        -- inverse of the minimize placement above)
         local tile = f._miniTile
         if tile then
-            local s   = UIParent:GetEffectiveScale()
-            local ts  = tile:GetEffectiveScale()
-            local tl  = tile:GetLeft()
-            local tt  = tile:GetTop()
-            if tl and tt then
+            local s      = UIParent:GetEffectiveScale()
+            local ts     = tile:GetEffectiveScale()
+            local tx, ty = tile:GetCenter()
+            if tx and ty then
+                local off = ICON_SZ / 2 - ICON_INSET
                 f:ClearAllPoints()
-                f:SetPoint("TOPRIGHT", UIParent, "BOTTOMLEFT",
-                    (tl * ts) / s,
-                    (tt * ts) / s)
+                f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT",
+                    (tx * ts) / s - off,
+                    (ty * ts) / s + off)
             end
         end
 
@@ -4257,6 +4500,7 @@ end
 
 function SN.Close(noteID)
     local f = openFrames[noteID]; if not f then return end
+    EndInlineEdit(f)   -- save before the frame fades out
     -- Clear per-note task collapse state
     _stickyCollapsed[noteID] = nil
     -- If this was an ESC-only sticky, clear the flag so the next open is a
@@ -4429,6 +4673,72 @@ function SN.Toggle(noteID)
     end
 end
 
+-- Re-lay the title lock after a lock change. noteID nil = every open sticky
+-- (the global "lock notes" setting). Title row only, so the body keeps its scroll.
+function SN.RefreshLockIcons(noteID)
+    for id, f in pairs(openFrames) do
+        if not noteID or id == noteID then
+            LayoutStickyTitle(f, BNB.GetNote(id))
+        end
+    end
+end
+
+-- Autosave from the main window (ALL-52): update the title and body in place,
+-- keeping the scroll position. RefreshNote would scroll to the top and rebuild
+-- the icon badge on every save while typing.
+function SN.RefreshBodyLive(noteID)
+    local f = openFrames[noteID]; if not f then return end
+    local note = BNB.GetNote(noteID); if not note then return end
+    if f._titleLbl then
+        f._titleLbl:SetText(note.title ~= "" and note.title or L["UNTITLED"])
+    end
+    if f._inlineEditing or f._taskViewActive then return end
+    if f._richNoteID == noteID and f._richScroll:IsShown() then
+        local rf, rs = f._richRender, f._richScroll
+        local y  = rs:GetVerticalScroll()
+        local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, BNB.AdvancedMode.OutlineFlagStr(note.fontOutline))
+        local rawST = getmetatable(rf).__index.SetText
+        rawST(rf, BNB.AdvancedMode.ToHTML(note.body or "", bs))
+        rf:SetHeight(rf:GetContentHeight())
+        C_Timer.After(0, function()
+            rs:SetVerticalScroll(math.min(y, rs:GetVerticalScrollRange() or y))
+        end)
+    elseif f._bodyScroll:IsShown() then
+        local body = note.body or ""
+        if GetCfg(noteID).richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
+            body = BNB.AdvancedMode.StripMarkup(body)
+        end
+        if f._bodyEb:GetText() ~= body then
+            local sf, y = f._bodyScroll, f._bodyScroll:GetVerticalScroll()
+            f._bodyEb:SetText(body)
+            -- Runs after the SetText hook in Widgets.lua, which scrolls to 0
+            C_Timer.After(0, function()
+                sf:SetVerticalScroll(math.min(y, sf:GetVerticalScrollRange() or y))
+            end)
+        end
+    end
+end
+
+-- Re-show the situation/class markers after a context or scope change.
+function SN.RefreshMarkers(noteID)
+    local f = noteID and openFrames[noteID]
+    if f then UpdateStickyMarkers(f._iconFrame, BNB.GetNote(noteID)) end
+end
+
+-- Re-draw the icon badge and mini tile of every open sticky. Called by
+-- TargetNote.lua once an NPC's display ID has been looked up, so the portrait
+-- replaces the placeholder icon without reopening the sticky.
+function SN.RefreshNpcPortraits()
+    for id, f in pairs(openFrames) do
+        local note = BNB.GetNote(id)
+        if note and note.source == "target" then
+            SetStickyNoteIcon(f._badgeTex, note)
+            if f._miniTile then SetStickyNoteIcon(f._miniTile._iconTex, note) end
+        end
+    end
+end
+
 -- Close the sticky settings panel (called by ESC handler in MainWindow)
 function SN.CloseSettings()
     CloseStickySettings()
@@ -4464,13 +4774,10 @@ function SN.RefreshNote(noteID)
         f._titleLbl:SetText(note.title ~= "" and note.title or L["UNTITLED"])
     end
     -- Rebuild icon badge (handles icon added, changed, or cleared)
-    local titleLeft = BuildIconBadge(f, noteID, note)
-    if f._titleLbl then
-        f._titleLbl:ClearAllPoints()
-        f._titleLbl:SetPoint("LEFT",  f._headerBar, "LEFT",  titleLeft, 0)
-        f._titleLbl:SetPoint("RIGHT", f._headerBar, "RIGHT", -PAD,      0)
-    end
-    if f._bodyEb then
+    f._titleLeft = BuildIconBadge(f, noteID, note)
+    LayoutStickyTitle(f, note)
+    -- Mid-edit: leave the body alone, SetText would move the cursor and drop typing
+    if f._bodyEb and not f._inlineEditing then
         -- If task view is currently active, don't clobber it — just update
         -- the title and badge above which we've already done.
         if f._taskViewActive then

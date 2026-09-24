@@ -585,6 +585,68 @@ function BNB.SaveCurrentNote()
 end
 
 --------------------------------------------------------------------------------
+-- AUTOSAVE (ALL-52)
+-- BigNoteBoxDB.saveMode: nil = automatic (default), "manual" = the Save button,
+-- a note switch or closing the window saves, nothing else. Automatic saves on
+-- the undo snapshot rhythm: undoIdleDelay after the last edit, and at least
+-- every undoForcedInterval while typing without a pause. Both modes save on
+-- logout, so a /reload never loses text (OnHide does not run on a reload).
+--------------------------------------------------------------------------------
+function BNB.IsAutoSave()
+    return not (BigNoteBoxDB and BigNoteBoxDB.saveMode == "manual")
+end
+
+-- Saves the open note without SaveCurrentNote's title check: an empty title is
+-- not an error here, the text is saved and the stored title kept. BNB._dirty
+-- stays set while the title is empty, so the title guards on note switch and
+-- window close still apply.
+function BNB.SaveCurrentNoteQuiet()
+    if not BNB._dirty then return end
+    local id   = BNB._currentNoteID
+    local note = id and BNB.GetNote(id)
+    if not note then BNB._dirty = false; return end
+
+    local title = BNB._editorTitle and BNB._editorTitle:GetText() or note.title
+    local body  = BNB._editorBody  and BNB._editorBody:GetText()  or note.body
+    if BNB._editorTitle and BNB._editorTitle._showingPlaceholder then title = "" end
+    if BNB._editorBody  and BNB._editorBody._showingPlaceholder  then body  = "" end
+    if title == L["NOTE_TITLE_HINT"] then title = "" end
+    if body  == L["NOTE_BODY_HINT"]  then body  = "" end
+
+    local fields = { body = body }
+    if title ~= "" then fields.title = title end
+    BNB.UpdateNote(id, fields)
+    BNB._dirty = (title == "")
+    if BNB.UpdateSaveButtonState then BNB.UpdateSaveButtonState() end
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    if BNB._syncNoteConfigTitle then BNB._syncNoteConfigTitle() end
+    -- Live update: keeps the sticky's scroll, unlike RefreshNote
+    if BNB.Sticky and BNB.Sticky.RefreshBodyLive then BNB.Sticky.RefreshBodyLive(id) end
+end
+
+local _autoIdle, _autoForced
+local function RunAutoSave()
+    if _autoIdle   then _autoIdle:Cancel();   _autoIdle   = nil end
+    if _autoForced then _autoForced:Cancel(); _autoForced = nil end
+    if BNB.IsAutoSave() then pcall(BNB.SaveCurrentNoteQuiet) end
+end
+
+-- Called from BNB.MarkDirty (UI/NoteEditor.lua) on every editor change.
+function BNB.ScheduleAutoSave()
+    if not BNB.IsAutoSave() then return end
+    local db     = BigNoteBoxDB
+    local idle   = (db and db.undoIdleDelay)      or 0.8
+    local forced = (db and db.undoForcedInterval) or 3.0
+    if _autoIdle then _autoIdle:Cancel() end
+    _autoIdle = C_Timer.NewTimer(idle, RunAutoSave)
+    if not _autoForced then _autoForced = C_Timer.NewTimer(forced, RunAutoSave) end
+end
+
+BNB.RegisterEvent("PLAYER_LOGOUT", function()
+    pcall(BNB.SaveCurrentNoteQuiet)
+end)
+
+--------------------------------------------------------------------------------
 -- MARK DIRTY
 --------------------------------------------------------------------------------
 function BNB.MarkDirty()

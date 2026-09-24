@@ -111,6 +111,7 @@ local function RefreshAfterResolve()
             BNB.RefreshNoteList()
         end
         if BNB.RefreshReferenceBoxTabs then BNB.RefreshReferenceBoxTabs() end
+        if BNB.Sticky and BNB.Sticky.RefreshNpcPortraits then BNB.Sticky.RefreshNpcPortraits() end
     end)
 end
 

@@ -751,9 +751,11 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
             swatchFunc=function()
                 local r,g,b=ColorPickerFrame:GetColorRGB()
                 glowColorVal={r,g,b,1}; swTx:SetColorTexture(r,g,b,1); MarkDirty()
+                if f._restartPreview then f._restartPreview() end
             end,
             cancelFunc=function()
                 glowColorVal=pv; swTx:SetColorTexture(pv[1],pv[2],pv[3],1)
+                if f._restartPreview then f._restartPreview() end
             end,
             hasOpacity=false,r=pv[1],g=pv[2],b=pv[3],
         })

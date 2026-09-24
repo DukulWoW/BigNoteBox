@@ -64,6 +64,24 @@ local _baseMarkDirty = BNB.MarkDirty
 BNB.MarkDirty = function()
     BNB._dirty = true
     BNB.UpdateSaveButtonState()
+    if BNB.ScheduleAutoSave then BNB.ScheduleAutoSave() end   -- ALL-52
+end
+
+-- Automatic save mode hides the Save button and closes its gap: the buttons
+-- after it are anchored at fixed x offsets, so each moves left by one slot.
+-- _baseX is recorded once, when the toolbar is built.
+local SAVE_SLOT_W = 32
+function BNB.ApplySaveMode()
+    local bar = BNB._editorToolbar
+    if not (bar and saveBtn) then return end
+    local auto = BNB.IsAutoSave and BNB.IsAutoSave()
+    saveBtn:SetShown(not auto)
+    for _, c in ipairs({ bar:GetChildren() }) do
+        if c._baseX then
+            c:ClearAllPoints()
+            c:SetPoint("LEFT", bar, "LEFT", c._baseX - (auto and SAVE_SLOT_W or 0), 0)
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -3087,6 +3105,7 @@ local function BuildToolbar(parent)
             -- Lock persistently (same as right-click "Lock note")
             BNB.UpdateNote(id, { locked = true })
         end
+        if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(id) end
         if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
         BNB.LoadNoteInEditor(id)
     end)
@@ -3169,6 +3188,12 @@ local function BuildToolbar(parent)
     bar._delBtn  = delBtn
     bar._dupBtn  = dupBtn
     bar._copyBtn = copyBtn
+
+    -- Record the left-anchored buttons after Save for BNB.ApplySaveMode
+    for _, c in ipairs({ bar:GetChildren() }) do
+        local p, rel, _, x = c:GetPoint(1)
+        if c ~= saveBtn and p == "LEFT" and rel == bar and x then c._baseX = x end
+    end
     return bar
 end
 
@@ -4295,6 +4320,7 @@ function BNB.BuildNoteEditor()
     -- Becomes clickable only when the current note has coord data.
     local toolbar = BuildToolbar(pane)
     BNB._editorToolbar = toolbar
+    BNB.ApplySaveMode()
 
     -- Tag strip sits between body and toolbar — build after toolbar so we know TOOLBAR_H
     local tagStrip, tagStripSep = BuildTagStrip(pane, toolbar)
