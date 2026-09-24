@@ -2733,12 +2733,12 @@ local function BuildAdvancedTab(sf, ct)
         function(v)
             db.blizzardIconComplete = v
             if v then
-                -- Enable: promote the list into BNB.BlizzardIconList right now
-                -- so the user can use it immediately without a reload.
-                if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList() end
+                -- Enable: load BigNoteBox_Icons now so the autocomplete works
+                -- without a reload; says in chat why if it cannot (ALL-62).
+                if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList(true) end
             else
-                -- Disable: nil the list (GC will reclaim it shortly).
-                -- Prompt for reload so the raw table is also freed.
+                -- Disable: stop using the list at once. It stays in memory
+                -- until a reload, which unloads BigNoteBox_Icons.
                 BNB.BlizzardIconList = nil
                 StaticPopup_Show("BNB_BLZICON_AC_DISABLE")
             end

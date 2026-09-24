@@ -1444,6 +1444,10 @@ L["CFG_CHK_WYSIWYG_TIP"]            = "Toggle the WYSIWYG formatting toolbar (Un
 L["CFG_RELOAD_NOW_BTN"]             = "Reload Now"
 L["CFG_LATER_BTN"]                  = "Later"
 L["CFG_BLZICON_DISABLED_MSG"]       = "Blizzard icon autocomplete has been disabled.\nThe icon list (~2 MB) will be freed after a reload."
+-- Icon autocomplete list could not load (ALL-62); shown only when the setting is switched on
+L["ICONLIST_MISSING"]               = "Blizzard icon autocomplete needs the BigNoteBox Icons addon, which is not installed. Reinstall BigNoteBox to get it back."
+L["ICONLIST_DISABLED"]              = "Blizzard icon autocomplete needs the BigNoteBox Icons addon, which is disabled. Enable it in the AddOns list and reload."
+L["ICONLIST_FAILED_FMT"]            = "Blizzard icon autocomplete could not load its icon list (%s)."
 
 L["CFG_KB_HINT_CTRL_N"]             = "(Default: Ctrl+N)"
 L["CFG_KB_HINT_CTRL_H"]             = "(Default: Ctrl+H)"

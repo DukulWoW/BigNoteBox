@@ -1,0 +1,10 @@
+## Interface: 120105, 120100
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r |cffaaaaaaIcons|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: Blizzard icon names for BigNoteBox's icon autocomplete. Loaded only when that setting is on.
+## Author: Dukul
+## Version: 1.0.0
+## Dependencies: BigNoteBox
+## LoadOnDemand: 1
+
+IconList.lua

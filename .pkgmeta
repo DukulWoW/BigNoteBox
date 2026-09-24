@@ -1,8 +1,8 @@
 # BigWigs packager layout contract for BigNoteBox.
-# This repo holds TWO addons at its root, so the default one-addon-per-repo
+# This repo holds THREE addons at its root, so the default one-addon-per-repo
 # assumption does not apply: move-folders lifts each addon folder up to the
-# top level of the zip. The result must list exactly BigNoteBox\ and
-# BigNoteBoxDB\ and nothing else - same as the hand-built Compress-Archive zip.
+# top level of the zip. The result must list exactly BigNoteBox\, BigNoteBoxDB\
+# and BigNoteBox_Icons\ (load-on-demand icon list, ALL-62) and nothing else.
 
 package-as: BigNoteBox
 
@@ -11,6 +11,7 @@ enable-nolib-creation: no
 move-folders:
   BigNoteBox/BigNoteBox: BigNoteBox
   BigNoteBox/BigNoteBoxDB: BigNoteBoxDB
+  BigNoteBox/BigNoteBox_Icons: BigNoteBox_Icons
 
 manual-changelog:
   filename: CHANGELOG.md

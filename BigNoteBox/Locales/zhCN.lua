@@ -1414,6 +1414,10 @@ L["CFG_CHK_WYSIWYG_TIP"]            = "切换所见即所得格式化工具栏 (
 L["CFG_RELOAD_NOW_BTN"]             = "立即重载"
 L["CFG_LATER_BTN"]                  = "稍后"
 L["CFG_BLZICON_DISABLED_MSG"]       = "暴雪图标自动完成已被禁用。\n图标列表 (约 2 MB) 将在重载后释放。"
+-- Icon autocomplete list could not load (ALL-62). Dukul, 2026-09-24
+L["ICONLIST_MISSING"]               = "暴雪图标自动补全功能需要 BigNoteBox Icons 插件，但该插件尚未安装。请重新安装 BigNoteBox 以恢复此功能。"
+L["ICONLIST_DISABLED"]              = "暴雪图标自动补全功能需要 BigNoteBox Icons 插件，但该插件已被禁用。请在插件列表中启用它，然后重新加载。"
+L["ICONLIST_FAILED_FMT"]            = "暴雪图标自动补全功能无法加载图标列表（%s）。"
 
 L["CFG_KB_HINT_CTRL_N"]             = "(默认：Ctrl+N)"
 L["CFG_KB_HINT_CTRL_H"]             = "(默认：Ctrl+H)"
