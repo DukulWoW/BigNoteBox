@@ -139,7 +139,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     if action == "confirm" then
         -- Small static popup to confirm/edit the title before creating
         StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] = StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] or {
-            text         = "Create note — edit title if needed:",
+            text         = "Create note - edit title if needed:",
             button1      = "Create",
             button2      = "Cancel",
             hasEditBox   = true,
@@ -1229,7 +1229,7 @@ function BNB.ToggleImmersionBypass()
         BNB:Print("QuickNote: Immersion restored.")
     else
         ImmersionBypassStart()
-        BNB:Print("QuickNote: Immersion bypassed — native frames active until conversation ends.")
+        BNB:Print("QuickNote: Immersion bypassed - native frames active until conversation ends.")
     end
 end
 

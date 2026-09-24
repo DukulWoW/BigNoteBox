@@ -434,7 +434,7 @@ html, body {
     <!-- Spine -->
     <div class="book-spine">
       <div class="book-spine-title">BigNoteBox</div>
-      <div class="book-spine-emblem"><span class="book-spine-rune">✦</span></div>
+      <div class="book-spine-emblem"><span class="book-spine-rune">*</span></div>
     </div>
 
     <!-- Corner ornaments (pre-rendered SVG, no JS required) -->
@@ -847,7 +847,7 @@ html, body {
     <rect x="22" y="12" width="14" height="56" rx="2" fill="#1a0d06" stroke="#c99a45" stroke-width="0.75"/>
     <rect x="34" y="22" width="56" height="36" rx="1" fill="#d4a96a" opacity="0.9"/>
     <text x="62" y="38" font-family="serif" font-size="7" fill="#2a1508" text-anchor="middle" font-weight="bold">BigNoteBox</text>
-    <text x="62" y="50" font-family="serif" font-size="4" fill="#5a3a1a" text-anchor="middle">— note export —</text>
+    <text x="62" y="50" font-family="serif" font-size="4" fill="#5a3a1a" text-anchor="middle">- note export -</text>
   </svg>
 </template>
 </body>

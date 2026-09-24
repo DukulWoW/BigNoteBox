@@ -402,10 +402,10 @@ local function BuildPicker()
     closeBtn:SetSize(20, 20)
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
     local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    closeLbl:SetAllPoints(); closeLbl:SetText("|cffaaaaaa×|r")
+    closeLbl:SetAllPoints(); closeLbl:SetText("|cffaaaaaax|r")
     closeBtn:SetScript("OnClick", function() ZP.Close() end)
-    closeBtn:SetScript("OnEnter", function() closeLbl:SetText("|cffff4444×|r") end)
-    closeBtn:SetScript("OnLeave", function() closeLbl:SetText("|cffaaaaaa×|r") end)
+    closeBtn:SetScript("OnEnter", function() closeLbl:SetText("|cffff4444x|r") end)
+    closeBtn:SetScript("OnLeave", function() closeLbl:SetText("|cffaaaaaax|r") end)
 
     f:Hide()
     return f

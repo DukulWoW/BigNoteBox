@@ -340,7 +340,7 @@ BNB.FEATURE_LIST = {
         blurb  = "BigNoteBox ships with a full skin system that replaces the default " ..
                  "WoW frame chrome with a custom styled look. Choose from multiple " ..
                  "colour presets and adjust brightness to your taste. Every window " ..
-                 "in BNB — including Config, RefBox, and sticky notes — follows " ..
+                 "in BNB - including Config, RefBox, and sticky notes - follows " ..
                  "the active skin.",
         items  = {
             "Skin mode toggle: switch between WoW default chrome and BNB skin",

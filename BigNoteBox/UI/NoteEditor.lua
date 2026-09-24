@@ -2631,7 +2631,7 @@ local function BuildWysiwygBar(parent, tsStrip)
                 break
             end
         end
-        local BULLET = "  · "  -- two spaces + middle dot (U+00B7) + space
+        local BULLET = "  - "  -- two spaces + hyphen + space
         local newText   = text:sub(1, lineStart) .. BULLET .. text:sub(lineStart + 1)
         local newCursor = cursor + #BULLET
         -- Seed snap with pre-bullet state if not yet initialised (note never typed in).
@@ -2647,7 +2647,8 @@ local function BuildWysiwygBar(parent, tsStrip)
         -- UndoPush: snap=old→pushed onto stack, snap updated to newText. Undo recovers old.
         BNB.UndoPush(id, newText, newCursor)
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
-        C_Timer.After(0, function() eb:SetCursorPosition(newCursor) end)
+        -- The button click took keyboard focus from the body; give it back.
+        C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
         BNB.MarkDirty()
     end)
 
@@ -3245,7 +3246,7 @@ local function RebuildTagChips(strip, tags)
         closeChip:SetSize(14, 14)
         closeChip:SetPoint("LEFT", lblBtn, "RIGHT", 2, 0)
         local closeLbl = closeChip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        closeLbl:SetAllPoints(); closeLbl:SetText("×"); closeLbl:SetTextColor(0.65, 0.65, 0.65)
+        closeLbl:SetAllPoints(); closeLbl:SetText("x"); closeLbl:SetTextColor(0.65, 0.65, 0.65)
         closeChip:SetScript("OnEnter", function() closeLbl:SetTextColor(1, 0.3, 0.3) end)
         closeChip:SetScript("OnLeave", function() closeLbl:SetTextColor(0.65, 0.65, 0.65) end)
         closeChip:SetScript("OnClick", function()

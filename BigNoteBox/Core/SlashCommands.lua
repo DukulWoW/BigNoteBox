@@ -33,7 +33,7 @@ function BNB.RegisterSlashCommands()
         -- ── Developer: testwp ─────────────────────────────────────────────────
         elseif cmd:sub(1, 6) == "testwp" then
             if not BNB._debugWaypoint then
-                BNB:Print("|cffff6666Enable Debug mode + Test waypoint system in Config → Advanced first.|r")
+                BNB:Print("|cffff6666Enable Debug mode + Test waypoint system in Config -> Advanced first.|r")
                 return
             end
             local sub = cmd:sub(8) or ""
@@ -74,7 +74,7 @@ function BNB.RegisterSlashCommands()
                 for id, uid in pairs(BNB._autoWaypoints or {}) do
                     local note = BNB.GetNote(id)
                     local title = note and note.title or "?"
-                    BNB:Print(string.format("  |cff88bbff%s|r → uid=%s", title, tostring(uid)))
+                    BNB:Print(string.format("  |cff88bbff%s|r -> uid=%s", title, tostring(uid)))
                     count = count + 1
                 end
                 if count == 0 then BNB:Print("|cff88bbffNo auto-placed waypoints tracked.|r") end
@@ -240,9 +240,9 @@ StaticPopupDialogs["BNB_IMPORT_SCOPE_REMAP"] = {
         .. "Original character: |cffffcc00%s|r\n"
         .. "Current character:  |cff66cc66%s|r\n\n"
         .. "Character-scoped notes only appear when that specific character is logged in.\n\n"
-        .. "|cffaaaaaa• Yes — reassign to your current character\n"
-        .. "• No — keep the original character's scope\n"
-        .. "• Press Escape to cancel the import entirely|r",
+        .. "|cffaaaaaa- Yes - reassign to your current character\n"
+        .. "- No - keep the original character's scope\n"
+        .. "- Press Escape to cancel the import entirely|r",
     button1 = "Yes, use current character",
     button2 = "No, keep original",
     OnAccept = function()

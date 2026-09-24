@@ -385,10 +385,10 @@ local function ShowToast(matchIDs, locationName)
             local title = (note and note.title and note.title ~= "") and note.title or L["UNTITLED"]
             local tc = note and note.titleColor
             if tc then
-                row._lbl:SetText("|cffffd100•|r  " .. title)
+                row._lbl:SetText("|cffffd100-|r  " .. title)
                 row._lbl:SetTextColor(tc.r, tc.g, tc.b, 1)
             else
-                row._lbl:SetText("|cffffd100•|r  " .. title)
+                row._lbl:SetText("|cffffd100-|r  " .. title)
                 row._lbl:SetTextColor(0.85, 0.85, 0.85)
             end
 
