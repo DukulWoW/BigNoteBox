@@ -311,19 +311,6 @@ local function SaveFocusNote()
     if BNB.RichPreviewFocus then BNB.RichPreviewFocus.Refresh() end
 end
 
--- Copy centre position from src to dst (scale-aware). Does NOT copy size —
--- the focus frame is fixed-size; only its centre position is transferred.
-local function CopyFrameCenter(src, dst)
-    if not src or not dst then return end
-    local ss = src:GetEffectiveScale()
-    local ds = dst:GetEffectiveScale()
-    local x, y = src:GetCenter()
-    if not x then return end
-    dst:ClearAllPoints()
-    dst:SetPoint("CENTER", UIParent, "BOTTOMLEFT",
-        (x * ss) / ds, (y * ss) / ds)
-end
-
 --------------------------------------------------------------------------------
 -- LOAD NOTE INTO FOCUS FRAME
 -- Defers SetText one tick so ScrollFrame OnSizeChanged has fired and
@@ -1318,10 +1305,11 @@ function BNB.OpenFocusMode()
     end
     BNB._focusHiddenWindows = snap
 
-    -- Centre focus frame over the main window (focus is fixed size)
-    if BNB.mainFrame then
-        CopyFrameCenter(BNB.mainFrame, focusFrame)
-    end
+    -- FOR-19: focus is its own window, always opened at screen centre. It used
+    -- to be centred over the main window, which pushed it off-screen when the
+    -- main window sat near an edge.
+    focusFrame:ClearAllPoints()
+    focusFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
     focusFrame:SetAlpha(0)
     focusFrame:Show()
@@ -1390,14 +1378,11 @@ function BNB.CloseFocusMode()
     -- Restore Narcissus guard flag (only if Narcissus isn't actually open)
     if Narci and not Narci.isAFK then Narci.isActive = false end
 
-    -- Centre main window where focus frame currently is, then show it.
-    -- _fromFocusMode suppresses RestoreWindowPos in OnShow so the position
-    -- we just set isn't immediately overwritten from DB.
+    -- Show the main window at its own saved position (FOR-19: focus is a
+    -- separate window and no longer hands its position over).
     if BNB.mainFrame then
-        CopyFrameCenter(focusFrame, BNB.mainFrame)
         BNB.mainFrame:SetAlpha(0)
         BNB.mainFrame._focusHide = true
-        BNB.mainFrame._fromFocusMode = true
         BNB.mainFrame:Show()
         BNB.mainFrame._focusHide = false
         if BNB._currentNoteID and BNB.LoadNoteInEditor then
