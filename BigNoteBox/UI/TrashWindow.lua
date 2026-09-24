@@ -101,6 +101,34 @@ local function UpdateTrashBtnState()
     if BNB.SyncTrashBtnState then BNB.SyncTrashBtnState() end
 end
 
+-- "Delete selected": permanently removes the ticked rows, after a confirm.
+-- It used to purge on the first click with no way back (found with ALL-58).
+local function PurgeSelectedConfirm()
+    local ids = {}
+    for id in pairs(_multiSel) do ids[#ids + 1] = id end
+    if #ids == 0 then return end
+    if not StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] then
+        StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] = {
+            text = L["POPUP_TRASH_PURGE_SEL"],
+            button1 = L["BTN_DELETE_CONFIRM"],
+            button2 = L["CANCEL"],
+            OnAccept = function(self, data)
+                local sel = data or self.data
+                if type(sel) ~= "table" then return end
+                local trash = BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash
+                if trash then
+                    for _, id in ipairs(sel) do trash[id] = nil end
+                end
+                SetTrashMultiMode(false)
+            end,
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+            showAlert = true,
+        }
+    end
+    local popup = StaticPopup_Show("BNB_TRASH_PURGE_SEL", tostring(#ids), nil, ids)
+    if popup then popup.data = ids end
+end
+
 -- Row builder — Button with backdrop, matching NoteList style
 local function GetRow(parent, index)
     local row = _rows[index]
@@ -510,16 +538,7 @@ local function BuildTrashWindow()
     local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:SetScript("OnClick", function()
-        local ids = {}
-        for id in pairs(_multiSel) do ids[#ids + 1] = id end
-        if BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash then
-            for _, id in ipairs(ids) do
-                BigNoteBoxNotesDB.trash[id] = nil
-            end
-        end
-        SetTrashMultiMode(false)
-    end)
+    deleteSelBtn:SetScript("OnClick", PurgeSelectedConfirm)
     deleteSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
@@ -554,6 +573,10 @@ local function BuildTrashWindow()
     f:Hide()
     tinsert(UISpecialFrames, "BigNoteBoxTrashFrame")
 
+    -- Leave select mode on any hide (ESC, main window close), not only the close button
+    f:HookScript("OnHide", function()
+        if _multiMode then SetTrashMultiMode(false) end
+    end)
     _twFrame = f
     return f
 end
@@ -678,16 +701,7 @@ local function BuildTrashWindowSkin()
     local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:SetScript("OnClick", function()
-        local ids = {}
-        for id in pairs(_multiSel) do ids[#ids + 1] = id end
-        if BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash then
-            for _, id in ipairs(ids) do
-                BigNoteBoxNotesDB.trash[id] = nil
-            end
-        end
-        SetTrashMultiMode(false)
-    end)
+    deleteSelBtn:SetScript("OnClick", PurgeSelectedConfirm)
     deleteSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
@@ -724,6 +738,10 @@ local function BuildTrashWindowSkin()
     f:Hide()
     tinsert(UISpecialFrames, "BigNoteBoxTrashFrame")
 
+    -- Leave select mode on any hide (ESC, main window close), not only the close button
+    f:HookScript("OnHide", function()
+        if _multiMode then SetTrashMultiMode(false) end
+    end)
     _twFrame = f
     return f
 end

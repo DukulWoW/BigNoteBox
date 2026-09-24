@@ -681,15 +681,10 @@ local function DuplicateNote(id)
     local src = BNB.GetNote(id)
     if not src then return end
     BNB.SaveCurrentNote()
-    local newID = BNB.CreateNote(src.title ~= "" and (src.title .. " (copy)") or "")
-    local fields = { body = src.body, tags = src.tags or {} }
-    -- Preserve appearance: icon and border settings
-    if src.icon             then fields.icon             = src.icon             end
-    if src.borderOverride   then fields.borderOverride   = src.borderOverride   end
-    if src.borderScale      then fields.borderScale      = src.borderScale      end
-    if src.borderOffset     then fields.borderOffset     = src.borderOffset     end
-    if src.borderBrightness then fields.borderBrightness = src.borderBrightness end
-    BNB.UpdateNote(newID, fields)
+    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
+    local newID = BNB.CopyNote(id, {
+        title = src.title ~= "" and (src.title .. " (copy)") or "" })
+    if not newID then return end
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote      then BNB.SelectNote(newID) end
 end
@@ -702,7 +697,7 @@ local function ShowNoteContextMenu(btn, noteID)
     -- Shared helpers
     local function DoTrash()
         if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title)
+            local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title, nil, noteID)
             if popup then popup.data = noteID end
         else
             if BNB.DeleteNote then BNB.DeleteNote(noteID) end
@@ -710,10 +705,11 @@ local function ShowNoteContextMenu(btn, noteID)
     end
     local function DoDeletePerm()
         if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE", title)
+            local popup = StaticPopup_Show("BNB_DELETE_NOTE", title, nil, noteID)
             if popup then popup.data = noteID end
         else
-            if BNB.DeleteNote then BNB.DeleteNote(noteID) end
+            -- Skips the trash even while it is on (ALL-58 follow-up)
+            if BNB.DeleteNote then BNB.DeleteNote(noteID, true) end
         end
     end
     local function CopyBody()
@@ -1079,42 +1075,79 @@ function BNB._multiGetSelected()
     return ids
 end
 
-function BNB.DeleteMultiSelected()
-    local ids = {}
-    for id in pairs(_multiSel) do ids[#ids+1] = id end
-    if #ids == 0 then return end
-    local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
-    if BNB.TrashEnabled and BNB.TrashEnabled() then
-        if warn then
-            local popup = StaticPopup_Show("BNB_DELETE_MULTI_TRASH", tostring(#ids))
-            if popup then popup.data = ids end
-        else
-            for _, id in ipairs(ids) do
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
+-- Confirm text for a bulk delete (ALL-58): the first few titles in list order,
+-- then "...and N more", plus a red warning when the selection is every note.
+-- Titles are shortened and "|" is doubled so a title cannot break the popup.
+local MULTI_TITLES_SHOWN = 3
+local MULTI_TITLE_MAX    = 40
+local function MultiDeleteSummary(ids)
+    local lines = {}
+    for i = 1, math.min(#ids, MULTI_TITLES_SHOWN) do
+        local note  = BNB.GetNote(ids[i])
+        local title = note and note.title ~= "" and note.title or L["UNTITLED"]
+        if #title > MULTI_TITLE_MAX then
+            -- Cut on a UTF-8 lead byte so a CJK title is never split mid-character
+            local cut = MULTI_TITLE_MAX
+            while cut > 1 and title:byte(cut + 1) and title:byte(cut + 1) >= 0x80
+                and title:byte(cut + 1) < 0xC0 do
+                cut = cut - 1
             end
-            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+            title = title:sub(1, cut) .. "..."
         end
-    else
-        if warn then
-            local popup = StaticPopup_Show("BNB_DELETE_MULTI", tostring(#ids))
-            if popup then popup.data = ids end
-        else
-            for _, id in ipairs(ids) do
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
-            end
-            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-        end
+        lines[#lines + 1] = "|cffffd100" .. title:gsub("|", "||") .. "|r"
     end
+    if #ids > MULTI_TITLES_SHOWN then
+        lines[#lines + 1] = string.format(L["POPUP_MULTI_MORE"], #ids - MULTI_TITLES_SHOWN)
+    end
+    local live = 0
+    for _ in pairs(BigNoteBoxNotesDB.notes) do live = live + 1 end
+    if #ids >= live then
+        lines[#lines + 1] = "\n|cffff5555" .. L["POPUP_MULTI_ALL_WARN"] .. "|r"
+    end
+    return table.concat(lines, "\n")
 end
 
+function BNB.DeleteMultiSelected()
+    -- Selected ids in note order (so the confirm lists them as the list does),
+    -- live notes only
+    local ids = {}
+    for _, id in ipairs(BigNoteBoxNotesDB.noteOrder) do
+        if _multiSel[id] and BNB.GetNote(id) then ids[#ids + 1] = id end
+    end
+    if #ids == 0 then return end
+    local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
+    -- A single note follows "Warn before delete"; two or more always confirm
+    if #ids == 1 and not warn then
+        if BNB.DeleteNotes then BNB.DeleteNotes(ids) end
+        if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+        return
+    end
+    local which = (BNB.TrashEnabled and BNB.TrashEnabled())
+        and "BNB_DELETE_MULTI_TRASH" or "BNB_DELETE_MULTI"
+    local popup = StaticPopup_Show(which, tostring(#ids), MultiDeleteSummary(ids), ids)
+    if popup then popup.data = ids end
+end
+
+-- Returns true while the list is in multi-select mode (the Select button reads
+-- this instead of keeping its own flag, which went stale on exit: ALL-58)
+function BNB.IsMultiMode()
+    return _multiMode
+end
+
+-- Selects exactly the notes the list is showing: search text, tag filter and
+-- collapsed tag-tree groups all apply. Hidden notes are never selected (ALL-58:
+-- Select All used to select every note behind an active search).
 function BNB.SelectAll()
     if not _multiMode then return end
-    local notes = BNB.GetOrderedNotes(nil, nil, false)
     _multiSel = {}
-    for _, note in ipairs(notes) do
-        _multiSel[note.id] = true
+    local n = 0
+    for _, btn in ipairs(listEntries) do
+        if btn:IsShown() and btn._noteID and not _multiSel[btn._noteID] then
+            _multiSel[btn._noteID] = true
+            n = n + 1
+        end
     end
-    UpdateMultiActionBtns(#notes)
+    UpdateMultiActionBtns(n)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 end
 
@@ -1748,7 +1781,9 @@ local function PopulateEntry(btn, note, selected, collapsed)
     -- The selection background (COL_SEL_BG) is drawn at ARTWORK layer;
     -- text is at OVERLAY, so there is no layer conflict.
     local tc = note.titleColor
-    if selected then
+    -- In multi-select mode only the blue tint marks a selection; the gold
+    -- open-note highlight made a just-deselected note look selected (ALL-58)
+    if selected and not _multiMode then
         btn._selBg:Show()
         if btn._titleLbl then
             if tc then
@@ -1962,7 +1997,7 @@ function BNB.SelectNote(id)
     local collapsed = BNB._listCollapsed
     for _, btn in ipairs(listEntries) do
         if btn:IsShown() then
-            if btn._noteID == id then
+            if btn._noteID == id and not _multiMode then   -- see PopulateEntry (ALL-58)
                 local note = BNB.GetNote(id)
                 local tc   = note and note.titleColor
                 if btn._titleLbl then

@@ -3,7 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
 ## Author: Dukul
-## Version: 1.11.0
+## Version: 1.11.1
 ## SavedVariables: BigNoteBoxDB BigNoteBoxLocale
 ## LoadSavedVariablesFirst: 1
 ## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB

@@ -3038,14 +3038,14 @@ local function BuildToolbar(parent)
         local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
         if BNB.TrashEnabled and BNB.TrashEnabled() then
             if warn then
-                local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title)
+                local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title, nil, id)
                 if popup then popup.data = id end
             else
                 if BNB.DeleteNote then BNB.DeleteNote(id) end
             end
         else
             if warn then
-                local popup = StaticPopup_Show("BNB_DELETE_NOTE", title)
+                local popup = StaticPopup_Show("BNB_DELETE_NOTE", title, nil, id)
                 if popup then popup.data = id end
             else
                 if BNB.DeleteNote then BNB.DeleteNote(id) end
@@ -3060,17 +3060,10 @@ local function BuildToolbar(parent)
         local id = BNB._currentNoteID; if not id then return end
         local src = BNB.GetNote(id);   if not src then return end
         BNB.SaveCurrentNote()
-        local newID = BNB.CreateNote(src.title ~= "" and (src.title .. " (copy)") or "")
-        -- Deep-copy attachments so the duplicate has its own independent list
-        local attCopy = {}
-        if src.attachments then
-            for _, att in ipairs(src.attachments) do
-                local a = {}
-                for k, v in pairs(att) do a[k] = v end
-                table.insert(attCopy, a)
-            end
-        end
-        BNB.UpdateNote(newID, { body = src.body, tags = src.tags or {}, attachments = #attCopy > 0 and attCopy or nil })
+        -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
+        local newID = BNB.CopyNote(id, {
+            title = src.title ~= "" and (src.title .. " (copy)") or "" })
+        if not newID then return end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SelectNote      then BNB.SelectNote(newID) end
     end)

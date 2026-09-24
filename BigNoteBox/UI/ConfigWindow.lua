@@ -2230,10 +2230,9 @@ local function BuildFeaturesTab(sf, ct)
         warnLbl:SetAlpha(a)
         retainSlider:SetAlpha(a)
         retainSlider:EnableMouse(enabled)
-        -- Show/hide the trashcan icon in the main window toolbar
-        if BNB._toolbarTrashBtn then
-            BNB._toolbarTrashBtn:SetShown(enabled)
-        end
+        -- Show/hide the trashcan icon in the main window toolbar; the row
+        -- closes up so no gap is left (reads db.trashFeature, set by the caller)
+        if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
         -- Close the trash window if it's open and we're disabling
         if not enabled and BNB.ToggleTrashWindow then
             local tf = _G["BigNoteBoxTrashFrame"]

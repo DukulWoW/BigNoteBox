@@ -225,6 +225,52 @@ function BNB.CreateNote(title, body)
 end
 
 --------------------------------------------------------------------------------
+-- COPY  (Duplicate and Copy/Move share this, so a copy keeps every field)
+--------------------------------------------------------------------------------
+-- Fields a copy never inherits: identity and timestamps, the creation position
+-- (the copy is created here and now), the source's own edit history, and the
+-- alarm (one reminder would ring twice). Everything else, including richMode,
+-- tasks, attachments and inspect data, is copied. The hand-written field lists
+-- this replaced each missed some (a rich note duplicated as a normal one).
+local COPY_SKIP = {
+    id = true, created = true, updated = true, updatedAt = true,
+    coordX = true, coordY = true, coordMapID = true, coordZone = true,
+    history = true, manualSnapshot = true, alarm = true,
+}
+
+-- Full recursive copy, so the new note shares no table with the source
+-- (the old copies shared the tags table: editing one note's tags changed both)
+local function DeepCopy(v)
+    if type(v) ~= "table" then return v end
+    local t = {}
+    for k, val in pairs(v) do t[k] = DeepCopy(val) end
+    return t
+end
+
+-- Copies note srcID into a new note and returns the new id. The copy keeps the
+-- source's scope unless overrides says otherwise; overrides (optional) replaces
+-- fields after the copy, e.g. { title = "...", scope = "char:X" }.
+function BNB.CopyNote(srcID, overrides)
+    local src = NDB() and NDB().notes[srcID]
+    if not src then return nil end
+    local newID = BNB.CreateNote(src.title, src.body)
+    if not newID then return nil end
+    local fields = {}
+    for k, v in pairs(src) do
+        if not COPY_SKIP[k] then fields[k] = DeepCopy(v) end
+    end
+    -- nil scope means global; CreateNote would otherwise use the sidebar's
+    if fields.scope == nil then fields.scope = "global" end
+    if overrides then
+        for k, v in pairs(overrides) do fields[k] = v end
+    end
+    -- UpdateNote indexes tags only when the field is present
+    if fields.tags == nil then fields.tags = {} end
+    BNB.UpdateNote(newID, fields)
+    return newID
+end
+
+--------------------------------------------------------------------------------
 -- UPDATE
 --------------------------------------------------------------------------------
 function BNB.UpdateNote(id, fields)
@@ -255,16 +301,19 @@ function BNB.UpdateNote(id, fields)
 end
 
 --------------------------------------------------------------------------------
--- DELETE  (moves to trash unless trash is disabled — trashRetainDays == 0)
+-- DELETE  (moves to trash while BNB.TrashEnabled(), unless permanent is true)
 --------------------------------------------------------------------------------
-function BNB.DeleteNote(id)
+-- Data half of a delete: trash copy, live removal, sticky, tag index, undo.
+-- No list/trash window refresh, so a bulk delete can refresh once at the end
+-- (ALL-58: 48 per-note refreshes froze the game for ~3 seconds).
+-- Trash follows BNB.TrashEnabled(), the same test the delete popups use, so a
+-- "cannot be undone" popup really deletes. It used to check trashRetainDays
+-- only, so with Trash switched off notes still went to a hidden trash.
+local function RemoveNote(id, permanent)
     local note = NDB().notes[id]
-    if not note then return end
+    if not note then return false end
 
-    local days = BigNoteBoxDB and BigNoteBoxDB.trashRetainDays
-    if days == nil then days = 30 end
-
-    if days > 0 then
+    if not permanent and BNB.TrashEnabled and BNB.TrashEnabled() then
         -- Move to trash: full copy with deletedAt timestamp
         local ndb = NDB()
         if ndb.trash == nil then ndb.trash = {} end
@@ -275,7 +324,7 @@ function BNB.DeleteNote(id)
     end
 
     -- Remove from live notes and order
-    local deletedTags = NDB().notes[id] and NDB().notes[id].tags or {}
+    local deletedTags = note.tags or {}
     NDB().notes[id] = nil
     local order = NDB().noteOrder
     for i = #order, 1, -1 do
@@ -286,19 +335,43 @@ function BNB.DeleteNote(id)
     end
     -- Close any open sticky for this note
     if BNB.Sticky and BNB.Sticky.Close then BNB.Sticky.Close(id) end
+    -- Remove deleted note from tag index
+    for _, tag in ipairs(deletedTags) do
+        BNB.TagIndexRemove(id, tag)
+    end
+    -- Free runtime undo/redo memory for this note
+    if BNB.UndoClearNote then BNB.UndoClearNote(id) end
+    return true
+end
+
+-- UI half: list, editor selection, trash window, trash button.
+local function RefreshAfterDelete()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SelectNote      then BNB.SelectNote(nil)   end
     end
     -- Refresh trash window if open (note may now appear there)
     if BNB.RefreshTrashWindow then BNB.RefreshTrashWindow() end
-    -- Remove deleted note from tag index
-    for _, tag in ipairs(deletedTags) do
-        BNB.TagIndexRemove(id, tag)
-    end
     BNB.SyncTrashBtnState()
-    -- Free runtime undo/redo memory for this note
-    if BNB.UndoClearNote then BNB.UndoClearNote(id) end
+end
+
+-- permanent = true skips the trash even while it is on ("Delete permanently")
+function BNB.DeleteNote(id, permanent)
+    if not RemoveNote(id, permanent) then return end
+    RefreshAfterDelete()
+end
+
+-- Bulk delete: every id goes through the same path as DeleteNote, the UI
+-- refreshes once. Ids that are no longer live notes are skipped. Returns the
+-- number of notes actually deleted.
+function BNB.DeleteNotes(ids, permanent)
+    if not ids then return 0 end
+    local n = 0
+    for _, id in ipairs(ids) do
+        if RemoveNote(id, permanent) then n = n + 1 end
+    end
+    if n > 0 then RefreshAfterDelete() end
+    return n
 end
 
 --------------------------------------------------------------------------------

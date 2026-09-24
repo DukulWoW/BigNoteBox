@@ -623,8 +623,9 @@ function BNB.CreateMainWindow()
     selBtn:SetPoint("TOP", f, "TOP", 0, SORT_STRIP_MID_Y + SORT_BTN_H / 2 + 1)
     BNB._multiSelBtn = selBtn
     selBtn:SetScript("OnClick", function()
-        local entering = not BNB._multiMode
-        BNB._multiMode = entering
+        -- Read the list's own state: popups, export and the sidebar leave multi
+        -- mode through SetMultiMode, which a local flag here never saw (ALL-58)
+        local entering = not (BNB.IsMultiMode and BNB.IsMultiMode())
         if BNB.SetMultiMode then BNB.SetMultiMode(entering) end
         selBtn:SetText(entering and L["CANCEL"] or L["MW_SELECT_BTN"])
         if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(entering) end
@@ -636,7 +637,6 @@ function BNB.CreateMainWindow()
         GameTooltip:Show()
     end)
     selBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiMode = false
 
     -- Select All button (hidden until multi-select mode is on)
     local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], 76, 22)
@@ -709,20 +709,16 @@ function BNB.CreateMainWindow()
     multiExportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._multiExportBtn = multiExportBtn
 
-    -- Hides/shows the right-side toolbar icons while multi-select mode is active,
-    -- so the action buttons don't overlap them.
-    function BNB._setToolbarMultiMode(on)
-        -- Only hide the top-right toolbar buttons. Title bar buttons (focus,
-        -- lock, close) are never hidden by multiselect.
-        local btns = {
-            BNB._toolbarConfigBtn,  BNB._toolbarTrashBtn,   BNB._toolbarHistoryBtn,
-            BNB._toolbarTagsBtn,    BNB._toolbarAlarmOvBtn, BNB._toolbarImportBtn,
-            BNB._toolbarShareTopBtn,
-        }
-        for _, btn in ipairs(btns) do
-            if btn then btn:SetShown(not on) end
-        end
-    end
+    -- Right-side toolbar icons, in slot order right to left (see
+    -- BNB.InitToolbarIconRow). They hide in multi-select so the action buttons
+    -- don't overlap them; the sidebar toggle right of the cog stays. Title bar
+    -- buttons (focus, lock, close) are never hidden by multiselect.
+    BNB.InitToolbarIconRow({
+        BNB._toolbarConfigBtn,   BNB._toolbarTrashBtn,   BNB._toolbarHistoryBtn,
+        BNB._toolbarTagsBtn,     BNB._toolbarShareTopBtn, BNB._toolbarAlarmOvBtn,
+        BNB._toolbarImportBtn,
+    })
+    function BNB._setToolbarMultiMode() BNB.ApplyToolbarIcons() end
 
     C_Timer.After(0, function() UpdateDirEnabled(); ApplySort() end)
 
@@ -1041,7 +1037,11 @@ function BNB.CreateMainWindow()
 
     f:SetScript("OnHide", function(self)
         -- Focus mode hides the main window silently — skip confirm/save.
-        if self._focusHide then return end
+        if self._focusHide then
+            -- Focus mode also leaves multi-select, same as a close
+            if BNB.IsMultiMode and BNB.IsMultiMode() then BNB.SetMultiMode(false) end
+            return
+        end
         -- If confirmClose is on and this hide wasn't explicitly approved,
         -- re-show the window and display the confirm popup instead.
         -- _skipConfirm is set by RequestCloseMainWindow when the user confirmed.
@@ -1065,6 +1065,9 @@ function BNB.CreateMainWindow()
             BNB._favBtn:SetAlpha(0.35)
             pcall(function() BNB._favBtn._tx:SetDesaturated(true) end)
         end
+        -- Leave multi-select: its buttons and selection must not survive a close.
+        -- After the confirmClose check, so a cancelled close keeps the selection
+        if BNB.IsMultiMode and BNB.IsMultiMode() then BNB.SetMultiMode(false) end
         -- Close companion windows
         BNB.CloseCompanionWindows()
     end)
@@ -1101,6 +1104,43 @@ function BNB.CreateMainWindow()
         end
         ApplySplit(f, listPane, editorPane, nil, splitter)
     end
+end
+
+--------------------------------------------------------------------------------
+-- TOOLBAR ICON ROW  (shared by MainWindow.lua and MainWindowSkin.lua)
+-- row:   icons in slot order, right to left, each already anchored at its own
+--        slot. Their anchors are recorded as the slot positions; visible icons
+--        are packed into the first slots, so a hidden icon leaves no gap.
+-- fixed: icons that keep their own place but also hide in multi-select.
+-- Visibility: everything hides in multi-select (the action buttons use that
+-- space); the trash icon also hides while Trash is off in Settings.
+--------------------------------------------------------------------------------
+local _tbRow, _tbFixed, _tbSlots
+
+function BNB.InitToolbarIconRow(row, fixed)
+    _tbRow, _tbFixed, _tbSlots = row, fixed or {}, {}
+    for i, btn in ipairs(row) do
+        _tbSlots[i] = { btn:GetPoint(1) }
+    end
+    BNB.ApplyToolbarIcons()
+end
+
+function BNB.ApplyToolbarIcons()
+    if not _tbRow then return end
+    local multi   = BNB.IsMultiMode and BNB.IsMultiMode() or false
+    local trashOn = not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false
+    local slot = 0
+    for _, btn in ipairs(_tbRow) do
+        local show = not multi and (btn ~= BNB._toolbarTrashBtn or trashOn)
+        btn:SetShown(show)
+        if show then
+            slot = slot + 1
+            local p = _tbSlots[slot]
+            btn:ClearAllPoints()
+            btn:SetPoint(p[1], p[2], p[3], p[4], p[5])
+        end
+    end
+    for _, btn in ipairs(_tbFixed) do btn:SetShown(not multi) end
 end
 
 --------------------------------------------------------------------------------

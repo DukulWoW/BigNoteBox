@@ -1076,27 +1076,9 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         return selected
     end
 
+    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
     local function CopyNoteToScope(destScope)
-        local newID = BNB.CreateNote(note.title, note.body)
-        BNB.UpdateNote(newID, {
-            scope          = destScope,
-            tags           = note.tags,
-            icon           = note.icon,
-            titleColor     = note.titleColor,
-            fontOverride   = note.fontOverride,
-            context        = note.context,
-            contextDisplay = note.contextDisplay,
-            contextLeave   = note.contextLeave,
-            pinned         = note.pinned,
-            locked         = note.locked,
-            borderOverride = note.borderOverride,
-            borderScale    = note.borderScale,
-            borderOffset   = note.borderOffset,
-            lineHeight     = note.lineHeight,
-            waypoint       = note.waypoint,
-            wpClearOnLeave = note.wpClearOnLeave,
-        })
-        if note.favorited then BNB.UpdateNote(newID, { favorited = true }) end
+        BNB.CopyNote(noteID, { scope = destScope })
     end
 
     f._copyBtn:SetScript("OnClick", function()
@@ -1227,37 +1209,18 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         return selected
     end
 
-    local function CopyNoteToScope(note, destScope)
-        local newID = BNB.CreateNote(note.title, note.body)
-        BNB.UpdateNote(newID, {
-            scope          = destScope,
-            tags           = note.tags,
-            icon           = note.icon,
-            titleColor     = note.titleColor,
-            fontOverride   = note.fontOverride,
-            context        = note.context,
-            contextDisplay = note.contextDisplay,
-            contextLeave   = note.contextLeave,
-            pinned         = note.pinned,
-            locked         = note.locked,
-            borderOverride = note.borderOverride,
-            borderScale    = note.borderScale,
-            borderOffset   = note.borderOffset,
-            lineHeight     = note.lineHeight,
-            waypoint       = note.waypoint,
-            wpClearOnLeave = note.wpClearOnLeave,
-        })
-        if note.favorited then BNB.UpdateNote(newID, { favorited = true }) end
+    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
+    local function CopyNoteToScope(id, destScope)
+        BNB.CopyNote(id, { scope = destScope })
     end
 
     f._copyBtn:SetScript("OnClick", function()
         local selected = GetSelected()
         if #selected == 0 then return end
         for _, id in ipairs(noteIDs) do
-            local note = ndb.notes[id]
-            if note then
+            if ndb.notes[id] then
                 for _, destScope in ipairs(selected) do
-                    CopyNoteToScope(note, destScope)
+                    CopyNoteToScope(id, destScope)
                 end
             end
         end

@@ -454,8 +454,9 @@ function BNB.CreateMainWindowSkin()
     selBtn:SetPoint("TOP", toolBar, "TOP", 0, BTN_Y)
     BNB._multiSelBtn = selBtn
     selBtn:SetScript("OnClick", function()
-        local entering = not BNB._multiMode
-        BNB._multiMode = entering
+        -- Read the list's own state: popups, export and the sidebar leave multi
+        -- mode through SetMultiMode, which a local flag here never saw (ALL-58)
+        local entering = not (BNB.IsMultiMode and BNB.IsMultiMode())
         if BNB.SetMultiMode then BNB.SetMultiMode(entering) end
         selBtn:SetText(entering and L["CANCEL"] or L["MW_SELECT_BTN"])
         if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(entering) end
@@ -467,7 +468,6 @@ function BNB.CreateMainWindowSkin()
         GameTooltip:Show()
     end)
     selBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiMode = false
 
     -- Multi-select action buttons (hidden until select mode active)
     local function MakeMultiBtn(text, w, onClick, tip)
@@ -663,14 +663,14 @@ function BNB.CreateMainWindowSkin()
         end
     end
 
-    function BNB._setToolbarMultiMode(on)
-        local btns = {
-            BNB._toolbarSidebarBtn, BNB._toolbarConfigBtn,  BNB._toolbarTrashBtn,
-            BNB._toolbarHistoryBtn, BNB._toolbarTagsBtn,    BNB._toolbarShareTopBtn,
-            BNB._toolbarAlarmOvBtn, BNB._toolbarImportBtn,
-        }
-        for _, btn in ipairs(btns) do if btn then btn:SetShown(not on) end end
-    end
+    -- Right-side toolbar icons, in slot order right to left (see
+    -- BNB.InitToolbarIconRow in MainWindow.lua): a hidden trash icon leaves no gap
+    BNB.InitToolbarIconRow({
+        BNB._toolbarSidebarBtn, BNB._toolbarConfigBtn,   BNB._toolbarTrashBtn,
+        BNB._toolbarHistoryBtn, BNB._toolbarTagsBtn,     BNB._toolbarShareTopBtn,
+        BNB._toolbarAlarmOvBtn, BNB._toolbarImportBtn,
+    })
+    function BNB._setToolbarMultiMode() BNB.ApplyToolbarIcons() end
 
     C_Timer.After(0, function() UpdateDirEnabled(); ApplySort() end)
 
@@ -879,7 +879,11 @@ function BNB.CreateMainWindowSkin()
     end)
 
     f:SetScript("OnHide", function(self)
-        if self._focusHide then return end
+        if self._focusHide then
+            -- Focus mode also leaves multi-select, same as a close
+            if BNB.IsMultiMode and BNB.IsMultiMode() then BNB.SetMultiMode(false) end
+            return
+        end
         if BigNoteBoxDB and BigNoteBoxDB.confirmClose and not self._skipConfirm then
             C_Timer.After(0, function()
                 if not self:IsShown() then
@@ -898,6 +902,9 @@ function BNB.CreateMainWindowSkin()
             BNB._favBtn:SetAlpha(0.35)
             pcall(function() BNB._favBtn._tx:SetDesaturated(true) end)
         end
+        -- Leave multi-select: its buttons and selection must not survive a close.
+        -- After the confirmClose check, so a cancelled close keeps the selection
+        if BNB.IsMultiMode and BNB.IsMultiMode() then BNB.SetMultiMode(false) end
         BNB.CloseCompanionWindows()
     end)
 

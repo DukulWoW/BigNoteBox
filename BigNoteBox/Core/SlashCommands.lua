@@ -158,13 +158,18 @@ local function BuildPopups()
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
     }
 
+    -- Delete popups take the note id(s) as StaticPopup data (4th arg of
+    -- StaticPopup_Show). They delete exactly what was confirmed: no fallback to
+    -- the note open in the editor, so a popup without data deletes nothing.
+    -- The non-trash popups say "cannot be undone" and delete permanently, even
+    -- while trash is on ("Delete permanently" in the note context menu).
     StaticPopupDialogs["BNB_DELETE_NOTE"] = {
         text = L["POPUP_DELETE_NOTE"],
         button1 = L["BTN_DELETE_CONFIRM"],
         button2 = L["CANCEL"],
-        OnAccept = function(self)
-            local id = self.data or BNB._currentNoteID
-            if id and BNB.DeleteNote then BNB.DeleteNote(id) end
+        OnAccept = function(self, data)
+            local id = data or self.data
+            if id and BNB.DeleteNote then BNB.DeleteNote(id, true) end
         end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
     }
@@ -175,41 +180,39 @@ local function BuildPopups()
         text = L["POPUP_TRASH_NOTE"],
         button1 = L["BTN_TRASH_CONFIRM"],
         button2 = L["CANCEL"],
-        OnAccept = function(self)
-            local id = self.data or BNB._currentNoteID
+        OnAccept = function(self, data)
+            local id = data or self.data
             if id and BNB.DeleteNote then BNB.DeleteNote(id) end
         end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
     }
 
+    -- Bulk variants (ALL-58): %s1 = count, %s2 = the first titles plus
+    -- "...and N more", and a red line when the selection is every note.
+    -- Shown for any bulk delete of 2+ notes, even with "Warn before delete" off.
+    local function AcceptMulti(self, data, permanent)
+        local ids = data or self.data
+        if type(ids) ~= "table" then return end
+        if BNB.DeleteNotes then BNB.DeleteNotes(ids, permanent) end
+        if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+    end
+
     StaticPopupDialogs["BNB_DELETE_MULTI"] = {
-        text = L["POPUP_DELETE_MULTI"],
-        button1 = L["BTN_DELETE_ALL"],
+        text = L["POPUP_DELETE_MULTI"] .. "\n\n%s",
+        button1 = L["BTN_DELETE_CONFIRM"],
         button2 = L["CANCEL"],
-        OnAccept = function(self)
-            local ids = self.data
-            if not ids then return end
-            for _, id in ipairs(ids) do
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
-            end
-            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-        end,
+        OnAccept = function(self, data) AcceptMulti(self, data, true) end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        showAlert = true,
     }
 
     StaticPopupDialogs["BNB_DELETE_MULTI_TRASH"] = {
-        text = L["POPUP_TRASH_MULTI"],
+        text = L["POPUP_TRASH_MULTI"] .. "\n\n%s",
         button1 = L["BTN_TRASH_CONFIRM"],
         button2 = L["CANCEL"],
-        OnAccept = function(self)
-            local ids = self.data
-            if not ids then return end
-            for _, id in ipairs(ids) do
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
-            end
-            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-        end,
+        OnAccept = function(self, data) AcceptMulti(self, data, false) end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        showAlert = true,
     }
 
     StaticPopupDialogs["BNB_EMPTY_TRASH"] = {

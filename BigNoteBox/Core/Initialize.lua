@@ -204,10 +204,8 @@ function BNB.Initialize()
     end
 
     -- 11b. Apply trash feature visibility (hide toolbar button if feature disabled)
-    if BNB._toolbarTrashBtn then
-        local enabled = not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false
-        BNB._toolbarTrashBtn:SetShown(enabled)
-    end
+    -- The toolbar row closes up so no gap is left (UI/MainWindow.lua)
+    if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
 
     -- 11c. Sync trash button state (grey + disabled when trash is empty)
     if BNB.SyncTrashBtnState then BNB.SyncTrashBtnState() end
