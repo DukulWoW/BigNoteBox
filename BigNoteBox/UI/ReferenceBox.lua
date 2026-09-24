@@ -1459,27 +1459,29 @@ local function OnModeClick(mode)
     end
 end
 
--- ── Forever: Model/Tasks side tabs ───────────────────────────────────────────
--- Forever normal mode swaps the text strip for two icon tabs on the Reference
+-- ── Model/Tasks side tabs (FOR-21) ───────────────────────────────────────────
+-- Normal mode swaps the text strip for two icon tabs on the Reference
 -- box's outer edge (left when docked left of the main window, right when docked
 -- right), in the sidebar's border/hover/active art at 48px instead of 64.
 -- Tasks sits at the bottom, its bottom edge level with the model viewer's gear
 -- button (model bottom BOTTOM_PAD + that button's 4px inset); Model above it.
--- Retail and skin mode keep the text strip until this is approved.
+-- Built on Forever, extended to Retail 2026-09-24; skin mode keeps the text strip.
 local TAB_SZ     = 48                          -- sidebar BTN_SZ 64, scaled 0.75
 local TAB_ICON   = 36                          -- sidebar ICON_SZ 48, scaled
 local TAB_ICON_X = { left = 8, right = 4 }     -- sidebar 10 / 5, scaled
 local TAB_ICON_Y = -6                          -- sidebar -8, scaled
 local TAB_GAP    = 1                           -- sidebar GAP
--- Edge offset against the frame, per side: sidebar FOR-15 values, scaled.
--- Left draws above the frame, right below it, as the sidebar does.
-local TAB_OFF    = { left = 5, right = -2 }
+-- Edge offset against the frame, per side and client: the sidebar's values
+-- (Sidebar.lua SIDE_OFFSET, FOR-15 on Forever; its 2 / -2 default on Retail),
+-- scaled. On Forever the right side draws below the frame, as the sidebar does.
+local TAB_OFF    = BNB.IsForever and { left = 5, right = -2 } or { left = 8, right = -4 }
+local TAB_BORDER = ASSETS .. (BNB.IsForever and "Sidebar\\sb-border-forever" or "Sidebar\\sb-border")
 local TAB_BOTTOM = BOTTOM_PAD + 4
 local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
 local TAB_FALLBACK  = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local function UseSideTabs()
-    return BNB.IsForever and not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
+    return not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
 end
 
 -- Outer edge: away from the main window, so the tabs never cover it
@@ -1518,7 +1520,7 @@ local function BuildSideTabs(f)
         local btn = CreateFrame("Button", nil, strip)
         btn:SetSize(TAB_SZ, TAB_SZ)
         local border = btn:CreateTexture(nil, "OVERLAY")
-        border:SetAllPoints(); border:SetTexture(ASSETS .. "Sidebar\\sb-border-forever")
+        border:SetAllPoints(); border:SetTexture(TAB_BORDER)
         local icon = btn:CreateTexture(nil, "ARTWORK")
         icon:SetSize(TAB_ICON, TAB_ICON)
         local hover = btn:CreateTexture(nil, "OVERLAY", nil, -2)
@@ -1564,7 +1566,9 @@ local function PositionSideTabs()
         strip:SetFrameLevel(rbFrame:GetFrameLevel() + 1)
     else
         strip:SetPoint("BOTTOMLEFT", rbFrame, "BOTTOMRIGHT", TAB_OFF.right, TAB_BOTTOM)
-        strip:SetFrameLevel(math.max(0, rbFrame:GetFrameLevel() - 1))
+        -- Below the frame on Forever (its border overlaps the tab), above on Retail
+        strip:SetFrameLevel(BNB.IsForever and math.max(0, rbFrame:GetFrameLevel() - 1)
+            or rbFrame:GetFrameLevel() + 1)
     end
     local c1,c2,c3,c4,c5,c6,c7,c8 = SideTabTexCoord(side)
     for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
@@ -2664,6 +2668,12 @@ end
 -- Public helper: focus the inline editbox of a specific task row.
 -- Used by NoteList "Create task" context menu item after opening RefBox.
 function BNB.FocusTaskEditBox(taskID)
+    -- Every "add task" path (editor bottom bar, note list menu, sticky note)
+    -- ends here. Notes with a model open on the Model tab, so the new task was
+    -- added out of sight; switch to Tasks first (builds the rows it focuses).
+    if rbFrame and rbFrame:IsShown() and _rbMode ~= "attachments" and IsInspectNote(_noteID) then
+        OnModeClick("attachments")
+    end
     for _, row in ipairs(_taskRows) do
         if row._taskID == taskID and row._editBox then
             for _, region in ipairs({ row:GetRegions() }) do
@@ -3159,6 +3169,33 @@ BNB._SyncRefBoxHeight = SyncRefBoxHeight  -- exposed for RenderList hook
 -- BuildReferenceBoxSkin — called once after the scroll frame is created.
 -- Components are hidden by default and shown by UpdateModelViewer.
 
+-- ── Faction crest (FOR-22) ──────────────────────────────────────────────────
+local FACTION_CREST = {
+    Horde    = ASSETS .. "UI\\ui-bg-model-horde",
+    Alliance = ASSETS .. "UI\\ui-bg-model-alliance",
+}
+
+-- "Horde" / "Alliance" for a model note, nil for neutral or unknown. Newest
+-- source first: the saved field (notes made after FOR-22), the faction tag
+-- (on by default), the race for inspect notes, then the "Faction: X" body line
+-- both note formats write (tag setting off, older notes).
+local function NoteFaction(note)
+    if not note then return nil end
+    local f = note.targetFaction or note.inspectFaction
+    if FACTION_CREST[f] then return f end
+    for _, t in ipairs(note.tags or {}) do
+        if FACTION_CREST[t] then return t end
+    end
+    if note.source == "inspect" and note.inspectRaceID
+       and C_CreatureInfo and C_CreatureInfo.GetFactionInfo then
+        local ok, info = pcall(C_CreatureInfo.GetFactionInfo, note.inspectRaceID)
+        if ok and info and FACTION_CREST[info.groupTag] then return info.groupTag end
+    end
+    local m = type(note.body) == "string" and note.body:match("Faction: (%a+)")
+    if m and FACTION_CREST[m] then return m end
+    return nil
+end
+
 BuildModelViewer = function(f)
     -- DressUpModel frame (below the item list, fills bottom portion of refbox)
     local model = CreateFrame("DressUpModel", nil, f)
@@ -3173,6 +3210,23 @@ BuildModelViewer = function(f)
     bgTex:SetTexture(ASSETS .. "UI\\ui-bg-parchment")
     bgTex:SetAlpha(0.30)
     model._bgTex = bgTex
+
+    -- Faction crest (FOR-22) over the parchment: top-centre, a square as wide
+    -- as the model, cropped at the bottom when the model is shorter than wide.
+    -- The art is already faint, so it is drawn at full alpha.
+    local crest = model:CreateTexture(nil, "BACKGROUND", nil, 1)
+    crest:SetPoint("TOP", model, "TOP", 0, 0)
+    crest:Hide()
+    model._crestTex = crest
+    local function SizeCrest()
+        local w, h = model:GetWidth(), model:GetHeight()
+        if not (w and h) or w <= 0 or h <= 0 then return end
+        local ch = math.min(w, h)
+        crest:SetSize(w, ch)
+        crest:SetTexCoord(0, 1, 0, ch / w)
+    end
+    model:HookScript("OnSizeChanged", SizeCrest)
+    model._sizeCrest = SizeCrest
 
     -- Mouse drag: left = rotate, right = pan X/Y
     local rotating = false
@@ -3273,9 +3327,12 @@ BuildModelViewer = function(f)
 
     -- "Show model" button (bt-up) — bottom-right corner of the refbox scroll area.
     -- Only visible when model data exists but the user has hidden the viewer.
+    -- Same distance from the right edge as the hide button: the model's right
+    -- inset (ApplyModelLayout insetR: 4 normal, 2 skin) plus the hide button's 4
     local showBtn = CreateFrame("Button", nil, f)
     showBtn:SetSize(BTN_SZ, BTN_SZ)
-    showBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -18, BOTTOM_PAD + 4)
+    local showR = ((BigNoteBoxDB and BigNoteBoxDB.skinMode) and 2 or 4) + 4
+    showBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -showR, BOTTOM_PAD + 4)
     showBtn:SetFrameLevel(f:GetFrameLevel() + 20)
     showBtn:SetHighlightTexture(""); showBtn:SetPushedTexture("")
     local sbN = showBtn:CreateTexture(nil, "ARTWORK"); sbN:SetAllPoints()
@@ -3467,6 +3524,19 @@ UpdateModelViewer = function()
 
     -- Try live mode first: check if the inspected player is our current target
     local note = BNB.GetNote(_noteID)
+
+    -- Faction crest (FOR-22)
+    local crest = mdl._crestTex
+    if crest then
+        local fac = NoteFaction(note)
+        if fac then
+            crest:SetTexture(FACTION_CREST[fac])
+            mdl._sizeCrest()
+            crest:Show()
+        else
+            crest:Hide()
+        end
+    end
     local inspName  = note and note.inspectName
     local tgtName = (BNB.UnitNameRealm("target"))
 

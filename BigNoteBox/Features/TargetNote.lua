@@ -697,6 +697,10 @@ local function CreateTargetNote(richMode, data)
         tags     = tags,
     }
 
+    -- Faction token ("Horde"/"Alliance"; nil for neutral) for the model
+    -- viewer's crest (FOR-22), independent of the faction tag setting
+    fields.targetFaction = data.faction
+
     -- Hidden duplicate-detection keys
     if data.isPlayer then
         local key = "player:" .. data.name

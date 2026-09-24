@@ -530,6 +530,7 @@ local function CreateInspectNote(richMode, silent)
         inspectSexID   = data.sexID,
         inspectName    = data.name,
         inspectRealm   = data.realm,
+        inspectFaction = data.faction,   -- model viewer crest (FOR-22)
     }
     -- Transmog appearance IDs for reconstructed model viewer (indexed by slot)
     if data.transmogAppearances and next(data.transmogAppearances) then
