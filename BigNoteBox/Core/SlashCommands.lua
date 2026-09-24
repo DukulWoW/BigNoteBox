@@ -23,12 +23,15 @@ function BNB.RegisterSlashCommands()
             StaticPopup_Show("BNB_RESET_ALL")
         elseif cmd == "config" or cmd == "settings" then
             if BNB.OpenConfig then BNB.OpenConfig() end
+        elseif cmd == "debug" then
+            if BNB.DebugWindow then BNB.DebugWindow.Toggle() end
         elseif cmd == "help" then
             print(L["SLASH_HELP"])
             print(L["SLASH_HELP_OPEN"])
             print(L["SLASH_HELP_NEW"])
             print(L["SLASH_HELP_CONFIG"])
             print(L["SLASH_HELP_RESET"])
+            print(L["SLASH_HELP_DEBUG"])
 
         -- ── Developer: testwp ─────────────────────────────────────────────────
         elseif cmd:sub(1, 6) == "testwp" then

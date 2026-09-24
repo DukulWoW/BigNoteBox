@@ -370,8 +370,8 @@ function AM.ConvertToPlain(id, onDone)
     if not StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] then
         StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] = {
             text     = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?",
-            button1  = "Remove tags",
-            button2  = "Cancel",
+            button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
+            button2  = BNB.L["CANCEL"],
             OnAccept = function(self, data)
                 local noteID = data.id
                 local note   = BNB.GetNote(noteID)

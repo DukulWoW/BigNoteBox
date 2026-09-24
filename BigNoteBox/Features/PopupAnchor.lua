@@ -32,11 +32,11 @@ local function CreateAnchorEditor()
     -- Title text
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("LEFT", f, "LEFT", 8, 0)
-    title:SetText("Context Popup Anchor")
+    title:SetText(L["POPANCHOR_TITLE"])
     title:SetTextColor(1, 0.82, 0, 0.9)
 
     -- Lock button
-    local lockBtn = BNB.CreateButton(nil, f, "Lock", 50, 20)
+    local lockBtn = BNB.CreateButton(nil, f, L["POPANCHOR_LOCK"], 50, 20)
     lockBtn:SetPoint("RIGHT", f, "RIGHT", -4, 0)
     lockBtn:SetScript("OnClick", function()
         BNB.LockPopupAnchor()
@@ -64,9 +64,9 @@ local function CreateAnchorEditor()
     -- Tooltip
     f:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine("Context Popup Anchor", 1, 0.82, 0)
-        GameTooltip:AddLine("Drag to position where context popups appear.", 0.7, 0.7, 0.7)
-        GameTooltip:AddLine("Click Lock to save position.", 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["POPANCHOR_TITLE"], 1, 0.82, 0)
+        GameTooltip:AddLine(L["POPANCHOR_TIP1"], 0.7, 0.7, 0.7)
+        GameTooltip:AddLine(L["POPANCHOR_TIP2"], 0.7, 0.7, 0.7)
         GameTooltip:Show()
     end)
     f:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -106,7 +106,7 @@ function BNB.LockPopupAnchor()
         end
     end
     _anchor:Hide()
-    BNB:Print("Popup anchor position saved.")
+    BNB:Print(L["POPANCHOR_SAVED"])
 end
 
 function BNB.IsPopupAnchorShown()

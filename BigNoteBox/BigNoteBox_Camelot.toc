@@ -50,6 +50,7 @@ UI\ConfigWindow.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
+UI\DebugWindow.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua
 Assets\Icons\IconManifest.lua

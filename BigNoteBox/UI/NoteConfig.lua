@@ -2126,7 +2126,7 @@ local function BuildSituationTab(panel)
     end
 
     -- ── Helper: refresh current-binding label ────────────────────────────────
-    local KIND_LABELS = { zone = "Zone", subzone = "Sub-zone", instance = "Instance", player = "Player" }
+    local KIND_LABELS = { zone = L["STICKY_KIND_ZONE"], subzone = L["STICKY_KIND_SUBZONE"], instance = L["STICKY_KIND_INSTANCE"], player = L["STICKY_KIND_PLAYER"] }
     local BIND_MAX_W  = NCW - PAD * 2 - 8  -- available width for the value text
     local BIND_DEF_SZ = 20                  -- GameFontNormalHuge3 default size
     local BIND_MIN_SZ = 11                  -- smallest we'll shrink to
@@ -2152,10 +2152,10 @@ local function BuildSituationTab(panel)
                 end
             end
         else
-            curBindHeader:SetText("|cff666666No binding|r")
+            curBindHeader:SetText("|cff666666" .. L["NC_NO_BINDING"] .. "|r")
             local path = curBindValue:GetFont()
             if path then pcall(function() curBindValue:SetFont(path, BIND_DEF_SZ, "") end) end
-            curBindValue:SetText("|cff666666Note is global.|r")
+            curBindValue:SetText("|cff666666" .. L["NC_NOTE_GLOBAL"] .. "|r")
         end
     end
     panel._refreshCurBind = RefreshCurBind
@@ -2873,13 +2873,13 @@ local function CreateNoteConfigWindow()
     end)
 
     local tabDefs = {
-        { label="General",    useScroll=true,  builder=BuildGeneralTab    },
-        { label="Appearance", useScroll=false, builder=BuildAppearanceTab },
-        { label="Situation",  useScroll=false, builder=BuildSituationTab  },
+        { label=L["CFG_TAB_GENERAL"],    useScroll=true,  builder=BuildGeneralTab    },
+        { label=L["CFG_TAB_APPEARANCE"], useScroll=false, builder=BuildAppearanceTab },
+        { label=L["NC_TAB_SITUATION"],  useScroll=false, builder=BuildSituationTab  },
     }
 
     if skinMode then
-        local tabCtrl = BNB.CreateSkinTabs(f, {"General", "Appearance", "Situation"},
+        local tabCtrl = BNB.CreateSkinTabs(f, {L["CFG_TAB_GENERAL"], L["CFG_TAB_APPEARANCE"], L["NC_TAB_SITUATION"]},
             function(idx) BNB._NoteConfigSelectTab(idx) end)
         tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -SK_NC_TITLE_H)
         tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_NC_TITLE_H)

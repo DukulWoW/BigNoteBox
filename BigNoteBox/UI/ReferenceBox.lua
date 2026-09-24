@@ -3722,16 +3722,16 @@ UpdateDynamicTitle = function()
     local title
     if hasTasks and hasModel then
         if _rbMode == "model" then
-            title = "Tasks + Model"
+            title = L["REFBOX_TITLE_TASKS_MODEL"]
         else
-            title = "Tasks + Reference"
+            title = L["REFBOX_TITLE_TASKS_REF"]
         end
     elseif hasTasks and hasAtts then
-        title = "Tasks + Reference"
+        title = L["REFBOX_TITLE_TASKS_REF"]
     elseif hasTasks then
-        title = "Tasks"
+        title = L["REFBOX_TITLE_TASKS"]
     elseif hasModel then
-        title = "Reference + Model"
+        title = L["REFBOX_TITLE_REF_MODEL"]
     else
         title = L["REFBOX_TITLE"]
     end

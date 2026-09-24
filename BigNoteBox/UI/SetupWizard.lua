@@ -205,6 +205,8 @@ local function StartGlow()
             glowFrame:SetPoint("TOPLEFT",     _frame, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
             glowFrame:SetPoint("BOTTOMRIGHT", _frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
         end
+    else
+        BNB.NudgeRetailGlow(_frame, GLOW_KEY)   -- RET-04
     end
 end
 

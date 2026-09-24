@@ -238,36 +238,9 @@ end
 --------------------------------------------------------------------------------
 -- TIMESTAMP FORMATTER
 --------------------------------------------------------------------------------
+-- One implementation, in UI/NoteEditor.lua (was a hardcoded duplicate, ALL-28)
 local function FmtTime(ts)
-    if not ts or ts == 0 then return "" end
-    local db    = BigNoteBoxDB
-    local fmt   = db and db.dateFormat or "YYYY-MM-DD"
-    local use24 = db == nil or db.use24Hour ~= false
-    if fmt == "relative" then
-        local diff = time() - ts
-        if diff < 60          then return "just now"
-        elseif diff < 3600    then return math.floor(diff/60) .. "m ago"
-        elseif diff < 86400   then return math.floor(diff/3600) .. "h ago"
-        elseif diff < 604800  then return math.floor(diff/86400) .. "d ago"
-        elseif diff < 2592000 then return math.floor(diff/604800) .. " weeks ago"
-        elseif diff < 31536000 then return math.floor(diff/2592000) .. " months ago"
-        else return math.floor(diff/31536000) .. " years ago" end
-    end
-    local dp
-    if fmt == "DD-MM-YYYY" then dp = date("%d-%m-%Y", ts)
-    elseif fmt == "MM-DD-YYYY" then dp = date("%m-%d-%Y", ts)
-    else dp = date("%Y-%m-%d", ts) end
-    local tp
-    if use24 then
-        tp = date("%H:%M", ts)
-    else
-        local h = tonumber(date("%H", ts))
-        local m = date("%M", ts)
-        local ap = h >= 12 and "pm" or "am"
-        h = h % 12; if h == 0 then h = 12 end
-        tp = h .. ":" .. m .. " " .. ap
-    end
-    return dp .. " " .. tp
+    return BNB.FmtTime and BNB.FmtTime(ts) or ""
 end
 
 --------------------------------------------------------------------------------
@@ -283,7 +256,7 @@ local function UpdateFocusStats(text)
     -- word count: split on whitespace sequences
     local words = 0
     for _ in text:gmatch("%S+") do words = words + 1 end
-    focusStatsStrip:SetText(chars .. " chars  " .. words .. " words")
+    focusStatsStrip:SetText(string.format(L["NE_STATS_FMT"], chars, words))
 end
 
 local function UpdateFocusSaveBtn()
@@ -378,8 +351,8 @@ local function LoadNoteInFocus(id)
 
     -- Timestamps can be set immediately
     if focusTsStrip then
-        local cr = note.created and ("Created " .. FmtTime(note.created)) or ""
-        local up = note.updated and ("  \226\128\162  Edited " .. FmtTime(note.updated)) or ""
+        local cr = note.created and string.format(L["NE_CREATED_FMT"], FmtTime(note.created)) or ""
+        local up = note.updated and string.format(L["NE_TS_SEP_EDITED_FMT"], FmtTime(note.updated)) or ""
         focusTsStrip:SetText(cr .. up)
     end
 

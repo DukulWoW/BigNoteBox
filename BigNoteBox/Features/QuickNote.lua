@@ -140,9 +140,9 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     if action == "confirm" then
         -- Small static popup to confirm/edit the title before creating
         StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] = StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] or {
-            text         = "Create note - edit title if needed:",
-            button1      = "Create",
-            button2      = "Cancel",
+            text         = BNB.L["QN_CONFIRM_TEXT"],
+            button1      = BNB.L["QN_CONFIRM_CREATE"],
+            button2      = BNB.L["CANCEL"],
             hasEditBox   = true,
             maxLetters   = 100,
             whileDead    = false,
@@ -322,7 +322,7 @@ local function QuestLogText(questID)
     if C_QuestLog and C_QuestLog.GetTitleForQuestID then
         title = C_QuestLog.GetTitleForQuestID(questID) or ""
     end
-    if title == "" then title = "Quest " .. questID end
+    if title == "" then title = string.format(BNB.L["QN_QUEST_TITLE_FMT"], questID) end
 
     local desc, objText = "", ""
     if GetQuestLogQuestText then
@@ -953,7 +953,7 @@ local function InjectQuestLogFrame()
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         GameTooltip:AddLine(BNB.L["QN_BTN_TIP1"], 1, 1, 1)
-        GameTooltip:AddLine("from this quest.", 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(BNB.L["QN_BTN_TIP2_QUEST"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -963,7 +963,7 @@ local function InjectQuestLogFrame()
 
         local questID = _questLogSelectedID or 0
         if questID == 0 then
-            BNB:Print("|cffff6666No quest selected in the quest log.|r")
+            BNB:Print("|cffff6666" .. BNB.L["QN_NO_QUEST"] .. "|r")
             return
         end
 
@@ -1139,8 +1139,8 @@ local function BuildImmersionButton()
         SetTexPad(PAD_HOVER)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         GameTooltip:AddLine(BNB.L["QN_BTN_TIP1"], 1, 1, 1)
-        GameTooltip:AddLine("from this Immersion dialogue.", 0.78, 0.78, 0.78)
-        GameTooltip:AddLine("Shift+Drag to reposition.", 0.55, 0.55, 0.55)
+        GameTooltip:AddLine(BNB.L["QN_BTN_TIP2_IMM"], 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(BNB.L["QN_BTN_TIP_DRAG"], 0.55, 0.55, 0.55)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function(self)
@@ -1198,7 +1198,7 @@ local function BuildImmersionButton()
             if rewardStr then immBody = immBody .. "\n\n----------\n" .. rewardStr end
         end
         CreateQuickNote(title, immBody, RandomIcon(), { "Quest" }, rewardFn)
-        BNB:Print("Note created: " .. (title or ""))
+        BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title or ""))
     end)
 
     _immersionBtn = btn
@@ -1253,10 +1253,10 @@ function BNB.ToggleImmersionBypass()
     if not _G["ImmersionFrame"] then return end
     if _immBypass then
         ImmersionBypassEnd()
-        BNB:Print("QuickNote: Immersion restored.")
+        BNB:Print(BNB.L["QN_IMM_RESTORED"])
     else
         ImmersionBypassStart()
-        BNB:Print("QuickNote: Immersion bypassed - native frames active until conversation ends.")
+        BNB:Print(BNB.L["QN_IMM_BYPASSED"])
     end
 end
 

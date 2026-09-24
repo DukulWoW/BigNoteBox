@@ -90,6 +90,8 @@ local function StartGlow(f)
                 g:SetPoint("TOPLEFT",     f, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
                 g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
             end
+        else
+            BNB.NudgeRetailGlow(f, GLOW_KEY)   -- RET-04
         end
     end
 end

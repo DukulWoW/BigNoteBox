@@ -25,13 +25,13 @@ local PAD           = 12
 
 -- Dropdown option definitions
 local SHARE_OPTIONS = {
-    { key = "basic",      label = "Title and body" },
-    { key = "tasks",      label = "Title, body and tasks" },
-    { key = "refbox",     label = "Title, body and refbox" },
-    { key = "tags",       label = "Title, body, tags and refbox" },
-    { key = "icon",       label = "Title, body, tags, icon and refbox" },
-    { key = "inspect",    label = "Title, body, tags, icon, refbox and inspect data" },
-    { key = "everything", label = "Everything" },
+    { key = "basic",      labelKey = "SHARE_OPT_BASIC" },
+    { key = "tasks",      labelKey = "SHARE_OPT_TASKS" },
+    { key = "refbox",     labelKey = "SHARE_OPT_REFBOX" },
+    { key = "tags",       labelKey = "SHARE_OPT_TAGS" },
+    { key = "icon",       labelKey = "SHARE_OPT_ICON" },
+    { key = "inspect",    labelKey = "SHARE_OPT_INSPECT" },
+    { key = "everything", labelKey = "SHARE_OPT_EVERYTHING" },
 }
 local SHARE_FIELDS = {
     basic      = { "title", "body", "richMode" },
@@ -237,7 +237,7 @@ end
 function BNB.ShareEncode(noteID, optionKey)
     local ndb  = BigNoteBoxNotesDB
     local note = ndb and ndb.notes and ndb.notes[noteID]
-    if not note then return nil, "Note not found" end
+    if not note then return nil, L["SHARE_ERR_NOTFOUND"] end
 
     local fields = SHARE_FIELDS[optionKey] or SHARE_FIELDS.basic
     local data   = {}
@@ -267,11 +267,11 @@ function BNB.ShareEncode(noteID, optionKey)
 end
 
 function BNB.ShareDecode(str)
-    if not str or str == "" then return nil, "Empty string" end
+    if not str or str == "" then return nil, L["SHARE_ERR_EMPTY"] end
     str = str:match("^%s*(.-)%s*$")  -- trim whitespace
 
     if str:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
-        return nil, "Not a valid BNB share string (missing prefix)"
+        return nil, L["SHARE_ERR_PREFIX"]
     end
     local encoded = str:sub(#SHARE_PREFIX + 1)
 
@@ -279,16 +279,16 @@ function BNB.ShareDecode(str)
     local serialized
     if ld then
         local compressed = ld:DecodeForPrint(encoded)
-        if not compressed then return nil, "Failed to decode (corrupt or wrong format)" end
+        if not compressed then return nil, L["SHARE_ERR_DECODE"] end
         serialized = ld:DecompressDeflate(compressed)
-        if not serialized then return nil, "Failed to decompress (corrupt data)" end
+        if not serialized then return nil, L["SHARE_ERR_DECOMPRESS"] end
     else
         serialized = encoded
     end
 
     local data = Deserialize(serialized)
     if not data or not data.title and not data.body then
-        return nil, "Failed to deserialize (no content found)"
+        return nil, L["SHARE_ERR_DESERIALIZE"]
     end
     -- Decode flat attachment string back into array
     if data._att then
@@ -327,7 +327,7 @@ local function BuildSharePreviewSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Preview Shared Note")
+    titleLbl:SetText(L["SHARE_PREVIEW_TITLE"])
     f._titleLbl = titleLbl
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseSharePreview() end)
@@ -353,7 +353,7 @@ local function BuildSharePreviewNormal()
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle("Preview Shared Note")
+    f:SetTitle(L["SHARE_PREVIEW_TITLE"])
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseSharePreview() end)
     end
@@ -444,7 +444,7 @@ local function BuildSharePreview()
     footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
 
     -- Add Note button
-    local addBtn = BNB.CreateButton(nil, f, "Add Note", 90, 26)
+    local addBtn = BNB.CreateButton(nil, f, L["SHARE_ADD_BTN"], 90, 26)
     addBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
     addBtn:SetScript("OnClick", function()
         local data = f._pendingData
@@ -476,7 +476,7 @@ local function BuildSharePreview()
             end
             if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             if BNB.SelectNote     then BNB.SelectNote(id)    end
-            BNB:Print("|cff66bb6aNote imported successfully.|r")
+            BNB:Print("|cff66bb6a" .. L["SHARE_IMPORTED"] .. "|r")
         end
         BNB.CloseSharePreview()
         BNB.CloseShareWindow()
@@ -485,7 +485,7 @@ local function BuildSharePreview()
     f._addBtn = addBtn
 
     -- Discard button
-    local discardBtn = BNB.CreateButton(nil, f, "Discard", 80, 26)
+    local discardBtn = BNB.CreateButton(nil, f, L["SHARE_DISCARD_BTN"], 80, 26)
     discardBtn:SetPoint("LEFT", addBtn, "RIGHT", 8, 0)
     discardBtn:SetScript("OnClick", function() BNB.CloseSharePreview() end)
 
@@ -545,7 +545,7 @@ function BNB.OpenSharePreview(data)
                 end
                 parts[#parts + 1] = label
             end
-            f._attLbl:SetText("|cff88cc88Refbox:|r " .. table.concat(parts, ", "))
+            f._attLbl:SetText(string.format(L["SHARE_REFBOX_FMT"], table.concat(parts, ", ")))
             f._attLbl:Show()
         else
             f._attLbl:Hide()
@@ -608,7 +608,7 @@ local function BuildShareWindowSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Share Note")
+    titleLbl:SetText(L["SHARE_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseShareWindow() end)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -633,7 +633,7 @@ local function BuildShareWindowNormal()
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle("Share Note")
+    f:SetTitle(L["SHARE_TITLE"])
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseShareWindow() end)
     end
@@ -658,14 +658,14 @@ local function BuildShareWindow()
     local shareHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     shareHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     shareHdr:SetTextColor(1, 0.82, 0)
-    shareHdr:SetText("Share")
+    shareHdr:SetText(L["SHARE_HDR"])
     y = y - 20
 
     -- What to include dropdown
     local ddLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     ddLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     ddLbl:SetTextColor(0.78, 0.78, 0.78)
-    ddLbl:SetText("Include:")
+    ddLbl:SetText(L["SHARE_INCLUDE"])
     y = y - 18
 
     local useNativeDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
@@ -677,7 +677,7 @@ local function BuildShareWindow()
         if str and f._shareEB then
             f._shareEB:SetText(str)
         elseif f._shareEB then
-            f._shareEB:SetText(err or "Error generating share string")
+            f._shareEB:SetText(err or L["SHARE_ERR_GENERATE"])
         end
     end
 
@@ -690,7 +690,7 @@ local function BuildShareWindow()
             dd:SetupMenu(function(_, root)
                 for _, opt in ipairs(SHARE_OPTIONS) do
                     local key = opt.key
-                    root:CreateRadio(opt.label,
+                    root:CreateRadio(L[opt.labelKey],
                         function() return _selOption == key end,
                         function()
                             _selOption = key
@@ -707,9 +707,9 @@ local function BuildShareWindow()
         -- Fallback: cycling button
         local function GetCurrentLabel()
             for _, opt in ipairs(SHARE_OPTIONS) do
-                if opt.key == _selOption then return opt.label end
+                if opt.key == _selOption then return L[opt.labelKey] end
             end
-            return SHARE_OPTIONS[1].label
+            return L[SHARE_OPTIONS[1].labelKey]
         end
         local cycleBtn = BNB.CreateButton(nil, f, GetCurrentLabel(), CW, 24)
         cycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
@@ -720,7 +720,7 @@ local function BuildShareWindow()
             end
             idx = (idx % #SHARE_OPTIONS) + 1
             _selOption = SHARE_OPTIONS[idx].key
-            self:SetText(SHARE_OPTIONS[idx].label)
+            self:SetText(L[SHARE_OPTIONS[idx].labelKey])
             RegenerateShareString()
         end)
         f._shareCycleBtn = cycleBtn
@@ -748,7 +748,7 @@ local function BuildShareWindow()
     y = y - 58
 
     -- Copy hint button
-    local copyBtn = BNB.CreateButton(nil, f, "Copy to Clipboard", 140, 24)
+    local copyBtn = BNB.CreateButton(nil, f, L["SHARE_COPY_BTN"], 140, 24)
     copyBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     copyBtn:SetScript("OnClick", function()
         local str = f._shareEB and f._shareEB:GetText() or ""
@@ -758,11 +758,11 @@ local function BuildShareWindow()
     end)
 
     -- BCB send button (or "Get BCB" if absent)
-    local bcbShareBtn = BNB.CreateButton(nil, f, "Send with BCB", 110, 24)
+    local bcbShareBtn = BNB.CreateButton(nil, f, L["SHARE_BCB_BTN"], 110, 24)
     bcbShareBtn:SetPoint("LEFT", copyBtn, "RIGHT", 6, 0)
     local function RefreshBCBShareBtn()
         local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
-        bcbShareBtn:SetText(hasBCB and "Send with BCB" or "Get BCB")
+        bcbShareBtn:SetText(hasBCB and L["SHARE_BCB_BTN"] or L["SHARE_GET_BCB_BTN"])
     end
     RefreshBCBShareBtn()
     bcbShareBtn:SetScript("OnClick", function()
@@ -808,13 +808,13 @@ local function BuildShareWindow()
     charCounter:SetPoint("RIGHT", f, "RIGHT", -PAD, 0)
     charCounter:SetPoint("TOP",   copyBtn, "TOP", 0, 0)
     charCounter:SetTextColor(0.55, 0.55, 0.55)
-    charCounter:SetText("0 chars")
+    charCounter:SetText(string.format(L["SHARE_CHARS_FMT"], 0))
     f._charCounter = charCounter
 
     shareEB:SetScript("OnTextChanged", function(self)
         local n = #(self:GetText() or "")
         local col = n > 2000 and "|cffff6666" or n > 800 and "|cffffff66" or "|cff888888"
-        charCounter:SetText(col .. n .. " chars|r")
+        charCounter:SetText(col .. string.format(L["SHARE_CHARS_FMT"], n) .. "|r")
     end)
 
     y = y - 34
@@ -1002,13 +1002,13 @@ local function BuildShareWindow()
     local importHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     importHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     importHdr:SetTextColor(1, 0.82, 0)
-    importHdr:SetText("Import")
+    importHdr:SetText(L["SHARE_IMPORT_HDR"])
     y = y - 20
 
     local importLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     importLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     importLbl:SetTextColor(0.78, 0.78, 0.78)
-    importLbl:SetText("Paste a share string from another player:")
+    importLbl:SetText(L["SHARE_PASTE_PROMPT"])
     y = y - 18
 
     -- Import editbox
@@ -1026,7 +1026,7 @@ local function BuildShareWindow()
     importEB:SetAutoFocus(false)
     importEB:SetMaxLetters(0)
     importEB:SetTextInsets(2, 2, 2, 2)
-    BNB.AddPlaceholder(importEB, "Paste BNB share string here...", 0.4, 0.4, 0.4)
+    BNB.AddPlaceholder(importEB, L["SHARE_IMPORT_PLACEHOLDER"], 0.4, 0.4, 0.4)
     importEB:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     f._importEB = importEB
     y = y - 58
@@ -1042,19 +1042,19 @@ local function BuildShareWindow()
     y = y - 22
 
     -- Preview button
-    local previewBtn = BNB.CreateButton(nil, f, "Preview", 90, 26)
+    local previewBtn = BNB.CreateButton(nil, f, L["SHARE_PREVIEW_BTN"], 90, 26)
     previewBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
         if f._errLbl then f._errLbl:SetText("") end
         local str = f._importEB and not f._importEB._showingPlaceholder
             and f._importEB:GetText() or ""
         if str == "" then
-            if f._errLbl then f._errLbl:SetText("Please paste a share string first.") end
+            if f._errLbl then f._errLbl:SetText(L["SHARE_PASTE_FIRST"]) end
             return
         end
         local data, err = BNB.ShareDecode(str)
         if not data then
-            if f._errLbl then f._errLbl:SetText(err or "Invalid share string.") end
+            if f._errLbl then f._errLbl:SetText(err or L["SHARE_ERR_INVALID"]) end
             return
         end
         BNB.OpenSharePreview(data)
@@ -1095,12 +1095,12 @@ function BNB.OpenShareWindow(noteID)
     -- Reset dropdown to default
     if f._shareDD and f._rebuildDD then f._rebuildDD() end
     if f._shareCycleBtn then
-        f._shareCycleBtn:SetText(SHARE_OPTIONS[1].label)
+        f._shareCycleBtn:SetText(L[SHARE_OPTIONS[1].labelKey])
     end
     -- Reset import field
     if f._importEB then
         f._importEB:SetText("")
-        BNB.AddPlaceholder(f._importEB, "Paste BNB share string here...", 0.4, 0.4, 0.4)
+        BNB.AddPlaceholder(f._importEB, L["SHARE_IMPORT_PLACEHOLDER"], 0.4, 0.4, 0.4)
     end
     if f._errLbl then f._errLbl:SetText("") end
 
@@ -1160,7 +1160,7 @@ local function BuildImportWindowSkin()
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText("Import Shared Note")
+    titleLbl:SetText(L["SHARE_IMPORT_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseImportWindow() end)
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
@@ -1184,7 +1184,7 @@ local function BuildImportWindowNormal()
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle("Import Shared Note")
+    f:SetTitle(L["SHARE_IMPORT_TITLE"])
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseImportWindow() end)
     end
@@ -1211,7 +1211,7 @@ local function BuildImportWindow()
     instrLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     instrLbl:SetJustifyH("LEFT")
     instrLbl:SetTextColor(0.78, 0.78, 0.78)
-    instrLbl:SetText("Paste a share string from another player:")
+    instrLbl:SetText(L["SHARE_PASTE_PROMPT"])
     y = y - 20
 
     -- Import editbox
@@ -1229,7 +1229,7 @@ local function BuildImportWindow()
     importEB:SetAutoFocus(false)
     importEB:SetMaxLetters(0)
     importEB:SetTextInsets(2, 2, 2, 2)
-    BNB.AddPlaceholder(importEB, "Paste BNB share string here...", 0.4, 0.4, 0.4)
+    BNB.AddPlaceholder(importEB, L["SHARE_IMPORT_PLACEHOLDER"], 0.4, 0.4, 0.4)
     importEB:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
     f._importEB = importEB
     y = y - 58
@@ -1245,19 +1245,19 @@ local function BuildImportWindow()
     y = y - 22
 
     -- Preview button
-    local previewBtn = BNB.CreateButton(nil, f, "Preview", 90, 26)
+    local previewBtn = BNB.CreateButton(nil, f, L["SHARE_PREVIEW_BTN"], 90, 26)
     previewBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
         if f._errLbl then f._errLbl:SetText("") end
         local str = f._importEB and not f._importEB._showingPlaceholder
             and f._importEB:GetText() or ""
         if str == "" then
-            if f._errLbl then f._errLbl:SetText("Please paste a share string first.") end
+            if f._errLbl then f._errLbl:SetText(L["SHARE_PASTE_FIRST"]) end
             return
         end
         local data, err = BNB.ShareDecode(str)
         if not data then
-            if f._errLbl then f._errLbl:SetText(err or "Invalid share string.") end
+            if f._errLbl then f._errLbl:SetText(err or L["SHARE_ERR_INVALID"]) end
             return
         end
         BNB.OpenSharePreview(data)
@@ -1269,12 +1269,12 @@ local function BuildImportWindow()
     impCharCounter:SetPoint("RIGHT", f,           "RIGHT", -PAD, 0)
     impCharCounter:SetJustifyH("LEFT")
     impCharCounter:SetTextColor(0.55, 0.55, 0.55)
-    impCharCounter:SetText("0 chars")
+    impCharCounter:SetText(string.format(L["SHARE_CHARS_FMT"], 0))
     f._importEB:SetScript("OnTextChanged", function(self)
-        if self._showingPlaceholder then impCharCounter:SetText("0 chars"); return end
+        if self._showingPlaceholder then impCharCounter:SetText(string.format(L["SHARE_CHARS_FMT"], 0)); return end
         local n = #(self:GetText() or "")
         local col = n > 0 and "|cff888888" or "|cff555555"
-        impCharCounter:SetText(col .. n .. " chars|r")
+        impCharCounter:SetText(col .. string.format(L["SHARE_CHARS_FMT"], n) .. "|r")
     end)
 
     y = y - 36
@@ -1305,7 +1305,7 @@ function BNB.OpenImportWindow()
     -- Reset fields
     if f._importEB then
         f._importEB:SetText("")
-        BNB.AddPlaceholder(f._importEB, "Paste BNB share string here...", 0.4, 0.4, 0.4)
+        BNB.AddPlaceholder(f._importEB, L["SHARE_IMPORT_PLACEHOLDER"], 0.4, 0.4, 0.4)
     end
     if f._errLbl then f._errLbl:SetText("") end
     BNB.CloseSharePreview()

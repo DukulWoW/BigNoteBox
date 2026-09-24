@@ -612,13 +612,13 @@ end
 --------------------------------------------------------------------------------
 local function BuildWarnDialogButtons(f)
     -- Row 1 (top): Open Note (left) | Create Duplicate (centre) | Close (right)
-    f._openBtn = BNB.CreateButton(nil, f, "Open Note", 90, 26)
+    f._openBtn = BNB.CreateButton(nil, f, L["AO_OPEN_NOTE_BTN"], 90, 26)
     f._openBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
 
-    f._dupeBtn = BNB.CreateButton(nil, f, "Create Duplicate", 120, 26)
+    f._dupeBtn = BNB.CreateButton(nil, f, L["INS_WARN_DUPLICATE"], 120, 26)
     f._dupeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 48)
 
-    local closeBtn = BNB.CreateButton(nil, f, "Close", 70, 26)
+    local closeBtn = BNB.CreateButton(nil, f, L["CLOSE"], 70, 26)
     closeBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
@@ -654,7 +654,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
 
             local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0); tl:SetText("Note Exists")
+            tl:SetTextColor(1, 0.82, 0); tl:SetText(L["INS_NOTE_EXISTS"])
 
             BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
                 :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
@@ -680,7 +680,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
             f:RegisterForDrag("LeftButton")
             f:SetScript("OnDragStart", function(self) self:StartMoving() end)
             f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText("Note Exists")
+            f.TitleText:SetText(L["INS_NOTE_EXISTS"])
 
             local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             msg:SetPoint("TOP", f, "TOP", 0, -38)
@@ -697,7 +697,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
         _warnDialog = f
     end
 
-    _warnDialog._msgLbl:SetText("You already have a note for " .. playerName .. ".")
+    _warnDialog._msgLbl:SetText(string.format(L["INS_WARN_EXISTS_FMT"], playerName))
     _warnDialog._openBtn:SetScript("OnClick", function() OpenExistingNote(existingNoteID) end)
     _warnDialog._dupeBtn:SetScript("OnClick", function()
         _warnDialog:Hide()
@@ -713,8 +713,8 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
         -- restore point will be created first so the user can recover their edits.
         StaticPopupDialogs["BNB_CONFIRM_UPDATE_ALL"] = {
             text          = L["INS_WARN_UPDATE_ALL_CONFIRM"],
-            button1       = "Update",
-            button2       = "Cancel",
+            button1       = L["INS_WARN_UPDATE_BTN"],
+            button2       = L["CANCEL"],
             OnAccept      = function()
                 -- Create restore point before overwriting the note body.
                 BNB.HistoryCreateManual(existingNoteID)
@@ -760,16 +760,16 @@ local function ShowTypeDialog()
 
             local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0); tl:SetText("Create Note")
+            tl:SetTextColor(1, 0.82, 0); tl:SetText(L["INS_CREATE_NOTE"])
 
             BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
                 :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
 
-            local nb = BNB.CreateButton(nil, f, "Normal", 85, 28)
+            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
             nb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
             nb:SetScript("OnClick", function() CreateInspectNote(false) end)
 
-            local rb = BNB.CreateButton(nil, f, "Rich", 85, 28)
+            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
             rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
             rb:SetScript("OnClick", function() CreateInspectNote(true) end)
 
@@ -785,13 +785,13 @@ local function ShowTypeDialog()
             f:RegisterForDrag("LeftButton")
             f:SetScript("OnDragStart", function(self) self:StartMoving() end)
             f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText("Create Note")
+            f.TitleText:SetText(L["INS_CREATE_NOTE"])
 
-            local nb = BNB.CreateButton(nil, f, "Normal", 85, 28)
+            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
             nb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
             nb:SetScript("OnClick", function() CreateInspectNote(false) end)
 
-            local rb = BNB.CreateButton(nil, f, "Rich", 85, 28)
+            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
             rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
             rb:SetScript("OnClick", function() CreateInspectNote(true) end)
         end

@@ -843,7 +843,7 @@ local function BuildStickySettingsWindow()
     -- ── Tab buttons ───────────────────────────────────────────────────────────
     local sTabBtns   = {}
     local sTabPanels = {}
-    local TAB_LABELS = { "General", "Appearance", "Situation" }
+    local TAB_LABELS = { L["CFG_TAB_GENERAL"], L["CFG_TAB_APPEARANCE"], L["NC_TAB_SITUATION"] }
 
     local function SelectStickyTab(idx)
         for i = 1, 3 do
@@ -2286,10 +2286,10 @@ local function PopulateStickySettings(noteID)
                 end
             end
         else
-            sitCurBindHeader:SetText("|cff666666No binding|r")
+            sitCurBindHeader:SetText("|cff666666" .. L["NC_NO_BINDING"] .. "|r")
             local path = sitCurBindValue:GetFont()
             if path then pcall(function() sitCurBindValue:SetFont(path, SIT_BIND_DEF_SZ, "") end) end
-            sitCurBindValue:SetText("|cff666666Note is global.|r")
+            sitCurBindValue:SetText("|cff666666" .. L["NC_NOTE_GLOBAL"] .. "|r")
         end
     end
 

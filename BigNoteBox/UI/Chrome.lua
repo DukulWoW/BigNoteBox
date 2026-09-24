@@ -125,6 +125,22 @@ function BNB.AddForeverGlow(host, region)
     return glow
 end
 
+-- RET-04: on Retail the ButtonFrameTemplate rect overhangs the visible panel on the
+-- left, so an AutoCast glow anchored flush to it sits too far out on that side
+-- (normal mode only; skin frames are plain and already correct). Pull the left edge
+-- in by this many pixels. Tune in game: raise it to move the glow inward.
+local RETAIL_GLOW_LEFT = 4
+
+function BNB.NudgeRetailGlow(f, key)
+    if not f or BNB.IsForever then return end
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then return end
+    local g = f["_AutoCastGlow" .. key]
+    if not g then return end
+    g:ClearAllPoints()
+    g:SetPoint("TOPLEFT",     f, "TOPLEFT",     RETAIL_GLOW_LEFT + 0.05, 0.05)
+    g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0,                       0.05)
+end
+
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
     if BNB.IsForever then pcall(SkinBg, f) end

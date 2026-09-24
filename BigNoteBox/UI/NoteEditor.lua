@@ -97,13 +97,13 @@ local function FmtTime(ts)
 
     if fmt == "relative" then
         local diff = time() - ts
-        if diff < 60         then return "just now"
-        elseif diff < 3600   then return math.floor(diff/60) .. "m ago"
-        elseif diff < 86400  then return math.floor(diff/3600) .. "h ago"
-        elseif diff < 604800 then return math.floor(diff/86400) .. "d ago"
-        elseif diff < 2592000 then return math.floor(diff/604800) .. " weeks ago"
-        elseif diff < 31536000 then return math.floor(diff/2592000) .. " months ago"
-        else return math.floor(diff/31536000) .. " years ago" end
+        if diff < 60         then return L["REL_JUST_NOW"]
+        elseif diff < 3600   then return string.format(L["REL_MIN_AGO_FMT"],    math.floor(diff/60))
+        elseif diff < 86400  then return string.format(L["REL_HOUR_AGO_FMT"],   math.floor(diff/3600))
+        elseif diff < 604800 then return string.format(L["REL_DAY_AGO_FMT"],    math.floor(diff/86400))
+        elseif diff < 2592000 then return string.format(L["REL_WEEK_AGO_FMT"],  math.floor(diff/604800))
+        elseif diff < 31536000 then return string.format(L["REL_MONTH_AGO_FMT"], math.floor(diff/2592000))
+        else return string.format(L["REL_YEAR_AGO_FMT"], math.floor(diff/31536000)) end
     end
 
     -- Build date part
@@ -130,6 +130,8 @@ local function FmtTime(ts)
 
     return datePart .. " " .. timePart
 end
+-- Shared with UI/FocusEditor.lua (called at runtime, so load order does not matter)
+BNB.FmtTime = FmtTime
 
 --------------------------------------------------------------------------------
 -- WELCOME PANEL HELPERS
@@ -2302,10 +2304,10 @@ local function BuildWysiwygBar(parent, tsStrip)
     -- ── LEFT SIDE ─────────────────────────────────────────────────────────────
 
     -- Undo / Redo
-    local undoBtn = WyBtn("tb-undo", "Undo  (Ctrl+Z)")
+    local undoBtn = WyBtn("tb-undo", L["NE_TB_UNDO"])
     undoBtn:SetPoint("LEFT", bar, "LEFT", 6, 0)
 
-    local redoBtn = WyBtn("tb-redo", "Redo  (Ctrl+Shift+Z / Ctrl+Y)")
+    local redoBtn = WyBtn("tb-redo", L["NE_TB_REDO"])
     redoBtn:SetPoint("LEFT", undoBtn, "RIGHT", 4, 0)
 
     -- Wire undo
