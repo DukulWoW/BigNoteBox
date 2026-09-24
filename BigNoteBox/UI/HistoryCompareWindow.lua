@@ -142,19 +142,32 @@ local function OpenExportPopup(noteData, anchorFrame)
                 if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
             end)
         else
+            -- This branch, EPAD and ey were lost to a bad paste before v1.7.0
+            -- (the function's tail sat here instead), so Export errored on
+            -- every client. Rebuilt 2026-09-24 after the BNB.OpenExportWindow pattern.
+            ef = CreateFrame("Frame", "BigNoteBoxHistoryExportFrame", UIParent, "ButtonFrameTemplate")
+            ef:SetSize(280, 156)
+            ef:SetFrameStrata("TOOLTIP")
+            ef:SetFrameLevel(10)
+            ef:SetToplevel(true)
+            ef:SetMovable(true); ef:SetClampedToScreen(true)
+            ef:EnableMouse(true)
+            ef:RegisterForDrag("LeftButton")
+            ef:SetScript("OnDragStart", function(s) s:StartMoving() end)
+            ef:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
+            ButtonFrameTemplate_HidePortrait(ef)
+            ButtonFrameTemplate_HideButtonBar(ef)
+            if ef.Inset then ef.Inset:Hide() end
+            BNB.SeatChrome(ef)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+            ef._forGlow = BNB.AddForeverGlow(ef, ef.Bg)   -- Forever: glow over the wood grain
+            ef:SetTitle(L["HISTORY_EXPORT_TITLE"])
+            if ef.CloseButton then
+                ef.CloseButton:SetScript("OnClick", function() ef:Hide() end)
+            end
+        end
 
-    _exportFrame._noteData = noteData
-    _exportFrame._jsonRb:SetChecked(true)
-    _exportFrame._mdRb:SetChecked(false)
-    _exportFrame:ClearAllPoints()
-    if anchorFrame then
-        _exportFrame:SetPoint("TOP", anchorFrame, "BOTTOM", 0, -6)
-    else
-        _exportFrame:SetPoint("CENTER")
-    end
-    _exportFrame:Show()
-    _exportFrame:Raise()
-end
+        local EPAD = PAD
+        local ey   = skinMode and -(SK_EXP_TITLE_H_CMP + 8) or -32
 
         local fmtLbl = ef:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fmtLbl:SetPoint("TOPLEFT", ef, "TOPLEFT", EPAD, ey)
@@ -252,6 +265,17 @@ local function BuildPanel(f, isLeft)
     pane:SetSize(panW, panH)
     local xOff = isLeft and PAD or (PAD + panW + COL_GAP)
     pane:SetPoint("TOPLEFT", f, "TOPLEFT", xOff, -(titleH + HDR_H + PAD))
+
+    -- Forever normal mode: one glow per side, from the column header down to the buttons
+    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then
+        local glow = BNB.AddForeverGlow(f)
+        if glow then
+            glow:ClearAllPoints()
+            glow:SetPoint("TOPLEFT",     pane, "TOPLEFT",     0, HDR_H + PAD - 4)
+            glow:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", 0, 0)
+            pane._forGlow = glow
+        end
+    end
 
     local bodySize = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
     local sf, eb  = BNB.CreateScrolledEditBox(nil, pane, bodySize)

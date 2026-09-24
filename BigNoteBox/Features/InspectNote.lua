@@ -18,6 +18,8 @@ local BTNS   = ASSETS .. "Buttons\\"
 -- ── Button placement (adjust these to fine-tune position) ─────────────────────
 local INS_X  = -24   -- pixels from TOPRIGHT of InspectFrame
 local INS_Y  = 0     -- pixels down from TOPRIGHT of InspectFrame
+-- Forever's InspectFrame border sits elsewhere: 1px left, 2px up (Dukul, 2026-09-24)
+if BNB.IsForever then INS_X, INS_Y = INS_X - 1, INS_Y + 2 end
 local INS_SZ = 24    -- button size
 
 -- ── Race icon mapping: raceFile -> asset filename (without .tga) ──────────────
@@ -74,6 +76,17 @@ local function GetRaceIconPath(raceFile, gender)
     -- Achievement_Character_ assets use title-case (Achievement_Character_Human_Male).
     local suffix = base:sub(1, 5) == "race_" and gender:lower() or gender
     return RACE_ICONS .. base .. "_" .. suffix
+end
+
+-- Race icon for a saved inspect note (the Reference box's Model tab). Notes
+-- keep only inspectRaceID / inspectSexID (0 male, 1 female), so the race file
+-- name comes from the client. nil when the id is unknown; the caller falls back.
+function BNB.GetInspectRaceIcon(raceID, sexID)
+    if not raceID or not (C_CreatureInfo and C_CreatureInfo.GetRaceInfo) then return nil end
+    local info = C_CreatureInfo.GetRaceInfo(raceID)
+    local raceFile = info and info.clientFileString
+    if not raceFile then return nil end
+    return GetRaceIconPath(raceFile, sexID == 1 and "Female" or "Male")
 end
 local SLOT_INFO = {
     { id =  1, label = "Head" },
@@ -133,7 +146,7 @@ end
 local function GatherInspectData()
     local data = {}
 
-    local name, realm = UnitName("target")
+    local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
     data.name  = name or "Unknown"
     data.realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
@@ -540,6 +553,7 @@ local function CreateInspectNote(richMode, silent)
     end
 
     BNB.UpdateNote(noteID, fields)
+    BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title))
 
     if not silent then
         if BNB.OpenMainWindow then BNB.OpenMainWindow() end
@@ -794,7 +808,7 @@ end
 local function StartInspectNoteFlow(isAutomatic)
     if not _inspectReady then return end
 
-    local name, realm = UnitName("target")
+    local name, realm = BNB.UnitNameRealm("target")
     if not name then return end
     realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
@@ -864,6 +878,8 @@ local function CreateInspectButton()
 
     local hi = btn:CreateTexture(nil, "HIGHLIGHT"); hi:SetAllPoints()
     hi:SetTexture(BTNS .. "bt-createnote-hover")
+    -- Pressed texture while held, same as the quest/gossip buttons (FOR-20)
+    if BNB.AddQuickNotePressState then BNB.AddQuickNotePressState(btn, tex, hi) end
 
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
@@ -871,8 +887,7 @@ local function CreateInspectButton()
             GameTooltip:AddLine("Create a BigNoteBox note", 1, 1, 1)
             GameTooltip:AddLine("Waiting for inspect data...", 1, 0.5, 0.25)
         else
-            local tName = UnitName("target")
-            local tRealm = select(2, UnitName("target"))
+            local tName, tRealm = BNB.UnitNameRealm("target")
             tRealm = tRealm and tRealm ~= "" and tRealm or GetNormalizedRealmName() or ""
             local existing = tName and FindExistingNote(tName, tRealm)
             if existing then
@@ -922,14 +937,34 @@ local evf = CreateFrame("Frame")
 evf:RegisterEvent("ADDON_LOADED")
 evf:RegisterEvent("INSPECT_READY")
 
+-- GUID of the last INSPECT_READY. When the client already has a player's data
+-- (inspected recently, or close by), INSPECT_READY can fire before InspectFrame
+-- is shown; OnShow used to disable the button unconditionally after it, leaving
+-- it greyed out for good on some players and not others. Now OnShow enables it
+-- when the data for the shown unit has already arrived. Cleared on hide, since
+-- Blizzard clears the inspect data then.
+local _readyGUID = nil
+
+local function InspectedGUID()
+    local unit = InspectFrame and InspectFrame.unit or "target"
+    return UnitGUID(unit)
+end
+
+local OnInspectReady   -- defined below, shared by INSPECT_READY and OnShow
+
 local function HookInspectFrame()
     if not InspectFrame then return end
     InspectFrame:HookScript("OnShow", function()
-        DisableInspectBtn()
         _autoCreatedThisInspect = false
+        if _readyGUID and _readyGUID == InspectedGUID() then
+            OnInspectReady()
+        else
+            DisableInspectBtn()
+        end
     end)
     InspectFrame:HookScript("OnHide", function()
         DisableInspectBtn()
+        _readyGUID = nil
         _autoCreatedThisInspect = false
         if _typeDialog then _typeDialog:Hide() end
         if _warnDialog then _warnDialog:Hide() end
@@ -943,32 +978,39 @@ evf:SetScript("OnEvent", function(_, event, arg1)
             HookInspectFrame()
         end)
     elseif event == "INSPECT_READY" then
-        if InspectFrame and InspectFrame:IsShown() then
-            EnableInspectBtn()
-            -- One-shot flag set by TargetNote right-click "Inspect & Create Note".
-            -- Takes priority over auto-create mode so the user sees the type dialog.
-            if BNB._inspectAndCreate then
-                BNB._inspectAndCreate = nil
-                _autoCreatedThisInspect = true  -- suppress auto-create for this inspect
-                C_Timer.After(0.1, function()
-                    if InspectFrame and InspectFrame:IsShown() and _inspectReady then
-                        StartInspectNoteFlow(false)  -- false = manual, shows type dialog
-                    end
-                end)
-                return
-            end
-            local mode = GetMode()
-            if not _autoCreatedThisInspect and (mode == "auto_rich" or mode == "auto_normal") then
-                _autoCreatedThisInspect = true
-                C_Timer.After(0.1, function()
-                    if InspectFrame and InspectFrame:IsShown() and _inspectReady then
-                        StartInspectNoteFlow(true)
-                    end
-                end)
-            end
+        _readyGUID = arg1
+        -- Ignore data for someone else (e.g. another addon inspecting)
+        if InspectFrame and InspectFrame:IsShown()
+           and (not arg1 or arg1 == InspectedGUID()) then
+            OnInspectReady()
         end
     end
 end)
+
+OnInspectReady = function()
+    EnableInspectBtn()
+    -- One-shot flag set by TargetNote right-click "Inspect & Create Note".
+    -- Takes priority over auto-create mode so the user sees the type dialog.
+    if BNB._inspectAndCreate then
+        BNB._inspectAndCreate = nil
+        _autoCreatedThisInspect = true  -- suppress auto-create for this inspect
+        C_Timer.After(0.1, function()
+            if InspectFrame and InspectFrame:IsShown() and _inspectReady then
+                StartInspectNoteFlow(false)  -- false = manual, shows type dialog
+            end
+        end)
+        return
+    end
+    local mode = GetMode()
+    if not _autoCreatedThisInspect and (mode == "auto_rich" or mode == "auto_normal") then
+        _autoCreatedThisInspect = true
+        C_Timer.After(0.1, function()
+            if InspectFrame and InspectFrame:IsShown() and _inspectReady then
+                StartInspectNoteFlow(true)
+            end
+        end)
+    end
+end
 
 -- If Blizzard_InspectUI already loaded
 if InspectFrame then

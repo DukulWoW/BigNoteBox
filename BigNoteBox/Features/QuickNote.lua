@@ -24,6 +24,7 @@ local BNB = BigNoteBox
 local ASSETS          = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local QUEST_ICON      = ASSETS .. "Buttons\\bt-createnote-normal"        -- normal state for Blizzard frame buttons
 local QUEST_ICON_HOVER= ASSETS .. "Buttons\\bt-createnote-hover"  -- hover state for Blizzard frame buttons
+local QUEST_ICON_PRESS= ASSETS .. "Buttons\\bt-createnote-press"  -- pressed state for Blizzard frame buttons
 
 -- ── Button position on Blizzard frames ───────────────────────────────────────
 -- POSITION: top-left corner of the host frame, next to the native X button.
@@ -167,6 +168,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
                 end
                 if self._qnReward then self._qnReward(id) end
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], t))
             end,
         }
         local dlg = StaticPopup_Show("BNB_QUICKNOTE_CONFIRM")
@@ -204,6 +206,9 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
             BNB.mainFrame:Show()
         end
         if BNB.SelectNote then BNB.SelectNote(id) end
+    else
+        -- Silent mode shows nothing else, so say it in chat
+        BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title or ""))
     end
 end
 
@@ -219,6 +224,26 @@ local function ItemIcon(itemID)
     end
     return nil
 end
+
+-- ── Pressed state (FOR-20) ────────────────────────────────────────────────────
+-- Swaps the icon to bt-createnote-press while the left button is held. The
+-- hover texture sits on the HIGHLIGHT layer above it, so it is hidden for the
+-- press. OnHide resets it in case the frame closes mid-press. Also used by the
+-- inspect-frame button (Features/InspectNote.lua), hence the BNB export.
+local function AddPressState(btn, tex, hi)
+    local function Release()
+        tex:SetTexture(QUEST_ICON)
+        hi:SetAlpha(1)
+    end
+    btn:SetScript("OnMouseDown", function(self, mouseBtn)
+        if mouseBtn ~= "LeftButton" or not self:IsEnabled() then return end
+        tex:SetTexture(QUEST_ICON_PRESS)
+        hi:SetAlpha(0)
+    end)
+    btn:SetScript("OnMouseUp", Release)
+    btn:HookScript("OnHide", Release)
+end
+BNB.AddQuickNotePressState = AddPressState
 
 -- ── Button builder helper ─────────────────────────────────────────────────────
 -- Creates a button anchored at TOPLEFT of `parent` with QN_X / QN_Y offset.
@@ -241,6 +266,7 @@ local function MakeButton(name, parent, onClickFn)
     local hi = btn:CreateTexture(nil, "HIGHLIGHT")
     hi:SetAllPoints()
     hi:SetTexture(QUEST_ICON_HOVER)
+    AddPressState(btn, tex, hi)
 
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
@@ -922,6 +948,7 @@ local function InjectQuestLogFrame()
     local hi = btn:CreateTexture(nil, "HIGHLIGHT")
     hi:SetAllPoints()
     hi:SetTexture(QUEST_ICON_HOVER)
+    AddPressState(btn, tex, hi)
 
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")

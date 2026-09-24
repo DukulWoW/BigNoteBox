@@ -102,7 +102,7 @@ local function GetTargetName()
     if not UnitExists("target") then
         return L["INSERT_NO_TARGET"] or "No target"
     end
-    return UnitName("target") or "Unknown"
+    return (BNB.UnitNameRealm("target")) or "Unknown"
 end
 
 -- ── Date helpers ──────────────────────────────────────────────────────────────

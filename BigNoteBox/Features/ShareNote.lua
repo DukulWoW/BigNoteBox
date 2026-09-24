@@ -352,6 +352,7 @@ local function BuildSharePreviewNormal()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetTitle("Preview Shared Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseSharePreview() end)
@@ -631,6 +632,7 @@ local function BuildShareWindowNormal()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetTitle("Share Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseShareWindow() end)
@@ -1181,6 +1183,7 @@ local function BuildImportWindowNormal()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetTitle("Import Shared Note")
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseImportWindow() end)

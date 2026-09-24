@@ -1476,16 +1476,26 @@ BNB._createListEntry = function(parent) return CreateListEntry(parent) end
 
 local function PopulateEntry(btn, note, selected, collapsed)
     btn._noteID = note.id
-    local iconPath = (note.icon and note.icon ~= "") and note.icon or DEFAULT_ICON
+    local noteIcon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
+    local iconPath = (noteIcon and noteIcon ~= "") and noteIcon or DEFAULT_ICON
     btn._icon:SetTexture(iconPath)
+    -- NPC notes: the NPC's face from its saved display ID, no target needed
+    -- (ALL-46, Features/TargetNote.lua). Falls back to iconPath until resolved.
+    if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(btn._icon, note) end
 
-    -- Live portrait: if this is a target note and the stored target is currently
-    -- targeted, replace the creature-type icon with the actual unit portrait.
+    -- Live portrait: if this is a target or inspect note and that unit is
+    -- currently targeted, replace the icon with the actual unit portrait.
     -- SetPortraitTexture renders the live unit face/model into the texture widget.
-    -- Falls back silently to the stored iconPath if the unit is not targeted.
-    if note.source == "target" and UnitExists("target") then
+    -- Players only get this live: a saved ID cannot carry their customizations.
+    if (note.source == "target" or note.source == "inspect") and UnitExists("target") then
         local matched = false
-        if note.targetNpcID then
+        if note.source == "inspect" then
+            if UnitIsPlayer("target") and note.inspectName then
+                local name, realm = BNB.UnitNameRealm("target")
+                matched = (name == note.inspectName) and
+                    (not note.inspectRealm or note.inspectRealm == "" or realm == note.inspectRealm)
+            end
+        elseif note.targetNpcID then
             -- NPC match: compare stored creature ID against current target GUID
             local guid = UnitGUID("target")
             local curID = guid and (
@@ -1496,7 +1506,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
             matched = (curID == note.targetNpcID)
         elseif note.targetPlayerKey then
             -- Player match: compare stored key against current target name+realm
-            local name, realm = UnitName("target")
+            local name, realm = BNB.UnitNameRealm("target")
             realm = (realm and realm ~= "") and realm or
                     GetNormalizedRealmName() or ""
             local curKey = "player:" .. (name or "") .. (realm ~= "" and ("-" .. realm) or "")

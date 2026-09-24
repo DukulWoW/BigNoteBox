@@ -348,7 +348,7 @@ local function BuildContent(f, ct, saveBtn)
         elseif _selSitType == "instance" then
             val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
         elseif _selSitType == "player" then
-            val = UnitName("target") or ""
+            val = (BNB.UnitNameRealm("target")) or ""
         end
         if _sitValueEb then _sitValueEb:SetText(val) end
         MarkDirty()

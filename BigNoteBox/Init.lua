@@ -20,6 +20,24 @@ BNB.version = BNB.ADDON_VERSION
 local _, _, _, _tocVersion = GetBuildInfo()
 BNB.IsForever = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE) and (_tocVersion or 0) < 100000
 
+-- A unit's name and realm, for note titles and player keys (FOR-23). Forever
+-- characters have a surname, and UnitName hands it back in the realm slot for
+-- other players ("Mango", "Thellama") but joined for yourself ("Dakdak Lo", nil).
+-- Forever is one realm with shards, so the second value there is never a realm.
+-- Joined here rather than through GetUnitName so the key does not depend on the
+-- surname display setting (C_PlayerInfo.ShouldDisplaySurname).
+-- Returns nil when the unit does not exist; realm is never nil otherwise.
+function BNB.UnitNameRealm(unit)
+    local name, second = UnitName(unit)
+    if not name then return nil end
+    local ownRealm = GetNormalizedRealmName and GetNormalizedRealmName() or ""
+    if BNB.IsForever then
+        if second and second ~= "" then name = name .. " " .. second end
+        return name, ownRealm
+    end
+    return name, (second and second ~= "") and second or ownRealm
+end
+
 -- Forced display language (ALL-14). BigNoteBoxLocale is its own SavedVariable so it is
 -- already loaded here, before the Locales/ files run. nil/"" /"client" = follow the WoW
 -- client locale; any other value is a forced locale code (e.g. "zhCN").

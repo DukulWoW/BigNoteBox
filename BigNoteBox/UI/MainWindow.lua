@@ -990,6 +990,10 @@ function BNB.CreateMainWindow()
     listPane:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
     BNB.listPane = listPane
 
+    -- Forever: soft glow behind the note list so the side panel stands out
+    -- against the wood grain; stretches with the pane (splitter, resize, collapse)
+    listPane._forGlow = BNB.AddForeverGlow(listPane)
+
     -- ── Right pane (editor) ──────────────────────────────────────────────────
     local editorPane = CreateFrame("Frame", nil, f)
     editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)

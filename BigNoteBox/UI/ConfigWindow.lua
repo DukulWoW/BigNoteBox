@@ -5047,6 +5047,7 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
             ButtonFrameTemplate_HideButtonBar(f)
             if f.Inset then f.Inset:Hide() end
             BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+            f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
             f:SetTitle(L["CFG_EXPORT_TITLE"])
             if f.CloseButton then
                 f.CloseButton:SetScript("OnClick", function() f:Hide() end)
@@ -5276,6 +5277,7 @@ local function CreateConfigWindow()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetAlpha(0.95)
     f:SetTitle(L["CONFIG_TITLE"])
     if f.CloseButton then

@@ -38,7 +38,7 @@ local function GetCurrentZone()
 end
 
 local function GetCurrentPlayer()
-    return UnitName("target")   -- nil if no target
+    return (BNB.UnitNameRealm("target"))   -- nil if no target
 end
 
 -- ── Match a single note against current context ────────────────────────────────
@@ -637,7 +637,7 @@ function BNB.BuildContextString(kind)
         if sub ~= "" then return "subzone:" .. sub end
         return nil
     elseif kind == "player" then
-        local tgt = UnitName("target")
+        local tgt = (BNB.UnitNameRealm("target"))
         if tgt then return "player:" .. tgt end
         return nil
     end

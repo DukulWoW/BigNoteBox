@@ -99,6 +99,7 @@ local RenderTaskPanel          -- forward declaration
 local ApplyTaskLayout          -- forward declaration
 local UpdateDynamicTitle       -- forward declaration
 local UpdateModeStrip          -- forward declaration
+local PositionModeStrip        -- forward declaration (the picker's OnDragStop calls it)
 local RegisterTaskCallback     -- forward declaration
 
 -- ── DB helpers ────────────────────────────────────────────────────────────────
@@ -1447,23 +1448,195 @@ end
 -- Mirrors the Editor/View tab strip pattern from NoteEditor.lua.
 local _modeStrip = nil   -- the external strip frame
 
+local function OnModeClick(mode)
+    _rbMode = mode
+    if rbFrame then
+        RenderTaskPanel()
+        ApplyTaskLayout(rbFrame)
+        UpdateModelViewer()
+        UpdateDynamicTitle()
+        UpdateModeStrip()
+    end
+end
+
+-- ── Forever: Model/Tasks side tabs ───────────────────────────────────────────
+-- Forever normal mode swaps the text strip for two icon tabs on the Reference
+-- box's outer edge (left when docked left of the main window, right when docked
+-- right), in the sidebar's border/hover/active art at 48px instead of 64.
+-- Tasks sits at the bottom, its bottom edge level with the model viewer's gear
+-- button (model bottom BOTTOM_PAD + that button's 4px inset); Model above it.
+-- Retail and skin mode keep the text strip until this is approved.
+local TAB_SZ     = 48                          -- sidebar BTN_SZ 64, scaled 0.75
+local TAB_ICON   = 36                          -- sidebar ICON_SZ 48, scaled
+local TAB_ICON_X = { left = 8, right = 4 }     -- sidebar 10 / 5, scaled
+local TAB_ICON_Y = -6                          -- sidebar -8, scaled
+local TAB_GAP    = 1                           -- sidebar GAP
+-- Edge offset against the frame, per side: sidebar FOR-15 values, scaled.
+-- Left draws above the frame, right below it, as the sidebar does.
+local TAB_OFF    = { left = 5, right = -2 }
+local TAB_BOTTOM = BOTTOM_PAD + 4
+local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
+local TAB_FALLBACK  = "Interface\\Icons\\INV_Misc_QuestionMark"
+
+local function UseSideTabs()
+    return BNB.IsForever and not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
+end
+
+-- Outer edge: away from the main window, so the tabs never cover it
+local function SideTabSide()
+    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or "left"
+    if not (BNB.mainFrame and BNB.mainFrame:IsShown()) then side = "left" end
+    return side
+end
+
+-- Same orientations as Sidebar.lua SidebarTexCoord (6 = left, 4 = right)
+local function SideTabTexCoord(side)
+    if side == "left" then return 1,0, 1,1, 0,0, 0,1 end
+    return 0,1, 0,0, 1,1, 1,0
+end
+
+-- Model tab icon: the player's race icon for inspect notes, the note's own
+-- icon for NPC (target) notes
+local function ModelTabIcon()
+    local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
+    if not note then return TAB_FALLBACK end
+    if note.source == "inspect" and BNB.GetInspectRaceIcon then
+        local ok, path = pcall(BNB.GetInspectRaceIcon, note.inspectRaceID, note.inspectSexID)
+        if ok and path then return path end
+    end
+    local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
+    return (icon and icon ~= "") and icon or TAB_FALLBACK
+end
+
+local function BuildSideTabs(f)
+    local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeTabs", f)
+    strip:SetSize(TAB_SZ, TAB_SZ * 2 + TAB_GAP)
+    strip:Hide()
+    strip._sideTabs = true
+
+    local function MakeTab(mode, tipKey)
+        local btn = CreateFrame("Button", nil, strip)
+        btn:SetSize(TAB_SZ, TAB_SZ)
+        local border = btn:CreateTexture(nil, "OVERLAY")
+        border:SetAllPoints(); border:SetTexture(ASSETS .. "Sidebar\\sb-border-forever")
+        local icon = btn:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(TAB_ICON, TAB_ICON)
+        local hover = btn:CreateTexture(nil, "OVERLAY", nil, -2)
+        hover:SetAllPoints(); hover:SetTexture(ASSETS .. "Sidebar\\sb-hover"); hover:Hide()
+        local active = btn:CreateTexture(nil, "OVERLAY", nil, -1)
+        active:SetAllPoints(); active:SetTexture(ASSETS .. "Sidebar\\sb-active")
+        active:SetVertexColor(0.40, 0.85, 0.40, 1)   -- sidebar ACTIVE_R/G/B
+        active:Hide()
+        btn._border, btn._icon, btn._hover, btn._active, btn._mode = border, icon, hover, active, mode
+
+        btn:SetScript("OnEnter", function(self)
+            if _rbMode ~= mode then hover:Show() end
+            GameTooltip:SetOwner(self, SideTabSide() == "left" and "ANCHOR_LEFT" or "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L[tipKey], 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() hover:Hide(); GameTooltip:Hide() end)
+        btn:SetScript("OnClick", function()
+            if _rbMode == mode then return end
+            hover:Hide()
+            OnModeClick(mode)
+        end)
+        return btn
+    end
+
+    local tasksBtn = MakeTab("attachments", "REFBOX_STRIP_TASKS")
+    tasksBtn:SetPoint("BOTTOM", strip, "BOTTOM", 0, 0)
+    local modelBtn = MakeTab("model", "REFBOX_STRIP_MODEL")
+    modelBtn:SetPoint("BOTTOM", tasksBtn, "TOP", 0, TAB_GAP)
+    tasksBtn._icon:SetTexture(TAB_TASK_ICON)
+
+    strip._modelBtn = modelBtn
+    strip._tasksBtn = tasksBtn
+    return strip
+end
+
+local function PositionSideTabs()
+    local strip = _modeStrip
+    local side  = SideTabSide()
+    strip:ClearAllPoints()
+    if side == "left" then
+        strip:SetPoint("BOTTOMRIGHT", rbFrame, "BOTTOMLEFT", TAB_OFF.left, TAB_BOTTOM)
+        strip:SetFrameLevel(rbFrame:GetFrameLevel() + 1)
+    else
+        strip:SetPoint("BOTTOMLEFT", rbFrame, "BOTTOMRIGHT", TAB_OFF.right, TAB_BOTTOM)
+        strip:SetFrameLevel(math.max(0, rbFrame:GetFrameLevel() - 1))
+    end
+    local c1,c2,c3,c4,c5,c6,c7,c8 = SideTabTexCoord(side)
+    for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
+        btn._border:SetTexCoord(c1,c2,c3,c4,c5,c6,c7,c8)
+        btn._hover:SetTexCoord(c1,c2,c3,c4,c5,c6,c7,c8)
+        btn._active:SetTexCoord(c1,c2,c3,c4,c5,c6,c7,c8)
+        btn._icon:ClearAllPoints()
+        btn._icon:SetPoint("TOPLEFT", btn, "TOPLEFT", TAB_ICON_X[side], TAB_ICON_Y)
+    end
+end
+
+-- NPC notes store a creature-type icon (Humanoid = a human face). While that
+-- NPC is the current target, show its live portrait instead, as the note list
+-- does (NoteList.lua PopulateEntry).
+local function TargetMatchesNpcNote()
+    local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
+    if not (note and note.source == "target" and note.targetNpcID) then return false end
+    if not UnitExists("target") or UnitIsPlayer("target") then return false end
+    local guid = UnitGUID("target")
+    local curID = guid and (
+        guid:match("^Creature%-0%-%d+%-%d+%-%d+%-(%d+)") or
+        guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)") or
+        guid:match("^Pet%-0%-%d+%-%d+%-%d+%-(%d+)")
+    )
+    return curID ~= nil and curID == tostring(note.targetNpcID)
+end
+
+-- Inspect note whose player is the current target (live portrait, ALL-46)
+local function TargetMatchesInspectNote()
+    local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
+    if not (note and note.source == "inspect" and note.inspectName) then return false end
+    if not (UnitExists("target") and UnitIsPlayer("target")) then return false end
+    local name, realm = BNB.UnitNameRealm("target")
+    return name == note.inspectName and
+        (not note.inspectRealm or note.inspectRealm == "" or realm == note.inspectRealm)
+end
+
+local function UpdateSideTabs()
+    local strip = _modeStrip
+    local icon  = strip._modelBtn._icon
+    icon:SetTexture(ModelTabIcon())
+    -- Live portrait while targeted, else the NPC's saved portrait (ALL-46)
+    if TargetMatchesNpcNote() or TargetMatchesInspectNote() then
+        pcall(SetPortraitTexture, icon, "target")
+    elseif BNB.SetNpcNotePortrait then
+        local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
+        BNB.SetNpcNotePortrait(icon, note)
+    end
+    for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
+        local on = (_rbMode == btn._mode)
+        btn._active:SetShown(on)
+        if on then btn._hover:Hide() end
+        btn._icon:SetDesaturated(not on)
+        local v = on and 1 or 0.90   -- sidebar INACTIVE_V
+        btn._icon:SetVertexColor(v, v, v)
+    end
+end
+
 local function BuildExternalModeStrip()
     if _modeStrip then return _modeStrip end
+
+    if UseSideTabs() then
+        -- Needs rbFrame; the build-time call comes before it is assigned, the
+        -- call in BNB.OpenReferenceBox builds it
+        if not rbFrame then return nil end
+        _modeStrip = BuildSideTabs(rbFrame)
+        return _modeStrip
+    end
 
     local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeStrip", UIParent)
     strip:SetHeight(28)
     strip:Hide()
-
-    local function OnModeClick(mode)
-        _rbMode = mode
-        if rbFrame then
-            RenderTaskPanel()
-            ApplyTaskLayout(rbFrame)
-            UpdateModelViewer()
-            UpdateDynamicTitle()
-            UpdateModeStrip()
-        end
-    end
 
     local modelBtn = BNB.CreateButton(nil, strip, L["REFBOX_STRIP_MODEL"], 1, 24)
     modelBtn:SetPoint("TOPLEFT",  strip, "TOPLEFT",  0, -2)
@@ -1481,9 +1654,12 @@ local function BuildExternalModeStrip()
     return strip
 end
 
--- Reposition the external strip below rbFrame.
-local function PositionModeStrip()
-    if not _modeStrip or not rbFrame then return end
+-- Reposition the external strip below rbFrame (side tabs: on its outer edge).
+PositionModeStrip = function()
+    if not rbFrame then return end
+    if not _modeStrip then BuildExternalModeStrip() end   -- side tabs: auto-open path
+    if not _modeStrip then return end
+    if _modeStrip._sideTabs then PositionSideTabs(); return end
     _modeStrip:ClearAllPoints()
     _modeStrip:SetPoint("TOPLEFT",  rbFrame, "BOTTOMLEFT",  0, 0)
     _modeStrip:SetPoint("TOPRIGHT", rbFrame, "BOTTOMRIGHT", 0, 0)
@@ -1492,10 +1668,17 @@ end
 -- Update button alpha to reflect active mode.
 -- Active button is fully visible; inactive button is dimmed.
 function UpdateModeStrip()
+    -- Side tabs need rbFrame, so the build-time call skips them; the auto-open
+    -- path in BNB.SyncReferenceBox never calls the builder, so build on first use
+    if not _modeStrip and rbFrame then
+        BuildExternalModeStrip()
+        if _modeStrip then PositionModeStrip() end
+    end
     if not _modeStrip then return end
     local hasModel = IsInspectNote(_noteID)
     _modeStrip:SetShown(hasModel)
     if not hasModel then return end
+    if _modeStrip._sideTabs then UpdateSideTabs(); return end
     local mb = _modeStrip._modelBtn
     local tb = _modeStrip._tasksBtn
     if mb then
@@ -1506,6 +1689,11 @@ function UpdateModeStrip()
         tb:SetEnabled(_rbMode ~= "attachments")
         tb:SetAlpha(_rbMode == "attachments" and 1.0 or 0.45)
     end
+end
+
+-- Called by Features/TargetNote.lua when an NPC portrait ID has been looked up
+function BNB.RefreshReferenceBoxTabs()
+    if rbFrame and rbFrame:IsShown() then UpdateModeStrip() end
 end
 
 -- ApplyTaskLayout: positions all panes based on note content and _rbMode.
@@ -1691,6 +1879,9 @@ local function BuildTaskPanel(f)
         -- Stone texture in normal mode — matches the ButtonFrameTemplate chrome
         -- and prevents attachment cards from bleeding through.
         bg:SetTexture(ASSETS .. "UI\\ui-bg-stone")
+        -- Forever: the stone reads too light next to the wood grain; darken it
+        -- (vertex colour survives the SetTexture in the skin callback below)
+        if BNB.IsForever then bg:SetVertexColor(0.6, 0.6, 0.6) end
     end
     pnl._bg = bg
 
@@ -1740,7 +1931,8 @@ local function BuildTaskPanel(f)
     -- Permanent pnl children so they don't scroll with tasks and are always visible.
     local footerBtnH = TASK_FOOTER_H - 2
     local clrFooter = BNB.CreateButton(nil, pnl, L["REFBOX_TASK_CLEAR_BTN"], 0, footerBtnH)
-    clrFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOMLEFT",  6, 3)
+    -- 9 = the bg's 6px left inset + the 3px gap Delete has past the bg's right inset
+    clrFooter:SetPoint("BOTTOMLEFT",  pnl, "BOTTOMLEFT",  9, 3)
     clrFooter:SetPoint("BOTTOMRIGHT", pnl, "BOTTOM",      -2, 3)
     clrFooter:SetScript("OnClick", function()
         if _noteID then BNB.Task.ClearCompleted(_noteID) end
@@ -2453,12 +2645,15 @@ RenderTaskPanel = function()
     tsc:SetHeight(math.max(math.abs(y) + 4, tsf and tsf:GetHeight() or 60))
 
     -- Disable Clear/Delete when no tasks are completed; dim label to match.
+    -- Normal mode leaves the colour to the button template (yellow, grey when
+    -- disabled) like every other button; only skin labels are coloured by hand.
     local hasCompleted = done > 0
+    local isSkin = BigNoteBoxDB and BigNoteBoxDB.skinMode
     local function SetFooterBtn(btn, enabled)
         if not btn then return end
         btn:SetEnabled(enabled)
         local lbl = btn._lbl
-        if lbl then
+        if lbl and isSkin then
             lbl:SetTextColor(enabled and 1 or 0.4, enabled and 1 or 0.4, enabled and 1 or 0.4)
         end
     end
@@ -2626,7 +2821,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
                 end)
         end
 
-        local targetName = UnitName("target")
+        local targetName = (BNB.UnitNameRealm("target"))
         if targetName and UnitIsPlayer("target") then
             sitSub:CreateRadio(string.format(L["REFBOX_TASK_SIT_PLAYER_FMT"], targetName),
                 function() return task.situation == ("player:" .. targetName) end,
@@ -2668,6 +2863,7 @@ local function BuildReferenceBox()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetTitle(L["REFBOX_TITLE"])
 
     if f.CloseButton then
@@ -3272,7 +3468,7 @@ UpdateModelViewer = function()
     -- Try live mode first: check if the inspected player is our current target
     local note = BNB.GetNote(_noteID)
     local inspName  = note and note.inspectName
-    local tgtName = UnitName("target")
+    local tgtName = (BNB.UnitNameRealm("target"))
 
     local isLive = false
     if tgtName and inspName and tgtName == inspName then
@@ -3595,6 +3791,7 @@ BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
     if not rbFrame or not rbFrame:IsShown() then return end
     if IsInspectNote(_noteID) then
         C_Timer.After(0.1, UpdateModelViewer)
+        UpdateModeStrip()   -- Model tab: NPC portrait follows the target
     end
 end)
 

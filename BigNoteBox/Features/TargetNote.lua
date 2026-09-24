@@ -67,7 +67,9 @@ end
 -- Used for the portrait icon in rich notes and as the note list icon.
 --------------------------------------------------------------------------------
 local CREATURE_TYPE_ICON = {
-    ["Humanoid"]    = "Achievement_Character_Human_Male",
+    -- Neutral silhouettes, not a human face: wrong on every non-human NPC. Only
+    -- seen when no portrait is available (ALL-46, see NPC PORTRAITS below).
+    ["Humanoid"]    = "INV_Misc_GroupNeedMore",
     ["Beast"]       = "ability_hunter_beastcall",
     ["Demon"]       = "Spell_Shadow_SummonFelHunter",
     ["Dragonkin"]   = "ability_dragonkin",
@@ -78,6 +80,128 @@ local CREATURE_TYPE_ICON = {
     ["Aberration"]  = "inv_misc_slime_01",
     ["Uncategorized"] = "inv_misc_questionmark",
 }
+
+--------------------------------------------------------------------------------
+-- NPC PORTRAITS (ALL-46)
+-- A portrait image cannot be saved, but the creature display ID can, and
+-- SetPortraitTextureFromCreatureDisplayID draws the face from it with no unit.
+-- UnitDisplayID does not exist; a PlayerModel loaded with SetCreature(npcID)
+-- reports the ID through GetDisplayInfo (SetUnit("target") reports 0). Probed
+-- on Forever 2026-09-24: NPC 713 -> 1355, portrait drawn correctly.
+-- Looked up once per NPC on first display and cached on the note as
+-- targetDisplayID, so notes made before this fill in as they are shown.
+-- Combat pets are skipped: their creature ID is shared (see targetIsPet).
+--------------------------------------------------------------------------------
+local OLD_HUMANOID_ICON = "achievement_character_human_male"
+local NEUTRAL_ICON      = ICONS .. "INV_Misc_GroupNeedMore"
+
+local _resolver         -- PlayerModel that reads display IDs
+local _queue   = {}     -- npcIDs waiting, in order
+local _queued  = {}     -- npcID -> true while waiting or in flight
+local _failed  = {}     -- npcID -> true: gave up this session (not saved)
+local _busy    = false
+local _refreshPending = false
+
+local function RefreshAfterResolve()
+    if _refreshPending then return end
+    _refreshPending = true
+    C_Timer.After(0.2, function()
+        _refreshPending = false
+        if BNB.RefreshNoteList and BNB.mainFrame and BNB.mainFrame:IsShown() then
+            BNB.RefreshNoteList()
+        end
+        if BNB.RefreshReferenceBoxTabs then BNB.RefreshReferenceBoxTabs() end
+    end)
+end
+
+local function StoreDisplayID(npcID, displayID)
+    local ndb = BigNoteBoxNotesDB
+    if not (ndb and ndb.notes) then return end
+    for _, note in pairs(ndb.notes) do
+        if note.source == "target" and note.targetNpcID == npcID and not note.targetIsPet then
+            note.targetDisplayID = displayID
+        end
+    end
+end
+
+local function ProcessQueue()
+    local npcID = table.remove(_queue, 1)
+    if not npcID then
+        _busy = false
+        if _resolver then _resolver:Hide() end
+        return
+    end
+    _busy = true
+    if not _resolver then
+        -- A model that is not drawn never loads: shown, 1px, bottom-left corner,
+        -- under everything
+        _resolver = CreateFrame("PlayerModel", nil, UIParent)
+        _resolver:SetSize(1, 1)
+        _resolver:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+        _resolver:SetFrameStrata("BACKGROUND")
+    end
+    _resolver:Show()
+    -- Clear first so GetDisplayInfo cannot return the previous NPC's ID
+    pcall(_resolver.ClearModel, _resolver)
+    local ok = pcall(_resolver.SetCreature, _resolver, tonumber(npcID))
+    local tries = 0
+    local function Poll()
+        tries = tries + 1
+        local id = 0
+        if ok then
+            local okD, v = pcall(_resolver.GetDisplayInfo, _resolver)
+            id = (okD and tonumber(v)) or 0
+        end
+        if id > 0 then
+            StoreDisplayID(npcID, id)
+            _queued[npcID] = nil
+            RefreshAfterResolve()
+            ProcessQueue()
+        elseif not ok or tries >= 30 then   -- 3 s: creature not in the client cache
+            _failed[npcID] = true
+            _queued[npcID] = nil
+            ProcessQueue()
+        else
+            C_Timer.After(0.1, Poll)
+        end
+    end
+    C_Timer.After(0.1, Poll)
+end
+
+local function Enqueue(npcID)
+    if _queued[npcID] or _failed[npcID] then return end
+    _queued[npcID] = true
+    _queue[#_queue + 1] = npcID
+    if not _busy then ProcessQueue() end
+end
+
+-- Draws the NPC's portrait into tex for an NPC note. Returns true when drawn;
+-- otherwise starts the display-ID lookup and returns false, and the caller
+-- keeps the note icon (BNB.NpcNoteIcon).
+function BNB.SetNpcNotePortrait(tex, note)
+    if not (tex and note and note.source == "target" and note.targetNpcID)
+       or note.targetIsPet then
+        return false
+    end
+    local id = note.targetDisplayID
+    if id and id > 0 and SetPortraitTextureFromCreatureDisplayID then
+        return (pcall(SetPortraitTextureFromCreatureDisplayID, tex, id))
+    end
+    if not id then Enqueue(note.targetNpcID) end
+    return false
+end
+
+-- The icon to show for a note. NPC notes made before ALL-46 stored a human
+-- face for every humanoid; show the neutral icon instead (the saved note is
+-- left as it is).
+function BNB.NpcNoteIcon(note)
+    local icon = note and note.icon
+    if note and note.source == "target" and note.targetNpcID and type(icon) == "string"
+       and icon:lower():find(OLD_HUMANOID_ICON, 1, true) then
+        return NEUTRAL_ICON
+    end
+    return icon
+end
 
 -- Classification label mapping for display
 local CLASSIFICATION_LABEL = {
@@ -153,7 +277,7 @@ local function GatherTargetData()
     data.isPlayer = UnitIsPlayer("target")
 
     -- Name + realm
-    local name, realm = UnitName("target")
+    local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
     data.name  = name or "Unknown"
     data.realm = (realm and realm ~= "") and realm or
                  GetNormalizedRealmName() or ""

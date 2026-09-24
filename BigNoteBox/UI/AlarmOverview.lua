@@ -365,6 +365,7 @@ local function BuildOverview()
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     f:SetTitle(L["MW_ALARM_TIP"])
 
     if f.CloseButton then

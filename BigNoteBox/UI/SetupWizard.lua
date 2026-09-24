@@ -625,7 +625,9 @@ local function BuildPage2(content)
         return btn
     end
 
-    local normalBtn = MakeImageChoice(L["SW_NORMAL_MODE"],  "setup-normal", "normal", 0)
+    -- Forever's normal mode draws wood grain (UI/Chrome.lua), so its preview does too
+    local normalImg = BNB.IsForever and "setup-normal-forever" or "setup-normal"
+    local normalBtn = MakeImageChoice(L["SW_NORMAL_MODE"],  normalImg,      "normal", 0)
     local skinBtn   = MakeImageChoice(L["SW_SKIN_MODE"],    "setup-skin",   "skin",   IMG_W + GAP)
     f._normalBtn = normalBtn
     f._skinBtn   = skinBtn

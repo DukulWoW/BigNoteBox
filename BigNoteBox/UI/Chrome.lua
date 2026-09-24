@@ -110,6 +110,21 @@ local function SkinBg(f)
     bg:SetVertTile(true)
 end
 
+-- Forever only: soft glow (orange, fades to clear at its edges) that lifts a
+-- panel off the wood grain. Stretches with `region` (default: host), so it
+-- stays centred through resizes. Drawn at the top of BACKGROUND so it sits
+-- above the template's Bg but below anything else on the host.
+-- Call after SeatChrome, so the chrome snapshot never picks it up.
+local FOREVER_GLOW = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-sp-highlight"
+
+function BNB.AddForeverGlow(host, region)
+    if not (BNB.IsForever and host) then return end
+    local glow = host:CreateTexture(nil, "BACKGROUND", nil, 7)
+    glow:SetAllPoints(region or host)
+    glow:SetTexture(FOREVER_GLOW)
+    return glow
+end
+
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
     if BNB.IsForever then pcall(SkinBg, f) end

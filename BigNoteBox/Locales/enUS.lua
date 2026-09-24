@@ -1168,6 +1168,7 @@ L["CFG_QN_MODE_OPEN"]               = "Open: BigNoteBox opens and selects the ne
 L["CFG_QN_MODE_CONFIRM"]            = "Confirm: a small popup lets you edit the title before saving."
 L["QN_BTN_TIP1"]                    = "Create a BigNoteBox note"
 L["QN_BTN_TIP2"]                    = "from this content."
+L["QN_NOTE_CREATED"]                = "Note created: %s"
 L["CFG_DUI_HEADER"]                 = "Dialogue UI"
 L["CFG_IMMERSION_HEADER"]           = "Immersion"
 L["CFG_IMM_RESET_TIP1"]             = "Moves the Immersion quick note button"

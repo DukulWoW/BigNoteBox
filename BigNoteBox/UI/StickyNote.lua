@@ -814,6 +814,7 @@ local function BuildStickySettingsWindow()
         ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
         BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
         f:SetAlpha(0.95)
         f:SetTitle(L["STICKY_SETTINGS_TITLE"])
         if f.CloseButton then
@@ -2311,7 +2312,7 @@ local function PopulateStickySettings(noteID)
         elseif sitSelType == "instance" then
             val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
         elseif sitSelType == "player" then
-            val = UnitName("target") or ""
+            val = (BNB.UnitNameRealm("target")) or ""
         end
         if sitValueEb then sitValueEb:SetText(val) end
     end)

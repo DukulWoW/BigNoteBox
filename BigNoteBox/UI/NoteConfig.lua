@@ -2196,7 +2196,7 @@ local function BuildSituationTab(panel)
         elseif selType == "instance" then
             val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
         elseif selType == "player" then
-            val = UnitName("target") or ""
+            val = (BNB.UnitNameRealm("target")) or ""
         end
         if valueEb then valueEb:SetText(val) end
     end)
@@ -2853,6 +2853,7 @@ local function CreateNoteConfigWindow()
         ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
         if f.Inset then f.Inset:Hide() end
         BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
         f:SetAlpha(0.95)
         f:SetTitle(L["STICKY_NOTE_SETTINGS_TIP"])
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
