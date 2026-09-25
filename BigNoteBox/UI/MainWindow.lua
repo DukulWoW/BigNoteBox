@@ -260,7 +260,6 @@ function BNB.CreateMainWindow()
             RefreshLockBtn()
             GameTooltip:Hide()
         end)
-        BNB._lockScaleBtn     = lockBtn
         BNB._refreshLockBtn   = RefreshLockBtn
     end
 
@@ -510,7 +509,6 @@ function BNB.CreateMainWindow()
         end
         RebuildSortMenu()
         BNB._rebuildSortMenu = RebuildSortMenu
-        BNB._sortDD = sortDD
     else
         -- Fallback: cycling button
         sortCycleBtn = BNB.CreateButton(nil, f, CurrentSortLabel(), sortDDWidth, SORT_BTN_H)
@@ -1509,6 +1507,4 @@ function BNB.BuildNotesUnavailablePanel(listPane, editorPane)
     local reloadBtn = BNB.CreateButton(nil, panel, L["CFG_RELOAD_UI_BTN"], 140, 30)
     reloadBtn:SetPoint("TOP", body, "BOTTOM", 0, -24)
     reloadBtn:SetScript("OnClick", function() C_UI.Reload() end)
-
-    BNB._notesUnavailablePanel = panel
 end

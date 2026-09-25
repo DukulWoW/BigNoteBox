@@ -2351,9 +2351,6 @@ local function BuildWysiwygBar(parent, tsStrip)
         redoBtn:SetIconEnabled(not locked and BNB.UndoCanRedo(id))
     end
 
-    bar._undoBtn = undoBtn
-    bar._redoBtn = redoBtn
-
     -- Divider: undo/redo | font controls
     local divFont = MakeDiv(redoBtn)
 
@@ -3005,7 +3002,6 @@ local function BuildToolbar(parent)
         refboxBtn:SetScript("OnClick", function()
             if BNB.ToggleReferenceBox then BNB.ToggleReferenceBox() end
         end)
-        bar._refboxBtn = refboxBtn
         BNB._editorRefBoxBtn = refboxBtn
     end
 
@@ -3023,7 +3019,6 @@ local function BuildToolbar(parent)
                 end)
             end
         end)
-        bar._tasksBtn = tasksBtn
     end
 
     -- Delete
@@ -3154,8 +3149,6 @@ local function BuildToolbar(parent)
         self:SetSize(24, 24)
         GameTooltip:Hide()
     end)
-    bar._pinBtn = pinBtn
-
     -- Send to Chat button (right side) — icon-only using send.tga
     local sendBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-send", L["SEND_TITLE"], 28, 28)
     sendBtn:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
@@ -3175,12 +3168,8 @@ local function BuildToolbar(parent)
         local id = BNB._currentNoteID; if not id then return end
         if BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
     end)
-    bar._sendBtn = sendBtn
-
     bar._saveBtn = saveBtn
     bar._delBtn  = delBtn
-    bar._dupBtn  = dupBtn
-    bar._copyBtn = copyBtn
 
     -- Record the left-anchored buttons after Save for BNB.ApplySaveMode
     for _, c in ipairs({ bar:GetChildren() }) do

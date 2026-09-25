@@ -283,7 +283,6 @@ function BNB.CreateMainWindowSkin()
         GameTooltip:Show()
     end)
     lockBtn:SetScript("OnLeave", function() RefreshLockBtn(); GameTooltip:Hide() end)
-    BNB._lockScaleBtn   = lockBtn
     BNB._refreshLockBtn = RefreshLockBtn
 
     function BNB._applyScaleLock()
