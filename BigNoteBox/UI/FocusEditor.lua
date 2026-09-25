@@ -113,11 +113,6 @@ local function ShowFocusOverlay()
     FadeTo(ov, 0, 1, 0.6)  -- fade the frame alpha in over 0.6s
 end
 
-local function HideFocusOverlay()
-    if not focusOverlay or not focusOverlay:IsShown() then return end
-    focusOverlay:Hide()
-end
-
 --------------------------------------------------------------------------------
 -- AFK OVERLAY
 -- A second full-screen overlay that appears ON TOP of the focus overlay and

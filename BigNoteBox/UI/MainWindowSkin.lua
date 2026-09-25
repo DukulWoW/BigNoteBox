@@ -20,13 +20,6 @@ local SK_WIN_H       = 640
 local SK_TITLE_H     = 20    -- top row: window title + X / lock / focus buttons
 local SK_TOOLBAR_H   = 35    -- sort dropdowns + topbar icons strip
 local SK_LIST_W      = 250   -- left pane total width
-local SK_SEARCH_H    = 30    -- search bar at top of list pane
-local SK_LIST_BOT_H  = 40    -- New Note / Quick Note bar at bottom of list pane
-local SK_NOTE_HDR_H  = 50    -- note title editbox area
-local SK_TS_H        = 20    -- timestamp strip
-local SK_WYS_H       = 25    -- WYSIWYG formatting toolbar
-local SK_TAG_H       = 20    -- tag chips strip
-local SK_BOT_H       = 40    -- editor action bar
 
 local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 55
 
@@ -167,10 +160,6 @@ end
 --------------------------------------------------------------------------------
 function BNB.CreateMainWindowSkin()
     if BNB.mainFrame then return end
-
-    -- Expose chrome height so child modules (NoteEditor anchor, etc.) use correct value
-    BNB.MAIN_TITLE_H   = SK_CHROME_H
-    BNB.MAIN_TOOLBAR_H = SK_BOT_H
 
     BNB._listPaneW = math.max(SK_MIN_LIST_W,
         math.min(SK_MAX_LIST_W, BigNoteBoxDB.splitX or SK_LIST_W))
@@ -470,21 +459,6 @@ function BNB.CreateMainWindowSkin()
     selBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Multi-select action buttons (hidden until select mode active)
-    local function MakeMultiBtn(text, w, onClick, tip)
-        local btn = BNB.CreateButton(nil, toolBar, text, w, SORT_BTN_H)
-        btn:SetPoint("LEFT", selBtn, "RIGHT", 4, 0)   -- will be re-anchored below
-        btn:SetPoint("TOP",  selBtn, "TOP",   0,  0)
-        btn:SetEnabled(false); btn:Hide()
-        btn:SetScript("OnClick", onClick)
-        btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(tip, 1,1,1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        return btn
-    end
-
     local selectAllBtn = BNB.CreateButton(nil, toolBar, L["MW_SELECT_ALL_BTN"], 76, SORT_BTN_H)
     selectAllBtn:SetPoint("LEFT", selBtn, "RIGHT", 4, 0)
     selectAllBtn:SetPoint("TOP",  selBtn, "TOP",   0, 0)

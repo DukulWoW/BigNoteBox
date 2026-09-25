@@ -31,7 +31,6 @@ local SECTION_H      = 22   -- section header height
 local MIN_H          = 200
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
-local ASSETS       = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
 local _nhpFrame  = nil
 local _currentID = nil

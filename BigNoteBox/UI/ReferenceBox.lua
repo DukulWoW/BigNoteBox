@@ -2691,27 +2691,6 @@ function BNB.FocusTaskEditBox(taskID)
     end
 end
 
-local _hdrCtxDropdown
-function BNB.ShowTaskHeaderContextMenu(anchor, noteID)
-    if not noteID then return end
-    if not _hdrCtxDropdown then
-        _hdrCtxDropdown = CreateFrame("DropdownButton", "BNBTaskHdrCtxDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _hdrCtxDropdown:SetSize(1, 1); _hdrCtxDropdown:SetAlpha(0)
-    end
-    _hdrCtxDropdown:ClearAllPoints()
-    _hdrCtxDropdown:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, 0)
-    _hdrCtxDropdown:SetupMenu(function(_, root)
-        root:CreateTitle(L["REFBOX_TASK_HDR_CTX_TITLE"])
-        root:CreateButton(L["REFBOX_TASK_HDR_CTX_EDIT"], function()
-            if BNB.TaskEditWindow and BNB.TaskEditWindow.OpenGlobal then
-                BNB.TaskEditWindow.OpenGlobal(noteID, anchor)
-            end
-        end)
-    end)
-    _hdrCtxDropdown:Click()
-end
-
 -- ── Task context menu (WowStyle1DropdownTemplate — matches attachment rows) ──
 local _taskCtxDropdown
 function BNB.ShowTaskContextMenu(anchor, noteID, taskID)

@@ -24,7 +24,6 @@ local BNB    = BigNoteBox
 local L      = BNB.L
 local UNKNOWN_STR = type(UNKNOWN) == "string" and UNKNOWN or "Unknown"
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local BTNS   = ASSETS .. "Buttons\\"
 local ICONS  = "Interface\\Icons\\"
 
 BNB.TargetNote = BNB.TargetNote or {}

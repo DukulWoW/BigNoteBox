@@ -5,8 +5,6 @@
 -- Public API:
 --   BNB.TaskEditWindow.Open(noteID, taskID, anchorFrame)
 --   BNB.TaskEditWindow.Close()
---   BNB.TaskEditWindow.IsOpen() -> bool
---   BNB.TaskEditWindow.GetTaskID() -> taskID | nil
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -853,6 +851,3 @@ function TW.Close()
     if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
     _noteID = nil; _taskID = nil; _isDirty = false; _pendingText = ""
 end
-
-function TW.IsOpen()    return _frame and _frame:IsShown() end
-function TW.GetTaskID() return _taskID end

@@ -18,13 +18,11 @@ local ENTRY_INDENT = 8      -- px left indent for notes under a tag header
 local PAD_L      = 8
 local BTN_SZ     = 18   -- arrow button size, matches AlarmWindow calendar nav buttons
 local BTN_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-local COL_GOLD   = { 1, 0.82, 0, 1 }
 
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
 local function DB()  return BigNoteBoxDB          end
-local function NDB() return BigNoteBoxNotesDB      end
 
 -- Returns ordered list of { tag, notes[] } sorted A-Z.
 -- "notes" is the filtered set for that tag (respects text + fav filter).

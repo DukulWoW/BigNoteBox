@@ -22,8 +22,6 @@ local BNB = BigNoteBox
 BNB.ZonePicker = BNB.ZonePicker or {}
 local ZP = BNB.ZonePicker
 
-local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-
 -- ── Zone continent lookup ─────────────────────────────────────────────────────
 -- Walks a zone's uiMapID parent chain up to its Continent-type ancestor.
 local function GetContinentName(mapID)
@@ -206,7 +204,6 @@ local _onSelect    = nil
 local _activeKind  = "zone"   -- "zone" or "instance", drives the list shown
 
 local ROW_H     = 22
-local HEADER_H  = 26
 local SEARCH_H  = 24
 local TAB_H     = 26
 local PAD       = 6

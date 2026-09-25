@@ -41,7 +41,6 @@ local debounceTimer = nil
 
 -- Expose filter state for TagTree.lua
 function BNB.GetCurrentFilter()    return currentFilter    end
-function BNB.GetCurrentTagFilter() return currentTagFilter end
 
 -- Drag-reorder state
 local _dragNoteID   = nil   -- noteID being dragged
@@ -1015,10 +1014,6 @@ end
 --------------------------------------------------------------------------------
 -- MULTI-SELECT HELPERS
 --------------------------------------------------------------------------------
-local function IsMultiSelected(noteID)
-    return _multiMode and _multiSel[noteID] == true
-end
-
 local function UpdateMultiActionBtns(n)
     local label = n > 0 and ("(" .. n .. ")") or "(0)"
     local en    = n > 0
@@ -1497,14 +1492,6 @@ local function CreateListEntry(parent)
     end)
 
     return btn
-end
-
--- TruncStr is kept for tooltip use only (not for FontString display)
-local function TruncStr(s, max)
-    if not s or s == "" then return "" end
-    s = s:gsub("\n", " "):gsub("%s+", " ")
-    if #s <= max then return s end
-    return s:sub(1, max - 3) .. "..."
 end
 
 BNB._createListEntry = function(parent) return CreateListEntry(parent) end

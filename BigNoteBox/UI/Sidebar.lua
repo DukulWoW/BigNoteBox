@@ -23,7 +23,6 @@
 --   BNB.Sidebar.Refresh()
 --   BNB.Sidebar.SetActive(key)
 --   BNB.Sidebar.GetActive()
---   BNB.Sidebar.UpdateCounts()
 --   BNB.Sidebar.IsEnabled()
 
 local BNB = BigNoteBox
@@ -69,8 +68,6 @@ local ICON_SZ       = 48     -- icon texture size: fills the border's inner fram
 local ICON_X        = 5     -- icon left offset (inner frame starts at 13px from left)
 local ICON_Y        = -8     -- icon top offset  (inner frame starts at 8px from top)
 local GAP           = 1      -- gap between slots
-local TOP_PAD       = BTN_SZ + GAP   -- phantom slot height + gap (recalculated in GetLayoutVars)
-local SLOT_STEP     = BTN_SZ + GAP   -- total vertical space per slot (recalculated in GetLayoutVars)
 
 -- Returns current layout values based on DB settings.
 -- Called at Refresh() time so changes take effect without a reload.
@@ -636,23 +633,6 @@ function SB.SetActive(key)
     if BNB.SyncSidebarWysiwygBtns then BNB.SyncSidebarWysiwygBtns() end
 end
 
---------------------------------------------------------------------------------
--- UpdateCounts — refresh badge numbers on all visible buttons
---------------------------------------------------------------------------------
-function SB.UpdateCounts()
-    for i, key in ipairs(_builtKeys) do
-        local w = _btnPool[i]
-        if w then
-            local n = CountForKey(key)
-            if n > 0 then
-                w.badge:SetText(tostring(n))
-                w.badge:Show()
-            else
-                w.badge:Hide()
-            end
-        end
-    end
-end
 
 --------------------------------------------------------------------------------
 -- Refresh — rebuild visible slot buttons from current DB state

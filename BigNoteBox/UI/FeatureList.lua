@@ -41,11 +41,9 @@ local TITLE_H_N     = 28        -- ButtonFrameTemplate title bar height (normal 
 local TITLE_H_S     = 26        -- skin mode title bar height
 local OK_BTN_H      = 44        -- height of the bottom OK button
 local OK_BTN_PAD    = 10        -- padding above and below OK button area
-local SECTION_GAP   = 18        -- vertical gap between sections
 local HEADER_SIZE   = 14        -- section header font size (px)
 local BLURB_SIZE    = 12        -- blurb font size (px)
 local ITEM_SIZE     = 12        -- bullet item font size (px)
-local BLURB_GAP     = 6         -- gap between header and blurb
 local ITEMS_GAP     = 6         -- gap between blurb and first item
 local ITEM_GAP      = 3         -- gap between bullet items
 local FADE_TIME     = 0.25      -- open/close fade duration (seconds)
@@ -158,14 +156,6 @@ local function ShowOverlay()
     ov._tex:SetColorTexture(r, g, b, 0.6)
     ov:Show()
     FadeTo(ov, 0, 1, FADE_TIME)
-end
-
-local function HideOverlay()
-    if _overlay then
-        FadeTo(_overlay, _overlay:GetAlpha(), 0, FADE_TIME, function()
-            if _overlay then _overlay:Hide() end
-        end)
-    end
 end
 
 -- ── Window snapshot helpers ───────────────────────────────────────────────────

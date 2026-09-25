@@ -5,7 +5,6 @@
 -- Public API surface:
 --   BNB.Alarm.SetAlarm(noteID, alarmData)   -- write alarm to note; nil alarmData = clear
 --   BNB.Alarm.ClearAlarm(noteID)            -- remove alarm entirely
---   BNB.Alarm.FireNow(noteID)               -- force-fire for testing
 --   BNB.Alarm.Dismiss(noteID)               -- dismiss fired popup, mark fired
 --   BNB.Alarm.Snooze(noteID, minutes)       -- snooze by N minutes
 --   BNB.Alarm.ResetFired(noteID)            -- re-arm a fired alarm
@@ -45,10 +44,6 @@ local GLOW_PAD_RIGHT  = 1
 local GLOW_PAD_BOTTOM = 2
 local DEFAULT_SOUND   = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
 local SOUND_CHANNEL   = "Master"
-
--- Weekday names for recurring UI (1=Mon ... 7=Sun, matches Lua date %w with adjustment)
--- WoW Tuesday reset: server resets on Tuesday 07:00 UTC (region-dependent; we use day-of-week)
-local WOW_RESET_DOW = 3   -- Tuesday in Lua's date %w: 0=Sun,1=Mon,2=Tue...
 
 -- ---------------------------------------------------------------------------
 -- STATE
@@ -560,17 +555,9 @@ function AM.ClearAlarm(noteID)
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
-function AM.FireNow(noteID)
-    FireAlarm(noteID, false)
-end
-
 -- ---------------------------------------------------------------------------
 -- NEXT FIRE TIME UTILITY
 -- ---------------------------------------------------------------------------
-function AM.IsGlowing(noteID)
-    local gs = _glowState[noteID]
-    return gs ~= nil
-end
 
 -- Returns true if this note's alarm has fired and not yet been dismissed/snoozed.
 -- Works regardless of glow state (glow may be deferred or not yet started).
@@ -661,14 +648,6 @@ local function OnCombatEnd()
             ShowAlarmPopup(id)
         end
     end
-end
-
--- Chat message during combat (combatPost="chat" path — called at fire time)
-local function CombatChatNotify(noteID)
-    local note = GetNote(noteID)
-    local alarm = note and note.alarm
-    local label = (alarm and alarm.label ~= "") and alarm.label or (note and note.title) or "Alarm"
-    BNB:Print(string.format("[BNB Alarm] \"%s\" fired during combat.", label))
 end
 
 -- ---------------------------------------------------------------------------

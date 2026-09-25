@@ -9,7 +9,6 @@ local L   = BNB.L
 -- TITLE_H: height of the ButtonFrameTemplate title area (includes the reserved
 -- icon toolbar strip beneath the "BigNoteBox" heading).
 local TITLE_H    = 60
-local TOOLBAR_H  = 32   -- editor bottom toolbar
 local MIN_W      = 500
 local MIN_H      = 400
 local DEFAULT_W  = 820
@@ -23,10 +22,6 @@ local DEFAULT_LIST_W = 240
 -- Icon-only collapsed width: 8px left pad + 32px icon + 8px right pad + 22px scrollbar + 2px buffer = 72px
 -- Must match COLLAPSED_W in NoteList.lua
 local COLLAPSED_W    = 82   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + PAD_L(8) + scrollbar(22) + 2
-
--- Expose for child modules
-BNB.MAIN_TITLE_H   = TITLE_H
-BNB.MAIN_TOOLBAR_H = TOOLBAR_H
 
 -- Runtime split position (set from DB on first window open)
 BNB._listPaneW = DEFAULT_LIST_W

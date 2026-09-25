@@ -32,7 +32,6 @@
 --   BNB.HistoryDeleteAutoSlot(id, index)        Remove one auto entry
 --   BNB.HistoryDeleteManual(id)                 Remove manual snapshot
 --   BNB.HistoryDeleteAuto(id)                    Remove only auto snapshots for one note
---   BNB.HistoryDeleteAll(id)                    Remove all history for one note
 --   BNB.HistoryNoteHasAny(id)                   bool
 --   BNB.HistoryTotalSize()                       bytes across all history
 --   BNB.HistoryNoteSize(id)                      bytes for one note's history
@@ -224,18 +223,6 @@ function BNB.HistoryDeleteAuto(id)
     BNB.SyncHistoryNoteBtnState()
 end
 
---------------------------------------------------------------------------------
--- HistoryDeleteAll — wipe all history (auto + manual) for one note.
---------------------------------------------------------------------------------
-function BNB.HistoryDeleteAll(id)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
-    if not note then return end
-    note.history        = nil
-    note.manualSnapshot = nil
-    BNB.SyncHistoryBtnState()
-    BNB.SyncHistoryNoteBtnState()
-end
 
 --------------------------------------------------------------------------------
 -- HistoryGetSlots — returns {auto={snap,...}, manual=snap|nil} for a note.

@@ -171,29 +171,6 @@ local function GetMaxHeight()
     return math.min(math.max(math.floor(UIParent:GetHeight() * 0.75), WN_MIN_H), 900)
 end
 
--- ── Content height measurement ────────────────────────────────────────────────
--- Measures how tall all entries will be when rendered, so we can size the
--- window before showing it. Uses a hidden measuring FontString.
-local _measureFS = nil
-local function MeasureContentHeight(entries, availableW)
-    if not _measureFS then
-        _measureFS = UIParent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-        _measureFS:Hide()
-    end
-    _measureFS:SetFont("Fonts\\FRIZQT__.TTF", ENTRY_FONT_SIZE, "")
-    _measureFS:SetWidth(availableW)
-    _measureFS:SetWordWrap(true)
-
-    local total = PAD  -- top padding
-    for _, entry in ipairs(entries or {}) do
-        _measureFS:SetText(BULLET .. entry)
-        local h = _measureFS:GetStringHeight()
-        total = total + math.max(h, 14) + ENTRY_GAP
-    end
-    total = total + PAD  -- bottom padding
-    return total
-end
-
 -- ── Window chrome: normal mode ────────────────────────────────────────────────
 local function BuildFrameNormal(onClose)
     local f = CreateFrame("Frame", "BigNoteBoxWhatsNewFrame", UIParent, "ButtonFrameTemplate")

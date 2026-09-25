@@ -734,12 +734,3 @@ function BNB.MarkDirty()
     BNB._dirty = true
 end
 
---------------------------------------------------------------------------------
--- COUNT NOTES
---------------------------------------------------------------------------------
-function BNB.NoteCount()
-    if not NDB() then return 0 end
-    local n = 0
-    for _ in pairs(NDB().notes) do n = n + 1 end
-    return n
-end

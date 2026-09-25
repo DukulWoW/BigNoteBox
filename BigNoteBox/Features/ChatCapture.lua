@@ -10,7 +10,6 @@
 --
 -- Public API:
 --   BNB.SetupChatCapture()   — called by Initialize.lua; idempotent
---   BNB.CaptureFromBCB()     — capture current BCB editbox text right now
 --
 -- Requirements:
 --   BigChatBox ~= nil and BigChatBox.SendDirect ~= nil  (BNB.hasBCB)
@@ -82,12 +81,6 @@ local function DoCaptureFromBCB()
 
     BNB:Print(string.format(L["CAPTURE_SAVED"], "|cffffd100" .. autoTitle .. "|r"))
     return true, id
-end
-
--- ── Public API ─────────────────────────────────────────────────────────────────
-
-function BNB.CaptureFromBCB()
-    DoCaptureFromBCB()
 end
 
 -- ── Right-click menu hook ──────────────────────────────────────────────────────

@@ -620,17 +620,6 @@ local function ItemTextTags()
     return { "Letter" }
 end
 
-local function ItemTextContent()
-    -- Single-page read (kept as fallback; full capture uses the async accumulator).
-    -- ItemTextGetItem() returns the item/object name (the "title")
-    -- ItemTextGetText() returns the current page body
-    local title = ItemTextGetItem and ItemTextGetItem() or ""
-    local body  = ItemTextGetText and ItemTextGetText()  or ""
-    -- Strip any |c colour codes and |r resets from book/letter body
-    body = body:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    return title, body
-end
-
 -- ── Item-text async page accumulator ─────────────────────────────────────────
 -- ItemTextNextPage() is asynchronous: it fires ITEM_TEXT_READY when the new
 -- page is ready. We cannot read all pages in a synchronous loop.
@@ -1230,15 +1219,6 @@ local IMM_EVENTS = {
     "QUEST_GREETING", "QUEST_FINISHED",
 }
 
-local function ImmersionBypassStart()
-    local imm = _G["ImmersionFrame"]
-    if not imm then return end
-    _immBypass = true
-    for _, ev in ipairs(IMM_EVENTS) do
-        imm:UnregisterEvent(ev)
-    end
-end
-
 local function ImmersionBypassEnd()
     if not _immBypass then return end
     _immBypass = false
@@ -1246,17 +1226,6 @@ local function ImmersionBypassEnd()
     if not imm then return end
     for _, ev in ipairs(IMM_EVENTS) do
         imm:RegisterEvent(ev)
-    end
-end
-
-function BNB.ToggleImmersionBypass()
-    if not _G["ImmersionFrame"] then return end
-    if _immBypass then
-        ImmersionBypassEnd()
-        BNB:Print(BNB.L["QN_IMM_RESTORED"])
-    else
-        ImmersionBypassStart()
-        BNB:Print(BNB.L["QN_IMM_BYPASSED"])
     end
 end
 

@@ -13,7 +13,6 @@ local TSTAMP_H    = 16   -- height of the timestamp strip below title
 local CHIP_ROW_H  = 22   -- height of one row of tag chips
 local TAG_STRIP_H = CHIP_ROW_H  -- kept for legacy references; strip grows dynamically
 
-local COL_GOLD = { 1, 0.82, 0, 1 }
 local COL_GREY = { 0.50, 0.50, 0.50, 1 }
 
 local saveBtn  -- forward ref
@@ -60,7 +59,6 @@ function BNB.UpdateSaveButtonState()
     end
 end
 
-local _baseMarkDirty = BNB.MarkDirty
 BNB.MarkDirty = function()
     BNB._dirty = true
     BNB.UpdateSaveButtonState()
@@ -3866,8 +3864,6 @@ end
 -- Sits between WYSIWYG bar and body. Shown only when a rich note is loaded.
 -- Buttons insert rich-note markup tag pairs at the cursor position.
 --------------------------------------------------------------------------------
-local MARKUP_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\"
-
 local function InsertTagPair(open, close)
     local eb = BNB._editorBody
     if not eb then return end

@@ -35,12 +35,6 @@ local _selectBtn   = nil
 local _selAllBtn   = nil
 local _delSelBtn   = nil
 
--- Content width inside the scroll child (for hitBtn sizing)
-local function ContentW()
-    if _scrollFrame then return _scrollFrame:GetWidth() end
-    return TM_W - SCROLL_LPAD - SCROLL_PAD
-end
-
 --------------------------------------------------------------------------------
 -- TAG HEADER ROW POOL
 -- hitBtn covers only the left "clickable" region (arrow+name+count).

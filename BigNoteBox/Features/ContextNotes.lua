@@ -625,25 +625,6 @@ BNB._taskContextMatch = function(ctx)
     return false
 end
 
--- ── Context string builder (used by NoteConfig Situation tab) ──────────────────
--- Returns a context string for the player's current location.
-function BNB.BuildContextString(kind)
-    if kind == "zone" or kind == "instance" then
-        local curKind, curVal = GetCurrentZone()
-        local useKind = (kind == "instance" or curKind == "instance") and "instance" or "zone"
-        return useKind .. ":" .. (curVal ~= "" and curVal or "Unknown")
-    elseif kind == "subzone" then
-        local sub = GetSubZoneText and GetSubZoneText() or ""
-        if sub ~= "" then return "subzone:" .. sub end
-        return nil
-    elseif kind == "player" then
-        local tgt = (BNB.UnitNameRealm("target"))
-        if tgt then return "player:" .. tgt end
-        return nil
-    end
-    return nil
-end
-
 -- ── Decode context string for display ─────────────────────────────────────────
 -- Returns kind (string), value (string) or nil, nil
 function BNB.DecodeContext(ctx)

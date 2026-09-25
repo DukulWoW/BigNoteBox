@@ -14,7 +14,6 @@ local L   = BNB.L
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 local NCW     = 264
-local TITLE_H = 60
 -- Tab buttons (PanelTopTabButtonTemplate) sit at y=-25, are ~20px tall, ending ~y=-45.
 -- TAB_CONTENT_Y = distance from frame top to content start.
 -- 60 (TITLE_H) - 25 (tab y-offset from top) + 20 (tab height) + 8 (padding) = 63
@@ -1651,7 +1650,6 @@ end
 -- Stored as: note.context = "zone:Elwynn Forest" / "instance:Molten Core" / "player:Thrall" / nil
 -- ─────────────────────────────────────────────────────────────────────────────
 local function BuildSituationTab(panel)
-    local function Row(p, y) return y - ROW_H - ROW_GAP end
     local y = -PAD
 
     -- Header label

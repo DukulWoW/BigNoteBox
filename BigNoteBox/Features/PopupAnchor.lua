@@ -109,10 +109,6 @@ function BNB.LockPopupAnchor()
     BNB:Print(L["POPANCHOR_SAVED"])
 end
 
-function BNB.IsPopupAnchorShown()
-    return _anchor and _anchor:IsShown() or false
-end
-
 --------------------------------------------------------------------------------
 -- GET POSITION — used by ContextNotes.lua for toast placement
 -- Returns: point, relativeTo, relativePoint, x, y

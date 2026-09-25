@@ -8,7 +8,6 @@
 --   BNB.Task.UpdateTask(noteID, taskID, changes)
 --   BNB.Task.DeleteTask(noteID, taskID)
 --   BNB.Task.ToggleTask(noteID, taskID)
---   BNB.Task.MoveTask(noteID, taskID, newOrder)
 --   BNB.Task.GetCompletionCount(noteID)       -> done, total
 --   BNB.Task.ClearCompleted(noteID)
 --   BNB.Task.HasTasks(noteID)                 -> bool
@@ -37,7 +36,6 @@ local DAILY_RESET_HOUR  = 7      -- 07:00 UTC (matches WoW daily reset)
 -- Completion display colours
 local COLOR_DONE   = { r = 0.45, g = 0.45, b = 0.48 }  -- greyed text
 local COLOR_ACTIVE = { r = 1.00, g = 1.00, b = 1.00 }  -- normal text
-local COLOR_ALL_DONE = { r = 0.40, g = 0.85, b = 0.40 } -- green badge
 
 -- Sub-task indent (px) -- used by ReferenceBox renderer
 T.SUBTASK_INDENT = 14
@@ -136,14 +134,6 @@ function T.GetCompletionCount(noteID)
         if task.completed then done = done + 1 end
     end
     return done, total
-end
-
--- Returns the colour table to use for the completion badge.
-function T.GetBadgeColor(noteID)
-    local done, total = T.GetCompletionCount(noteID)
-    if total == 0 then return COLOR_ACTIVE end
-    if done == total then return COLOR_ALL_DONE end
-    return COLOR_ACTIVE
 end
 
 -- Returns colour for a task row's text.
@@ -339,37 +329,6 @@ function T.DeleteTask(noteID, taskID)
         if toRemove[tasks[i].id] then
             table.remove(tasks, i)
         end
-    end
-
-    Persist(noteID)
-    Fire("TasksChanged", noteID)
-end
-
--- Move a task to a new order position within its parent group.
--- newOrder is the target 1-based index among siblings.
-function T.MoveTask(noteID, taskID, newOrder)
-    local task = T.FindTask(noteID, taskID)
-    if not task then return end
-
-    -- Collect siblings (same parent), sorted by current order.
-    local siblings = task.parentID and T.GetSubTasks(noteID, task.parentID)
-        or T.GetTopLevel(noteID)
-
-    -- Remove task from its current position in the sibling list.
-    local reordered = {}
-    for _, s in ipairs(siblings) do
-        if s.id ~= taskID then
-            reordered[#reordered + 1] = s
-        end
-    end
-
-    -- Clamp newOrder to valid range.
-    newOrder = math.max(1, math.min(newOrder, #reordered + 1))
-    table.insert(reordered, newOrder, task)
-
-    -- Write back order values.
-    for i, s in ipairs(reordered) do
-        s.order = i
     end
 
     Persist(noteID)

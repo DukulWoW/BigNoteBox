@@ -703,8 +703,6 @@ end
 -- that fades in (FadeFrame) when the user clicks "=" on a sticky.
 
 local SETTINGS_W = 264   -- matches NoteConfig NCW
-local SETTINGS_TITLE_H = 60
-local SETTINGS_TAB_BAR_H = 28
 -- Content starts just below the tab button bottoms (~y=-45 from frame top) + small pad
 local SETTINGS_TAB_CONTENT_Y = 62
 local SETTINGS_PAD = 12  -- matches NoteConfig PAD
@@ -4538,10 +4536,6 @@ function SN.Close(noteID)
         db2.postits[noteID].shown = false
     end
     FadeFrame(f, f:GetAlpha(), 0, FLIP_TIME, function() f:Hide() end)
-end
-
-function SN.CloseAll()
-    for id in pairs(openFrames) do SN.Close(id) end
 end
 
 -- Hide all open sticky frames and tiles without closing them.

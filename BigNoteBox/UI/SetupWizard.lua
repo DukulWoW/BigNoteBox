@@ -21,7 +21,6 @@ local L   = BNB.L
 -- CONSTANTS
 --------------------------------------------------------------------------------
 local ASSETS    = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local BTNS      = ASSETS .. "Buttons\\"
 local WIN_W     = 480
 local WIN_H     = 500
 local PAD       = 20
@@ -60,7 +59,6 @@ local _overlay     = nil
 local _pages       = {}
 local _curPage     = 1
 local _lcg         = nil
-local _skinChoice  = nil   -- "normal" or "skin", set on page 2
 local _pageTitle   = nil
 local _pageCounter = nil
 local _prevBtn     = nil

@@ -31,14 +31,6 @@ function BNB.SetBackdrop(frame, r, g, b, a, bR, bG, bB, bA)
     end
 end
 
-function BNB.SetBackdropLight(frame)
-    if frame.SetBackdrop then
-        frame:SetBackdrop(BACKDROP_INSET)
-        frame:SetBackdropColor(0.08, 0.08, 0.10, 0.92)
-        frame:SetBackdropBorderColor(0.28, 0.28, 0.28, 0.9)
-    end
-end
-
 function BNB.SetBackdropDark(frame)
     if frame.SetBackdrop then
         frame:SetBackdrop(BACKDROP_INSET)
@@ -198,27 +190,6 @@ end
 -- Legacy stub kept for any call sites that still reference TintButton.
 -- In skin mode buttons should be created with CreateSkinButton instead.
 function BNB.TintButton(btn) end
-
---------------------------------------------------------------------------------
--- ICON BUTTON — small square with a texture, no text
--- Used for cog (config) in the title bar.
---------------------------------------------------------------------------------
-function BNB.CreateIconButton(name, parent, texturePath, size)
-    size = size or 20
-    local btn = CreateFrame("Button", name, parent)
-    btn:SetSize(size, size)
-
-    local icon = btn:CreateTexture(nil, "ARTWORK")
-    icon:SetAllPoints()
-    if texturePath then icon:SetTexture(texturePath) end
-    btn._icon = icon
-
-    local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-    hi:SetAllPoints()
-    hi:SetColorTexture(1, 1, 1, 0.18)
-
-    return btn
-end
 
 --------------------------------------------------------------------------------
 -- SMART SCROLL FRAME  (mirrors BCB's CreateSmartScrollFrame)
@@ -659,23 +630,6 @@ function BNB.BuildColorGrid(ct, y, contentW, onPick)
     end
 
     return y - (ROWS * (SZ + GAP)) - 4
-end
-
---------------------------------------------------------------------------------
--- TAG CHIP
---------------------------------------------------------------------------------
-function BNB.CreateTagChip(parent, text)
-    local chip = BNB.CreateBackdropFrame("Frame", nil, parent)
-    if chip.SetBackdrop then
-        chip:SetBackdrop(BACKDROP_INSET)
-        chip:SetBackdropColor(0.12, 0.22, 0.12, 0.9)
-        chip:SetBackdropBorderColor(0.3, 0.6, 0.3, 1)
-    end
-    local lbl = chip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetPoint("CENTER")
-    lbl:SetText(text or "")
-    chip:SetSize(lbl:GetStringWidth() + 10, 16)
-    return chip
 end
 
 --------------------------------------------------------------------------------

@@ -29,7 +29,6 @@ local CONTENT_W      = HW_W - PAD * 2 - 30
 local BOTTOM_STRIP_H = 44
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
-local ASSETS       = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
 local _hwFrame    = nil
 local _rows       = {}
@@ -37,26 +36,6 @@ local _emptyLbl   = nil
 local _blocker    = nil   -- invisible frame to eat clicks when greyed out
 local _clearAllBtn = nil
 local _sizeLbl    = nil
-
---------------------------------------------------------------------------------
--- INTERNAL: format a unix timestamp as a short date+time string
---------------------------------------------------------------------------------
-local function FmtSnap(ts)
-    if not ts or ts == 0 then return L["HW_TIME_UNKNOWN"] end
-    local db  = BigNoteBoxDB
-    local use24 = db and db.use24Hour ~= false
-    local d = date("%Y-%m-%d", ts)
-    local t
-    if use24 then
-        t = date("%H:%M", ts)
-    else
-        local h = tonumber(date("%H", ts))
-        local ampm = h >= 12 and "pm" or "am"
-        h = h % 12; if h == 0 then h = 12 end
-        t = h .. ":" .. date("%M", ts) .. " " .. ampm
-    end
-    return d .. "  " .. t
-end
 
 --------------------------------------------------------------------------------
 -- INTERNAL: count total slots across auto + manual

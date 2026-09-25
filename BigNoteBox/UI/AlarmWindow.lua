@@ -315,7 +315,6 @@ end
 -- identical. Uses SkinSystem API for backdrop frames.
 -- ---------------------------------------------------------------------------
 local SK_AW_TITLE_H = 28   -- title bar strip height
-local SK_AW_TAB_H   = 24   -- skin tab row height
 local SK_AW_TAB_GAP = 10   -- gap below tabs to reach AW_TAB_Y (62px total)
 
 local function BuildWindowSkin()
