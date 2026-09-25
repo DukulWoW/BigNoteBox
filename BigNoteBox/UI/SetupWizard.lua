@@ -256,6 +256,8 @@ local function RegisterQuitDialog()
             HideOverlay()
             StopCamera()
             StopGlow()
+            -- Held back while the wizard was pending (Core/Events.lua)
+            if BNB.ShowForeverNoticeIfDue then BNB.ShowForeverNoticeIfDue() end
         end,
     }
 end

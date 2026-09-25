@@ -985,6 +985,7 @@ local function ReleaseAllRows()
         row:Hide()
         -- Clear gear-row state so pooled rows don't carry stale flags.
         row._gearSlot  = nil
+        row._gearSlotIdx = nil
         row._isGearRow = nil
         row._isTmog    = nil
         table.insert(_rowPool, row)
@@ -1091,7 +1092,9 @@ local function SetupRow(row, att, data, index, compact, locked)
     -- isGearRow: gear card from inspectGearItems / inspectTransmogItems.
     local isGearRow = row._isGearRow
     local isTmog    = row._isTmog
-    local slotText  = row._gearSlot or ""
+    -- Translated name from the slot id first; notes saved before ALL-72 stored English
+    local slotText  = (row._gearSlotIdx and BNB.InspectSlotLabel and BNB.InspectSlotLabel(row._gearSlotIdx))
+                      or row._gearSlot or ""
 
     -- Compact: slot right-aligned; name constrained to avoid overlap.
     -- Normal:  type label = "Transmog: Head" or "Regular: Head"; name below.
@@ -1349,6 +1352,7 @@ RenderList = function()
             row:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PAD, y)
             -- Pass slot label and transmog flag through the row for SetupRow.
             row._gearSlot  = gearEntry.slot
+            row._gearSlotIdx = gearEntry.slotIdx
             row._isGearRow = true
             row._isTmog    = isTmog
             SetupRow(row, att, data, nil, compact, false)

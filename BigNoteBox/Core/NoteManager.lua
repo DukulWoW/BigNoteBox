@@ -278,6 +278,14 @@ function BNB.UpdateNote(id, fields)
     if not note then return end
     -- Capture old tags before mutation if tags are changing
     local oldTags = fields.tags and note.tags or nil
+    -- A note never carries the same tag twice, whichever caller built the list
+    if fields.tags then
+        local seen, uniq = {}, {}
+        for _, tag in ipairs(fields.tags) do
+            if not seen[tag] then seen[tag] = true; uniq[#uniq + 1] = tag end
+        end
+        fields.tags = uniq
+    end
     for k, v in pairs(fields) do
         if k ~= "_clear" then note[k] = v end
     end

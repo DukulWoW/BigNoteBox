@@ -66,6 +66,7 @@ UI\TaskEditWindow.lua
 UI\AlarmOverview.lua
 UI\OkPhrases.lua
 UI\WhatsNew.lua
+UI\BugReport.lua
 UI\WhatsNewData.lua
 UI\FeatureList.lua
 UI\FeatureListData.lua

@@ -88,26 +88,43 @@ function BNB.GetInspectRaceIcon(raceID, sexID)
     if not raceFile then return nil end
     return GetRaceIconPath(raceFile, sexID == 1 and "Female" or "Male")
 end
+-- Slot names come from Blizzard's own translated globals (ALL-72); the English
+-- word is only a fallback if a global is ever missing. num tells the two rings
+-- and the two trinkets apart.
 local SLOT_INFO = {
-    { id =  1, label = "Head" },
-    { id =  2, label = "Neck" },
-    { id =  3, label = "Shoulder" },
-    { id =  4, label = "Shirt" },
-    { id =  5, label = "Chest" },
-    { id =  6, label = "Waist" },
-    { id =  7, label = "Legs" },
-    { id =  8, label = "Feet" },
-    { id =  9, label = "Wrist" },
-    { id = 10, label = "Hands" },
-    { id = 11, label = "Ring 1" },
-    { id = 12, label = "Ring 2" },
-    { id = 13, label = "Trinket 1" },
-    { id = 14, label = "Trinket 2" },
-    { id = 15, label = "Back" },
-    { id = 16, label = "Main Hand" },
-    { id = 17, label = "Off Hand" },
-    { id = 19, label = "Tabard" },
+    { id =  1, g = "HEADSLOT",          en = "Head" },
+    { id =  2, g = "NECKSLOT",          en = "Neck" },
+    { id =  3, g = "SHOULDERSLOT",      en = "Shoulder" },
+    { id =  4, g = "SHIRTSLOT",         en = "Shirt" },
+    { id =  5, g = "CHESTSLOT",         en = "Chest" },
+    { id =  6, g = "WAISTSLOT",         en = "Waist" },
+    { id =  7, g = "LEGSSLOT",          en = "Legs" },
+    { id =  8, g = "FEETSLOT",          en = "Feet" },
+    { id =  9, g = "WRISTSLOT",         en = "Wrist" },
+    { id = 10, g = "HANDSSLOT",         en = "Hands" },
+    { id = 11, g = "FINGER0SLOT",       en = "Ring", num = 1 },
+    { id = 12, g = "FINGER1SLOT",       en = "Ring", num = 2 },
+    { id = 13, g = "TRINKET0SLOT",      en = "Trinket", num = 1 },
+    { id = 14, g = "TRINKET1SLOT",      en = "Trinket", num = 2 },
+    { id = 15, g = "BACKSLOT",          en = "Back" },
+    { id = 16, g = "MAINHANDSLOT",      en = "Main Hand" },
+    { id = 17, g = "SECONDARYHANDSLOT", en = "Off Hand" },
+    { id = 19, g = "TABARDSLOT",        en = "Tabard" },
 }
+for _, s in ipairs(SLOT_INFO) do
+    local g = _G[s.g]
+    s.label = (type(g) == "string" and g ~= "" and g or s.en) .. (s.num and (" " .. s.num) or "")
+end
+
+-- Translated slot name for an inventory slot id. The RefBox gear cards call this
+-- at draw time, so notes saved with English slot names show the client's language.
+function BNB.InspectSlotLabel(slotIdx)
+    for _, s in ipairs(SLOT_INFO) do
+        if s.id == slotIdx then return s.label end
+    end
+end
+
+local UNKNOWN_STR = type(UNKNOWN) == "string" and UNKNOWN or "Unknown"
 
 -- WoW item quality hex colours
 local QUALITY_HEX = {
@@ -147,7 +164,7 @@ local function GatherInspectData()
     local data = {}
 
     local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
-    data.name  = name or "Unknown"
+    data.name  = name or UNKNOWN_STR
     data.realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
     local pvpName = UnitPVPName("target")
@@ -158,10 +175,10 @@ local function GatherInspectData()
     data.level = UnitLevel("target")
     if data.level == -1 then data.level = "??" end
     local className, classFile = UnitClass("target")
-    data.className = className or "Unknown"
+    data.className = className or UNKNOWN_STR
     data.classFile = classFile or "WARRIOR"
     local raceName, raceFile, raceID = UnitRace("target")
-    data.race     = raceName or "Unknown"
+    data.race     = raceName or UNKNOWN_STR
     data.raceFile = raceFile or "Human"
 
     -- UnitRace may not return raceID as 3rd value on all retail builds.
@@ -217,7 +234,11 @@ local function GatherInspectData()
         local specID = GetInspectSpecialization("target")
         if specID and specID > 0 then
             local _, specName = GetSpecializationInfoByID(specID)
-            data.spec = specName
+            -- A player without a chosen spec gets a starter spec named after the
+            -- class: skip it, or the note reads "Rogue Rogue" (ALL-72)
+            if specName and specName ~= "" and specName ~= data.className then
+                data.spec = specName
+            end
         end
     end
 
@@ -225,7 +246,10 @@ local function GatherInspectData()
     data.guild     = guildName
     data.guildRank = guildRankName
 
-    data.faction = UnitFactionGroup("target")
+    -- faction = English token for logic (model crest); factionLabel = translated, for text and tag
+    local factionEn, factionLoc = UnitFactionGroup("target")
+    data.faction      = factionEn
+    data.factionLabel = factionLoc or factionEn
 
     data.achievePoints = nil
     if GetComparisonAchievementPoints then
@@ -269,7 +293,7 @@ local function GatherInspectData()
                 slot    = slot.label,
                 slotIdx = slot.id,
                 id      = itemID,
-                name    = itemName or ("Item " .. itemID),
+                name    = itemName or string.format(L["INSPECT_ITEM_FMT"], tostring(itemID)),
                 quality = quality or 1,
                 ilvl    = actualIlvl,
                 icon    = iconTex,
@@ -321,6 +345,8 @@ end
 
 local function FormatNumber(n)
     if not n then return "?" end
+    -- The client's own thousands separator (ALL-72)
+    if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
     local s = tostring(n)
     local pos, result = #s, ""
     while pos > 0 do
@@ -331,6 +357,20 @@ local function FormatNumber(n)
     return result
 end
 
+-- "Level 80 Dracthyr Preservation Evoker": spec is optional (ALL-72)
+local function LevelLine(data)
+    local classStr = data.spec and (data.spec .. " " .. data.className) or data.className
+    return string.format(L["TGT_LEVEL_FMT"], tostring(data.level), data.race, classStr)
+end
+
+-- Guild line with or without the rank: key .. "_RANK" is the variant with the rank
+local function GuildLine(data, key)
+    if data.guildRank then
+        return string.format(L[key .. "_RANK"], data.guild, data.guildRank)
+    end
+    return string.format(L[key], data.guild)
+end
+
 local function BuildNormalBody(data)
     local lines = {}
 
@@ -338,46 +378,40 @@ local function BuildNormalBody(data)
     lines[#lines + 1] = data.displayTitle or data.name
     lines[#lines + 1] = ""
 
-    local header = string.format("Level %s %s %s%s",
-        tostring(data.level), data.race,
-        data.spec and (data.spec .. " ") or "",
-        data.className)
-    lines[#lines + 1] = header
+    lines[#lines + 1] = LevelLine(data)
 
-    if data.faction then
-        lines[#lines + 1] = "Faction: " .. data.faction
+    if data.factionLabel then
+        lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
     end
 
     if data.guild then
-        local guildLine = "Guild: <" .. data.guild .. ">"
-        if data.guildRank then guildLine = guildLine .. " (" .. data.guildRank .. ")" end
-        lines[#lines + 1] = guildLine
+        lines[#lines + 1] = GuildLine(data, "INSPECT_LINE_GUILD")
     end
 
     lines[#lines + 1] = ""
 
     if data.ilvl then
-        lines[#lines + 1] = "Item Level: " .. tostring(data.ilvl)
+        lines[#lines + 1] = string.format(L["INSPECT_LINE_ILVL"], tostring(data.ilvl))
     end
     if data.achievePoints then
-        lines[#lines + 1] = "Achievement Points: " .. FormatNumber(data.achievePoints)
+        lines[#lines + 1] = string.format(L["INSPECT_LINE_ACHIEVE"], FormatNumber(data.achievePoints))
     end
     if data.honorKills then
-        lines[#lines + 1] = "Honor Kills: " .. FormatNumber(data.honorKills)
+        lines[#lines + 1] = string.format(L["INSPECT_LINE_HK"], FormatNumber(data.honorKills))
     end
 
     lines[#lines + 1] = ""
 
     if #data.gear > 0 then
-        lines[#lines + 1] = "Equipment:"
+        lines[#lines + 1] = string.format(L["TGT_HDR_COLON_FMT"], L["INSPECT_HDR_EQUIPMENT"])
         for _, g in ipairs(data.gear) do
             local ilvlStr = g.ilvl and (" (" .. tostring(g.ilvl) .. ")") or ""
-            lines[#lines + 1] = "  " .. g.slot .. ": " .. g.name .. ilvlStr
+            lines[#lines + 1] = "  " .. string.format(L["TGT_LINE_STAT_FMT"], g.slot, g.name .. ilvlStr)
         end
     end
 
     lines[#lines + 1] = ""
-    lines[#lines + 1] = "Notes:"
+    lines[#lines + 1] = string.format(L["TGT_HDR_COLON_FMT"], L["TGT_HDR_NOTES"])
     lines[#lines + 1] = ""
 
     return table.concat(lines, "\n")
@@ -392,14 +426,10 @@ local function BuildRichBody(data)
     lines[#lines + 1] = ""
 
     -- Class-coloured subtitle
-    local subtitle = string.format("Level %s %s %s%s",
-        tostring(data.level), data.race,
-        data.spec and (data.spec .. " ") or "",
-        data.className)
-    lines[#lines + 1] = "{p:c}{col:" .. data.classHex .. "}" .. subtitle .. "{/col}{/p}"
+    lines[#lines + 1] = "{p:c}{col:" .. data.classHex .. "}" .. LevelLine(data) .. "{/col}{/p}"
 
-    if data.faction then
-        lines[#lines + 1] = "{p:c}" .. data.faction .. "{/p}"
+    if data.factionLabel then
+        lines[#lines + 1] = "{p:c}" .. data.factionLabel .. "{/p}"
     end
 
     lines[#lines + 1] = ""
@@ -407,9 +437,7 @@ local function BuildRichBody(data)
 
     -- Guild
     if data.guild then
-        local guildStr = "Guild member of <" .. data.guild .. ">"
-        if data.guildRank then guildStr = guildStr .. " (" .. data.guildRank .. ")" end
-        lines[#lines + 1] = "{p}" .. guildStr .. "{/p}"
+        lines[#lines + 1] = "{p}" .. GuildLine(data, "INSPECT_LINE_GUILD_MEMBER") .. "{/p}"
         lines[#lines + 1] = ""
         lines[#lines + 1] = ""
     end
@@ -417,16 +445,16 @@ local function BuildRichBody(data)
     -- Stats
     local hasStats = data.ilvl or data.achievePoints or data.honorKills
     if hasStats then
-        lines[#lines + 1] = "{h3}Stats{/h3}"
+        lines[#lines + 1] = "{h3}" .. L["INSPECT_HDR_STATS"] .. "{/h3}"
         lines[#lines + 1] = ""
         if data.ilvl then
-            lines[#lines + 1] = "{p}Item Level: " .. tostring(data.ilvl) .. "{/p}"
+            lines[#lines + 1] = "{p}" .. string.format(L["INSPECT_LINE_ILVL"], tostring(data.ilvl)) .. "{/p}"
         end
         if data.achievePoints then
-            lines[#lines + 1] = "{p}Achievement Points: " .. FormatNumber(data.achievePoints) .. "{/p}"
+            lines[#lines + 1] = "{p}" .. string.format(L["INSPECT_LINE_ACHIEVE"], FormatNumber(data.achievePoints)) .. "{/p}"
         end
         if data.honorKills then
-            lines[#lines + 1] = "{p}Honor Kills: " .. FormatNumber(data.honorKills) .. "{/p}"
+            lines[#lines + 1] = "{p}" .. string.format(L["INSPECT_LINE_HK"], FormatNumber(data.honorKills)) .. "{/p}"
         end
         lines[#lines + 1] = ""
         lines[#lines + 1] = ""
@@ -434,7 +462,7 @@ local function BuildRichBody(data)
 
     -- Gear with icons and quality colours
     if #data.gear > 0 then
-        lines[#lines + 1] = "{h3}Equipment{/h3}"
+        lines[#lines + 1] = "{h3}" .. L["INSPECT_HDR_EQUIPMENT"] .. "{/h3}"
         lines[#lines + 1] = ""
         for _, g in ipairs(data.gear) do
             local qHex = QUALITY_HEX[g.quality] or QUALITY_HEX[1]
@@ -443,13 +471,14 @@ local function BuildRichBody(data)
             if g.icon then
                 iconStr = "{icon:" .. tostring(g.icon) .. ":18} "
             end
-            lines[#lines + 1] = "{p}" .. iconStr .. g.slot .. ": {col:" .. qHex .. "}" .. g.name .. ilvlStr .. "{/col}{/p}"
+            lines[#lines + 1] = "{p}" .. iconStr .. string.format(L["TGT_LINE_STAT_FMT"], g.slot,
+                "{col:" .. qHex .. "}" .. g.name .. ilvlStr .. "{/col}") .. "{/p}"
         end
     end
 
     lines[#lines + 1] = ""
     lines[#lines + 1] = ""
-    lines[#lines + 1] = "{h3}Notes:{/h3}"
+    lines[#lines + 1] = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
     lines[#lines + 1] = "{p}{/p}"
 
     return table.concat(lines, "\n")
@@ -470,9 +499,9 @@ local function MakeUniqueTitle(baseName)
     for i = 1, 100 do
         local candidate
         if i == 1 then
-            candidate = baseName .. " (Duplicate)"
+            candidate = string.format(L["INSPECT_DUP_FMT"], baseName)
         else
-            candidate = baseName .. " (Duplicate " .. i .. ")"
+            candidate = string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(i))
         end
         local found = false
         for _, note in pairs(ndb.notes) do
@@ -480,7 +509,7 @@ local function MakeUniqueTitle(baseName)
         end
         if not found then return candidate end
     end
-    return baseName .. " (Duplicate " .. time() .. ")"
+    return string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(time()))
 end
 
 -- Find existing note by player context. Returns noteID or nil.
@@ -515,11 +544,11 @@ local function CreateInspectNote(richMode, silent)
         end
     end
 
-    local tags = { "Inspected" }
-    if data.race and data.race ~= "Unknown" then tags[#tags + 1] = data.race end
-    if data.className and data.className ~= "Unknown" then tags[#tags + 1] = data.className end
+    local tags = { L["INSPECT_TAG"] }
+    if data.race and data.race ~= UNKNOWN_STR then tags[#tags + 1] = data.race end
+    if data.className and data.className ~= UNKNOWN_STR then tags[#tags + 1] = data.className end
     if data.spec then tags[#tags + 1] = data.spec end
-    if data.faction then tags[#tags + 1] = data.faction end
+    if data.factionLabel then tags[#tags + 1] = data.factionLabel end
 
     local fields = {
         source         = "inspect",
@@ -886,18 +915,18 @@ local function CreateInspectButton()
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         if not _inspectReady then
             GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
-            GameTooltip:AddLine("Waiting for inspect data...", 1, 0.5, 0.25)
+            GameTooltip:AddLine(L["INSPECT_TIP_WAITING"], 1, 0.5, 0.25)
         else
             local tName, tRealm = BNB.UnitNameRealm("target")
             tRealm = tRealm and tRealm ~= "" and tRealm or GetNormalizedRealmName() or ""
             local existing = tName and FindExistingNote(tName, tRealm)
             if existing then
                 GameTooltip:AddLine(L["INSPECT_TIP_OPEN"], 1, 1, 1)
-                GameTooltip:AddLine("A note already exists for " .. tName .. ".", 0.55, 0.8, 0.55)
-                GameTooltip:AddLine("Click to view or create a duplicate.", 0.78, 0.78, 0.78)
+                GameTooltip:AddLine(string.format(L["INSPECT_TIP_EXISTS"], tName), 0.55, 0.8, 0.55)
+                GameTooltip:AddLine(L["INSPECT_TIP_DUPE"], 0.78, 0.78, 0.78)
             else
                 GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
-                GameTooltip:AddLine("from this player's inspect data.", 0.78, 0.78, 0.78)
+                GameTooltip:AddLine(L["INSPECT_TIP_FROM"], 0.78, 0.78, 0.78)
             end
         end
         GameTooltip:Show()

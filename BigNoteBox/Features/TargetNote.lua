@@ -22,6 +22,7 @@
 
 local BNB    = BigNoteBox
 local L      = BNB.L
+local UNKNOWN_STR = type(UNKNOWN) == "string" and UNKNOWN or "Unknown"
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local BTNS   = ASSETS .. "Buttons\\"
 local ICONS  = "Interface\\Icons\\"
@@ -51,6 +52,8 @@ end
 --------------------------------------------------------------------------------
 local function FormatNumber(n)
     if not n then return "?" end
+    -- The client's own thousands separator (ALL-72)
+    if BreakUpLargeNumbers then return BreakUpLargeNumbers(math.floor(n)) end
     local s = tostring(math.floor(n))
     local pos, result = #s, ""
     while pos > 0 do
@@ -204,17 +207,40 @@ function BNB.NpcNoteIcon(note)
     return icon
 end
 
--- Classification label mapping for display
-local CLASSIFICATION_LABEL = {
-    ["normal"]     = nil,          -- don't show, it's implied
-    ["elite"]      = "Elite",
-    ["rareelite"]  = "Rare Elite",
-    ["rare"]       = "Rare",
-    ["worldboss"]  = "World Boss",
-    ["trivial"]    = "Trivial",
+-- Classification -> locale key for display and tag ("normal" is implied, not shown)
+local CLASSIFICATION_KEY = {
+    ["elite"]      = "TGT_CLASS_ELITE",
+    ["rareelite"]  = "TGT_CLASS_RAREELITE",
+    ["rare"]       = "TGT_CLASS_RARE",
+    ["worldboss"]  = "TGT_CLASS_WORLDBOSS",
+    ["trivial"]    = "TGT_CLASS_TRIVIAL",
 }
 
--- Power type index -> name mapping for common NPC power types
+-- Creature type id -> CREATURE_TYPE_ICON key. UnitCreatureType is translated, so on
+-- a non-English client the name is mapped back through C_CreatureInfo (ALL-72).
+local CREATURE_TYPE_KEY_BY_ID = {
+    [1] = "Beast", [2] = "Dragonkin", [3] = "Demon", [4] = "Elemental", [5] = "Giant",
+    [6] = "Undead", [7] = "Humanoid", [9] = "Mechanical", [15] = "Aberration",
+}
+local _ctKeyByName
+local function CreatureTypeKey(locName)
+    if not locName then return nil end
+    if CREATURE_TYPE_ICON[locName] then return locName end   -- English client
+    if not _ctKeyByName then
+        _ctKeyByName = {}
+        local getInfo = C_CreatureInfo and C_CreatureInfo.GetCreatureTypeInfo
+        if getInfo then
+            for id, key in pairs(CREATURE_TYPE_KEY_BY_ID) do
+                local ok, info = pcall(getInfo, id)
+                local name = ok and (type(info) == "table" and info.name or type(info) == "string" and info)
+                if name then _ctKeyByName[name] = key end
+            end
+        end
+    end
+    return _ctKeyByName[locName]
+end
+
+-- English fallback only; the display name comes from _G[powerToken] (ALL-72)
 local POWER_TYPE_NAME = {
     [0]  = "Mana",
     [1]  = "Rage",
@@ -242,6 +268,7 @@ local REACTION_HEX = {
     [7] = "40d040",  -- Revered
     [8] = "40d040",  -- Exalted
 }
+-- English fallback only; the display name is FACTION_STANDING_LABEL<n> (ALL-72)
 local REACTION_LABEL = {
     [1] = "Hated",
     [2] = "Hostile",
@@ -279,7 +306,7 @@ local function GatherTargetData()
 
     -- Name + realm
     local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
-    data.name  = name or "Unknown"
+    data.name  = name or UNKNOWN_STR
     data.realm = (realm and realm ~= "") and realm or
                  GetNormalizedRealmName() or ""
 
@@ -301,13 +328,17 @@ local function GatherTargetData()
     -- from the GUID. No display ID needed.
     data.displayID = nil
 
-    -- Faction
-    data.faction = UnitFactionGroup("target")
+    -- Faction: English token for logic (icon, model crest); factionLabel = translated
+    local factionEn, factionLoc = UnitFactionGroup("target")
+    data.faction      = factionEn
+    data.factionLabel = factionLoc or factionEn
 
     -- Reaction to player
     local reactionIdx = UnitReaction("player", "target")
     data.reactionIdx   = reactionIdx
-    data.reactionLabel = reactionIdx and REACTION_LABEL[reactionIdx] or nil
+    local standing     = reactionIdx and _G["FACTION_STANDING_LABEL" .. reactionIdx]
+    data.reactionLabel = type(standing) == "string" and standing
+                         or (reactionIdx and REACTION_LABEL[reactionIdx]) or nil
     data.reactionHex   = reactionIdx and REACTION_HEX[reactionIdx] or nil
 
     -- Zone where encountered
@@ -322,11 +353,11 @@ local function GatherTargetData()
         end
 
         local className, classFile = UnitClass("target")
-        data.className = className or "Unknown"
+        data.className = className or UNKNOWN_STR
         data.classFile = classFile or "WARRIOR"
 
         local raceName, raceFile = UnitRace("target")
-        data.race     = raceName or "Unknown"
+        data.race     = raceName or UNKNOWN_STR
         data.raceFile = raceFile or "Human"
 
         local sex = UnitSex("target")
@@ -346,12 +377,16 @@ local function GatherTargetData()
         data.portraitIcon = ASSETS .. "Icons\\Classes\\ClassIcon_" .. (data.classFile or "Warrior")
     else
         -- ── NPC / mob / boss branch ────────────────────────────────────────
-        data.creatureType   = UnitCreatureType("target")
+        local ctName, ctID  = UnitCreatureType("target")   -- translated name, type id
+        data.creatureType   = ctName
+        -- English key, icons only: by id first, then the name mapped back
+        data.creatureTypeKey = CREATURE_TYPE_KEY_BY_ID[ctID] or CreatureTypeKey(ctName)
         data.creatureFamily = UnitCreatureFamily("target")  -- may be nil
 
         local classification = UnitClassification("target")
         data.classification      = classification
-        data.classificationLabel = CLASSIFICATION_LABEL[classification or "normal"]
+        local classKey = CLASSIFICATION_KEY[classification or "normal"]
+        data.classificationLabel = classKey and L[classKey] or nil
         data.isBoss = (classification == "worldboss") or (data.level == "??")
 
         -- Max health — UnitHealthMax returns a "secret" (taint-protected) value
@@ -367,17 +402,20 @@ local function GatherTargetData()
             local powerIdx, powerToken = UnitPowerType("target")
             local maxPow = UnitPowerMax("target")
             if maxPow and maxPow > 0 then
-                data.powerName = POWER_TYPE_NAME[powerIdx]
+                data.powerIdx  = powerIdx
+                local g = powerToken and _G[powerToken]
+                data.powerName = (type(g) == "string" and g ~= "" and g)
+                              or POWER_TYPE_NAME[powerIdx]
                               or (powerToken and powerToken:gsub("_", " "):gsub("(%a)([%w]*)", function(a, b)
                                     return a:upper() .. b:lower()
                                  end))
-                              or "Power"
+                              or L["TGT_POWER"]
                 data.maxPower = maxPow
             end
         end)
 
         -- NPC portrait icon: use creature-type mapped icon, fallback to note icon
-        local ctIcon = CREATURE_TYPE_ICON[data.creatureType or ""] or "inv_misc_questionmark"
+        local ctIcon = CREATURE_TYPE_ICON[data.creatureTypeKey or ""] or "inv_misc_questionmark"
         data.portraitIcon = ICONS .. ctIcon
 
         -- Note list icon: same creature-type icon
@@ -398,15 +436,13 @@ local function BuildNormalBody(data)
         lines[#lines + 1] = data.displayTitle or data.name
         lines[#lines + 1] = ""
 
-        local sub = string.format("Level %s %s %s",
-            tostring(data.level), data.race, data.className)
-        lines[#lines + 1] = sub
+        lines[#lines + 1] = string.format(L["TGT_LEVEL_FMT"], tostring(data.level), data.race, data.className)
 
-        if data.faction then
-            lines[#lines + 1] = "Faction: " .. data.faction
+        if data.factionLabel then
+            lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
         end
         if data.reactionLabel then
-            lines[#lines + 1] = "Reaction: " .. data.reactionLabel
+            lines[#lines + 1] = string.format(L["TGT_LINE_REACTION"], data.reactionLabel)
         end
     else
         lines[#lines + 1] = data.name
@@ -414,30 +450,30 @@ local function BuildNormalBody(data)
 
         -- Level + classification
         local classif = data.classificationLabel and (" [" .. data.classificationLabel .. "]") or ""
-        lines[#lines + 1] = "Level " .. tostring(data.level) .. classif
+        lines[#lines + 1] = string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif
 
         if data.creatureType then
             local typeStr = data.creatureType
             if data.creatureFamily then
                 typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
             end
-            lines[#lines + 1] = "Type: " .. typeStr
+            lines[#lines + 1] = string.format(L["TGT_LINE_TYPE"], typeStr)
         end
 
-        if data.faction then
-            lines[#lines + 1] = "Faction: " .. data.faction
+        if data.factionLabel then
+            lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
         end
         if data.reactionLabel then
-            lines[#lines + 1] = "Reaction: " .. data.reactionLabel
+            lines[#lines + 1] = string.format(L["TGT_LINE_REACTION"], data.reactionLabel)
         end
 
         lines[#lines + 1] = ""
 
         if data.maxHealth then
-            lines[#lines + 1] = "Max Health: " .. FormatNumber(data.maxHealth)
+            lines[#lines + 1] = string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth))
         end
         if data.maxPower then
-            lines[#lines + 1] = (data.powerName or "Power") .. ": " .. FormatNumber(data.maxPower)
+            lines[#lines + 1] = string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower))
         end
     end
 
@@ -448,7 +484,7 @@ local function BuildNormalBody(data)
         zoneStr = data.subZone .. ", " .. data.zone
     end
     if zoneStr ~= "" then
-        lines[#lines + 1] = "Encountered in: " .. zoneStr
+        lines[#lines + 1] = string.format(L["TGT_LINE_ENCOUNTERED"], zoneStr)
     end
 
     return table.concat(lines, "\n")
@@ -475,13 +511,12 @@ local function BuildRichBody(data)
         lines[#lines + 1] = "{h1:c}" .. displayName .. "{/h1}"
         lines[#lines + 1] = ""
 
-        local sub = string.format("Level %s %s %s",
-            tostring(data.level), data.race, data.className)
+        local sub = string.format(L["TGT_LEVEL_FMT"], tostring(data.level), data.race, data.className)
         lines[#lines + 1] = "{p:c}{col:" .. (data.classHex or "ffffff") .. "}" .. sub .. "{/col}{/p}"
         lines[#lines + 1] = ""
 
-        if data.faction then
-            lines[#lines + 1] = "{p:c}" .. data.faction .. "{/p}"
+        if data.factionLabel then
+            lines[#lines + 1] = "{p:c}" .. data.factionLabel .. "{/p}"
         end
         if data.reactionLabel and data.reactionHex then
             lines[#lines + 1] = "{p:c}{col:" .. data.reactionHex .. "}" .. data.reactionLabel .. "{/col}{/p}"
@@ -497,7 +532,7 @@ local function BuildRichBody(data)
 
         -- Level + classification subtitle
         local classif = data.classificationLabel and (" {col:ffcc44}[" .. data.classificationLabel .. "]{/col}") or ""
-        lines[#lines + 1] = "{p:c}Level " .. tostring(data.level) .. classif .. "{/p}"
+        lines[#lines + 1] = "{p:c}" .. string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif .. "{/p}"
         lines[#lines + 1] = ""
 
         -- Reaction line (coloured)
@@ -509,7 +544,7 @@ local function BuildRichBody(data)
         -- Details section
         local hasDetails = data.creatureType or data.faction or data.maxHealth or data.maxPower
         if hasDetails then
-            lines[#lines + 1] = "{h3}Details{/h3}"
+            lines[#lines + 1] = "{h3}" .. L["TGT_HDR_DETAILS"] .. "{/h3}"
             lines[#lines + 1] = ""
 
             if data.creatureType then
@@ -518,8 +553,8 @@ local function BuildRichBody(data)
                     typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
                 end
                 -- Inline creature-type icon (18px) before the label
-                local ctIcon = CREATURE_TYPE_ICON[data.creatureType] or "inv_misc_questionmark"
-                lines[#lines + 1] = "{p}{icon:" .. ctIcon .. ":18}  Type: " .. typeStr .. "{/p}"
+                local ctIcon = CREATURE_TYPE_ICON[data.creatureTypeKey or ""] or "inv_misc_questionmark"
+                lines[#lines + 1] = "{p}{icon:" .. ctIcon .. ":18}  " .. string.format(L["TGT_LINE_TYPE"], typeStr) .. "{/p}"
             end
 
             if data.faction then
@@ -530,26 +565,27 @@ local function BuildRichBody(data)
                 elseif data.faction == "Horde" then
                     factionIcon = "ui_hordeicon"
                 end
-                lines[#lines + 1] = "{p}{icon:" .. factionIcon .. ":18}  Faction: " .. data.faction .. "{/p}"
+                lines[#lines + 1] = "{p}{icon:" .. factionIcon .. ":18}  " .. string.format(L["TGT_LINE_FACTION"], data.factionLabel or data.faction) .. "{/p}"
             end
 
             if data.maxHealth then
-                lines[#lines + 1] = "{p}{icon:inv_elemental_mote_life01:18}  Max Health: " .. FormatNumber(data.maxHealth) .. "{/p}"
+                lines[#lines + 1] = "{p}{icon:inv_elemental_mote_life01:18}  " .. string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth)) .. "{/p}"
             end
 
             if data.maxPower then
-                -- Power icon varies by type
+                -- Power icon varies by type (by index: the name is translated)
                 local powerIcon = "inv_misc_questionmark"
-                if data.powerName == "Mana" then
+                local pi = data.powerIdx
+                if pi == 0 then                    -- Mana
                     powerIcon = "inv_elemental_mote_mana"
-                elseif data.powerName == "Rage" or data.powerName == "Fury" then
+                elseif pi == 1 or pi == 17 then    -- Rage, Fury
                     powerIcon = "ability_racial_bloodrage"
-                elseif data.powerName == "Energy" or data.powerName == "Focus" then
+                elseif pi == 3 or pi == 2 then     -- Energy, Focus
                     powerIcon = "ability_druid_caster"
-                elseif data.powerName == "Runic Power" then
+                elseif pi == 6 then                -- Runic Power
                     powerIcon = "inv_sword_62"
                 end
-                lines[#lines + 1] = "{p}{icon:" .. powerIcon .. ":18}  " .. (data.powerName or "Power") .. ": " .. FormatNumber(data.maxPower) .. "{/p}"
+                lines[#lines + 1] = "{p}{icon:" .. powerIcon .. ":18}  " .. string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower)) .. "{/p}"
             end
 
             lines[#lines + 1] = ""
@@ -562,7 +598,7 @@ local function BuildRichBody(data)
             zoneStr = data.subZone .. ", " .. data.zone
         end
         if zoneStr and zoneStr ~= "" then
-            lines[#lines + 1] = "{h3}Encountered{/h3}"
+            lines[#lines + 1] = "{h3}" .. L["TGT_HDR_ENCOUNTERED"] .. "{/h3}"
             lines[#lines + 1] = ""
             lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. zoneStr .. "{/p}"
             lines[#lines + 1] = ""
@@ -573,7 +609,7 @@ local function BuildRichBody(data)
     -- Notes section: blank, for the player to fill in.
     -- A bare empty line is intentional — {p}{/p} produces an empty <P></P> in
     -- SimpleHTML which miscalculates document height and offsets the text cursor.
-    lines[#lines + 1] = "{h3}Notes{/h3}"
+    lines[#lines + 1] = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
     lines[#lines + 1] = ""
 
     return table.concat(lines, "\n")
@@ -662,10 +698,10 @@ local function CreateTargetNote(richMode, data)
     end
 
     -- Tags — "Target Note" is always added. All others are user-configurable.
-    local tags = { "Target Note" }
+    local tags = { L["TGT_TAG_TARGET"] }
     if data.isPlayer then
-        if TagEnabled("targetNoteTagFaction", true) and data.faction then
-            tags[#tags + 1] = data.faction
+        if TagEnabled("targetNoteTagFaction", true) and data.factionLabel then
+            tags[#tags + 1] = data.factionLabel
         end
         if TagEnabled("targetNoteTagZone", true) and data.zone and data.zone ~= "" then
             tags[#tags + 1] = data.zone
@@ -680,14 +716,14 @@ local function CreateTargetNote(richMode, data)
         if TagEnabled("targetNoteTagClassification", true) and data.classificationLabel then
             tags[#tags + 1] = data.classificationLabel
         end
-        if TagEnabled("targetNoteTagFaction", true) and data.faction then
-            tags[#tags + 1] = data.faction
+        if TagEnabled("targetNoteTagFaction", true) and data.factionLabel then
+            tags[#tags + 1] = data.factionLabel
         end
         if TagEnabled("targetNoteTagZone", true) and data.zone and data.zone ~= "" then
             tags[#tags + 1] = data.zone
         end
         if TagEnabled("targetNoteTagBoss", true) and data.isBoss then
-            tags[#tags + 1] = "Boss"
+            tags[#tags + 1] = L["TGT_TAG_BOSS"]
         end
     end
 

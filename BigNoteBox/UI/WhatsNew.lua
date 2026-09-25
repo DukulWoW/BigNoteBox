@@ -75,15 +75,16 @@ local GLOW_PAD_RIGHT  = 2
 local GLOW_PAD_TOP    = 6
 local GLOW_PAD_BOTTOM = 5
 
-local function StartGlow(f)
+local function StartGlow(f, key)
+    key = key or GLOW_KEY
     if not f then return end
     if not LCG then
         LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
     end
     if LCG then
-        pcall(LCG.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, GLOW_KEY)
+        pcall(LCG.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, key)
         if BNB.IsForever then
-            local g = f["_AutoCastGlow" .. GLOW_KEY]
+            local g = f["_AutoCastGlow" .. key]
             if g then
                 local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
                 g:ClearAllPoints()
@@ -91,15 +92,19 @@ local function StartGlow(f)
                 g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
             end
         else
-            BNB.NudgeRetailGlow(f, GLOW_KEY)   -- RET-04
+            BNB.NudgeRetailGlow(f, key)   -- RET-04
         end
     end
 end
 
-local function StopGlow(f)
+local function StopGlow(f, key)
     if not f or not LCG then return end
-    pcall(LCG.AutoCastGlow_Stop, f, GLOW_KEY)
+    pcall(LCG.AutoCastGlow_Stop, f, key or GLOW_KEY)
 end
+
+-- The What's New glow for other windows (Report a bug, ALL-73); give each its own key
+BNB.StartWindowGlow = StartGlow
+BNB.StopWindowGlow  = StopGlow
 
 -- ── Overlay ───────────────────────────────────────────────────────────────────
 local function _overlayColor()

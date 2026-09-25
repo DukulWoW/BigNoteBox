@@ -5,6 +5,104 @@ local BNB = BigNoteBox
 local L = BNB.L
 
 --------------------------------------------------------------------------------
+-- WoW: Forever beta notice (FOR-10). Blizzard fixed the SavedVariables loader on
+-- 2026-09-25, so this is now a "still in development, keep backups" note with a
+-- "Don't show this again" box (BigNoteBoxDB.foreverNoticeHidden). Its own window
+-- rather than a StaticPopup, so the button is the new SharedButtonTemplate one.
+--------------------------------------------------------------------------------
+local _foreverNotice
+
+-- Forever only, until "Don't show this again" is ticked, and never while the setup
+-- wizard is still to be done: its Finish reloads (so the next login shows it) and
+-- its Quit calls this directly (UI/SetupWizard.lua BNB_QUIT_SETUP).
+function BNB.ShowForeverNoticeIfDue()
+    local db = BigNoteBoxDB
+    if not BNB.IsForever or not db then return end
+    if db.foreverNoticeHidden or db.setupComplete ~= true then return end
+    pcall(BNB.ShowForeverNotice)
+end
+function BNB.ShowForeverNotice()
+    local f = _foreverNotice
+    if not f then
+        local W, PAD = 400, 20
+        f = CreateFrame("Frame", "BNBForeverNoticeFrame", UIParent, "ButtonFrameTemplate")
+        f:SetWidth(W)
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+        f:SetFrameStrata("DIALOG")
+        f:SetToplevel(true)
+        f:SetClampedToScreen(true)
+        f:EnableMouse(true)
+        f:SetMovable(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", f.StartMoving)
+        f:SetScript("OnDragStop", f.StopMovingOrSizing)
+        ButtonFrameTemplate_HidePortrait(f)
+        ButtonFrameTemplate_HideButtonBar(f)
+        if f.Inset then f.Inset:Hide() end
+        BNB.SeatChrome(f)
+        BNB.AddForeverGlow(f, f.Bg)
+        f:SetTitle(L["FOREVER_NOTICE_TITLE"])
+        tinsert(UISpecialFrames, "BNBForeverNoticeFrame")
+
+        local body = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -40)
+        body:SetWidth(W - PAD * 2)
+        body:SetJustifyH("LEFT")
+        body:SetSpacing(2)
+        body:SetText(L["FOREVER_TEST_NOTICE"])
+
+        local ok = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
+        ok:SetSize(120, 26)
+        ok:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
+        ok:SetText(L["OK"])
+        ok:SetScript("OnClick", function() f:Hide() end)
+
+        -- Report-a-bug links (ALL-73), under the text
+        local bugs = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        bugs:SetPoint("TOPLEFT", body, "BOTTOMLEFT", 0, -16)
+        bugs:SetWidth(W - PAD * 2)
+        bugs:SetJustifyH("LEFT")
+        bugs:SetText(L["FOREVER_NOTICE_BUGS"])
+        local links = BNB.CreateBugLinkButtons(f, W - PAD * 2)
+        links:SetPoint("TOPLEFT", bugs, "BOTTOMLEFT", 0, -8)
+
+        -- Checkbox + label, centred as a group above the OK button
+        local row = CreateFrame("Frame", nil, f)
+        row:SetHeight(24)
+        row:SetPoint("BOTTOM", ok, "TOP", 0, 8)
+        local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        cb:SetSize(24, 24)
+        cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+        local cbLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        cbLabel:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        cbLabel:SetText(L["FOREVER_NOTICE_DONT_SHOW"])
+        row:SetWidth(24 + 2 + cbLabel:GetStringWidth())
+        -- Label clicks toggle the box too
+        local hit = CreateFrame("Button", nil, f)
+        hit:SetPoint("TOPLEFT", cbLabel, "TOPLEFT", -2, 4)
+        hit:SetPoint("BOTTOMRIGHT", cbLabel, "BOTTOMRIGHT", 2, -4)
+        hit:SetScript("OnClick", function() cb:Click() end)
+
+        -- The box is saved on close (OK, X or Escape), not on each click
+        f:SetScript("OnHide", function()
+            if BigNoteBoxDB then
+                BigNoteBoxDB.foreverNoticeHidden = cb:GetChecked() and true or nil
+            end
+        end)
+        -- Height from the wrapped text: title bar, body, bug line + links, checkbox
+        -- row, button row. Set here, not in OnShow: the frame is created shown, so
+        -- OnShow never fired and the template's default size stayed.
+        f:SetHeight(40 + body:GetStringHeight() + 16 + bugs:GetStringHeight() + 8
+            + BNB.BUG_LINKS_H + 16 + 24 + 8 + 26 + 16)
+        f._cb = cb
+        _foreverNotice = f
+    end
+    f._cb:SetChecked(false)
+    f:Show()
+    f:Raise()
+end
+
+--------------------------------------------------------------------------------
 -- EVENT BUS
 -- Modules register callbacks via BNB.RegisterEvent(event, callback).
 -- All events funnel through a single frame.
@@ -85,18 +183,7 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
     end)
     C_Timer.After(0.5, function()
         if BNB.Initialize then BNB.Initialize() end
-        -- Forever beta: the client never loads SavedVariables, so nothing BNB saves
-        -- survives a relog (FOR-10). Shown every login, since a "seen" flag could not
-        -- persist either. Remove once Blizzard fixes the loader.
-        if BNB.IsForever then
-            if not StaticPopupDialogs["BNB_FOREVER_NOTICE"] then
-                StaticPopupDialogs["BNB_FOREVER_NOTICE"] = {
-                    text = L["FOREVER_TEST_NOTICE"], button1 = L["OK"],
-                    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-                }
-            end
-            StaticPopup_Show("BNB_FOREVER_NOTICE")
-        end
+        BNB.ShowForeverNoticeIfDue()
         -- Show What's New popup if the user has updated since they last saw it.
         -- Suppressed during first-time setup so the wizard isn't interrupted.
         C_Timer.After(0.5, function()

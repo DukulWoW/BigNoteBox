@@ -22,7 +22,7 @@
 --   /bnb chromeprobe       dump the template layout, to compare clients
 --   /bnb chrome l t r b    re-seat every window live with a trial delta
 --   /bnb chrome reset      back to the built-in delta
--- Live, not saved: Forever does not keep SavedVariables yet (FOR-10).
+-- Live, not saved.
 --------------------------------------------------------------------------------
 
 local BNB = BigNoteBox

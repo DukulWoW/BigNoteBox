@@ -105,12 +105,25 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "|cffaaaaaa您现有的笔记很安全，一旦 BigNoteBoxDB 激活就会重新出现。|r"
 
 -- ── WoW: Forever testing notice (FOR-10) ────────────────────────────
+L["FOREVER_NOTICE_TITLE"] = "WoW: Forever 中的 BigNoteBox"
 L["FOREVER_TEST_NOTICE"] =
-    "|cff66bb6aBigNoteBox 在 WoW: Forever 上|r\n\n" ..
-    "此版本仅供测试，BigNoteBox 正在为 Forever 做好准备。\n\n" ..
-    "暴雪方面的一个错误目前导致 Forever 测试版无法加载插件保存的数据，" ..
-    "因此每次登出或重载时，你的笔记和设置都会丢失。" ..
-    "在暴雪修复此问题之前，BigNoteBox 将无法按预期运行。"
+    "BigNoteBox 仍在为 WoW: Forever 开发中。\n\n" ..
+    "在 Forever 上线之前，我们无法保证你的备注不会突然消失。\n\n" ..
+    "记得时不时备份：设置 > 备份 > 导出备注。"
+L["FOREVER_NOTICE_DONT_SHOW"] = "不再显示"
+L["FOREVER_NOTICE_BUGS"] = "发现了 bug？如果可以，请在 GitHub 上报告："
+
+-- ── Report a bug (ALL-73) ──────────────────────────────────────────────────
+L["BUG_BTN_TIP"]    = "报告 bug"
+L["BUG_TITLE"]      = "报告 Bug"
+L["BUG_BODY"]       =
+    "发现了 bug？感谢你提交报告！\n\n" ..
+    "|cff66bb6a如果可以，请使用 GitHub。|r Bug 会在那里得到跟踪和修复，" ..
+    "你也可以跟进报告，直到修复正式发布。\n\n" ..
+    "没有 GitHub 账号？请改在 CurseForge、Wago 或 WoWInterface 上留言。\n\n" ..
+    "|cffaaaaaa请告诉我们你做了什么、发生了什么，并粘贴任何 Lua 错误文本。|r"
+L["BUG_BTN_GITHUB"] = "GitHub（首选）"
+L["BUG_LINK_TIP"]   = "点击复制链接。"
 
 -- ── Trash window ──────────────────────────────────────────────────────────────
 L["TW_TIME_UNKNOWN"]       = "未知"
@@ -1797,6 +1810,43 @@ L["TGT_CREATE_TITLE"]               = "创建目标笔记"
 L["TGT_CANNOT_INSPECT"]             = "无法查看该玩家——对方是否在可查看范围内？"
 L["TGT_MENU_OPEN"]                  = "打开 BNB 笔记"
 L["TGT_MENU_CREATE"]                = "创建 BNB 笔记"
+L["TGT_LEVEL_FMT"]                  = "等级 %s %s %s"
+L["TGT_LEVEL_NPC_FMT"]              = "等级 %s"
+L["TGT_LINE_FACTION"]               = "阵营：%s"
+L["TGT_LINE_REACTION"]              = "反应：%s"
+L["TGT_LINE_TYPE"]                  = "类型：%s"
+L["TGT_LINE_MAX_HEALTH"]            = "最大生命值：%s"
+L["TGT_LINE_STAT_FMT"]              = "%s：%s"
+L["TGT_LINE_ENCOUNTERED"]           = "遭遇地点：%s"
+L["TGT_HDR_COLON_FMT"]              = "%s："
+L["TGT_HDR_DETAILS"]                = "详情"
+L["TGT_HDR_ENCOUNTERED"]            = "遭遇地点"
+L["TGT_HDR_NOTES"]                  = "备注"
+L["TGT_POWER"]                      = "能量"
+L["TGT_TAG_TARGET"]                 = "目标备注"
+L["TGT_TAG_BOSS"]                   = "首领"
+L["TGT_CLASS_ELITE"]                = "精英"
+L["TGT_CLASS_RAREELITE"]            = "稀有精英"
+L["TGT_CLASS_RARE"]                 = "稀有"
+L["TGT_CLASS_WORLDBOSS"]            = "世界首领"
+L["TGT_CLASS_TRIVIAL"]              = "低等级"
+L["INSPECT_LINE_GUILD"]             = "公会：<%s>"
+L["INSPECT_LINE_GUILD_RANK"]        = "公会：<%s>（%s）"
+L["INSPECT_LINE_GUILD_MEMBER"]      = "<%s>公会成员"
+L["INSPECT_LINE_GUILD_MEMBER_RANK"] = "<%s>公会成员（%s）"
+L["INSPECT_LINE_ILVL"]              = "物品等级：%s"
+L["INSPECT_LINE_ACHIEVE"]           = "成就点数：%s"
+L["INSPECT_LINE_HK"]                = "荣誉击杀：%s"
+L["INSPECT_HDR_STATS"]              = "属性"
+L["INSPECT_HDR_EQUIPMENT"]          = "装备"
+L["INSPECT_ITEM_FMT"]               = "物品 %s"
+L["INSPECT_DUP_FMT"]                = "%s（重复）"
+L["INSPECT_DUP_N_FMT"]              = "%s（重复 %s）"
+L["INSPECT_TAG"]                    = "已检查"
+L["INSPECT_TIP_WAITING"]            = "正在等待检查数据..."
+L["INSPECT_TIP_EXISTS"]             = "%s 已有备注。"
+L["INSPECT_TIP_DUPE"]               = "点击查看或创建重复项。"
+L["INSPECT_TIP_FROM"]               = "来自该玩家的检查数据。"
 L["ADV_REMOVE_TAGS_CONFIRM"]        = "这将移除此笔记中的所有格式标签。此操作无法撤销。\n\n继续吗？"
 L["ADV_REMOVE_TAGS_BTN"]            = "移除标签"
 L["QN_CONFIRM_TEXT"]                = "创建笔记 - 如有需要，请编辑标题："

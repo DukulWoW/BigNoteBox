@@ -124,12 +124,25 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "|cffaaaaaaYour existing notes are safe and will reappear once BigNoteBoxDB is active.|r"
 
 -- ── WoW: Forever testing notice (FOR-10) ────────────────────────────────────
+L["FOREVER_NOTICE_TITLE"] = "BigNoteBox on WoW: Forever"
 L["FOREVER_TEST_NOTICE"] =
-    "|cff66bb6aBigNoteBox on WoW: Forever|r\n\n" ..
-    "This version is for testing only, while BigNoteBox is being made ready for Forever.\n\n" ..
-    "A bug on Blizzard's end currently stops the Forever beta from loading addon saved data, " ..
-    "so your notes and settings are lost every time you log out or reload. " ..
-    "BigNoteBox will not work as intended until Blizzard fixes it."
+    "BigNoteBox is still being developed for WoW: Forever.\n\n" ..
+    "Until Forever launches, we cannot guarantee that your notes will not suddenly disappear.\n\n" ..
+    "Remember to take a backup now and then: Settings > Backup > Export Notes."
+L["FOREVER_NOTICE_DONT_SHOW"] = "Don't show this again"
+L["FOREVER_NOTICE_BUGS"] = "Found a bug? Please report it, on GitHub if you can:"
+
+-- ── Report a bug (ALL-73) ──────────────────────────────────────────────────
+L["BUG_BTN_TIP"]    = "Report a bug"
+L["BUG_TITLE"]      = "Report a Bug"
+L["BUG_BODY"]       =
+    "Found a bug? Thank you for reporting it!\n\n" ..
+    "|cff66bb6aPlease use GitHub if you can.|r It is where bugs are tracked and fixed, " ..
+    "and you can follow your report until the fix ships.\n\n" ..
+    "No GitHub account? Leave a comment on CurseForge, Wago or WoWInterface instead.\n\n" ..
+    "|cffaaaaaaTell us what you did, what happened, and paste any Lua error text.|r"
+L["BUG_BTN_GITHUB"] = "GitHub (preferred)"
+L["BUG_LINK_TIP"]   = "Click to copy the link."
 
 -- ── Trash window ──────────────────────────────────────────────────────────────
 L["TW_TIME_UNKNOWN"]       = "Unknown"
@@ -1830,6 +1843,45 @@ L["TGT_CREATE_TITLE"]               = "Create Target Note"
 L["TGT_CANNOT_INSPECT"]             = "Cannot inspect this player - are they in range?"
 L["TGT_MENU_OPEN"]                  = "Open BNB Note"
 L["TGT_MENU_CREATE"]                = "Create BNB Note"
+
+-- Player / NPC note content and tags (ALL-72)
+L["TGT_LEVEL_FMT"]                  = "Level %s %s %s"
+L["TGT_LEVEL_NPC_FMT"]              = "Level %s"
+L["TGT_LINE_FACTION"]               = "Faction: %s"
+L["TGT_LINE_REACTION"]              = "Reaction: %s"
+L["TGT_LINE_TYPE"]                  = "Type: %s"
+L["TGT_LINE_MAX_HEALTH"]            = "Max Health: %s"
+L["TGT_LINE_STAT_FMT"]              = "%s: %s"
+L["TGT_LINE_ENCOUNTERED"]           = "Encountered in: %s"
+L["TGT_HDR_COLON_FMT"]              = "%s:"
+L["TGT_HDR_DETAILS"]                = "Details"
+L["TGT_HDR_ENCOUNTERED"]            = "Encountered"
+L["TGT_HDR_NOTES"]                  = "Notes"
+L["TGT_POWER"]                      = "Power"
+L["TGT_TAG_TARGET"]                 = "Target Note"
+L["TGT_TAG_BOSS"]                   = "Boss"
+L["TGT_CLASS_ELITE"]                = "Elite"
+L["TGT_CLASS_RAREELITE"]            = "Rare Elite"
+L["TGT_CLASS_RARE"]                 = "Rare"
+L["TGT_CLASS_WORLDBOSS"]            = "World Boss"
+L["TGT_CLASS_TRIVIAL"]              = "Trivial"
+L["INSPECT_LINE_GUILD"]             = "Guild: <%s>"
+L["INSPECT_LINE_GUILD_RANK"]        = "Guild: <%s> (%s)"
+L["INSPECT_LINE_GUILD_MEMBER"]      = "Guild member of <%s>"
+L["INSPECT_LINE_GUILD_MEMBER_RANK"] = "Guild member of <%s> (%s)"
+L["INSPECT_LINE_ILVL"]              = "Item Level: %s"
+L["INSPECT_LINE_ACHIEVE"]           = "Achievement Points: %s"
+L["INSPECT_LINE_HK"]                = "Honor Kills: %s"
+L["INSPECT_HDR_STATS"]              = "Stats"
+L["INSPECT_HDR_EQUIPMENT"]          = "Equipment"
+L["INSPECT_ITEM_FMT"]               = "Item %s"
+L["INSPECT_DUP_FMT"]                = "%s (Duplicate)"
+L["INSPECT_DUP_N_FMT"]              = "%s (Duplicate %s)"
+L["INSPECT_TAG"]                    = "Inspected"
+L["INSPECT_TIP_WAITING"]            = "Waiting for inspect data..."
+L["INSPECT_TIP_EXISTS"]             = "A note already exists for %s."
+L["INSPECT_TIP_DUPE"]               = "Click to view or create a duplicate."
+L["INSPECT_TIP_FROM"]               = "from this player's inspect data."
 L["ADV_REMOVE_TAGS_CONFIRM"]        = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?"
 L["ADV_REMOVE_TAGS_BTN"]            = "Remove tags"
 L["QN_CONFIRM_TEXT"]                = "Create note - edit title if needed:"
