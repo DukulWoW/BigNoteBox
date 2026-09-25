@@ -194,18 +194,7 @@ local function Hdr(parent, y, text)
     return y - 20
 end
 local function Rule(parent, y)
-    local t = parent:CreateTexture(nil, "ARTWORK")
-    t:SetHeight(1)
-    t:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, y)
-    t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        t:SetColorTexture(br, bg_, bb, 0.9)
-        BNB.RegisterSkinRule(t, 0.9)
-    else
-        t:SetColorTexture(0.25, 0.25, 0.28, 1)
-    end
+    BNB.CreateRule(parent, y)
     return y - 10
 end
 local function Check(parent, y, text, getter, setter, tip)
@@ -289,19 +278,8 @@ local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
     return c
 end
 
--- ── Color picker ──────────────────────────────────────────────────────────────
-local function OpenColorPicker(r, g, b, onDone)
-    if ColorPickerFrame.SetupColorPickerAndShow then
-        ColorPickerFrame:SetupColorPickerAndShow({
-            swatchFunc = function() local nr,ng,nb=ColorPickerFrame:GetColorRGB(); onDone(nr,ng,nb) end,
-            cancelFunc = function() end, hasOpacity=false, r=r, g=g, b=b })
-    else
-        ColorPickerFrame.func       = function() local nr,ng,nb=ColorPickerFrame:GetColorRGB(); onDone(nr,ng,nb) end
-        ColorPickerFrame.cancelFunc = function() end
-        ColorPickerFrame.hasOpacity = false
-        ColorPickerFrame:SetColorRGB(r,g,b); ShowUIPanel(ColorPickerFrame)
-    end
-end
+-- ── Color picker ── BNB.OpenColorPicker (UI/Widgets.lua)
+local OpenColorPicker = BNB.OpenColorPicker
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL

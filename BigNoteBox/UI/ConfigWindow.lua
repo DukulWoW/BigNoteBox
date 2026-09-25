@@ -60,47 +60,10 @@ local tabContent   = {}   -- content frames (scroll children)
 -- tab bar) for ButtonFrameTemplate. Skin mode passes its own smaller value.
 local function MakeScrollPanel(parent, topOffset)
     topOffset = topOffset or (TITLE_H + TAB_BAR_H)
-    local sf  = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
-    local bar = sf.ScrollBar
-    if bar then bar:SetAlpha(0) end
-
+    local sf, ct = BNB.CreateAutoScrollPanel(parent, CONTENT_W, CONTENT_W2)
     -- Always leave 24px on the right for the scrollbar track.
     sf:SetPoint("TOPLEFT",     parent, "TOPLEFT",      PAD,  -topOffset)
     sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -24,   4)
-
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(CONTENT_W)
-    ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    -- Stored content height so we can re-evaluate on resize / show
-    local _contentH = 0
-
-    local function ApplyScrollbar()
-        local sfH = sf:GetHeight()
-        -- GetHeight() returns 0 before the frame is laid out; skip until ready
-        if sfH < 4 then return end
-        ct:SetHeight(math.max(_contentH, sfH))
-        if _contentH <= sfH + 2 then
-            if bar then bar:SetAlpha(0) end
-            ct:SetWidth(CONTENT_W2)
-        else
-            if bar then bar:SetAlpha(1) end
-            ct:SetWidth(CONTENT_W)
-        end
-    end
-
-    -- Re-evaluate whenever the scroll frame is resized (window resize / height sync)
-    sf:SetScript("OnSizeChanged", function() ApplyScrollbar() end)
-    -- Re-evaluate when shown (first open, tab switch)
-    sf:HookScript("OnShow", function() C_Timer.After(0.05, ApplyScrollbar) end)
-
-    function sf:FinaliseHeight(contentH)
-        _contentH = contentH
-        -- Defer one frame so the scroll frame has been laid out and GetHeight() is valid
-        C_Timer.After(0.05, ApplyScrollbar)
-    end
-
     sf:Hide()
     return sf, ct
 end

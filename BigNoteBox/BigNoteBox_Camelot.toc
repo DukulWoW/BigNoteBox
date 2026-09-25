@@ -62,6 +62,7 @@ UI\Sidebar.lua
 UI\HistoryWindow.lua
 UI\NoteHistoryPanel.lua
 UI\HistoryCompareWindow.lua
+UI\ToolWindow.lua
 UI\AlarmWindow.lua
 UI\TaskEditWindow.lua
 UI\AlarmOverview.lua

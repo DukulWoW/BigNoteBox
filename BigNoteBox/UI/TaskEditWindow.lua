@@ -20,8 +20,7 @@ local TW_W       = 264
 local TW_H       = 340
 local TW_PAD     = 12
 local TW_CW      = 224   -- content width  (TW_W - 2*TW_PAD - scrollbar pad)
-local TW_TOP_Y   = 32    -- below title bar (ButtonFrameTemplate)
-local SK_TITLE_H = 28    -- skin title bar height
+local TW_TOP_Y   = 32    -- below title bar (ButtonFrameTemplate, and the 28px skin strip + 4)
 local TW_FOOT_H  = 38    -- static footer height (Save / Cancel)
 local TW_ROW     = 22
 local TW_GAP     = 8
@@ -52,90 +51,18 @@ local _pendingText = ""  -- backing store for task text label/editbox
 -- ---------------------------------------------------------------------------
 -- HELPERS
 -- ---------------------------------------------------------------------------
-local function HasWowStyle1()
-    return C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") ~= nil
-end
-
 local function MarkDirty()
     if _isPopulating then return end
     _isDirty = true
     if _saveBtn then _saveBtn:SetEnabled(true) end
 end
 
--- Local MakeDD mirroring AlarmWindow pattern
+-- Layout adapters over the shared pieces in UI/Widgets.lua (ALL-65.8)
 local function MakeDD(parent, entries, initial, onChange, width)
-    width = width or TW_CW
-    local c = CreateFrame("Frame", nil, parent)
-    c:SetSize(width, TW_ROW)
-
-    if HasWowStyle1() then
-        local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-        dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(TW_ROW)
-        dd:SetPoint("TOPLEFT")
-        dd._selected = initial
-        dd:SetupMenu(function(_, root)
-            for _, e in ipairs(entries) do
-                local ev = e.value
-                root:CreateRadio(e.label,
-                    function() return dd._selected == ev end,
-                    function()
-                        dd._selected = ev; dd:SetText(e.label)
-                        MarkDirty()
-                        if onChange then onChange(ev) end
-                    end)
-            end
-        end)
-        for _, e in ipairs(entries) do
-            if e.value == initial then dd:SetText(e.label); break end
-        end
-        function c:SetSelected(v)
-            dd._selected = v
-            for _, e in ipairs(entries) do
-                if e.value == v then dd:SetText(e.label); return end
-            end
-            dd:SetText("")
-        end
-        function c:GetSelected() return dd._selected end
-        c._dd = dd
-    else
-        local idx = 1
-        for i, e in ipairs(entries) do if e.value == initial then idx = i; break end end
-        local btn = BNB.CreateBackdropFrame("Button", nil, c)
-        btn:SetSize(width, TW_ROW); btn:SetPoint("TOPLEFT")
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetAllPoints(); lbl:SetJustifyH("CENTER")
-        local function Rf() lbl:SetText(entries[idx] and entries[idx].label or "") end; Rf()
-        btn:SetScript("OnClick", function()
-            idx = (idx % #entries) + 1; Rf(); MarkDirty()
-            if onChange then onChange(entries[idx].value) end
-        end)
-        function c:SetSelected(v)
-            for i, e in ipairs(entries) do if e.value == v then idx = i; Rf(); return end end
-        end
-        function c:GetSelected() return entries[idx] and entries[idx].value end
-    end
-    return c
+    return BNB.CreateValueDropdown(parent, entries, initial, onChange, width or TW_CW, TW_ROW, MarkDirty)
 end
-
--- Yellow section header
-local function SectionHdr(parent, text, y)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    l:SetWidth(TW_CW); l:SetJustifyH("LEFT")
-    l:SetText(text)
-    l:SetTextColor(1, 0.82, 0.0, 1)
-    return l
-end
-
--- Small grey label
-local function SmallLbl(parent, text, y)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    l:SetWidth(TW_CW); l:SetJustifyH("LEFT")
-    l:SetText(text); l:SetTextColor(0.68, 0.68, 0.68, 1)
-    return l
-end
+local function SectionHdr(parent, text, y) return BNB.CreateSectionHeader(parent, text, y, TW_CW) end
+local function SmallLbl(parent, text, y)   return BNB.CreateSmallLabel(parent, text, y, TW_CW) end
 
 -- ---------------------------------------------------------------------------
 -- SITUATION helpers
@@ -455,174 +382,34 @@ local function BuildContent(f, ct, saveBtn)
 end
 
 -- ---------------------------------------------------------------------------
--- BUILD WINDOW -- normal (ButtonFrameTemplate)
+-- BUILD WINDOW -- chrome from BNB.CreateToolWindow (UI/ToolWindow.lua),
+-- ButtonFrameTemplate or skin frame
 -- ---------------------------------------------------------------------------
 local function BuildWindow()
     if _frame then return _frame end
 
-    local f = CreateFrame("Frame", "BNBTaskEditWindow", UIParent, "ButtonFrameTemplate")
-    f:SetSize(TW_W, TW_H)
-    f:SetFrameStrata("DIALOG")
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f:SetAlpha(0.95)
-    f:SetTitle(L["TEW_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() TW.Close() end)
-    end
-    f:HookScript("OnHide", function()
-        _noteID = nil; _taskID = nil; _isDirty = false; _isPopulating = false
-    end)
-
-    -- Footer divider
-    local footerDiv = f:CreateTexture(nil, "ARTWORK")
-    footerDiv:SetHeight(1)
-    footerDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  TW_PAD, TW_FOOT_H)
-    footerDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -TW_PAD, TW_FOOT_H)
-    footerDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
-
-    -- Buttons
-    local bW = math.floor(TW_CW / 2) - 4
-    local saveBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
-    saveBtn:SetSize(bW, 26); saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD, 6)
-    saveBtn:SetText(L["SAVE"]); saveBtn:SetEnabled(false)
-    _saveBtn = saveBtn
-
-    local cancelBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
-    cancelBtn:SetSize(bW, 26)
-    cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD + bW + 8, 6)
-    cancelBtn:SetText(L["CANCEL"])
-    cancelBtn:SetScript("OnClick", function() TW.Close() end)
-
-    -- Scroll panel
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    if sf.ScrollBar then sf.ScrollBar:SetAlpha(0) end
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     TW_PAD, -TW_TOP_Y)
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24,     TW_FOOT_H + 6)
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(TW_CW); ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    local function ApplyScroll()
-        local sfH = sf:GetHeight(); if sfH < 4 then return end
-        local ctH = ct._contentH or 1
-        ct:SetHeight(math.max(ctH, sfH))
-        local bar = sf.ScrollBar
-        if ctH <= sfH + 2 then
-            if bar then bar:SetAlpha(0) end; ct:SetWidth(TW_CW + 20)
-        else
-            if bar then bar:SetAlpha(1) end; ct:SetWidth(TW_CW)
-        end
-    end
-    sf:SetScript("OnSizeChanged", ApplyScroll)
-    sf:HookScript("OnShow", function() C_Timer.After(0.05, ApplyScroll) end)
-
-    -- Content
-    BuildContent(f, ct, saveBtn)
-    f._ct = ct
-
-    f:Hide()
-    -- ESC handled by MainWindow.lua OnKeyDown
-    _frame = f
-    return f
-end
-
--- ---------------------------------------------------------------------------
--- BUILD WINDOW -- skin mode
--- ---------------------------------------------------------------------------
-local function BuildWindowSkin()
-    if _frame then return _frame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBTaskEditWindow", false)
-    _G["BNBTaskEditWindow"] = f
-    f:SetSize(TW_W, TW_H)
-    f:SetFrameStrata("DIALOG")
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetAlpha(0.95)
-
-    f:HookScript("OnHide", function()
-        _noteID = nil; _taskID = nil; _isDirty = false; _isPopulating = false
-    end)
-
-    -- Title bar
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["TEW_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() TW.Close() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- Footer
-    local footerHost = CreateFrame("Frame", nil, f)
-    footerHost:SetHeight(1)
-    footerHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  TW_PAD, TW_FOOT_H)
-    footerHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -TW_PAD, TW_FOOT_H)
-    local footerDiv = BNB.CreateDivider(footerHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
-    footerDiv:SetPoint("TOPLEFT",  footerHost, "TOPLEFT",  0, 0)
-    footerDiv:SetPoint("TOPRIGHT", footerHost, "TOPRIGHT", 0, 0)
-
-    -- Buttons
-    local bW = math.floor(TW_CW / 2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
-    saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD, 6)
+    local f, saveBtn, cancelBtn = BNB.CreateToolWindow({
+        name = "BNBTaskEditWindow", w = TW_W, h = TW_H, title = L["TEW_TITLE"],
+        pad = TW_PAD, cw = TW_CW, footH = TW_FOOT_H,
+        btn1 = L["SAVE"], btn2 = L["CANCEL"],
+        onClose = function() TW.Close() end,
+        onHide  = function()
+            _noteID = nil; _taskID = nil; _isDirty = false; _isPopulating = false
+        end,
+    })
     saveBtn:SetEnabled(false)
     _saveBtn = saveBtn
-
-    local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], bW, 26)
-    cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", TW_PAD + bW + 8, 6)
     cancelBtn:SetScript("OnClick", function() TW.Close() end)
 
     -- Scroll panel
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    local bar = sf.ScrollBar; if bar then bar:SetAlpha(0) end
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     TW_PAD, -(SK_TITLE_H + 4))
+    local sf, ct = BNB.CreateAutoScrollPanel(f, TW_CW, TW_CW + 20)
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     TW_PAD, -TW_TOP_Y)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24,     TW_FOOT_H + 6)
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(TW_CW); ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    local function ApplyScroll()
-        local sfH = sf:GetHeight(); if sfH < 4 then return end
-        local ctH = ct._contentH or 1
-        ct:SetHeight(math.max(ctH, sfH))
-        if ctH <= sfH + 2 then
-            if bar then bar:SetAlpha(0) end; ct:SetWidth(TW_CW + 20)
-        else
-            if bar then bar:SetAlpha(1) end; ct:SetWidth(TW_CW)
-        end
-    end
-    sf:SetScript("OnSizeChanged", ApplyScroll)
-    sf:HookScript("OnShow", function() C_Timer.After(0.05, ApplyScroll) end)
 
     -- Content
     BuildContent(f, ct, saveBtn)
     f._ct = ct
 
-    f:HookScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    f:Hide()
     -- ESC handled by MainWindow.lua OnKeyDown
     _frame = f
     return f
@@ -763,87 +550,34 @@ end
 -- ---------------------------------------------------------------------------
 -- OPEN / CLOSE
 -- ---------------------------------------------------------------------------
-local function SetTitle(isGlobal)
-    if not _frame then return end
-    if isGlobal then
-        if _frame.SetTitle then _frame:SetTitle(L["TEW_TITLE_GLOBAL"])
-        elseif _frame._titleLbl then _frame._titleLbl:SetText(L["TEW_TITLE_GLOBAL"]) end
-    else
-        if _frame.SetTitle then _frame:SetTitle(L["TEW_TITLE"])
-        elseif _frame._titleLbl then _frame._titleLbl:SetText(L["TEW_TITLE"]) end
-    end
-end
-
+-- taskID nil = the note-level task defaults ("global")
 local function DoOpen(noteID, taskID, anchorFrame)
-    if not _frame then
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            BuildWindowSkin()
-        else
-            BuildWindow()
-        end
-    end
+    if not _frame then BuildWindow() end
     local f = _frame
 
     _noteID = noteID; _taskID = taskID
-    Populate(noteID, taskID)
-    SetTitle(false)
+    if taskID then
+        Populate(noteID, taskID)
+        f:SetWindowTitle(L["TEW_TITLE"])
+    else
+        PopulateGlobal(noteID)
+        f:SetWindowTitle(L["TEW_TITLE_GLOBAL"])
+    end
     f:Show(); f:Raise()
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.ApplyMainWindowSkin then
         BNB.ApplyMainWindowSkin()
     end
-    return f
-end
-
-local function DoOpenGlobal(noteID, anchorFrame)
-    if not _frame then
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            BuildWindowSkin()
-        else
-            BuildWindow()
-        end
-    end
-    local f = _frame
-
-    _noteID = noteID; _taskID = nil
-    PopulateGlobal(noteID)
-    SetTitle(true)
-    f:Show(); f:Raise()
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.ApplyMainWindowSkin then
-        BNB.ApplyMainWindowSkin()
-    end
-    return f
+    BNB.PlaceBeside(f, anchorFrame, TW_W)
 end
 
 function TW.Open(noteID, taskID, anchorFrame)
     if not noteID or not taskID then return end
-    local f = DoOpen(noteID, taskID, anchorFrame)
-    f:ClearAllPoints()
-    if anchorFrame and anchorFrame.GetWidth then
-        local scrW = UIParent:GetWidth()
-        local cx   = anchorFrame:GetCenter()
-        local aw   = anchorFrame:GetWidth()
-        local right = ((cx or 0) + (aw or 0) / 2 + 8 + TW_W) <= scrW
-        if right then f:SetPoint("LEFT",  anchorFrame, "RIGHT",  8, 0)
-        else          f:SetPoint("RIGHT", anchorFrame, "LEFT",  -8, 0) end
-    else
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-    end
+    DoOpen(noteID, taskID, anchorFrame)
 end
 
 function TW.OpenGlobal(noteID, anchorFrame)
     if not noteID then return end
-    local f = DoOpenGlobal(noteID, anchorFrame)
-    f:ClearAllPoints()
-    if anchorFrame and anchorFrame.GetWidth then
-        local scrW = UIParent:GetWidth()
-        local cx   = anchorFrame:GetCenter()
-        local aw   = anchorFrame:GetWidth()
-        local right = ((cx or 0) + (aw or 0) / 2 + 8 + TW_W) <= scrW
-        if right then f:SetPoint("LEFT",  anchorFrame, "RIGHT",  8, 0)
-        else          f:SetPoint("RIGHT", anchorFrame, "LEFT",  -8, 0) end
-    else
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
-    end
+    DoOpen(noteID, nil, anchorFrame)
 end
 
 function TW.Close()

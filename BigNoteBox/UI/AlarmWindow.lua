@@ -66,11 +66,6 @@ local _saveBtn   -- ref so Populate can enable/disable it
 -- ---------------------------------------------------------------------------
 -- HELPERS
 -- ---------------------------------------------------------------------------
-local function HasWowStyle1()
-    return C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") ~= nil
-end
-
 -- Slider value helpers (used by BuildWindow and Populate)
 local function SetSliderVal(sl, v)
     if not sl then return end
@@ -85,92 +80,13 @@ local function MarkDirty()
     if _saveBtn then _saveBtn:SetEnabled(true) end
 end
 
--- Compact dropdown.
+-- Layout adapters over the shared pieces in UI/Widgets.lua (ALL-65.8)
 local function MakeDD(parent, entries, initial, onChange, width)
-    width = width or AW_CW
-    local c = CreateFrame("Frame", nil, parent)
-    c:SetSize(width, AW_ROW)
-
-    if HasWowStyle1() then
-        local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-        dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(AW_ROW)
-        dd:SetPoint("TOPLEFT")
-        dd._selected = initial
-        dd:SetupMenu(function(_, root)
-            for _, e in ipairs(entries) do
-                local ev = e.value
-                root:CreateRadio(e.label,
-                    function() return dd._selected == ev end,
-                    function()
-                        dd._selected = ev; dd:SetText(e.label)
-                        MarkDirty()
-                        if onChange then onChange(ev) end
-                    end)
-            end
-        end)
-        for _, e in ipairs(entries) do
-            if e.value == initial then dd:SetText(e.label); break end
-        end
-        function c:SetSelected(v)
-            dd._selected = v
-            for _, e in ipairs(entries) do
-                if e.value == v then dd:SetText(e.label); return end
-            end
-            dd:SetText("")
-        end
-        function c:GetSelected() return dd._selected end
-        c._dd = dd
-    else
-        local idx = 1
-        for i, e in ipairs(entries) do if e.value == initial then idx=i; break end end
-        local btn = BNB.CreateBackdropFrame("Button", nil, c)
-        btn:SetSize(width, AW_ROW); btn:SetPoint("TOPLEFT")
-        local lbl = btn:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        lbl:SetAllPoints(); lbl:SetJustifyH("CENTER")
-        local function Rf() lbl:SetText(entries[idx] and entries[idx].label or "") end; Rf()
-        btn:SetScript("OnClick", function()
-            idx = (idx % #entries)+1; Rf(); MarkDirty()
-            if onChange then onChange(entries[idx].value) end
-        end)
-        function c:SetSelected(v)
-            for i,e in ipairs(entries) do if e.value==v then idx=i; Rf(); return end end
-        end
-        function c:GetSelected() return entries[idx] and entries[idx].value end
-    end
-    return c
+    return BNB.CreateValueDropdown(parent, entries, initial, onChange, width or AW_CW, AW_ROW, MarkDirty)
 end
-
--- Yellow section header (matches NoteConfig/StickySettings style)
-local function SectionHdr(parent, text, y)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    l:SetWidth(AW_CW); l:SetJustifyH("LEFT")
-    l:SetText(text)
-    l:SetTextColor(1, 0.82, 0.0, 1)  -- gold / yellow
-    return l
-end
-
--- Small grey label
-local function Lbl(parent, text, y)
-    local l = parent:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    l:SetWidth(AW_CW); l:SetJustifyH("LEFT")
-    l:SetText(text); l:SetTextColor(0.68, 0.68, 0.68, 1)
-    return l
-end
-
-local function Div(parent, y)
-    local d = parent:CreateTexture(nil,"ARTWORK")
-    d:SetSize(AW_CW,1); d:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        d:SetColorTexture(br, bg_, bb, 0.9)
-        BNB.RegisterSkinRule(d, 0.9)
-    else
-        d:SetColorTexture(0.28, 0.28, 0.30, 1)
-    end
-end
+local function SectionHdr(parent, text, y) return BNB.CreateSectionHeader(parent, text, y, AW_CW) end
+local function Lbl(parent, text, y)        return BNB.CreateSmallLabel(parent, text, y, AW_CW) end
+local function Div(parent, y)              BNB.CreateRule(parent, y, AW_CW) end
 
 local SOUND_FILES = {
     sound01 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound01.ogg",
@@ -192,217 +108,100 @@ local function SoundPath(key)
 end
 
 -- ---------------------------------------------------------------------------
--- SCROLL PANEL FACTORY — shared by BuildWindow and BuildWindowSkin
+-- SCROLL PANEL FACTORY — one per tab
 -- ---------------------------------------------------------------------------
 local function MakeScrollPanel(f)
-    local sf = CreateFrame("ScrollFrame",nil,f,"ScrollFrameTemplate")
-    local bar = sf.ScrollBar; if bar then bar:SetAlpha(0) end
+    local sf, ct = BNB.CreateAutoScrollPanel(f, AW_CW, AW_CW + 20)
     sf:SetPoint("TOPLEFT",     f,"TOPLEFT",     AW_PAD, -AW_TAB_Y)
     sf:SetPoint("BOTTOMRIGHT", f,"BOTTOMRIGHT", -24, AW_FOOT_H + 6)
-    local ct = CreateFrame("Frame",nil,sf)
-    ct:SetWidth(AW_CW); ct:SetHeight(1); sf:SetScrollChild(ct)
-    local function Apply()
-        local sfH = sf:GetHeight(); if sfH<4 then return end
-        local ctH = ct._contentH or 1
-        ct:SetHeight(math.max(ctH,sfH))
-        if ctH <= sfH+2 then
-            if bar then bar:SetAlpha(0) end; ct:SetWidth(AW_CW+20)
-        else
-            if bar then bar:SetAlpha(1) end; ct:SetWidth(AW_CW)
-        end
-    end
-    sf:SetScript("OnSizeChanged",Apply)
-    sf:HookScript("OnShow",function() C_Timer.After(0.05,Apply) end)
     sf:Hide()
     return sf, ct
 end
 
 -- ---------------------------------------------------------------------------
--- BUILD (once)
+-- BUILD (once). Chrome from BNB.CreateToolWindow (UI/ToolWindow.lua) in
+-- either mode; the tab row differs per mode but both end at AW_TAB_Y (62px),
+-- so all tab content anchors are identical.
 -- ---------------------------------------------------------------------------
+local SK_AW_TITLE_H = 28   -- skin title bar strip height
+local SK_AW_TAB_GAP = 10   -- gap below tabs to reach AW_TAB_Y (62px total)
+
 local function BuildWindow()
     if _frame then return _frame end
 
-    local f = CreateFrame("Frame", "BNBAlarmWindow", UIParent, "ButtonFrameTemplate")
-    f:SetSize(AW_W, AW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving(); _stickyFrame = nil end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetAlpha(0.95)
-    f:SetTitle(L["AW_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() AW.Close() end)
-    end
-    f:HookScript("OnHide", function()
-        _noteID = nil; _stickyFrame = nil; _isDirty = false; _isPopulating = false
-    end)
-
-    -- ── STATIC FOOTER ────────────────────────────────────────────────────────
-    local footerDiv = f:CreateTexture(nil, "ARTWORK")
-    footerDiv:SetHeight(1)
-    footerDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  AW_PAD, AW_FOOT_H)
-    footerDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -AW_PAD, AW_FOOT_H)
-    footerDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
-
-    local bW = math.floor(AW_CW/2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
-    saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD, 6)
+    local f, saveBtn, delBtn = BNB.CreateToolWindow({
+        name = "BNBAlarmWindow", w = AW_W, h = AW_H, title = L["AW_TITLE"],
+        pad = AW_PAD, cw = AW_CW, footH = AW_FOOT_H,
+        btn1 = L["SAVE"], btn2 = L["AW_REMOVE_ALARM_BTN"],
+        toplevel = true, escClose = true,
+        onClose     = function() AW.Close() end,
+        onDragStart = function() _stickyFrame = nil end,   -- dragging detaches
+        onHide      = function()
+            _noteID = nil; _stickyFrame = nil; _isDirty = false; _isPopulating = false
+        end,
+    })
     saveBtn:SetEnabled(false)
-
-    local delBtn = BNB.CreateButton(nil, f, L["AW_REMOVE_ALARM_BTN"], bW, 26)
-    delBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD + bW + 8, 6)
     delBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
-
     _saveBtn = saveBtn
 
     -- ── TABS ─────────────────────────────────────────────────────────────────
-    local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-        and "PanelTopTabButtonTemplate" or "PanelTabButtonTemplate"
-
-    local tabBtns, tabPanels = {}, {}
-    local function SelectTab(idx)
-        for i = 1, 3 do
-            if tabBtns[i] then
-                if i==idx then PanelTemplates_SelectTab(tabBtns[i])
-                else            PanelTemplates_DeselectTab(tabBtns[i]) end
-            end
-            if tabPanels[i] then tabPanels[i]:SetShown(i==idx) end
-        end
-        f._activeTab = idx
-    end
-    f._selectTab = SelectTab
-
-    local lastBtn
-    for i, text in ipairs({L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}) do
-        local btn = CreateFrame("Button","BNBAlarmWindowTab"..i, f, tpl)
-        btn:SetText(text)
-        pcall(function()
-            if tpl=="PanelTopTabButtonTemplate" then
-                PanelTemplates_TabResize(btn,15,nil,70)
-            else
-                PanelTemplates_TabResize(btn,0)
-            end
-        end)
-        btn:SetID(i)
-        if lastBtn then btn:SetPoint("LEFT",lastBtn,"RIGHT",5,0)
-        else             btn:SetPoint("TOPLEFT",f,"TOPLEFT",7,-25) end
-        btn:SetScript("OnClick", function(self) SelectTab(self:GetID()) end)
-        tabBtns[i]=btn; lastBtn=btn
-    end
-    PanelTemplates_SetNumTabs(f,3); f.numTabs=3
-
-    local sf1,ct1 = MakeScrollPanel(f)
-    local sf2,ct2 = MakeScrollPanel(f)
-    local sf3,ct3 = MakeScrollPanel(f)
-    tabPanels[1]=sf1; tabPanels[2]=sf2; tabPanels[3]=sf3
-
-    f:Hide()
-    tinsert(UISpecialFrames, "BNBAlarmWindow")
-    _frame=f
-    return f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn, SelectTab
-end
-
--- ---------------------------------------------------------------------------
--- BUILD WINDOW  (SKIN VERSION)
--- Same chrome height as normal (62px total) so all tab content anchors are
--- identical. Uses SkinSystem API for backdrop frames.
--- ---------------------------------------------------------------------------
-local SK_AW_TITLE_H = 28   -- title bar strip height
-local SK_AW_TAB_GAP = 10   -- gap below tabs to reach AW_TAB_Y (62px total)
-
-local function BuildWindowSkin()
-    if _frame then return _frame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBAlarmWindow", false)
-    _G["BNBAlarmWindow"] = f
-    f:SetSize(AW_W, AW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving(); _stickyFrame = nil end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetAlpha(0.95)
-
-    f:HookScript("OnHide", function()
-        _noteID = nil; _stickyFrame = nil; _isDirty = false; _isPopulating = false
-    end)
-
-    -- Title bar strip
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_AW_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving(); _stickyFrame = nil end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["AW_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() AW.Close() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- ── FOOTER ────────────────────────────────────────────────────────────────
-    local footerHost = CreateFrame("Frame", nil, f)
-    footerHost:SetHeight(1)
-    footerHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  AW_PAD, AW_FOOT_H)
-    footerHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -AW_PAD, AW_FOOT_H)
-    local footerDiv = BNB.CreateDivider(footerHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
-    footerDiv:SetPoint("TOPLEFT",  footerHost, "TOPLEFT",  0, 0)
-    footerDiv:SetPoint("TOPRIGHT", footerHost, "TOPRIGHT", 0, 0)
-
-    local bW = math.floor(AW_CW/2) - 4
-    local saveBtn = BNB.CreateButton(nil, f, L["SAVE"], bW, 26)
-    saveBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD, 6)
-    saveBtn:SetEnabled(false)
-
-    local delBtn = BNB.CreateButton(nil, f, L["AW_REMOVE_ALARM_BTN"], bW, 26)
-    delBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", AW_PAD + bW + 8, 6)
-    delBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
-
-    _saveBtn = saveBtn
-
-    -- ── SKIN TABS ─────────────────────────────────────────────────────────────
+    local tabNames = {L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}
     local tabPanels = {}
-    local tabCtrl = BNB.CreateSkinTabs(f, {L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}, function(idx)
-        for i = 1, 3 do
-            if tabPanels[i] then tabPanels[i]:SetShown(i == idx) end
-        end
-        f._activeTab = idx
-    end)
-    tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  AW_PAD, -(SK_AW_TITLE_H + SK_AW_TAB_GAP))
-    tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -AW_PAD, -(SK_AW_TITLE_H + SK_AW_TAB_GAP))
+    if f._isSkin then
+        local tabCtrl = BNB.CreateSkinTabs(f, tabNames, function(idx)
+            for i = 1, 3 do
+                if tabPanels[i] then tabPanels[i]:SetShown(i == idx) end
+            end
+            f._activeTab = idx
+        end)
+        tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  AW_PAD, -(SK_AW_TITLE_H + SK_AW_TAB_GAP))
+        tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -AW_PAD, -(SK_AW_TITLE_H + SK_AW_TAB_GAP))
+        f._selectTab = function(idx) tabCtrl.Select(idx) end
+    else
+        local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
+            and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
+            and "PanelTopTabButtonTemplate" or "PanelTabButtonTemplate"
 
-    f._selectTab = function(idx)
-        tabCtrl.Select(idx)
+        local tabBtns = {}
+        local function SelectTab(idx)
+            for i = 1, 3 do
+                if tabBtns[i] then
+                    if i==idx then PanelTemplates_SelectTab(tabBtns[i])
+                    else            PanelTemplates_DeselectTab(tabBtns[i]) end
+                end
+                if tabPanels[i] then tabPanels[i]:SetShown(i==idx) end
+            end
+            f._activeTab = idx
+        end
+        f._selectTab = SelectTab
+
+        local lastBtn
+        for i, text in ipairs(tabNames) do
+            local btn = CreateFrame("Button","BNBAlarmWindowTab"..i, f, tpl)
+            btn:SetText(text)
+            pcall(function()
+                if tpl=="PanelTopTabButtonTemplate" then
+                    PanelTemplates_TabResize(btn,15,nil,70)
+                else
+                    PanelTemplates_TabResize(btn,0)
+                end
+            end)
+            btn:SetID(i)
+            if lastBtn then btn:SetPoint("LEFT",lastBtn,"RIGHT",5,0)
+            else             btn:SetPoint("TOPLEFT",f,"TOPLEFT",7,-25) end
+            btn:SetScript("OnClick", function(self) SelectTab(self:GetID()) end)
+            tabBtns[i]=btn; lastBtn=btn
+        end
+        PanelTemplates_SetNumTabs(f,3); f.numTabs=3
     end
 
-    -- ── SCROLL PANELS (identical anchor to normal — AW_TAB_Y = 62) ───────────
     local sf1,ct1 = MakeScrollPanel(f)
     local sf2,ct2 = MakeScrollPanel(f)
     local sf3,ct3 = MakeScrollPanel(f)
     tabPanels[1]=sf1; tabPanels[2]=sf2; tabPanels[3]=sf3
 
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    f:Hide()
-    tinsert(UISpecialFrames, "BNBAlarmWindow")
     _frame=f
-    return f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn, tabCtrl.Select
+    return f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn
 end
 
 -- ---------------------------------------------------------------------------
@@ -725,18 +524,15 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     end)
     swatchBtn:SetScript("OnClick",function()
         local pv=glowColorVal or {BNB_GR,BNB_GG,BNB_GB,1}
-        ColorPickerFrame:SetupColorPickerAndShow({
-            swatchFunc=function()
-                local r,g,b=ColorPickerFrame:GetColorRGB()
+        BNB.OpenColorPicker(pv[1],pv[2],pv[3],
+            function(r,g,b)
                 glowColorVal={r,g,b,1}; swTx:SetColorTexture(r,g,b,1); MarkDirty()
                 if f._restartPreview then f._restartPreview() end
             end,
-            cancelFunc=function()
+            function()
                 glowColorVal=pv; swTx:SetColorTexture(pv[1],pv[2],pv[3],1)
                 if f._restartPreview then f._restartPreview() end
-            end,
-            hasOpacity=false,r=pv[1],g=pv[2],b=pv[3],
-        })
+            end)
     end)
     y2 = y2 - AW_ROW - AW_GAP
     Div(ct2,y2); y2 = y2 - AW_GAP
@@ -1262,13 +1058,7 @@ end
 -- ---------------------------------------------------------------------------
 local function DoOpen(noteID, anchorFrame, stickyFrame)
     if not _frame then
-        local f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn = BuildWindowSkin()
-        else
-            f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn = BuildWindow()
-        end
-        BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
+        BuildTabContent(BuildWindow())
     end
     local f = _frame
 
@@ -1291,18 +1081,7 @@ end
 function AW.Open(noteID, anchorFrame, stickyFrame)
     if not noteID then return end
     local f = DoOpen(noteID, anchorFrame, stickyFrame)
-    f:ClearAllPoints()
-    local anchor = stickyFrame or anchorFrame
-    if anchor and anchor.GetWidth then
-        local scrW = UIParent:GetWidth()
-        local cx   = anchor:GetCenter()
-        local aw   = anchor:GetWidth()
-        local right = ((cx or 0)+(aw or 0)/2+8+AW_W) <= scrW
-        if right then f:SetPoint("LEFT",  anchor,"RIGHT",  8,0)
-        else          f:SetPoint("RIGHT", anchor,"LEFT",  -8,0) end
-    else
-        f:SetPoint("CENTER",UIParent,"CENTER",0,60)
-    end
+    BNB.PlaceBeside(f, stickyFrame or anchorFrame, AW_W)
 end
 
 function AW.OpenLeftOfMain(noteID)

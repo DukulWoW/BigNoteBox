@@ -548,6 +548,173 @@ function BNB.CreateDivider(parent, orientation, r, g, b, a)
 end
 
 --------------------------------------------------------------------------------
+-- SETTINGS-PANEL PIECES  (ALL-65.8)
+-- Shared by AlarmWindow, TaskEditWindow, NoteConfig, StickyNote and
+-- ConfigWindow, which each had their own copy.
+--------------------------------------------------------------------------------
+
+-- Section rule: 1px line y pixels below the top of parent, width wide, or
+-- spanning the parent when width is nil. Skin mode: preset border at 0.9 alpha.
+function BNB.CreateRule(parent, y, width)
+    local t
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        t = BNB.CreateDivider(parent, "HORIZONTAL", nil, nil, nil, 0.9)
+    else
+        t = BNB.CreateDivider(parent, "HORIZONTAL", 0.25, 0.25, 0.28, 1)
+    end
+    t:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
+    if width then t:SetWidth(width)
+    else t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y) end
+    return t
+end
+
+-- Yellow section header
+function BNB.CreateSectionHeader(parent, text, y, width)
+    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
+    l:SetWidth(width); l:SetJustifyH("LEFT")
+    l:SetText(text)
+    l:SetTextColor(1, 0.82, 0.0, 1)
+    return l
+end
+
+-- Small grey label
+function BNB.CreateSmallLabel(parent, text, y, width)
+    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
+    l:SetWidth(width); l:SetJustifyH("LEFT")
+    l:SetText(text); l:SetTextColor(0.68, 0.68, 0.68, 1)
+    return l
+end
+
+function BNB.HasWowStyle1()
+    return C_XMLUtil and C_XMLUtil.GetTemplateInfo
+        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") ~= nil
+end
+
+-- Compact value dropdown: WowStyle1DropdownTemplate where it exists, else a
+-- button that cycles through the entries on click.
+-- entries = { { label = "...", value = v }, ... }
+-- onDirty() fires on every user pick, before onChange(value).
+-- Returns a container with :SetSelected(v) / :GetSelected(); ._dd is the
+-- DropdownButton when there is one.
+function BNB.CreateValueDropdown(parent, entries, initial, onChange, width, height, onDirty)
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetSize(width, height)
+
+    if BNB.HasWowStyle1() then
+        local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+        dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(height)
+        dd:SetPoint("TOPLEFT")
+        dd._selected = initial
+        dd:SetupMenu(function(_, root)
+            for _, e in ipairs(entries) do
+                local ev = e.value
+                root:CreateRadio(e.label,
+                    function() return dd._selected == ev end,
+                    function()
+                        dd._selected = ev; dd:SetText(e.label)
+                        if onDirty then onDirty() end
+                        if onChange then onChange(ev) end
+                    end)
+            end
+        end)
+        for _, e in ipairs(entries) do
+            if e.value == initial then dd:SetText(e.label); break end
+        end
+        function c:SetSelected(v)
+            dd._selected = v
+            for _, e in ipairs(entries) do
+                if e.value == v then dd:SetText(e.label); return end
+            end
+            dd:SetText("")
+        end
+        function c:GetSelected() return dd._selected end
+        c._dd = dd
+    else
+        local idx = 1
+        for i, e in ipairs(entries) do if e.value == initial then idx = i; break end end
+        local btn = BNB.CreateBackdropFrame("Button", nil, c)
+        btn:SetSize(width, height); btn:SetPoint("TOPLEFT")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetAllPoints(); lbl:SetJustifyH("CENTER")
+        local function Refresh() lbl:SetText(entries[idx] and entries[idx].label or "") end
+        Refresh()
+        btn:SetScript("OnClick", function()
+            idx = (idx % #entries) + 1; Refresh()
+            if onDirty then onDirty() end
+            if onChange then onChange(entries[idx].value) end
+        end)
+        function c:SetSelected(v)
+            for i, e in ipairs(entries) do if e.value == v then idx = i; Refresh(); return end end
+        end
+        function c:GetSelected() return entries[idx] and entries[idx].value end
+    end
+    return c
+end
+
+-- Scroll panel whose bar stays invisible (alpha, never Hide) until the
+-- content outgrows it. While it fits, the content frame widens to cwNoBar
+-- and takes the bar's space. The caller anchors sf (leave 24px on the right
+-- for the bar) and reports the content height with sf:FinaliseHeight(h), or
+-- by setting ct._contentH before the panel is shown.
+-- Returns: scrollFrame, contentFrame
+function BNB.CreateAutoScrollPanel(parent, cw, cwNoBar)
+    local sf  = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
+    local bar = sf.ScrollBar
+    if bar then bar:SetAlpha(0) end
+
+    local ct = CreateFrame("Frame", nil, sf)
+    ct:SetWidth(cw); ct:SetHeight(1)
+    sf:SetScrollChild(ct)
+
+    local function ApplyScrollbar()
+        local sfH = sf:GetHeight()
+        -- GetHeight() returns 0 before the frame is laid out; skip until ready
+        if sfH < 4 then return end
+        local ctH = ct._contentH or 1
+        ct:SetHeight(math.max(ctH, sfH))
+        if ctH <= sfH + 2 then
+            if bar then bar:SetAlpha(0) end
+            ct:SetWidth(cwNoBar)
+        else
+            if bar then bar:SetAlpha(1) end
+            ct:SetWidth(cw)
+        end
+    end
+    -- Re-evaluate on resize, and when shown (first open, tab switch)
+    sf:SetScript("OnSizeChanged", function() ApplyScrollbar() end)
+    sf:HookScript("OnShow", function() C_Timer.After(0.05, ApplyScrollbar) end)
+    sf._applyScrollbar = ApplyScrollbar
+
+    function sf:FinaliseHeight(contentH)
+        ct._contentH = contentH
+        -- Defer one frame so the scroll frame has been laid out and GetHeight() is valid
+        C_Timer.After(0.05, ApplyScrollbar)
+    end
+
+    return sf, ct
+end
+
+-- Blizzard colour picker, both APIs. onDone(r, g, b) fires on every change
+-- (swatchFunc runs while dragging, not just on OK); onCancel is optional.
+function BNB.OpenColorPicker(r, g, b, onDone, onCancel)
+    local function Swatch() local nr, ng, nb = ColorPickerFrame:GetColorRGB(); onDone(nr, ng, nb) end
+    local function Cancel() if onCancel then onCancel() end end
+    if ColorPickerFrame.SetupColorPickerAndShow then
+        ColorPickerFrame:SetupColorPickerAndShow({
+            swatchFunc = Swatch, cancelFunc = Cancel,
+            hasOpacity = false, r = r, g = g, b = b,
+        })
+    else
+        ColorPickerFrame.func       = Swatch
+        ColorPickerFrame.cancelFunc = Cancel
+        ColorPickerFrame.hasOpacity = false
+        ColorPickerFrame:SetColorRGB(r, g, b); ShowUIPanel(ColorPickerFrame)
+    end
+end
+
+--------------------------------------------------------------------------------
 -- SLIDER  — matches BCB's Config.CreateSlider exactly.
 --
 -- Retail:  MinimalSliderWithSteppersTemplate (the modern look).

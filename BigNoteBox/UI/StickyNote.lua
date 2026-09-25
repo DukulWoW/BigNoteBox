@@ -723,19 +723,7 @@ local function GetBorderList()
     return list
 end
 
-local function OpenColorPicker(r, g, b, onDone)
-    if ColorPickerFrame.SetupColorPickerAndShow then
-        ColorPickerFrame:SetupColorPickerAndShow({
-            swatchFunc = function() local nr,ng,nb = ColorPickerFrame:GetColorRGB(); onDone(nr,ng,nb) end,
-            cancelFunc = function() end, hasOpacity = false, r = r, g = g, b = b,
-        })
-    else
-        ColorPickerFrame.func       = function() local nr,ng,nb = ColorPickerFrame:GetColorRGB(); onDone(nr,ng,nb) end
-        ColorPickerFrame.cancelFunc = function() end
-        ColorPickerFrame.hasOpacity = false
-        ColorPickerFrame:SetColorRGB(r, g, b); ShowUIPanel(ColorPickerFrame)
-    end
-end
+local OpenColorPicker = BNB.OpenColorPicker   -- UI/Widgets.lua
 
 -- Close the detached settings window and restore the sticky note
 local function CloseStickySettings()
@@ -905,34 +893,9 @@ local function BuildStickySettingsWindow()
 
     -- ── Two scroll panels (one per tab) ───────────────────────────────────────
     local function MakeScrollPanel()
-        local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-        local bar = sf.ScrollBar
-        if bar then bar:SetAlpha(0) end
+        local sf, ct = BNB.CreateAutoScrollPanel(f, SETTINGS_CW, SETTINGS_CW + 20)
         sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      SETTINGS_PAD, -tabContentY)
         sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 4)
-
-        local ct = CreateFrame("Frame", nil, sf)
-        ct:SetWidth(SETTINGS_CW)
-        ct:SetHeight(1)
-        sf:SetScrollChild(ct)
-
-        local function ApplyScrollbar()
-            local sfH = sf:GetHeight()
-            if sfH < 4 then return end
-            local ctH = ct._contentH or 1
-            ct:SetHeight(math.max(ctH, sfH))
-            if ctH <= sfH + 2 then
-                if bar then bar:SetAlpha(0) end
-                ct:SetWidth(SETTINGS_CW + 20)   -- use full width when no bar
-            else
-                if bar then bar:SetAlpha(1) end
-                ct:SetWidth(SETTINGS_CW)
-            end
-        end
-        sf:SetScript("OnSizeChanged", function() ApplyScrollbar() end)
-        sf:HookScript("OnShow", function() C_Timer.After(0.05, ApplyScrollbar) end)
-        sf._applyScrollbar = ApplyScrollbar
-
         return sf, ct
     end
 
@@ -985,6 +948,7 @@ local function PopulateStickySettings(noteID)
 
     local stickyFrame = openFrames[noteID]
     local cfg = GetCfg(noteID)
+    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
 
     -- ── Shared layout helpers (take ct as param) ──────────────────────────────
     local function Sec(ct, txt)
@@ -1013,18 +977,7 @@ local function PopulateStickySettings(noteID)
 
     local function Rule(ct)
         local y = ct._y or -8
-        local t = ct:CreateTexture(nil, "ARTWORK")
-        t:SetHeight(1)
-        t:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
-        t:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
-        if skinMode and BNB.GetSkinPreset then
-            local p = BNB.GetSkinPreset()
-            local br, bg_, bb = BNB.SkinBorderOf(p)
-            t:SetColorTexture(br, bg_, bb, 0.9)
-            BNB.RegisterSkinRule(t, 0.9)
-        else
-            t:SetColorTexture(0.25, 0.25, 0.28, 1)
-        end
+        BNB.CreateRule(ct, y)
         ct._y = y - 10
     end
 
@@ -2849,17 +2802,7 @@ local function OpenStickySettings(stickyFrame, noteID)
     -- Dragging the settings window calls StartMoving() which breaks the anchor;
     -- after that it floats freely (detached), and the sticky stays put.
     -- Rule: open to the right of the sticky if it fits, otherwise to the left.
-    local scrW = UIParent:GetWidth()
-    local sCX  = stickyFrame:GetCenter()
-    local sW   = stickyFrame:GetWidth()
-    local placeRight = ((sCX or 0) + (sW or 0) / 2 + 8 + SETTINGS_W) <= scrW
-
-    f:ClearAllPoints()
-    if placeRight then
-        f:SetPoint("LEFT", stickyFrame, "RIGHT", 8, 0)
-    else
-        f:SetPoint("RIGHT", stickyFrame, "LEFT", -8, 0)
-    end
+    BNB.PlaceBeside(f, stickyFrame, SETTINGS_W)
 
     -- Sticky stays at normal alpha — we want to see our changes live
     stickyFrame:SetAlpha(1.0)
