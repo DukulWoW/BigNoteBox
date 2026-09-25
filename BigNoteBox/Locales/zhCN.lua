@@ -901,6 +901,7 @@ L["HISTORY_COMPARE_EXPORT_TIP"]  = "导出此版本 (JSON 或 Markdown)"
 L["HISTORY_COMPARE_CANCEL"]      = "取消"
 L["HISTORY_KEPT_CURRENT"]        = "|cff66bb6a已保留当前笔记。|r"
 L["HISTORY_RESTORED"]            = "|cff66bb6a快照已还原。上一版本已保存至历史记录。|r"
+L["HISTORY_COMPARE_TASKS_HDR"]   = "-- 任务 --"
 
 -- Export popup
 L["HISTORY_EXPORT_TITLE"]        = "导出笔记"
