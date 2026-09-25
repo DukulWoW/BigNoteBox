@@ -158,7 +158,7 @@ end
 --------------------------------------------------------------------------------
 local function StartGlow()
     if not _frame then return end
-    local r, g, b = 1, 1, 1
+    local r, g, b = 0.400, 0.733, 0.416   -- BNB green
     local db = BigNoteBoxDB
     if db and db.skinMode and BNB.GetSkinPreset and BNB.SkinBorderOf then
         local p = BNB.GetSkinPreset()
