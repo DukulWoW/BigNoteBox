@@ -14,6 +14,7 @@ local BNB    = BigNoteBox
 local L      = BNB.L
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local BTNS   = ASSETS .. "Buttons\\"
+local UN     = BNB.UnitNotes   -- shared with TargetNote (Features/UnitNotes.lua)
 
 -- ── Button placement (adjust these to fine-tune position) ─────────────────────
 local INS_X  = -24   -- pixels from TOPRIGHT of InspectFrame
@@ -344,19 +345,7 @@ end
 -- NOTE BODY BUILDERS
 --------------------------------------------------------------------------------
 
-local function FormatNumber(n)
-    if not n then return "?" end
-    -- The client's own thousands separator (ALL-72)
-    if BreakUpLargeNumbers then return BreakUpLargeNumbers(n) end
-    local s = tostring(n)
-    local pos, result = #s, ""
-    while pos > 0 do
-        local start = math.max(1, pos - 2)
-        result = s:sub(start, pos) .. (result ~= "" and "," or "") .. result
-        pos = start - 1
-    end
-    return result
-end
+local FormatNumber = UN.FormatNumber
 
 -- "Level 80 Dracthyr Preservation Evoker": spec is optional (ALL-72)
 local function LevelLine(data)
@@ -479,59 +468,12 @@ local function BuildRichBody(data)
 
     lines[#lines + 1] = ""
     lines[#lines + 1] = ""
+    -- A bare empty line, as in TargetNote: {p}{/p} makes an empty <P></P> in
+    -- SimpleHTML, which miscalculates document height and offsets the text cursor.
     lines[#lines + 1] = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
-    lines[#lines + 1] = "{p}{/p}"
+    lines[#lines + 1] = ""
 
     return table.concat(lines, "\n")
-end
-
---------------------------------------------------------------------------------
--- DUPLICATE HANDLING
---------------------------------------------------------------------------------
-local function MakeUniqueTitle(baseName)
-    local ndb = BigNoteBoxNotesDB
-    if not ndb or not ndb.notes then return baseName end
-    local exists = false
-    for _, note in pairs(ndb.notes) do
-        if note.title == baseName then exists = true; break end
-    end
-    if not exists then return baseName end
-
-    for i = 1, 100 do
-        local candidate
-        if i == 1 then
-            candidate = string.format(L["INSPECT_DUP_FMT"], baseName)
-        else
-            candidate = string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(i))
-        end
-        local found = false
-        for _, note in pairs(ndb.notes) do
-            if note.title == candidate then found = true; break end
-        end
-        if not found then return candidate end
-    end
-    return string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(time()))
-end
-
--- Find an existing note for this player. Returns noteID or nil.
--- Matches the player context, or an inspect note's inspectName/inspectRealm
--- (the same test as NoteList and ReferenceBox). The context is only saved when
--- inspectNoteAddSituation is on (default off), so on its own it missed every
--- note made with default settings: no warning, and auto mode made a new
--- "(Duplicate)" note on every inspect.
-local function FindExistingNote(playerName, realm)
-    local ndb = BigNoteBoxNotesDB
-    if not ndb or not ndb.notes then return nil end
-    local ctx = "player:" .. playerName
-    if realm and realm ~= "" then ctx = ctx .. "-" .. realm end
-    for id, note in pairs(ndb.notes) do
-        if note.context == ctx then return id end
-        if note.source == "inspect" and note.inspectName == playerName
-           and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == realm) then
-            return id
-        end
-    end
-    return nil
 end
 
 --------------------------------------------------------------------------------
@@ -540,7 +482,7 @@ end
 local function CreateInspectNote(richMode, silent)
     local data = GatherInspectData()
     -- Title: character name only (no title)
-    local title = MakeUniqueTitle(data.name)
+    local title = UN.UniqueTitle(data.name)
     local body  = richMode and BuildRichBody(data) or BuildNormalBody(data)
 
     local noteID = BNB.CreateNote(title, body)
@@ -595,28 +537,10 @@ local function CreateInspectNote(richMode, silent)
     BNB.UpdateNote(noteID, fields)
     BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title))
 
-    if not silent then
-        if BNB.OpenMainWindow then BNB.OpenMainWindow() end
-        if BNB.SelectNote then
-            BNB.SaveCurrentNote()
-            BNB.SelectNote(noteID)
-        end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    end
+    if not silent then UN.OpenNote(noteID) end
 
     if _typeDialog then _typeDialog:Hide() end
     if _warnDialog then _warnDialog:Hide() end
-end
-
--- Open an existing note in BNB
-local function OpenExistingNote(noteID)
-    if BNB.OpenMainWindow then BNB.OpenMainWindow() end
-    if BNB.SelectNote then
-        BNB.SaveCurrentNote()
-        BNB.SelectNote(noteID)
-    end
-    if _warnDialog then _warnDialog:Hide() end
-    if _typeDialog then _typeDialog:Hide() end
 end
 
 --------------------------------------------------------------------------------
@@ -649,103 +573,26 @@ end
 -- Buttons: Open Note | Create Duplicate | Update gear | Update gear and note | Close
 -- Dialog is 340x180 to fit two rows of buttons.
 --------------------------------------------------------------------------------
-local function BuildWarnDialogButtons(f)
-    -- Row 1 (top): Open Note (left) | Create Duplicate (centre) | Close (right)
-    f._openBtn = BNB.CreateButton(nil, f, L["AO_OPEN_NOTE_BTN"], 90, 26)
-    f._openBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 48)
-
-    f._dupeBtn = BNB.CreateButton(nil, f, L["INS_WARN_DUPLICATE"], 120, 26)
-    f._dupeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 48)
-
-    local closeBtn = BNB.CreateButton(nil, f, L["CLOSE"], 70, 26)
-    closeBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 48)
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
-
-    -- Row 2 (bottom): Update gear (left) | Update gear and note (right)
-    f._updGearBtn = BNB.CreateButton(nil, f, L["INS_WARN_UPDATE_GEAR"], 130, 26)
-    f._updGearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
-
-    f._updAllBtn = BNB.CreateButton(nil, f, L["INS_WARN_UPDATE_ALL"], 150, 26)
-    f._updAllBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-end
-
 local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMode)
     if not _warnDialog then
-        local f
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBInspectWarnDialog", false)
-            _G["BNBInspectWarnDialog"] = f
-            f:SetSize(340, 180)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+        -- Row 1 (shared): Open Note | Create Duplicate | Close
+        local f = UN.WarnDialog("BNBInspectWarnDialog", 340, 180, 48, 120)
+        -- Row 2 (bottom): Update gear (left) | Update gear and note (right)
+        f._updGearBtn = BNB.CreateButton(nil, f, L["INS_WARN_UPDATE_GEAR"], 130, 26)
+        f._updGearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
 
-            local tb = BNB.CreateSkinStrip(f, true, false)
-            tb:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-            tb:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            tb:SetHeight(26)
-            tb:EnableMouse(true); tb:RegisterForDrag("LeftButton")
-            tb:SetScript("OnDragStart", function() f:StartMoving() end)
-            tb:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-            local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0); tl:SetText(L["INS_NOTE_EXISTS"])
-
-            BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
-                :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
-
-            local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            msg:SetPoint("TOP", f, "TOP", 0, -38)
-            msg:SetPoint("LEFT", f, "LEFT", 16, 0)
-            msg:SetPoint("RIGHT", f, "RIGHT", -16, 0)
-            msg:SetJustifyH("CENTER"); msg:SetWordWrap(true)
-            f._msgLbl = msg
-
-            BuildWarnDialogButtons(f)
-
-            f:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-            end)
-        else
-            f = CreateFrame("Frame", "BNBInspectWarnDialog", UIParent, "BasicFrameTemplateWithInset")
-            f:SetSize(340, 180)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText(L["INS_NOTE_EXISTS"])
-
-            local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            msg:SetPoint("TOP", f, "TOP", 0, -38)
-            msg:SetPoint("LEFT", f, "LEFT", 16, 0)
-            msg:SetPoint("RIGHT", f, "RIGHT", -16, 0)
-            msg:SetJustifyH("CENTER"); msg:SetWordWrap(true)
-            f._msgLbl = msg
-
-            BuildWarnDialogButtons(f)
-        end
-
-        f:Hide()
-        tinsert(UISpecialFrames, "BNBInspectWarnDialog")
+        f._updAllBtn = BNB.CreateButton(nil, f, L["INS_WARN_UPDATE_ALL"], 150, 26)
+        f._updAllBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
         _warnDialog = f
     end
 
-    _warnDialog._msgLbl:SetText(string.format(L["INS_WARN_EXISTS_FMT"], playerName))
-    _warnDialog._openBtn:SetScript("OnClick", function() OpenExistingNote(existingNoteID) end)
-    _warnDialog._dupeBtn:SetScript("OnClick", function()
-        _warnDialog:Hide()
-        if onDuplicate then onDuplicate() end
-    end)
+    -- Never both at once: the type dialog is reached from this one's Duplicate
+    if _typeDialog then _typeDialog:Hide() end
+
     _warnDialog._updGearBtn:SetScript("OnClick", function()
         _warnDialog:Hide()
         UpdateInspectGear(existingNoteID, nil)
-        OpenExistingNote(existingNoteID)
+        UN.OpenNote(existingNoteID)
     end)
     _warnDialog._updAllBtn:SetScript("OnClick", function()
         -- Confirm dialog: warn that the note body will be overwritten, but a
@@ -759,7 +606,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
                 BNB.HistoryCreateManual(existingNoteID)
                 -- richMode captured from the outer ShowWarningDialog call.
                 UpdateInspectGear(existingNoteID, richMode)
-                OpenExistingNote(existingNoteID)
+                UN.OpenNote(existingNoteID)
             end,
             timeout       = 0,
             whileDead     = true,
@@ -769,7 +616,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
         _warnDialog:Hide()
         StaticPopup_Show("BNB_CONFIRM_UPDATE_ALL")
     end)
-    _warnDialog:Show()
+    _warnDialog:Open(playerName, existingNoteID, onDuplicate)
 end
 
 --------------------------------------------------------------------------------
@@ -777,74 +624,9 @@ end
 --------------------------------------------------------------------------------
 local function ShowTypeDialog()
     if not _typeDialog then
-        local f
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBInspectNoteDialog", false)
-            _G["BNBInspectNoteDialog"] = f
-            f:SetSize(220, 100)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-            local tb = BNB.CreateSkinStrip(f, true, false)
-            tb:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-            tb:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            tb:SetHeight(26)
-            tb:EnableMouse(true); tb:RegisterForDrag("LeftButton")
-            tb:SetScript("OnDragStart", function() f:StartMoving() end)
-            tb:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-            local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0); tl:SetText(L["INS_CREATE_NOTE"])
-
-            BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
-                :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
-
-            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
-            nb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
-            nb:SetScript("OnClick", function() CreateInspectNote(false) end)
-
-            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
-            rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            rb:SetScript("OnClick", function() CreateInspectNote(true) end)
-
-            f:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-            end)
-        else
-            f = CreateFrame("Frame", "BNBInspectNoteDialog", UIParent, "BasicFrameTemplateWithInset")
-            f:SetSize(220, 100)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText(L["INS_CREATE_NOTE"])
-
-            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
-            nb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 14, 14)
-            nb:SetScript("OnClick", function() CreateInspectNote(false) end)
-
-            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
-            rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            rb:SetScript("OnClick", function() CreateInspectNote(true) end)
-        end
-
-        f:HookScript("OnHide", function(self)
-            if BNB.StopWindowGlow then BNB.StopWindowGlow(self, TYPE_DIALOG_GLOW_KEY) end
-        end)
-
-        f:Hide()
-        tinsert(UISpecialFrames, "BNBInspectNoteDialog")
-        _typeDialog = f
+        _typeDialog = UN.TypeDialog("BNBInspectNoteDialog", L["INS_CREATE_NOTE"], TYPE_DIALOG_GLOW_KEY)
     end
-    _typeDialog:Show()
-    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY, BNB.BasicFrameGlowPad()) end
+    _typeDialog:Open(function(richMode) CreateInspectNote(richMode) end)
 end
 
 --------------------------------------------------------------------------------
@@ -857,7 +639,7 @@ local function StartInspectNoteFlow(isAutomatic)
     if not name then return end
     realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
-    local existingID = FindExistingNote(name, realm)
+    local existingID = UN.FindPlayerNote(name, realm)
 
     -- Determine note type
     local richMode = nil  -- nil = ask user
@@ -934,7 +716,7 @@ local function CreateInspectButton()
         else
             local tName, tRealm = BNB.UnitNameRealm("target")
             tRealm = tRealm and tRealm ~= "" and tRealm or GetNormalizedRealmName() or ""
-            local existing = tName and FindExistingNote(tName, tRealm)
+            local existing = tName and UN.FindPlayerNote(tName, tRealm)
             if existing then
                 GameTooltip:AddLine(L["INSPECT_TIP_OPEN"], 1, 1, 1)
                 GameTooltip:AddLine(string.format(L["INSPECT_TIP_EXISTS"], tName), 0.55, 0.8, 0.55)

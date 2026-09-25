@@ -3,8 +3,10 @@
 -- Triggered via keybind (BNB_KeybindTargetNote) or the unit right-click menu.
 -- Does nothing if there is no target.
 --
--- NPC notes are keyed by creature ID (from GUID) stored in note.targetNpcID.
--- Player notes are keyed by "player:<name>-<realm>" stored in note.targetPlayerKey.
+-- Player targets are handed to InspectNote (gear, model), so every note made
+-- here is an NPC note, keyed by creature ID (from GUID) in note.targetNpcID.
+-- Older player notes made here carry "player:<name>-<realm>" in
+-- note.targetPlayerKey; the unit menu still finds them.
 -- Duplicate detection always uses these hidden fields, never the note title.
 --
 -- Config keys (BigNoteBoxDB):
@@ -23,8 +25,8 @@
 local BNB    = BigNoteBox
 local L      = BNB.L
 local UNKNOWN_STR = type(UNKNOWN) == "string" and UNKNOWN or "Unknown"
-local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ICONS  = "Interface\\Icons\\"
+local UN     = BNB.UnitNotes   -- shared with InspectNote (Features/UnitNotes.lua)
 
 BNB.TargetNote = BNB.TargetNote or {}
 local TN = BNB.TargetNote
@@ -46,22 +48,7 @@ local function TagEnabled(key, default)
     return v == true
 end
 
---------------------------------------------------------------------------------
--- NUMBER FORMATTING (matches InspectNote style)
---------------------------------------------------------------------------------
-local function FormatNumber(n)
-    if not n then return "?" end
-    -- The client's own thousands separator (ALL-72)
-    if BreakUpLargeNumbers then return BreakUpLargeNumbers(math.floor(n)) end
-    local s = tostring(math.floor(n))
-    local pos, result = #s, ""
-    while pos > 0 do
-        local start = math.max(1, pos - 2)
-        result = s:sub(start, pos) .. (result ~= "" and "," or "") .. result
-        pos = start - 1
-    end
-    return result
-end
+local FormatNumber = UN.FormatNumber
 
 --------------------------------------------------------------------------------
 -- CREATURE-TYPE ICON MAPPING
@@ -344,37 +331,9 @@ local function GatherTargetData()
     data.zone    = GetZoneText() or ""
     data.subZone = GetSubZoneText() or ""
 
-    if data.isPlayer then
-        -- ── Player branch ──────────────────────────────────────────────────
-        local pvpName = UnitPVPName("target")
-        if pvpName and pvpName ~= data.name then
-            data.displayTitle = pvpName
-        end
-
-        local className, classFile = UnitClass("target")
-        data.className = className or UNKNOWN_STR
-        data.classFile = classFile or "WARRIOR"
-
-        local raceName, raceFile = UnitRace("target")
-        data.race     = raceName or UNKNOWN_STR
-        data.raceFile = raceFile or "Human"
-
-        local sex = UnitSex("target")
-        data.gender = (sex == 3) and "Female" or "Male"
-
-        local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[data.classFile]
-        if cc then
-            data.classHex = string.format("%02x%02x%02x",
-                math.floor(cc.r * 255 + 0.5),
-                math.floor(cc.g * 255 + 0.5),
-                math.floor(cc.b * 255 + 0.5))
-        else
-            data.classHex = "ffffff"
-        end
-
-        -- Class icon path (bundled asset)
-        data.portraitIcon = ASSETS .. "Icons\\Classes\\ClassIcon_" .. (data.classFile or "Warrior")
-    else
+    -- Players stop here: StartTargetNoteFlow hands them to InspectNote, and the
+    -- unit menu needs only name and realm for FindExistingNote
+    if not data.isPlayer then
         -- ── NPC / mob / boss branch ────────────────────────────────────────
         local ctName, ctID  = UnitCreatureType("target")   -- translated name, type id
         data.creatureType   = ctName
@@ -430,50 +389,35 @@ end
 local function BuildNormalBody(data)
     local lines = {}
 
-    if data.isPlayer then
-        -- Name / title
-        lines[#lines + 1] = data.displayTitle or data.name
-        lines[#lines + 1] = ""
+    lines[#lines + 1] = data.name
+    lines[#lines + 1] = ""
 
-        lines[#lines + 1] = string.format(L["TGT_LEVEL_FMT"], tostring(data.level), data.race, data.className)
+    -- Level + classification
+    local classif = data.classificationLabel and (" [" .. data.classificationLabel .. "]") or ""
+    lines[#lines + 1] = string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif
 
-        if data.factionLabel then
-            lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
+    if data.creatureType then
+        local typeStr = data.creatureType
+        if data.creatureFamily then
+            typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
         end
-        if data.reactionLabel then
-            lines[#lines + 1] = string.format(L["TGT_LINE_REACTION"], data.reactionLabel)
-        end
-    else
-        lines[#lines + 1] = data.name
-        lines[#lines + 1] = ""
+        lines[#lines + 1] = string.format(L["TGT_LINE_TYPE"], typeStr)
+    end
 
-        -- Level + classification
-        local classif = data.classificationLabel and (" [" .. data.classificationLabel .. "]") or ""
-        lines[#lines + 1] = string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif
+    if data.factionLabel then
+        lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
+    end
+    if data.reactionLabel then
+        lines[#lines + 1] = string.format(L["TGT_LINE_REACTION"], data.reactionLabel)
+    end
 
-        if data.creatureType then
-            local typeStr = data.creatureType
-            if data.creatureFamily then
-                typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
-            end
-            lines[#lines + 1] = string.format(L["TGT_LINE_TYPE"], typeStr)
-        end
+    lines[#lines + 1] = ""
 
-        if data.factionLabel then
-            lines[#lines + 1] = string.format(L["TGT_LINE_FACTION"], data.factionLabel)
-        end
-        if data.reactionLabel then
-            lines[#lines + 1] = string.format(L["TGT_LINE_REACTION"], data.reactionLabel)
-        end
-
-        lines[#lines + 1] = ""
-
-        if data.maxHealth then
-            lines[#lines + 1] = string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth))
-        end
-        if data.maxPower then
-            lines[#lines + 1] = string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower))
-        end
+    if data.maxHealth then
+        lines[#lines + 1] = string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth))
+    end
+    if data.maxPower then
+        lines[#lines + 1] = string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower))
     end
 
     lines[#lines + 1] = ""
@@ -505,104 +449,83 @@ end
 local function BuildRichBody(data)
     local lines = {}
 
-    if data.isPlayer then
-        local displayName = data.displayTitle or data.name
-        lines[#lines + 1] = "{h1:c}" .. displayName .. "{/h1}"
+    -- Name as H1
+    lines[#lines + 1] = "{h1:c}" .. data.name .. "{/h1}"
+    lines[#lines + 1] = ""
+
+    -- Level + classification subtitle
+    local classif = data.classificationLabel and (" {col:ffcc44}[" .. data.classificationLabel .. "]{/col}") or ""
+    lines[#lines + 1] = "{p:c}" .. string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif .. "{/p}"
+    lines[#lines + 1] = ""
+
+    -- Reaction line (coloured)
+    if data.reactionLabel and data.reactionHex then
+        lines[#lines + 1] = "{p:c}{col:" .. data.reactionHex .. "}" .. data.reactionLabel .. "{/col}{/p}"
+    end
+    lines[#lines + 1] = ""
+
+    -- Details section
+    local hasDetails = data.creatureType or data.faction or data.maxHealth or data.maxPower
+    if hasDetails then
+        lines[#lines + 1] = "{h3}" .. L["TGT_HDR_DETAILS"] .. "{/h3}"
         lines[#lines + 1] = ""
 
-        local sub = string.format(L["TGT_LEVEL_FMT"], tostring(data.level), data.race, data.className)
-        lines[#lines + 1] = "{p:c}{col:" .. (data.classHex or "ffffff") .. "}" .. sub .. "{/col}{/p}"
-        lines[#lines + 1] = ""
-
-        if data.factionLabel then
-            lines[#lines + 1] = "{p:c}" .. data.factionLabel .. "{/p}"
-        end
-        if data.reactionLabel and data.reactionHex then
-            lines[#lines + 1] = "{p:c}{col:" .. data.reactionHex .. "}" .. data.reactionLabel .. "{/col}{/p}"
-        end
-        lines[#lines + 1] = ""
-        lines[#lines + 1] = ""
-    else
-        -- ── NPC / mob / boss ──────────────────────────────────────────────
-
-        -- Name as H1
-        lines[#lines + 1] = "{h1:c}" .. data.name .. "{/h1}"
-        lines[#lines + 1] = ""
-
-        -- Level + classification subtitle
-        local classif = data.classificationLabel and (" {col:ffcc44}[" .. data.classificationLabel .. "]{/col}") or ""
-        lines[#lines + 1] = "{p:c}" .. string.format(L["TGT_LEVEL_NPC_FMT"], tostring(data.level)) .. classif .. "{/p}"
-        lines[#lines + 1] = ""
-
-        -- Reaction line (coloured)
-        if data.reactionLabel and data.reactionHex then
-            lines[#lines + 1] = "{p:c}{col:" .. data.reactionHex .. "}" .. data.reactionLabel .. "{/col}{/p}"
-        end
-        lines[#lines + 1] = ""
-
-        -- Details section
-        local hasDetails = data.creatureType or data.faction or data.maxHealth or data.maxPower
-        if hasDetails then
-            lines[#lines + 1] = "{h3}" .. L["TGT_HDR_DETAILS"] .. "{/h3}"
-            lines[#lines + 1] = ""
-
-            if data.creatureType then
-                local typeStr = data.creatureType
-                if data.creatureFamily then
-                    typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
-                end
-                -- Inline creature-type icon (18px) before the label
-                local ctIcon = CREATURE_TYPE_ICON[data.creatureTypeKey or ""] or "inv_misc_questionmark"
-                lines[#lines + 1] = "{p}{icon:" .. ctIcon .. ":18}  " .. string.format(L["TGT_LINE_TYPE"], typeStr) .. "{/p}"
+        if data.creatureType then
+            local typeStr = data.creatureType
+            if data.creatureFamily then
+                typeStr = typeStr .. " (" .. data.creatureFamily .. ")"
             end
-
-            if data.faction then
-                -- Faction icon
-                local factionIcon = "inv_misc_questionmark"
-                if data.faction == "Alliance" then
-                    factionIcon = "ui_allianceicon"
-                elseif data.faction == "Horde" then
-                    factionIcon = "ui_hordeicon"
-                end
-                lines[#lines + 1] = "{p}{icon:" .. factionIcon .. ":18}  " .. string.format(L["TGT_LINE_FACTION"], data.factionLabel or data.faction) .. "{/p}"
-            end
-
-            if data.maxHealth then
-                lines[#lines + 1] = "{p}{icon:inv_elemental_mote_life01:18}  " .. string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth)) .. "{/p}"
-            end
-
-            if data.maxPower then
-                -- Power icon varies by type (by index: the name is translated)
-                local powerIcon = "inv_misc_questionmark"
-                local pi = data.powerIdx
-                if pi == 0 then                    -- Mana
-                    powerIcon = "inv_elemental_mote_mana"
-                elseif pi == 1 or pi == 17 then    -- Rage, Fury
-                    powerIcon = "ability_racial_bloodrage"
-                elseif pi == 3 or pi == 2 then     -- Energy, Focus
-                    powerIcon = "ability_druid_caster"
-                elseif pi == 6 then                -- Runic Power
-                    powerIcon = "inv_sword_62"
-                end
-                lines[#lines + 1] = "{p}{icon:" .. powerIcon .. ":18}  " .. string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower)) .. "{/p}"
-            end
-
-            lines[#lines + 1] = ""
-            lines[#lines + 1] = ""
+            -- Inline creature-type icon (18px) before the label
+            local ctIcon = CREATURE_TYPE_ICON[data.creatureTypeKey or ""] or "inv_misc_questionmark"
+            lines[#lines + 1] = "{p}{icon:" .. ctIcon .. ":18}  " .. string.format(L["TGT_LINE_TYPE"], typeStr) .. "{/p}"
         end
 
-        -- Zone / encounter section
-        local zoneStr = data.zone
-        if data.subZone and data.subZone ~= "" and data.subZone ~= data.zone then
-            zoneStr = data.subZone .. ", " .. data.zone
+        if data.faction then
+            -- Faction icon
+            local factionIcon = "inv_misc_questionmark"
+            if data.faction == "Alliance" then
+                factionIcon = "ui_allianceicon"
+            elseif data.faction == "Horde" then
+                factionIcon = "ui_hordeicon"
+            end
+            lines[#lines + 1] = "{p}{icon:" .. factionIcon .. ":18}  " .. string.format(L["TGT_LINE_FACTION"], data.factionLabel or data.faction) .. "{/p}"
         end
-        if zoneStr and zoneStr ~= "" then
-            lines[#lines + 1] = "{h3}" .. L["TGT_HDR_ENCOUNTERED"] .. "{/h3}"
-            lines[#lines + 1] = ""
-            lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. zoneStr .. "{/p}"
-            lines[#lines + 1] = ""
-            lines[#lines + 1] = ""
+
+        if data.maxHealth then
+            lines[#lines + 1] = "{p}{icon:inv_elemental_mote_life01:18}  " .. string.format(L["TGT_LINE_MAX_HEALTH"], FormatNumber(data.maxHealth)) .. "{/p}"
         end
+
+        if data.maxPower then
+            -- Power icon varies by type (by index: the name is translated)
+            local powerIcon = "inv_misc_questionmark"
+            local pi = data.powerIdx
+            if pi == 0 then                    -- Mana
+                powerIcon = "inv_elemental_mote_mana"
+            elseif pi == 1 or pi == 17 then    -- Rage, Fury
+                powerIcon = "ability_racial_bloodrage"
+            elseif pi == 3 or pi == 2 then     -- Energy, Focus
+                powerIcon = "ability_druid_caster"
+            elseif pi == 6 then                -- Runic Power
+                powerIcon = "inv_sword_62"
+            end
+            lines[#lines + 1] = "{p}{icon:" .. powerIcon .. ":18}  " .. string.format(L["TGT_LINE_STAT_FMT"], data.powerName or L["TGT_POWER"], FormatNumber(data.maxPower)) .. "{/p}"
+        end
+
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ""
+    end
+
+    -- Zone / encounter section
+    local zoneStr = data.zone
+    if data.subZone and data.subZone ~= "" and data.subZone ~= data.zone then
+        zoneStr = data.subZone .. ", " .. data.zone
+    end
+    if zoneStr and zoneStr ~= "" then
+        lines[#lines + 1] = "{h3}" .. L["TGT_HDR_ENCOUNTERED"] .. "{/h3}"
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. zoneStr .. "{/p}"
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = ""
     end
 
     -- Notes section: blank, for the player to fill in.
@@ -616,7 +539,8 @@ end
 
 --------------------------------------------------------------------------------
 -- DUPLICATE DETECTION
--- Checks note.targetNpcID (for NPCs) or note.targetPlayerKey (for players).
+-- Checks note.targetNpcID (for NPCs). Players (unit menu only): an older
+-- target note's targetPlayerKey, then the inspect-note lookup InspectNote uses.
 -- Never checks title — title can be renamed freely.
 --------------------------------------------------------------------------------
 local function FindExistingNote(data)
@@ -631,6 +555,7 @@ local function FindExistingNote(data)
         for id, note in pairs(ndb.notes) do
             if note.targetPlayerKey == key then return id end
         end
+        return UN.FindPlayerNote(data.name, data.realm)
     elseif data.isPet then
         -- Combat pets share a generic creature ID — match on name + npcID
         for id, note in pairs(ndb.notes) do
@@ -646,90 +571,41 @@ local function FindExistingNote(data)
     return nil
 end
 
-local function MakeUniqueTitle(baseName)
-    local ndb = BigNoteBoxNotesDB
-    if not ndb or not ndb.notes then return baseName end
-    local exists = false
-    for _, note in pairs(ndb.notes) do
-        if note.title == baseName then exists = true; break end
-    end
-    if not exists then return baseName end
-    for i = 1, 100 do
-        local c = baseName .. " (" .. i .. ")"
-        local found = false
-        for _, note in pairs(ndb.notes) do
-            if note.title == c then found = true; break end
-        end
-        if not found then return c end
-    end
-    return baseName
-end
-
---------------------------------------------------------------------------------
--- OPEN EXISTING NOTE
---------------------------------------------------------------------------------
-local function OpenExistingNote(noteID)
-    if BNB.OpenMainWindow then BNB.OpenMainWindow() end
-    if BNB.SelectNote then
-        if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
-        BNB.SelectNote(noteID)
-    end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-end
-
 --------------------------------------------------------------------------------
 -- CREATE THE NOTE
 --------------------------------------------------------------------------------
 local function CreateTargetNote(richMode, data)
-    local title = MakeUniqueTitle(data.name)
+    local title = UN.UniqueTitle(data.name)
     local body  = richMode and BuildRichBody(data) or BuildNormalBody(data)
 
     local noteID = BNB.CreateNote(title, body)
     if not noteID then return end
 
-    -- Icon for the note list
-    local noteIcon
-    if data.isPlayer then
-        -- Class icon from bundled assets
-        noteIcon = ASSETS .. "Icons\\Classes\\ClassIcon_" .. (data.classFile or "Warrior")
-    else
-        noteIcon = data.noteIcon
-    end
-
     -- Tags — "Target Note" is always added. All others are user-configurable.
     local tags = { L["TGT_TAG_TARGET"] }
-    if data.isPlayer then
-        if TagEnabled("targetNoteTagFaction", true) and data.factionLabel then
-            tags[#tags + 1] = data.factionLabel
-        end
-        if TagEnabled("targetNoteTagZone", true) and data.zone and data.zone ~= "" then
-            tags[#tags + 1] = data.zone
-        end
-    else
-        if TagEnabled("targetNoteTagCreatureType", true) and data.creatureType then
-            tags[#tags + 1] = data.creatureType
-        end
-        if TagEnabled("targetNoteTagFamily", false) and data.creatureFamily then
-            tags[#tags + 1] = data.creatureFamily
-        end
-        if TagEnabled("targetNoteTagClassification", true) and data.classificationLabel then
-            tags[#tags + 1] = data.classificationLabel
-        end
-        if TagEnabled("targetNoteTagFaction", true) and data.factionLabel then
-            tags[#tags + 1] = data.factionLabel
-        end
-        if TagEnabled("targetNoteTagZone", true) and data.zone and data.zone ~= "" then
-            tags[#tags + 1] = data.zone
-        end
-        if TagEnabled("targetNoteTagBoss", true) and data.isBoss then
-            tags[#tags + 1] = L["TGT_TAG_BOSS"]
-        end
+    if TagEnabled("targetNoteTagCreatureType", true) and data.creatureType then
+        tags[#tags + 1] = data.creatureType
+    end
+    if TagEnabled("targetNoteTagFamily", false) and data.creatureFamily then
+        tags[#tags + 1] = data.creatureFamily
+    end
+    if TagEnabled("targetNoteTagClassification", true) and data.classificationLabel then
+        tags[#tags + 1] = data.classificationLabel
+    end
+    if TagEnabled("targetNoteTagFaction", true) and data.factionLabel then
+        tags[#tags + 1] = data.factionLabel
+    end
+    if TagEnabled("targetNoteTagZone", true) and data.zone and data.zone ~= "" then
+        tags[#tags + 1] = data.zone
+    end
+    if TagEnabled("targetNoteTagBoss", true) and data.isBoss then
+        tags[#tags + 1] = L["TGT_TAG_BOSS"]
     end
 
     local fields = {
         source   = "target",
         richMode = richMode or false,
-        icon     = noteIcon,
+        icon     = data.noteIcon,
         tags     = tags,
     }
 
@@ -738,20 +614,9 @@ local function CreateTargetNote(richMode, data)
     fields.targetFaction = data.faction
 
     -- Hidden duplicate-detection keys
-    if data.isPlayer then
-        local key = "player:" .. data.name
-        if data.realm and data.realm ~= "" then key = key .. "-" .. data.realm end
-        fields.targetPlayerKey = key
-        -- Title colour from class colour
-        local cc = RAID_CLASS_COLORS and data.classFile and RAID_CLASS_COLORS[data.classFile]
-        if cc then
-            fields.titleColor = { r = cc.r, g = cc.g, b = cc.b }
-        end
-    else
-        fields.targetNpcID = data.npcID  -- may be nil for vehicles/objects without creature ID
-        if data.isPet then
-            fields.targetIsPet = true  -- combat pet: SetCreature shows wrong model
-        end
+    fields.targetNpcID = data.npcID  -- may be nil for vehicles/objects without creature ID
+    if data.isPet then
+        fields.targetIsPet = true  -- combat pet: SetCreature shows wrong model
     end
 
     BNB.UpdateNote(noteID, fields)
@@ -769,207 +634,25 @@ local function CreateTargetNote(richMode, data)
 end
 
 --------------------------------------------------------------------------------
--- TYPE DIALOG: "Normal" or "Rich" (self-contained, skin-aware)
+-- DIALOGS: Normal/Rich and "note exists" (Features/UnitNotes.lua)
 --------------------------------------------------------------------------------
 local _typeDialog = nil
+local _warnDialog = nil
 local TYPE_DIALOG_GLOW_KEY = "bnb_target_typedlg"
 
 local function ShowTypeDialog(data)
     if not _typeDialog then
-        local f
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBTargetNoteTypeDialog", false)
-            _G["BNBTargetNoteTypeDialog"] = f
-            f:SetSize(220, 100)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true)
-            f:EnableMouse(true)
-            f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-            local tb = BNB.CreateSkinStrip(f, true, false)
-            tb:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            tb:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            tb:SetHeight(26)
-            tb:EnableMouse(true)
-            tb:RegisterForDrag("LeftButton")
-            tb:SetScript("OnDragStart", function() f:StartMoving() end)
-            tb:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-            local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0)
-            tl:SetText(L["TGT_CREATE_TITLE"])
-
-            BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
-                :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
-
-            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
-            nb:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  14, 14)
-            f._normalBtn = nb
-
-            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
-            rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            f._richBtn = rb
-
-            f:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-            end)
-        else
-            f = CreateFrame("Frame", "BNBTargetNoteTypeDialog", UIParent,
-                            "BasicFrameTemplateWithInset")
-            f:SetSize(220, 100)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true)
-            f:EnableMouse(true)
-            f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText(L["TGT_CREATE_TITLE"])
-
-            local nb = BNB.CreateButton(nil, f, L["SW_MODE_NORMAL"], 85, 28)
-            nb:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  14, 14)
-            f._normalBtn = nb
-
-            local rb = BNB.CreateButton(nil, f, L["INS_RICH_BTN"], 85, 28)
-            rb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            f._richBtn = rb
-        end
-
-        f:HookScript("OnHide", function(self)
-            if BNB.StopWindowGlow then BNB.StopWindowGlow(self, TYPE_DIALOG_GLOW_KEY) end
-        end)
-
-        f:Hide()
-        tinsert(UISpecialFrames, "BNBTargetNoteTypeDialog")
-        _typeDialog = f
+        _typeDialog = UN.TypeDialog("BNBTargetNoteTypeDialog", L["TGT_CREATE_TITLE"], TYPE_DIALOG_GLOW_KEY)
     end
-
-    -- Wire buttons to the current data snapshot (captured in closure)
-    _typeDialog._normalBtn:SetScript("OnClick", function()
-        _typeDialog:Hide()
-        CreateTargetNote(false, data)
-    end)
-    _typeDialog._richBtn:SetScript("OnClick", function()
-        _typeDialog:Hide()
-        CreateTargetNote(true, data)
-    end)
-    _typeDialog:Show()
-    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY, BNB.BasicFrameGlowPad()) end
+    -- data is the snapshot taken when the flow started
+    _typeDialog:Open(function(richMode) CreateTargetNote(richMode, data) end)
 end
-
---------------------------------------------------------------------------------
--- WARNING DIALOG: "You already have a note for [Name]"
---------------------------------------------------------------------------------
-local _warnDialog = nil
 
 local function ShowWarningDialog(existingNoteID, targetName, onDuplicate)
     if not _warnDialog then
-        local f
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBTargetNoteWarnDialog", false)
-            _G["BNBTargetNoteWarnDialog"] = f
-            f:SetSize(320, 130)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true)
-            f:EnableMouse(true)
-            f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-            local tb = BNB.CreateSkinStrip(f, true, false)
-            tb:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            tb:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            tb:SetHeight(26)
-            tb:EnableMouse(true)
-            tb:RegisterForDrag("LeftButton")
-            tb:SetScript("OnDragStart", function() f:StartMoving() end)
-            tb:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-            local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-            tl:SetTextColor(1, 0.82, 0)
-            tl:SetText(L["INS_NOTE_EXISTS"])
-
-            BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
-                :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
-
-            local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            msg:SetPoint("TOP",   f, "TOP",   0,   -38)
-            msg:SetPoint("LEFT",  f, "LEFT",  16,  0)
-            msg:SetPoint("RIGHT", f, "RIGHT", -16, 0)
-            msg:SetJustifyH("CENTER")
-            msg:SetWordWrap(true)
-            f._msgLbl = msg
-
-            f._openBtn = BNB.CreateButton(nil, f, L["AO_OPEN_NOTE_BTN"], 90, 26)
-            f._openBtn:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  14, 14)
-
-            f._dupeBtn = BNB.CreateButton(nil, f, L["INS_WARN_DUPLICATE"], 110, 26)
-            f._dupeBtn:SetPoint("BOTTOM",      f, "BOTTOM",       0,  14)
-
-            local cancelBtn = BNB.CreateButton(nil, f, L["CLOSE"], 70, 26)
-            cancelBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            cancelBtn:SetScript("OnClick", function() f:Hide() end)
-
-            f:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-            end)
-        else
-            f = CreateFrame("Frame", "BNBTargetNoteWarnDialog", UIParent,
-                            "BasicFrameTemplateWithInset")
-            f:SetSize(320, 130)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true)
-            f:EnableMouse(true)
-            f:SetMovable(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            f.TitleText:SetText(L["INS_NOTE_EXISTS"])
-
-            local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            msg:SetPoint("TOP",   f, "TOP",   0,   -38)
-            msg:SetPoint("LEFT",  f, "LEFT",  16,  0)
-            msg:SetPoint("RIGHT", f, "RIGHT", -16, 0)
-            msg:SetJustifyH("CENTER")
-            msg:SetWordWrap(true)
-            f._msgLbl = msg
-
-            f._openBtn = BNB.CreateButton(nil, f, L["AO_OPEN_NOTE_BTN"], 90, 26)
-            f._openBtn:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  14, 14)
-
-            f._dupeBtn = BNB.CreateButton(nil, f, L["INS_WARN_DUPLICATE"], 110, 26)
-            f._dupeBtn:SetPoint("BOTTOM",      f, "BOTTOM",       0,  14)
-
-            local cancelBtn = BNB.CreateButton(nil, f, L["CLOSE"], 70, 26)
-            cancelBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -14, 14)
-            cancelBtn:SetScript("OnClick", function() f:Hide() end)
-        end
-
-        f:Hide()
-        tinsert(UISpecialFrames, "BNBTargetNoteWarnDialog")
-        _warnDialog = f
+        _warnDialog = UN.WarnDialog("BNBTargetNoteWarnDialog", 320, 130, 14, 110)
     end
-
-    _warnDialog._msgLbl:SetText(string.format(L["INS_WARN_EXISTS_FMT"], targetName))
-    _warnDialog._openBtn:SetScript("OnClick", function()
-        OpenExistingNote(existingNoteID)
-        _warnDialog:Hide()
-    end)
-    _warnDialog._dupeBtn:SetScript("OnClick", function()
-        _warnDialog:Hide()
-        if onDuplicate then onDuplicate() end
-    end)
-    _warnDialog:Show()
+    _warnDialog:Open(targetName, existingNoteID, onDuplicate)
 end
 
 --------------------------------------------------------------------------------
@@ -1044,7 +727,9 @@ end
 -- Tags to hook — covers all unit popup contexts where note creation makes sense.
 local MENU_TAGS = {
     "PLAYER",       -- right-click a player target portrait
+    "ENEMY_PLAYER", -- a player of the other faction: hostile players get their own menu
     "TARGET",       -- right-click an NPC/mob/boss target portrait
+    "ENEMY",        -- hostile unit menu (OneWoW hooks it for NPCs next to TARGET)
     "SELF",         -- right-click own portrait
     "FOCUS",        -- right-click focus frame
     "BOSS",         -- right-click boss frame
@@ -1069,13 +754,14 @@ local function OnUnitMenuOpen(owner, rootDescription, contextData)
 
     if existingID then
         rootDescription:CreateButton(L["TGT_MENU_OPEN"], function()
-            OpenExistingNote(existingID)
-        end)
-    else
-        rootDescription:CreateButton(L["TGT_MENU_CREATE"], function()
-            StartTargetNoteFlow(data)
+            UN.OpenNote(existingID)
         end)
     end
+    -- Offered even when a note exists: the flow then shows the "note exists"
+    -- window, whose Create Duplicate is the menu's only way to a second note
+    rootDescription:CreateButton(L["TGT_MENU_CREATE"], function()
+        StartTargetNoteFlow(data)
+    end)
 end
 
 local function HookUnitPopupMenu()

@@ -94,6 +94,7 @@ Features\FocusOrbit.lua
 Features\AdvancedMode.lua
 Features\HtmlTemplate.lua
 Features\ShareNote.lua
+Features\UnitNotes.lua
 Features\InspectNote.lua
 Features\TargetNote.lua
 Features\DirectSend.lua
