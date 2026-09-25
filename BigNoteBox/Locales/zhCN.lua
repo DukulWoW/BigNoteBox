@@ -10,7 +10,6 @@ local L = BigNoteBox.L
 -- ── Addon identity ────────────────────────────────────────────────────────────
 L["ADDON_NAME"]   = "BigNoteBox"
 L["AUTHOR"]       = "作者：Dukul"
-L["VERSION"]      = "版本"
 L["LOADED_MSG"]   = "BigNoteBox v%s 已加载！输入 /bnb 查看选项。"
 
 -- ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -23,9 +22,7 @@ L["YES"]          = "是"
 L["NO"]           = "否"
 L["CONFIRM"]      = "确认"
 L["RESET"]        = "重置"
-L["SEARCH"]       = "搜索"
 L["UNTITLED"]     = "无标题笔记"
-L["NEW_NOTE"]     = "新建笔记"
 
 -- ── Fonts (shared) ────────────────────────────────────────────────────────────
 L["FONT_USE_WOW_DEFAULT"]     = "使用魔兽世界默认字体"
@@ -43,12 +40,7 @@ L["BTN_NEW_NOTE"]       = "新建笔记"
 L["BTN_SAVE_NOTE"]      = "保存"
 L["BTN_DELETE_NOTE"]    = "删除"
 L["BTN_COPY_NOTE"]        = "将整条笔记复制到剪贴板"
-L["BTN_COPY_NOTE_DONE"]   = "笔记已复制到剪贴板。"
 L["BTN_COPY_NOTE_CLASSIC"]= "已选择笔记 - 按 Ctrl+C 复制。"
-L["BTN_SEND_TO_CHAT"]   = "发送到聊天"
-L["BTN_COPY"]           = "复制"
-L["BTN_TAG"]            = "标签"
-L["BTN_CONTEXT"]        = "情境"
 
 -- ── Main window: title bar lock/scale button ─────────────────────────────────
 L["MW_LOCK_TIP"]         = "窗口缩放已锁定"
@@ -641,36 +633,25 @@ L["SB_COPY_MOVE_MULTI_ONE_FMT"] = "复制 / 移动 %d 条笔记"
 L["SB_COPY_MOVE_MULTI_N_FMT"]   = "复制 / 移动 %d 条笔记"
 
 -- ── Tags ──────────────────────────────────────────────────────────────────────
-L["TAGS"]               = "标签"
 L["TAG_ADD_HINT"]       = "添加标签..."
-L["TAG_NONE"]           = "无标签"
 
 -- ── Context binding ───────────────────────────────────────────────────────────
-L["CONTEXT"]            = "情境"
-L["CONTEXT_NONE"]       = "任何地方"
-L["CONTEXT_ZONE"]       = "区域"
-L["CONTEXT_INSTANCE"]   = "副本"
-L["CONTEXT_PLAYER"]     = "玩家"
 
 -- ── Send to Chat ──────────────────────────────────────────────────────────────
 L["SEND_TITLE"]         = "发送到聊天"
 L["SEND_CHANNEL_LABEL"] = "频道："
 L["SEND_LINE_BY_LINE"]  = "将每一行作为单独的消息发送"
-L["SEND_CONFIRM"]       = "发送 %d 行到 %s？"
 L["SEND_CONFIRM_BTN"]   = "发送"
-L["SEND_NO_BCB"]        = "不使用 BigChatBox 发送（直接模式）"
 L["SEND_EMPTY"]         = "笔记为空 - 没有可发送的内容。"
 L["SEND_COMPLETE"]      = "已发送 %d 行到 %s。"
 
 -- ── Chat Capture ──────────────────────────────────────────────────────────────
 L["CAPTURE_SAVED"]      = "聊天已保存为笔记：%s"
-L["CAPTURE_APPENDED"]   = "已追加到笔记：%s"
 L["CAPTURE_EMPTY"]      = "没有可捕获的内容。"
 L["CAPTURE_MENU"]       = "保存到 BigNoteBox"
 
 -- ── Contextual surfacing ──────────────────────────────────────────────────────
 L["CONTEXT_BADGE"]      = "此区域有 %d 条笔记"
-L["CONTEXT_TOAST"]      = "BigNoteBox：%d 条笔记，位于 %s"
 
 -- ── Confirmations ─────────────────────────────────────────────────────────────
 L["POPUP_DELETE_NOTE"]   = "删除笔记“%s”？此操作无法撤销。"
@@ -684,11 +665,9 @@ L["SLASH_HELP_OPEN"]     = "  /bnb - 切换笔记窗口"
 L["SLASH_HELP_NEW"]      = "  /bnb new - 创建新笔记"
 L["SLASH_HELP_RESET"]    = "  /bnb reset - 重置所有设置"
 L["SLASH_HELP_CONFIG"]   = "  /bnb config - 打开设置"
-L["SLASH_RESET_DONE"]    = "所有设置已重置为默认值。"
 L["SLASH_NOTE_CREATED"]  = "新笔记已创建。"
 
 -- ── Minimap ───────────────────────────────────────────────────────────────────
-L["MINIMAP_TOOLTIP"]     = "BigNoteBox"
 L["MINIMAP_LEFT_CLICK"]  = "|cffffd100左键点击|r 切换笔记"
 L["MINIMAP_RIGHT_CLICK"] = "|cffffd100右键点击|r 新建笔记"
 L["MINIMAP_DRAG"]        = "|cffffd100拖动|r 重新定位"
@@ -698,7 +677,6 @@ L["CONFIG_TITLE"]           = "BigNoteBox 设置"
 L["CONFIG_FONT_SIZE"]       = "笔记正文字体大小"
 L["CONFIG_FONT_FAMILY"]     = "笔记字体"
 L["CONFIG_CONTEXT_SURFACE"] = "显示情境笔记警报"
-L["CONFIG_BCB_INTEGRATION"] = "启用 BigChatBox 集成"
 L["CONFIG_SHOW_MINIMAP"]    = "显示小地图按钮"
 L["CONFIG_HIDE_LOGIN_MSG"]  = "隐藏登录消息"
 
@@ -707,10 +685,8 @@ L["CFG_TAB_GENERAL"]    = "常规"
 L["CFG_TAB_APPEARANCE"] = "外观"
 L["CFG_TAB_FEATURES"]   = "功能"
 L["CFG_TAB_EDITOR"]     = "编辑器"
-L["CFG_TAB_KEYBINDS"]   = "按键绑定"
 L["CFG_TAB_ADVANCED"]   = "高级"
 L["CFG_TAB_BACKUP"]     = "备份"
-L["CFG_TAB_RESET"]      = "重置"
 
 -- ── Backup / Export-Import ─────────────────────────────────────────────────────
 L["BACKUP_EXPORT_HEADER"]      = "导出笔记"
@@ -737,9 +713,6 @@ L["STICKY_COMBAT"]      = "战斗中无法打开便签。"
 L["STICKY_MAX"]         = "已达到最大 %d 个打开的便签。"
 
 -- ── Icon picker ───────────────────────────────────────────────────────────────
-L["ICON_PICKER_TITLE"]  = "选择图标"
-L["ICON_PICKER_SEARCH"] = "搜索图标..."
-L["ICON_PICKER_CLEAR"]  = "清除图标（使用默认）"
 
 -- ── Tag editing ───────────────────────────────────────────────────────────────
 L["TAG_ADD_HINT"]        = "添加标签..."
@@ -754,7 +727,6 @@ L["TAG_MGR_COUNT"]       = "%d 条笔记"
 L["TAG_MGR_RENAME"]      = "重命名"
 L["TAG_MGR_DELETE"]      = "删除"
 L["TAG_MGR_RENAME_HINT"] = "新标签名称..."
-L["TAG_MGR_RENAME_CONFIRM"] = "将“%s”重命名为“%s”？"
 L["TAG_MGR_DELETE_CONFIRM"] = "将标签“%s”从所有 %d 条笔记中移除？"
 L["TAG_MGR_MERGE_NOTE"]  = "提示：将标签重命名为现有名称以合并它们。"
 
@@ -791,10 +763,8 @@ L["SCOPE_NO_ALTS"]       = "尚未注册其他角色。请至少登录每个小�
 
 -- ── Reference Box ─────────────────────────────────────────────────────────────
 L["REFBOX_TITLE"]           = "参考框"
-L["REFBOX_TITLE_NOTE"]      = "参考框：%s"
 L["REFBOX_EMPTY"]           = "将物品拖到此处，\nShift-点击物品，或\n在上方字段中输入 ID。"
 L["REFBOX_COUNT"]           = "附件 (%d/%d)"
-L["REFBOX_HINT"]            = "将物品拖到此处 · Shift-点击添加"
 L["REFBOX_PLACEHOLDER"]     = "物品 ID，s:法术 ID，q:任务 ID"
 L["REFBOX_ADD_BTN"]         = "添加"
 L["REFBOX_CTX_SEND"]        = "发送到聊天"
@@ -865,8 +835,6 @@ L["REFBOX_TASK_SITUATION_FMT"]  = "情境：%s"
 L["REFBOX_TASK_CLICK_EDIT"]     = "点击编辑。"
 L["REFBOX_TASK_RESET_DAILY_TIP"]  = "重置：每日"
 L["REFBOX_TASK_RESET_WEEKLY_TIP"] = "重置：每周"
-L["REFBOX_TASK_HDR_CTX_TITLE"]  = "笔记任务默认设置"
-L["REFBOX_TASK_HDR_CTX_EDIT"]   = "编辑全局重置和情境..."
 L["REFBOX_TASK_SIT_ZONE_FMT"]     = "区域：%s"
 L["REFBOX_TASK_SIT_SUBZONE_FMT"]  = "子区域：%s"
 L["REFBOX_TASK_SIT_INSTANCE_FMT"] = "副本：%s"
@@ -910,8 +878,6 @@ L["HISTORY_SIZE_TOTAL"]          = "总计：%s"
 L["HISTORY_CLEAR_ALL_BTN"]       = "清除所有历史"
 L["HISTORY_CLEAR_ALL_TIP"]       = "删除所有笔记的所有历史记录"
 L["HISTORY_CLEAR_ALL_CONFIRM"]   = "确定要删除所有笔记的所有历史记录吗？此操作无法撤销。"
-L["HISTORY_SNAPSHOTS_ONE"]       = "1 个快照"
-L["HISTORY_SNAPSHOTS_MANY"]      = "%d 个快照"
 
 -- Per-Note History Panel
 L["HISTORY_NOTE_TITLE"]          = "历史：%s"
@@ -966,7 +932,6 @@ L["HISTORY_TOOLBAR_TIP"]         = "笔记历史"
 L["WELCOME_MORNING"]   = "早上好"
 L["WELCOME_AFTERNOON"] = "下午好"
 L["WELCOME_EVENING"]   = "晚上好"
-L["WELCOME_NIGHT"]     = "晚安"
 
 L["WELCOME_WEEKDAYS"] = {
     [1] = "星期日", [2] = "星期一", [3] = "星期二", [4] = "星期三",
@@ -978,7 +943,6 @@ L["WELCOME_MONTHS"] = {
     [9]  = "九月",[10] = "十月",  [11] = "十一月", [12] = "十二月",
 }
 
-L["WELCOME_LOC_NOTES"]  = "当前位置笔记"
 L["WELCOME_FAV_NOTES"]  = "收藏笔记"
 L["WELCOME_IMPORT_BTN"]       = "导入笔记"
 L["WELCOME_CONFIG_BTN"]       = "打开配置"
@@ -1019,7 +983,6 @@ L["CFG_FOCUS_OVERLAY_SKIN_COLOR"]     = "使用皮肤颜色为遮罩着色 (仅�
 L["CFG_FOCUS_OVERLAY_SKIN_COLOR_TIP"] = "启用后，专注遮罩将使用您当前的皮肤颜色作为色调，而不是纯黑色。"
 
 -- Rich Notes
-L["CFG_RICH_NOTES_HEADER"]      = "富文本笔记"
 L["CFG_RICH_NOTES_DEFAULT"]     = "新笔记默认为富文本"
 L["CFG_RICH_NOTES_DEFAULT_TIP"] = "启用后，新笔记将创建为支持标记格式的富文本笔记。"
 L["CFG_RICH_OPEN_EDITOR"]       = "始终在编辑器模式下打开富文本笔记"
@@ -1032,8 +995,6 @@ L["CFG_KB_TOGGLE_RV"]           = "打开编辑器模式："
 L["CFG_KB_TOGGLE_RV_TIP"]       = "打开当前富文本笔记的编辑器。如果笔记已处于编辑器模式，则不执行任何操作。"
 L["CFG_SKIN_RANDOMIZE"]         = "登录/重载时随机化主题"
 L["CFG_SKIN_RANDOMIZE_TIP"]     = "每次登录或重载时随机选择不同的皮肤预设。亮度不受影响。"
-L["RICH_MARKUP_TAB_EDITOR"]     = "编辑器"
-L["RICH_MARKUP_TAB_VIEW"]       = "视图"
 L["MARKUP_PREVIEW_BTN"]         = "实时预览"
 L["MARKUP_PREVIEW_TIP"]         = "切换实时预览窗口 - 在您输入时渲染富文本笔记。"
 L["RICH_PREVIEW_TITLE"]         = "实时预览"
@@ -1059,12 +1020,8 @@ L["DS_DECLINE"]             = "拒绝"
 L["DS_DECLINED_PRINT"]      = "|cffffcc00BigNoteBox：|r 已拒绝来自 %s 的传入笔记。"
 L["DS_AUTO_REJECTED"]       = "|cffffcc00BigNoteBox：|r 已自动拒绝来自 %s 的笔记 (自动拒绝已开启)。"
 -- Config: Features tab -- Direct Send
-L["CFG_DS_HEADER"]          = "直接发送"
-L["CFG_DS_AUTO_REJECT"]     = "自动拒绝传入的笔记分享"
-L["CFG_DS_AUTO_REJECT_TIP"] = "静默拒绝直接从 BigNoteBox 或 TakeANote 发送的笔记，不显示提示。类似于魔兽世界的自动拒绝决斗选项。"
 
 -- What's New window
-L["WHATS_NEW_TITLE"]       = "有什么新功能？"
 L["WHATS_NEW_VERSION_TIP"] = "点击查看补丁说明"
 
 -- LibSharedMedia font opt-in
@@ -1847,7 +1804,6 @@ L["INSPECT_TIP_WAITING"]            = "正在等待检查数据..."
 L["INSPECT_TIP_EXISTS"]             = "%s 已有备注。"
 L["INSPECT_TIP_DUPE"]               = "点击查看或创建重复项。"
 L["INSPECT_TIP_FROM"]               = "来自该玩家的检查数据。"
-L["ADV_REMOVE_TAGS_CONFIRM"]        = "这将移除此笔记中的所有格式标签。此操作无法撤销。\n\n继续吗？"
 L["ADV_REMOVE_TAGS_BTN"]            = "移除标签"
 L["QN_CONFIRM_TEXT"]                = "创建笔记 - 如有需要，请编辑标题："
 L["QN_CONFIRM_CREATE"]              = "创建"
@@ -1856,8 +1812,6 @@ L["QN_BTN_TIP2_QUEST"]              = "来自此任务。"
 L["QN_BTN_TIP2_IMM"]                = "来自此 Immersion 对话。"
 L["QN_BTN_TIP_DRAG"]                = "按住 Shift 并拖动以重新定位。"
 L["QN_NO_QUEST"]                    = "任务日志中未选择任何任务。"
-L["QN_IMM_RESTORED"]                = "QuickNote：Immersion 已恢复。"
-L["QN_IMM_BYPASSED"]                = "QuickNote：已绕过 Immersion - 对话结束前将使用游戏原生界面。"
 L["POPANCHOR_TITLE"]                = "上下文弹窗锚点"
 L["POPANCHOR_LOCK"]                 = "锁定"
 L["POPANCHOR_TIP1"]                 = "拖动以设置上下文弹窗出现的位置。"

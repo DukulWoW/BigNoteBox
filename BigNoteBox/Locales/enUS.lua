@@ -29,7 +29,6 @@ local L = BigNoteBox.L
 -- ── Addon identity ────────────────────────────────────────────────────────────
 L["ADDON_NAME"]   = "BigNoteBox"
 L["AUTHOR"]       = "by Dukul"
-L["VERSION"]      = "Version"
 L["LOADED_MSG"]   = "BigNoteBox v%s loaded! Type /bnb for options."
 
 -- ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -42,9 +41,7 @@ L["YES"]          = "Yes"
 L["NO"]           = "No"
 L["CONFIRM"]      = "Confirm"
 L["RESET"]        = "Reset"
-L["SEARCH"]       = "Search"
 L["UNTITLED"]     = "Untitled Note"
-L["NEW_NOTE"]     = "New Note"
 
 -- ── Fonts (shared) ────────────────────────────────────────────────────────────
 L["FONT_USE_WOW_DEFAULT"]     = "Use WoW's default font"
@@ -62,12 +59,7 @@ L["BTN_NEW_NOTE"]       = "New Note"
 L["BTN_SAVE_NOTE"]      = "Save"
 L["BTN_DELETE_NOTE"]    = "Delete"
 L["BTN_COPY_NOTE"]        = "Copy this entire note to your clipboard"
-L["BTN_COPY_NOTE_DONE"]   = "Note copied to clipboard."
 L["BTN_COPY_NOTE_CLASSIC"]= "Note selected - press Ctrl+C to copy."
-L["BTN_SEND_TO_CHAT"]   = "Send to Chat"
-L["BTN_COPY"]           = "Copy"
-L["BTN_TAG"]            = "Tag"
-L["BTN_CONTEXT"]        = "Context"
 
 -- ── Main window: title bar lock/scale button ─────────────────────────────────
 L["MW_LOCK_TIP"]         = "Window scale is locked"
@@ -660,36 +652,25 @@ L["SB_COPY_MOVE_MULTI_ONE_FMT"] = "Copy / Move %d Note"
 L["SB_COPY_MOVE_MULTI_N_FMT"]   = "Copy / Move %d Notes"
 
 -- ── Tags ──────────────────────────────────────────────────────────────────────
-L["TAGS"]               = "Tags"
 L["TAG_ADD_HINT"]       = "Add tag..."
-L["TAG_NONE"]           = "No tags"
 
 -- ── Context binding ───────────────────────────────────────────────────────────
-L["CONTEXT"]            = "Context"
-L["CONTEXT_NONE"]       = "Anywhere"
-L["CONTEXT_ZONE"]       = "Zone"
-L["CONTEXT_INSTANCE"]   = "Instance"
-L["CONTEXT_PLAYER"]     = "Player"
 
 -- ── Send to Chat ──────────────────────────────────────────────────────────────
 L["SEND_TITLE"]         = "Send to Chat"
 L["SEND_CHANNEL_LABEL"] = "Channel:"
 L["SEND_LINE_BY_LINE"]  = "Send each line as a separate message"
-L["SEND_CONFIRM"]       = "Send %d line(s) to %s?"
 L["SEND_CONFIRM_BTN"]   = "Send"
-L["SEND_NO_BCB"]        = "Sending without BigChatBox (direct mode)"
 L["SEND_EMPTY"]         = "Note is empty - nothing to send."
 L["SEND_COMPLETE"]      = "Sent %d line(s) to %s."
 
 -- ── Chat Capture ──────────────────────────────────────────────────────────────
 L["CAPTURE_SAVED"]      = "Chat captured as note: %s"
-L["CAPTURE_APPENDED"]   = "Appended to note: %s"
 L["CAPTURE_EMPTY"]      = "Nothing to capture."
 L["CAPTURE_MENU"]       = "Save to BigNoteBox"
 
 -- ── Contextual surfacing ──────────────────────────────────────────────────────
 L["CONTEXT_BADGE"]      = "%d note(s) for this area"
-L["CONTEXT_TOAST"]      = "BigNoteBox: %d note(s) for %s"
 
 -- ── Confirmations ─────────────────────────────────────────────────────────────
 L["POPUP_DELETE_NOTE"]   = "Delete note '%s'? This cannot be undone."
@@ -704,11 +685,9 @@ L["SLASH_HELP_NEW"]      = "  /bnb new - Create a new note"
 L["SLASH_HELP_RESET"]    = "  /bnb reset - Reset all settings"
 L["SLASH_HELP_CONFIG"]   = "  /bnb config - Open settings"
 L["SLASH_HELP_DEBUG"]    = "  /bnb debug - Open the developer tools"
-L["SLASH_RESET_DONE"]    = "All settings reset to defaults."
 L["SLASH_NOTE_CREATED"]  = "New note created."
 
 -- ── Minimap ───────────────────────────────────────────────────────────────────
-L["MINIMAP_TOOLTIP"]     = "BigNoteBox"
 L["MINIMAP_LEFT_CLICK"]  = "|cffffd100Left-click|r Toggle notes"
 L["MINIMAP_RIGHT_CLICK"] = "|cffffd100Right-click|r New note"
 L["MINIMAP_DRAG"]        = "|cffffd100Drag|r to reposition"
@@ -718,7 +697,6 @@ L["CONFIG_TITLE"]           = "BigNoteBox Settings"
 L["CONFIG_FONT_SIZE"]       = "Note body font size"
 L["CONFIG_FONT_FAMILY"]     = "Note font"
 L["CONFIG_CONTEXT_SURFACE"] = "Show contextual note alerts"
-L["CONFIG_BCB_INTEGRATION"] = "Enable BigChatBox integration"
 L["CONFIG_SHOW_MINIMAP"]    = "Show minimap button"
 L["CONFIG_HIDE_LOGIN_MSG"]  = "Hide login message"
 
@@ -727,10 +705,8 @@ L["CFG_TAB_GENERAL"]    = "General"
 L["CFG_TAB_APPEARANCE"] = "Appearance"
 L["CFG_TAB_FEATURES"]   = "Features"
 L["CFG_TAB_EDITOR"]     = "Editor"
-L["CFG_TAB_KEYBINDS"]   = "Keybinds"
 L["CFG_TAB_ADVANCED"]   = "Advanced"
 L["CFG_TAB_BACKUP"]     = "Backup"
-L["CFG_TAB_RESET"]      = "Reset"
 
 -- ── Backup / Export-Import ─────────────────────────────────────────────────────
 L["BACKUP_EXPORT_HEADER"]      = "Export Notes"
@@ -757,9 +733,6 @@ L["STICKY_COMBAT"]      = "Cannot open sticky notes during combat."
 L["STICKY_MAX"]         = "Maximum of %d sticky notes already open."
 
 -- ── Icon picker ───────────────────────────────────────────────────────────────
-L["ICON_PICKER_TITLE"]  = "Choose Icon"
-L["ICON_PICKER_SEARCH"] = "Search icons..."
-L["ICON_PICKER_CLEAR"]  = "Clear icon (use default)"
 
 -- ── Tag editing ───────────────────────────────────────────────────────────────
 L["TAG_ADD_HINT"]        = "Add tag..."
@@ -774,7 +747,6 @@ L["TAG_MGR_COUNT"]       = "%d note(s)"
 L["TAG_MGR_RENAME"]      = "Rename"
 L["TAG_MGR_DELETE"]      = "Delete"
 L["TAG_MGR_RENAME_HINT"] = "New tag name..."
-L["TAG_MGR_RENAME_CONFIRM"] = "Rename '%s' to '%s'?"
 L["TAG_MGR_DELETE_CONFIRM"] = "Remove tag '%s' from all %d note(s)?"
 L["TAG_MGR_MERGE_NOTE"]  = "Tip: rename a tag to an existing name to merge them."
 
@@ -811,10 +783,8 @@ L["SCOPE_NO_ALTS"]       = "No other characters registered yet. Log in on each a
 
 -- ── Reference Box ─────────────────────────────────────────────────────────────
 L["REFBOX_TITLE"]           = "Reference Box"
-L["REFBOX_TITLE_NOTE"]      = "Refbox: %s"
 L["REFBOX_EMPTY"]           = "Drag items here,\nshift-click items, or\ntype an ID in the field above."
 L["REFBOX_COUNT"]           = "Attachments (%d/%d)"
-L["REFBOX_HINT"]            = "Drag items here - Shift-click to add"
 L["REFBOX_PLACEHOLDER"]     = "Item ID, s:Spell ID, q:Quest ID"
 L["REFBOX_ADD_BTN"]         = "Add"
 L["REFBOX_CTX_SEND"]        = "Send to chat"
@@ -885,8 +855,6 @@ L["REFBOX_TASK_SITUATION_FMT"]  = "Situation: %s"
 L["REFBOX_TASK_CLICK_EDIT"]     = "Click to edit."
 L["REFBOX_TASK_RESET_DAILY_TIP"]  = "Reset: Daily"
 L["REFBOX_TASK_RESET_WEEKLY_TIP"] = "Reset: Weekly"
-L["REFBOX_TASK_HDR_CTX_TITLE"]  = "Note task defaults"
-L["REFBOX_TASK_HDR_CTX_EDIT"]   = "Edit global reset and situation..."
 L["REFBOX_TASK_SIT_ZONE_FMT"]     = "Zone: %s"
 L["REFBOX_TASK_SIT_SUBZONE_FMT"]  = "Sub-zone: %s"
 L["REFBOX_TASK_SIT_INSTANCE_FMT"] = "Instance: %s"
@@ -930,8 +898,6 @@ L["HISTORY_SIZE_TOTAL"]          = "Total: %s"
 L["HISTORY_CLEAR_ALL_BTN"]       = "Clear All History"
 L["HISTORY_CLEAR_ALL_TIP"]       = "Delete all history for all notes"
 L["HISTORY_CLEAR_ALL_CONFIRM"]   = "Delete ALL history for ALL notes? This cannot be undone."
-L["HISTORY_SNAPSHOTS_ONE"]       = "1 snapshot"
-L["HISTORY_SNAPSHOTS_MANY"]      = "%d snapshots"
 
 -- Per-Note History Panel
 L["HISTORY_NOTE_TITLE"]          = "History: %s"
@@ -986,7 +952,6 @@ L["HISTORY_TOOLBAR_TIP"]         = "Note History"
 L["WELCOME_MORNING"]   = "Good morning"
 L["WELCOME_AFTERNOON"] = "Good afternoon"
 L["WELCOME_EVENING"]   = "Good evening"
-L["WELCOME_NIGHT"]     = "Good night"
 
 L["WELCOME_WEEKDAYS"] = {
     [1] = "Sunday", [2] = "Monday", [3] = "Tuesday", [4] = "Wednesday",
@@ -998,7 +963,6 @@ L["WELCOME_MONTHS"] = {
     [9]  = "September",[10] = "October",  [11] = "November", [12] = "December",
 }
 
-L["WELCOME_LOC_NOTES"]  = "Current location notes"
 L["WELCOME_FAV_NOTES"]  = "Favorite notes"
 L["WELCOME_IMPORT_BTN"]       = "Import note(s)"
 L["WELCOME_CONFIG_BTN"]       = "Open config"
@@ -1039,7 +1003,6 @@ L["CFG_FOCUS_OVERLAY_SKIN_COLOR"]     = "Tint overlay with skin color (skin mode
 L["CFG_FOCUS_OVERLAY_SKIN_COLOR_TIP"] = "When enabled, the focus overlay uses your current skin color as a tint instead of plain black."
 
 -- Rich Notes
-L["CFG_RICH_NOTES_HEADER"]      = "Rich Notes"
 L["CFG_RICH_NOTES_DEFAULT"]     = "New notes are rich by default"
 L["CFG_RICH_NOTES_DEFAULT_TIP"] = "When enabled, new notes are created as rich notes with markup formatting support."
 L["CFG_RICH_OPEN_EDITOR"]       = "Always open rich notes in editor mode"
@@ -1052,8 +1015,6 @@ L["CFG_KB_TOGGLE_RV"]           = "Open editor mode:"
 L["CFG_KB_TOGGLE_RV_TIP"]       = "Opens the editor for the current rich note. If the note is already in editor mode, this does nothing."
 L["CFG_SKIN_RANDOMIZE"]         = "Randomize theme on login/reload"
 L["CFG_SKIN_RANDOMIZE_TIP"]     = "Randomly picks a different skin preset each time you log in or reload. Brightness is not affected."
-L["RICH_MARKUP_TAB_EDITOR"]     = "Editor"
-L["RICH_MARKUP_TAB_VIEW"]       = "View"
 L["MARKUP_PREVIEW_BTN"]         = "Live Preview"
 L["MARKUP_PREVIEW_TIP"]         = "Toggle the live preview window - renders the rich note as you type."
 L["RICH_PREVIEW_TITLE"]         = "Live Preview"
@@ -1079,12 +1040,8 @@ L["DS_DECLINE"]             = "Decline"
 L["DS_DECLINED_PRINT"]      = "|cffffcc00BigNoteBox:|r Incoming note from %s declined."
 L["DS_AUTO_REJECTED"]       = "|cffffcc00BigNoteBox:|r Note from %s auto-rejected (auto-reject is on)."
 -- Config: Features tab -- Direct Send
-L["CFG_DS_HEADER"]          = "Direct Send"
-L["CFG_DS_AUTO_REJECT"]     = "Auto-reject incoming note shares"
-L["CFG_DS_AUTO_REJECT_TIP"] = "Silently decline notes sent directly from BigNoteBox or TakeANote, without showing a prompt. Similar to WoW's auto-decline duel option."
 
 -- What's New window
-L["WHATS_NEW_TITLE"]       = "What's New?"
 L["WHATS_NEW_VERSION_TIP"] = "Click to see patch notes"
 
 -- LibSharedMedia font opt-in
@@ -1882,7 +1839,6 @@ L["INSPECT_TIP_WAITING"]            = "Waiting for inspect data..."
 L["INSPECT_TIP_EXISTS"]             = "A note already exists for %s."
 L["INSPECT_TIP_DUPE"]               = "Click to view or create a duplicate."
 L["INSPECT_TIP_FROM"]               = "from this player's inspect data."
-L["ADV_REMOVE_TAGS_CONFIRM"]        = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?"
 L["ADV_REMOVE_TAGS_BTN"]            = "Remove tags"
 L["QN_CONFIRM_TEXT"]                = "Create note - edit title if needed:"
 L["QN_CONFIRM_CREATE"]              = "Create"
@@ -1891,8 +1847,6 @@ L["QN_BTN_TIP2_QUEST"]              = "from this quest."
 L["QN_BTN_TIP2_IMM"]                = "from this Immersion dialogue."
 L["QN_BTN_TIP_DRAG"]                = "Shift+Drag to reposition."
 L["QN_NO_QUEST"]                    = "No quest selected in the quest log."
-L["QN_IMM_RESTORED"]                = "QuickNote: Immersion restored."
-L["QN_IMM_BYPASSED"]                = "QuickNote: Immersion bypassed - native frames active until conversation ends."
 L["POPANCHOR_TITLE"]                = "Context Popup Anchor"
 L["POPANCHOR_LOCK"]                 = "Lock"
 L["POPANCHOR_TIP1"]                 = "Drag to position where context popups appear."
