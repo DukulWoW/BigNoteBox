@@ -86,6 +86,22 @@ local _rbMode        = "attachments"
 local _taskRows      = {}   -- pool of task row frames
 local _taskCallbackRegistered = false  -- ensures TasksChanged callback is registered once
 local _collapsedTasks = {}  -- taskID → true when user has collapsed that parent row
+-- Inline task edit in progress, { id = taskID, eb = editbox }, set on focus gain.
+-- Rebuilding the rows hides a focused editbox, and its OnEditFocusLost used to
+-- read that as "the user left the field": an empty task was deleted from inside
+-- RenderTaskPanel, and the 0.05s re-composite in RenderList then re-showed a
+-- panel with no rows and no + button (ALL-76). While _taskTeardown is set a
+-- focus loss is ignored, and RenderTaskPanel carries the edit over to the new row.
+local _taskEdit       = nil
+local _taskTeardown   = false
+-- What the task rows were last built from. ApplyTaskLayout re-renders before
+-- showing the panel when they are stale, so the panel is never shown over rows
+-- a no-tasks render tore down ("Tasks (0/1)", no rows, no + button, ALL-76).
+local _taskDataGen    = 0      -- bumped on every TasksChanged
+local _taskRowsGen    = -1     -- _taskDataGen when the rows were built
+local _taskRowsNoteID = nil    -- note the rows were built for; nil = none built
+local _taskRendering  = false  -- RenderTaskPanel running: a nested call reruns it after
+local _taskRenderAgain = false
 
 local RenderList               -- forward declaration
 local SyncRefBoxHeight         -- forward declaration (defined near PositionFrame)
@@ -97,6 +113,7 @@ local BuildModelViewer         -- forward declaration
 local ApplyModelLayout         -- forward declaration
 local RenderTaskPanel          -- forward declaration
 local ApplyTaskLayout          -- forward declaration
+local StartTaskEdit            -- forward declaration
 local UpdateDynamicTitle       -- forward declaration
 local UpdateModeStrip          -- forward declaration
 local PositionModeStrip        -- forward declaration (the picker's OnDragStop calls it)
@@ -1438,10 +1455,19 @@ RenderList = function()
             -- Without this, the task panel appears transparent over attachment
             -- cards until the splitter is dragged (which triggers the same
             -- geometry pass via SetHeight).
+            -- ApplyTaskLayout does the Show, and only when there are tasks to
+            -- show (a bare Show re-showed a panel emptied in between, ALL-76).
+            -- An inline task edit survives the Hide/Show.
             local tp = rbFrame._taskPanel
             if tp and tp:IsShown() then
+                local keep = _taskEdit and _taskEdit.eb:HasFocus()
+                    and { id = _taskEdit.id, text = _taskEdit.eb:GetText() }
+                _taskTeardown = true
+                if keep then _taskEdit.eb:ClearFocus() end
                 tp:Hide()
-                tp:Show()
+                ApplyTaskLayout(rbFrame)
+                _taskTeardown = false
+                if keep and tp:IsShown() then StartTaskEdit(keep.id, keep.text) end
             end
         end
     end)
@@ -1811,6 +1837,10 @@ ApplyTaskLayout = function(f)
     local taskTop = contentTop - attH - (useSplitter and SPLITTER_H or 0)
 
     if taskPnl then
+        -- Rows built for another note or older data: rebuild first (ALL-76)
+        if _taskRowsNoteID ~= _noteID or _taskRowsGen ~= _taskDataGen then
+            RenderTaskPanel()
+        end
         taskPnl:Show()
         -- Refresh frame level each layout pass so taskPnl stays above attachment
         -- rows even after rbFrame is Raised (SetToplevel raises the whole stack,
@@ -1979,18 +2009,15 @@ local function BuildTaskPanel(f)
     addWide:Hide()
     addWide:SetScript("OnClick", function()
         if not _noteID or not BNB.Task then return end
-        BNB.Task.AddTask(_noteID, "")
+        local taskID = BNB.Task.AddTask(_noteID, "")
         RenderTaskPanel()
         ApplyTaskLayout(rbFrame)
         UpdateModelViewer()
         UpdateDynamicTitle()
         UpdateModeStrip()
-        for _, row in ipairs(_taskRows) do
-            if row._editBox then
-                row._editBox:SetFocus()
-                break
-            end
-        end
+        -- Focused the first row's editbox without showing it, so the new task
+        -- stayed "(empty)" and was never cleaned up (ALL-76).
+        if taskID then BNB.FocusTaskEditBox(taskID) end
     end)
     f._addTasksWide = addWide
 
@@ -2092,6 +2119,7 @@ RegisterTaskCallback = function()
     if not BNB.Task or not BNB.Task.RegisterCallback then return end
     _taskCallbackRegistered = true
     BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
+        _taskDataGen = _taskDataGen + 1
         if rbFrame and rbFrame:IsShown() and changedNoteID == _noteID then
             if BNB.Task then
                 for _, task in ipairs(BNB.Task.GetTasks(_noteID)) do
@@ -2123,11 +2151,38 @@ RegisterTaskCallback = function()
 end
 
 -- ── Task panel renderer ───────────────────────────────────────────────────────
+-- Open the inline editbox of a rendered task row with the given text.
+-- Returns true when the row was found.
+StartTaskEdit = function(taskID, text)
+    for _, row in ipairs(_taskRows) do
+        if row._taskID == taskID and row._editBox then
+            for _, region in ipairs({ row:GetRegions() }) do
+                if region.SetWordWrap then region:Hide() end
+            end
+            row._editBox:SetText(text or "")
+            row._editBox:Show()
+            row._editBox:SetFocus()
+            return true
+        end
+    end
+    return false
+end
+
 -- Renders task rows into f._taskScrollChild. Called from RenderList.
-RenderTaskPanel = function()
+local function DoRenderTaskPanel()
     if not rbFrame then return end
     local tsc = rbFrame._taskScrollChild
     if not tsc then return end
+
+    -- Carry an inline edit over the rebuild (ALL-76): the new row reopens it
+    -- with the typed text, if the task still exists.
+    local keepEdit
+    if _taskEdit and _taskEdit.eb:HasFocus() then
+        keepEdit = { id = _taskEdit.id, text = _taskEdit.eb:GetText() }
+    end
+    local wasTeardown = _taskTeardown
+    _taskTeardown = true
+    if keepEdit then _taskEdit.eb:ClearFocus() end
 
     -- Release existing task row widgets — hide frames and fontstrings alike
     for _, tr in ipairs(_taskRows) do tr:Hide() end
@@ -2136,6 +2191,9 @@ RenderTaskPanel = function()
     -- accumulation (FontStrings created on tsc can't be destroyed, only hidden).
     for _, child in ipairs({ tsc:GetChildren() }) do child:Hide() end
     for _, region in ipairs({ tsc:GetRegions() }) do region:Hide() end
+    _taskTeardown = wasTeardown
+    _taskEdit = nil
+    _taskRowsNoteID, _taskRowsGen = nil, _taskDataGen
 
     local hasTasks = BNB.Task and BNB.Task.HasTasks(_noteID)
     local taskPnl  = rbFrame._taskPanel
@@ -2148,6 +2206,7 @@ RenderTaskPanel = function()
 
     -- Tasks exist: ensure panel is visible (ApplyTaskLayout positions it)
     if taskPnl then taskPnl:Show() end
+    _taskRowsNoteID = _noteID
 
     local db           = BigNoteBoxDB
     local completedPos = (db and db.taskCompletedPosition) or "bottom"
@@ -2361,7 +2420,11 @@ RenderTaskPanel = function()
             eb:Show()
             eb:SetFocus()
         end)
+        eb:SetScript("OnEditFocusGained", function(self)
+            _taskEdit = { id = task.id, eb = self }
+        end)
         eb:SetScript("OnEnterPressed", function(self)
+            _taskEdit = nil  -- edit ends here; the re-render below must not reopen it
             local newText = self:GetText()
             if IsShiftKeyDown() then
                 -- Shift+Enter: save current task and create a new sibling below it
@@ -2391,6 +2454,7 @@ RenderTaskPanel = function()
             self:ClearFocus()
         end)
         eb:SetScript("OnEscapePressed", function(self)
+            _taskEdit = nil
             if task.text == "" then
                 -- Escape on a never-saved empty task removes it
                 BNB.Task.DeleteTask(_noteID, task.id)
@@ -2400,6 +2464,9 @@ RenderTaskPanel = function()
             self:ClearFocus()
         end)
         eb:SetScript("OnEditFocusLost", function(self)
+            -- Rows being rebuilt: not the user leaving the field (ALL-76)
+            if _taskTeardown then return end
+            _taskEdit = nil
             if self:IsShown() then
                 -- Focus lost without Enter/Escape — save if non-empty, delete if empty
                 local newText = self:GetText()
@@ -2667,6 +2734,24 @@ RenderTaskPanel = function()
     end
     SetFooterBtn(rbFrame._taskClrBtn, hasCompleted)
     SetFooterBtn(rbFrame._taskDelBtn, hasCompleted)
+
+    if keepEdit then StartTaskEdit(keepEdit.id, keepEdit.text) end
+end
+
+-- A render triggered from inside a render (a focus change deleting a task,
+-- a TasksChanged listener) runs again after the current one instead of
+-- nesting, so the last pass always draws the current data (ALL-76).
+RenderTaskPanel = function()
+    if _taskRendering then _taskRenderAgain = true; return end
+    _taskRendering = true
+    local passes = 0
+    repeat
+        _taskRenderAgain = false
+        passes = passes + 1
+        local ok, err = pcall(DoRenderTaskPanel)
+        if not ok then geterrorhandler()(err) end
+    until not _taskRenderAgain or passes >= 3
+    _taskRendering = false
 end
 
 -- Public helper: focus the inline editbox of a specific task row.
@@ -2678,17 +2763,12 @@ function BNB.FocusTaskEditBox(taskID)
     if rbFrame and rbFrame:IsShown() and _rbMode ~= "attachments" and IsInspectNote(_noteID) then
         OnModeClick("attachments")
     end
-    for _, row in ipairs(_taskRows) do
-        if row._taskID == taskID and row._editBox then
-            for _, region in ipairs({ row:GetRegions() }) do
-                if region.SetWordWrap then region:Hide() end
-            end
-            row._editBox:SetText("")
-            row._editBox:Show()
-            row._editBox:SetFocus()
-            return
-        end
-    end
+    if StartTaskEdit(taskID, "") then return end
+    -- No row to type into (Reference Box closed or disabled): the caller added
+    -- this empty task only to edit it, so don't leave it behind (ALL-76).
+    local T = BNB.Task
+    local task = T and _noteID and T.FindTask(_noteID, taskID)
+    if task and task.text == "" then T.DeleteTask(_noteID, taskID) end
 end
 
 -- ── Task context menu (WowStyle1DropdownTemplate — matches attachment rows) ──
