@@ -513,7 +513,12 @@ local function MakeUniqueTitle(baseName)
     return string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(time()))
 end
 
--- Find existing note by player context. Returns noteID or nil.
+-- Find an existing note for this player. Returns noteID or nil.
+-- Matches the player context, or an inspect note's inspectName/inspectRealm
+-- (the same test as NoteList and ReferenceBox). The context is only saved when
+-- inspectNoteAddSituation is on (default off), so on its own it missed every
+-- note made with default settings: no warning, and auto mode made a new
+-- "(Duplicate)" note on every inspect.
 local function FindExistingNote(playerName, realm)
     local ndb = BigNoteBoxNotesDB
     if not ndb or not ndb.notes then return nil end
@@ -521,6 +526,10 @@ local function FindExistingNote(playerName, realm)
     if realm and realm ~= "" then ctx = ctx .. "-" .. realm end
     for id, note in pairs(ndb.notes) do
         if note.context == ctx then return id end
+        if note.source == "inspect" and note.inspectName == playerName
+           and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == realm) then
+            return id
+        end
     end
     return nil
 end
