@@ -267,7 +267,7 @@ end
 -- BNB.CreateSkinCloseButton(parent, onClick)
 --
 -- Shared 22x22 textured close button used by every skinned window's title bar.
--- Matches the bt-close-normal/hover/press asset set used by MainWindowSkin's
+-- Matches the bt-close-normal/hover/press asset set used by MainWindow.lua's
 -- MakeTexBtn. Callers are responsible for anchoring; the convention is:
 --     btn:SetPoint("RIGHT", titleBar, "RIGHT", -2, 0)
 -- The -2 inset keeps the button slightly clear of the window border while
@@ -441,18 +441,10 @@ end
 
 --------------------------------------------------------------------------------
 -- OPEN MAIN WINDOW ROUTER
--- Replaces direct calls to CreateMainWindow / CreateMainWindowSkin everywhere.
--- Builds the frame on first call, then shows it.
+-- Builds the frame on first call, then shows it. CreateMainWindow picks the
+-- classic or skin chrome from BigNoteBoxDB.skinMode.
 --------------------------------------------------------------------------------
 function BNB.OpenMainWindow()
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        if not BNB.mainFrame then
-            if BNB.CreateMainWindowSkin then BNB.CreateMainWindowSkin() end
-        end
-    else
-        if not BNB.mainFrame then
-            if BNB.CreateMainWindow then BNB.CreateMainWindow() end
-        end
-    end
+    if not BNB.mainFrame and BNB.CreateMainWindow then BNB.CreateMainWindow() end
     if BNB.mainFrame then BNB.mainFrame:Show() end
 end

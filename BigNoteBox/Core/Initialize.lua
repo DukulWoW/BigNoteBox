@@ -101,12 +101,8 @@ function BNB.Initialize()
     -- 6. Main window — build always, show only if openOnLogin is enabled
     if BNB.OpenMainWindow then
         SafeCall("MainWindow", function()
-            -- Build the frame without showing it
-            if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-                if not BNB.mainFrame then BNB.CreateMainWindowSkin() end
-            else
-                if not BNB.mainFrame then BNB.CreateMainWindow() end
-            end
+            -- Build the frame without showing it (classic or skin chrome)
+            if not BNB.mainFrame then BNB.CreateMainWindow() end
             local db = BigNoteBoxDB
             local openOnce = db and db._openOnceAfterSetup
             if openOnce then db._openOnceAfterSetup = nil end

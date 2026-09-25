@@ -1,16 +1,16 @@
 -- BigNoteBox UI/MainWindow.lua
--- ButtonFrameTemplate window (matches BCB).
--- Two-pane layout with draggable splitter between list and editor panes.
+-- The main window: two-pane layout with a draggable splitter between the list
+-- and editor panes. Built once by BNB.CreateMainWindow for both looks; the
+-- frame and title bar come from a chrome builder (see CHROME CONTRACT below).
 
 local BNB = BigNoteBox
 local L   = BNB.L
 
 -- ── Layout constants ────────────────────────────────────────────────────────
--- TITLE_H: height of the ButtonFrameTemplate title area (includes the reserved
--- icon toolbar strip beneath the "BigNoteBox" heading).
-local TITLE_H    = 60
 local MIN_W      = 500
 local MIN_H      = 400
+local MAX_W      = 1400
+local MAX_H      = 1000
 local DEFAULT_W  = 820
 local DEFAULT_H  = 640
 
@@ -23,8 +23,40 @@ local DEFAULT_LIST_W = 240
 -- Must match COLLAPSED_W in NoteList.lua
 local COLLAPSED_W    = 82   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + PAD_L(8) + scrollbar(22) + 2
 
+local SORT_BTN_H = 22   -- height to match WowStyle1 button
+local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4)
+
+local BTNS   = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
+local TOPBAR = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
+local BCB_PROMO_ICON = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
+
 -- Runtime split position (set from DB on first window open)
 BNB._listPaneW = DEFAULT_LIST_W
+
+--------------------------------------------------------------------------------
+-- CHROME CONTRACT
+-- The window body (toolbar, sort, multi-select, splitter, resize, ESC, show
+-- and hide) is built once in BNB.CreateMainWindow. The frame itself and what
+-- differs between the two looks comes from a chrome builder: BuildClassicChrome
+-- below (ButtonFrameTemplate), or BNB.BuildMainWindowSkinChrome in
+-- MainWindowSkin.lua when BigNoteBoxDB.skinMode is on. A builder creates the
+-- frame named "BigNoteBoxFrame" and returns a table:
+--   frame        the window
+--   dragBar      optional extra drag handle (a mouse-enabled title strip)
+--   headerH      title + toolbar height; the panes start below it
+--   closeBtn     the close button; focus and lock line up to its left
+--   btnParent    parent of the focus / lock buttons
+--   btnSize      focus / lock button size; btnGap the space between buttons
+--   sortX, sortY TOPLEFT of the sort dropdown, from the window's TOPLEFT
+--   selY         TOP of the Select button, from the window's TOP
+--   iconX, iconY TOPRIGHT of the right-most toolbar icon (sidebar toggle)
+-- Optional hooks:
+--   AddTitleButtons(lockBtn, MakeTexBtn)  extra title-bar buttons left of lock
+--   StyleIcons(icons)                     once, with the toolbar icon buttons
+--   DotColour()                           splitter grip colour at rest (r,g,b)
+--   StylePanes(listPane, editorPane)      once, after the panes exist
+--   OnShow()                              each show, after the position is restored
+--------------------------------------------------------------------------------
 
 --------------------------------------------------------------------------------
 -- POSITION / SIZE / SPLIT PERSISTENCE
@@ -54,51 +86,262 @@ local function RestoreWindowPos(f)
     end
 end
 
--- Apply the current split position to listPane / editorPane / divider.
--- Called after drag and on window show.
-local function ApplySplit(f, listPane, editorPane, _divider, splitter)
-    local lw = BNB._listPaneW
-    listPane:SetWidth(lw)
-    if _divider then
-        _divider:SetPoint("TOPLEFT",    f, "TOPLEFT",   lw, -TITLE_H)
-        _divider:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", lw, 0)
-    end
-    splitter:SetPoint("TOPLEFT",    f, "TOPLEFT",   lw - 3, -TITLE_H)
-    splitter:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", lw - 3, 0)
-    editorPane:SetPoint("TOPLEFT",     f, "TOPLEFT",    lw + 1, -TITLE_H)
-    editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+-- Apply the current split position to the list pane / splitter / editor pane.
+-- Called after drag, resize, collapse and on window show.
+local function ApplySplit(f)
+    local lw, top = BNB._listPaneW, -f._headerH
+    BNB.listPane:SetWidth(lw)
+    f._splitter:SetPoint("TOPLEFT",    f, "TOPLEFT",    lw - 3, top)
+    f._splitter:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", lw - 3, 0)
+    BNB.editorPane:SetPoint("TOPLEFT",     f, "TOPLEFT",     lw + 1, top)
+    BNB.editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
 end
 
 --------------------------------------------------------------------------------
--- CREATE MAIN WINDOW
+-- BUTTON HELPERS
 --------------------------------------------------------------------------------
-function BNB.CreateMainWindow()
-    if BNB.mainFrame then return end
+-- Texture button with a normal / hover / press TGA set (Assets\Buttons\).
+-- Textures are exposed as _n / _h / _p for callers that desaturate or swap them.
+local function MakeTexBtn(parent, baseName, size, onClick, tipTitle, tipSub)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(size, size)
+    -- Suppress WoW's default button flash so our press texture shows cleanly
+    btn:SetHighlightTexture("")
+    btn:SetPushedTexture("")
 
-    -- Restore saved split width
-    BNB._listPaneW = math.max(MIN_LIST_W,
-        math.min(MAX_LIST_W, BigNoteBoxDB.splitX or DEFAULT_LIST_W))
+    local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
+    n:SetTexture(BTNS .. baseName .. "-normal")
+    local h = btn:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
+    h:SetTexture(BTNS .. baseName .. "-hover"); h:Hide()
+    local p = btn:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
+    p:SetTexture(BTNS .. baseName .. "-press"); p:Hide()
+
+    btn:SetScript("OnClick",     function() if onClick then onClick() end end)
+    btn:SetScript("OnMouseDown", function(self) if self:IsEnabled() then p:Show(); n:Hide(); h:Hide() end end)
+    btn:SetScript("OnMouseUp",   function(self) p:Hide(); if self:IsEnabled() then h:Show() else n:Show() end end)
+    btn:SetScript("OnEnter", function(self)
+        if self:IsEnabled() then n:Hide(); h:Show() end
+        if tipTitle then
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:AddLine(tipTitle, 1, 1, 1)
+            if tipSub then GameTooltip:AddLine(tipSub, 0.78, 0.78, 0.78) end
+            GameTooltip:Show()
+        end
+    end)
+    btn:SetScript("OnLeave", function()
+        p:Hide(); h:Hide(); n:Show()
+        GameTooltip:Hide()
+    end)
+
+    btn._n, btn._h, btn._p = n, h, p
+    return btn
+end
+
+-- Toolbar icon: plain Button, no template, fixed TOPRIGHT anchor on the window.
+local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick)
+    local ICON_BTN_SIZE = 20
+    local btn = CreateFrame("Button", nil, f)
+    btn:SetSize(ICON_BTN_SIZE, ICON_BTN_SIZE)
+    btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", x, y)
+
+    local iconTx = btn:CreateTexture(nil, "ARTWORK")
+    -- Texture slightly inset at rest; expands to fill (and slightly overflow)
+    -- the fixed hitbox on hover — gives a centred grow effect without moving
+    -- the frame anchor or shifting cursor hit registration.
+    local REST  = 2   -- inset each side at rest  (renders at ICON_BTN_SIZE - 4)
+    local HOVER = 2   -- outset each side on hover (renders at ICON_BTN_SIZE + 4)
+    iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
+    iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
+    iconTx:SetTexture(iconTex)
+    btn._tx = iconTx   -- exposed for SetDesaturated / alpha callers
+
+    btn:SetScript("OnEnter", function(self)
+        iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      -HOVER,  HOVER)
+        iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",   HOVER, -HOVER)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(tooltipText, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function()
+        iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
+        iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
+        GameTooltip:Hide()
+    end)
+    btn:SetScript("OnClick", onClick)
+    return btn
+end
+
+-- Text button with a tooltip (title line plus optional grey sub line).
+local function MakeTipButton(parent, text, w, tip, tipSub, onClick)
+    local btn = BNB.CreateButton(nil, parent, text, w, SORT_BTN_H)
+    btn:SetScript("OnClick", onClick)
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(tip, 1, 1, 1)
+        if tipSub then GameTooltip:AddLine(tipSub, 0.78, 0.78, 0.78) end
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return btn
+end
+
+--------------------------------------------------------------------------------
+-- SCALE-LOCK BUTTON
+-- Locked → bt-lock textures, unlocked → bt-unlock. State persists via
+-- BigNoteBoxDB.scaleLocked. Right-click resets the window size and position.
+--------------------------------------------------------------------------------
+local function IsLocked() return BigNoteBoxDB and BigNoteBoxDB.scaleLocked end
+
+local function MakeLockBtn(f, parent, size)
+    local lockBtn = CreateFrame("Button", nil, parent)
+    lockBtn:SetSize(size, size)
+    lockBtn:SetHighlightTexture("")
+    lockBtn:SetPushedTexture("")
+
+    local lockTex     = lockBtn:CreateTexture(nil, "ARTWORK"); lockTex:SetAllPoints()
+    local unlockTex   = lockBtn:CreateTexture(nil, "ARTWORK"); unlockTex:SetAllPoints()
+    local lockHov     = lockBtn:CreateTexture(nil, "ARTWORK"); lockHov:SetAllPoints();     lockHov:Hide()
+    local unlockHov   = lockBtn:CreateTexture(nil, "ARTWORK"); unlockHov:SetAllPoints();   unlockHov:Hide()
+    local lockPress   = lockBtn:CreateTexture(nil, "ARTWORK"); lockPress:SetAllPoints();   lockPress:Hide()
+    local unlockPress = lockBtn:CreateTexture(nil, "ARTWORK"); unlockPress:SetAllPoints(); unlockPress:Hide()
+
+    lockTex:SetTexture(BTNS .. "bt-lock-normal")
+    unlockTex:SetTexture(BTNS .. "bt-unlock-normal")
+    lockHov:SetTexture(BTNS .. "bt-lock-hover")
+    unlockHov:SetTexture(BTNS .. "bt-unlock-hover")
+    lockPress:SetTexture(BTNS .. "bt-lock-press")
+    unlockPress:SetTexture(BTNS .. "bt-unlock-press")
+
+    local function RefreshLockBtn()
+        local locked = IsLocked()
+        lockTex:SetShown(locked);   unlockTex:SetShown(not locked)
+        lockHov:Hide(); unlockHov:Hide(); lockPress:Hide(); unlockPress:Hide()
+    end
+    RefreshLockBtn()
+
+    lockBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    lockBtn:SetScript("OnClick", function(_, btn)
+        if btn == "RightButton" then
+            -- Reset window to default size and position
+            f:SetSize(DEFAULT_W, DEFAULT_H)
+            f:ClearAllPoints()
+            f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+            SaveWindowPos(f)
+            return
+        end
+        local db = BigNoteBoxDB; if not db then return end
+        db.scaleLocked = not db.scaleLocked
+        RefreshLockBtn()
+        if BNB._applyScaleLock then BNB._applyScaleLock() end
+    end)
+    lockBtn:SetScript("OnMouseDown", function()
+        local locked = IsLocked()
+        lockTex:Hide(); unlockTex:Hide(); lockHov:Hide(); unlockHov:Hide()
+        if locked then lockPress:Show() else unlockPress:Show() end
+    end)
+    lockBtn:SetScript("OnMouseUp", function()
+        lockPress:Hide(); unlockPress:Hide()
+        if IsLocked() then lockHov:Show() else unlockHov:Show() end
+    end)
+    lockBtn:SetScript("OnEnter", function(self)
+        local locked = IsLocked()
+        if locked then lockTex:Hide();   lockHov:Show()
+        else           unlockTex:Hide(); unlockHov:Show() end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        if locked then
+            GameTooltip:AddLine(L["MW_LOCK_TIP"], 1, 1, 1)
+            GameTooltip:AddLine(L["MW_LOCK_TIP_SUB"], 0.78, 0.78, 0.78)
+        else
+            GameTooltip:AddLine(L["MW_UNLOCK_TIP"], 1, 1, 1)
+            GameTooltip:AddLine(L["MW_UNLOCK_TIP_SUB"], 0.78, 0.78, 0.78)
+        end
+        GameTooltip:AddLine(L["MW_LOCK_RESET_TIP"], 0.55, 0.55, 0.55)
+        GameTooltip:Show()
+    end)
+    lockBtn:SetScript("OnLeave", function() RefreshLockBtn(); GameTooltip:Hide() end)
+    BNB._refreshLockBtn = RefreshLockBtn
+    return lockBtn
+end
+
+-- Apply scale lock state from DB (called on show and on lock toggle)
+function BNB._applyScaleLock()
+    local locked = IsLocked()
+    local rh = BNB.mainFrame and BNB.mainFrame._resizeHandle
+    if rh then rh:SetShown(not locked) end
+    if BNB.mainFrame and BNB.mainFrame.SetResizable then
+        BNB.mainFrame:SetResizable(not locked)
+    end
+    if BNB._refreshLockBtn then BNB._refreshLockBtn() end
+end
+
+--------------------------------------------------------------------------------
+-- ESC HANDLING
+-- Handle ESC manually so we control the close order and can intercept
+-- confirmClose. We do NOT add BigNoteBoxFrame to UISpecialFrames —
+-- that would make it compete with ConfigFrame and NoteConfigFrame for
+-- the same ESC press. Instead we catch ESC via OnKeyDown and close the
+-- top-most BNB window first, the main window last.
+--------------------------------------------------------------------------------
+-- Hides a shown window through its close function (plain Hide without one).
+local function TryHide(name, closeFn)
+    local w = _G[name]
+    if w and w:IsShown() then
+        if closeFn then closeFn() else w:Hide() end
+        return true
+    end
+end
+
+local function OnEscapeKey(self, key)
+    if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
+    self:SetPropagateKeyboardInput(false)
+    -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
+    -- (sidebar right-click → Change icon), Insert Info menu
+    if TryHide("BNBNewNoteDialogFrame",
+        BNB.NewNoteDialog and BNB.NewNoteDialog.Close) then return end
+    if TryHide("BNBClipboardHintFrame",
+        BNB._clipboardHint and BNB._clipboardHint._dismiss) then return end
+    if TryHide("BNBSidebarIconPickerFrame") then return end
+    if BNB.CloseInsertInfoMenu and BNB.CloseInsertInfoMenu() then return end
+    if TryHide("BigNoteBoxExportFrame")   then return end
+    if TryHide("BigNoteBoxCopyMoveFrame") then return end
+    if TryHide("BigNoteBoxHistoryCompareFrame", BNB.CloseHistoryCompare) then return end
+    -- Alarm setter window closes before sticky settings
+    if TryHide("BNBAlarmWindow", BNB.AlarmWindow and BNB.AlarmWindow.Close) then return end
+    if TryHide("BNBAlarmOverviewFrame") then return end
+    if TryHide("BigNoteBoxStickySettingsFrame",
+        BNB.Sticky and BNB.Sticky.CloseSettings) then return end
+    if TryHide("BigNoteBoxTagManagerFrame") then return end
+    -- Per-note history panel, then the main history window (also closes panel)
+    if TryHide("BigNoteBoxNoteHistoryFrame", BNB.CloseNoteHistoryPanel) then return end
+    if TryHide("BigNoteBoxHistoryFrame",     BNB.CloseHistoryWindow)    then return end
+    -- Trash view popup before the trash window itself
+    if TryHide("BNBTrashViewPopup")    then return end
+    if TryHide("BigNoteBoxTrashFrame") then return end
+    if TryHide("BigNoteBoxNoteConfigFrame") then return end
+    -- Task Edit Window before the Reference Box
+    if TryHide("BNBTaskEditWindow",
+        BNB.TaskEditWindow and BNB.TaskEditWindow.Close) then return end
+    if TryHide("BigNoteBoxReferenceBoxFrame") then return end
+    -- Share preview, then share, then import, all before the main window
+    if TryHide("BNBSharePreviewFrame", BNB.CloseSharePreview) then return end
+    if TryHide("BNBShareFrame",        BNB.CloseShareWindow)  then return end
+    if TryHide("BNBImportFrame",       BNB.CloseImportWindow) then return end
+    -- Addon settings window
+    if TryHide("BigNoteBoxConfigFrame") then return end
+    -- Otherwise close main window (with confirm if enabled)
+    BNB.RequestCloseMainWindow()
+end
+
+--------------------------------------------------------------------------------
+-- CLASSIC CHROME  (ButtonFrameTemplate, matches BCB)
+--------------------------------------------------------------------------------
+local function BuildClassicChrome()
+    -- TITLE_H: height of the ButtonFrameTemplate title area (includes the
+    -- icon toolbar strip beneath the "BigNoteBox" heading).
+    local TITLE_H = 60
 
     local f = CreateFrame("Frame", "BigNoteBoxFrame", UIParent, "ButtonFrameTemplate")
     f:SetSize(DEFAULT_W, DEFAULT_H)
-    f:SetPoint("CENTER")
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetResizable(true)   -- REQUIRED — ButtonFrameTemplate does not set this
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self)
-        self:StopMovingOrSizing()
-        SaveWindowPos(self)
-    end)
-    -- When the main window is clicked/raised, bring all visible BNB windows
-    -- to the front together so none get left behind other frames.
-    f:SetScript("OnMouseDown", function()
-        if BNB.RaiseBNBWindows then BNB.RaiseBNBWindows() end
-    end)
-
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
@@ -112,231 +355,93 @@ function BNB.CreateMainWindow()
         end)
     end
 
-    -- ── Focus mode button ────────────────────────────────────────────────────
-    -- Parented to f.CloseButton so it inherits the correct frame level and
-    -- stacking context — guaranteed above ButtonFrameTemplate chrome.
-    -- Uses focus-normal.tga at rest, focus-hover.tga on mouse-over.
-    if f.CloseButton then
-        local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-        local focusBtn = CreateFrame("Button", nil, f.CloseButton)
-        focusBtn:SetSize(20, 20)
-        focusBtn:SetPoint("RIGHT", f.CloseButton, "LEFT", -2, 0)
+    -- The toolbar strip sits in the title area below the "BigNoteBox" title:
+    -- sort row top-left, icons top-right 4px above the pane top edge.
+    local sortY = -(TITLE_H - 14) + SORT_BTN_H / 2
+    return {
+        frame     = f,
+        headerH   = TITLE_H,
+        closeBtn  = f.CloseButton,
+        -- Parented to the CloseButton so they inherit its frame level and
+        -- stacking context — guaranteed above ButtonFrameTemplate chrome.
+        btnParent = f.CloseButton,
+        btnSize   = 20,
+        btnGap    = 2,
+        sortX     = 12,
+        sortY     = sortY,
+        selY      = sortY + 1,
+        iconX     = -6,
+        iconY     = -(TITLE_H - 22),
+        -- Forever: soft glow behind the note list so the side panel stands out
+        -- against the wood grain; stretches with the pane (splitter, resize, collapse)
+        StylePanes = function(listPane)
+            listPane._forGlow = BNB.AddForeverGlow(listPane)
+        end,
+    }
+end
 
-        -- Suppress WoW's default button flash so our press texture shows cleanly
-        focusBtn:SetHighlightTexture("")
-        focusBtn:SetPushedTexture("")
+--------------------------------------------------------------------------------
+-- CREATE MAIN WINDOW
+--------------------------------------------------------------------------------
+function BNB.CreateMainWindow()
+    if BNB.mainFrame then return end
 
-        local focusNormal = focusBtn:CreateTexture(nil, "ARTWORK")
-        focusNormal:SetAllPoints()
-        focusNormal:SetTexture(ASSETS .. "bt-focus-normal")
+    -- Restore saved split width
+    BNB._listPaneW = math.max(MIN_LIST_W,
+        math.min(MAX_LIST_W, BigNoteBoxDB.splitX or DEFAULT_LIST_W))
 
-        local focusHover = focusBtn:CreateTexture(nil, "ARTWORK")
-        focusHover:SetAllPoints()
-        focusHover:SetTexture(ASSETS .. "bt-focus-hover")
-        focusHover:Hide()
+    local skin = BigNoteBoxDB.skinMode and BNB.BuildMainWindowSkinChrome
+    local chrome = skin and BNB.BuildMainWindowSkinChrome() or BuildClassicChrome()
+    local f = chrome.frame
+    f._headerH = chrome.headerH
 
-        local focusPress = focusBtn:CreateTexture(nil, "ARTWORK")
-        focusPress:SetAllPoints()
-        focusPress:SetTexture(ASSETS .. "bt-focus-press")
-        focusPress:Hide()
+    f:SetSize(DEFAULT_W, DEFAULT_H)
+    f:SetPoint("CENTER")
+    f:SetToplevel(true)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:SetResizable(true)   -- REQUIRED — ButtonFrameTemplate does not set this
+    f:SetClampedToScreen(true)
+    for _, handle in ipairs({ f, chrome.dragBar }) do
+        handle:RegisterForDrag("LeftButton")
+        handle:SetScript("OnDragStart", function() f:StartMoving() end)
+        handle:SetScript("OnDragStop",  function()
+            f:StopMovingOrSizing()
+            SaveWindowPos(f)
+        end)
+    end
+    -- When the main window is clicked/raised, bring all visible BNB windows
+    -- to the front together so none get left behind other frames.
+    f:SetScript("OnMouseDown", function()
+        if BNB.RaiseBNBWindows then BNB.RaiseBNBWindows() end
+    end)
 
-        focusBtn:SetScript("OnClick", function()
-            if BNB.OpenFocusMode then BNB.OpenFocusMode() end
-        end)
-        focusBtn:SetScript("OnMouseDown", function()
-            focusPress:Show(); focusNormal:Hide(); focusHover:Hide()
-        end)
-        focusBtn:SetScript("OnMouseUp", function()
-            focusPress:Hide(); focusHover:Show()
-        end)
-        focusBtn:SetScript("OnEnter", function()
-            focusNormal:Hide()
-            focusHover:Show()
-            GameTooltip:SetOwner(focusBtn, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(L["FOCUS_MODE_TIP"], 1, 1, 1)
-            GameTooltip:AddLine(L["FOCUS_MODE_TIP_SUB"], 0.78, 0.78, 0.78)
-            GameTooltip:Show()
-        end)
-        focusBtn:SetScript("OnLeave", function()
-            focusPress:Hide(); focusHover:Hide()
-            focusNormal:Show()
-            GameTooltip:Hide()
-        end)
+    -- ── Title-bar buttons: focus mode, scale lock (right to left) ─────────────
+    if chrome.closeBtn then
+        local focusBtn = MakeTexBtn(chrome.btnParent, "bt-focus", chrome.btnSize,
+            function() if BNB.OpenFocusMode then BNB.OpenFocusMode() end end,
+            L["FOCUS_MODE_TIP"], L["FOCUS_MODE_TIP_SUB"])
+        focusBtn:SetPoint("RIGHT", chrome.closeBtn, "LEFT", -chrome.btnGap, 0)
         BNB._focusModeBtn = focusBtn
         -- Start disabled — no note selected yet; UpdateSaveButtonState re-enables on note load
         focusBtn:SetEnabled(false)
         focusBtn:SetAlpha(0.35)
-        pcall(function() focusBtn._tx:SetDesaturated(true) end)
+        pcall(function() focusBtn._n:SetDesaturated(true) end)
+
+        local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
+        lockBtn:SetPoint("RIGHT", focusBtn, "LEFT", -chrome.btnGap, 0)
+
+        if chrome.AddTitleButtons then chrome.AddTitleButtons(lockBtn, MakeTexBtn) end
     end
 
-    -- ── Scale-lock button ─────────────────────────────────────────────────────
-    -- Sits between the focus button and the X (CloseButton).
-    -- Locked   → button-lock.tga    / button-lock-hover.tga
-    -- Unlocked → button-unlock.tga  / button-unlock-hover.tga
-    -- State persists via BigNoteBoxDB.scaleLocked.
-    if f.CloseButton then
-        local LOCK_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-        local lockBtn = CreateFrame("Button", nil, f.CloseButton)
-        lockBtn:SetSize(20, 20)
-        -- Focus button is RIGHT of CloseButton at -2; lock sits left of focus button
-        lockBtn:SetPoint("RIGHT", BNB._focusModeBtn or f.CloseButton, "LEFT", -2, 0)
-
-        local function IsLocked() return BigNoteBoxDB and BigNoteBoxDB.scaleLocked end
-
-        -- Suppress WoW's default button flash so our press texture shows cleanly
-        lockBtn:SetHighlightTexture("")
-        lockBtn:SetPushedTexture("")
-
-        local lockTex   = lockBtn:CreateTexture(nil, "ARTWORK")
-        lockTex:SetAllPoints()
-        local unlockTex = lockBtn:CreateTexture(nil, "ARTWORK")
-        unlockTex:SetAllPoints()
-        local lockHov   = lockBtn:CreateTexture(nil, "ARTWORK")
-        lockHov:SetAllPoints(); lockHov:Hide()
-        local unlockHov = lockBtn:CreateTexture(nil, "ARTWORK")
-        unlockHov:SetAllPoints(); unlockHov:Hide()
-        local lockPress   = lockBtn:CreateTexture(nil, "ARTWORK")
-        lockPress:SetAllPoints(); lockPress:Hide()
-        local unlockPress = lockBtn:CreateTexture(nil, "ARTWORK")
-        unlockPress:SetAllPoints(); unlockPress:Hide()
-
-        lockTex:SetTexture(LOCK_ASSETS .. "bt-lock-normal")
-        unlockTex:SetTexture(LOCK_ASSETS .. "bt-unlock-normal")
-        lockHov:SetTexture(LOCK_ASSETS .. "bt-lock-hover")
-        unlockHov:SetTexture(LOCK_ASSETS .. "bt-unlock-hover")
-        lockPress:SetTexture(LOCK_ASSETS .. "bt-lock-press")
-        unlockPress:SetTexture(LOCK_ASSETS .. "bt-unlock-press")
-
-        local function RefreshLockBtn()
-            local locked = IsLocked()
-            lockTex:SetShown(locked)
-            unlockTex:SetShown(not locked)
-            lockHov:Hide(); unlockHov:Hide()
-            lockPress:Hide(); unlockPress:Hide()
-        end
-        RefreshLockBtn()
-
-        lockBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        lockBtn:SetScript("OnClick", function(_, btn)
-            if btn == "RightButton" then
-                f:SetSize(DEFAULT_W, DEFAULT_H)
-                f:ClearAllPoints()
-                f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-                SaveWindowPos(f)
-                return
-            end
-            local db = BigNoteBoxDB
-            if not db then return end
-            db.scaleLocked = not db.scaleLocked
-            RefreshLockBtn()
-            if BNB._applyScaleLock then BNB._applyScaleLock() end
-        end)
-        lockBtn:SetScript("OnMouseDown", function()
-            local locked = IsLocked()
-            lockTex:Hide(); unlockTex:Hide(); lockHov:Hide(); unlockHov:Hide()
-            if locked then lockPress:Show() else unlockPress:Show() end
-        end)
-        lockBtn:SetScript("OnMouseUp", function()
-            lockPress:Hide(); unlockPress:Hide()
-            local locked = IsLocked()
-            if locked then lockHov:Show() else unlockHov:Show() end
-        end)
-        lockBtn:SetScript("OnEnter", function()
-            local locked = IsLocked()
-            if locked then lockTex:Hide();   lockHov:Show()
-            else           unlockTex:Hide(); unlockHov:Show() end
-            GameTooltip:SetOwner(lockBtn, "ANCHOR_BOTTOM")
-            if locked then
-                GameTooltip:AddLine(L["MW_LOCK_TIP"], 1, 1, 1)
-                GameTooltip:AddLine(L["MW_LOCK_TIP_SUB"], 0.78, 0.78, 0.78)
-            else
-                GameTooltip:AddLine(L["MW_UNLOCK_TIP"], 1, 1, 1)
-                GameTooltip:AddLine(L["MW_UNLOCK_TIP_SUB"], 0.78, 0.78, 0.78)
-            end
-            GameTooltip:AddLine(L["MW_LOCK_RESET_TIP"], 0.55, 0.55, 0.55)
-            GameTooltip:Show()
-        end)
-        lockBtn:SetScript("OnLeave", function()
-            RefreshLockBtn()
-            GameTooltip:Hide()
-        end)
-        BNB._refreshLockBtn   = RefreshLockBtn
+    -- ── Toolbar icons (right side of the toolbar strip) ──────────────────────
+    -- Slot 0 is the right-most (sidebar toggle); each slot one ICON_STEP left.
+    local function TBIcon(tex, tip, slot, onClick)
+        return MakeIconToolbarBtn(f, tex, tip,
+            chrome.iconX - ICON_STEP * slot, chrome.iconY, onClick)
     end
 
-    -- Apply scale lock state from DB (called here and after DB loads)
-    function BNB._applyScaleLock()
-        local locked = BigNoteBoxDB and BigNoteBoxDB.scaleLocked
-        local rh = BNB.mainFrame and BNB.mainFrame._resizeHandle
-        if rh then rh:SetShown(not locked) end
-        if BNB.mainFrame then
-            if BNB.mainFrame.SetResizable then
-                BNB.mainFrame:SetResizable(not locked)
-            end
-        end
-        if BNB._refreshLockBtn then BNB._refreshLockBtn() end
-    end
-
-    -- ── Icon toolbar strip ───────────────────────────────────────────────────
-    -- The ButtonFrameTemplate title area is TITLE_H (60px) tall.
-    -- The "BigNoteBox" title text sits ~8px from the top, leaving ~28px below
-    -- it before the pane content starts.  We place small icon-texture buttons
-    -- there: Config (cog), Export, Import.
-    --
-    -- All three are plain CreateFrame("Button") — no template — so they work
-    -- identically across templates with no SetWidth/GetFontString issues.
-    -- Icons are 20×20, sitting 4px above the pane edge (y = -(TITLE_H - 22)).
-
-    local ICON_BTN_SIZE = 20
-    local ICON_BTN_Y    = -(TITLE_H - 22)   -- 4px above the pane top edge
-
-    local function MakeIconToolbarBtn(iconTex, tooltipText, xOffset, onClick)
-        local btn = CreateFrame("Button", nil, f)
-        btn:SetSize(ICON_BTN_SIZE, ICON_BTN_SIZE)
-        btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", xOffset, ICON_BTN_Y)
-
-        local iconTx = btn:CreateTexture(nil, "ARTWORK")
-        -- Texture slightly inset at rest; expands to fill (and slightly overflow)
-        -- the fixed hitbox on hover — gives a centred grow effect without moving
-        -- the frame anchor or shifting cursor hit registration.
-        local REST  = 2   -- inset each side at rest  (renders at ICON_BTN_SIZE - 4)
-        local HOVER = 2   -- outset each side on hover (renders at ICON_BTN_SIZE + 4)
-        iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
-        iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
-        iconTx:SetTexture(iconTex)
-        btn._tx = iconTx   -- exposed for SetDesaturated / alpha callers
-
-        btn:SetScript("OnEnter", function(self)
-            iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      -HOVER,  HOVER)
-            iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",   HOVER, -HOVER)
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(tooltipText, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function(self)
-            iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
-            iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
-            GameTooltip:Hide()
-        end)
-        btn:SetScript("OnClick", onClick)
-        return btn
-    end
-
-    -- Config button (cog icon) — right-most (slot 0)
-    local configBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-cog",
-        L["MW_CONFIG_TIP"],
-        -(30),
-        function()
-            if BNB.OpenConfig then BNB.OpenConfig() end
-        end)
-    BNB._toolbarConfigBtn = configBtn
-
-    -- Sidebar toggle button — right of cog
-    local TOPBAR_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
-    local sidebarToggleBtn = MakeIconToolbarBtn(
-        TOPBAR_PATH .. "tp-sidebar-open",
-        L["MW_SIDEBAR_TIP"],
-        -(30 - (ICON_BTN_SIZE + 4)),
+    local sidebarToggleBtn = TBIcon(TOPBAR .. "tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
         function()
             if BNB.Sidebar and BNB.Sidebar.ToggleCollapsed then
                 BNB.Sidebar.ToggleCollapsed()
@@ -347,62 +452,33 @@ function BNB.CreateMainWindow()
     -- Refreshes sidebar toggle icon to match current state
     function BNB.RefreshSidebarToggleBtn()
         local collapsed = BigNoteBoxDB and BigNoteBoxDB.sidebarCollapsed
-        local tex = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
-            .. (collapsed and "tp-sidebar-closed" or "tp-sidebar-open")
+        local tex = TOPBAR .. (collapsed and "tp-sidebar-closed" or "tp-sidebar-open")
         pcall(function() BNB._toolbarSidebarBtn._tx:SetTexture(tex) end)
     end
     BNB.RefreshSidebarToggleBtn()
 
-    -- Trash button — left of cog
-    local trashBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-trash",
-        L["MW_TRASH_TIP"],
-        -(30 + ICON_BTN_SIZE + 4),
-        function()
-            if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end
-        end)
+    local configBtn = TBIcon(TOPBAR .. "tp-cog", L["MW_CONFIG_TIP"], 1,
+        function() if BNB.OpenConfig then BNB.OpenConfig() end end)
+    BNB._toolbarConfigBtn = configBtn
+
+    local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 2,
+        function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end)
     BNB._toolbarTrashBtn = trashBtn
 
-    -- History button — left of trash (desaturated until history exists)
-    local histBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-history",
-        L["HISTORY_TOOLBAR_TIP"],
-        -(30 + (ICON_BTN_SIZE + 4) * 2),
-        function()
-            if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end
-        end)
+    -- History button (desaturated until history exists)
+    local histBtn = TBIcon(TOPBAR .. "tp-history", L["HISTORY_TOOLBAR_TIP"], 3,
+        function() if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end end)
     histBtn:SetEnabled(false)
     histBtn:SetAlpha(0.4)
     pcall(function() histBtn._tx:SetDesaturated(true) end)
     BNB._toolbarHistoryBtn = histBtn
 
-    -- Tags button — left of history (slot 3)
-    local tagsBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-tags",
-        L["TAG_MGR_TOOLTIP"],
-        -(30 + (ICON_BTN_SIZE + 4) * 3),
-        function()
-            if BNB.ToggleTagManager then BNB.ToggleTagManager() end
-        end)
+    local tagsBtn = TBIcon(TOPBAR .. "tp-tags", L["TAG_MGR_TOOLTIP"], 4,
+        function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end)
     BNB._toolbarTagsBtn = tagsBtn
 
-    -- Alarm overview button (slot 5, left of share)
-    local alarmOvBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-alarm",
-        L["MW_ALARM_TIP"],
-        -(30 + (ICON_BTN_SIZE + 4) * 5),
-        function()
-            if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
-                BNB.AlarmOverview.Toggle()
-            end
-        end)
-    BNB._toolbarAlarmOvBtn = alarmOvBtn
-
-    -- Share/import button (slot 4, left of tags) — opens import-only window
-    local shareTopBtn = MakeIconToolbarBtn(
-        "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-share",
-        L["MW_IMPORT_SHARED_TIP"],
-        -(30 + (ICON_BTN_SIZE + 4) * 4),
+    -- Share/import button — toggles the import-only window
+    local shareTopBtn = TBIcon(TOPBAR .. "tp-share", L["MW_IMPORT_SHARED_TIP"], 5,
         function()
             local iw = _G["BNBImportFrame"]
             if iw and iw:IsShown() then
@@ -413,14 +489,20 @@ function BNB.CreateMainWindow()
         end)
     BNB._toolbarShareTopBtn = shareTopBtn
 
-    -- Import button (slot 6, wired to BCB chat capture by Features/ChatCapture.lua)
-    -- Icon: tp-bcb when BCB is installed, bcb-icon when absent. Always full colour.
-    local importBtn = MakeIconToolbarBtn(
-        (BigChatBox and BigChatBox.SendDirect)
-            and "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-bcb"
-            or  "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon",
-        L["MW_BCB_SEND_TIP"],
-        -(30 + (ICON_BTN_SIZE + 4) * 6),
+    -- Alarm overview button
+    local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarm", L["MW_ALARM_TIP"], 6,
+        function()
+            if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
+                BNB.AlarmOverview.Toggle()
+            end
+        end)
+    BNB._toolbarAlarmOvBtn = alarmOvBtn
+
+    -- Send-to-BCB button. Icon: tp-bcb when BCB is installed, bcb-icon when
+    -- absent. Always full colour.
+    local importBtn = TBIcon(
+        (BigChatBox and BigChatBox.SendDirect) and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON,
+        L["MW_BCB_SEND_TIP"], 7,
         function()
             if not (BigChatBox and BigChatBox.SendDirect) then
                 -- BCB absent: show promo popup
@@ -446,23 +528,25 @@ function BNB.CreateMainWindow()
     -- Re-evaluates BCB presence and swaps icon; called after BCB loads late.
     local function RefreshImportBtn()
         local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
-        local tex = hasBCB
-            and "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-bcb"
-            or  "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
         pcall(function()
-            importBtn._tx:SetTexture(tex)
+            importBtn._tx:SetTexture(hasBCB and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON)
             importBtn._tx:SetDesaturated(false)
             importBtn:SetAlpha(1.0)
         end)
     end
     RefreshImportBtn()
-    BNB._toolbarImportBtn  = importBtn
-    BNB._refreshImportBtn  = RefreshImportBtn
+    BNB._toolbarImportBtn = importBtn
+    BNB._refreshImportBtn = RefreshImportBtn
 
-    -- ── Sort dropdown — top-LEFT of title strip ──────────────────────────────
-    local SORT_STRIP_MID_Y = -(TITLE_H - 14)
-    local SORT_BTN_H = 22   -- height to match WowStyle1 button
+    if chrome.StyleIcons then
+        chrome.StyleIcons({ sidebarToggleBtn, configBtn, trashBtn, histBtn,
+            tagsBtn, shareTopBtn, alarmOvBtn, importBtn })
+    end
 
+    -- ── Sort + order dropdowns — top-left of the toolbar strip ───────────────
+    -- WowStyle1 dropdowns where the template exists, cycling buttons otherwise.
+    -- The order dropdown is disabled (greyed out) when sort is "custom" since
+    -- order has no meaning there.
     local SORT_MODES = {
         { key="custom",   label=L["SORT_MODE_CUSTOM"]   },
         { key="creation", label=L["SORT_MODE_CREATION"] },
@@ -470,49 +554,70 @@ function BNB.CreateMainWindow()
         { key="alpha",    label=L["SORT_MODE_ALPHA"]    },
         { key="location", label=L["SORT_MODE_LOCATION"] },
     }
+    local DIR_MODES = {
+        { key="desc", label=L["DIR_MODE_DESC"] },
+        { key="asc",  label=L["DIR_MODE_ASC"]  },
+    }
     local function CurrentSortLabel()
-        local db = BigNoteBoxDB
         for _, m in ipairs(SORT_MODES) do
-            if m.key == (db.sortBy or "creation") then return m.label end
+            if m.key == (BigNoteBoxDB.sortBy or "creation") then return m.label end
         end
         return L["SORT_MODE_CREATION"]
+    end
+    local function IsCustomSort()  return BigNoteBoxDB.sortBy == "custom" end
+    local function CurrentDirKey() return BigNoteBoxDB.sortAsc and "asc" or "desc" end
+    local function CurrentDirLabel()
+        return BigNoteBoxDB.sortAsc and L["DIR_MODE_ASC"] or L["DIR_MODE_DESC"]
+    end
+
+    local sortDD, dirDD             -- WowStyle1 DropdownButtons (retail)
+    local sortCycleBtn, dirCycleBtn -- fallback cycling buttons
+    local DD_W = 120
+
+    local function UpdateDirEnabled()
+        local custom = IsCustomSort()
+        if dirDD       then dirDD:SetEnabled(not custom);       dirDD:SetAlpha(custom and 0.4 or 1.0)       end
+        if dirCycleBtn then dirCycleBtn:SetEnabled(not custom); dirCycleBtn:SetAlpha(custom and 0.4 or 1.0) end
+    end
+
+    -- Refreshes the list, then the order control (its state follows the sort key)
+    local function ApplySort()
+        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+        UpdateDirEnabled()
+        if dirDD and dirDD.GenerateMenu then dirDD:GenerateMenu() end
+        if dirCycleBtn then dirCycleBtn:SetText(CurrentDirLabel()) end
     end
 
     local useNativeSort = C_XMLUtil and C_XMLUtil.GetTemplateInfo
         and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
-    local sortDD       -- WowStyle1 DropdownButton (retail)
-    local sortCycleBtn -- fallback cycling button
-    local sortDDWidth  = 120
-
-    local function ApplySort()
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    end
-
     if useNativeSort then
         sortDD = CreateFrame("DropdownButton", "BNBMainSortDD", f, "WowStyle1DropdownTemplate")
-        sortDD:SetSize(sortDDWidth, SORT_BTN_H)
-        sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", 12, SORT_STRIP_MID_Y + SORT_BTN_H / 2)
-        local function RebuildSortMenu()
-            sortDD:SetupMenu(function(_, root)
-                for _, m in ipairs(SORT_MODES) do
-                    local key = m.key
-                    root:CreateRadio(m.label,
-                        function() return (BigNoteBoxDB.sortBy or "creation") == key end,
-                        function()
-                            BigNoteBoxDB.sortBy = key
-                            sortDD:GenerateMenu()
-                            ApplySort()
-                        end)
-                end
-            end)
-        end
-        RebuildSortMenu()
-        BNB._rebuildSortMenu = RebuildSortMenu
+        sortDD:SetSize(DD_W, SORT_BTN_H)
+        sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
+        sortDD:SetupMenu(function(_, root)
+            for _, m in ipairs(SORT_MODES) do
+                local key = m.key
+                root:CreateRadio(m.label,
+                    function() return (BigNoteBoxDB.sortBy or "creation") == key end,
+                    function() BigNoteBoxDB.sortBy = key; sortDD:GenerateMenu(); ApplySort() end)
+            end
+        end)
+
+        dirDD = CreateFrame("DropdownButton", "BNBMainDirDD", f, "WowStyle1DropdownTemplate")
+        dirDD:SetSize(DD_W, SORT_BTN_H)
+        dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
+        dirDD:SetupMenu(function(_, root)
+            for _, m in ipairs(DIR_MODES) do
+                local key = m.key
+                root:CreateRadio(m.label,
+                    function() return CurrentDirKey() == key end,
+                    function() BigNoteBoxDB.sortAsc = (key == "asc"); dirDD:GenerateMenu(); ApplySort() end)
+            end
+        end)
     else
-        -- Fallback: cycling button
-        sortCycleBtn = BNB.CreateButton(nil, f, CurrentSortLabel(), sortDDWidth, SORT_BTN_H)
-        sortCycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", 12, SORT_STRIP_MID_Y + SORT_BTN_H / 2)
+        sortCycleBtn = BNB.CreateButton(nil, f, CurrentSortLabel(), DD_W, SORT_BTN_H)
+        sortCycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
         sortCycleBtn:SetScript("OnClick", function(self)
             local cur = BigNoteBoxDB.sortBy or "creation"
             local idx = 1
@@ -522,99 +627,38 @@ function BNB.CreateMainWindow()
             self:SetText(CurrentSortLabel())
             ApplySort()
         end)
-        BNB._sortCycleBtn = sortCycleBtn
-    end
 
-    -- Exposed so TagTree can disable sorting while tree view is active.
-    function BNB.SetSortEnabled(enabled)
-        if sortDD then
-            sortDD:SetEnabled(enabled)
-            sortDD:SetAlpha(enabled and 1.0 or 0.4)
-        end
-        if sortCycleBtn then
-            sortCycleBtn:SetEnabled(enabled)
-            sortCycleBtn:SetAlpha(enabled and 1.0 or 0.4)
-        end
-    end
-
-    -- ── Order dropdown (Asc/Desc) — WowStyle1 or cycling button ─────────────
-    -- Disabled (greyed out) when sort is "custom" since order has no meaning there.
-    local DIR_MODES = {
-        { key="desc", label=L["DIR_MODE_DESC"] },
-        { key="asc",  label=L["DIR_MODE_ASC"]  },
-    }
-    local function IsCustomSort() return BigNoteBoxDB.sortBy == "custom" end
-    local function CurrentDirKey() return BigNoteBoxDB.sortAsc and "asc" or "desc" end
-    local function CurrentDirLabel()
-        return BigNoteBoxDB.sortAsc and L["DIR_MODE_ASC"] or L["DIR_MODE_DESC"]
-    end
-
-    local dirDD       -- WowStyle1 DropdownButton
-    local dirCycleBtn -- fallback cycling button
-    local dirDDWidth  = 120
-
-    -- Shared: update enabled/disabled state based on sort mode
-    local function UpdateDirEnabled()
-        local custom = IsCustomSort()
-        if dirDD then
-            dirDD:SetEnabled(not custom)
-            dirDD:SetAlpha(custom and 0.4 or 1.0)
-        end
-        if dirCycleBtn then
-            dirCycleBtn:SetEnabled(not custom)
-            dirCycleBtn:SetAlpha(custom and 0.4 or 1.0)
-        end
-    end
-
-    if useNativeSort then
-        dirDD = CreateFrame("DropdownButton", "BNBMainDirDD", f, "WowStyle1DropdownTemplate")
-        dirDD:SetSize(dirDDWidth, SORT_BTN_H)
-        dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
-        local function RebuildDirMenu()
-            dirDD:SetupMenu(function(_, root)
-                for _, m in ipairs(DIR_MODES) do
-                    local key = m.key
-                    root:CreateRadio(m.label,
-                        function() return CurrentDirKey() == key end,
-                        function()
-                            BigNoteBoxDB.sortAsc = (key == "asc")
-                            dirDD:GenerateMenu()
-                            ApplySort()
-                        end)
-                end
-            end)
-        end
-        RebuildDirMenu()
-        BNB._rebuildDirMenu = RebuildDirMenu
-    else
-        dirCycleBtn = BNB.CreateButton(nil, f, CurrentDirLabel(), dirDDWidth, SORT_BTN_H)
+        dirCycleBtn = BNB.CreateButton(nil, f, CurrentDirLabel(), DD_W, SORT_BTN_H)
         dirCycleBtn:SetPoint("LEFT", sortCycleBtn, "RIGHT", 4, 0)
         dirCycleBtn:SetScript("OnClick", function(self)
             BigNoteBoxDB.sortAsc = not BigNoteBoxDB.sortAsc
             self:SetText(CurrentDirLabel())
-            UpdateDirEnabled()
             ApplySort()
         end)
     end
 
-    -- Hook ApplySort to also refresh dir dropdown state after sort key changes
-    local _origApplySort = ApplySort
-    ApplySort = function()
-        _origApplySort()
-        UpdateDirEnabled()
-        if dirDD and dirDD.GenerateMenu then dirDD:GenerateMenu() end
-        if dirCycleBtn then dirCycleBtn:SetText(CurrentDirLabel()) end
+    -- Exposed so TagTree can disable sorting while tree view is active.
+    -- Also disables the direction control, which has no meaning without sort
+    -- either; re-enabling defers to UpdateDirEnabled so "custom" sort still
+    -- greys it out (BUG found ALL-65.9, 2026-09-25: it never touched direction).
+    function BNB.SetSortEnabled(enabled)
+        local sortCtl = sortDD or sortCycleBtn
+        sortCtl:SetEnabled(enabled)
+        sortCtl:SetAlpha(enabled and 1.0 or 0.4)
+        if enabled then
+            UpdateDirEnabled()
+        else
+            local dirCtl = dirDD or dirCycleBtn
+            dirCtl:SetEnabled(false)
+            dirCtl:SetAlpha(0.4)
+        end
     end
 
-    -- ── Select-mode toggle button ─────────────────────────────────────────────
-    local selBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 52, 22)
-    if useNativeSort then
-        selBtn:SetPoint("LEFT", dirDD, "RIGHT", 6, 0)
-    else
-        selBtn:SetPoint("LEFT", dirCycleBtn, "RIGHT", 6, 0)
-    end
-    selBtn:SetPoint("TOP", f, "TOP", 0, SORT_STRIP_MID_Y + SORT_BTN_H / 2 + 1)
-    BNB._multiSelBtn = selBtn
+    -- ── Select-mode toggle + multi-select action buttons ─────────────────────
+    local selBtn = MakeTipButton(f, L["MW_SELECT_BTN"], 52,
+        L["MW_SELECT_TIP"], L["MW_SELECT_TIP_SUB"], nil)
+    selBtn:SetPoint("LEFT", dirDD or dirCycleBtn, "RIGHT", 6, 0)
+    selBtn:SetPoint("TOP", f, "TOP", 0, chrome.selY)
     selBtn:SetScript("OnClick", function()
         -- Read the list's own state: popups, export and the sidebar leave multi
         -- mode through SetMultiMode, which a local flag here never saw (ALL-58)
@@ -623,218 +667,63 @@ function BNB.CreateMainWindow()
         selBtn:SetText(entering and L["CANCEL"] or L["MW_SELECT_BTN"])
         if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(entering) end
     end)
-    selBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["MW_SELECT_TIP"], 1,1,1)
-        GameTooltip:AddLine(L["MW_SELECT_TIP_SUB"], 0.78,0.78,0.78)
-        GameTooltip:Show()
-    end)
-    selBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    BNB._multiSelBtn = selBtn
 
-    -- Select All button (hidden until multi-select mode is on)
-    local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], 76, 22)
-    selectAllBtn:SetPoint("LEFT", selBtn, "RIGHT", 4, 0)
-    selectAllBtn:SetPoint("TOP",  selBtn, "TOP",   0, 0)
-    selectAllBtn:Hide()
-    selectAllBtn:SetScript("OnClick", function()
-        if BNB.SelectAll then BNB.SelectAll() end
-    end)
-    selectAllBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["MW_SELECT_ALL_TIP"], 1,1,1)
-        GameTooltip:Show()
-    end)
-    selectAllBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiSelectAllBtn = selectAllBtn
+    -- Action buttons, hidden until multi-select mode is on; each sits right of
+    -- the previous one
+    local prev = selBtn
+    local function MultiBtn(text, w, tip, tipSub, onClick)
+        local btn = MakeTipButton(f, text, w, tip, tipSub, onClick)
+        btn:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+        btn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
+        btn:Hide()
+        prev = btn
+        return btn
+    end
 
-    -- Bulk-delete button (hidden until multi-select mode is on)
-    local multiDelBtn = BNB.CreateButton(nil, f, string.format(L["MULTI_DELETE_FMT"], "(0)"), 90, 22)
-    multiDelBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 4, 0)
-    multiDelBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
-    multiDelBtn:SetEnabled(false)
-    multiDelBtn:Hide()
-    multiDelBtn:SetScript("OnClick", function()
-        if BNB.DeleteMultiSelected then BNB.DeleteMultiSelected() end
-    end)
-    multiDelBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["MW_MULTI_DELETE_TIP"], 1,1,1)
-        GameTooltip:Show()
-    end)
-    multiDelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiDeleteBtn = multiDelBtn
+    BNB._multiSelectAllBtn = MultiBtn(L["MW_SELECT_ALL_BTN"], 76,
+        L["MW_SELECT_ALL_TIP"], nil,
+        function() if BNB.SelectAll then BNB.SelectAll() end end)
 
-    -- Bulk copy/move button
-    local multiCopyMoveBtn = BNB.CreateButton(nil, f, string.format(L["MULTI_COPYMOVE_FMT"], "(0)"), 120, 22)
-    multiCopyMoveBtn:SetPoint("LEFT", multiDelBtn, "RIGHT", 4, 0)
-    multiCopyMoveBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
-    multiCopyMoveBtn:SetEnabled(false)
-    multiCopyMoveBtn:Hide()
-    multiCopyMoveBtn:SetScript("OnClick", function()
-        if BNB.CopyMoveMultiSelected then BNB.CopyMoveMultiSelected() end
-    end)
-    multiCopyMoveBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["MW_MULTI_COPYMOVE_TIP"], 1,1,1)
-        GameTooltip:Show()
-    end)
-    multiCopyMoveBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiCopyMoveBtn = multiCopyMoveBtn
+    BNB._multiDeleteBtn = MultiBtn(string.format(L["MULTI_DELETE_FMT"], "(0)"), 90,
+        L["MW_MULTI_DELETE_TIP"], nil,
+        function() if BNB.DeleteMultiSelected then BNB.DeleteMultiSelected() end end)
 
-    -- Bulk export button (JSON, re-importable)
-    local multiExportBtn = BNB.CreateButton(nil, f, string.format(L["MULTI_EXPORT_FMT"], "(0)"), 90, 22)
-    multiExportBtn:SetPoint("LEFT", multiCopyMoveBtn, "RIGHT", 4, 0)
-    multiExportBtn:SetPoint("TOP",  selBtn, "TOP", 0, 0)
-    multiExportBtn:SetEnabled(false)
-    multiExportBtn:Hide()
-    multiExportBtn:SetScript("OnClick", function()
-        if BNB.ExportMultiJSON and BNB._multiGetSelected then
-            BNB.ExportMultiJSON(BNB._multiGetSelected())
-        end
-        if BNB.SetMultiMode then BNB.SetMultiMode(false) end
-    end)
-    multiExportBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["MW_MULTI_EXPORT_TIP"], 1,1,1)
-        GameTooltip:AddLine(L["MW_MULTI_EXPORT_TIP_SUB"], 0.78,0.78,0.78)
-        GameTooltip:Show()
-    end)
-    multiExportBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    BNB._multiExportBtn = multiExportBtn
+    BNB._multiCopyMoveBtn = MultiBtn(string.format(L["MULTI_COPYMOVE_FMT"], "(0)"), 120,
+        L["MW_MULTI_COPYMOVE_TIP"], nil,
+        function() if BNB.CopyMoveMultiSelected then BNB.CopyMoveMultiSelected() end end)
+
+    -- Bulk export (JSON, re-importable)
+    BNB._multiExportBtn = MultiBtn(string.format(L["MULTI_EXPORT_FMT"], "(0)"), 90,
+        L["MW_MULTI_EXPORT_TIP"], L["MW_MULTI_EXPORT_TIP_SUB"],
+        function()
+            if BNB.ExportMultiJSON and BNB._multiGetSelected then
+                BNB.ExportMultiJSON(BNB._multiGetSelected())
+            end
+            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+        end)
+    -- The bulk actions start disabled: nothing is selected yet
+    BNB._multiDeleteBtn:SetEnabled(false)
+    BNB._multiCopyMoveBtn:SetEnabled(false)
+    BNB._multiExportBtn:SetEnabled(false)
 
     -- Right-side toolbar icons, in slot order right to left (see
     -- BNB.InitToolbarIconRow). They hide in multi-select so the action buttons
     -- don't overlap them; the sidebar toggle right of the cog stays. Title bar
     -- buttons (focus, lock, close) are never hidden by multiselect.
     BNB.InitToolbarIconRow({
-        BNB._toolbarConfigBtn,   BNB._toolbarTrashBtn,   BNB._toolbarHistoryBtn,
-        BNB._toolbarTagsBtn,     BNB._toolbarShareTopBtn, BNB._toolbarAlarmOvBtn,
-        BNB._toolbarImportBtn,
+        configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, importBtn,
     })
     function BNB._setToolbarMultiMode() BNB.ApplyToolbarIcons() end
 
-    C_Timer.After(0, function() UpdateDirEnabled(); ApplySort() end)
+    C_Timer.After(0, ApplySort)
 
-    -- Handle ESC manually so we control the close order and can intercept
-    -- confirmClose. We do NOT add BigNoteBoxFrame to UISpecialFrames —
-    -- that would make it compete with ConfigFrame and NoteConfigFrame for
-    -- the same ESC press. Instead we catch ESC via OnKeyDown.
-    -- Order: NoteConfig (right) → Config (left) → Main window
     f:SetPropagateKeyboardInput(false)
     f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
-        -- ESC close order:
-        -- 0. Clipboard hint (DIALOG strata — always first)
-        -- 1. Export window (DIALOG strata)
-        -- 2. Any open sticky note settings window
-        -- 3. NoteConfig (per-note settings, left of main)
-        -- 4. Config (addon settings, right of main)
-        -- 5. Main window itself
-        -- New Note dialog (DIALOG strata — always first)
-        local nnd = _G["BNBNewNoteDialogFrame"]
-        if nnd and nnd:IsShown() then
-            if BNB.NewNoteDialog and BNB.NewNoteDialog.Close then
-                BNB.NewNoteDialog.Close()
-            else
-                nnd:Hide()
-            end
-            return
-        end
-        local ch = _G["BNBClipboardHintFrame"]
-        if ch and ch:IsShown() then
-            if BNB._clipboardHint and BNB._clipboardHint._dismiss then
-                BNB._clipboardHint._dismiss()
-            else
-                ch:Hide()
-            end
-            return
-        end
-        -- Icon picker (sidebar right-click → Change icon)
-        local ip = _G["BNBSidebarIconPickerFrame"]
-        if ip and ip:IsShown() then ip:Hide(); return end
-        -- Insert Info menu (closes before all BNB windows)
-        if BNB.CloseInsertInfoMenu and BNB.CloseInsertInfoMenu() then return end
-        local ew = _G["BigNoteBoxExportFrame"]
-        if ew and ew:IsShown() then ew:Hide(); return end
-        -- Copy/Move popup
-        local cm = _G["BigNoteBoxCopyMoveFrame"]
-        if cm and cm:IsShown() then cm:Hide(); return end
-        -- History compare window (closes before everything else)
-        local hcw = _G["BigNoteBoxHistoryCompareFrame"]
-        if hcw and hcw:IsShown() then BNB.CloseHistoryCompare(); return end
-        -- Alarm setter window closes before sticky settings
-        local aw = _G["BNBAlarmWindow"]
-        if aw and aw:IsShown() then
-            if BNB.AlarmWindow and BNB.AlarmWindow.Close then
-                BNB.AlarmWindow.Close()
-            else
-                aw:Hide()
-            end
-            return
-        end
-        -- Alarm overview window (all alarms list)
-        local ao = _G["BNBAlarmOverviewFrame"]
-        if ao and ao:IsShown() then ao:Hide(); return end
-        local ss = _G["BigNoteBoxStickySettingsFrame"]
-        if ss and ss:IsShown() then
-            if BNB.Sticky and BNB.Sticky.CloseSettings then
-                BNB.Sticky.CloseSettings()
-            else
-                ss:Hide()
-            end
-            return
-        end
-        -- If tag manager is open, close it next
-        local tm = _G["BigNoteBoxTagManagerFrame"]
-        if tm and tm:IsShown() then tm:Hide(); return end
-        -- If per-note history panel is open, close it next
-        local nhp = _G["BigNoteBoxNoteHistoryFrame"]
-        if nhp and nhp:IsShown() then BNB.CloseNoteHistoryPanel(); return end
-        -- If main history window is open, close it next (also closes panel)
-        local hw = _G["BigNoteBoxHistoryFrame"]
-        if hw and hw:IsShown() then BNB.CloseHistoryWindow(); return end
-        -- If trash view popup is open, close it before the trash window itself
-        local tvp = _G["BNBTrashViewPopup"]
-        if tvp and tvp:IsShown() then tvp:Hide(); return end
-        -- If trash window is open, close it next
-        local tw = _G["BigNoteBoxTrashFrame"]
-        if tw and tw:IsShown() then tw:Hide(); return end
-        -- If NoteConfig is open, close it next
-        local nc = _G["BigNoteBoxNoteConfigFrame"]
-        if nc and nc:IsShown() then nc:Hide(); return end
-        -- If Task Edit Window is open, close it before RefBox
-        local tew = _G["BNBTaskEditWindow"]
-        if tew and tew:IsShown() then
-            if BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
-                BNB.TaskEditWindow.Close()
-            else
-                tew:Hide()
-            end
-            return
-        end
-        -- If Reference Box is open, close it next
-        local rb = _G["BigNoteBoxReferenceBoxFrame"]
-        if rb and rb:IsShown() then rb:Hide(); return end
-        -- Share preview window closes before share/import windows
-        local spv = _G["BNBSharePreviewFrame"]
-        if spv and spv:IsShown() then BNB.CloseSharePreview(); return end
-        -- Share window closes before import window and main window
-        local sw = _G["BNBShareFrame"]
-        if sw and sw:IsShown() then BNB.CloseShareWindow(); return end
-        -- Import window closes before main window
-        local iw = _G["BNBImportFrame"]
-        if iw and iw:IsShown() then BNB.CloseImportWindow(); return end
-        -- If right settings window is open, close it first
-        local cfg = _G["BigNoteBoxConfigFrame"]
-        if cfg and cfg:IsShown() then cfg:Hide(); return end
-        -- Otherwise close main window (with confirm if enabled)
-        BNB.RequestCloseMainWindow()
-    end)
+    f:SetScript("OnKeyDown", OnEscapeKey)
 
     -- ── Resize (whole window, bottom-right) ─────────────────────────────────
-    f:SetResizeBounds(MIN_W, MIN_H, 1400, 1000)
+    f:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
     local resizeHandle = CreateFrame("Button", nil, f)
     resizeHandle:SetSize(16, 16)
     resizeHandle:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
@@ -843,7 +732,7 @@ function BNB.CreateMainWindow()
     rtex:SetAllPoints()
     rtex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
     f._resizeHandle = resizeHandle  -- stored for scale-lock toggle
-    -- ── Resize size tooltip ──────────────────────────────────────────────────
+
     -- Small label that tracks the cursor during resize and shows WxH.
     local sizeLabel = CreateFrame("Frame", nil, UIParent)
     sizeLabel:SetSize(90, 22)
@@ -858,59 +747,50 @@ function BNB.CreateMainWindow()
     sizeLabelTxt:SetJustifyH("CENTER")
     sizeLabelTxt:SetTextColor(1, 1, 1)
 
-    local _resizing = false
     -- Sidebar width (BTN_SZ in Sidebar.lua = 64) subtracted when sidebar is visible
-    -- so the tooltip shows the notepad window size, not including the sidebar strip.
+    -- so the label shows the notepad window size, not including the sidebar strip.
     local function SidebarW()
         return (BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled()) and 64 or 0
     end
-
-    f:HookScript("OnSizeChanged", function(self)
-        if not _resizing then return end
-        local w = math.floor(self:GetWidth()  - SidebarW())
-        local h = math.floor(self:GetHeight())
-        sizeLabelTxt:SetText(w .. " x " .. h)
-        -- Position the label 14px to the right and 4px below the cursor
+    -- Label text is the current size; it sits 14px right of and 4px below the cursor
+    local function UpdateSizeLabel()
+        sizeLabelTxt:SetText(math.floor(f:GetWidth() - SidebarW()) .. " x " .. math.floor(f:GetHeight()))
         local cx, cy = GetCursorPosition()
         local uisc   = UIParent:GetEffectiveScale()
         sizeLabel:ClearAllPoints()
-        sizeLabel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT",
-            cx / uisc + 14, cy / uisc + 4)
+        sizeLabel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / uisc + 14, cy / uisc + 4)
+    end
+
+    local _resizing = false
+    f:HookScript("OnSizeChanged", function()
+        if _resizing then UpdateSizeLabel() end
     end)
 
     resizeHandle:SetScript("OnMouseDown", function(self, btn)
-        if btn == "LeftButton" then
-            local left = f:GetLeft()
-            local top  = f:GetTop()
-            -- GetLeft/GetTop return nil if the frame hasn't been laid out yet
-            if left and top then
-                f:ClearAllPoints()
-                f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
-            end
-            _resizing = true
-            -- Seed the label with current size before first OnSizeChanged fires
-            sizeLabelTxt:SetText(
-                math.floor(f:GetWidth() - SidebarW()) .. " x " .. math.floor(f:GetHeight()))
-            local uisc = UIParent:GetEffectiveScale()
-            local cx, cy = GetCursorPosition()
-            sizeLabel:ClearAllPoints()
-            sizeLabel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT",
-                cx / uisc + 14, cy / uisc + 4)
-            sizeLabel:Show()
-            f:StartSizing("BOTTOMRIGHT")
+        if btn ~= "LeftButton" then return end
+        -- GetLeft/GetTop return nil if the frame hasn't been laid out yet;
+        -- otherwise they are already in UIParent coordinate space
+        local left, top = f:GetLeft(), f:GetTop()
+        if left and top then
+            f:ClearAllPoints()
+            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
         end
+        _resizing = true
+        -- Seed the label with current size before first OnSizeChanged fires
+        UpdateSizeLabel()
+        sizeLabel:Show()
+        f:StartSizing("BOTTOMRIGHT")
     end)
     resizeHandle:SetScript("OnMouseUp", function()
         _resizing = false
         sizeLabel:Hide()
         f:StopMovingOrSizing()
-        local w = math.max(MIN_W, math.min(1400, f:GetWidth()))
-        local h = math.max(MIN_H, math.min(1000, f:GetHeight()))
+        local w = math.max(MIN_W, math.min(MAX_W, f:GetWidth()))
+        local h = math.max(MIN_H, math.min(MAX_H, f:GetHeight()))
         f:SetSize(w, h)
         SaveWindowPos(f)
         -- Re-apply split so panes adjust to new width
-        ApplySplit(f, BNB.listPane, BNB.editorPane,
-            nil, f._splitter)
+        ApplySplit(f)
         -- Recalculate sidebar slot visibility after resize
         if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
     end)
@@ -923,26 +803,30 @@ function BNB.CreateMainWindow()
     splitter:SetWidth(7)
     splitter:SetFrameLevel(f:GetFrameLevel() + 5)
 
-    -- Three grip dots centred vertically on the splitter
-    local dotSize = 3
-    local dotGap  = 5
-    for i = -1, 1 do
-        local dot = splitter:CreateTexture(nil, "OVERLAY")
-        dot:SetSize(dotSize, dotSize)
-        dot:SetPoint("CENTER", splitter, "CENTER", 0, i * dotGap)
-        dot:SetColorTexture(0.65, 0.65, 0.65, 0.9)
+    local function DotColour()
+        if chrome.DotColour then return chrome.DotColour() end
+        return 0.65, 0.65, 0.65
+    end
+    local function ColourDots(r, g, b, a)
+        for _, reg in ipairs({ splitter:GetRegions() }) do
+            if reg.SetColorTexture then reg:SetColorTexture(r, g, b, a) end
+        end
     end
 
+    -- Three grip dots centred vertically on the splitter
+    for i = -1, 1 do
+        local dot = splitter:CreateTexture(nil, "OVERLAY")
+        dot:SetSize(3, 3)
+        dot:SetPoint("CENTER", splitter, "CENTER", 0, i * 5)
+    end
+    local dr, dg, db = DotColour()
+    ColourDots(dr, dg, db, 0.9)
+
     -- Highlight dots on hover
-    splitter:SetScript("OnEnter", function(self)
-        for _, r in ipairs({self:GetRegions()}) do
-            if r.SetColorTexture then r:SetColorTexture(1, 0.82, 0, 1) end
-        end
-    end)
-    splitter:SetScript("OnLeave", function(self)
-        for _, r in ipairs({self:GetRegions()}) do
-            if r.SetColorTexture then r:SetColorTexture(0.65, 0.65, 0.65, 0.9) end
-        end
+    splitter:SetScript("OnEnter", function() ColourDots(1, 0.82, 0, 1) end)
+    splitter:SetScript("OnLeave", function()
+        local r, g, b = DotColour()
+        ColourDots(r, g, b, 0.9)
     end)
 
     local dragging = false
@@ -962,7 +846,7 @@ function BNB.CreateMainWindow()
             newW = math.min(newW, maxW)
             if newW ~= BNB._listPaneW then
                 BNB._listPaneW = newW
-                ApplySplit(f, BNB.listPane, BNB.editorPane, nil, splitter)
+                ApplySplit(f)
             end
         end)
     end)
@@ -975,21 +859,19 @@ function BNB.CreateMainWindow()
 
     -- ── Left pane (note list) ────────────────────────────────────────────────
     local listPane = CreateFrame("Frame", nil, f)
-    listPane:SetPoint("TOPLEFT",    f, "TOPLEFT",    0, -TITLE_H)
+    listPane:SetPoint("TOPLEFT",    f, "TOPLEFT",    0, -chrome.headerH)
     listPane:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
     BNB.listPane = listPane
-
-    -- Forever: soft glow behind the note list so the side panel stands out
-    -- against the wood grain; stretches with the pane (splitter, resize, collapse)
-    listPane._forGlow = BNB.AddForeverGlow(listPane)
 
     -- ── Right pane (editor) ──────────────────────────────────────────────────
     local editorPane = CreateFrame("Frame", nil, f)
     editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
     BNB.editorPane = editorPane
 
-    -- Apply initial split (sets widths and anchors divider/splitter/editorPane)
-    ApplySplit(f, listPane, editorPane, nil, splitter)
+    if chrome.StylePanes then chrome.StylePanes(listPane, editorPane) end
+
+    -- Apply initial split (sets widths and anchors splitter/editorPane)
+    ApplySplit(f)
 
     -- ── Lifecycle ────────────────────────────────────────────────────────────
     f:SetScript("OnShow", function(self)
@@ -1001,13 +883,14 @@ function BNB.CreateMainWindow()
                 math.min(MAX_LIST_W, BigNoteBoxDB.splitX or DEFAULT_LIST_W))
             splitter:EnableMouse(true)
         end
-        ApplySplit(f, listPane, editorPane, nil, splitter)
+        ApplySplit(f)
         -- Skip RestoreWindowPos when returning from focus mode — position was
         -- already set by CopyFramePosition in CloseFocusMode.
         if not self._fromFocusMode then
             RestoreWindowPos(self)
         end
         self._fromFocusMode = false
+        if chrome.OnShow then chrome.OnShow() end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         local sel = BigNoteBoxDB.selectedNoteID
         -- Recovery: if the previously selected note is a title-less stub (abandoned
@@ -1025,7 +908,7 @@ function BNB.CreateMainWindow()
             if BNB.SelectNote then BNB.SelectNote(sel) end
         end
         -- Apply scale lock state from saved DB
-        if BNB._applyScaleLock then BNB._applyScaleLock() end
+        BNB._applyScaleLock()
     end)
 
     f:SetScript("OnHide", function(self)
@@ -1095,23 +978,22 @@ function BNB.CreateMainWindow()
                 collapsedW + 40)
             splitter:EnableMouse(true)
         end
-        ApplySplit(f, listPane, editorPane, nil, splitter)
+        ApplySplit(f)
     end
 end
 
 --------------------------------------------------------------------------------
--- TOOLBAR ICON ROW  (shared by MainWindow.lua and MainWindowSkin.lua)
+-- TOOLBAR ICON ROW
 -- row:   icons in slot order, right to left, each already anchored at its own
 --        slot. Their anchors are recorded as the slot positions; visible icons
 --        are packed into the first slots, so a hidden icon leaves no gap.
--- fixed: icons that keep their own place but also hide in multi-select.
 -- Visibility: everything hides in multi-select (the action buttons use that
 -- space); the trash icon also hides while Trash is off in Settings.
 --------------------------------------------------------------------------------
-local _tbRow, _tbFixed, _tbSlots
+local _tbRow, _tbSlots
 
-function BNB.InitToolbarIconRow(row, fixed)
-    _tbRow, _tbFixed, _tbSlots = row, fixed or {}, {}
+function BNB.InitToolbarIconRow(row)
+    _tbRow, _tbSlots = row, {}
     for i, btn in ipairs(row) do
         _tbSlots[i] = { btn:GetPoint(1) }
     end
@@ -1133,7 +1015,6 @@ function BNB.ApplyToolbarIcons()
             btn:SetPoint(p[1], p[2], p[3], p[4], p[5])
         end
     end
-    for _, btn in ipairs(_tbFixed) do btn:SetShown(not multi) end
 end
 
 --------------------------------------------------------------------------------

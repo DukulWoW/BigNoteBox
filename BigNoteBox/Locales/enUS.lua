@@ -247,7 +247,6 @@ L["NL_HDR_REGULAR_FMT"]      = "|cff888888-- Notes (%d) --|r"
 -- ── Main window skin mode: extras not shared with MainWindow.lua ────────────
 L["MWS_RANDOM_SKIN_TIP"]     = "Random skin"
 L["MWS_RANDOM_SKIN_TIP_SUB"] = "Click to randomly change the skin preset and brightness"
-L["MWS_MULTI_COPYMOVE_TIP"]  = "Copy or move selected notes"
 
 -- ── New Note dialog ───────────────────────────────────────────────────────────
 L["NND_CHOOSE_ICON"]      = "Choose Icon"

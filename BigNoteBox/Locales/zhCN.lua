@@ -228,7 +228,6 @@ L["NL_HDR_REGULAR_FMT"]      = "|cff888888-- 笔记 (%d) --|r"
 -- ── Main window skin mode: extras not shared with MainWindow.lua ────────────
 L["MWS_RANDOM_SKIN_TIP"]     = "随机皮肤"
 L["MWS_RANDOM_SKIN_TIP_SUB"] = "点击以随机更改皮肤预设和亮度"
-L["MWS_MULTI_COPYMOVE_TIP"]  = "复制或移动选中的笔记"
 
 -- ── New Note dialog ───────────────────────────────────────────────────────────
 L["NND_CHOOSE_ICON"]      = "选择图标"
