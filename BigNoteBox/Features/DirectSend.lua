@@ -57,9 +57,7 @@ local _prompt         = nil  -- the prompt frame (lazy built)
 --------------------------------------------------------------------------------
 -- HELPERS
 --------------------------------------------------------------------------------
-local function GetDeflate()
-    return LibStub and LibStub("LibDeflate", true)
-end
+local GetDeflate = BNB.GetDeflate
 
 local function GetLibSerialize()
     return LibStub and LibStub("LibSerialize", true)

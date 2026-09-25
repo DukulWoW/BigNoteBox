@@ -192,6 +192,32 @@ local function SoundPath(key)
 end
 
 -- ---------------------------------------------------------------------------
+-- SCROLL PANEL FACTORY — shared by BuildWindow and BuildWindowSkin
+-- ---------------------------------------------------------------------------
+local function MakeScrollPanel(f)
+    local sf = CreateFrame("ScrollFrame",nil,f,"ScrollFrameTemplate")
+    local bar = sf.ScrollBar; if bar then bar:SetAlpha(0) end
+    sf:SetPoint("TOPLEFT",     f,"TOPLEFT",     AW_PAD, -AW_TAB_Y)
+    sf:SetPoint("BOTTOMRIGHT", f,"BOTTOMRIGHT", -24, AW_FOOT_H + 6)
+    local ct = CreateFrame("Frame",nil,sf)
+    ct:SetWidth(AW_CW); ct:SetHeight(1); sf:SetScrollChild(ct)
+    local function Apply()
+        local sfH = sf:GetHeight(); if sfH<4 then return end
+        local ctH = ct._contentH or 1
+        ct:SetHeight(math.max(ctH,sfH))
+        if ctH <= sfH+2 then
+            if bar then bar:SetAlpha(0) end; ct:SetWidth(AW_CW+20)
+        else
+            if bar then bar:SetAlpha(1) end; ct:SetWidth(AW_CW)
+        end
+    end
+    sf:SetScript("OnSizeChanged",Apply)
+    sf:HookScript("OnShow",function() C_Timer.After(0.05,Apply) end)
+    sf:Hide()
+    return sf, ct
+end
+
+-- ---------------------------------------------------------------------------
 -- BUILD (once)
 -- ---------------------------------------------------------------------------
 local function BuildWindow()
@@ -274,33 +300,9 @@ local function BuildWindow()
     end
     PanelTemplates_SetNumTabs(f,3); f.numTabs=3
 
-    -- ── SCROLL PANEL FACTORY ─────────────────────────────────────────────────
-    local function MakeSP()
-        local sf = CreateFrame("ScrollFrame",nil,f,"ScrollFrameTemplate")
-        local bar = sf.ScrollBar; if bar then bar:SetAlpha(0) end
-        sf:SetPoint("TOPLEFT",     f,"TOPLEFT",     AW_PAD, -AW_TAB_Y)
-        sf:SetPoint("BOTTOMRIGHT", f,"BOTTOMRIGHT", -24, AW_FOOT_H + 6)
-        local ct = CreateFrame("Frame",nil,sf)
-        ct:SetWidth(AW_CW); ct:SetHeight(1); sf:SetScrollChild(ct)
-        local function Apply()
-            local sfH = sf:GetHeight(); if sfH<4 then return end
-            local ctH = ct._contentH or 1
-            ct:SetHeight(math.max(ctH,sfH))
-            if ctH <= sfH+2 then
-                if bar then bar:SetAlpha(0) end; ct:SetWidth(AW_CW+20)
-            else
-                if bar then bar:SetAlpha(1) end; ct:SetWidth(AW_CW)
-            end
-        end
-        sf:SetScript("OnSizeChanged",Apply)
-        sf:HookScript("OnShow",function() C_Timer.After(0.05,Apply) end)
-        sf:Hide()
-        return sf, ct
-    end
-
-    local sf1,ct1 = MakeSP()
-    local sf2,ct2 = MakeSP()
-    local sf3,ct3 = MakeSP()
+    local sf1,ct1 = MakeScrollPanel(f)
+    local sf2,ct2 = MakeScrollPanel(f)
+    local sf3,ct3 = MakeScrollPanel(f)
     tabPanels[1]=sf1; tabPanels[2]=sf2; tabPanels[3]=sf3
 
     f:Hide()
@@ -387,33 +389,10 @@ local function BuildWindowSkin()
         tabCtrl.Select(idx)
     end
 
-    -- ── SCROLL PANEL FACTORY (identical anchor to normal — AW_TAB_Y = 62) ────
-    local function MakeSP()
-        local sf = CreateFrame("ScrollFrame",nil,f,"ScrollFrameTemplate")
-        local bar = sf.ScrollBar; if bar then bar:SetAlpha(0) end
-        sf:SetPoint("TOPLEFT",     f,"TOPLEFT",     AW_PAD, -AW_TAB_Y)
-        sf:SetPoint("BOTTOMRIGHT", f,"BOTTOMRIGHT", -24, AW_FOOT_H + 6)
-        local ct = CreateFrame("Frame",nil,sf)
-        ct:SetWidth(AW_CW); ct:SetHeight(1); sf:SetScrollChild(ct)
-        local function Apply()
-            local sfH = sf:GetHeight(); if sfH<4 then return end
-            local ctH = ct._contentH or 1
-            ct:SetHeight(math.max(ctH,sfH))
-            if ctH <= sfH+2 then
-                if bar then bar:SetAlpha(0) end; ct:SetWidth(AW_CW+20)
-            else
-                if bar then bar:SetAlpha(1) end; ct:SetWidth(AW_CW)
-            end
-        end
-        sf:SetScript("OnSizeChanged",Apply)
-        sf:HookScript("OnShow",function() C_Timer.After(0.05,Apply) end)
-        sf:Hide()
-        return sf, ct
-    end
-
-    local sf1,ct1 = MakeSP()
-    local sf2,ct2 = MakeSP()
-    local sf3,ct3 = MakeSP()
+    -- ── SCROLL PANELS (identical anchor to normal — AW_TAB_Y = 62) ───────────
+    local sf1,ct1 = MakeScrollPanel(f)
+    local sf2,ct2 = MakeScrollPanel(f)
+    local sf3,ct3 = MakeScrollPanel(f)
     tabPanels[1]=sf1; tabPanels[2]=sf2; tabPanels[3]=sf3
 
     f:SetScript("OnShow", function()

@@ -3934,32 +3934,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
     end
 
     -- Button helper
-    local btnX = PAD
-    local function MkBtn(label, tip, onClick)
-        local btn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
-        btn:SetSize(28, 18)
-        btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
-        btn:SetText(label)
-        local fs = btn:GetFontString()
-        if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
-        btn:SetScript("OnClick", onClick)
-        btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        btnX = btnX + 30
-        return btn
-    end
-
-    local function Divider()
-        local d = bar:CreateTexture(nil, "ARTWORK")
-        d:SetSize(1, 14)
-        d:SetPoint("LEFT", bar, "LEFT", btnX, 0)
-        d:SetColorTexture(0.35, 0.35, 0.38, 1)
-        btnX = btnX + 6
-    end
+    local MkBtn, Divider = BNB.MakeToolbarFactory(bar, PAD)
 
     MkBtn("H1", "Insert H1 header: {h1}...{/h1}",
         function() InsertTagPair("{h1}", "{/h1}") end)

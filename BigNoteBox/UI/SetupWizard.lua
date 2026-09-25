@@ -448,18 +448,7 @@ local function BuildPage1(content)
         -- language is active -- so on a forced-Chinese UI it reads "客户端语言" alone, with no
         -- clue that it means "Client Language" (Dukul, 2026-09-23). Always show the hardcoded
         -- English name too, whenever the ACTIVE language isn't English -- forced or natural.
-        local CLIENT_LABEL_EN = "Client Language"
-
-        local function MakeLangLabel(entry)
-            local label = entry.label
-            if entry.code == "client" and BNB.GetActiveLanguage and BNB.GetActiveLanguage() ~= "enUS" then
-                label = CLIENT_LABEL_EN .. " - " .. label
-            end
-            if entry.flag then
-                return "|T" .. entry.flag .. ":14:20:0:0:32:32|t " .. label
-            end
-            return label
-        end
+        local MakeLangLabel = BNB.MakeLangLabel
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 
@@ -1056,9 +1045,6 @@ local function BuildPage5(content)
         nil, 0.75, 0.75, 0.75)
     y = ny - 4
 
-    local _KB_MODS = {
-        LSHIFT=true, RSHIFT=true, LCTRL=true, RCTRL=true, LALT=true, RALT=true,
-    }
     local KEYBINDS = {
         { action="BIGNOTEBOXOPEN",         label=L["SW_KB_OPEN"],         hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-N") },
         { action="BIGNOTEBOXQUICKNOTE",    label=L["SW_KB_QUICKNOTE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
@@ -1066,17 +1052,6 @@ local function BuildPage5(content)
         { action="BIGNOTEBOXHIDESTICKIES", label=L["SW_KB_HIDESTICKIES"], hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-H") },
         { action="BIGNOTEBOXTOGGLERV",     label=L["SW_KB_RICHEDITOR"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
     }
-
-    -- Register conflict popup once
-    if not StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] then
-        StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] = {
-            text = "%s", button1 = YES, button2 = NO,
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            OnAccept = function(_, data)
-                if data and data.applyFn then data.applyFn(data.fullKey) end
-            end,
-        }
-    end
 
     local _updateFns = {}
 
@@ -1111,58 +1086,7 @@ local function BuildPage5(content)
         UpdateText()
         _updateFns[#_updateFns + 1] = UpdateText
 
-        local function StopCapture(btn)
-            btn:EnableKeyboard(false)
-            btn:SetScript("OnKeyDown", nil)
-            btn:SetPropagateKeyboardInput(true)
-            UpdateText()
-        end
-
-        local function ApplyBind(fullKey)
-            local k1, k2 = GetBindingKey(entry.action)
-            if k1 then SetBinding(k1, nil) end
-            if k2 then SetBinding(k2, nil) end
-            SetBinding(fullKey, entry.action)
-            SaveBindings(GetCurrentBindingSet())
-            UpdateText()
-        end
-
-        local function OnKeyCaptured(btn, key)
-            if _KB_MODS[key] then return end
-            btn:SetPropagateKeyboardInput(false)
-            if key == "ESCAPE" or InCombatLockdown() then StopCapture(btn); return end
-            local mods = {}
-            if IsAltKeyDown()     then mods[#mods+1] = "ALT"   end
-            if IsControlKeyDown() then mods[#mods+1] = "CTRL"  end
-            if IsShiftKeyDown()   then mods[#mods+1] = "SHIFT" end
-            mods[#mods+1] = key
-            local fullKey = table.concat(mods, "-")
-            StopCapture(btn)
-            local existing = GetBindingAction(fullKey)
-            if existing and existing ~= "" and existing ~= entry.action then
-                local msg = string.format(L["KEYBIND_CONFLICT"],
-                    GetBindingText(fullKey), GetBindingName(existing))
-                StaticPopup_Show("BNB_KEYBIND_CONFLICT", msg, nil,
-                    { fullKey=fullKey, applyFn=ApplyBind })
-                return
-            end
-            ApplyBind(fullKey)
-        end
-
-        kbBtn:SetScript("OnClick", function(btn, button)
-            if button == "RightButton" then
-                local k1, k2 = GetBindingKey(entry.action)
-                if k1 then SetBinding(k1, nil) end
-                if k2 then SetBinding(k2, nil) end
-                if k1 or k2 then SaveBindings(GetCurrentBindingSet()) end
-                UpdateText()
-            else
-                btn:SetText(L["KEYBIND_PRESS_KEY"])
-                btn:EnableKeyboard(true)
-                btn:SetPropagateKeyboardInput(false)
-                btn:SetScript("OnKeyDown", OnKeyCaptured)
-            end
-        end)
+        BNB.WireKeybindCapture(kbBtn, entry.action, UpdateText, L["KEYBIND_PRESS_KEY"])
 
         kbBtn:SetScript("OnEnter", function(btn)
             GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")

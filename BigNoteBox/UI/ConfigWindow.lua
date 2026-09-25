@@ -421,9 +421,6 @@ end
 -- Registers BNB_KEYBIND_CONFLICT StaticPopup once (guarded).
 -- Returns the new y offset after the row.
 -- ─────────────────────────────────────────────────────────────────────────────
-local _KB_MODIFIER_KEYS = {
-    LSHIFT=true, RSHIFT=true, LCTRL=true, RCTRL=true, LALT=true, RALT=true,
-}
 local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, tooltipVerb)
     local kbLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     kbLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y + 2)
@@ -449,27 +446,6 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
         if event == "UPDATE_BINDINGS" then UpdateText() end
     end)
 
-    local function StopCapture(btn)
-        btn:EnableKeyboard(false); btn:SetScript("OnKeyDown", nil); UpdateText()
-    end
-
-    local function ApplyBind(fullKey)
-        local k1, k2 = GetBindingKey(kbAction)
-        if k1 then SetBinding(k1, nil) end
-        if k2 then SetBinding(k2, nil) end
-        SetBinding(fullKey, kbAction)
-        SaveBindings(GetCurrentBindingSet())
-        UpdateText()
-    end
-
-    if not StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] then
-        StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] = {
-            text = "%s", button1 = YES, button2 = NO,
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            OnAccept = function(_, data) if data then ApplyBind(data.fullKey) end end,
-        }
-    end
-
     if not StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] then
         StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] = {
             text = "%s",
@@ -490,39 +466,8 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
         }
     end
 
-    local function OnKeyCaptured(btn, key)
-        if _KB_MODIFIER_KEYS[key] then return end
-        if key == "ESCAPE" or InCombatLockdown() then StopCapture(btn); return end
-        local mods = {}
-        if IsAltKeyDown()     then mods[#mods+1] = "ALT"   end
-        if IsControlKeyDown() then mods[#mods+1] = "CTRL"  end
-        if IsShiftKeyDown()   then mods[#mods+1] = "SHIFT" end
-        mods[#mods+1] = key
-        local fullKey = table.concat(mods, "-")
-        StopCapture(btn)
-        local existing = GetBindingAction(fullKey)
-        if existing and existing ~= "" and existing ~= kbAction then
-            local msg = string.format(L["KEYBIND_CONFLICT"],
-                GetBindingText(fullKey), GetBindingName(existing))
-            StaticPopup_Show("BNB_KEYBIND_CONFLICT", msg, nil, { fullKey = fullKey })
-            return
-        end
-        ApplyBind(fullKey)
-    end
+    BNB.WireKeybindCapture(kbBtn, kbAction, UpdateText, L["KEYBIND_PRESS_KEY"])
 
-    kbBtn:SetScript("OnClick", function(btn, button)
-        if button == "RightButton" then
-            local k1, k2 = GetBindingKey(kbAction)
-            if k1 then SetBinding(k1, nil) end
-            if k2 then SetBinding(k2, nil) end
-            if k1 or k2 then SaveBindings(GetCurrentBindingSet()) end
-            UpdateText(); GameTooltip:Hide()
-        else
-            btn:SetText(L["KEYBIND_PRESS_KEY"])
-            btn:EnableKeyboard(true)
-            btn:SetScript("OnKeyDown", OnKeyCaptured)
-        end
-    end)
     kbBtn:SetScript("OnEnter", function(btn)
         GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
         local key = GetBindingKey(kbAction)
@@ -667,18 +612,7 @@ local function BuildGeneralTab(sf, ct)
         -- clue that it means "Client Language" (Dukul, 2026-09-23, after seeing that on an
         -- English client with Chinese selected). Always show the hardcoded English name too,
         -- whenever the ACTIVE language isn't English -- forced or natural, doesn't matter.
-        local CLIENT_LABEL_EN = "Client Language"
-
-        local function MakeLangLabel(entry)
-            local label = entry.label
-            if entry.code == "client" and BNB.GetActiveLanguage and BNB.GetActiveLanguage() ~= "enUS" then
-                label = CLIENT_LABEL_EN .. " - " .. label
-            end
-            if entry.flag then
-                return "|T" .. entry.flag .. ":14:20:0:0:32:32|t " .. label
-            end
-            return label
-        end
+        local MakeLangLabel = BNB.MakeLangLabel
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 

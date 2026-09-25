@@ -230,9 +230,7 @@ end
 --------------------------------------------------------------------------------
 -- COMPRESS / ENCODE
 --------------------------------------------------------------------------------
-local function GetDeflate()
-    return LibStub and LibStub("LibDeflate", true)
-end
+local GetDeflate = BNB.GetDeflate
 
 function BNB.ShareEncode(noteID, optionKey)
     local ndb  = BigNoteBoxNotesDB

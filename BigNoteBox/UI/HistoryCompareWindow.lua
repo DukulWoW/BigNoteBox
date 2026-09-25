@@ -29,22 +29,7 @@ local _snap        = nil
 local _exportFrame = nil
 local _overlays    = {}
 
-local function FmtTs(ts)
-    if not ts or ts == 0 then return "Unknown" end
-    local db    = BigNoteBoxDB
-    local use24 = db and db.use24Hour ~= false
-    local d = date("%Y-%m-%d", ts)
-    local t
-    if use24 then
-        t = date("%H:%M", ts)
-    else
-        local h = tonumber(date("%H", ts))
-        local ampm = h >= 12 and "pm" or "am"
-        h = h % 12; if h == 0 then h = 12 end
-        t = h .. ":" .. date("%M", ts) .. " " .. ampm
-    end
-    return d .. "  " .. t
-end
+local FmtTs = BNB.FmtTs
 
 local function MakeOverlay(target)
     if not target then return nil end

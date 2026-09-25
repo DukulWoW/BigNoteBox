@@ -39,6 +39,149 @@ function BNB.SetBackdropDark(frame)
     end
 end
 
+-- BNB.MakeToolbarFactory(bar, startX) — shared MkBtn/Divider pair for an
+-- editor toolbar strip. Returns MkBtn(label, tip, onClick) and Divider(),
+-- both advancing a shared x-offset starting at startX.
+function BNB.MakeToolbarFactory(bar, startX)
+    local btnX = startX or 0
+    local function MkBtn(label, tip, onClick)
+        local btn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
+        btn:SetSize(28, 18)
+        btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
+        btn:SetText(label)
+        local fs = btn:GetFontString()
+        if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
+        btn:SetScript("OnClick", onClick)
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(tip, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        btnX = btnX + 30
+        return btn
+    end
+    local function Divider()
+        local d = bar:CreateTexture(nil, "ARTWORK")
+        d:SetSize(1, 14)
+        d:SetPoint("LEFT", bar, "LEFT", btnX, 0)
+        d:SetColorTexture(0.35, 0.35, 0.38, 1)
+        btnX = btnX + 6
+    end
+    return MkBtn, Divider
+end
+
+-- BNB.MakeLangLabel(entry) — language picker row label, prefixed with the
+-- hardcoded English name for the "client" entry when the active language
+-- isn't English (Dukul, 2026-09-23), plus the flag icon markup if present.
+local LANG_CLIENT_LABEL_EN = "Client Language"
+function BNB.MakeLangLabel(entry)
+    local label = entry.label
+    if entry.code == "client" and BNB.GetActiveLanguage and BNB.GetActiveLanguage() ~= "enUS" then
+        label = LANG_CLIENT_LABEL_EN .. " - " .. label
+    end
+    if entry.flag then
+        return "|T" .. entry.flag .. ":14:20:0:0:32:32|t " .. label
+    end
+    return label
+end
+
+-- BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
+-- Shared keybind-row click handling: right-click clears the binding,
+-- left-click enters capture mode and applies the next non-modifier key
+-- (with a conflict prompt via the shared BNB_KEYBIND_CONFLICT StaticPopup).
+-- Registers the StaticPopup once, guarded, and calls SetPropagateKeyboardInput
+-- for keys it does not handle (keyboard-routing rule, CLAUDE.md).
+local _KB_MODIFIER_KEYS = {
+    LSHIFT=true, RSHIFT=true, LCTRL=true, RCTRL=true, LALT=true, RALT=true,
+}
+if not StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] then
+    StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] = {
+        text = "%s", button1 = YES, button2 = NO,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        OnAccept = function(_, data)
+            if data and data.applyFn then data.applyFn(data.fullKey) end
+        end,
+    }
+end
+
+function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
+    local function StopCapture(btn)
+        btn:EnableKeyboard(false)
+        btn:SetScript("OnKeyDown", nil)
+        btn:SetPropagateKeyboardInput(true)
+        UpdateText()
+    end
+
+    local function ApplyBind(fullKey)
+        local k1, k2 = GetBindingKey(action)
+        if k1 then SetBinding(k1, nil) end
+        if k2 then SetBinding(k2, nil) end
+        SetBinding(fullKey, action)
+        SaveBindings(GetCurrentBindingSet())
+        UpdateText()
+    end
+
+    local function OnKeyCaptured(btn, key)
+        if _KB_MODIFIER_KEYS[key] then return end
+        btn:SetPropagateKeyboardInput(false)
+        if key == "ESCAPE" or InCombatLockdown() then StopCapture(btn); return end
+        local mods = {}
+        if IsAltKeyDown()     then mods[#mods+1] = "ALT"   end
+        if IsControlKeyDown() then mods[#mods+1] = "CTRL"  end
+        if IsShiftKeyDown()   then mods[#mods+1] = "SHIFT" end
+        mods[#mods+1] = key
+        local fullKey = table.concat(mods, "-")
+        StopCapture(btn)
+        local existing = GetBindingAction(fullKey)
+        if existing and existing ~= "" and existing ~= action then
+            local msg = string.format(L["KEYBIND_CONFLICT"],
+                GetBindingText(fullKey), GetBindingName(existing))
+            StaticPopup_Show("BNB_KEYBIND_CONFLICT", msg, nil,
+                { fullKey = fullKey, applyFn = ApplyBind })
+            return
+        end
+        ApplyBind(fullKey)
+    end
+
+    kbBtn:SetScript("OnClick", function(btn, button)
+        if button == "RightButton" then
+            local k1, k2 = GetBindingKey(action)
+            if k1 then SetBinding(k1, nil) end
+            if k2 then SetBinding(k2, nil) end
+            if k1 or k2 then SaveBindings(GetCurrentBindingSet()) end
+            UpdateText(); GameTooltip:Hide()
+        else
+            btn:SetText(pressText)
+            btn:EnableKeyboard(true)
+            btn:SetPropagateKeyboardInput(false)
+            btn:SetScript("OnKeyDown", OnKeyCaptured)
+        end
+    end)
+end
+
+function BNB.GetDeflate()
+    return LibStub and LibStub("LibDeflate", true)
+end
+
+-- BNB.FmtTs — short "YYYY-MM-DD  H:MM am/pm" timestamp (distinct from BNB.FmtTime's relative/date-format logic)
+function BNB.FmtTs(ts)
+    if not ts or ts == 0 then return "Unknown" end
+    local db    = BigNoteBoxDB
+    local use24 = db and db.use24Hour ~= false
+    local d     = date("%Y-%m-%d", ts)
+    local t
+    if use24 then
+        t = date("%H:%M", ts)
+    else
+        local h    = tonumber(date("%H", ts))
+        local ampm = h >= 12 and "pm" or "am"
+        h = h % 12; if h == 0 then h = 12 end
+        t = h .. ":" .. date("%M", ts) .. " " .. ampm
+    end
+    return d .. "  " .. t
+end
+
 --------------------------------------------------------------------------------
 -- ENSURE BACKDROP MIXIN
 --------------------------------------------------------------------------------
