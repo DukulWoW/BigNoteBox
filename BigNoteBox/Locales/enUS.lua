@@ -921,6 +921,7 @@ L["HISTORY_COMPARE_EXPORT_TIP"]  = "Export this version (JSON or Markdown)"
 L["HISTORY_COMPARE_CANCEL"]      = "Cancel"
 L["HISTORY_KEPT_CURRENT"]        = "|cff66bb6aKept current note.|r"
 L["HISTORY_RESTORED"]            = "|cff66bb6aSnapshot restored. Previous version saved to history.|r"
+L["HISTORY_COMPARE_TASKS_HDR"]   = "-- Tasks --"
 
 -- Export popup
 L["HISTORY_EXPORT_TITLE"]        = "Export Note"

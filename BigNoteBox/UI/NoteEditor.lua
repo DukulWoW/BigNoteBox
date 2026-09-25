@@ -2855,10 +2855,10 @@ local function BuildWysiwygBar(parent, tsStrip)
                 end
             end,
             OnCancel       = function(self, noteID, reason)
-                -- button2 = "Compare" fires OnCancel with reason == "override"
-                -- ESC / X fires OnCancel with reason == "clicked" or nil
+                -- button2 = "Compare" fires OnCancel with reason == "clicked"
+                -- ESC / X dismiss fires OnCancel with reason == "override" or nil
                 -- We only open compare when the button was explicitly clicked.
-                if reason == "override" then
+                if reason == "clicked" then
                     if noteID then
                         local slots = BNB.HistoryGetSlots(noteID)
                         if slots.manual and BNB.OpenHistoryCompare then

@@ -11,7 +11,8 @@
 -- A "snap" table contains:
 --   timestamp  — unix time of snapshot
 --   + all content fields from the note (title, body, tags, context, icon, ...)
---   NOT: id, created, updated, history, manualSnapshot (identity / recursion)
+--   NOT: whatever BNB.NOTE_COPY_SKIP lists (id, created, updated, updatedAt,
+--        coordX/Y/mapID/zone, history, manualSnapshot, alarm)
 --
 -- AUTO SLOTS:
 --   Controlled by BigNoteBoxDB.historyMaxSlots (default 5, range 1-20).
@@ -41,15 +42,14 @@
 local BNB = BigNoteBox
 
 --------------------------------------------------------------------------------
--- CONTENT FIELDS to capture in a snapshot (all content, no identity/meta)
+-- FIELDS a snapshot never captures: identity, timestamps, the creation
+-- position, the note's own history/alarm (recursion / one reminder ringing
+-- twice). Everything else is content and gets snapshotted, so a restore
+-- brings back every field NoteManager knows about (richMode, tasks,
+-- taskList, ...) without a hand-written list going stale (ALL-65.6: the old
+-- allow-list missed richMode and tasks). Shared with BNB.CopyNote (ALL-58).
 --------------------------------------------------------------------------------
-local SNAP_FIELDS = {
-    "title", "body", "tags", "context", "contextDisplay", "contextLeave",
-    "pinned", "favorited", "locked", "icon", "titleColor",
-    "fontOverride", "textAlign", "fontOutline",
-    "borderOverride", "borderScale", "borderOffset", "lineHeight",
-    "waypoint", "wpClearOnLeave", "attachments", "scope",
-}
+local SNAP_SKIP = BNB.NOTE_COPY_SKIP
 
 --------------------------------------------------------------------------------
 -- INTERNAL: deep-copy a value (handles tables, arrays, primitives)
@@ -75,9 +75,9 @@ end
 --------------------------------------------------------------------------------
 local function MakeSnap(note)
     local snap = { timestamp = time() }
-    for _, field in ipairs(SNAP_FIELDS) do
-        if note[field] ~= nil then
-            snap[field] = DeepCopy(note[field])
+    for field, v in pairs(note) do
+        if not SNAP_SKIP[field] then
+            snap[field] = DeepCopy(v)
         end
     end
     return snap
@@ -320,12 +320,17 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
         while #note.history > max do table.remove(note.history) end
     end
 
-    -- Apply snapshot fields to live note
-    for _, field in ipairs(SNAP_FIELDS) do
-        if snap[field] ~= nil then
-            note[field] = DeepCopy(snap[field])
-        else
+    -- Apply snapshot fields to live note. Clear any content field the note
+    -- currently has that the snapshot doesn't (a field added after the
+    -- snapshot was taken), then copy every field the snapshot does carry.
+    for field in pairs(note) do
+        if not SNAP_SKIP[field] and snap[field] == nil then
             note[field] = nil
+        end
+    end
+    for field, v in pairs(snap) do
+        if field ~= "timestamp" then
+            note[field] = DeepCopy(v)
         end
     end
     note.updated = time()
@@ -337,6 +342,11 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
     if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
     if BNB.Sticky and BNB.Sticky.RefreshNote then
         BNB.Sticky.RefreshNote(id)
+    end
+    -- note.tasks was replaced wholesale above, so any open task display
+    -- (Reference Box, sticky, note list) needs its own refresh signal.
+    if BNB.Task and BNB.Task.NotifyTasksChanged then
+        BNB.Task.NotifyTasksChanged(id)
     end
     BNB.SyncHistoryBtnState()
     BNB.SyncHistoryNoteBtnState()

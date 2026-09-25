@@ -31,6 +31,33 @@ local _overlays    = {}
 
 local FmtTs = BNB.FmtTs
 
+-- Both the live note and a snapshot store tasks as a flat note.tasks array
+-- (order + parentID), so both sides can be rendered with the same helper.
+-- Neither pane is otherwise aware of tasks (ALL-65.6: only body text showed,
+-- so a task-only change compared as "no difference").
+local function TasksToText(tasks)
+    if not tasks or #tasks == 0 then return nil end
+    local sorted = {}
+    for i, t in ipairs(tasks) do sorted[i] = t end
+    table.sort(sorted, function(a, b) return (a.order or 0) < (b.order or 0) end)
+    local lines = { L["HISTORY_COMPARE_TASKS_HDR"] }
+    for _, t in ipairs(sorted) do
+        local indent = t.parentID and "    " or ""
+        local box = t.completed and "[x]" or "[ ]"
+        lines[#lines + 1] = indent .. box .. " " .. (t.text or "")
+    end
+    return table.concat(lines, "\n")
+end
+
+local function PaneText(data)
+    local body = data.body or ""
+    local taskText = TasksToText(data.tasks)
+    if taskText then
+        body = (body ~= "" and (body .. "\n\n") or "") .. taskText
+    end
+    return body
+end
+
 local function MakeOverlay(target)
     if not target then return nil end
     local ov = CreateFrame("Frame", nil, target)
@@ -434,7 +461,7 @@ function BNB.OpenHistoryCompare(noteID, snap)
     end
 
     local lp = f._leftPane
-    lp._eb:SetText(note.body or "")
+    lp._eb:SetText(PaneText(note))
     C_Timer.After(0, function() if lp._sf then lp._sf:SetVerticalScroll(0) end end)
     lp._makeBtn:SetScript("OnClick", function()
         BNB.CloseHistoryCompare()
@@ -445,7 +472,7 @@ function BNB.OpenHistoryCompare(noteID, snap)
     end)
 
     local rp = f._rightPane
-    rp._eb:SetText(snap.body or "")
+    rp._eb:SetText(PaneText(snap))
     C_Timer.After(0, function() if rp._sf then rp._sf:SetVerticalScroll(0) end end)
     rp._makeBtn:SetScript("OnClick", function()
         BNB.HistoryRestoreNote(noteID, snap, true)

@@ -57,6 +57,13 @@ local function Fire(event, ...)
     end
 end
 
+-- Public: notify TasksChanged listeners (ReferenceBox, StickyNote, NoteList)
+-- after a write that bypasses T's own mutation functions, e.g. a history
+-- restore that replaces note.tasks wholesale (ALL-65.6).
+function T.NotifyTasksChanged(noteID)
+    Fire("TasksChanged", noteID)
+end
+
 --------------------------------------------------------------------------------
 -- HELPERS -- note access
 --------------------------------------------------------------------------------

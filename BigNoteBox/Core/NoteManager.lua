@@ -237,6 +237,9 @@ local COPY_SKIP = {
     coordX = true, coordY = true, coordMapID = true, coordZone = true,
     history = true, manualSnapshot = true, alarm = true,
 }
+-- Shared with NoteHistory.lua (ALL-65.6), so a snapshot/restore skips the same
+-- identity/meta fields as a copy instead of keeping its own hand-written list.
+BNB.NOTE_COPY_SKIP = COPY_SKIP
 
 -- Full recursive copy, so the new note shares no table with the source
 -- (the old copies shared the tags table: editing one note's tags changed both)
