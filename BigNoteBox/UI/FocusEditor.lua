@@ -38,36 +38,14 @@ local focusSpinBtn      -- orbit toggle button (set in both builders)
 local focusDirty = false
 local focusMarkupBar    -- rich note markup toolbar
 
---------------------------------------------------------------------------------
--- FADE HELPER  (local copy of StickyNote.lua FadeTo pattern)
---------------------------------------------------------------------------------
-local function FadeTo(target, fromAlpha, toAlpha, duration, onDone)
-    local elapsed = 0
-    target:SetAlpha(fromAlpha)
-    target:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / duration, 1)
-        self:SetAlpha(fromAlpha + (toAlpha - fromAlpha) * t)
-        if t >= 1 then
-            self:SetScript("OnUpdate", nil)
-            if onDone then onDone() end
-        end
-    end)
-end
+-- FadeTo and the skin-tinted overlay colour check are shared with WhatsNew/
+-- FeatureList/SetupWizard/DangerZone in UI/GlowOverlay.lua (ALL-65.4).
+local FadeTo = BNB.FadeTo
 
 -- Dark overlay behind the focus frame (created once, lives on WorldFrame)
 local focusOverlay
 
-local function _overlayColor()
-    local db = BigNoteBoxDB
-    if db and db.skinMode and db.focusOverlayUseSkinColor
-       and BNB.GetSkinPreset and BNB.SkinColourOf then
-        local preset = BNB.GetSkinPreset()
-        local r, g, b = BNB.SkinColourOf(preset, false)
-        return r, g, b
-    end
-    return 0, 0, 0
-end
+local _overlayColor = BNB.OverlayColor
 
 local function GetFocusOverlay()
     if focusOverlay then return focusOverlay end
@@ -163,21 +141,10 @@ local function GetAfkOverlay()
     return ov
 end
 
-local function _afkOverlayColor()
-    local db = BigNoteBoxDB
-    if db and db.skinMode and db.focusOverlayUseSkinColor
-       and BNB.GetSkinPreset and BNB.SkinColourOf then
-        local preset = BNB.GetSkinPreset()
-        local r, g, b = BNB.SkinColourOf(preset, false)
-        return r, g, b
-    end
-    return 0, 0, 0
-end
-
 local function ShowAfkOverlay()
     if not focusFrame or not focusFrame:IsShown() then return end
     local ov = GetAfkOverlay()
-    local r, g, b = _afkOverlayColor()
+    local r, g, b = _overlayColor()
     ov._tex:SetColorTexture(r, g, b, 0.90)
     ov:SetAlpha(0)
     -- Reset cursor tracking so a stationary mouse doesn't dismiss immediately

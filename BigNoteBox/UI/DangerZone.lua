@@ -55,28 +55,13 @@ local RED_STRIP_R, RED_STRIP_G, RED_STRIP_B       = 0.20, 0.04, 0.04
 -- ── Module state ──────────────────────────────────────────────────────────────
 local _frame   = nil
 local _overlay = nil
-local _LCG     = nil
-
-local function GetLCG()
-    if not _LCG then
-        _LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
-    end
-    return _LCG
-end
 
 local function StartGlow(f)
-    local lcg = GetLCG()
-    if lcg and f then
-        pcall(lcg.PixelGlow_Start, f, GLOW_COLOR, GLOW_LINES, GLOW_FREQ, GLOW_LEN,
-              nil, nil, nil, nil, GLOW_KEY)
-    end
+    BNB.StartPixelGlow(f, GLOW_KEY, GLOW_COLOR, GLOW_LINES, GLOW_FREQ, GLOW_LEN)
 end
 
 local function StopGlow(f)
-    local lcg = GetLCG()
-    if lcg and f then
-        pcall(lcg.PixelGlow_Stop, f, GLOW_KEY)
-    end
+    BNB.StopPixelGlow(f, GLOW_KEY)
 end
 
 -- ── Overlay ───────────────────────────────────────────────────────────────────

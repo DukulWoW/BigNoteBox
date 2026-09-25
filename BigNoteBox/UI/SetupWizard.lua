@@ -44,13 +44,6 @@ local GLOW_N         = 12    -- particles around the border
 local GLOW_FREQUENCY = 0.03  -- slow, stately rotation
 local GLOW_SCALE     = 1.3   -- larger dots
 
--- FOR-16: the library pads left+right / top+bottom symmetrically, so asymmetric
--- clearance needs the glow frame re-anchored by hand afterward. Forever only:
--- its window chrome clips the glow at top and bottom, Retail's does not.
-local GLOW_PAD_RIGHT  = 2
-local GLOW_PAD_TOP    = 6
-local GLOW_PAD_BOTTOM = 5
-
 --------------------------------------------------------------------------------
 -- MODULE STATE
 --------------------------------------------------------------------------------
@@ -58,36 +51,15 @@ local _frame       = nil
 local _overlay     = nil
 local _pages       = {}
 local _curPage     = 1
-local _lcg         = nil
 local _pageTitle   = nil
 local _pageCounter = nil
 local _prevBtn     = nil
 local _nextBtn     = nil
 local _getStartedBtn = nil
 
-local function GetLCG()
-    if not _lcg then
-        _lcg = LibStub and LibStub("LibCustomGlow-1.0", true)
-    end
-    return _lcg
-end
-
---------------------------------------------------------------------------------
--- FADE HELPER
---------------------------------------------------------------------------------
-local function FadeTo(target, fromAlpha, toAlpha, duration, onDone)
-    local elapsed = 0
-    target:SetAlpha(fromAlpha)
-    target:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / duration, 1)
-        self:SetAlpha(fromAlpha + (toAlpha - fromAlpha) * t)
-        if t >= 1 then
-            self:SetScript("OnUpdate", nil)
-            if onDone then onDone() end
-        end
-    end)
-end
+-- FadeTo and the LibCustomGlow lookup are shared with WhatsNew/FeatureList/
+-- DangerZone/FocusEditor in UI/GlowOverlay.lua (ALL-65.4).
+local FadeTo = BNB.FadeTo
 
 --------------------------------------------------------------------------------
 -- LARGE BUTTON FACTORY  (matches OptionsPanel.lua's SharedButtonLargeTemplate)
@@ -185,33 +157,18 @@ end
 -- GLOW
 --------------------------------------------------------------------------------
 local function StartGlow()
-    local lcg = GetLCG()
-    if not lcg or not _frame then return end
+    if not _frame then return end
     local r, g, b = 1, 1, 1
     local db = BigNoteBoxDB
     if db and db.skinMode and BNB.GetSkinPreset and BNB.SkinBorderOf then
         local p = BNB.GetSkinPreset()
         r, g, b = BNB.SkinBorderOf(p)
     end
-    pcall(lcg.AutoCastGlow_Start, _frame, {r, g, b, 0.85}, GLOW_N, GLOW_FREQUENCY, GLOW_SCALE,
-          nil, nil, GLOW_KEY)
-    if BNB.IsForever then
-        local glowFrame = _frame["_AutoCastGlow" .. GLOW_KEY]
-        if glowFrame then
-            local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
-            glowFrame:ClearAllPoints()
-            glowFrame:SetPoint("TOPLEFT",     _frame, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
-            glowFrame:SetPoint("BOTTOMRIGHT", _frame, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
-        end
-    else
-        BNB.NudgeRetailGlow(_frame, GLOW_KEY)   -- RET-04
-    end
+    BNB.StartWindowGlow(_frame, GLOW_KEY, nil, { r, g, b, 0.85 }, GLOW_N, GLOW_FREQUENCY, GLOW_SCALE)
 end
 
 local function StopGlow()
-    local lcg = GetLCG()
-    if not lcg or not _frame then return end
-    pcall(lcg.AutoCastGlow_Stop, _frame, GLOW_KEY)
+    BNB.StopWindowGlow(_frame, GLOW_KEY)
 end
 
 local function RefreshGlow()

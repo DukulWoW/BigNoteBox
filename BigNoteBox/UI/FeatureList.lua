@@ -53,12 +53,6 @@ local GLOW_N        = 15
 local GLOW_FREQ     = 0.03
 local GLOW_SCALE    = 1.5
 local GLOW_KEY      = "bnb_featurelist"
--- FOR-16: the library pads left+right / top+bottom symmetrically, so asymmetric
--- clearance needs the glow frame re-anchored by hand afterward. Forever only:
--- its window chrome clips the glow at top and bottom, Retail's does not.
-local GLOW_PAD_RIGHT  = 2
-local GLOW_PAD_TOP    = 6
-local GLOW_PAD_BOTTOM = 5
 -- Bullet prefix
 local BULLET        = "|cff66bb6a*|r "
 
@@ -67,64 +61,20 @@ local _frame   = nil
 local _overlay = nil
 local _isOpen  = false   -- true between Open() and Close() completing
 
--- ── FadeTo helper (self-contained, mirrors FocusEditor) ───────────────────────
--- Cancels any running OnUpdate on `target` before starting a new one.
-local function FadeTo(target, fromAlpha, toAlpha, duration, onDone)
-    target:SetScript("OnUpdate", nil)   -- cancel any in-flight fade first
-    local elapsed = 0
-    target:SetAlpha(fromAlpha)
-    target:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / duration, 1)
-        self:SetAlpha(fromAlpha + (toAlpha - fromAlpha) * t)
-        if t >= 1 then
-            self:SetScript("OnUpdate", nil)
-            if onDone then onDone() end
-        end
-    end)
-end
-
--- ── Glow ─────────────────────────────────────────────────────────────────────
-local _lcg = nil
-local function GetLCG()
-    if not _lcg then _lcg = LibStub and LibStub("LibCustomGlow-1.0", true) end
-    return _lcg
-end
+-- FadeTo, glow start/stop and the skin-tinted overlay colour check are shared
+-- with WhatsNew/SetupWizard/DangerZone/FocusEditor in UI/GlowOverlay.lua (ALL-65.4).
+local FadeTo = BNB.FadeTo
 
 local function StartGlow(f)
-    local lcg = GetLCG()
-    if lcg and f then
-        pcall(lcg.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, GLOW_KEY)
-        if BNB.IsForever then
-            local g = f["_AutoCastGlow" .. GLOW_KEY]
-            if g then
-                local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
-                g:ClearAllPoints()
-                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
-                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
-            end
-        else
-            BNB.NudgeRetailGlow(f, GLOW_KEY)   -- RET-04
-        end
-    end
+    BNB.StartWindowGlow(f, GLOW_KEY, nil, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE)
 end
 
 local function StopGlow(f)
-    local lcg = GetLCG()
-    if lcg and f then
-        pcall(lcg.AutoCastGlow_Stop, f, GLOW_KEY)
-    end
+    BNB.StopWindowGlow(f, GLOW_KEY)
 end
 
 -- ── Overlay ───────────────────────────────────────────────────────────────────
-local function _overlayColor()
-    local db = BigNoteBoxDB
-    if db and db.skinMode and db.focusOverlayUseSkinColor
-       and BNB.GetSkinPreset and BNB.SkinColourOf then
-        return BNB.SkinColourOf(BNB.GetSkinPreset(), false)
-    end
-    return 0, 0, 0
-end
+local _overlayColor = BNB.OverlayColor
 
 local function GetOverlay()
     if _overlay then return _overlay end

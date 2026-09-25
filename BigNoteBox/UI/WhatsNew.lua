@@ -58,69 +58,23 @@ local _frame    = nil   -- the window frame (built once, reused)
 local _overlay  = nil   -- the cosmetic dimmer (built once, reused)
 
 -- ── AutoCast glow (LibCustomGlow-1.0) ─────────────────────────────────────────
--- Resolves after PLAYER_LOGIN; nil-safe everywhere via pcall.
-local LCG        = nil
-local GLOW_KEY   = "bnb_whatsnew"
-local GLOW_COLOR = { 0.400, 0.733, 0.416, 1.0 }  -- BNB green
-local GLOW_N     = 15
-local GLOW_FREQ  = 0.03
-local GLOW_SCALE = 1.5
+-- The LCG lookup, start/stop and the skin-tinted overlay colour check are
+-- shared with FeatureList/SetupWizard/DangerZone/FocusEditor in
+-- UI/GlowOverlay.lua (ALL-65.4). BNB.StartWindowGlow/StopWindowGlow are the
+-- default (BNB-green) window glow; other windows (Report a bug, ALL-73;
+-- note-type "add" dialog, ALL-71) call them directly with their own key.
+local GLOW_KEY = "bnb_whatsnew"
 
--- FOR-16: the library's own xOffset/yOffset are symmetric per axis (they pad
--- left+right or top+bottom together), so asymmetric padding needs the glow
--- frame re-anchored by hand after the library positions it flush. Forever only:
--- its window chrome clips the glow at top and bottom, Retail's does not, and
--- applying this there pushes the glow visibly off (that was FOR-04's bug).
-local GLOW_PAD_RIGHT  = 2
-local GLOW_PAD_TOP    = 6
-local GLOW_PAD_BOTTOM = 5
-
--- pad (optional): { l, t, r, b } outward pixels, for a frame that is not a seated
--- ButtonFrameTemplate window (ALL-71); replaces the per-client placement below.
-local function StartGlow(f, key, pad)
-    key = key or GLOW_KEY
-    if not f then return end
-    if not LCG then
-        LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
-    end
-    if LCG then
-        pcall(LCG.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, key)
-        if pad then
-            BNB.PadWindowGlow(f, key, pad.l, pad.t, pad.r, pad.b)
-        elseif BNB.IsForever then
-            local g = f["_AutoCastGlow" .. key]
-            if g then
-                local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
-                g:ClearAllPoints()
-                g:SetPoint("TOPLEFT",     f, "TOPLEFT",     -d.l,              GLOW_PAD_TOP + d.t)
-                g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", GLOW_PAD_RIGHT + d.r, -(GLOW_PAD_BOTTOM + d.b))
-            end
-        else
-            BNB.NudgeRetailGlow(f, key)   -- RET-04
-        end
-    end
+local function StartGlow(f, key)
+    BNB.StartWindowGlow(f, key or GLOW_KEY)
 end
 
 local function StopGlow(f, key)
-    if not f or not LCG then return end
-    pcall(LCG.AutoCastGlow_Stop, f, key or GLOW_KEY)
+    BNB.StopWindowGlow(f, key or GLOW_KEY)
 end
-
--- The What's New glow for other windows (Report a bug, ALL-73; note-type "add"
--- dialog, ALL-71); give each its own key
-BNB.StartWindowGlow = StartGlow
-BNB.StopWindowGlow  = StopGlow
 
 -- ── Overlay ───────────────────────────────────────────────────────────────────
-local function _overlayColor()
-    local db = BigNoteBoxDB
-    if db and db.skinMode and db.focusOverlayUseSkinColor
-       and BNB.GetSkinPreset and BNB.SkinColourOf then
-        local preset = BNB.GetSkinPreset()
-        return BNB.SkinColourOf(preset, false)
-    end
-    return 0, 0, 0
-end
+local _overlayColor = BNB.OverlayColor
 
 local function GetOverlay()
     if _overlay then return _overlay end
