@@ -861,7 +861,7 @@ local function ShowTypeDialog(data)
         CreateTargetNote(true, data)
     end)
     _typeDialog:Show()
-    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY) end
+    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY, BNB.BasicFrameGlowPad()) end
 end
 
 --------------------------------------------------------------------------------

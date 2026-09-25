@@ -141,6 +141,31 @@ function BNB.NudgeRetailGlow(f, key)
     g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0,                       0.05)
 end
 
+-- Re-anchor an AutoCast glow by hand: each value is pixels outward from that edge
+-- of f (negative = inward). Also a tuning tool, e.g.
+-- /run BigNoteBox.PadWindowGlow(BNBTargetNoteTypeDialog,"bnb_target_typedlg",3,3,3,3)
+function BNB.PadWindowGlow(f, key, l, t, r, b)
+    local g = f and f["_AutoCastGlow" .. key]
+    if not g then return end
+    g:ClearAllPoints()
+    g:SetPoint("TOPLEFT",     f, "TOPLEFT",     -l, t)
+    g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  r, -b)
+end
+
+-- ALL-71: BasicFrameTemplateWithInset (the small note-type dialogs) is never seated
+-- and has its own border art, so neither the Forever pads in UI/WhatsNew.lua nor
+-- RETAIL_GLOW_LEFT fit it. Outward pixels per side for a glow on one, normal mode
+-- only (skin frames are plain: flush). Checked in game (Dukul, 2026-09-25);
+-- retune with PadWindowGlow.
+local BASIC_GLOW_PAD = BNB.IsForever and { l = 3, t = 3, r = 3, b = 3 }
+                                      or { l = 0, t = 0, r = 0, b = 0 }
+local FLUSH_GLOW_PAD = { l = 0, t = 0, r = 0, b = 0 }
+
+function BNB.BasicFrameGlowPad()
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then return FLUSH_GLOW_PAD end
+    return BASIC_GLOW_PAD
+end
+
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
     if BNB.IsForever then pcall(SkinBg, f) end

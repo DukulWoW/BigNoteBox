@@ -75,7 +75,9 @@ local GLOW_PAD_RIGHT  = 2
 local GLOW_PAD_TOP    = 6
 local GLOW_PAD_BOTTOM = 5
 
-local function StartGlow(f, key)
+-- pad (optional): { l, t, r, b } outward pixels, for a frame that is not a seated
+-- ButtonFrameTemplate window (ALL-71); replaces the per-client placement below.
+local function StartGlow(f, key, pad)
     key = key or GLOW_KEY
     if not f then return end
     if not LCG then
@@ -83,7 +85,9 @@ local function StartGlow(f, key)
     end
     if LCG then
         pcall(LCG.AutoCastGlow_Start, f, GLOW_COLOR, GLOW_N, GLOW_FREQ, GLOW_SCALE, nil, nil, key)
-        if BNB.IsForever then
+        if pad then
+            BNB.PadWindowGlow(f, key, pad.l, pad.t, pad.r, pad.b)
+        elseif BNB.IsForever then
             local g = f["_AutoCastGlow" .. key]
             if g then
                 local d = BNB.CHROME_DELTA or { l = 0, t = 0, r = 0, b = 0 }
