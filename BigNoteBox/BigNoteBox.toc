@@ -21,10 +21,6 @@ UserImages\UserImages.lua
 # Libraries
 libs\libs.xml
 libs\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
-# LibTourist is retail-only: its load-time zone walk breaks on Forever (FOR-01),
-# so it is listed here rather than in libs.xml and BigNoteBox_Camelot.toc omits it.
-libs\LibTourist-3.0\HereBeDragons\HereBeDragons-2.0.lua
-libs\LibTourist-3.0\LibTourist-3.0.lua
 
 # Locales
 Locales\enUS.lua

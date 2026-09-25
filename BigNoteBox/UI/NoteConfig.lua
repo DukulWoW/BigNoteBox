@@ -2188,7 +2188,7 @@ local function BuildSituationTab(panel)
         clearCtxBtn:SetShown(true)
         ShowDispControls(needsValue)
 
-        -- Browse button only makes sense for zone/instance (LibTourist covers those)
+        -- Browse button only makes sense for zone/instance (ZonePicker covers those)
         local canBrowse = (t == "zone" or t == "instance")
         browseBtn:SetShown(needsValue and canBrowse)
 

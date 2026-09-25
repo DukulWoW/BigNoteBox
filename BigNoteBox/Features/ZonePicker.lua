@@ -1,7 +1,9 @@
 -- BigNoteBox Features/ZonePicker.lua
 --
 -- Zone & instance browse picker and autocomplete for the Situation tab.
--- Powered by LibTourist-3.0 (lazy-loaded on first use).
+-- Zones come from C_Map; instances from the Encounter Journal where it has
+-- data (Retail), or a fixed classic-instance list where it does not (Forever,
+-- ALL-63 probes 2026-09-25: Forever's EJ has zero tiers and no dungeon uiMaps).
 --
 -- Public API:
 --   BNB.ZonePicker.Open(anchorFrame, onSelect, filterType)
@@ -22,60 +24,116 @@ local ZP = BNB.ZonePicker
 
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
--- ── LibTourist access (guarded — nil if not loaded) ──────────────────────────
-local function GetTourist()
-    return LibStub and LibStub("LibTourist-3.0", true)
+-- ── Zone continent lookup ─────────────────────────────────────────────────────
+-- Walks a zone's uiMapID parent chain up to its Continent-type ancestor.
+local function GetContinentName(mapID)
+    local info = mapID and C_Map.GetMapInfo(mapID)
+    local guard = 0
+    while info and info.parentMapID and info.parentMapID > 0 and guard < 10 do
+        guard = guard + 1
+        local parent = C_Map.GetMapInfo(info.parentMapID)
+        if not parent then break end
+        if parent.mapType == Enum.UIMapType.Continent then
+            return parent.name
+        end
+        info = parent
+    end
+    return nil
 end
 
--- ── Continent display order ───────────────────────────────────────────────────
--- Ordered newest-first so Midnight/TWW content is easy to find.
-local CONTINENT_ORDER = {
-    "Quel'Thalas",
-    "Khaz Algar",
-    "Dragon Isles",
-    "The Shadowlands",
-    "Kul Tiras",
-    "Zandalar",
-    "Argus",
-    "Broken Isles",
-    "Draenor",
-    "Pandaria",
-    "The Maelstrom",
-    "Northrend",
-    "Outland",
-    "Eastern Kingdoms",
-    "Kalimdor",
+-- ── Fixed classic instance list (Forever: no EJ, no dungeon uiMaps) ──────────
+-- mapType==4 (Dungeon) uiMaps and the Encounter Journal are both empty on
+-- Forever (probed 2026-09-25). Names come from GetRealZoneText(id) at build
+-- time so they are translated; ids that resolve to nil/empty are skipped.
+-- Continent anchors resolve dynamically via GetContinentName so the label is
+-- never hardcoded English.
+local FIXED_INSTANCE_IDS = {
+    33, 34, 36, 43, 47, 48, 70, 90, 109, 129, 189, 209, 229, 230, 249,
+    289, 309, 329, 349, 389, 409, 429, 469, 509, 531, 533,
 }
+local FIXED_KALIMDOR_IDS = {
+    [43] = true, [47] = true, [48] = true, [129] = true, [209] = true,
+    [249] = true, [349] = true, [389] = true, [429] = true, [509] = true,
+    [531] = true,
+}
+local KALIMDOR_ANCHOR_ZONE = 1411 -- Durotar
+local EASTERN_KINGDOMS_ANCHOR_ZONE = 37 -- Elwynn Forest
 
 -- ── Data cache ────────────────────────────────────────────────────────────────
 -- Built once per session on first Open() or GetMatches() call.
 -- _cache = { zones = {name, continent}[], instances = {name, continent}[] }
--- Each list is sorted A-Z; continent is the display string from Tourist:GetContinent.
+-- Each list is sorted A-Z.
 local _cache = nil
+
+local function BuildZones()
+    local zones, seen = {}, {}
+    for _, root in ipairs({ 946, 947 }) do
+        local ok, kids = pcall(C_Map.GetMapChildrenInfo, root, Enum.UIMapType.Zone, true)
+        if ok and kids and #kids > 0 then
+            for _, m in ipairs(kids) do
+                if m.mapID and m.name and m.name ~= "" and not seen[m.mapID] then
+                    seen[m.mapID] = true
+                    zones[#zones + 1] = { name = m.name, continent = GetContinentName(m.mapID) or "?" }
+                end
+            end
+            break
+        end
+    end
+    return zones
+end
+
+-- Returns nil when the Encounter Journal has no data (Forever, ALL-63).
+local function BuildInstancesFromEJ()
+    local ok, numTiers = pcall(EJ_GetNumTiers)
+    if not ok or not numTiers or numTiers == 0 then return nil end
+
+    local instances, seen = {}, {}
+    local curTier = select(2, pcall(EJ_GetCurrentTier))
+
+    for t = 1, numTiers do
+        pcall(EJ_SelectTier, t)
+        local tierName = select(1, pcall(EJ_GetTierInfo, t))
+        for isRaid = 0, 1 do
+            local j = 1
+            while true do
+                local ok2, instanceID = pcall(EJ_GetInstanceByIndex, j, isRaid == 1)
+                if not ok2 or not instanceID then break end
+                if not seen[instanceID] then
+                    seen[instanceID] = true
+                    local ok3, name = pcall(EJ_GetInstanceInfo, instanceID)
+                    if ok3 and name and name ~= "" then
+                        instances[#instances + 1] = { name = name, continent = tierName or "?" }
+                    end
+                end
+                j = j + 1
+            end
+        end
+    end
+
+    if curTier then pcall(EJ_SelectTier, curTier) end
+    return instances
+end
+
+local function BuildInstancesFixed()
+    local kalimdorName = GetContinentName(KALIMDOR_ANCHOR_ZONE) or "Kalimdor"
+    local ekName        = GetContinentName(EASTERN_KINGDOMS_ANCHOR_ZONE) or "Eastern Kingdoms"
+
+    local instances = {}
+    for _, id in ipairs(FIXED_INSTANCE_IDS) do
+        local name = GetRealZoneText and GetRealZoneText(id)
+        if name and name ~= "" then
+            instances[#instances + 1] = {
+                name = name,
+                continent = FIXED_KALIMDOR_IDS[id] and kalimdorName or ekName,
+            }
+        end
+    end
+    return instances
+end
 
 local function BuildCache()
     if _cache then return end
-    local Tourist = GetTourist()
-    _cache = { zones = {}, instances = {} }
-    if not Tourist then return end
-
-    local seen = {}
-
-    for zone in Tourist:IterateZones() do
-        if not seen[zone] then
-            seen[zone] = true
-            local continent = Tourist:GetContinent(zone) or "?"
-            _cache.zones[#_cache.zones + 1] = { name = zone, continent = continent }
-        end
-    end
-
-    for inst in Tourist:IterateInstances() do
-        if not seen[inst] then
-            seen[inst] = true
-            local continent = Tourist:GetContinent(inst) or "?"
-            _cache.instances[#_cache.instances + 1] = { name = inst, continent = continent }
-        end
-    end
+    _cache = { zones = BuildZones(), instances = BuildInstancesFromEJ() or BuildInstancesFixed() }
 
     table.sort(_cache.zones,     function(a, b) return a.name < b.name end)
     table.sort(_cache.instances, function(a, b) return a.name < b.name end)
@@ -156,11 +214,6 @@ local SCROLL_PAD = 18
 
 -- Rows are pooled — built once, reused on each populate pass.
 local _rows = {}
-
-local function GetTouristSafe()
-    local ok, t = pcall(GetTourist)
-    return ok and t or nil
-end
 
 local function BuildPicker()
     local f = BNB.CreateBackdropFrame("Frame", "BNBZonePickerFrame", UIParent)
@@ -254,7 +307,6 @@ local function BuildPicker()
     -- ── Populate list ─────────────────────────────────────────────────────────
     local function Populate(filterText)
         BuildCache()
-        local Tourist = GetTouristSafe()
         local list = (_activeKind == "instance") and _cache.instances or _cache.zones
         local lower = filterText and filterText:lower() or nil
 
