@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://media.forgecdn.net/attachments/description/1492673/description_3d6bbdcd-63c2-4ee2-bde6-f2e27ea10889.png" />
+  <img src=".github/logo.png" width="256" alt="BigNoteBox logo" />
   <br><br>
   <h1>BigNoteBox</h1>
   <b>By Dukul</b>
