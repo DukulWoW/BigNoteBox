@@ -855,7 +855,7 @@ local function BuildFocusFrameSkin()
     f:RegisterForDrag("LeftButton")
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetAlpha(0.95)
+    f:SetAlpha(BNB.WindowAlpha(f))
 
     -- ── Title bar strip ───────────────────────────────────────────────────────
     local titleBar = BNB.CreateSkinStrip(f, true, false)
@@ -1246,11 +1246,11 @@ function BNB.OpenFocusMode()
                 BNB.mainFrame._focusHide = true
                 BNB.mainFrame:Hide()
                 BNB.mainFrame._focusHide = false
-                BNB.mainFrame:SetAlpha(0.95)
+                BNB.mainFrame:SetAlpha(BNB.WindowAlpha(BNB.mainFrame))
             end
         end)
     end
-    FadeTo(focusFrame, 0, 0.95, FADE_TIME)
+    FadeTo(focusFrame, 0, BNB.WindowAlpha(focusFrame), FADE_TIME)
 
     ShowFocusOverlay()
 
@@ -1311,7 +1311,7 @@ function BNB.CloseFocusMode()
         if focusFrame then focusFrame:Hide() end
     end)
     if BNB.mainFrame then
-        FadeTo(BNB.mainFrame, 0, 0.95, FADE_TIME)
+        FadeTo(BNB.mainFrame, 0, BNB.WindowAlpha(BNB.mainFrame), FADE_TIME)
     end
 
     -- Restore companion windows and stickies that were open when focus mode was entered.

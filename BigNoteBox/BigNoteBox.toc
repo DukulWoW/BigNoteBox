@@ -44,11 +44,19 @@ UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
 UI\NoteEditor.lua
+UI\TagDialogs.lua
 UI\FocusEditor.lua
 UI\RichPreview.lua
 UI\StickyNote.lua
+UI\StickySettings.lua
 UI\SendToChat.lua
 UI\ConfigWindow.lua
+UI\Config\General.lua
+UI\Config\Appearance.lua
+UI\Config\Features.lua
+UI\Config\Editor.lua
+UI\Config\Backup.lua
+UI\Config\Advanced.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
@@ -94,6 +102,7 @@ Features\TagTree.lua
 Features\FocusOrbit.lua
 Features\AdvancedMode.lua
 Features\HtmlTemplate.lua
+Features\NoteExport.lua
 Features\ShareNote.lua
 Features\UnitNotes.lua
 Features\InspectNote.lua

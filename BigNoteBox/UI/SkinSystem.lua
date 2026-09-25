@@ -59,6 +59,14 @@ function BNB.GetSkinBgAlpha()
     return (BigNoteBoxDB and BigNoteBoxDB.skinBgAlpha) or 0.97
 end
 
+-- Resting frame alpha for a whole window (ALL-78). Classic windows sit at 0.95.
+-- A skin window stays at 1: its background already carries the Window opacity
+-- setting above, and a frame alpha below 1 would stack on top of it, so 1.00
+-- could never be reached. Skin frames are marked _isSkin by BNB.CreateSkinFrame.
+function BNB.WindowAlpha(f)
+    return (f and f._isSkin) and 1.0 or 0.95
+end
+
 -- Returns r, g, b for a preset body colour at the given lift level,
 -- scaled by the current brightness multiplier.
 function BNB.SkinColourOf(preset, lifted)
@@ -241,6 +249,7 @@ function BNB.CreateSkinFrame(parent, lifted, name, isMain)
     local br, bg_, bb = BNB.SkinBorderOf(preset)
     local f = BNB.CreateBackdropFrame("Frame", name, parent)
     BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg_, bb, 1)
+    f._isSkin = true   -- read by BNB.WindowAlpha
     if isMain then
         RegisterMain(f, lifted, false)
     else

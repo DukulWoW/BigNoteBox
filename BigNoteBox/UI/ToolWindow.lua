@@ -105,7 +105,7 @@ function BNB.CreateToolWindow(o)
         if o.onDragStart then o.onDragStart() end
     end)
     f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() end)
-    f:SetAlpha(0.95)
+    f:SetAlpha(BNB.WindowAlpha(f))
     if o.onHide then f:HookScript("OnHide", o.onHide) end
 
     local bW = math.floor(o.cw / 2) - 4

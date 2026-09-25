@@ -604,7 +604,7 @@ function FL.Open()
 
     -- Cancel any in-flight close fade so the frame starts clean
     f:SetScript("OnUpdate", nil)
-    f:SetAlpha(0.95)
+    f:SetAlpha(BNB.WindowAlpha(f))
 
     -- Snapshot and hide all BNB windows
     SnapshotAndHide()
@@ -654,7 +654,7 @@ function FL.Close()
         StopGlow(_frame)
         _frame:SetScript("OnUpdate", nil)
         _frame:Hide()
-        _frame:SetAlpha(0.95)  -- reset alpha for next open
+        _frame:SetAlpha(BNB.WindowAlpha(_frame))  -- reset alpha for next open
     end
 
     RestoreSnapshot()
