@@ -1,13 +1,15 @@
 -- BigNoteBox UI/BugReport.lua
--- "Report a bug" (ALL-73): a button outside the main window's top-right corner
--- that opens a window with links to the issue tracker and the three download
--- sites, GitHub first. The same link buttons sit on the Forever login notice
+-- "Report a bug" (ALL-73): a button outside a window's top-right corner that
+-- opens a window with links to the issue tracker and the three download sites,
+-- GitHub first. Forever (beta): beside the main window, with a red glow.
+-- Retail: beside the Settings window, so only while Settings is open (ALL-77). The same link buttons sit on the Forever login notice
 -- (Core/Events.lua). Link buttons open the copy box (BNB.ShowClipboardHint).
 --
 -- Public API:
 --   BNB.ShowBugReport()              open the window
 --   BNB.CreateBugLinkButtons(parent) frame with the link buttons, see below
 --   BNB.AttachBugButton()            called from Initialize once mainFrame exists
+--   BNB.AttachSettingsBugButton(f)   called from OpenConfig once the Settings frame exists
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -133,21 +135,27 @@ function BNB.ShowBugReport()
 end
 
 --------------------------------------------------------------------------------
--- BUTTON outside the main window's top-right corner (same look as the rich-note
+-- BUTTON outside a window's top-right corner (same look as the rich-note
 -- editor/view buttons, NoteEditor.lua MakeRichBtn)
 --------------------------------------------------------------------------------
 local BUG_BTN_SZ   = 32
 local BUG_BTN_X    = 6     -- gap from the window's right edge
 local BUG_BTN_Y    = -24   -- down from the window's top edge
 
-function BNB.AttachBugButton()
-    local mf = BNB.mainFrame
-    if not mf or mf._bugBtn then return end
+-- Where the button lives (Dukul, 2026-09-25): Settings on Retail, the main
+-- window on Forever during the beta. At Forever launch, Forever moves to
+-- Settings too (and loses the glow): make this true on both clients.
+local BUG_BTN_ON_SETTINGS = not BNB.IsForever
 
-    local btn = CreateFrame("Button", nil, mf)
+-- host: the window the button sits beside, and its parent (hidden with it).
+-- glow: the red pixel glow that gets the button noticed during the beta.
+local function MakeBugButton(host, glow)
+    if not host or host._bugBtn then return end
+
+    local btn = CreateFrame("Button", nil, host)
     btn:SetSize(BUG_BTN_SZ, BUG_BTN_SZ)
     local d = BNB.IsForever and BNB.CHROME_DELTA or nil
-    btn:SetPoint("TOPLEFT", mf, "TOPRIGHT", BUG_BTN_X + (d and d.r or 0), BUG_BTN_Y)
+    btn:SetPoint("TOPLEFT", host, "TOPRIGHT", BUG_BTN_X + (d and d.r or 0), BUG_BTN_Y)
 
     local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
     n:SetTexture(BTN_PATH .. "bt-bugs-normal")
@@ -170,13 +178,23 @@ function BNB.AttachBugButton()
         GameTooltip:Hide()
     end)
     btn:SetScript("OnClick", function() BNB.ShowBugReport() end)
-    mf._bugBtn = btn
+    host._bugBtn = btn
 
     -- Pixel glow so the button is noticed during the beta (Dukul, 2026-09-25):
     -- red, lines 6, frequency 0.10, length 8. Runs while the
     -- button is shown; the library's glow frame is a child of the button.
-    local LCG = LibStub and LibStub("LibCustomGlow-1.0", true)
+    local LCG = glow and LibStub and LibStub("LibCustomGlow-1.0", true)
     if LCG and LCG.PixelGlow_Start then
         pcall(LCG.PixelGlow_Start, btn, { 1, 0.15, 0.15, 1 }, 6, 0.10, 8, nil, nil, nil, nil, "bnb_bugbtn")
     end
+end
+
+function BNB.AttachBugButton()
+    if BUG_BTN_ON_SETTINGS then return end
+    MakeBugButton(BNB.mainFrame, true)
+end
+
+function BNB.AttachSettingsBugButton(cfgFrame)
+    if not BUG_BTN_ON_SETTINGS then return end
+    MakeBugButton(cfgFrame, false)
 end

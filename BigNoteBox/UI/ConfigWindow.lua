@@ -5106,6 +5106,8 @@ function BNB.OpenConfig()
             cfgFrame = CreateConfigWindow()
         end
         BNB.HookConfigHeightTracking()
+        -- Report-a-bug button beside Settings (Retail; ALL-77)
+        if BNB.AttachSettingsBugButton then pcall(BNB.AttachSettingsBugButton, cfgFrame) end
     end
 
     if cfgFrame:IsShown() then cfgFrame:Hide(); return end
