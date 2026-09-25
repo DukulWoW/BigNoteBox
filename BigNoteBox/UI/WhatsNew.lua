@@ -102,7 +102,8 @@ local function StopGlow(f, key)
     pcall(LCG.AutoCastGlow_Stop, f, key or GLOW_KEY)
 end
 
--- The What's New glow for other windows (Report a bug, ALL-73); give each its own key
+-- The What's New glow for other windows (Report a bug, ALL-73; note-type "add"
+-- dialog, ALL-71); give each its own key
 BNB.StartWindowGlow = StartGlow
 BNB.StopWindowGlow  = StopGlow
 

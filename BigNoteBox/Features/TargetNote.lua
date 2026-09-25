@@ -773,6 +773,7 @@ end
 -- TYPE DIALOG: "Normal" or "Rich" (self-contained, skin-aware)
 --------------------------------------------------------------------------------
 local _typeDialog = nil
+local TYPE_DIALOG_GLOW_KEY = "bnb_target_typedlg"
 
 local function ShowTypeDialog(data)
     if not _typeDialog then
@@ -841,6 +842,10 @@ local function ShowTypeDialog(data)
             f._richBtn = rb
         end
 
+        f:HookScript("OnHide", function(self)
+            if BNB.StopWindowGlow then BNB.StopWindowGlow(self, TYPE_DIALOG_GLOW_KEY) end
+        end)
+
         f:Hide()
         tinsert(UISpecialFrames, "BNBTargetNoteTypeDialog")
         _typeDialog = f
@@ -856,6 +861,7 @@ local function ShowTypeDialog(data)
         CreateTargetNote(true, data)
     end)
     _typeDialog:Show()
+    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY) end
 end
 
 --------------------------------------------------------------------------------

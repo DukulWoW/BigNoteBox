@@ -143,6 +143,7 @@ local QUALITY_HEX = {
 local _inspectBtn
 local _typeDialog
 local _warnDialog
+local TYPE_DIALOG_GLOW_KEY = "bnb_inspect_typedlg"
 local _inspectReady = false
 local _autoCreatedThisInspect = false
 
@@ -825,11 +826,16 @@ local function ShowTypeDialog()
             rb:SetScript("OnClick", function() CreateInspectNote(true) end)
         end
 
+        f:HookScript("OnHide", function(self)
+            if BNB.StopWindowGlow then BNB.StopWindowGlow(self, TYPE_DIALOG_GLOW_KEY) end
+        end)
+
         f:Hide()
         tinsert(UISpecialFrames, "BNBInspectNoteDialog")
         _typeDialog = f
     end
     _typeDialog:Show()
+    if BNB.StartWindowGlow then BNB.StartWindowGlow(_typeDialog, TYPE_DIALOG_GLOW_KEY) end
 end
 
 --------------------------------------------------------------------------------
