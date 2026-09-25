@@ -480,12 +480,8 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     MkBtn("Img", L["FE_MK_IMG"],      function() BNB.OpenImgDialog(FocusInsertTag) end)
 
     -- "Live Preview" toggle — right-aligned, same pattern as main markup bar
-    local previewBtn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
-    previewBtn:SetSize(72, 18)
+    local previewBtn = BNB.CreateBarTextButton(bar, L["MARKUP_PREVIEW_BTN"], 72, 18)
     previewBtn:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
-    previewBtn:SetText(L["MARKUP_PREVIEW_BTN"])
-    local pfs = previewBtn:GetFontString()
-    if pfs then pcall(function() pfs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
     previewBtn:SetAlpha(0.45)
     previewBtn:SetScript("OnClick", function()
         if BNB.RichPreviewFocus then
@@ -883,10 +879,8 @@ local function BuildFocusFrameSkin()
     closeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Restore button
-    local restoreBtn = CreateFrame("Button", nil, titleBar, BNB.PanelButtonTemplate())
-    restoreBtn:SetSize(64, 22)
+    local restoreBtn = BNB.CreateSkinButton(nil, titleBar, L["FOCUS_RESTORE_BTN"], 64, 22)
     restoreBtn:SetPoint("RIGHT", closeBtn, "LEFT", -4, 0)
-    restoreBtn:SetText(L["FOCUS_RESTORE_BTN"])
     restoreBtn:SetScript("OnClick", function() BNB.CloseFocusMode() end)
     restoreBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")

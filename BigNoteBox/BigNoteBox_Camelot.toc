@@ -43,6 +43,8 @@ UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
 UI\NoteEditor.lua
+UI\WelcomePanel.lua
+UI\WysiwygBar.lua
 UI\TagDialogs.lua
 UI\FocusEditor.lua
 UI\RichPreview.lua

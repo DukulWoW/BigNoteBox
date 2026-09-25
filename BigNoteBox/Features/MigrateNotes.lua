@@ -984,11 +984,8 @@ local function BuildPreviewWindow()
         titleLbl:SetTextColor(1, 0.82, 0)
         titleLbl:SetText(L["MIG_PREVIEW_TITLE"])
         f._titleLbl = titleLbl
-        local closeBtn = CreateFrame("Button", nil, titleBar, BNB.PanelButtonTemplate())
-        closeBtn:SetSize(24, 22)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", 0, 0)
-        closeBtn:SetText("X")
-        closeBtn:SetScript("OnClick", function() f:Hide() end)
+        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
+        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         titleH = 28
         f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
     else
@@ -1148,9 +1145,8 @@ function M.ShowAddonPopup(key)
         tl:SetTextColor(1, 0.82, 0)
         tl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
         f._titleLbl = tl
-        local cb2 = CreateFrame("Button", nil, titleBar, BNB.PanelButtonTemplate())
-        cb2:SetSize(24, 22); cb2:SetPoint("RIGHT", titleBar, "RIGHT", 0, 0)
-        cb2:SetText("X"); cb2:SetScript("OnClick", function() f:Hide() end)
+        local cb2 = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
+        cb2:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         titleH = 28
         f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
     else
@@ -1266,9 +1262,8 @@ function M.ShowPopup()
         tl:SetTextColor(1, 0.82, 0)
         tl:SetText(L["MIG_POPUP_TITLE"])
         f._titleLbl = tl
-        local xBtn = CreateFrame("Button", nil, titleBar, BNB.PanelButtonTemplate())
-        xBtn:SetSize(24, 22); xBtn:SetPoint("RIGHT", titleBar, "RIGHT", 0, 0)
-        xBtn:SetText("X"); xBtn:SetScript("OnClick", function() f:Hide() end)
+        local xBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
+        xBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
         titleH = 28
         f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
     else

@@ -64,6 +64,8 @@ local FadeTo = BNB.FadeTo
 --------------------------------------------------------------------------------
 -- LARGE BUTTON FACTORY  (matches OptionsPanel.lua's SharedButtonLargeTemplate)
 -- Used for primary CTA buttons: Get Started, Finish, Finish & Open.
+-- Skin mode: a 16pt skin button instead (ALL-79). Choosing skin mode on page 2
+-- reloads, so the mode read at build time is always current.
 --------------------------------------------------------------------------------
 local _largeBtnTpl
 local function GetLargeBtnTpl()
@@ -85,6 +87,9 @@ local function GetLargeBtnTpl()
 end
 
 local function MakeLargeButton(parent, text, w, h)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        return BNB.CreateSkinButton(nil, parent, text, w or 220, h or 50, 16)
+    end
     local btn = CreateFrame("Button", nil, parent, GetLargeBtnTpl())
     btn:SetSize(w or 220, h or 50)
     btn:SetText(text or "")
@@ -487,10 +492,8 @@ local function BuildPage1(content)
             -- Fallback: only the available entries, as plain stacked buttons.
             for _, entry in ipairs(LANG_LIST) do
                 if entry.available then
-                    local lb = CreateFrame("Button", nil, ct, BNB.PanelButtonTemplate())
-                    lb:SetSize(CW - 40, 22)
+                    local lb = BNB.CreateButton(nil, ct, MakeLangLabel(entry), CW - 40, 22)
                     lb:SetPoint("TOP", ct, "TOP", 0, y)
-                    lb:SetText(MakeLangLabel(entry))
                     lb:SetScript("OnClick", function()
                         if entry.code == curLangCode then return end
                         BNB._pendingLangCode = entry.code
@@ -1067,8 +1070,7 @@ local function BuildPage5(content)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(entry.label)
 
-        local kbBtn = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
-        kbBtn:SetSize(BTN_W, 22)
+        local kbBtn = BNB.CreateButton(nil, parent, "", BTN_W, 22)
         kbBtn:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yp)
         kbBtn:RegisterForClicks("AnyUp")
 

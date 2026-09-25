@@ -39,18 +39,29 @@ function BNB.SetBackdropDark(frame)
     end
 end
 
+-- BNB.CreateBarTextButton(parent, text, w, h) — small 10pt text button for the
+-- markup bars (main and focus editor). Skin mode: a skin button (ALL-79);
+-- normal mode: the panel button template with WoW's locale font.
+function BNB.CreateBarTextButton(parent, text, w, h)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        return BNB.CreateSkinButton(nil, parent, text, w, h, 10)
+    end
+    local btn = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
+    btn:SetSize(w, h)
+    btn:SetText(text)
+    local fs = btn:GetFontString()
+    if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
+    return btn
+end
+
 -- BNB.MakeToolbarFactory(bar, startX) — shared MkBtn/Divider pair for an
 -- editor toolbar strip. Returns MkBtn(label, tip, onClick) and Divider(),
 -- both advancing a shared x-offset starting at startX.
 function BNB.MakeToolbarFactory(bar, startX)
     local btnX = startX or 0
     local function MkBtn(label, tip, onClick)
-        local btn = CreateFrame("Button", nil, bar, BNB.PanelButtonTemplate())
-        btn:SetSize(28, 18)
+        local btn = BNB.CreateBarTextButton(bar, label, 28, 18)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
-        btn:SetText(label)
-        local fs = btn:GetFontString()
-        if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
         btn:SetScript("OnClick", onClick)
         btn:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -66,6 +77,7 @@ function BNB.MakeToolbarFactory(bar, startX)
         d:SetSize(1, 14)
         d:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         d:SetColorTexture(0.35, 0.35, 0.38, 1)
+        if BigNoteBoxDB and BigNoteBoxDB.skinMode then BNB.RegisterSkinRule(d, 0.40) end
         btnX = btnX + 6
     end
     return MkBtn, Divider
@@ -321,6 +333,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
 
     -- Mimic standard Button API
     function btn:SetText(t) lbl:SetText(t or "") end
+    function btn:GetText() return lbl:GetText() end
     function btn:GetFontString() return lbl end
 
     -- Re-skin when preset changes (triggered by ApplyMainWindowSkin).

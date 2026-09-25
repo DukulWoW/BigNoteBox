@@ -84,14 +84,17 @@ local function ShowOverlay() GetOverlay():Show() end
 local function HideOverlay() if _overlay then _overlay:Hide() end end
 
 -- ── Red button factory ────────────────────────────────────────────────────────
--- Bypasses BNB.CreateButton / CreateSkinButton so the buttons are always
--- red regardless of skin mode or preset. Matches the window's red palette.
--- ALL-43: SharedButtonTemplate is red on every client, so it is used in both
--- modes; the backdrop button below is only the fallback for a client without it.
+-- Skin mode: a skin button that follows the preset, like every other skin
+-- window (ALL-79, Dukul 2026-09-26). Normal mode: red, bypassing CreateButton.
+-- ALL-43: SharedButtonTemplate is red on every client, so normal mode uses it;
+-- the backdrop button below is only the fallback for a client without it.
 local RED_BTN_R,  RED_BTN_G,  RED_BTN_B  = 0.28, 0.05, 0.05   -- base fill
 local RED_BTN_BR, RED_BTN_BG, RED_BTN_BB = 0.65, 0.10, 0.10   -- border
 
 local function MakeRedButton(parent, text, w, h)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        return BNB.CreateSkinButton(nil, parent, text, w or 80, h or 24)
+    end
     if BNB.PanelButtonTemplate() == "SharedButtonTemplate" then
         local btn = CreateFrame("Button", nil, parent, "SharedButtonTemplate")
         btn:SetSize(w or 80, h or 24)
@@ -239,10 +242,8 @@ local function PopulateContent(ct, sf)
     -- Safe action — resets only the setup completion flag, not notes or settings.
     y = MakeHeader(ct, y, L["DZ_SETUP_HDR"])
     y = MakeDesc(ct, y, L["DZ_SETUP_DESC"])
-    local runSetupBtn = CreateFrame("Button", nil, ct, BNB.PanelButtonTemplate())
-    runSetupBtn:SetSize(180, 26)
+    local runSetupBtn = BNB.CreateButton(nil, ct, L["DZ_SETUP_BTN"], 180, 26)
     runSetupBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    runSetupBtn:SetText(L["DZ_SETUP_BTN"])
     runSetupBtn:SetScript("OnClick", function()
         StaticPopup_Show("BNB_RUN_SETUP_AGAIN")
     end)
