@@ -763,8 +763,7 @@ function AO.Refresh()
                         UIParent, "WowStyle1DropdownTemplate")
                     _ovCtxDD:SetSize(1,1); _ovCtxDD:SetAlpha(0)
                 end
-                _ovCtxDD:ClearAllPoints()
-                _ovCtxDD:SetPoint("TOPLEFT", self, "TOPRIGHT", 0, 0)
+                BNB.PlaceContextMenu(_ovCtxDD, self)
                 local nid = noteID  -- capture for closures
                 _ovCtxDD:SetupMenu(function(_, root)
                     root:CreateTitle(t)

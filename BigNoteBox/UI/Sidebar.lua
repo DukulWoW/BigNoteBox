@@ -555,8 +555,7 @@ local function ShowSlotContextMenu(key, btn)
         SB._ctxDD = dd
     end
     local dd = SB._ctxDD
-    dd:ClearAllPoints()
-    dd:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, 0)
+    BNB.PlaceContextMenu(dd, btn)
 
     dd:SetupMenu(function(_, root)
         -- Pin / Unpin

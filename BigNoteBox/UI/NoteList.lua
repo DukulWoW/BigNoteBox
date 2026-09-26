@@ -725,8 +725,7 @@ local function ShowNoteContextMenu(btn, noteID)
                 UIParent, "WowStyle1DropdownTemplate")
             _ctxDropdown:SetSize(1, 1); _ctxDropdown:SetAlpha(0)
         end
-        _ctxDropdown:ClearAllPoints()
-        _ctxDropdown:SetPoint("TOPLEFT", btn, "TOPRIGHT", 0, 0)
+        BNB.PlaceContextMenu(_ctxDropdown, btn)
 
         _ctxDropdown:SetupMenu(function(_, root)
             root:CreateTitle(title)

@@ -68,6 +68,7 @@ Assets\Icons\IconManifest.lua
 UI\BlizzardIconList.lua
 UI\NoteConfig.lua
 UI\ReferenceBox.lua
+UI\ReferenceBoxTasks.lua
 UI\Sidebar.lua
 UI\HistoryWindow.lua
 UI\NoteHistoryPanel.lua

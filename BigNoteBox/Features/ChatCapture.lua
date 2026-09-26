@@ -98,8 +98,7 @@ local function ShowBCBCaptureMenu(eb)
         _bcbCtxDropdown:SetSize(1, 1)
         _bcbCtxDropdown:SetAlpha(0)
     end
-    _bcbCtxDropdown:ClearAllPoints()
-    _bcbCtxDropdown:SetPoint("TOPLEFT", eb, "TOPLEFT", 0, 0)
+    BNB.PlaceContextMenu(_bcbCtxDropdown, eb)
 
     _bcbCtxDropdown:SetupMenu(function(_, root)
         root:CreateTitle(menuTitle)

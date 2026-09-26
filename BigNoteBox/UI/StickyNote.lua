@@ -848,8 +848,7 @@ local function CreateMiniTile(frame, noteID, note)
                         "WowStyle1DropdownTemplate")
                     tile._ctxDD:SetSize(1,1); tile._ctxDD:SetAlpha(0)
                 end
-                tile._ctxDD:ClearAllPoints()
-                tile._ctxDD:SetPoint("TOPLEFT", tile, "TOPRIGHT", 0, 0)
+                BNB.PlaceContextMenu(tile._ctxDD, tile)
                 tile._ctxDD:SetupMenu(function(_, root)
                     root:CreateButton("|cffff9900" .. L["STICKY_CTX_DISMISS_ALARM"] .. "|r", function()
                         if BNB.Alarm and BNB.Alarm.Dismiss then

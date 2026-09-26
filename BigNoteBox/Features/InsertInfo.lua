@@ -135,8 +135,7 @@ local function ShowInsertInfoMenuModern(eb)
         _infoDropdown:SetSize(1, 1)
         _infoDropdown:SetAlpha(0)
     end
-    _infoDropdown:ClearAllPoints()
-    _infoDropdown:SetPoint("TOPLEFT", eb, "CENTER", 0, 0)
+    BNB.PlaceContextMenu(_infoDropdown, eb)
 
     _infoDropdown:SetupMenu(function(_, root)
         root:CreateTitle(L["INSERT_INFO_TITLE"] or "Insert Info")
