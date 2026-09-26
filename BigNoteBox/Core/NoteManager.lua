@@ -160,6 +160,18 @@ function BNB.DeleteTag(tag)
     idx[tag] = nil
 end
 
+-- Remove one tag from one note only (ALL-83 tag manager context menu).
+function BNB.RemoveNoteTag(id, tag)
+    local ndb = NDB(); if not ndb or not ndb.notes then return end
+    local note = ndb.notes[id]; if not note or not note.tags then return end
+    local newTags = {}
+    for _, t in ipairs(note.tags) do
+        if t ~= tag then newTags[#newTags + 1] = t end
+    end
+    note.tags = newTags
+    BNB.TagIndexRemove(id, tag)
+end
+
 --------------------------------------------------------------------------------
 -- CREATE
 --------------------------------------------------------------------------------

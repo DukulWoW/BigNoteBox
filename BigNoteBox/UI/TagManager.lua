@@ -28,6 +28,8 @@ local _openTag     = nil
 local _tagPool  = {}
 local _notePool = {}
 
+local _tagCtxDD = nil   -- reused WowStyle1DropdownTemplate button (tag header rows)
+
 -- Multi-select state
 local _multiMode   = false
 local _multiSel    = {}   -- { [tag] = true }
@@ -57,6 +59,7 @@ local function GetTagRow(idx)
     -- hitBtn covers everything LEFT of the delete button — so the action
     -- buttons are never occluded by it and will receive their own clicks.
     local hitBtn = CreateFrame("Button", nil, f)
+    hitBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     hitBtn:SetPoint("TOPLEFT",    f,      "TOPLEFT",    0, 0)
     hitBtn:SetPoint("BOTTOMRIGHT",delBtn, "BOTTOMLEFT", -2, 0)
     local hiTx = hitBtn:CreateTexture(nil, "HIGHLIGHT")
@@ -138,6 +141,7 @@ local function GetNoteRow(idx)
 
     local f = CreateFrame("Frame", nil, _scrollChild)
     f:SetHeight(NOTE_ROW_H)
+    f:EnableMouse(true)
 
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
@@ -236,7 +240,25 @@ PopulateTagManager = function()
         row.selHi:SetShown(_multiMode and _multiSel[tag] == true)
 
         -- Expand / collapse (normal) or toggle selection (multi-select)
-        row.hitBtn:SetScript("OnClick", function()
+        row.hitBtn:SetScript("OnClick", function(_, mouseBtn)
+            if mouseBtn == "RightButton" then
+                if not _tagCtxDD then
+                    _tagCtxDD = CreateFrame("DropdownButton", "BNBTagContextDropdown",
+                        UIParent, "WowStyle1DropdownTemplate")
+                    _tagCtxDD:SetSize(1, 1); _tagCtxDD:SetAlpha(0)
+                end
+                BNB.PlaceContextMenu(_tagCtxDD, row.hitBtn)
+                _tagCtxDD:SetupMenu(function(_, root)
+                    root:CreateButton(L["TAG_MGR_RENAME"], function() row.renBtn:GetScript("OnClick")(row.renBtn) end)
+                    root:CreateButton(L["TAG_MGR_DELETE"], function() row.delBtn:GetScript("OnClick")(row.delBtn) end)
+                    root:CreateButton(L["TAG_MGR_SHOW_NOTES"], function()
+                        _openTag = capturedTag
+                        PopulateTagManager()
+                    end)
+                end)
+                _tagCtxDD:OpenMenu()
+                return
+            end
             if _multiMode then
                 if _multiSel[tag] then _multiSel[tag] = nil
                 else                   _multiSel[tag] = true end
@@ -344,11 +366,30 @@ PopulateTagManager = function()
                     end
 
                     local capturedID = noteID
-                    nrow.goBtn:SetScript("OnClick", function()
+                    local function GoToNote()
                         if BNB.mainFrame then
                             BNB.mainFrame:Show()
                             if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                             if BNB.SelectNote      then BNB.SelectNote(capturedID) end
+                        end
+                    end
+                    nrow.goBtn:SetScript("OnClick", GoToNote)
+
+                    -- Right-click: the full note-list menu with tag-specific
+                    -- entries pinned on top (Kim, ALL-83 scoping: "1. Perfect.")
+                    nrow.frame:SetScript("OnMouseUp", function(self, mouseBtn)
+                        if mouseBtn ~= "RightButton" then return end
+                        if BNB.ShowNoteContextMenu then
+                            BNB.ShowNoteContextMenu(nrow.frame, capturedID, function(root)
+                                root:CreateButton(L["TAG_MGR_CTX_GOTO"], GoToNote)
+                                root:CreateButton(L["TAG_MGR_CTX_REMOVE_TAG"], function()
+                                    BNB.RemoveNoteTag(capturedID, capturedTag)
+                                    PopulateTagManager()
+                                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                                    if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
+                                end)
+                                root:CreateDivider()
+                            end)
                         end
                     end)
                 end

@@ -688,7 +688,9 @@ local function DuplicateNote(id)
     if BNB.SelectNote      then BNB.SelectNote(newID) end
 end
 
-local function ShowNoteContextMenu(btn, noteID)
+-- extraTop(root) — optional, lets a caller elsewhere (e.g. Tag Manager note
+-- rows) inject its own entries right after the title, before "Open".
+function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
     local note = BNB.GetNote(noteID)
     if not note then return end
     local title = (note.title ~= "") and note.title or L["UNTITLED"]
@@ -729,6 +731,8 @@ local function ShowNoteContextMenu(btn, noteID)
 
         _ctxDropdown:SetupMenu(function(_, root)
             root:CreateTitle(title)
+
+            if extraTop then extraTop(root) end
 
             -- Open
             root:CreateButton(L["NL_CTX_OPEN"], function()
@@ -1319,7 +1323,7 @@ local function CreateListEntry(parent)
     -- Double-click → open note settings
     btn:SetScript("OnClick", function(self, mouseBtn)
         if mouseBtn == "RightButton" then
-            ShowNoteContextMenu(self, self._noteID)
+            BNB.ShowNoteContextMenu(self, self._noteID)
             return
         end
 

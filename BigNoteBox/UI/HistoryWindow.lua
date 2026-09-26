@@ -50,9 +50,12 @@ end
 --------------------------------------------------------------------------------
 -- INTERNAL: build one row frame for a note entry
 --------------------------------------------------------------------------------
+local _hwCtxDD = nil   -- reused WowStyle1DropdownTemplate button
+
 local function BuildRow(parent, note, id, yOff)
     local row = CreateFrame("Button", nil, parent)
     row:SetHeight(ROW_H)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0,         yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0,         yOff)
 
@@ -111,9 +114,50 @@ local function BuildRow(parent, note, id, yOff)
     sep:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
     sep:SetColorTexture(0.22, 0.22, 0.25, 1)
 
-    row:SetScript("OnClick", function()
-        if BNB.OpenNoteHistoryPanel then
-            BNB.OpenNoteHistoryPanel(id)
+    row:SetScript("OnClick", function(self, mouseBtn)
+        if mouseBtn == "RightButton" then
+            if not _hwCtxDD then
+                _hwCtxDD = CreateFrame("DropdownButton", "BNBHistoryRowContextDropdown",
+                    UIParent, "WowStyle1DropdownTemplate")
+                _hwCtxDD:SetSize(1, 1); _hwCtxDD:SetAlpha(0)
+            end
+            BNB.PlaceContextMenu(_hwCtxDD, row)
+            _hwCtxDD:SetupMenu(function(_, root)
+                root:CreateButton(L["HISTORY_CTX_VIEW"], function()
+                    if BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(id) end
+                end)
+                root:CreateButton(L["HW_CTX_OPEN_EDITOR"], function()
+                    if BNB.mainFrame then
+                        BNB.mainFrame:Show()
+                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                        if BNB.SelectNote      then BNB.SelectNote(id) end
+                    end
+                end)
+                root:CreateDivider()
+                root:CreateButton(L["HW_CTX_CLEAR_NOTE"], function()
+                    local title = note.title and note.title ~= "" and note.title or L["HW_UNTITLED"]
+                    StaticPopupDialogs["BNB_HISTORY_CLEAR_NOTE"] = {
+                        text           = string.format(L["HW_CLEAR_NOTE_CONFIRM_FMT"], title),
+                        button1        = L["DELETE"],
+                        button2        = L["CANCEL"],
+                        OnAccept       = function()
+                            BNB.HistoryDeleteAuto(id)
+                            BNB.RefreshHistoryWindow()
+                            BNB.RefreshNoteHistoryPanel()
+                        end,
+                        timeout        = 0,
+                        whileDead      = true,
+                        hideOnEscape   = true,
+                        preferredIndex = 3,
+                    }
+                    StaticPopup_Show("BNB_HISTORY_CLEAR_NOTE")
+                end)
+            end)
+            _hwCtxDD:OpenMenu()
+        else
+            if BNB.OpenNoteHistoryPanel then
+                BNB.OpenNoteHistoryPanel(id)
+            end
         end
     end)
 

@@ -82,12 +82,15 @@ end
 --------------------------------------------------------------------------------
 -- BuildSnapRow — one snapshot entry
 --------------------------------------------------------------------------------
+local _snapCtxDD = nil   -- reused WowStyle1DropdownTemplate button
+
 local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     -- slotType = "manual" or "auto"; slotIndex = 1-based for auto
     local row = CreateFrame("Frame", nil, parent)
     row:SetHeight(ROW_H)
     row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yOff)
+    row:EnableMouse(true)
 
     -- Note icon from the snapshot
     local icon = row:CreateTexture(nil, "ARTWORK")
@@ -166,6 +169,33 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
         end
         BNB.RefreshNoteHistoryPanel()
         BNB.RefreshHistoryWindow()
+    end)
+
+    -- Right-click context menu: Compare, Restore (direct), Delete (keeps the
+    -- row's own confirm step rather than a second popup).
+    row:SetScript("OnMouseUp", function(self, button)
+        if button ~= "RightButton" then return end
+        if not _snapCtxDD then
+            _snapCtxDD = CreateFrame("DropdownButton", "BNBSnapContextDropdown",
+                UIParent, "WowStyle1DropdownTemplate")
+            _snapCtxDD:SetSize(1, 1); _snapCtxDD:SetAlpha(0)
+        end
+        BNB.PlaceContextMenu(_snapCtxDD, row)
+        _snapCtxDD:SetupMenu(function(_, root)
+            root:CreateButton(L["HISTORY_OVERRIDE_COMPARE"], function()
+                if BNB.OpenHistoryCompare then BNB.OpenHistoryCompare(noteID, snap) end
+            end)
+            root:CreateButton(L["HISTORY_CTX_RESTORE"], function()
+                BNB.HistoryRestoreNote(noteID, snap, true)
+                BNB:Print(L["HISTORY_RESTORED"])
+            end)
+            root:CreateDivider()
+            root:CreateButton(L["BTN_DELETE_NOTE"], function()
+                local onClick = delBtn:GetScript("OnClick")
+                if onClick then onClick(delBtn) end
+            end)
+        end)
+        _snapCtxDD:OpenMenu()
     end)
 
     -- Bottom separator

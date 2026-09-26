@@ -835,35 +835,11 @@ local function CreateMiniTile(frame, noteID, note)
     end)
     tile:SetScript("OnMouseUp", function(self, btn)
         if btn == "RightButton" then
-            -- Show context menu: Dismiss Alarm (if active) + Close Sticky
-            local note = BNB.GetNote and BNB.GetNote(noteID)
-            local alarm = note and note.alarm
-            local hasActiveAlarm = alarm and not alarm.fired
-                and BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID)
-
-            if hasActiveAlarm and C_XMLUtil and C_XMLUtil.GetTemplateInfo
-               and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") then
-                if not tile._ctxDD then
-                    tile._ctxDD = CreateFrame("DropdownButton", nil, UIParent,
-                        "WowStyle1DropdownTemplate")
-                    tile._ctxDD:SetSize(1,1); tile._ctxDD:SetAlpha(0)
-                end
-                BNB.PlaceContextMenu(tile._ctxDD, tile)
-                tile._ctxDD:SetupMenu(function(_, root)
-                    root:CreateButton("|cffff9900" .. L["STICKY_CTX_DISMISS_ALARM"] .. "|r", function()
-                        if BNB.Alarm and BNB.Alarm.Dismiss then
-                            BNB.Alarm.Dismiss(noteID)
-                        end
-                    end)
-                    root:CreateDivider()
-                    root:CreateButton(L["STICKY_CTX_CLOSE"], function()
-                        SN.Close(noteID)
-                    end)
-                end)
-                tile._ctxDD:OpenMenu()
-            else
-                -- No active alarm or no modern menu: just close
-                SN.Close(noteID)
+            -- Same full menu as the header/body (ALL-83 follow-up, 2026-09-26:
+            -- Kim expected right-click on the icon to bring the menu back,
+            -- including "Restore", not a bare dismiss/close shortcut).
+            if frame._showStickyCtxMenu then
+                frame._showStickyCtxMenu(tile)
             end
             return
         end
@@ -975,12 +951,13 @@ local function BuildIconBadge(f, noteID, note)
     UpdateStickyMarkers(iconFrame, note)
 
     -- Left-click: toggle minimize (both when normal and when minimized)
-    -- Right-click: close the sticky note entirely, open or minimized, the same
-    --   as right-clicking the mini tile (Dukul, 2026-09-24)
+    -- Right-click: the same full context menu as the mini tile / header / body
+    -- (ALL-83 follow-up, 2026-09-26: Kim expected the icon to behave the same
+    -- whether the note is open or minimized)
     iconFrame:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     iconFrame:SetScript("OnClick", function(self, btn)
         if btn == "RightButton" then
-            SN.Close(noteID)
+            if f._showStickyCtxMenu then f._showStickyCtxMenu(iconFrame) end
         elseif btn == "LeftButton" then
             SN.SetMinimized(noteID, not f._minimized)
         end
@@ -1783,6 +1760,100 @@ local function CreateStickyFrame(noteID)
         ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
     end)
     f._tasksHdrBtn = tasksHdrBtn
+
+    -- ── Right-click context menu (ALL-83) ─────────────────────────────────────
+    -- Same entries as the header buttons: Open in editor, Settings, Set/Edit
+    -- alarm, Show tasks/note, then a divider, Minimize, Close.
+    local _stickyCtxDD = nil
+    local function ShowStickyContextMenu(anchor)
+        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
+                and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")) then
+            return
+        end
+        if not _stickyCtxDD then
+            _stickyCtxDD = CreateFrame("DropdownButton", nil, UIParent, "WowStyle1DropdownTemplate")
+            _stickyCtxDD:SetSize(1, 1); _stickyCtxDD:SetAlpha(0)
+        end
+        BNB.PlaceContextMenu(_stickyCtxDD, anchor)
+        _stickyCtxDD:SetupMenu(function(_, root)
+            root:CreateButton(L["STICKY_OPEN_TO_EDIT_TIP"], function()
+                EndInlineEdit(f)
+                OpenInMainEditor(noteID)
+            end)
+            root:CreateButton(L["STICKY_NOTE_SETTINGS_TIP"], function()
+                -- Same special case as the header settings button: minimized
+                -- just restores instead of opening settings on a hidden frame.
+                if f._minimized then SN.SetMinimized(noteID, false); return end
+                if SN._IsSettingsOpenFor(noteID) then
+                    SN.CloseSettings()
+                else
+                    SN._OpenSettings(f, noteID)
+                end
+            end)
+            do
+                local n = BNB.GetNote and BNB.GetNote(noteID)
+                local alarm = n and n.alarm
+                local label = alarm and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
+                root:CreateButton(label, function()
+                    if alarm and not alarm.fired and BNB.Alarm and BNB.Alarm.IsAlarmActive
+                       and BNB.Alarm.IsAlarmActive(noteID) then
+                        BNB.Alarm.Dismiss(noteID)
+                        return
+                    end
+                    if BNB.AlarmWindow and BNB.AlarmWindow.Open then
+                        BNB.AlarmWindow.Open(noteID, f._alarmHdrBtn, f)
+                    end
+                end)
+            end
+            do
+                local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
+                local label
+                if not hasTasks then label = L["STICKY_CREATE_TASK_TIP"]
+                elseif f._taskViewActive then label = L["STICKY_SHOW_NOTE_TIP"]
+                else label = L["STICKY_SHOW_TASKS_TIP"] end
+                root:CreateButton(label, function()
+                    if not hasTasks then
+                        CloseESCAndDo(function()
+                            if not BNB.mainFrame then
+                                if BNB.CreateMainWindow then BNB.CreateMainWindow() end
+                            end
+                            if BNB.mainFrame then
+                                BNB.mainFrame:Show()
+                                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                                if BNB.SelectNote      then BNB.SelectNote(noteID) end
+                            end
+                            local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
+                            if taskID then
+                                if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+                                C_Timer.After(0.2, function()
+                                    if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
+                                end)
+                            end
+                        end)
+                    else
+                        -- Restore first so the toggled view is visible (from
+                        -- the mini-tile menu, the note starts hidden).
+                        if f._minimized then SN.SetMinimized(noteID, false) end
+                        local newView = f._taskViewActive and "note" or "tasks"
+                        SN_SetTaskView(noteID, newView)
+                    end
+                end)
+            end
+            root:CreateDivider()
+            root:CreateButton(f._minimized and L["STICKY_RESTORE_TIP"] or L["STICKY_MINIMIZE_TO_ICON_TIP"], function()
+                SN.SetMinimized(noteID, not f._minimized)
+            end)
+            root:CreateButton(L["STICKY_CTX_CLOSE"], function()
+                SN.Close(noteID)
+            end)
+        end)
+        _stickyCtxDD:OpenMenu()
+    end
+    f._showStickyCtxMenu = ShowStickyContextMenu
+
+    header:SetScript("OnMouseUp", function(self, mouseBtn)
+        if mouseBtn == "RightButton" then ShowStickyContextMenu(header) end
+    end)
     -- OnEnter/OnLeave on the root are unreliable when the frame is fully covered
     -- by child frames (front, header, body) — the cursor may never "touch" the
     -- root's own hit rect, so Leave events can be swallowed.  Polling each frame
@@ -2007,6 +2078,16 @@ local function CreateStickyFrame(noteID)
     sf2:HookScript("OnMouseDown", OnBodyMouseDown)
     richScroll:HookScript("OnMouseDown", OnBodyMouseDown)
     richRender:HookScript("OnMouseDown", OnBodyMouseDown)
+
+    -- Right-click on the body (ALL-83). OnMouseDown above only reacts to
+    -- LeftButton, so this cannot interfere with the double-click-to-edit timer.
+    local function OnBodyMouseUp(_, button)
+        if button == "RightButton" then ShowStickyContextMenu(bodyEb) end
+    end
+    bodyEb:HookScript("OnMouseUp", OnBodyMouseUp)
+    sf2:HookScript("OnMouseUp", OnBodyMouseUp)
+    richScroll:HookScript("OnMouseUp", OnBodyMouseUp)
+    richRender:HookScript("OnMouseUp", OnBodyMouseUp)
 
     -- ── Task scroll frame ─────────────────────────────────────────────────────
     -- Sibling to _bodyScroll and _richScroll. Shown only when task view is active.
