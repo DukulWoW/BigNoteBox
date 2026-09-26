@@ -2626,6 +2626,7 @@ end
 -- ── Public API ────────────────────────────────────────────────────────────────
 function BNB.OpenReferenceBox(noteID)
     if DB().referenceBoxEnabled == false then return end
+    BNB.StampOpened(noteID)
     if not rbFrame then
         if BigNoteBoxDB and BigNoteBoxDB.skinMode then
             rbFrame = BuildReferenceBoxSkin()

@@ -248,6 +248,7 @@ local COPY_SKIP = {
     id = true, created = true, updated = true, updatedAt = true,
     coordX = true, coordY = true, coordMapID = true, coordZone = true,
     history = true, manualSnapshot = true, alarm = true,
+    lastOpened = true,
 }
 -- Shared with NoteHistory.lua (ALL-65.6), so a snapshot/restore skips the same
 -- identity/meta fields as a copy instead of keeping its own hand-written list.
@@ -283,6 +284,14 @@ function BNB.CopyNote(srcID, overrides)
     if fields.tags == nil then fields.tags = {} end
     BNB.UpdateNote(newID, fields)
     return newID
+end
+
+-- Marks a note as opened just now, for the Oracle's "recently opened"
+-- weight (ALL-69.3). Written straight to the note: going through UpdateNote
+-- would change `updated`, and opening is not editing.
+function BNB.StampOpened(id)
+    local note = id and NDB() and NDB().notes[id]
+    if note then note.lastOpened = time() end
 end
 
 --------------------------------------------------------------------------------

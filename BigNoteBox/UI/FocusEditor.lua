@@ -1173,6 +1173,7 @@ end
 function BNB.OpenFocusMode()
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     if BNB._dirty then BNB.SaveCurrentNote() end
+    BNB.StampOpened(BNB._currentNoteID)
 
     if not focusFrame then
         if BigNoteBoxDB and BigNoteBoxDB.skinMode then

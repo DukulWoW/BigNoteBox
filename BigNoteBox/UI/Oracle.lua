@@ -435,6 +435,10 @@ local function RowText(row, r, textRight)
     local note = r.note
     local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     row.icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
+    -- NPC notes: the NPC's face, as in the note list (ALL-46). Until its
+    -- display ID is looked up the note icon stays; Oracle.RefreshPortraits
+    -- redraws when the lookup finishes.
+    if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(row.icon, note) end
     local title = (note.title and note.title ~= "") and note.title or L["UNTITLED"]
     row.title:SetText(title)
     local tc = note.titleColor
@@ -604,6 +608,36 @@ local function Layout()
     panel:SetHeight(-y + HINT_H + padY)
 end
 
+-- Where the player is, for the "current zone" weight (ALL-69.3).
+local function ZoneCtx()
+    if not BNB.GetCurrentZone then return nil end
+    local kind, name = BNB.GetCurrentZone()
+    return { kind = kind, name = (name or ""):lower(),
+             sub = ((GetSubZoneText and GetSubZoneText()) or ""):lower() }
+end
+
+-- The current target, for the "current target" weight: matched on the
+-- same fields a target or inspect note saves. Unit data can be a secret
+-- value on Midnight (combat, instances), so it is read in a pcall and a
+-- failure only drops the weight.
+local function TargetCtx()
+    if not UnitExists("target") then return nil end
+    local ok, t = pcall(function()
+        local name, realm = BNB.UnitNameRealm("target")
+        if not name then return nil end
+        local out = { name = name, isPlayer = UnitIsPlayer("target") and true or false }
+        if out.isPlayer then
+            out.realm = (realm and realm ~= "") and realm or GetNormalizedRealmName() or ""
+        else
+            local guid = UnitGUID("target")
+            out.npcID = guid and BNB.CreatureIDFromGUID and BNB.CreatureIDFromGUID(guid)
+            out.isPet = guid and guid:find("^Pet%-") and true or false
+        end
+        return out
+    end)
+    return ok and t or nil
+end
+
 local function Refresh()
     local text = eb:GetText() or ""
     if text == "" then placeholder:Show() else placeholder:Hide() end
@@ -622,6 +656,9 @@ local function Refresh()
         charScope = "char:" .. (BNB.currentChar or ""), now = time(),
         -- Reference Box items store only an id; nil while the item is uncached.
         itemName = function(itemID) return (C_Item.GetItemInfo(itemID)) end,
+        -- Weights (ALL-69.3): levels per boost, nil = the defaults.
+        weights = BigNoteBoxDB and BigNoteBoxDB.oracleWeights,
+        zone = ZoneCtx(), target = TargetCtx(),
     }
     results = BNB.OracleSearch.SearchParsed(notes, parsed, { max = MAX_ROWS, ctx = ctx })
     if #results == 0 then
@@ -795,13 +832,19 @@ local PREVIEW = {
 
 -- Draws the preview rows on pv, a results panel the layout tool has
 -- themed (pv._size set by ApplySearchChrome), and sizes it. Row 1 shows
--- selected, in the theme's highlight colour.
-function Oracle.DrawPreview(pv, themeID)
+-- selected, in the theme's highlight colour. count: how many rows (1 to
+-- MAX_ROWS, the fake notes repeat); left out = all of them.
+function Oracle.DrawPreview(pv, themeID, count)
     pv._rows = pv._rows or {}
+    local list = PREVIEW
+    if count then
+        list = {}
+        for i = 1, math.max(1, math.min(MAX_ROWS, count)) do list[i] = PREVIEW[(i - 1) % #PREVIEW + 1] end
+    end
     local size = pv._size or { border = 24, borderY = 24 }
     local padX = math.floor(size.border * 0.6 + 0.5)
     local padY = math.floor((size.borderY or size.border) * 0.6 + 0.5)
-    local y = PlaceRows(pv, pv._rows, PREVIEW, -padY, padX, function(i)
+    local y = PlaceRows(pv, pv._rows, list, -padY, padX, function(i)
         pv._rows[i] = BuildRow(pv)
         return pv._rows[i]
     end)
@@ -820,6 +863,16 @@ function Oracle.DrawPreview(pv, themeID)
     pv._hint:SetPoint("TOPLEFT", pv, "TOPLEFT", padX + 6, y - 2)
     pv._hint:SetPoint("TOPRIGHT", pv, "TOPRIGHT", -padX - 6, y - 2)
     pv:SetHeight(-y + HINT_H + padY)
+end
+
+-- Redraws the NPC portraits of the shown results, after
+-- Features/TargetNote.lua has looked up a display ID.
+function Oracle.RefreshPortraits()
+    if not (bar and bar:IsShown() and BNB.SetNpcNotePortrait) then return end
+    for i, row in ipairs(rows) do
+        local r = results[i]
+        if r and row:IsShown() then BNB.SetNpcNotePortrait(row.icon, r.note) end
+    end
 end
 
 function Oracle.Close()

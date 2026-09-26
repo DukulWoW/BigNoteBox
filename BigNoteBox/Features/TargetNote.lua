@@ -101,6 +101,7 @@ local function RefreshAfterResolve()
         end
         if BNB.RefreshReferenceBoxTabs then BNB.RefreshReferenceBoxTabs() end
         if BNB.Sticky and BNB.Sticky.RefreshNpcPortraits then BNB.Sticky.RefreshNpcPortraits() end
+        if BNB.Oracle and BNB.Oracle.RefreshPortraits then BNB.Oracle.RefreshPortraits() end
     end)
 end
 
@@ -281,6 +282,8 @@ local function GetCreatureID(guid)
         or guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)")
         or guid:match("^Pet%-0%-%d+%-%d+%-%d+%-(%d+)")
 end
+-- Oracle search weights the notes about the current target (ALL-69.3).
+BNB.CreatureIDFromGUID = GetCreatureID
 
 --------------------------------------------------------------------------------
 -- DATA GATHERING

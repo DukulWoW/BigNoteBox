@@ -2350,6 +2350,8 @@ end
 function SN.Open(noteID, noESCOpen)
     if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
     if not BNB.GetNote(noteID) then return end
+    -- noESCOpen is the login restore (RestoreSession), not an open.
+    if not noESCOpen then BNB.StampOpened(noteID) end
     if openFrames[noteID] then
         local f = openFrames[noteID]
         if f._minimized then SN.SetMinimized(noteID, false)

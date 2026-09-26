@@ -9,10 +9,11 @@
 -- and keep their size; edges and the background hang off two and stretch
 -- with the bar.
 --
--- Themes are registered in Assets\Search\SearchThemes.lua (loads after this
--- file) through BigNoteBox.RegisterSearchTheme, the same call another addon
--- can make. BNB.ApplySearchChrome(f, themeID) draws a theme on any frame; the
--- real search bar will call it. /bnb searchlayout (debug mode) opens a
+-- Each theme is registered by the theme.lua in its own folder under
+-- Assets\Search\ (loads after this file; Assets\Search\README.txt) through
+-- BigNoteBox.RegisterSearchTheme, the same call another addon can make.
+-- BNB.ApplySearchChrome(f, themeID) draws a theme on any frame; the real
+-- search bar calls it. /bnb searchlayout (debug mode) opens a
 -- preview where each piece can be moved and resized; Export hands back a
 -- ready RegisterSearchTheme call.
 
@@ -53,6 +54,19 @@ local PIECES = {
     { key = "pornament3",     file = "s-panel-ornament-3", layer = "ARTWORK",   sub = 2, panelOnly = true },
     { key = "pornament4",     file = "s-panel-ornament-4", layer = "ARTWORK",   sub = 2, panelOnly = true },
 }
+
+-- Ornaments can be drawn at another depth than their own, set per piece in
+-- the layout: layer = "back" puts it behind every border piece (over the
+-- background), layer = "top" over everything, including the other frame
+-- (a panel ornament over the search bar, the bar's ornament over the
+-- results) and the text and rows. Left out = the piece's own layer above.
+local ORNAMENTS = {
+    ornament = true, topornament = true, bottomornament = true,
+    pornament1 = true, pornament2 = true, pornament3 = true, pornament4 = true,
+}
+-- "top" pieces live on a child frame this many levels above their own
+-- frame: above the other frame and every child of either.
+local TOP_LIFT = 30
 
 -- Layouts are in native art pixels (32): every x offset is multiplied by
 -- size.border / 32 and every y offset by size.borderY / 32, so a smaller
@@ -140,7 +154,10 @@ end
 -- built while the panel was over the bar follow it under the bar too.
 local function SetLevelTree(f, lvl)
     f:SetFrameLevel(lvl)
-    for _, child in ipairs({ f:GetChildren() }) do SetLevelTree(child, lvl + 1) end
+    for _, child in ipairs({ f:GetChildren() }) do
+        if child == f._searchOver then child:SetFrameLevel(lvl + TOP_LIFT)
+        else SetLevelTree(child, lvl + 1) end
+    end
 end
 
 -- Frame level a search bar is given when it is created, before its
@@ -158,6 +175,7 @@ function BNB.PlaceSearchPanel(panel, bar, id, pos)
     panel:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", -pos.right, -pos.gap)
     local lvl = bar:GetFrameLevel()
     SetLevelTree(panel, (pos.under ~= false) and math.max(0, lvl - 10) or lvl + 1)
+    if bar._searchOver then bar._searchOver:SetFrameLevel(lvl + TOP_LIFT) end
 end
 
 -- A theme's layout and size, falling back to the default theme's.
@@ -218,6 +236,22 @@ function BNB.ApplySearchChrome(f, themeID, layout, size, opts)
             tex = f:CreateTexture(nil, def.layer, nil, def.sub)
             f._searchPieces[def.key] = tex
         end
+        -- Depth (ORNAMENTS above): moved to the over frame for "top".
+        local lp = layout[def.key]
+        local depth = ORNAMENTS[def.key] and lp and lp.layer
+        if depth == "top" then
+            if not f._searchOver then
+                f._searchOver = CreateFrame("Frame", nil, f)
+                f._searchOver:SetAllPoints(f)
+            end
+            f._searchOver:SetFrameLevel(f:GetFrameLevel() + TOP_LIFT)
+            tex:SetParent(f._searchOver)
+            tex:SetDrawLayer("OVERLAY", 6)
+        else
+            tex:SetParent(f)
+            if depth == "back" then tex:SetDrawLayer("BORDER", -1)
+            else tex:SetDrawLayer(def.layer, def.sub) end
+        end
         local file = def.file
         local fk = def.same or def.key
         if d.files and d.files[fk] ~= nil then file = d.files[fk] end
@@ -266,7 +300,7 @@ BigNoteBox.RegisterSearchTheme = BNB.RegisterSearchTheme
 -- The Move anchor drags the whole preview (right-click: back to the centre).
 local tool
 
-local TOOL_W, TOOL_H = 300, 732
+local TOOL_W, TOOL_H = 300, 756
 local TOOL_PAD = 10
 local WHITE = "Interface\\Buttons\\WHITE8x8"
 
@@ -304,7 +338,7 @@ local function OnSide(side, def)
 end
 
 local function CopyPiece(p)
-    return { a1 = p.a1, x1 = p.x1, y1 = p.y1, a2 = p.a2, x2 = p.x2, y2 = p.y2 }
+    return { a1 = p.a1, x1 = p.x1, y1 = p.y1, a2 = p.a2, x2 = p.x2, y2 = p.y2, layer = p.layer }
 end
 
 local function CopyLayout(src)
@@ -452,8 +486,9 @@ local function ExportText()
             local p = OnSide(side, def) and layout[def.key]   -- nil: not used
             if p then
                 lines[#lines + 1] = string.format(
-                    "        %-14s = { a1 = %q, x1 = %s, y1 = %s, a2 = %q, x2 = %s, y2 = %s },",
-                    def.key, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2))
+                    "        %-14s = { a1 = %q, x1 = %s, y1 = %s, a2 = %q, x2 = %s, y2 = %s%s },",
+                    def.key, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2),
+                    p.layer and string.format(", layer = %q", p.layer) or "")
             end
         end
         lines[#lines + 1] = "    },"
@@ -493,11 +528,18 @@ local function PlaceHighlight()
         hl:SetAllPoints(host)
     else
         local layout, size = Side(tool.side)
-        PlacePiece(hl, host, layout[tool.sel], size.border / NATIVE, size.borderY / NATIVE)
+        local p = layout[tool.sel]
+        -- Over a "top" ornament too, which sits on the over frame.
+        if ORNAMENTS[tool.sel] and p.layer == "top" and host._searchOver then hl:SetParent(host._searchOver) end
+        PlacePiece(hl, host, p, size.border / NATIVE, size.borderY / NATIVE)
     end
     hl:SetDrawLayer("OVERLAY", 7)
     hl:SetShown(tool.showHL)
 end
+
+-- Ornament depth: the button steps through these (see ORNAMENTS).
+local DEPTHS = { "own", "back", "top" }
+local DEPTH_NAME = { own = "Over borders", back = "Behind borders", top = "Over everything" }
 
 local function Refresh()
     local w = Work()
@@ -506,7 +548,7 @@ local function Refresh()
     BNB.ApplySearchChrome(bar, tool.theme, w.layout, w.size)
     panel._size = BNB.ApplySearchChrome(panel, tool.theme, w.panelLayout, w.panelSize, { panel = true })
     BNB.PlaceSearchPanel(panel, bar, tool.theme, w.panelPos)
-    if BNB.Oracle and BNB.Oracle.DrawPreview then BNB.Oracle.DrawPreview(panel, tool.theme) end
+    if BNB.Oracle and BNB.Oracle.DrawPreview then BNB.Oracle.DrawPreview(panel, tool.theme, tool.rows) end
     tool.title:SetText("Search bar layout (ALL-69)\n|cffffffff" .. BNB.GetSearchTheme(tool.theme).name .. "|r")
     PlaceHighlight()
     tool.anchor:SetShown(tool.showAnchor)
@@ -519,6 +561,13 @@ local function Refresh()
         b.sel:SetShown(b.side == tool.side and b.key == tool.sel)
     end
     tool.removeBtn:SetEnabled(tool.sel ~= PLACE and not KEEP[tool.sel])
+    local orn = ORNAMENTS[tool.sel] and Side(tool.side)[tool.sel]
+    tool.depthBtn:SetEnabled(orn and true or false)
+    tool.depthBtn:SetText("Depth: " .. (orn and DEPTH_NAME[orn.layer or "own"] or "-"))
+    local ap = tool.sel ~= PLACE and Side(tool.side)[tool.sel]
+    local fixed = ap and ap.a1 == ap.a2
+    tool.anchorBtn:SetEnabled(fixed and true or false)
+    tool.anchorBtn:SetText(fixed and ap.a1 or "Anchor: 2 points")
 
     local layout, size = Side(tool.side)
     local p = layout[tool.sel]
@@ -594,6 +643,47 @@ local function SelectOrAdd(side, key)
     Refresh()
 end
 
+local function CycleDepth()
+    local p = ORNAMENTS[tool.sel] and Side(tool.side)[tool.sel]
+    if not p then return end
+    local cur = p.layer or "own"
+    for i, d in ipairs(DEPTHS) do
+        if d == cur then cur = DEPTHS[i % #DEPTHS + 1]; break end
+    end
+    p.layer = (cur ~= "own") and cur or nil
+    Refresh()
+end
+
+-- Where frame point pt sits, from the frame's top-left, in screen px.
+local function PointXY(pt, w, h)
+    local x = pt:find("LEFT") and 0 or pt:find("RIGHT") and w or w / 2
+    local y = pt:find("TOP") and 0 or pt:find("BOTTOM") and -h or -h / 2
+    return x, y
+end
+
+-- Hangs the selected fixed-size piece (both points on one frame point)
+-- from the next frame point, with its offsets changed so it stays put.
+local ANCHORS = { "TOPLEFT", "TOP", "TOPRIGHT", "RIGHT", "BOTTOMRIGHT", "BOTTOM", "BOTTOMLEFT", "LEFT", "CENTER" }
+local function CycleAnchor()
+    if tool.sel == PLACE then return end
+    local layout, size = Side(tool.side)
+    local p = layout[tool.sel]
+    if not p or p.a1 ~= p.a2 then return end
+    local nxt = ANCHORS[1]
+    for i, a in ipairs(ANCHORS) do
+        if a == p.a1 then nxt = ANCHORS[i % #ANCHORS + 1]; break end
+    end
+    local host = (tool.side == "panel") and tool.panel or tool.bar
+    local w, h = host:GetSize()
+    local ox, oy = PointXY(p.a1, w, h)
+    local nx, ny = PointXY(nxt, w, h)
+    local kx, ky = size.border / NATIVE, size.borderY / NATIVE
+    local dx, dy = (ox - nx) / kx, (oy - ny) / ky
+    p.x1, p.x2, p.y1, p.y2 = p.x1 + dx, p.x2 + dx, p.y1 + dy, p.y2 + dy
+    p.a1, p.a2 = nxt, nxt
+    Refresh()
+end
+
 local function RemoveSelected()
     if tool.sel == PLACE or KEEP[tool.sel] then return end
     local layout, _, removed = Side(tool.side)
@@ -654,6 +744,8 @@ local function BuildTool()
     tool = f
     f.side, f.sel, f.zoom, f.showHL, f.showAnchor = "bar", "topleft", 1, true, false
     f.theme = BNB.SEARCH_DEFAULT_THEME
+    -- Preview result count: 8 is what the Oracle shows on an empty box.
+    f.rows = 8
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", TOOL_PAD, -8)
@@ -940,6 +1032,34 @@ local function BuildTool()
     rm:SetScript("OnClick", RemoveSelected)
     f.removeBtn = rm
     Row()
+    -- Two half-width buttons: the ornament's depth and the point a piece
+    -- hangs from.
+    local HALF = math.floor((INNER_W - 4) / 2)
+    local function HalfBtn(x, fn, tipTitle, tip)
+        local b = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
+        b:SetSize(HALF, 20)
+        b:SetPoint("TOPLEFT", TOOL_PAD + x, y)
+        b:SetNormalFontObject("GameFontHighlightSmall")
+        b:SetHighlightFontObject("GameFontHighlightSmall")
+        b:SetDisabledFontObject("GameFontDisableSmall")
+        b:SetScript("OnClick", fn)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(tipTitle, 1, 1, 1)
+            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return b
+    end
+    f.depthBtn = HalfBtn(0, CycleDepth, "Ornament depth",
+        "Over borders: the piece's own place.\nBehind borders: over the background only."
+        .. "\nOver everything: over the other frame, the text and the rows too.")
+    f.anchorBtn = HalfBtn(HALF + 4, CycleAnchor, "Anchor",
+        "The frame point the piece hangs from. It stays where it is when you change it. "
+        .. "Hang a piece from the edge it should follow: a results ornament near the bottom "
+        .. "from a BOTTOM point, or it moves as the results grow and shrink.")
+    Row()
 
     Check("Same size for matching pieces", true, function(v) f.linkSizes = v end)
     f.keepSquare = true
@@ -952,15 +1072,16 @@ local function BuildTool()
     help:SetJustifyH("LEFT")
     help:SetText("Arrows / drag: move.  Alt: top-left point only, Ctrl: bottom-right point "
         .. "only (resize).  Shift: 5 px.  Tab: next piece.  Dimmed button: not used, click to add.  "
-        .. "Placement: arrows move the panel, Alt / Ctrl one edge, up / down the gap.")
+        .. "Placement: arrows move the panel, Alt / Ctrl one edge, up / down the gap.  "
+        .. "Rows: check that results pieces follow the panel as it grows.")
 
-    -- Tool buttons, three to a row from the bottom up.
-    local BW = math.floor((INNER_W - 8) / 3)
+    -- Tool buttons, four to a row from the bottom up.
+    local BW = math.floor((INNER_W - 12) / 4)
     local btnN = 0
     local function Btn(label, fn)
         local b = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
         b:SetSize(BW, 20)
-        local row, col = math.floor(btnN / 3), btnN % 3
+        local row, col = math.floor(btnN / 4), btnN % 4
         b:SetPoint("BOTTOMLEFT", TOOL_PAD + col * (BW + 4), 8 + (1 - row) * 24)
         b:SetText(label)
         b:SetScript("OnClick", fn)
@@ -983,6 +1104,15 @@ local function BuildTool()
     end)
     Btn("Highlight", function() f.showHL = not f.showHL; Refresh() end)
     Btn("Move", function() f.showAnchor = not f.showAnchor; Refresh() end)
+    local ROW_STEPS = { 8, 5, 3, 1 }
+    local rowsBtn
+    rowsBtn = Btn("Rows: 8", function()
+        for i, n in ipairs(ROW_STEPS) do
+            if n == f.rows then f.rows = ROW_STEPS[i % #ROW_STEPS + 1]; break end
+        end
+        rowsBtn:SetText("Rows: " .. f.rows)
+        Refresh()
+    end)
     Btn("Reset", function()
         if BigNoteBoxDB.devSearch then BigNoteBoxDB.devSearch[f.theme] = nil end
         Refresh()

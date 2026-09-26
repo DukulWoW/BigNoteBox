@@ -36,6 +36,8 @@ local function GetCurrentZone()
     end
     return "zone", GetZoneText() or ""
 end
+-- Oracle search weights the notes for where the player is (ALL-69.3).
+BNB.GetCurrentZone = GetCurrentZone
 
 local function GetCurrentPlayer()
     return (BNB.UnitNameRealm("target"))   -- nil if no target

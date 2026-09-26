@@ -2001,6 +2001,7 @@ function BNB.SelectNote(id)
     end
 
     BNB._currentNoteID = id; BigNoteBoxDB.selectedNoteID = id
+    BNB.StampOpened(id)
     local collapsed = BNB._listCollapsed
     for _, btn in ipairs(listEntries) do
         if btn:IsShown() then

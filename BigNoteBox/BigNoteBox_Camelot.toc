@@ -63,7 +63,10 @@ UI\TrashWindow.lua
 UI\DangerZone.lua
 UI\DebugWindow.lua
 UI\SearchChrome.lua
-Assets\Search\SearchThemes.lua
+Assets\Search\Kilrogg\theme.lua
+Assets\Search\Alliance\theme.lua
+Assets\Search\Horde\theme.lua
+Assets\Search\The-Eye\theme.lua
 UI\Oracle.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua

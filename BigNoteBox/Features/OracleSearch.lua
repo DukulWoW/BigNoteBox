@@ -8,7 +8,9 @@
 -- context / who the note is about > body), so a word in the title outranks
 -- the same word in the body. Ties go to the most recently edited note.
 -- Prefixes (ALL-69.2) narrow the search before scoring; weights (ALL-69.3)
--- are not in yet.
+-- then add context boosts (this character, current zone, target...) on top
+-- of the word score, so they reorder close matches without beating a title
+-- hit with a body hit.
 --
 -- ParseQuery() below is the whole prefix grammar, pure so LuaJIT can test it
 -- (_work/tools/oracle-test.lua). UI/Oracle.lua supplies the localized letter
@@ -66,6 +68,23 @@ OS.SCORE = { title = 100, tag = 60, who = 40, body = 10, item = 100 }
 -- Extra when the whole query starts or equals the title.
 OS.TITLE_PREFIX_BONUS = 40
 OS.TITLE_EXACT_BONUS  = 80
+
+-- Weights (ALL-69.3): each boost is Off / Low / Normal / High, saved in
+-- BigNoteBoxDB.oracleWeights[key] (nil = the default here) and handed in as
+-- ctx.weights. Points are on the same scale as OS.SCORE: High is less than
+-- a title hit, Low about a body hit.
+OS.WEIGHT_KEYS = { "char", "zone", "fav", "opened", "target", "edited", "alarm" }
+OS.WEIGHT_DEFAULTS = {
+    char = "normal", zone = "normal", fav = "low", opened = "low",
+    target = "high", edited = "low", alarm = "low",
+}
+OS.WEIGHT_LEVELS = { "off", "low", "normal", "high" }
+OS.WEIGHT_POINTS = { off = 0, low = 15, normal = 30, high = 60 }
+-- Recently opened / edited: full points within a day, half within a week.
+OS.RECENT_FULL = DAY
+OS.RECENT_HALF = 7 * DAY
+-- Alarm due soon: set to go off within this many seconds.
+OS.ALARM_SOON = DAY
 
 local SNIPPET_BEFORE = 30    -- bytes of body shown before the first hit
 local SNIPPET_LEN    = 140   -- bytes of body in a snippet at most
@@ -437,6 +456,72 @@ function OS.Snippet(f, words)
     return out
 end
 
+-- Points for one boost at the level weights gives it (or its default).
+function OS.WeightPoints(weights, key)
+    local lvl = weights and weights[key]
+    return OS.WEIGHT_POINTS[lvl] or OS.WEIGHT_POINTS[OS.WEIGHT_DEFAULTS[key]] or 0
+end
+
+-- 1 within RECENT_FULL of now, 0.5 within RECENT_HALF, else 0.
+local function Recency(t, now)
+    if type(t) ~= "number" then return 0 end
+    local age = math.max(0, now - t)
+    if age <= OS.RECENT_FULL then return 1 end
+    if age <= OS.RECENT_HALF then return 0.5 end
+    return 0
+end
+
+-- A note that surfaces where the player is now. zone = { kind = "zone" or
+-- "instance", name = ..., sub = ... }, lower case (UI/Oracle.lua).
+function OS.IsHereNote(note, zone)
+    if type(note.context) ~= "string" or not zone then return false end
+    local kind, value = note.context:match("^(%a+):(.+)$")
+    if not kind then return false end
+    value = value:lower()
+    if kind == "subzone" then return zone.sub ~= nil and zone.sub ~= "" and value == zone.sub end
+    return kind == zone.kind and value == zone.name
+end
+
+-- A note about the current target, found the way Features/TargetNote.lua
+-- and BNB.UnitNotes.FindPlayerNote find one. target = { name, realm,
+-- isPlayer, npcID, isPet } (UI/Oracle.lua).
+function OS.IsTargetNote(note, target)
+    if not target or not target.name then return false end
+    if target.isPlayer then
+        local key = "player:" .. target.name
+        local full = (target.realm and target.realm ~= "") and (key .. "-" .. target.realm) or key
+        if note.targetPlayerKey == full or note.context == full or note.context == key then return true end
+        return note.source == "inspect" and note.inspectName == target.name
+            and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == target.realm)
+    end
+    if not target.npcID or note.targetNpcID == nil then return false end
+    if tostring(note.targetNpcID) ~= tostring(target.npcID) then return false end
+    -- Combat pets share a creature id: the name has to match too.
+    return not target.isPet or note.title == target.name
+end
+
+-- The context boosts for one note (see OS.WEIGHT_KEYS). ctx.weights,
+-- ctx.charScope, ctx.zone, ctx.target, ctx.now; no ctx = no boosts.
+function OS.Boost(note, ctx)
+    if not ctx then return 0 end
+    local w, now = ctx.weights, ctx.now or timeFn()
+    local b = 0
+    if ctx.charScope and note.scope == ctx.charScope then b = b + OS.WeightPoints(w, "char") end
+    if ctx.zone and OS.IsHereNote(note, ctx.zone) then b = b + OS.WeightPoints(w, "zone") end
+    if note.favorited or note.pinned then b = b + OS.WeightPoints(w, "fav") end
+    b = b + math.floor(OS.WeightPoints(w, "opened") * Recency(note.lastOpened, now))
+    if ctx.target and OS.IsTargetNote(note, ctx.target) then b = b + OS.WeightPoints(w, "target") end
+    b = b + math.floor(OS.WeightPoints(w, "edited") * Recency(note.updated, now))
+    local a = note.alarm
+    if type(a) == "table" and not a.fired then
+        local t = a.snoozedUntil or a.time
+        if type(t) == "number" and t >= now and t - now <= OS.ALARM_SOON then
+            b = b + OS.WeightPoints(w, "alarm")
+        end
+    end
+    return b
+end
+
 local function Newer(a, b)
     local ua, ub = a.note.updated or 0, b.note.updated or 0
     if ua ~= ub then return ua > ub end
@@ -448,9 +533,11 @@ end
 -- same way a plain word does (see WordScore), just against a narrower field
 -- or with the test inverted.
 --   opts.max  most results returned (default 8)
---   opts.ctx  passed through to OS.MatchesFilters (charScope, now)
+--   opts.ctx  passed through to OS.MatchesFilters (charScope, now) and
+--             OS.Boost (weights, zone, target)
 -- Returns an array of { note, score, snippet }, best first. A blank query
--- returns the most recently edited notes, score 0.
+-- scores the boosts alone, so it lists the notes that matter here and now,
+-- newest first among equals.
 function OS.SearchParsed(notes, parsed, opts)
     local max = (opts and opts.max) or 8
     local ctx = opts and opts.ctx
@@ -501,6 +588,7 @@ function OS.SearchParsed(notes, parsed, opts)
                     if f.title == whole then score = score + OS.TITLE_EXACT_BONUS
                     elseif f.title:sub(1, #whole) == whole then score = score + OS.TITLE_PREFIX_BONUS end
                 end
+                score = score + OS.Boost(note, ctx)
                 hits[#hits + 1] = { note = note, score = score, f = f }
             end
         end
