@@ -759,19 +759,14 @@ function BNB.HookTrashHeightTracking()
     BNB.mainFrame:HookScript("OnShow",        SyncTrashHeight)
 end
 
--- Public API
-function BNB.ToggleTrashWindow()
-    if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
-    local f
+local function TrashFrame()
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        f = BuildTrashWindowSkin()
-    else
-        f = BuildTrashWindow()
+        return BuildTrashWindowSkin()
     end
-    if f:IsShown() then
-        if _multiMode then SetTrashMultiMode(false) end
-        f:Hide(); return
-    end
+    return BuildTrashWindow()
+end
+
+local function ShowTrashWindow(f)
     SyncTrashHeight()
     f:ClearAllPoints()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
@@ -781,6 +776,26 @@ function BNB.ToggleTrashWindow()
     end
     f:Show()
     BNB.PopulateTrashWindow()
+end
+
+-- Public API
+function BNB.ToggleTrashWindow()
+    if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
+    local f = TrashFrame()
+    if f:IsShown() then
+        if _multiMode then SetTrashMultiMode(false) end
+        f:Hide(); return
+    end
+    ShowTrashWindow(f)
+end
+
+-- Opens the Trash window if it is not already showing (never closes it);
+-- used by the Oracle bar's `b` prefix (ALL-69.2), which needs "open", not
+-- "toggle".
+function BNB.OpenTrashWindow()
+    if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
+    local f = TrashFrame()
+    if not f:IsShown() then ShowTrashWindow(f) end
 end
 
 function BNB.InitTrashWindow()

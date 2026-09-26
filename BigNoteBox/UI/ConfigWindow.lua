@@ -385,6 +385,30 @@ end
 -- Expose for NoteConfig.lua (local functions cannot cross file boundaries)
 BNB._BuildLSMFontDropdown = BuildLSMFontDropdown
 
+-- Popups the Appearance and Modules tabs show. Registered from the keybind
+-- rows, which every config build runs (kept from before ALL-69).
+local function RegisterConfigPopups()
+    if not StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] then
+        StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] = {
+            text = "%s",
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            button2 = L["CFG_LATER_BTN"],
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+            OnAccept = function() C_UI.Reload() end,
+        }
+    end
+
+    if not StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] then
+        StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
+            text = L["CFG_BLZICON_DISABLED_MSG"],
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            button2 = L["CFG_LATER_BTN"],
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+            OnAccept = function() C_UI.Reload() end,
+        }
+    end
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- SHARED KEYBIND CAPTURE ROW
 -- Used in General tab (Open BNB) and Advanced tab (New Note, Quick Note).
@@ -417,25 +441,7 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
         if event == "UPDATE_BINDINGS" then UpdateText() end
     end)
 
-    if not StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] then
-        StaticPopupDialogs["BNB_SKIN_MODE_TOGGLE"] = {
-            text = "%s",
-            button1 = L["CFG_RELOAD_NOW_BTN"],
-            button2 = L["CFG_LATER_BTN"],
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            OnAccept = function() C_UI.Reload() end,
-        }
-    end
-
-    if not StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] then
-        StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
-            text = L["CFG_BLZICON_DISABLED_MSG"],
-            button1 = L["CFG_RELOAD_NOW_BTN"],
-            button2 = L["CFG_LATER_BTN"],
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            OnAccept = function() C_UI.Reload() end,
-        }
-    end
+    RegisterConfigPopups()
 
     BNB.WireKeybindCapture(kbBtn, kbAction, UpdateText, L["KEYBIND_PRESS_KEY"])
 
@@ -453,6 +459,68 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
     kbBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     return y - (ROW_H + ROW_GAP)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- COMPACT KEYBIND PAIR (ALL-69)
+-- Two bindings side by side, label above button, so two fit on one row.
+-- The default key moves from the grey hint into the button tooltip.
+-- cells: up to two { label, action, defaultKey, verb }; defaultKey is a
+-- binding string ("CTRL-N") or nil for no default.
+-- Returns the new y offset after the row.
+-- ─────────────────────────────────────────────────────────────────────────────
+local function MakeKeybindPair(parent, y, cells)
+    RegisterConfigPopups()
+    local colW  = math.floor(CONTENT_W / 2)
+    local BTN_W = colW - 24
+    local LBL_H = 18
+    local updaters = {}
+    for i, c in ipairs(cells) do
+        local x = (i - 1) * colW
+        local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+        lbl:SetWidth(BTN_W)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetWordWrap(false)
+        lbl:SetText(c.label)
+
+        local kbBtn = BNB.CreateButton(nil, parent, "", BTN_W, 22)
+        kbBtn:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y - LBL_H)
+        kbBtn:RegisterForClicks("AnyUp")
+
+        local function UpdateText()
+            local key = GetBindingKey(c.action)
+            kbBtn:SetText(key and GetBindingText(key) or L["KEYBIND_NOT_BOUND"])
+        end
+        UpdateText()
+        updaters[#updaters + 1] = UpdateText
+
+        BNB.WireKeybindCapture(kbBtn, c.action, UpdateText, L["KEYBIND_PRESS_KEY"])
+
+        kbBtn:SetScript("OnEnter", function(btn)
+            GameTooltip:SetOwner(btn, "ANCHOR_RIGHT")
+            local key = GetBindingKey(c.action)
+            if key then
+                GameTooltip:AddLine(string.format("%s (%s)", c.verb, GetBindingText(key)), 1, 1, 1)
+            else
+                GameTooltip:AddLine(c.verb, 1, 1, 1)
+            end
+            GameTooltip:AddLine(string.format(L["SW_KB_DEFAULT_FMT"],
+                c.defaultKey and GetBindingText(c.defaultKey) or L["SW_KB_NONE"]), 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(key and L["KEYBIND_TOOLTIP_UNBIND"] or L["KEYBIND_TOOLTIP_SET"], 0.6, 0.6, 0.6)
+            GameTooltip:Show()
+        end)
+        kbBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+
+    parent:RegisterEvent("UPDATE_BINDINGS")
+    parent:HookScript("OnEvent", function(_, event)
+        if event == "UPDATE_BINDINGS" then
+            for _, fn in ipairs(updaters) do fn() end
+        end
+    end)
+
+    return y - (LBL_H + 22 + ROW_GAP + 4)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -475,6 +543,7 @@ local K = {
     AddCheck             = AddCheck,
     AddSlider            = AddSlider,
     MakeKeybindRow       = MakeKeybindRow,
+    MakeKeybindPair      = MakeKeybindPair,
     BuildLSMFontDropdown = BuildLSMFontDropdown,
     NewSubPage           = NewSubPage,
     AddOverviewRow       = AddOverviewRow,

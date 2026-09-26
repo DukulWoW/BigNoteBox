@@ -346,6 +346,8 @@ local function GatherTargetData()
         local classKey = CLASSIFICATION_KEY[classification or "normal"]
         data.classificationLabel = classKey and L[classKey] or nil
         data.isBoss = (classification == "worldboss") or (data.level == "??")
+        -- Mob (can be attacked) or NPC, for the Oracle search badges (ALL-69)
+        data.attackable = UnitCanAttack("player", "target") and true or false
 
         -- Max health — UnitHealthMax returns a "secret" (taint-protected) value
         -- in keybind execution contexts on retail. The comparison must also happen
@@ -612,6 +614,11 @@ local function CreateTargetNote(richMode, data)
     -- Faction token ("Horde"/"Alliance"; nil for neutral) for the model
     -- viewer's crest (FOR-22), independent of the faction tag setting
     fields.targetFaction = data.faction
+    -- Kind of NPC for the Oracle search badges (ALL-69): English tokens
+    -- ("elite", "rareelite", "worldboss", "normal"...) and attackable = mob.
+    -- Notes made before these existed have neither and show as an NPC.
+    fields.targetClassification = data.classification
+    fields.targetAttackable     = data.attackable
 
     -- Hidden duplicate-detection keys
     fields.targetNpcID = data.npcID  -- may be nil for vehicles/objects without creature ID

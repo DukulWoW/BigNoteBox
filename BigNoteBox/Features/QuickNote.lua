@@ -160,6 +160,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
                 local n = BigNoteBoxNotesDB and BigNoteBoxNotesDB.notes and BigNoteBoxNotesDB.notes[id]
                 if n then
                     n.icon = self._qnIcon or RandomIcon()
+                    n.source = "quicknote"   -- Oracle search badge (ALL-69)
                     n.tags = self._qnTags or {}
                     n.updated = time()
                     for _, tag in ipairs(n.tags) do
@@ -191,6 +192,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     local note = ndb and ndb.notes and ndb.notes[id]
     if note then
         note.icon    = icon or RandomIcon()
+        note.source  = "quicknote"   -- made from a quest, gossip or book frame; Oracle badge (ALL-69)
         note.tags    = tags or {}
         note.updated = time()
         for _, tag in ipairs(note.tags) do

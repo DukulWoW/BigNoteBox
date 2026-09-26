@@ -289,3 +289,9 @@ function BNB_KeybindTargetNote()
     if InCombatLockdown() then return end
     if BNB.TargetNote and BNB.TargetNote.Fire then BNB.TargetNote.Fire() end
 end
+
+-- Oracle search (ALL-69) opens in combat too: searching is harmless, and each
+-- way of opening a note keeps its own combat check.
+function BNB_KeybindOracle()
+    if BNB.Oracle then BNB.Oracle.Toggle() end
+end

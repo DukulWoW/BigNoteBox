@@ -64,6 +64,7 @@ UI\DangerZone.lua
 UI\DebugWindow.lua
 UI\SearchChrome.lua
 Assets\Search\SearchThemes.lua
+UI\Oracle.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua
 Assets\Icons\IconManifest.lua
@@ -108,6 +109,7 @@ Features\AdvancedMode.lua
 Features\HtmlTemplate.lua
 Features\NoteExport.lua
 Features\ShareNote.lua
+Features\OracleSearch.lua
 Features\UnitNotes.lua
 Features\InspectNote.lua
 Features\TargetNote.lua

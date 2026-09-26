@@ -2634,6 +2634,28 @@ function BNB.OpenReferenceBox(noteID)
         end
         HookMainWindowResize()
         K.RegisterTaskCallback()
+        -- ESC normally reaches this box through the main window's key handler
+        -- (MainWindow.lua OnEscapeKey), which stops the key there. Opened on
+        -- its own (Oracle search, Alt) the main window is closed, so that
+        -- cascade never runs. UISpecialFrames covers this on Retail, but not
+        -- reliably on Forever (confirmed 2026-09-26, ALL-69.2: closes fine
+        -- with X, not with ESC, on Forever only) -- so the fallback is our
+        -- own key handler, which only takes over while the main window is
+        -- closed (it steps aside otherwise, so MainWindow's cascade order,
+        -- e.g. Task Edit Window before Reference Box, is untouched).
+        tinsert(UISpecialFrames, "BigNoteBoxReferenceBoxFrame")
+        rbFrame:SetScript("OnKeyDown", function(self, key)
+            if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
+                self:SetPropagateKeyboardInput(true)
+                return
+            end
+            self:SetPropagateKeyboardInput(false)
+            BNB.CloseReferenceBox()
+        end)
+        rbFrame:EnableKeyboard(true)
+        rbFrame:HookScript("OnHide", function()
+            if _modeStrip then _modeStrip:Hide() end
+        end)
     end
     _noteID = noteID or BNB._currentNoteID
     -- Reset to model mode on every note switch for inspect notes

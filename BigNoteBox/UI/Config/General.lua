@@ -6,7 +6,7 @@ local L   = BNB.L
 
 local K = BNB._ConfigKit
 local CONTENT_W, ASSET, ROW_H, ROW_GAP = K.CONTENT_W, K.ASSET, K.ROW_H, K.ROW_GAP
-local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
+local AddRule, AddHeader, AddCheck, MakeKeybindPair = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindPair
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL
@@ -379,7 +379,13 @@ local function BuildGeneralTab(sf, ct)
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_HDR_KEYBINDINGS"])
 
-    y = MakeKeybindRow(ct, y, L["CFG_KB_OPEN_BNB"], "BIGNOTEBOXOPEN", L["CFG_KB_HINT_CTRL_N"], L["CFG_KB_DESC_OPEN_BNB"])
+    -- Two per row, label above button (ALL-69): the default key is in the tooltip.
+    y = MakeKeybindPair(ct, y, {
+        { label = L["CFG_KB_DESC_OPEN_BNB"], action = "BIGNOTEBOXOPEN",
+          defaultKey = "CTRL-N", verb = L["CFG_KB_DESC_OPEN_BNB"] },
+        { label = L["CFG_KB_ORACLE"], action = "BIGNOTEBOXORACLE",
+          defaultKey = "CTRL-SPACE", verb = L["CFG_KB_DESC_ORACLE"] },
+    })
 
     -- Data Summary moved to the bottom of the Backup tab (ALL-14).
 

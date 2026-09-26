@@ -1959,6 +1959,23 @@ function BNB.RefreshNoteList()
 end
 
 --------------------------------------------------------------------------------
+-- REVEAL NOTE
+-- Oracle search (ALL-69) opens any note, including one the list is hiding.
+-- When id is not in the filtered list: sidebar to "All", and the search box,
+-- tag, favourite and task filters cleared (the reset button's own action).
+--------------------------------------------------------------------------------
+function BNB.RevealNoteInList(id)
+    for _, n in ipairs(BNB.GetOrderedNotes(currentFilter, currentTagFilter)) do
+        if n.id == id then return end
+    end
+    local SB = BNB.Sidebar
+    if SB and SB.GetActive and SB.GetActive() ~= "all" and SB.SetActive then SB.SetActive("all") end
+    local oc = BNB._searchOuterClear
+    local reset = oc and oc:GetScript("OnClick")
+    if reset then reset(oc) end
+end
+
+--------------------------------------------------------------------------------
 -- SELECT NOTE
 --------------------------------------------------------------------------------
 function BNB.SelectNote(id)

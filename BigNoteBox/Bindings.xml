@@ -17,4 +17,7 @@
     <Binding name="BIGNOTEBOXNOTEONTARGET" category="BigNoteBox" default="" runOnUp="false">
         BNB_KeybindTargetNote()
     </Binding>
+    <Binding name="BIGNOTEBOXORACLE" category="BigNoteBox" default="CTRL-SPACE" runOnUp="false">
+        BNB_KeybindOracle()
+    </Binding>
 </Bindings>

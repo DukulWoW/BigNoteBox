@@ -37,6 +37,14 @@ local function NoteIsLocked(note)
     return BigNoteBoxDB.lockNotes == true
 end
 
+-- Whether the editor treats note id as locked right now (a session unlock
+-- counts). Oracle search (ALL-69) asks before putting the cursor in a note.
+function BNB.IsNoteLockedInEditor(id)
+    local note = id and BNB.GetNote(id)
+    local sessionUnlocked = BNB._sessionUnlocked and BNB._sessionUnlocked[id]
+    return (not sessionUnlocked) and NoteIsLocked(note) or false
+end
+
 --------------------------------------------------------------------------------
 -- SAVE BUTTON STATE
 --------------------------------------------------------------------------------

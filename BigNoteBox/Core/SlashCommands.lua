@@ -25,10 +25,14 @@ function BNB.RegisterSlashCommands()
             if BNB.OpenConfig then BNB.OpenConfig() end
         elseif cmd == "debug" then
             if BNB.DebugWindow then BNB.DebugWindow.Toggle() end
+        elseif cmd == "search" or cmd:sub(1, 7) == "search " then
+            -- Oracle search (ALL-69); the text keeps its case
+            if BNB.Oracle then BNB.Oracle.Open((msg:match("^%s*%S+%s+(.-)%s*$"))) end
         elseif cmd == "help" then
             print(L["SLASH_HELP"])
             print(L["SLASH_HELP_OPEN"])
             print(L["SLASH_HELP_NEW"])
+            print(L["SLASH_HELP_SEARCH"])
             print(L["SLASH_HELP_CONFIG"])
             print(L["SLASH_HELP_RESET"])
             print(L["SLASH_HELP_DEBUG"])

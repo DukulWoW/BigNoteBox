@@ -17,6 +17,9 @@
 --
 -- A theme without an ornament: files = { ornament = false }.
 --
+-- The selected result in the Oracle's list is tinted with highlight =
+-- { r, g, b, alpha } (0-1 each). Left out, it is BigNoteBox gold.
+--
 -- NOTE: an addon update replaces this file. A theme of your own is safer in
 -- a small addon of its own that calls BigNoteBox.RegisterSearchTheme with
 -- path = "Interface\\AddOns\\<YourAddon>\\<folder>\\" instead of folder.
@@ -41,4 +44,5 @@ Register({
         text        = { a1 = "TOPLEFT",     x1 =  36,     y1 = -21,    a2 = "BOTTOMRIGHT", x2 = -32,    y2 =  19     },
     },
     size = { w = 500, h = 50, border = 24, borderY = 24 },
+    highlight = { 0.40, 0.73, 0.42, 0.18 },   -- BigNoteBox green (#66bb6a)
 })

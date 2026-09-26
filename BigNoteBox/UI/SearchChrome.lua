@@ -52,6 +52,8 @@ BNB.SEARCH_DEFAULT_THEME = "kilrogg"
 --   def.layout, def.size  optional; left out = the default theme's, which fits
 --               any art drawn on the same 32 px grid
 --   def.files   optional file name per piece; false = the theme has no such piece
+--   def.highlight  optional { r, g, b, a } for the selected Oracle result;
+--               left out = BNB gold
 -- Registering an id again replaces it and keeps its place in the list.
 function BNB.RegisterSearchTheme(def)
     if type(def) ~= "table" or type(def.name) ~= "string" then return false, "name missing" end
@@ -65,6 +67,7 @@ function BNB.RegisterSearchTheme(def)
     BNB.SEARCH_THEMES[id] = {
         id = id, name = def.name, folder = def.folder, art = art,
         files = def.files, layout = def.layout, size = def.size,
+        highlight = def.highlight,
     }
     return true
 end
@@ -73,6 +76,15 @@ end
 function BNB.GetSearchTheme(id)
     return BNB.SEARCH_THEMES[id or ""] or BNB.SEARCH_THEMES[BNB.SEARCH_DEFAULT_THEME]
         or BNB.SEARCH_THEMES[BNB.SEARCH_THEME_ORDER[1] or ""]
+end
+
+-- Selected-result colour of a theme: its own, else BNB gold.
+local DEFAULT_HIGHLIGHT = { 1, 0.82, 0, 0.14 }
+function BNB.GetSearchHighlight(id)
+    local d = BNB.GetSearchTheme(id)
+    local h = d and d.highlight
+    if type(h) ~= "table" then h = DEFAULT_HIGHLIGHT end
+    return h[1] or 1, h[2] or 0.82, h[3] or 0, h[4] or 0.14
 end
 
 -- A theme's layout and size, falling back to the default theme's.
@@ -95,13 +107,17 @@ end
 -- the theme's own (the layout tool passes its working copy). The "text" piece
 -- gets no texture: f._searchPieces.text is a bare region marker the caller
 -- anchors its EditBox to. Switching theme on a live frame is fine.
-function BNB.ApplySearchChrome(f, themeID, layout, size)
+-- opts.panel: the 9-slice only, for a frame the caller sizes itself (the
+-- Oracle results panel): no ornament, no text region, no SetSize.
+-- Returns the size table used, so a caller can pad by size.border.
+function BNB.ApplySearchChrome(f, themeID, layout, size, opts)
     local d = BNB.GetSearchTheme(themeID)
     if not d then return end
     local tl, ts = ThemeLayout(d)
     layout, size = layout or tl, size or ts
+    local panel = opts and opts.panel
     local kx, ky = size.border / NATIVE, (size.borderY or size.border) / NATIVE
-    f:SetSize(size.w, size.h)
+    if not panel then f:SetSize(size.w, size.h) end
     f._searchPieces = f._searchPieces or {}
     for _, def in ipairs(PIECES) do
         local tex = f._searchPieces[def.key]
@@ -114,8 +130,10 @@ function BNB.ApplySearchChrome(f, themeID, layout, size)
         if file then tex:SetTexture(d.art .. file) end
         if def.file then tex:SetShown(file and true or false) end
         local p = layout[def.key]
+        if panel and (def.key == "ornament" or def.key == "text") then p = nil end
         if p then PlacePiece(tex, f, p, kx, ky) else tex:Hide() end
     end
+    return size
 end
 BigNoteBox.RegisterSearchTheme = BNB.RegisterSearchTheme
 
@@ -205,6 +223,11 @@ local function ExportText()
     lines[#lines + 1] = "    },"
     lines[#lines + 1] = string.format("    size = { w = %d, h = %d, border = %d, borderY = %d },",
         size.w, size.h, size.border, size.borderY)
+    local h = d.highlight
+    if type(h) == "table" then
+        lines[#lines + 1] = string.format("    highlight = { %s, %s, %s, %s },",
+            Num(h[1] or 1), Num(h[2] or 0.82), Num(h[3] or 0), Num(h[4] or 0.14))
+    end
     lines[#lines + 1] = "})"
     return table.concat(lines, "\n")
 end

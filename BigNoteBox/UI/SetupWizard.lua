@@ -1054,6 +1054,8 @@ local function BuildPage5(content)
         { action="BIGNOTEBOXNEWNOTE",      label=L["SW_KB_NEWNOTE"],          hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
         { action="BIGNOTEBOXHIDESTICKIES", label=L["SW_KB_HIDESTICKIES"], hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-H") },
         { action="BIGNOTEBOXTOGGLERV",     label=L["SW_KB_RICHEDITOR"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXNOTEONTARGET", label=L["SW_KB_TARGETNOTE"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXORACLE",       label=L["SW_KB_ORACLE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-SPACE") },
     }
 
     local _updateFns = {}
