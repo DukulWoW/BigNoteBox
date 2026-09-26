@@ -1459,7 +1459,7 @@ end
 -- right), in the sidebar's border/hover/active art at 48px instead of 64.
 -- Tasks sits at the bottom, its bottom edge level with the model viewer's gear
 -- button (model bottom BOTTOM_PAD + that button's 4px inset); Model above it.
--- Built on Forever, extended to Retail 2026-09-24; skin mode keeps the text strip.
+-- Built on Forever, extended to Retail 2026-09-24, then skin mode 2026-09-26 (ALL-88).
 local TAB_SZ     = 48                          -- sidebar BTN_SZ 64, scaled 0.75
 local TAB_ICON   = 36                          -- sidebar ICON_SZ 48, scaled
 local TAB_ICON_X = { left = 8, right = 4 }     -- sidebar 10 / 5, scaled
@@ -1475,7 +1475,7 @@ local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
 local TAB_FALLBACK  = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 local function UseSideTabs()
-    return not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
+    return true
 end
 
 -- Outer edge: away from the main window, so the tabs never cover it
