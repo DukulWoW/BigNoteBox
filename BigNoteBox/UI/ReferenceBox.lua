@@ -1473,6 +1473,8 @@ local TAB_BORDER = ASSETS .. (BNB.IsForever and "Sidebar\\sb-border-forever" or 
 local TAB_BOTTOM = BOTTOM_PAD + 4
 local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
 local TAB_FALLBACK  = "Interface\\Icons\\INV_Misc_QuestionMark"
+local ACTIVE_R, ACTIVE_G, ACTIVE_B = 0.40, 0.85, 0.40   -- Sidebar.lua ACTIVE_R/G/B
+local ACTIVE_GLOW_MULT = 2.0                             -- Sidebar.lua ACTIVE_GLOW_MULT
 
 local function UseSideTabs()
     return true
@@ -1504,6 +1506,31 @@ local function ModelTabIcon()
     return (icon and icon ~= "") and icon or TAB_FALLBACK
 end
 
+-- Tint a tab's border + active-glow textures to the current skin preset,
+-- same formula as the sidebar's GetPooledBtn (Sidebar.lua ~320-351).
+local function TintSideTab(btn)
+    local skinOn = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local br, bg_, bb
+    if skinOn and BNB.GetSkinPreset then
+        br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+    end
+    if btn._border and btn._border.SetVertexColor then
+        if skinOn and br then
+            btn._border:SetVertexColor(br, bg_, bb, 1)
+        else
+            btn._border:SetVertexColor(1, 1, 1, 1)
+        end
+    end
+    if btn._active and btn._active.SetVertexColor then
+        if skinOn and br then
+            btn._active:SetVertexColor(math.min(1, br * ACTIVE_GLOW_MULT),
+                math.min(1, bg_ * ACTIVE_GLOW_MULT), math.min(1, bb * ACTIVE_GLOW_MULT), 1)
+        else
+            btn._active:SetVertexColor(ACTIVE_R, ACTIVE_G, ACTIVE_B, 1)
+        end
+    end
+end
+
 local function BuildSideTabs(f)
     local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeTabs", f)
     strip:SetSize(TAB_SZ, TAB_SZ * 2 + TAB_GAP)
@@ -1521,9 +1548,9 @@ local function BuildSideTabs(f)
         hover:SetAllPoints(); hover:SetTexture(ASSETS .. "Sidebar\\sb-hover"); hover:Hide()
         local active = btn:CreateTexture(nil, "OVERLAY", nil, -1)
         active:SetAllPoints(); active:SetTexture(ASSETS .. "Sidebar\\sb-active")
-        active:SetVertexColor(0.40, 0.85, 0.40, 1)   -- sidebar ACTIVE_R/G/B
         active:Hide()
         btn._border, btn._icon, btn._hover, btn._active, btn._mode = border, icon, hover, active, mode
+        TintSideTab(btn)
 
         btn:SetScript("OnEnter", function(self)
             if _rbMode ~= mode then hover:Show() end
@@ -1548,6 +1575,15 @@ local function BuildSideTabs(f)
 
     strip._modelBtn = modelBtn
     strip._tasksBtn = tasksBtn
+
+    -- Live-refresh on preset/brightness change (Sidebar.lua ~838-863 pattern)
+    if BNB.RegisterSkinButton then
+        BNB.RegisterSkinButton(function()
+            TintSideTab(tasksBtn)
+            TintSideTab(modelBtn)
+        end)
+    end
+
     return strip
 end
 
