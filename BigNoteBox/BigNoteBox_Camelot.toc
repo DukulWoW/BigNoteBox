@@ -62,6 +62,8 @@ UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
 UI\DebugWindow.lua
+UI\SearchChrome.lua
+Assets\Search\SearchThemes.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua
 Assets\Icons\IconManifest.lua
