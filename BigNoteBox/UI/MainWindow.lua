@@ -373,9 +373,15 @@ local function BuildClassicChrome()
         iconX     = -6,
         iconY     = -(TITLE_H - 22),
         -- Forever: soft glow behind the note list so the side panel stands out
-        -- against the wood grain; stretches with the pane (splitter, resize, collapse)
-        StylePanes = function(listPane)
+        -- against the wood grain; stretches with the pane (splitter, resize, collapse).
+        -- The note pane gets the same glow (trial, Dukul 2026-09-26).
+        StylePanes = function(listPane, editorPane)
             listPane._forGlow = BNB.AddForeverGlow(listPane)
+            if editorPane then
+                editorPane._forGlow = BNB.AddForeverGlow(editorPane)
+                -- 30% weaker than the list's (test, Dukul 2026-09-26)
+                if editorPane._forGlow then editorPane._forGlow:SetAlpha(0.7) end
+            end
         end,
     }
 end

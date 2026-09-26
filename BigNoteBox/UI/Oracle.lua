@@ -30,7 +30,6 @@ local ROW_H      = 36
 local ROW_GAP    = 2
 local ICON_SIZE  = 26
 local HINT_H     = 18
-local PANEL_GAP  = 2    -- space between the bar and the results panel
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 local BADGE_SIZE = 18
 local BADGE_GAP  = 4
@@ -484,8 +483,10 @@ local function RowText(row, r, textRight)
     row.snippet:SetPoint("RIGHT", row, "RIGHT", textRight, 0)
 end
 
-local function BuildRow(i)
-    local row = CreateFrame("Button", nil, panel)
+-- A result row on parent. onEnter / onClick: nil for the layout tool's
+-- preview rows, which take no mouse at all.
+local function BuildRow(parent, onEnter, onClick)
+    local row = CreateFrame("Button", nil, parent)
     row:SetHeight(ROW_H)
     row:RegisterForClicks("LeftButtonUp")
 
@@ -522,10 +523,42 @@ local function BuildRow(i)
     snippet:SetWordWrap(false)
     row.snippet = snippet
 
-    row:SetScript("OnEnter", function() SetSelection(i) end)
-    row:SetScript("OnClick", function() OpenResult(i) end)
-    rows[i] = row
+    if onEnter then row:SetScript("OnEnter", onEnter) end
+    if onClick then row:SetScript("OnClick", onClick) else row:EnableMouse(false) end
     return row
+end
+
+-- The real list's row i.
+local function MainRow(i)
+    rows[i] = BuildRow(panel, function() SetSelection(i) end, function() OpenResult(i) end)
+    return rows[i]
+end
+
+-- Lays out list (results) on the rows of parent from y down, building rows
+-- with build(i) as needed, one badge column for all. Returns the new y.
+local function PlaceRows(parent, rowList, list, y, padX, build)
+    local n = #list
+    -- Badge column as wide as the row with the most badges, plus a little
+    -- air between badges and text.
+    local most = 0
+    for i = 1, n do most = math.max(most, BadgeCount(list[i].note)) end
+    local textRight = -8
+    if most > 0 then textRight = -8 - most * (BADGE_SIZE + BADGE_GAP) - 4 end
+    for i = 1, math.max(MAX_ROWS, #rowList) do
+        local row = rowList[i]
+        if i <= n then
+            row = row or build(i)
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", parent, "TOPLEFT", padX, y)
+            row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -padX, y)
+            RowText(row, list[i], textRight)
+            row:Show()
+            y = y - ROW_H - ROW_GAP
+        elseif row then
+            row:Hide()
+        end
+    end
+    return y
 end
 
 -- Set by Refresh() when the query is "?" (OracleSearch's parsed.help):
@@ -555,26 +588,7 @@ local function Layout()
     hintFS:Show()
 
     local n = #results
-    -- Badge column as wide as the row with the most badges, plus a little
-    -- air between badges and text.
-    local most = 0
-    for i = 1, n do most = math.max(most, BadgeCount(results[i].note)) end
-    local textRight = -8
-    if most > 0 then textRight = -8 - most * (BADGE_SIZE + BADGE_GAP) - 4 end
-    for i = 1, MAX_ROWS do
-        local row = rows[i]
-        if i <= n then
-            row = row or BuildRow(i)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", panel, "TOPLEFT", padX, y)
-            row:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX, y)
-            RowText(row, results[i], textRight)
-            row:Show()
-            y = y - ROW_H - ROW_GAP
-        elseif row then
-            row:Hide()
-        end
-    end
+    y = PlaceRows(panel, rows, results, y, padX, MainRow)
     if n == 0 then
         emptyFS:ClearAllPoints()
         emptyFS:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 6)
@@ -643,6 +657,8 @@ end
 local function Build()
     bar = CreateFrame("Frame", "BigNoteBoxOracleFrame", UIParent)
     bar:SetFrameStrata("FULLSCREEN_DIALOG")
+    -- Room below the bar, so the results can draw under it (panelPos.under).
+    bar:SetFrameLevel(BNB.SEARCH_BAR_LEVEL)
     bar:SetToplevel(true)
     bar:SetClampedToScreen(true)
     bar:EnableMouse(true)
@@ -650,7 +666,12 @@ local function Build()
     drawnTheme = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
     BNB.ApplySearchChrome(bar, drawnTheme)
     -- A click on the bar's frame (not the text) puts the cursor back.
-    bar:SetScript("OnMouseDown", function() eb:SetFocus() end)
+    -- A click raises the bar (SetToplevel), lifting the results with it:
+    -- put them back under it after the raise.
+    bar:SetScript("OnMouseDown", function()
+        eb:SetFocus()
+        C_Timer.After(0, function() BNB.PlaceSearchPanel(panel, bar, drawnTheme) end)
+    end)
 
     eb = CreateFrame("EditBox", nil, bar)
     eb:SetPoint("TOPLEFT", bar._searchPieces.text, "TOPLEFT")
@@ -664,9 +685,11 @@ local function Build()
     placeholder:SetText(L["ORACLE_PLACEHOLDER"])
 
     panel = CreateFrame("Frame", nil, bar)
-    panel:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -PANEL_GAP)
-    panel:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -PANEL_GAP)
+    BNB.PlaceSearchPanel(panel, bar, drawnTheme)   -- the theme's panelPos
     panel:EnableMouse(true)
+    panel:SetScript("OnMouseDown", function()
+        C_Timer.After(0, function() BNB.PlaceSearchPanel(panel, bar, drawnTheme) end)
+    end)
     panel._size = BNB.ApplySearchChrome(panel, drawnTheme, nil, nil, { panel = true })
         or { border = 24, borderY = 24 }
     -- Esc still closes it if the box has lost focus to another window.
@@ -730,6 +753,7 @@ local function SyncTheme()
     drawnTheme = want
     BNB.ApplySearchChrome(bar, want)
     panel._size = BNB.ApplySearchChrome(panel, want, nil, nil, { panel = true }) or panel._size
+    BNB.PlaceSearchPanel(panel, bar, want)
     for _, row in ipairs(rows) do row.selTex:SetColorTexture(BNB.GetSearchHighlight(want)) end
 end
 
@@ -741,11 +765,61 @@ function Oracle.Open(text)
     Refresh()
     bar:Show()
     bar:Raise()
+    BNB.PlaceSearchPanel(panel, bar, drawnTheme)   -- raising lifted the panel too
     -- Focus a frame later, so the key press that opened the bar is spent
     -- before the box can take it as typing.
     C_Timer.After(0, function()
         if bar:IsShown() then eb:SetFocus() end
     end)
+end
+
+-- Fake results for the search bar layout tool (UI/SearchChrome.lua), drawn
+-- with the real row code so a theme is judged on what players see. Between
+-- them they show every badge. Developer tool only, so plain English.
+local PREVIEW = {
+    { note = { title = "Hogger", source = "target", targetAttackable = true,
+        targetClassification = "elite", icon = "Interface\\Icons\\INV_Misc_Head_Orc_01" },
+      snippet = "Elite gnoll in Elwynn Forest. Pull him away from the camp." },
+    { note = { title = "Thrall", source = "inspect", inspectFaction = "Horde",
+        icon = "Interface\\Icons\\Ability_Warrior_BattleShout" },
+      snippet = "Met him in Orgrimmar, asked about the Earthen Ring." },
+    { note = { title = "Raid tactics", richMode = true, titleColor = { r = 1, g = 0.5, b = 0.25 },
+        icon = "Interface\\Icons\\INV_Misc_Book_09" },
+      snippet = "Phase two: spread out, tank faces the boss away from the group." },
+    { note = { title = "Shopping list", body = "|Hitem:1:|h[Flask]|h", scope = "char:Dukul-Realm",
+        icon = "Interface\\Icons\\INV_Misc_Bag_08" },
+      snippet = "Flasks, food and a stack of runes before Thursday." },
+    { note = { title = "The Missing Diplomat", source = "quicknote" },
+      snippet = "Quest chain: start in Stormwind, then Westfall and Duskwood." },
+}
+
+-- Draws the preview rows on pv, a results panel the layout tool has
+-- themed (pv._size set by ApplySearchChrome), and sizes it. Row 1 shows
+-- selected, in the theme's highlight colour.
+function Oracle.DrawPreview(pv, themeID)
+    pv._rows = pv._rows or {}
+    local size = pv._size or { border = 24, borderY = 24 }
+    local padX = math.floor(size.border * 0.6 + 0.5)
+    local padY = math.floor((size.borderY or size.border) * 0.6 + 0.5)
+    local y = PlaceRows(pv, pv._rows, PREVIEW, -padY, padX, function(i)
+        pv._rows[i] = BuildRow(pv)
+        return pv._rows[i]
+    end)
+    for i, row in ipairs(pv._rows) do
+        row.selTex:SetColorTexture(BNB.GetSearchHighlight(themeID))
+        row.selTex:SetShown(i == 1)
+        for _, badge in pairs(row.badges) do badge:EnableMouse(false) end
+    end
+    if not pv._hint then
+        pv._hint = pv:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+        pv._hint:SetJustifyH("CENTER")
+        pv._hint:SetWordWrap(false)
+    end
+    pv._hint:SetText(L["ORACLE_HINT"])
+    pv._hint:ClearAllPoints()
+    pv._hint:SetPoint("TOPLEFT", pv, "TOPLEFT", padX + 6, y - 2)
+    pv._hint:SetPoint("TOPRIGHT", pv, "TOPRIGHT", -padX - 6, y - 2)
+    pv:SetHeight(-y + HINT_H + padY)
 end
 
 function Oracle.Close()

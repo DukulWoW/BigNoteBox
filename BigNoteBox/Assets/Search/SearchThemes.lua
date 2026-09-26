@@ -26,6 +26,12 @@
 -- layout (The Eye below is the example). Any piece a layout leaves out is
 -- simply not drawn, e.g. The Eye has no topleft, bottomleft or right.
 --
+-- The results panel under the bar: panelPos = { left, right, gap } in
+-- screen px moves its edges in from the bar's (negative = wider) and sets
+-- the space below the bar (negative = overlap). Up to four ornaments
+-- around it, s-panel-ornament-1 .. -4 (pieces pornament1-4), are placed
+-- relative to the panel. The layout tool edits and exports both.
+--
 -- A background of its own for the Oracle's results panel: panelBg =
 -- "s-bg-results". It is tiled, not stretched, so its size must be a power of
 -- two (128x128...), and the Forever highlight glow is drawn over it.
