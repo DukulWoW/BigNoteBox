@@ -37,6 +37,7 @@ local _cancelSelBtn  = nil   -- "Cancel"            (select mode only)
 local _infoLbl       = nil   -- "Kept X days\nX notes in trash" (bottom-right)
 local _multiSel  = {}
 local _multiMode = false
+local _itemOrder = {}    -- { id, note } per row, as last populated (row index = position)
 
 -- Date helper
 local function FormatDeleted(ts)
@@ -231,6 +232,7 @@ function BNB.PopulateTrashWindow()
     table.sort(items, function(a, b)
         return (a.note.deletedAt or 0) > (b.note.deletedAt or 0)
     end)
+    _itemOrder = items
 
     local n = #items
     UpdateInfoLbl(n)
@@ -789,13 +791,63 @@ function BNB.ToggleTrashWindow()
     ShowTrashWindow(f)
 end
 
+-- ESC reaches this window through the main window's key handler
+-- (MainWindow.lua OnEscapeKey). Opened on its own (the Oracle bar's `b`
+-- prefix) the main window is closed, so that cascade never runs, and
+-- UISpecialFrames is not reliable on Forever. Our own handler closes it
+-- then (view popup first), and steps aside while the main window is shown,
+-- so the cascade order is untouched. Same pattern as UI/ReferenceBox.lua
+-- OpenReferenceBox (ALL-69.2).
+local function HookStandaloneEscape(f)
+    if f._escHooked then return end
+    f._escHooked = true
+    f:EnableKeyboard(true)
+    f:SetScript("OnKeyDown", function(self, key)
+        if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
+            self:SetPropagateKeyboardInput(true)
+            return
+        end
+        self:SetPropagateKeyboardInput(false)
+        local vp = self._viewPopup
+        if vp and vp:IsShown() then vp:Hide(); return end
+        if _multiMode then SetTrashMultiMode(false) end
+        self:Hide()
+    end)
+end
+
+-- Scrolls the list to a trashed note and flashes its row for a moment.
+local function FocusTrashItem(id)
+    local idx
+    for i, item in ipairs(_itemOrder) do
+        if item.id == id then idx = i; break end
+    end
+    if not (idx and _twFrame) then return end
+    local sf, row = _twFrame._scrollFrame, _rows[idx]
+    -- A tick later: on the first open the scroll range is still 0.
+    C_Timer.After(0, function()
+        if not (sf and _twFrame:IsShown()) then return end
+        sf:UpdateScrollChildRect()
+        local want = (idx - 1) * (ROW_H + ROW_GAP)
+        sf:SetVerticalScroll(math.min(want, sf:GetVerticalScrollRange() or 0))
+    end)
+    if row and row._selHi and not _multiMode then
+        row._selHi:Show()
+        C_Timer.After(2.5, function()
+            if not _multiMode then row._selHi:Hide() end
+        end)
+    end
+end
+
 -- Opens the Trash window if it is not already showing (never closes it);
 -- used by the Oracle bar's `b` prefix (ALL-69.2), which needs "open", not
--- "toggle".
-function BNB.OpenTrashWindow()
+-- "toggle". focusID: a trashed note to scroll to and flash.
+function BNB.OpenTrashWindow(focusID)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local f = TrashFrame()
-    if not f:IsShown() then ShowTrashWindow(f) end
+    HookStandaloneEscape(f)
+    if not f:IsShown() then ShowTrashWindow(f) else BNB.PopulateTrashWindow() end
+    f:Raise()
+    if focusID then FocusTrashItem(focusID) end
 end
 
 function BNB.InitTrashWindow()

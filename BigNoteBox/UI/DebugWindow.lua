@@ -26,7 +26,7 @@ BNB.DebugWindow = BNB.DebugWindow or {}
 local DW = BNB.DebugWindow
 
 local SK_TITLE_H   = 28   -- skin title strip height
-local WIN_W, WIN_H = 400, 430
+local WIN_W, WIN_H = 400, 456
 local PAD          = 20
 local ROW_H        = 26
 local SUB_INDENT   = 20
@@ -231,7 +231,14 @@ local function BuildWindow()
                 BNB.Migration.ShowPopup()
             end
         end)
+    -- The search bar theme layout tool (ALL-69, UI/SearchChrome.lua), same as
+    -- /bnb searchlayout.
+    local layoutBtn = MakeButton(L["CFG_DEV_SEARCHLAYOUT_BTN"], 170,
+        L["CFG_DEV_SEARCHLAYOUT_BTN"], L["CFG_DEV_SEARCHLAYOUT_TIP_BODY"], function()
+            if BNB.ToggleSearchLayoutTool then BNB.ToggleSearchLayoutTool() end
+        end)
     dependents[#dependents + 1] = { btn = toastBtn }
+    dependents[#dependents + 1] = { btn = layoutBtn }
     dependents[#dependents + 1] = { btn = setupBtn }
     dependents[#dependents + 1] = { btn = migBtn }
 

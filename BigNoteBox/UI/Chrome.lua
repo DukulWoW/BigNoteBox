@@ -116,6 +116,9 @@ end
 -- above the template's Bg but below anything else on the host.
 -- Call after SeatChrome, so the chrome snapshot never picks it up.
 local FOREVER_GLOW = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-sp-highlight"
+-- Also drawn on both clients over a search theme's results background
+-- (UI/SearchChrome.lua, panelBg).
+BNB.FOREVER_GLOW_TEXTURE = FOREVER_GLOW
 
 function BNB.AddForeverGlow(host, region)
     if not (BNB.IsForever and host) then return end

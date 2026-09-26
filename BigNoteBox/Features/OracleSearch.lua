@@ -32,7 +32,7 @@ local DAY = 86400
 OS.DEFAULT_PREFIXES = {
     s = "sticky", f = "focus", r = "refbox", b = "trash",
     p = "player", n = "npc",   i = "item",   z = "zone",
-    c = "char",   g = "global", k = "tasks", a = "alarm",
+    c = "char",   g = "global", t = "tasks", a = "alarm",
     x = "rich",   l = "plain", d = "date",
 }
 -- Roles that pick how a result opens (at most one per query) rather than
@@ -45,7 +45,7 @@ OS.PREFIX_L_KEYS = {
     p = "ORACLE_PREFIX_PLAYER", n = "ORACLE_PREFIX_NPC",
     i = "ORACLE_PREFIX_ITEM",   z = "ORACLE_PREFIX_ZONE",
     c = "ORACLE_PREFIX_CHAR",   g = "ORACLE_PREFIX_GLOBAL",
-    k = "ORACLE_PREFIX_TASKS",  a = "ORACLE_PREFIX_ALARM",
+    t = "ORACLE_PREFIX_TASKS",  a = "ORACLE_PREFIX_ALARM",
     x = "ORACLE_PREFIX_RICH",   l = "ORACLE_PREFIX_PLAIN",
     d = "ORACLE_PREFIX_DATE",
 }
@@ -60,8 +60,9 @@ OS.DATE_WORD_L_KEYS = {
     week = "ORACLE_DATE_WEEK", month = "ORACLE_DATE_MONTH", year = "ORACLE_DATE_YEAR",
 }
 
--- Base score per field a word was found in.
-OS.SCORE = { title = 100, tag = 60, who = 40, body = 10 }
+-- Base score per field a word was found in. item: a word found in an item's
+-- name while the `i` prefix is on, which ranks like the title.
+OS.SCORE = { title = 100, tag = 60, who = 40, body = 10, item = 100 }
 -- Extra when the whole query starts or equals the title.
 OS.TITLE_PREFIX_BONUS = 40
 OS.TITLE_EXACT_BONUS  = 80
@@ -103,12 +104,31 @@ local function Fields(note)
         who[#who + 1] = (ctx:match("^%w+:(.+)$") or ctx):lower()
     end
     if note.inspectName then who[#who + 1] = tostring(note.inspectName):lower() end
+    -- @who matches only who a note is about: a player context, the inspected
+    -- player, or the NPC of a target note (whose name is only in its title).
+    -- A zone context counts for plain words (who above), not for @.
+    local about = {}
+    if type(ctx) == "string" then
+        local name = ctx:match("^player:(.+)$")
+        if name then about[#about + 1] = name:lower() end
+    end
+    if note.inspectName then about[#about + 1] = tostring(note.inspectName):lower() end
+    if note.source == "target" or note.source == "inspect" then
+        about[#about + 1] = (note.title or ""):lower()
+    end
+    -- Names of items linked in the body ("[Name]" in the link text), for `i`.
+    local items = {}
+    if type(note.body) == "string" then
+        for name in note.body:gmatch("|Hitem:.-|h%[?(.-)%]?|h") do items[#items + 1] = name:lower() end
+    end
     local plain = OS.PlainText(note.body, note.richMode == true)
     c = {
         stamp = stamp, rich = note.richMode == true,
         title = (note.title or ""):lower(),
         tags  = tags,
         who   = table.concat(who, " "),
+        about = table.concat(about, "\n"),
+        items = table.concat(items, "\n"),
         plain = plain,
         body  = plain:lower(),
     }
@@ -161,6 +181,23 @@ end
 function OS.HasItem(note)
     return OS.HasAttachment(note, "item")
         or (type(note.body) == "string" and note.body:find("|Hitem:", 1, true) ~= nil)
+end
+
+-- Item names a note carries, lower-case, one per line: links in the body
+-- (cached in Fields) plus Reference Box items, which store only an id, so
+-- ctx.itemName(id) names them (C_Item in WoW; nil while not cached yet).
+-- Only built while the `i` prefix is on.
+local function ItemNames(note, f, ctx)
+    local names = f.items
+    local getName = ctx and ctx.itemName
+    if not getName then return names end
+    for _, a in ipairs(note.attachments or {}) do
+        if type(a) == "table" and a.type == "item" and a.id then
+            local name = getName(a.id)
+            if type(name) == "string" and name ~= "" then names = names .. "\n" .. name:lower() end
+        end
+    end
+    return names
 end
 
 -- The `z` filter: a note that surfaces for a zone, instance or sub-zone
@@ -219,10 +256,16 @@ function OS.ParseDateArg(arg, dateWords)
     elseif kind == "year" then
         return { kind = "days", n = 365 }
     end
-    local yy, mm = arg:match("^(%d%d%d%d)%-(%d%d)$")
-    if yy then return { kind = "yearmonth", year = tonumber(yy), month = tonumber(mm) } end
-    local y = arg:match("^(%d%d%d%d)$")
-    if y then return { kind = "year", year = tonumber(y) } end
+    -- Years outside 1970..2100 are never a year: time() returns nil before
+    -- 1970 on Windows, which would crash DateRange. "d 1500" is days back.
+    local yy, mm = arg:match("^(%d%d%d%d)%-(%d%d?)$")
+    if yy then
+        yy, mm = tonumber(yy), tonumber(mm)
+        if yy < 1970 or yy > 2100 or mm < 1 or mm > 12 then return nil end
+        return { kind = "yearmonth", year = yy, month = mm }
+    end
+    local y = tonumber(arg:match("^(%d%d%d%d)$"))
+    if y and y >= 1970 and y <= 2100 then return { kind = "year", year = y } end
     local n = arg:match("^(%d+)$")
     if n then return { kind = "days", n = tonumber(n) } end
     return nil
@@ -278,8 +321,10 @@ function OS.ParseQuery(query, opts)
         return parsed
     end
 
+    -- Any leading token is looked up, not only an ASCII letter, so a locale
+    -- may set a letter outside a-z; a token that is no prefix ends the run.
     while true do
-        local letter, tail = rest:match("^%s*(%a)%s+(.*)$")
+        local letter, tail = rest:match("^%s*(%S+)%s+(.*)$")
         if not letter then break end
         local role = prefixes[letter:lower()]
         if not role then break end
@@ -302,10 +347,15 @@ function OS.ParseQuery(query, opts)
 
     for _, tok in ipairs(Tokenize(rest)) do
         if tok.phrase ~= nil then
-            if tok.phrase ~= "" then parsed.phrases[#parsed.phrases + 1] = tok.phrase:lower() end
+            -- Body text has its whitespace runs collapsed (PlainText); match that.
+            local p = tok.phrase:gsub("%s+", " "):gsub("^ ", ""):gsub(" $", "")
+            if p ~= "" then parsed.phrases[#parsed.phrases + 1] = p:lower() end
         else
             local w = tok.word
-            if w == "*" then
+            if w == "#" or w == "@" or w == "-" then
+                -- A symbol typed on its own, its word still to come: ignored,
+                -- so the list does not jump to notes containing a bare "-".
+            elseif w == "*" then
                 parsed.favorites = true
             elseif w:sub(1, 1) == "#" and #w > 1 then
                 parsed.tags[#parsed.tags + 1] = w:sub(2):lower()
@@ -325,6 +375,7 @@ end
 -- True when note passes every filter/date/favourite check in parsed.
 -- ctx.charScope: "char:<key>" for this character (the `c` filter).
 -- ctx.now: epoch used for the `d` filter (defaults to the current time).
+-- ctx.itemName(id): an item's name, for Reference Box items under `i`.
 function OS.MatchesFilters(note, parsed, ctx)
     ctx = ctx or {}
     local f = parsed.filters
@@ -410,8 +461,13 @@ function OS.SearchParsed(notes, parsed, opts)
         if OS.MatchesFilters(note, parsed, ctx) then
             local f = Fields(note)
             local score, ok = 0, true
+            -- Under `i` a word found in an item's name ranks like the title.
+            local items = parsed.filters.item and ItemNames(note, f, ctx) or nil
             for _, w in ipairs(words) do
                 local _, s = WordScore(f, w)
+                if items and items ~= "" and items:find(w, 1, true) then
+                    s = math.max(s or 0, OS.SCORE.item)
+                end
                 if not s then ok = false; break end
                 score = score + s
             end
@@ -423,7 +479,7 @@ function OS.SearchParsed(notes, parsed, opts)
             end
             if ok then
                 for _, w in ipairs(parsed.who) do
-                    if f.who == "" or not f.who:find(w, 1, true) then ok = false; break end
+                    if f.about == "" or not f.about:find(w, 1, true) then ok = false; break end
                     score = score + OS.SCORE.who
                 end
             end

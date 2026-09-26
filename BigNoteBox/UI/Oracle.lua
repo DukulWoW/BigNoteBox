@@ -48,28 +48,36 @@ end
 -- Small icons on the right of a result, so a note's kind shows at a glance.
 -- Drawn right to left in this order: the first five (who the note is about)
 -- never share a note, so they keep the rightmost column. show(note) decides
--- each. Art by Dukul, 32x32 TGA in Assets\Search\. More kinds are added here.
+-- each; tip is the L key of its hover text. Art by Dukul, 32x32 TGA in
+-- Assets\Search\. More kinds are added here.
 local BADGES = {
-    { file = "s-icon-npc",      show = function(note) return NpcKind(note) == "npc" end },
-    { file = "s-icon-mobs",     show = function(note) return NpcKind(note) == "mob" end },
-    { file = "s-icon-elite",    show = function(note) return NpcKind(note) == "elite" end },
-    { file = "s-icon-alliance", show = function(note)
+    { file = "s-icon-npc",      tip = "ORACLE_BADGE_NPC",
+      show = function(note) return NpcKind(note) == "npc" end },
+    { file = "s-icon-mobs",     tip = "ORACLE_BADGE_MOB",
+      show = function(note) return NpcKind(note) == "mob" end },
+    { file = "s-icon-elite",    tip = "ORACLE_BADGE_ELITE",
+      show = function(note) return NpcKind(note) == "elite" end },
+    { file = "s-icon-alliance", tip = "ORACLE_BADGE_ALLIANCE", show = function(note)
         return note.source == "inspect" and note.inspectFaction == "Alliance" end },
-    { file = "s-icon-horde",    show = function(note)
+    { file = "s-icon-horde",    tip = "ORACLE_BADGE_HORDE", show = function(note)
         return note.source == "inspect" and note.inspectFaction == "Horde" end },
     -- Quest, gossip and book notes (QuickNote.lua); older ones by their quest
-    { file = "s-icon-quest",    show = function(note)
+    { file = "s-icon-quest",    tip = "ORACLE_BADGE_QUEST", show = function(note)
         return note.source == "quicknote" or BNB.OracleSearch.HasAttachment(note, "quest") end },
     -- An item in the Reference Box, or an item link pasted into the text
-    { file = "s-icon-items",    show = function(note) return BNB.OracleSearch.HasItem(note) end },
-    { file = "s-icon-rich",     show = function(note) return note.richMode == true end },
+    { file = "s-icon-items",    tip = "ORACLE_BADGE_ITEM",
+      show = function(note) return BNB.OracleSearch.HasItem(note) end },
+    { file = "s-icon-rich",     tip = "ORACLE_BADGE_RICH",
+      show = function(note) return note.richMode == true end },
 }
 
-local bar, panel, eb, placeholder, hintFS, emptyFS, helpFS
+local bar, panel, eb, placeholder, hintFS, emptyFS
+local helpFrame, helpLines   -- the "?" listing, built once (BuildHelp)
 local rows    = {}
 local results = {}
 local sel     = 0
 local openT   = nil   -- GetTime() of the frame the bar opened in
+local drawnTheme      -- the oracleTheme value the bar was last drawn with
 
 --------------------------------------------------------------------------------
 -- DATA
@@ -144,39 +152,129 @@ local ROLE_DESC_KEY = {
     rich   = "ORACLE_PREFIX_DESC_RICH",   plain = "ORACLE_PREFIX_DESC_PLAIN",
 }
 
--- The full prefix list, shown in the results area when the query is "?".
--- helpLines is the line count, used to size the panel: GetStringHeight() on
--- a FontString the same tick it is first shown can read back 0 (the same
--- "GetWidth() on a newly shown frame" timing gap CLAUDE.md flags for
--- SimpleHTML), which collapsed the panel to one line the first time Kim
--- pressed "?" (found 2026-09-26).
-local helpText, helpLines
-local HELP_LINE_H = 14
-local function HelpText()
-    if helpText then return helpText end
-    local lines = { L["ORACLE_HELP_OPENAS"] }
+-- The localized word for a date kind ("week"), reverse of DateWordMap().
+local function DateWord(kind)
+    for word, k in pairs(DateWordMap()) do
+        if k == kind then return word end
+    end
+end
+
+-- The "?" listing: a full-width line on how a query is built, then two
+-- columns, prefix letters on the left, symbols and examples on the right.
+-- Two columns because one ran to ~30 lines, off the bottom of the screen
+-- below a centred bar. Each column is a list of lines:
+--   { h = text }          header
+--   { k = key, d = desc } key (white) and description (grey)
+--   { ex = query }        an example query, its { sub = desc } line below
+--   { sub = text }        indented grey line
+--   {}                    blank
+local function HelpColumns()
+    local left = { { h = L["ORACLE_HELP_OPENAS"] } }
     for _, role in ipairs(OPEN_AS_ORDER) do
         local letter = RoleLetter(role)
-        if letter then lines[#lines + 1] = ("  %s   %s"):format(letter, L[ROLE_DESC_KEY[role]]) end
+        if letter then left[#left + 1] = { k = letter, d = L[ROLE_DESC_KEY[role]] } end
     end
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = L["ORACLE_HELP_FILTERS"]
+    left[#left + 1] = {}
+    left[#left + 1] = { h = L["ORACLE_HELP_FILTERS"] }
     for _, role in ipairs(FILTER_ORDER) do
         local letter = RoleLetter(role)
-        if letter then lines[#lines + 1] = ("  %s   %s"):format(letter, L[ROLE_DESC_KEY[role]]) end
+        if letter then left[#left + 1] = { k = letter, d = L[ROLE_DESC_KEY[role]] } end
     end
-    local dLetter = RoleLetter("date")
-    if dLetter then lines[#lines + 1] = ("  %s   %s"):format(dLetter, L["ORACLE_PREFIX_DESC_DATE"]) end
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = L["ORACLE_HELP_OTHER"]
-    lines[#lines + 1] = "  #tag   " .. L["ORACLE_SYMBOL_DESC_TAG"]
-    lines[#lines + 1] = "  @name  " .. L["ORACLE_SYMBOL_DESC_WHO"]
-    lines[#lines + 1] = "  *      " .. L["ORACLE_SYMBOL_DESC_FAVORITE"]
-    lines[#lines + 1] = "  -word  " .. L["ORACLE_SYMBOL_DESC_EXCLUDE"]
-    lines[#lines + 1] = '  "..."  ' .. L["ORACLE_SYMBOL_DESC_PHRASE"]
-    helpLines = #lines
-    helpText = table.concat(lines, "\n")
-    return helpText
+    local d = RoleLetter("date")
+    if d then
+        left[#left + 1] = { k = d, d = L["ORACLE_PREFIX_DESC_DATE"] }
+        local words = {}
+        for _, kind in ipairs({ "today", "yesterday", "week", "month", "year" }) do
+            words[#words + 1] = DateWord(kind)
+        end
+        left[#left + 1] = { sub = table.concat(words, ", ") }
+        left[#left + 1] = { sub = L["ORACLE_HELP_DATE_NUMBERS"] }
+    end
+
+    local right = { { h = L["ORACLE_HELP_OTHER"] },
+        { k = "#tag",  d = L["ORACLE_SYMBOL_DESC_TAG"] },
+        { k = "@name", d = L["ORACLE_SYMBOL_DESC_WHO"] },
+        { k = "*",     d = L["ORACLE_SYMBOL_DESC_FAVORITE"] },
+        { k = "-word", d = L["ORACLE_SYMBOL_DESC_EXCLUDE"] },
+        { k = '"..."', d = L["ORACLE_SYMBOL_DESC_PHRASE"] },
+        {},
+        { h = L["ORACLE_HELP_EXAMPLES"] },
+    }
+    -- Example queries are format strings filled with this locale's letters
+    -- (and date word), so they always show what really works.
+    local function example(fmtKey, ...)
+        for i = 1, select("#", ...) do
+            if not (select(i, ...)) then return end   -- a letter the locale left out
+        end
+        right[#right + 1] = { ex = L[fmtKey]:format(...) }
+        right[#right + 1] = { sub = L[fmtKey .. "_DESC"] }
+    end
+    example("ORACLE_EX_1", RoleLetter("sticky"))
+    example("ORACLE_EX_2", RoleLetter("player"), RoleLetter("tasks"))
+    example("ORACLE_EX_3", d, DateWord("week"))
+    example("ORACLE_EX_4", d)
+    example("ORACLE_EX_5", RoleLetter("npc"))
+    return left, right
+end
+
+-- Builds the listing once, as its own frame on the results panel; Layout()
+-- only shows it and sizes the panel from helpLines. Fixed line pitch, never
+-- a measured string height (GetStringHeight() reads 0 the tick a string
+-- first shows), and one FontString per line: a single multi-line one with
+-- SetWordWrap(false) showed only its first line plus "..." (2026-09-26).
+local HELP_LINE_H  = 14
+local HELP_KEY_W   = { 18, 42 }   -- key column, left and right
+local HELP_INDENT  = 14           -- a { sub } line under an example
+local HELP_COL_GAP = 12
+
+local function BuildHelp()
+    helpFrame = CreateFrame("Frame", nil, panel)
+    local function FS(font, text)
+        local fs = helpFrame:CreateFontString(nil, "OVERLAY", font)
+        fs:SetJustifyH("LEFT")
+        fs:SetWordWrap(false)
+        fs:SetText(text)
+        return fs
+    end
+
+    local intro = FS("GameFontHighlightSmall", L["ORACLE_HELP_SYNTAX"])
+    intro:SetPoint("TOPLEFT", helpFrame, "TOPLEFT", 0, 0)
+    intro:SetPoint("TOPRIGHT", helpFrame, "TOPRIGHT", 0, 0)
+
+    local left, right = HelpColumns()
+    local most = 0
+    for c, col in ipairs({ left, right }) do
+        -- Column c runs from its left edge to the frame's middle (left) or
+        -- right edge (right); text that would cross it ends in "..." instead.
+        local x0          = (c == 1) and 0 or HELP_COL_GAP / 2
+        local anchor      = (c == 1) and "TOPLEFT" or "TOP"
+        local rightEdge   = (c == 1) and -HELP_COL_GAP / 2 or 0
+        local rightAnchor = (c == 1) and "TOP" or "TOPRIGHT"
+        for i, line in ipairs(col) do
+            local y = -(i + 1) * HELP_LINE_H   -- below the intro and a blank line
+            local fs, x
+            if line.h then
+                fs, x = FS("GameFontNormalSmall", line.h), x0
+            elseif line.k then
+                local key = FS("GameFontHighlightSmall", line.k)
+                key:SetPoint("TOPLEFT", helpFrame, anchor, x0 + 4, y)
+                fs, x = FS("GameFontDisableSmall", line.d), x0 + 4 + HELP_KEY_W[c]
+            elseif line.ex then
+                fs, x = FS("GameFontHighlightSmall", line.ex), x0 + 4
+            elseif line.sub then
+                -- Under `d` it lines up with the descriptions, under an
+                -- example it is indented a little.
+                local indent = (c == 1) and HELP_KEY_W[1] or HELP_INDENT
+                fs, x = FS("GameFontDisableSmall", line.sub), x0 + 4 + indent
+            end
+            if fs then
+                fs:SetPoint("TOPLEFT", helpFrame, anchor, x, y)
+                fs:SetPoint("RIGHT", helpFrame, rightAnchor, rightEdge, 0)
+            end
+        end
+        most = math.max(most, #col)
+    end
+    helpLines = most + 2
 end
 
 -- "Global", or the owning character's name.
@@ -276,14 +374,19 @@ local function OpenInRefBox(id)
 end
 
 -- The `b` prefix searches the trash and replaces the usual open actions:
--- Enter opens the Trash window (on that note, not scrolled to it -- there is
--- no per-item focus API yet), Shift+Enter restores it. Ctrl/Alt do nothing.
+-- Enter opens the Trash window scrolled to that note, which flashes;
+-- Shift+Enter restores it (a chat line says so, the bar has closed by then).
+-- Ctrl/Alt do nothing extra.
 local function OpenTrashResult(id)
     if IsShiftKeyDown() then
-        if BNB.RestoreNote then BNB.RestoreNote(id); return true end
-        return false
+        if not BNB.RestoreNote then return false end
+        local tn = BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash and BigNoteBoxNotesDB.trash[id]
+        local title = tn and tn.title ~= "" and tn.title or L["UNTITLED"]
+        BNB.RestoreNote(id)
+        BNB:Print(L["ORACLE_RESTORED_FMT"]:format(title))
+        return true
     end
-    if BNB.OpenTrashWindow then BNB.OpenTrashWindow(); return true end
+    if BNB.OpenTrashWindow then BNB.OpenTrashWindow(id); return true end
     return false
 end
 
@@ -317,7 +420,19 @@ local function SetSelection(i)
     for n, row in ipairs(rows) do row.selTex:SetShown(n == sel) end
 end
 
-local function RowText(row, r)
+-- How many badges a note shows.
+local function BadgeCount(note)
+    local n = 0
+    for _, def in ipairs(BADGES) do
+        if def.show(note) then n = n + 1 end
+    end
+    return n
+end
+
+-- textRight: x offset from the row's right edge where the scope label and
+-- snippet end. The same for every row (Layout sizes it to the row with the
+-- most badges), so the text lines up and does not shift with the badges.
+local function RowText(row, r, textRight)
     local note = r.note
     local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     row.icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
@@ -328,29 +443,45 @@ local function RowText(row, r)
     row.snippet:SetText(r.snippet or "")
     row.scope:SetText(ScopeLabel(note))
 
-    -- Badges from the right edge; the scope label and snippet end left of them.
+    -- Badges from the right edge, inside the column right of textRight.
     local x = -8
     for b, def in ipairs(BADGES) do
-        local tex = row.badges[b]
+        local badge = row.badges[b]
         if def.show(note) then
-            if not tex then
-                tex = row:CreateTexture(nil, "ARTWORK")
-                tex:SetSize(BADGE_SIZE, BADGE_SIZE)
+            if not badge then
+                -- A small frame, not a bare texture, so it can show what it
+                -- means on hover. It takes the mouse from the row, so it
+                -- passes hover (selection) and clicks (open) on to it.
+                badge = CreateFrame("Frame", nil, row)
+                badge:SetSize(BADGE_SIZE, BADGE_SIZE)
+                badge:EnableMouse(true)
+                local tex = badge:CreateTexture(nil, "ARTWORK")
+                tex:SetAllPoints()
                 tex:SetTexture(BADGE_ART .. def.file)
-                row.badges[b] = tex
+                badge:SetScript("OnEnter", function(self)
+                    local onEnter = row:GetScript("OnEnter")
+                    if onEnter then onEnter(row) end
+                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                    GameTooltip:SetText(L[def.tip], 1, 1, 1)
+                    GameTooltip:Show()
+                end)
+                badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+                badge:SetScript("OnMouseUp", function(self, button)
+                    if button == "LeftButton" and self:IsMouseOver() then row:Click() end
+                end)
+                row.badges[b] = badge
             end
-            tex:ClearAllPoints()
-            tex:SetPoint("RIGHT", row, "RIGHT", x, 0)
-            tex:Show()
+            badge:ClearAllPoints()
+            badge:SetPoint("RIGHT", row, "RIGHT", x, 0)
+            badge:Show()
             x = x - BADGE_SIZE - BADGE_GAP
-        elseif tex then
-            tex:Hide()
+        elseif badge then
+            badge:Hide()
         end
     end
-    if x < -8 then x = x - 4 end   -- a little air between badges and text
     row.scope:ClearAllPoints()
-    row.scope:SetPoint("TOPRIGHT", row, "TOPRIGHT", x, -4)
-    row.snippet:SetPoint("RIGHT", row, "RIGHT", x, 0)
+    row.scope:SetPoint("TOPRIGHT", row, "TOPRIGHT", textRight, -4)
+    row.snippet:SetPoint("RIGHT", row, "RIGHT", textRight, 0)
 end
 
 local function BuildRow(i)
@@ -410,18 +541,26 @@ local function Layout()
     if showingHelp then
         for _, row in ipairs(rows) do row:Hide() end
         emptyFS:Hide()
-        helpFS:ClearAllPoints()
-        helpFS:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 6)
-        helpFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX - 6, y - 6)
-        helpFS:Show()
+        if not helpFrame then BuildHelp() end
+        helpFrame:ClearAllPoints()
+        helpFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 6)
+        helpFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX - 6, y - 6)
+        helpFrame:SetHeight(helpLines * HELP_LINE_H)
+        helpFrame:Show()
         hintFS:Hide()
-        panel:SetHeight(padY - y + (helpLines or 1) * HELP_LINE_H + 12)
+        panel:SetHeight(padY - y + helpLines * HELP_LINE_H + 12)
         return
     end
-    helpFS:Hide()
+    if helpFrame then helpFrame:Hide() end
     hintFS:Show()
 
     local n = #results
+    -- Badge column as wide as the row with the most badges, plus a little
+    -- air between badges and text.
+    local most = 0
+    for i = 1, n do most = math.max(most, BadgeCount(results[i].note)) end
+    local textRight = -8
+    if most > 0 then textRight = -8 - most * (BADGE_SIZE + BADGE_GAP) - 4 end
     for i = 1, MAX_ROWS do
         local row = rows[i]
         if i <= n then
@@ -429,7 +568,7 @@ local function Layout()
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", panel, "TOPLEFT", padX, y)
             row:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX, y)
-            RowText(row, results[i])
+            RowText(row, results[i], textRight)
             row:Show()
             y = y - ROW_H - ROW_GAP
         elseif row then
@@ -460,18 +599,23 @@ local function Refresh()
     showingHelp = parsed.help
     if showingHelp then
         results = {}
-        helpFS:SetText(HelpText())
         Layout()
         return
     end
 
     local notes = (parsed.openAs == "trash") and TrashNotes() or AllNotes()
-    local ctx = { charScope = "char:" .. (BNB.currentChar or ""), now = time() }
+    local ctx = {
+        charScope = "char:" .. (BNB.currentChar or ""), now = time(),
+        -- Reference Box items store only an id; nil while the item is uncached.
+        itemName = function(itemID) return (C_Item.GetItemInfo(itemID)) end,
+    }
     results = BNB.OracleSearch.SearchParsed(notes, parsed, { max = MAX_ROWS, ctx = ctx })
     if #results == 0 then
         emptyFS:SetText(#notes == 0 and L["ORACLE_NO_NOTES"] or L["ORACLE_NO_MATCHES"])
     end
-    hintFS:SetText(text == "" and L["ORACLE_HINT_EMPTY"] or L["ORACLE_HINT"])
+    if text == "" then hintFS:SetText(L["ORACLE_HINT_EMPTY"])
+    elseif parsed.openAs == "trash" then hintFS:SetText(L["ORACLE_HINT_TRASH"])
+    else hintFS:SetText(L["ORACLE_HINT"]) end
     Layout()
     SetSelection(1)
 end
@@ -503,7 +647,8 @@ local function Build()
     bar:SetClampedToScreen(true)
     bar:EnableMouse(true)
     bar:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    BNB.ApplySearchChrome(bar, BigNoteBoxDB and BigNoteBoxDB.oracleTheme)
+    drawnTheme = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
+    BNB.ApplySearchChrome(bar, drawnTheme)
     -- A click on the bar's frame (not the text) puts the cursor back.
     bar:SetScript("OnMouseDown", function() eb:SetFocus() end)
 
@@ -522,7 +667,7 @@ local function Build()
     panel:SetPoint("TOPLEFT", bar, "BOTTOMLEFT", 0, -PANEL_GAP)
     panel:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -PANEL_GAP)
     panel:EnableMouse(true)
-    panel._size = BNB.ApplySearchChrome(panel, BigNoteBoxDB and BigNoteBoxDB.oracleTheme, nil, nil, { panel = true })
+    panel._size = BNB.ApplySearchChrome(panel, drawnTheme, nil, nil, { panel = true })
         or { border = 24, borderY = 24 }
     -- Esc still closes it if the box has lost focus to another window.
     tinsert(UISpecialFrames, "BigNoteBoxOracleFrame")
@@ -530,10 +675,6 @@ local function Build()
     emptyFS = panel:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     emptyFS:SetJustifyH("LEFT")
 
-    helpFS = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    helpFS:SetJustifyH("LEFT")
-    helpFS:SetWordWrap(false)
-    helpFS:Hide()
 
     hintFS = panel:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hintFS:SetJustifyH("CENTER")
@@ -580,8 +721,20 @@ end
 -- PUBLIC
 --------------------------------------------------------------------------------
 -- text: optional starting search text (/bnb search raid).
+-- Redraws the bar, the results panel and the row highlight when the theme
+-- setting changed since the bar was last drawn, so a new theme shows on
+-- the next open without a reload.
+local function SyncTheme()
+    local want = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
+    if want == drawnTheme then return end
+    drawnTheme = want
+    BNB.ApplySearchChrome(bar, want)
+    panel._size = BNB.ApplySearchChrome(panel, want, nil, nil, { panel = true }) or panel._size
+    for _, row in ipairs(rows) do row.selTex:SetColorTexture(BNB.GetSearchHighlight(want)) end
+end
+
 function Oracle.Open(text)
-    if not bar then Build() end
+    if not bar then Build() else SyncTheme() end
     openT = GetTime()
     eb:SetText(text or "")
     eb:SetCursorPosition(#(text or ""))

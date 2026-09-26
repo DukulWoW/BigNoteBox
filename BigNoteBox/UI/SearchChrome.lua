@@ -21,18 +21,29 @@ local BNB = BigNoteBox
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Search\\"
 
 -- Draw order: first in the list is drawn lowest.
+-- A piece the theme's layout leaves out is not drawn. That is how the
+-- optional ones work: a theme with a middle piece on its top edge
+-- (topornament) splits the edge around it, `top` running from the left
+-- corner to the middle piece and `top2` (same art as `top`) from the middle
+-- piece to the right corner; bottom likewise. A theme without them draws
+-- `top` corner to corner and leaves top2 / topornament out. Pieces with
+-- `same` use that piece's art, including a theme's files override for it.
 local PIECES = {
-    { key = "bg",           file = "s-bg",           layer = "BACKGROUND", sub = 0 },
-    { key = "top",          file = "s-top",          layer = "BORDER",     sub = 0 },
-    { key = "bottom",       file = "s-bottom",       layer = "BORDER",     sub = 0 },
-    { key = "left",         file = "s-left",         layer = "BORDER",     sub = 0 },
-    { key = "right",        file = "s-right",        layer = "BORDER",     sub = 0 },
-    { key = "topleft",      file = "s-top-left",     layer = "BORDER",     sub = 1 },
-    { key = "topright",     file = "s-top-right",    layer = "BORDER",     sub = 1 },
-    { key = "bottomleft",   file = "s-bottom-left",  layer = "BORDER",     sub = 1 },
-    { key = "bottomright",  file = "s-bottom-right", layer = "BORDER",     sub = 1 },
-    { key = "ornament",     file = "s-ornament",     layer = "ARTWORK",    sub = 0 },
-    { key = "text",         file = nil,              layer = "ARTWORK",    sub = 1 },
+    { key = "bg",             file = "s-bg",              layer = "BACKGROUND", sub = 0 },
+    { key = "top",            file = "s-top",             layer = "BORDER",     sub = 0 },
+    { key = "top2",           file = "s-top",             layer = "BORDER",     sub = 0, same = "top" },
+    { key = "bottom",         file = "s-bottom",          layer = "BORDER",     sub = 0 },
+    { key = "bottom2",        file = "s-bottom",          layer = "BORDER",     sub = 0, same = "bottom" },
+    { key = "left",           file = "s-left",            layer = "BORDER",     sub = 0 },
+    { key = "right",          file = "s-right",           layer = "BORDER",     sub = 0 },
+    { key = "topleft",        file = "s-top-left",        layer = "BORDER",     sub = 1 },
+    { key = "topright",       file = "s-top-right",       layer = "BORDER",     sub = 1 },
+    { key = "bottomleft",     file = "s-bottom-left",     layer = "BORDER",     sub = 1 },
+    { key = "bottomright",    file = "s-bottom-right",    layer = "BORDER",     sub = 1 },
+    { key = "topornament",    file = "s-top-ornament",    layer = "BORDER",     sub = 2 },
+    { key = "bottomornament", file = "s-bottom-ornament", layer = "BORDER",     sub = 2 },
+    { key = "ornament",       file = "s-ornament",        layer = "ARTWORK",    sub = 0 },
+    { key = "text",           file = nil,                 layer = "ARTWORK",    sub = 1 },
 }
 
 -- Layouts are in native art pixels (32): every x offset is multiplied by
@@ -54,6 +65,10 @@ BNB.SEARCH_DEFAULT_THEME = "kilrogg"
 --   def.files   optional file name per piece; false = the theme has no such piece
 --   def.highlight  optional { r, g, b, a } for the selected Oracle result;
 --               left out = BNB gold
+--   def.panelBg optional file name of a background for the Oracle results
+--               panel only, tiled (never stretched), so a power-of-two
+--               size; the Forever highlight glow is drawn over it. Left out
+--               = the panel uses s-bg like the bar
 -- Registering an id again replaces it and keeps its place in the list.
 function BNB.RegisterSearchTheme(def)
     if type(def) ~= "table" or type(def.name) ~= "string" then return false, "name missing" end
@@ -67,14 +82,16 @@ function BNB.RegisterSearchTheme(def)
     BNB.SEARCH_THEMES[id] = {
         id = id, name = def.name, folder = def.folder, art = art,
         files = def.files, layout = def.layout, size = def.size,
-        highlight = def.highlight,
+        highlight = def.highlight, panelBg = def.panelBg,
     }
     return true
 end
 
 -- A missing or removed theme id falls back to the default, then to the first.
+-- Ids are lower case; a saved "Horde" still finds "horde".
 function BNB.GetSearchTheme(id)
-    return BNB.SEARCH_THEMES[id or ""] or BNB.SEARCH_THEMES[BNB.SEARCH_DEFAULT_THEME]
+    id = type(id) == "string" and id:lower() or ""
+    return BNB.SEARCH_THEMES[id] or BNB.SEARCH_THEMES[BNB.SEARCH_DEFAULT_THEME]
         or BNB.SEARCH_THEMES[BNB.SEARCH_THEME_ORDER[1] or ""]
 end
 
@@ -126,12 +143,36 @@ function BNB.ApplySearchChrome(f, themeID, layout, size, opts)
             f._searchPieces[def.key] = tex
         end
         local file = def.file
-        if d.files and d.files[def.key] ~= nil then file = d.files[def.key] end
-        if file then tex:SetTexture(d.art .. file) end
+        local fk = def.same or def.key
+        if d.files and d.files[fk] ~= nil then file = d.files[fk] end
+        -- The results panel's own background tiles instead of stretching.
+        local tiled = panel and def.key == "bg" and d.panelBg ~= nil
+        if tiled then file = d.panelBg end
+        if file then
+            if tiled then tex:SetTexture(d.art .. file, "REPEAT", "REPEAT")
+            else tex:SetTexture(d.art .. file) end
+            tex:SetHorizTile(tiled)
+            tex:SetVertTile(tiled)
+        end
         if def.file then tex:SetShown(file and true or false) end
         local p = layout[def.key]
         if panel and (def.key == "ornament" or def.key == "text") then p = nil end
         if p then PlacePiece(tex, f, p, kx, ky) else tex:Hide() end
+    end
+    -- The Forever background glow over a tiled results background, on
+    -- both clients, above the background and below the border.
+    local glow = f._searchPieces.panelglow
+    if panel and d.panelBg then
+        if not glow then
+            glow = f:CreateTexture(nil, "BACKGROUND", nil, 7)
+            glow:SetTexture(BNB.FOREVER_GLOW_TEXTURE)
+            f._searchPieces.panelglow = glow
+        end
+        glow:ClearAllPoints()
+        glow:SetAllPoints(f._searchPieces.bg)
+        glow:SetShown(f._searchPieces.bg:IsShown())
+    elseif glow then
+        glow:Hide()
     end
     return size
 end
@@ -179,9 +220,19 @@ end
 
 -- Pieces that share a size when "Same for matching pieces" is ticked.
 local GROUPS = {
-    top = "tb", bottom = "tb", left = "lr", right = "lr",
+    top = "tb", bottom = "tb", top2 = "tb", bottom2 = "tb", left = "lr", right = "lr",
     topleft = "c", topright = "c", bottomleft = "c", bottomright = "c",
+    topornament = "mid", bottomornament = "mid",
 }
+
+-- The selected piece, moved to the first one the theme uses when the
+-- current one is not in its layout (a theme switch).
+local function ValidSel(layout)
+    if layout[tool.sel] then return end
+    for _, def in ipairs(PIECES) do
+        if layout[def.key] then tool.sel = def.key; return end
+    end
+end
 
 -- Which edge of a piece stays put when its size is typed in: the side both
 -- of its points hang off. nil = the piece stretches with the bar on that axis.
@@ -215,10 +266,12 @@ local function ExportText()
         d.folder and string.format("    folder = %q,", d.folder) or string.format("    path   = %q,", d.art),
         "    layout = {" }
     for _, def in ipairs(PIECES) do
-        local p = layout[def.key]
-        lines[#lines + 1] = string.format(
-            "        %-11s = { a1 = %q, x1 = %s, y1 = %s, a2 = %q, x2 = %s, y2 = %s },",
-            def.key, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2))
+        local p = layout[def.key]   -- nil: a piece this theme does not use
+        if p then
+            lines[#lines + 1] = string.format(
+                "        %-14s = { a1 = %q, x1 = %s, y1 = %s, a2 = %q, x2 = %s, y2 = %s },",
+                def.key, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2))
+        end
     end
     lines[#lines + 1] = "    },"
     lines[#lines + 1] = string.format("    size = { w = %d, h = %d, border = %d, borderY = %d },",
@@ -237,10 +290,22 @@ local function Refresh()
     local bar = tool.bar
     BNB.ApplySearchChrome(bar, tool.theme, layout, size)
     tool.title:SetText("Search bar layout (ALL-69):  |cffffffff" .. BNB.GetSearchTheme(tool.theme).name .. "|r")
+    ValidSel(layout)
     local p = layout[tool.sel]
     PlacePiece(tool.hl, bar, p, size.border / NATIVE, size.borderY / NATIVE)
     tool.hl:SetShown(tool.showHL)
+    -- Buttons only for the pieces this theme uses, packed in order.
+    local n = 0
     for _, b in ipairs(tool.pieceBtns) do
+        if layout[b.key] then
+            local row, col = math.floor(n / 6), n % 6
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", 10 + col * 102, -28 - row * 24)
+            b:Show()
+            n = n + 1
+        else
+            b:Hide()
+        end
         b.sel:SetShown(b.key == tool.sel)
     end
     for axis, eb in pairs(tool.sizeBoxes) do
@@ -275,7 +340,7 @@ end
 
 local function BuildTool()
     local f = CreateFrame("Frame", "BNBSearchLayoutTool", UIParent, "BackdropTemplate")
-    f:SetSize(660, 250)
+    f:SetSize(660, 274)
     f:SetPoint("CENTER", 0, -160)
     f:SetFrameStrata("DIALOG")
     f:SetToplevel(true)
@@ -333,13 +398,11 @@ local function BuildTool()
         end
     end)
 
-    -- Piece buttons, two rows.
+    -- Piece buttons, up to three rows of six; Refresh() places them.
     f.pieceBtns = {}
-    for i, def in ipairs(PIECES) do
+    for _, def in ipairs(PIECES) do
         local b = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
         b:SetSize(96, 20)
-        local row, col = (i <= 6) and 0 or 1, (i <= 6) and (i - 1) or (i - 7)
-        b:SetPoint("TOPLEFT", 10 + col * 102, -28 - row * 24)
         b:SetText(def.key)
         b.key = def.key
         b.sel = b:CreateTexture(nil, "OVERLAY")
@@ -351,7 +414,7 @@ local function BuildTool()
     end
 
     local info = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    info:SetPoint("TOPLEFT", 10, -136)
+    info:SetPoint("TOPLEFT", 10, -160)
     info:SetJustifyH("LEFT")
     info:SetWidth(640)
     f.info = info
@@ -390,7 +453,7 @@ local function BuildTool()
     local function SizeKey(key, lo)
         return function(n) local _, size = WorkLayout(); size[key] = math.max(lo, math.floor(n + 0.5)) end
     end
-    local r1 = Label("Bar:   Width", nil, -84)
+    local r1 = Label("Bar:   Width", nil, -108)
     local e, bg = NumBox(r1, 6, SizeKey("w", 64));        f.barBoxes.w = e
     local l = Label("Height", bg, 12)
     e, bg = NumBox(l, 6, SizeKey("h", 16));               f.barBoxes.h = e
@@ -425,7 +488,7 @@ local function BuildTool()
             end
         end
     end
-    local sizeLbl = Label("Piece:  Width", nil, -110)
+    local sizeLbl = Label("Piece:  Width", nil, -134)
     local wBox
     f.sizeBoxes.w, wBox = NumBox(sizeLbl, 6, PieceApply("w"))
     local hLbl = Label("Height", wBox, 12)
@@ -450,7 +513,7 @@ local function BuildTool()
     sqLbl:SetText("Ornament: keep square")
 
     local help = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    help:SetPoint("TOPLEFT", 10, -162)
+    help:SetPoint("TOPLEFT", 10, -186)
     help:SetJustifyH("LEFT")
     help:SetWidth(640)
     help:SetText("Arrows / drag: move.  Alt: top-left point only.  Ctrl: bottom-right point only (resize).  "
@@ -508,10 +571,16 @@ local function BuildTool()
         elseif key == "UP" then Nudge(0, step, mode)
         elseif key == "DOWN" then Nudge(0, -step, mode)
         elseif key == "TAB" then
-            for i, def in ipairs(PIECES) do
-                if def.key == f.sel then
-                    local n = IsShiftKeyDown() and (i - 2) % #PIECES + 1 or i % #PIECES + 1
-                    f.sel = PIECES[n].key
+            -- Next (Shift: previous) piece this theme uses.
+            local layout = WorkLayout()
+            local used = {}
+            for _, def in ipairs(PIECES) do
+                if layout[def.key] then used[#used + 1] = def.key end
+            end
+            for i, k in ipairs(used) do
+                if k == f.sel then
+                    local n = IsShiftKeyDown() and (i - 2) % #used + 1 or i % #used + 1
+                    f.sel = used[n]
                     break
                 end
             end
