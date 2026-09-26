@@ -7,7 +7,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ASSET   = K.CONTENT_W, K.ASSET
+local CONTENT_W, ASSET, ROW_H, ROW_GAP = K.CONTENT_W, K.ASSET, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader = K.AddRule, K.AddHeader
 
 -- Export window HTML mode: "noteonly", "plain", "stylized". Kept for the
@@ -219,6 +219,55 @@ local function BuildBackupTab(sf, ct)
         end
     end)
     y = y - 40
+
+    -- Migrate moved here from Advanced (ALL-84): it is an import.
+    local db = BigNoteBoxDB
+    -- ── Migrate section (only shown if any supported addon is installed) ─────────
+    if BNB.Migration and BNB.Migration.HasAny() then
+        AddRule(ct, y); y = y - 18
+        y = AddHeader(ct, y, L["CFG_HDR_MIGRATE"])
+
+        local migDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        migDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        migDesc:SetWidth(CONTENT_W); migDesc:SetJustifyH("LEFT")
+        migDesc:SetWordWrap(true)
+        migDesc:SetTextColor(0.60, 0.60, 0.60)
+        migDesc:SetText(L["CFG_IMPORT_DESC"])
+        y = y - 36
+
+        -- Use the Migration module's own key/name tables so this list stays
+        -- in sync automatically whenever new addons are added to MigrateNotes.lua.
+        local M = BNB.Migration
+        for _, k in ipairs(M.ADDON_KEYS) do
+            if M.IsAddonAvailable(k) then
+                local displayName = M.ADDON_NAMES[k] or k
+                local isDone = db.migrationDone and db.migrationDone[k]
+
+                -- Row: label + status badge + button
+                local rowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                rowLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+                rowLbl:SetText(displayName)
+
+                local statusLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                statusLbl:SetPoint("LEFT", rowLbl, "RIGHT", 8, 0)
+                if isDone then
+                    statusLbl:SetText("|cff66bb6a" .. L["CFG_DONE_BADGE"] .. "|r")
+                else
+                    statusLbl:SetText("|cff888888" .. L["CFG_NOT_YET_BADGE"] .. "|r")
+                end
+
+                local migrateRowBtn = BNB.CreateButton(nil, ct, isDone and L["CFG_MIGRATE_AGAIN_BTN"] or L["CFG_MIGRATE_BTN"], 110, 22)
+                migrateRowBtn:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
+                migrateRowBtn:SetScript("OnClick", function()
+                    if M.ShowAddonPopup then
+                        M.ShowAddonPopup(k)
+                    end
+                end)
+
+                y = y - (ROW_H + ROW_GAP)
+            end
+        end
+    end
 
     -- ── Data Summary section (moved here from General tab, ALL-14) ─────────────
     y = AddRule(ct, y) - 4

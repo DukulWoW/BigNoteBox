@@ -1,5 +1,6 @@
--- BigNoteBox UI/Config/Features.lua - Settings Features tab
--- Split out of ConfigWindow.lua (ALL-65.10).
+-- BigNoteBox UI/Config/Modules.lua - Settings Modules tab (was Features, ALL-84)
+-- Split out of ConfigWindow.lua (ALL-65.10). One overview row per feature,
+-- each feature's settings on its own sub-page.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -8,123 +9,17 @@ local K = BNB._ConfigKit
 local CONTENT_W, ROW_H, ROW_GAP, SLIDER_H = K.CONTENT_W, K.ROW_H, K.ROW_GAP, K.SLIDER_H
 local AddRule, AddHeader, AddCheck, AddSlider, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.AddSlider, K.MakeKeybindRow
 
+
 -- ─────────────────────────────────────────────────────────────────────────────
--- TAB 3 — FEATURES
+-- SUB-PAGES (ALL-84) - the larger Features sections, one page each, opened
+-- from the Modules tab rows. Built by K.NewSubPage; y starts under the page title.
 -- ─────────────────────────────────────────────────────────────────────────────
-local function BuildFeaturesTab(sf, ct)
+local function BuildQuickNotePage(sf, ct, y, page)
     local db = BigNoteBoxDB
-    local y  = -8
-
-    y = AddHeader(ct, y, L["CFG_HDR_NOTES"])
-
-    -- New note behaviour dropdown
-    do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
-        lbl:SetText(L["CFG_NEWNOTE_BEHAVIOUR"])
-        y = y - (ROW_H + 2)
-
-        local NEW_NOTE_ITEMS = {
-            { key = "prompt",    label = L["CFG_NEWNOTE_ITEM_PROMPT"] },
-            { key = "immediate", label = L["CFG_NEWNOTE_ITEM_IMMEDIATE"]             },
-        }
-        local curBehaviour = db.newNoteBehaviour or "prompt"
-        local nnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-        nnDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        nnDD:SetWidth(CONTENT_W)
-        nnDD:SetupMenu(function(_, root)
-            for _, item in ipairs(NEW_NOTE_ITEMS) do
-                root:CreateRadio(item.label,
-                    function() return curBehaviour == item.key end,
-                    function()
-                        curBehaviour = item.key
-                        db.newNoteBehaviour = item.key
-                        nnDD:GenerateMenu()
-                    end)
-            end
-        end)
-        nnDD:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["CFG_NEWNOTE_BEHAVIOUR"], 1, 1, 1)
-            GameTooltip:AddLine(L["CFG_NEWNOTE_PROMPT"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_NEWNOTE_IMMEDIATE"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        nnDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        y = y - (32 + ROW_GAP)
-    end
-
-    y = AddCheck(ct, y, L["CFG_CHK_OPEN_LOGIN_LABEL"],
-        function() return db.openOnLogin == true end,
-        function(v) db.openOnLogin = v end,
-        L["CFG_CHK_OPEN_LOGIN_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
-        function() return db.lockNotes == true end,
-        function(v)
-            db.lockNotes = v
-            -- Refresh the editor lock state for the currently open note
-            if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
-            if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons() end
-        end,
-        L["CFG_CHK_LOCK_NOTES_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_CHK_CONFIRM_CLOSE_LABEL"],
-        function() return db.confirmClose == true end,
-        function(v) db.confirmClose = v end,
-        L["CFG_CHK_CONFIRM_CLOSE_TIP"])
-
-    -- Combat action dropdown
-    do
-        local combatLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        combatLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        combatLbl:SetHeight(ROW_H); combatLbl:SetJustifyH("LEFT")
-        combatLbl:SetText(L["CFG_COMBAT_LABEL"])
-        y = y - (ROW_H + 2)
-
-        local COMBAT_ITEMS = {
-            { key = "nothing",            label = L["CFG_COMBAT_ITEM_NOTHING"] },
-            { key = "hide_no_stickies",   label = L["CFG_COMBAT_ITEM_HIDE_EXCEPT_STICKY"] },
-            { key = "hide_minimize",      label = L["CFG_COMBAT_ITEM_HIDE_MINIMIZE"] },
-            { key = "hide_all",           label = L["CFG_COMBAT_ITEM_HIDE_ALL"] },
-        }
-        local curCombat = db.combatAction or "nothing"
-        local combatDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-        combatDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        combatDD:SetWidth(CONTENT_W)
-        combatDD:SetupMenu(function(_, root)
-            for _, item in ipairs(COMBAT_ITEMS) do
-                root:CreateRadio(item.label,
-                    function() return curCombat == item.key end,
-                    function()
-                        curCombat = item.key
-                        db.combatAction = item.key
-                        combatDD:GenerateMenu()
-                    end)
-            end
-        end)
-        combatDD:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["CFG_COMBAT_LABEL"], 1, 1, 1)
-            GameTooltip:AddLine(L["CFG_COMBAT_NOTHING"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_EXCEPT_STICKY"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_MINIMIZE"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_ALL"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_COMBAT_REOPEN"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        combatDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        y = y - (32 + ROW_GAP)
-    end
-
     -- ── Quick Note ────────────────────────────────────────────────────────────
     -- Inject a small icon button into quest, gossip, and item-text frames so the
     -- player can create a note directly from those game windows.
     do
-        y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, L["CFG_HDR_QUICK_NOTE"])
-
         -- Collect sub-widgets for greying when the master toggle is off
         local qnWidgets = {}
 
@@ -139,6 +34,7 @@ local function BuildFeaturesTab(sf, ct)
             GameTooltip:Show()
         end)
         qnEnableCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        page.enableCb = qnEnableCb   -- twin on the Features overview row
 
         local qnEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         qnEnableLbl:SetPoint("LEFT",  qnEnableCb, "RIGHT", 4, 0)
@@ -269,9 +165,16 @@ local function BuildFeaturesTab(sf, ct)
         ApplyQNSection(db.quickNoteEnabled ~= false)
     end
 
+    -- Moved from Advanced > Keybindings (ALL-84): the key belongs to this module.
+    y = MakeKeybindRow(ct, y, L["CFG_KB_QUICK_NOTE"],
+        "BIGNOTEBOXQUICKNOTE", L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_QUICK_NOTE"])
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+local function BuildPlayerNpcPage(sf, ct, y)
+    local db = BigNoteBoxDB
     -- ── Inspect Note ──────────────────────────────────────────────────────────
     do
-        y = AddRule(ct, y) - 4
         y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])
 
         -- Creation mode dropdown
@@ -505,11 +408,11 @@ local function BuildFeaturesTab(sf, ct)
             function(v) if BigNoteBoxDB then BigNoteBoxDB.targetNoteTagBoss = v end end,
             L["CFG_CHK_TAG_BOSS_TIP"])
     end
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
 
+local function BuildTasksPage(sf, ct, y)
     -- ── Tasks ────────────────────────────────────────────────────────────────────
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_TASKS"])
-
     y = AddCheck(ct, y, L["CFG_CHK_TASK_REMOVE_LABEL"],
         function() return BigNoteBoxDB and BigNoteBoxDB.taskRemoveOnComplete == true end,
         function(v)
@@ -669,252 +572,13 @@ local function BuildFeaturesTab(sf, ct)
             end
         end,
         L["CFG_CHK_STICKY_TASKVIEW_TIP"])
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
 
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_FOCUS_ORBIT_HEADER"])
-
-    -- Hide entire WoW UI
-    y = AddCheck(ct, y,
-        L["CFG_CHK_FOCUS_HIDEUI_LABEL"],
-        function() local db = BigNoteBoxDB; return db == nil or db.focusHideUI ~= false end,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusHideUI = v end
-        end,
-        L["CFG_CHK_FOCUS_HIDEUI_TIP"])
-
-    -- Master orbit toggle
-    local orbitCheckY = y
-    y = AddCheck(ct, y, L["CFG_FOCUS_ORBIT_ENABLE"],
-        function() local db = BigNoteBoxDB; return db == nil or db.focusOrbitEnabled ~= false end,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitEnabled = v end
-            if BNB.FocusOrbit then
-                if v then BNB.FocusOrbit.Start() else BNB.FocusOrbit.Stop() end
-            end
-            if BNB.UpdateFocusSpinBtn then BNB.UpdateFocusSpinBtn(v) end
-            if BNB._focusOrbitRefreshUI then BNB._focusOrbitRefreshUI() end
-        end,
-        L["CFG_FOCUS_ORBIT_ENABLE_TIP"])
-
-    -- Speed slider (greyed when orbit off)
-    local speedSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_SPEED"], 0.001, 0.020,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or 0.004,
-        0.001, 0.004,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitSpeed = v end
-        end,
-        function(v) return string.format("%.3f", v) end)
-    speedSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
-    speedSl:SetWidth(CONTENT_W - 14)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- Resume-after-movement slider (greyed when orbit off)
-    local resumeSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_RESUME"], 0, 10,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or 3.0,
-        0.5, 3.0,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitResumeDelay = v end
-        end,
-        function(v)
-            if v <= 0 then return "Off" end
-            return string.format("%.1f s", v)
-        end)
-    resumeSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
-    resumeSl:SetWidth(CONTENT_W - 14)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- Overlay darkness slider (always active — not tied to orbit toggle)
-    y = y - 4
-    local overlaySl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_OVERLAY_ALPHA"], 0.0, 1.0,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or 0.6,
-        0.05, 0.6,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOverlayAlpha = v end
-        end,
-        function(v) return string.format("%.2f", v) end)
-    overlaySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    overlaySl:SetWidth(CONTENT_W)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- Skin color tint checkbox (only meaningful in skin mode, but always shown)
-    y = AddCheck(ct, y, L["CFG_FOCUS_OVERLAY_SKIN_COLOR"],
-        function()
-            local db = BigNoteBoxDB
-            return db ~= nil and db.focusOverlayUseSkinColor == true
-        end,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOverlayUseSkinColor = v end
-        end,
-        L["CFG_FOCUS_OVERLAY_SKIN_COLOR_TIP"])
-
-    -- Grey/ungrey orbit-specific sub-controls based on master toggle
-    local function RefreshOrbitUI()
-        local db = BigNoteBoxDB
-        local on = db == nil or db.focusOrbitEnabled ~= false
-        local alpha = on and 1.0 or 0.4
-        speedSl:SetAlpha(alpha);  speedSl:EnableMouse(on)
-        resumeSl:SetAlpha(alpha); resumeSl:EnableMouse(on)
-    end
-    RefreshOrbitUI()
-    BNB._focusOrbitRefreshUI = RefreshOrbitUI
-
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_CONTEXT_POPUP"])
-
-    y = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
-        function() return db.contextSurface ~= false end,
-        function(v) db.contextSurface = v end,
-        L["CFG_CHK_CONTEXT_SURFACE_TIP"])
-
-    -- "Set Popup Position" button
-    local anchorBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_ANCHOR_BTN"], 150, 22)
-    anchorBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    anchorBtn:SetScript("OnClick", function()
-        if BNB.TogglePopupAnchor then BNB.TogglePopupAnchor() end
-    end)
-    anchorBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_TOAST_ANCHOR_TIP"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    anchorBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    y = y - (22 + 6)
-
-    -- Popup hold time slider
-    y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
-        function() return db.popupHoldTime or 5 end,
-        function(v) db.popupHoldTime = v end,
-        L["CFG_SLIDER_ALERT_SECONDS_TIP"])
-
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_TRASH"])
-
-    -- ── Trash enable/disable checkbox ─────────────────────────────────────────
-    -- Capture all child widget refs so we can grey them out when disabled.
-    local trashEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
-    trashEnableCb:SetSize(24, 24)
-    trashEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
-    trashEnableCb:SetChecked(db.trashFeature ~= false)
-    local trashEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    trashEnableLbl:SetPoint("LEFT",  trashEnableCb, "RIGHT", 4, 0)
-    trashEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
-    trashEnableLbl:SetJustifyH("LEFT"); trashEnableLbl:SetHeight(ROW_H)
-    trashEnableLbl:SetText(L["CFG_TRASH_ENABLE_LABEL"])
-    y = y - (ROW_H + ROW_GAP)
-
-    -- ── Warn before deleting checkbox ─────────────────────────────────────────
-    local warnCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
-    warnCb:SetSize(24, 24)
-    warnCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
-    warnCb:SetChecked(db.warnBeforeDelete ~= false)
-    warnCb:SetScript("OnClick", function(self)
-        db.warnBeforeDelete = self:GetChecked() and true or false
-    end)
-    warnCb:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_TRASH_WARN_TIP"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    warnCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    warnLbl:SetPoint("LEFT",  warnCb, "RIGHT", 4, 0)
-    warnLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
-    warnLbl:SetJustifyH("LEFT"); warnLbl:SetHeight(ROW_H)
-    warnLbl:SetText(L["CFG_TRASH_WARN_LABEL"])
-    y = y - (ROW_H + ROW_GAP)
-
-    -- ── Retention slider ───────────────────────────────────────────────────────
-    local retainSlider = BNB.CreateSlider(ct, L["CFG_TRASH_RETAIN_SLIDER"], 0, 90,
-        db.trashRetainDays ~= nil and db.trashRetainDays or 30, nil,
-        function(v) db.trashRetainDays = v end)
-    retainSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    retainSlider:SetWidth(CONTENT_W)
-    retainSlider:EnableMouse(true)
-    retainSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_TRASH_RETAIN_TIP"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    retainSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- ── Apply greying / trash button visibility ────────────────────────────────
-    local function ApplyTrashSection(enabled)
-        local a = enabled and 1 or 0.35
-        warnCb:SetEnabled(enabled)
-        warnCb:SetAlpha(a)
-        warnLbl:SetAlpha(a)
-        retainSlider:SetAlpha(a)
-        retainSlider:EnableMouse(enabled)
-        -- Show/hide the trashcan icon in the main window toolbar; the row
-        -- closes up so no gap is left (reads db.trashFeature, set by the caller)
-        if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
-        -- Close the trash window if it's open and we're disabling
-        if not enabled and BNB.ToggleTrashWindow then
-            local tf = _G["BigNoteBoxTrashFrame"]
-            if tf and tf:IsShown() then tf:Hide() end
-        end
-    end
-
-    trashEnableCb:SetScript("OnClick", function(self)
-        local v = self:GetChecked() and true or false
-        db.trashFeature = v
-        ApplyTrashSection(v)
-    end)
-
-    -- Apply immediately (handles saved state on config open)
-    ApplyTrashSection(db.trashFeature ~= false)
-
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_CELL_STICKY_HDR"])
-
-    do
-        local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
-        desc:SetTextColor(0.60, 0.60, 0.60)
-        desc:SetText(L["CFG_ALARM_DESC"])
-        local h = desc:GetStringHeight() + 6
-        desc:SetHeight(h)
-        y = y - h - 6
-    end
-
-    y = AddSlider(ct, y, L["CFG_SLIDER_MAX_STICKIES"], 1, 50,
-        function() return db.stickyMaxCount or 20 end,
-        function(v) db.stickyMaxCount = v end,
-        L["CFG_SLIDER_MAX_STICKIES_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
-        function() return db.stickiesHiddenPersist == true end,
-        function(v) db.stickiesHiddenPersist = v end,
-        L["CFG_STICKY_HIDE_PERSIST_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_CHK_ESC_DEFAULT_LABEL"],
-        function() return db.stickyEscDefault == true end,
-        function(v) db.stickyEscDefault = v or nil end,
-        L["CFG_CHK_ESC_DEFAULT_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_CHK_ESC_DIM_LABEL"],
-        function() return db.stickyEscOverlay ~= false end,
-        -- nil = on, false = off. Not `v and nil or false`: that is always false.
-        function(v) if v then db.stickyEscOverlay = nil else db.stickyEscOverlay = false end end,
-        L["CFG_CHK_ESC_DIM_TIP"])
-
-    -- On by default: nil = on, explicit false = off.
-    y = AddCheck(ct, y, L["CFG_CHK_STICKY_INLINE_EDIT_LABEL"],
-        function() return db.stickyInlineEdit ~= false end,
-        function(v) if v then db.stickyInlineEdit = nil else db.stickyInlineEdit = false end end,
-        L["CFG_CHK_STICKY_INLINE_EDIT_TIP"])
-
-    -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
-    y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
-        "BIGNOTEBOXHIDESTICKIES", L["CFG_KB_HINT_CTRL_H"], L["CFG_KB_DESC_HIDE_STICKIES"])
-
+local function BuildRefBoxPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
     -- ── Reference Box ─────────────────────────────────────────────────────────
     do
-        y = AddRule(ct, y) - 4
-        y = AddHeader(ct, y, L["CFG_HDR_REFBOX"])
-
         -- Collect widgets for greying when disabled
         local rbWidgets = {}
 
@@ -928,6 +592,7 @@ local function BuildFeaturesTab(sf, ct)
             GameTooltip:Show()
         end)
         rbEnableCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        page.enableCb = rbEnableCb   -- twin on the Features overview row
         local rbEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         rbEnableLbl:SetPoint("LEFT", rbEnableCb, "RIGHT", 4, 0)
         rbEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
@@ -1048,16 +713,18 @@ local function BuildFeaturesTab(sf, ct)
 
         ApplyRBSection(db.referenceBoxEnabled ~= false)
     end
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
 
+local function BuildSidebarPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
     -- Sidebar
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_SIDEBAR"])
-
     -- Master enable checkbox (manual build to retain widget ref for greying)
     local sidebarEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     sidebarEnableCb:SetSize(24, 24)
     sidebarEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     sidebarEnableCb:SetChecked(db.sidebarEnabled == true)
+    page.enableCb = sidebarEnableCb   -- twin on the Features overview row
     local sidebarEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     sidebarEnableLbl:SetPoint("LEFT",  sidebarEnableCb, "RIGHT", 4, 0)
     sidebarEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
@@ -1070,6 +737,7 @@ local function BuildFeaturesTab(sf, ct)
     sidebarSub:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
     sidebarSub:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
     sidebarSub:SetHeight(200)  -- resized by RebuildHiddenList
+    local subTop = y           -- the list is last on the page: it sets the page height
     local subY = 0
 
     -- Auto-switch checkbox
@@ -1278,6 +946,7 @@ local function BuildFeaturesTab(sf, ct)
 
         local subH = math.abs(rowY) + 8
         sidebarSub:SetHeight(subH)
+        sf:FinaliseHeight(math.abs(subTop) + subH + 12)
     end
 
     sf:HookScript("OnShow", RebuildHiddenList)
@@ -1304,22 +973,218 @@ local function BuildFeaturesTab(sf, ct)
     end)
 
     ApplySidebarSection(db.sidebarEnabled == true)
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
 
-    -- ── Tag Tree ──────────────────────────────────────────────────────────────
-    AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y - 8, L["CFG_TAGTREE_HEADER"])
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TAB 4 — MODULES
+-- ─────────────────────────────────────────────────────────────────────────────
+local function BuildStickyPage(sf, ct, y)
+    local db = BigNoteBoxDB
+    do
+        local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
+        desc:SetTextColor(0.60, 0.60, 0.60)
+        desc:SetText(L["CFG_ALARM_DESC"])
+        local h = desc:GetStringHeight() + 6
+        desc:SetHeight(h)
+        y = y - h - 6
+    end
 
-    y = AddCheck(ct, y, L["CFG_TAGTREE_STAY_OPEN"],
-        function() return db.tagTreeStayOpen ~= false end,
-        function(v) db.tagTreeStayOpen = v end,
-        L["CFG_TAGTREE_STAY_OPEN_TIP"])
+    y = AddSlider(ct, y, L["CFG_SLIDER_MAX_STICKIES"], 1, 50,
+        function() return db.stickyMaxCount or 20 end,
+        function(v) db.stickyMaxCount = v end,
+        L["CFG_SLIDER_MAX_STICKIES_TIP"])
 
-    y = AddCheck(ct, y, L["CFG_TAGTREE_START_EXPANDED"],
-        function() return db.tagTreeStartExpanded == true end,
-        function(v) db.tagTreeStartExpanded = v end,
-        L["CFG_TAGTREE_START_EXPANDED_TIP"])
+    y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
+        function() return db.stickiesHiddenPersist == true end,
+        function(v) db.stickiesHiddenPersist = v end,
+        L["CFG_STICKY_HIDE_PERSIST_TIP"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_ESC_DEFAULT_LABEL"],
+        function() return db.stickyEscDefault == true end,
+        function(v) db.stickyEscDefault = v or nil end,
+        L["CFG_CHK_ESC_DEFAULT_TIP"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_ESC_DIM_LABEL"],
+        function() return db.stickyEscOverlay ~= false end,
+        -- nil = on, false = off. Not `v and nil or false`: that is always false.
+        function(v) if v then db.stickyEscOverlay = nil else db.stickyEscOverlay = false end end,
+        L["CFG_CHK_ESC_DIM_TIP"])
+
+    -- On by default: nil = on, explicit false = off.
+    y = AddCheck(ct, y, L["CFG_CHK_STICKY_INLINE_EDIT_LABEL"],
+        function() return db.stickyInlineEdit ~= false end,
+        function(v) if v then db.stickyInlineEdit = nil else db.stickyInlineEdit = false end end,
+        L["CFG_CHK_STICKY_INLINE_EDIT_TIP"])
+
+    -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
+    y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
+        "BIGNOTEBOXHIDESTICKIES", L["CFG_KB_HINT_CTRL_H"], L["CFG_KB_DESC_HIDE_STICKIES"])
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+local function BuildFocusPage(sf, ct, y)
+    -- Hide entire WoW UI
+    y = AddCheck(ct, y,
+        L["CFG_CHK_FOCUS_HIDEUI_LABEL"],
+        function() local db = BigNoteBoxDB; return db == nil or db.focusHideUI ~= false end,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusHideUI = v end
+        end,
+        L["CFG_CHK_FOCUS_HIDEUI_TIP"])
+
+    -- Master orbit toggle
+    local orbitCheckY = y
+    y = AddCheck(ct, y, L["CFG_FOCUS_ORBIT_ENABLE"],
+        function() local db = BigNoteBoxDB; return db == nil or db.focusOrbitEnabled ~= false end,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitEnabled = v end
+            if BNB.FocusOrbit then
+                if v then BNB.FocusOrbit.Start() else BNB.FocusOrbit.Stop() end
+            end
+            if BNB.UpdateFocusSpinBtn then BNB.UpdateFocusSpinBtn(v) end
+            if BNB._focusOrbitRefreshUI then BNB._focusOrbitRefreshUI() end
+        end,
+        L["CFG_FOCUS_ORBIT_ENABLE_TIP"])
+
+    -- Speed slider (greyed when orbit off)
+    local speedSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_SPEED"], 0.001, 0.020,
+        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or 0.004,
+        0.001, 0.004,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitSpeed = v end
+        end,
+        function(v) return string.format("%.3f", v) end)
+    speedSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
+    speedSl:SetWidth(CONTENT_W - 14)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- Resume-after-movement slider (greyed when orbit off)
+    local resumeSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_RESUME"], 0, 10,
+        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or 3.0,
+        0.5, 3.0,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitResumeDelay = v end
+        end,
+        function(v)
+            if v <= 0 then return "Off" end
+            return string.format("%.1f s", v)
+        end)
+    resumeSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
+    resumeSl:SetWidth(CONTENT_W - 14)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- Overlay darkness slider (always active — not tied to orbit toggle)
+    y = y - 4
+    local overlaySl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_OVERLAY_ALPHA"], 0.0, 1.0,
+        (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or 0.6,
+        0.05, 0.6,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOverlayAlpha = v end
+        end,
+        function(v) return string.format("%.2f", v) end)
+    overlaySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    overlaySl:SetWidth(CONTENT_W)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- Skin color tint checkbox (only meaningful in skin mode, but always shown)
+    y = AddCheck(ct, y, L["CFG_FOCUS_OVERLAY_SKIN_COLOR"],
+        function()
+            local db = BigNoteBoxDB
+            return db ~= nil and db.focusOverlayUseSkinColor == true
+        end,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOverlayUseSkinColor = v end
+        end,
+        L["CFG_FOCUS_OVERLAY_SKIN_COLOR_TIP"])
+
+    -- Grey/ungrey orbit-specific sub-controls based on master toggle
+    local function RefreshOrbitUI()
+        local db = BigNoteBoxDB
+        local on = db == nil or db.focusOrbitEnabled ~= false
+        local alpha = on and 1.0 or 0.4
+        speedSl:SetAlpha(alpha);  speedSl:EnableMouse(on)
+        resumeSl:SetAlpha(alpha); resumeSl:EnableMouse(on)
+    end
+    RefreshOrbitUI()
+    BNB._focusOrbitRefreshUI = RefreshOrbitUI
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+local function BuildContextPopupPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
+    local cb
+    y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
+        function() return db.contextSurface ~= false end,
+        function(v) db.contextSurface = v end,
+        L["CFG_CHK_CONTEXT_SURFACE_TIP"])
+
+    -- "Set Popup Position" button
+    local anchorBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_ANCHOR_BTN"], 150, 22)
+    anchorBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    anchorBtn:SetScript("OnClick", function()
+        if BNB.TogglePopupAnchor then BNB.TogglePopupAnchor() end
+    end)
+    anchorBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_TOAST_ANCHOR_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    anchorBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (22 + 6)
+
+    -- Popup hold time slider
+    y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
+        function() return db.popupHoldTime or 5 end,
+        function(v) db.popupHoldTime = v end,
+        L["CFG_SLIDER_ALERT_SECONDS_TIP"])
+    page.enableCb = cb   -- twin on the Features overview row
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+local function BuildModulesTab(sf, ct)
+    local db = BigNoteBoxDB
+    local y  = -8
+
+    local MODULES = {
+        { L["CFG_CELL_STICKY_HDR"],    L["CFG_SUB_STICKY_DESC"],     BuildStickyPage       },
+        { L["CFG_HDR_TASKS"],          L["CFG_SUB_TASKS_DESC"],      BuildTasksPage        },
+        { L["CFG_HDR_REFBOX"],         L["CFG_SUB_REFBOX_DESC"],     BuildRefBoxPage       },
+        { L["CFG_HDR_SIDEBAR"],        L["CFG_SUB_SIDEBAR_DESC"],    BuildSidebarPage      },
+        { L["CFG_FOCUS_ORBIT_HEADER"], L["CFG_SUB_FOCUS_DESC"],      BuildFocusPage        },
+        { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage    },
+        { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage    },
+        { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage },
+    }
+    for _, m in ipairs(MODULES) do
+        local page = K.NewSubPage(m[1], m[3])
+        y = K.AddOverviewRow(ct, sf, y, page, m[1], m[2])
+    end
+
+    -- Toggle-only module, no settings page: the Blizzard icon list lives in its
+    -- own load-on-demand addon, BigNoteBox_Icons (ALL-62). Moved from Advanced (ALL-84).
+    y = K.AddOverviewRow(ct, sf, y, {
+        get = function() return db.blizzardIconComplete == true end,
+        set = function(v)
+            db.blizzardIconComplete = v
+            if v then
+                -- Enable: load BigNoteBox_Icons now so the autocomplete works
+                -- without a reload; says in chat why if it cannot (ALL-62).
+                if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList(true) end
+            else
+                -- Disable: stop using the list at once. It stays in memory
+                -- until a reload, which unloads BigNoteBox_Icons.
+                BNB.BlizzardIconList = nil
+                StaticPopup_Show("BNB_BLZICON_AC_DISABLE")
+            end
+        end,
+        tip = L["CFG_CHK_BLZICON_TIP"],
+    }, L["CFG_HDR_ICONS"], L["CFG_SUB_ICONS_DESC"])
+
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
-K.BUILDERS.features = BuildFeaturesTab
+K.BUILDERS.modules = BuildModulesTab

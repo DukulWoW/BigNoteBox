@@ -54,8 +54,8 @@ UI\SendToChat.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua
 UI\Config\Appearance.lua
-UI\Config\Features.lua
-UI\Config\Editor.lua
+UI\Config\Modules.lua
+UI\Config\Notes.lua
 UI\Config\Backup.lua
 UI\Config\Advanced.lua
 UI\MainConfigSkin.lua

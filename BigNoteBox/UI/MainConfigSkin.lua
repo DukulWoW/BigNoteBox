@@ -78,6 +78,7 @@ function BNB.CreateConfigWindowSkin()
     -- Does NOT touch PanelTemplates_SelectTab (no PanelTab buttons exist here);
     -- CreateSkinTabs handles its own visual state.
     local function SelectTab(idx)
+        if BNB._CloseConfigSubPage then BNB._CloseConfigSubPage() end   -- ALL-84
         for i = 1, #panels do
             if panels[i] then
                 if i == idx then panels[i]:Show()

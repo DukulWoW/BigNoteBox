@@ -5,12 +5,12 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ASSET = K.CONTENT_W, K.ASSET
-local AddRule, AddHeader, MakeKeybindRow = K.AddRule, K.AddHeader, K.MakeKeybindRow
+local CONTENT_W, ASSET, ROW_H, ROW_GAP = K.CONTENT_W, K.ASSET, K.ROW_H, K.ROW_GAP
+local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL
--- Logo, version, by-line, 2×2 feature grid, solidarity line
+-- Logo, version, by-line, Language, BCB box + More Features, Window, Keybindings, solidarity line
 -- ─────────────────────────────────────────────────────────────────────────────
 local function BuildGeneralTab(sf, ct)
     local y = -8
@@ -205,7 +205,13 @@ local function BuildGeneralTab(sf, ct)
         }
     end
 
-    -- 2×2 feature grid
+    -- BCB box + More Features button, one row, ruled off from Language (or the
+    -- header on Forever) like the sections below it. The four feature boxes
+    -- that used to sit here went when the Modules tab arrived: it lists the
+    -- same features, and they pushed General into scrolling (Dukul, 2026-09-26).
+    y = AddRule(ct, y) - 4
+    local rowY = y
+    local h3
     local cellGap = 12
     local cellW   = math.floor((CONTENT_W - cellGap) / 2)
     local cellX2  = cellW + cellGap
@@ -224,16 +230,10 @@ local function BuildGeneralTab(sf, ct)
         return d:GetStringHeight() + 22
     end
 
-    local h1 = Cell(0,      y, L["CFG_CELL_NOTES_HDR"], L["CFG_CELL_NOTES_DESC"])
-    local h2 = Cell(cellX2, y, L["CFG_CELL_TAGS_HDR"],          L["CFG_CELL_TAGS_DESC"])
-    y = y - math.max(h1, h2) - 10
-
     local bcbLabel = L["CFG_BCB_HEADER"]
     if BigChatBox and BigChatBox.SendDirect then
         bcbLabel = bcbLabel .. " |cff66bb6a(INSTALLED)|r"
-        local h3 = Cell(0, y, bcbLabel, L["CFG_BCB_DESC"])
-        local h4 = Cell(cellX2, y, L["CFG_CELL_CONTEXT_HDR"],  L["CFG_CELL_CONTEXT_DESC"])
-        y = y - math.max(h3, h4) - 10
+        h3 = Cell(0, y, bcbLabel, L["CFG_BCB_DESC"])
     else
         -- BCB not installed: draw the header manually so we can add a clickable badge
         local hdr = ct:CreateFontString(nil, "ARTWORK", "GameFontNormal")
@@ -270,18 +270,12 @@ local function BuildGeneralTab(sf, ct)
         desc3:SetWordWrap(true); desc3:SetSpacing(2)
         desc3:SetTextColor(0.75, 0.75, 0.75)
         desc3:SetText(L["CFG_BCB_DESC"])
-        local h3 = desc3:GetStringHeight() + 22
-
-        local h4 = Cell(cellX2, y, L["CFG_CELL_CONTEXT_HDR"], L["CFG_CELL_CONTEXT_DESC"])
-        y = y - math.max(h3, h4) - 10
+        h3 = desc3:GetStringHeight() + 22
     end
 
-    -- Row 3: Sticky Notes (left) + More Features button (right)
+    -- More Features button (right of the BCB box)
     -- The button matches the height of the left cell. Since GetStringHeight()
     -- returns 0 at build time, we use a deferred resize via C_Timer.After(0).
-    local h5 = Cell(0, y, L["CFG_CELL_STICKY_HDR"],
-        L["CFG_CELL_STICKY_DESC"])
-
     -- More Features button — same template trychain as OptionsPanel and WhatsNew OK button
     local moreTpl = "SharedButtonLargeTemplate"
     if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo(moreTpl)) then
@@ -299,7 +293,7 @@ local function BuildGeneralTab(sf, ct)
         pcall(function() DynamicResizeButton_Resize(moreBtn) end)
         moreBtn:SetText(L["CFG_MORE_FEATURES_BTN"])
     end
-    moreBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", cellX2, y)
+    moreBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", cellX2, rowY)
     moreBtn:SetScript("OnClick", function()
         if BNB.FeatureList then BNB.FeatureList.Open() end
     end)
@@ -316,12 +310,70 @@ local function BuildGeneralTab(sf, ct)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         C_Timer.After(0, function()
             if not ct or not moreBtn then return end
-            local targetH = math.max(h5, 38)
+            local targetH = math.max(h3, 38)
             moreBtn:SetHeight(targetH)
         end)
     end
 
-    y = y - math.max(h5, 38) - 10
+    y = rowY - math.max(h3, 38) - 10
+
+    -- ── Window (moved from the Features tab, ALL-84) ───────────────────────────
+    local db = BigNoteBoxDB
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["CFG_HDR_WINDOW"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_OPEN_LOGIN_LABEL"],
+        function() return db.openOnLogin == true end,
+        function(v) db.openOnLogin = v end,
+        L["CFG_CHK_OPEN_LOGIN_TIP"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_CONFIRM_CLOSE_LABEL"],
+        function() return db.confirmClose == true end,
+        function(v) db.confirmClose = v end,
+        L["CFG_CHK_CONFIRM_CLOSE_TIP"])
+
+    -- Combat action dropdown
+    do
+        local combatLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        combatLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        combatLbl:SetHeight(ROW_H); combatLbl:SetJustifyH("LEFT")
+        combatLbl:SetText(L["CFG_COMBAT_LABEL"])
+        y = y - (ROW_H + 2)
+
+        local COMBAT_ITEMS = {
+            { key = "nothing",            label = L["CFG_COMBAT_ITEM_NOTHING"] },
+            { key = "hide_no_stickies",   label = L["CFG_COMBAT_ITEM_HIDE_EXCEPT_STICKY"] },
+            { key = "hide_minimize",      label = L["CFG_COMBAT_ITEM_HIDE_MINIMIZE"] },
+            { key = "hide_all",           label = L["CFG_COMBAT_ITEM_HIDE_ALL"] },
+        }
+        local curCombat = db.combatAction or "nothing"
+        local combatDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        combatDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        combatDD:SetWidth(CONTENT_W)
+        combatDD:SetupMenu(function(_, root)
+            for _, item in ipairs(COMBAT_ITEMS) do
+                root:CreateRadio(item.label,
+                    function() return curCombat == item.key end,
+                    function()
+                        curCombat = item.key
+                        db.combatAction = item.key
+                        combatDD:GenerateMenu()
+                    end)
+            end
+        end)
+        combatDD:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_COMBAT_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_COMBAT_NOTHING"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_EXCEPT_STICKY"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_MINIMIZE"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_COMBAT_HIDE_ALL"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_COMBAT_REOPEN"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        combatDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - (32 + ROW_GAP)
+    end
 
     -- ── Keybindings section ───────────────────────────────────────────────────
     y = AddRule(ct, y) - 4

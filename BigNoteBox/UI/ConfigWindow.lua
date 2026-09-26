@@ -1,6 +1,7 @@
 -- BigNoteBox UI/ConfigWindow.lua -- Settings window
 --
--- Six tabs: General | Appearance | Features | Editor | Backup | Advanced
+-- Six tabs: General | Notes | Appearance | Modules | Backup | Advanced
+-- (Notes was Editor, Modules was Features; reordered in ALL-84)
 -- Each tab is built by its own file, UI/Config/<Tab>.lua; the export codec
 -- is Features/NoteExport.lua. This file keeps the window, the scroll panels
 -- and the row builders the tabs share (BNB._ConfigKit).
@@ -37,9 +38,9 @@ local ASSET = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 -- ── Tab definitions ───────────────────────────────────────────────────────────
 local TABS = {
     { key = "general",    label = function() return L["CFG_TAB_GENERAL"]    end },
+    { key = "notes",      label = function() return L["CFG_TAB_NOTES"]      end },
     { key = "appearance", label = function() return L["CFG_TAB_APPEARANCE"] end },
-    { key = "features",   label = function() return L["CFG_TAB_FEATURES"]   end },
-    { key = "editor",     label = function() return L["CFG_TAB_EDITOR"]     end },
+    { key = "modules",    label = function() return L["CFG_TAB_MODULES"]    end },
     { key = "backup",     label = function() return L["CFG_TAB_BACKUP"]     end },
     { key = "advanced",   label = function() return L["CFG_TAB_ADVANCED"]   end },
 }
@@ -71,8 +72,24 @@ local function MakeScrollPanel(parent, topOffset)
     return sf, ct
 end
 
+-- ── Sub-page state (ALL-84) ───────────────────────────────────────────────────
+-- A sub-page is one more scroll panel over a tab's area, opened from a button
+-- on that tab. The tab stays highlighted; selecting any tab (the same one
+-- included), the back button or closing the window returns to the tab.
+local activeSub  = nil   -- the open page, or nil
+local buildOwner = nil   -- { parent, topOffset, idx } while _BuildConfigTabPanels runs
+
+local function CloseSubPage()
+    if not activeSub then return end
+    activeSub.sf:Hide()
+    activeSub = nil
+end
+-- MainConfigSkin.lua's own tab select calls this too.
+BNB._CloseConfigSubPage = CloseSubPage
+
 -- ── Tab selector ──────────────────────────────────────────────────────────────
 local function SelectTab(idx)
+    CloseSubPage()
     for i = 1, NUM_TABS do
         if tabBtns[i] then
             if i == idx then PanelTemplates_SelectTab(tabBtns[i])
@@ -131,7 +148,7 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     lbl:SetPoint("LEFT",  cb,  "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", ct,  "RIGHT", 0, 0)
     lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H); lbl:SetText(text)
-    return y - (ROW_H + ROW_GAP)
+    return y - (ROW_H + ROW_GAP), cb   -- cb: for an overview-row twin (ALL-84)
 end
 
 -- Slider using BNB.CreateSlider.
@@ -153,6 +170,131 @@ local function AddSlider(ct, y, label, mn, mx, getter, setter, tip)
         sl:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
     return y - (SLIDER_H + ROW_GAP)
+end
+
+-- ── Sub-pages (ALL-84) ────────────────────────────────────────────────────────
+-- Runs the chrome's own tab select, which closes the sub-page.
+local function ReselectTab(idx)
+    if cfgFrame and cfgFrame._skinTabCtrl then cfgFrame._skinTabCtrl.Select(idx)
+    else SelectTab(idx) end
+end
+
+local function OpenSubPage(page)
+    CloseSubPage()
+    if tabPanels[page.idx] then tabPanels[page.idx]:Hide() end
+    page.sf:SetVerticalScroll(0)
+    page.sf:Show()
+    activeSub = page
+    -- Both chromes disable the selected tab button; enable it so a click on
+    -- the highlighted tab comes back. The next tab select disables it again.
+    local ctrl = cfgFrame and cfgFrame._skinTabCtrl
+    local btn  = (ctrl and ctrl.buttons[page.idx]) or tabBtns[page.idx]
+    if btn then btn:SetEnabled(true) end
+end
+
+-- Only valid inside a tab builder: the page belongs to the tab being built.
+-- title is the page heading, beside the back button. build(sf, ct, y, page)
+-- fills it from y down and ends with sf:FinaliseHeight, like a tab builder;
+-- a page with a master checkbox stores it as page.enableCb (see AddOverviewRow).
+-- Returns the page; page.Open() shows it.
+local function NewSubPage(title, build)
+    local o = buildOwner
+    local sf, ct = MakeScrollPanel(o.parent, o.topOffset)
+    local page = { sf = sf, ct = ct, idx = o.idx }
+    function page.Open() OpenSubPage(page) end
+
+    -- Textured back arrow, same build as BNB.CreateSkinCloseButton; used in
+    -- both chromes (the art is not skin-tinted).
+    local back = CreateFrame("Button", nil, ct)
+    back:SetSize(22, 22)
+    back:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, -8)
+    local n = back:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
+    n:SetTexture(ASSET .. "Buttons\\bt-left-normal")
+    local h = back:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
+    h:SetTexture(ASSET .. "Buttons\\bt-left-hover"); h:Hide()
+    local p = back:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
+    p:SetTexture(ASSET .. "Buttons\\bt-left-press"); p:Hide()
+    back:SetScript("OnClick",     function() ReselectTab(page.idx) end)
+    back:SetScript("OnMouseDown", function() p:Show(); n:Hide(); h:Hide() end)
+    back:SetScript("OnMouseUp",   function() p:Hide(); h:Show() end)
+    back:SetScript("OnEnter", function(self)
+        n:Hide(); h:Show()
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_SUBPAGE_BACK"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    back:SetScript("OnLeave", function() p:Hide(); h:Hide(); n:Show(); GameTooltip:Hide() end)
+    -- The click hides the page under the pointer, so OnLeave may never come.
+    sf:HookScript("OnShow", function() p:Hide(); h:Hide(); n:Show() end)
+
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    lbl:SetPoint("LEFT", back, "RIGHT", 8, 0)
+    lbl:SetTextColor(1, 0.82, 0)
+    lbl:SetText(title)
+
+    build(sf, ct, AddRule(ct, -38) - 4, page)
+    return page
+end
+
+-- One overview row for a sub-page: [x] Title ... [Settings], a grey line
+-- under it. When the page has an enableCb, the row gets a twin checkbox that
+-- runs the page checkbox's own OnClick, so the two can never disagree.
+-- sf is the tab's scroll panel (the twin re-reads its state on show).
+-- A toggle-only module passes { get, set, tip } instead of a page: the row
+-- gets a plain checkbox and no Settings button.
+local function AddOverviewRow(ct, sf, y, page, title, desc)
+    local TEXT_X = 26
+    local cb = page.enableCb
+    if page.get then
+        local tg = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        tg:SetSize(24, 24)
+        tg:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
+        tg:SetChecked(page.get())
+        tg:SetScript("OnClick", function(self) page.set(self:GetChecked() and true or false) end)
+        if page.tip then
+            tg:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(page.tip, 0.8, 0.8, 0.8, true); GameTooltip:Show()
+            end)
+            tg:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+    elseif cb then
+        local ov = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        ov:SetSize(24, 24)
+        ov:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
+        ov:SetChecked(cb:GetChecked())
+        ov:SetScript("OnClick", function(self)
+            cb:SetChecked(self:GetChecked())
+            local fn = cb:GetScript("OnClick")
+            if fn then fn(cb, "LeftButton") end
+        end)
+        ov:SetScript("OnEnter", cb:GetScript("OnEnter"))
+        ov:SetScript("OnLeave", cb:GetScript("OnLeave"))
+        sf:HookScript("OnShow", function() ov:SetChecked(cb:GetChecked()) end)
+    end
+
+    local open
+    if page.Open then
+        open = BNB.CreateButton(nil, ct, L["CFG_SUBPAGE_OPEN"], 90, 22)
+        open:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
+        open:SetScript("OnClick", page.Open)
+    end
+
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lbl:SetPoint("LEFT",  ct,   "TOPLEFT", TEXT_X, y - 10)
+    if open then lbl:SetPoint("RIGHT", open, "LEFT", -8, 0)
+    else         lbl:SetPoint("RIGHT", ct,   "TOPRIGHT", 0, y - 10) end
+    lbl:SetJustifyH("LEFT")
+    lbl:SetText(title)
+
+    local d = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    d:SetPoint("TOPLEFT", ct, "TOPLEFT", TEXT_X, y - 24)
+    d:SetWidth(CONTENT_W - TEXT_X); d:SetJustifyH("LEFT"); d:SetWordWrap(true)
+    d:SetTextColor(0.65, 0.65, 0.65)
+    d:SetText(desc)
+    local h = d:GetStringHeight()
+    d:SetHeight(h)
+    return y - 24 - h - ROW_GAP - 6
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -334,6 +476,8 @@ local K = {
     AddSlider            = AddSlider,
     MakeKeybindRow       = MakeKeybindRow,
     BuildLSMFontDropdown = BuildLSMFontDropdown,
+    NewSubPage           = NewSubPage,
+    AddOverviewRow       = AddOverviewRow,
     BUILDERS             = BUILDERS,
     -- RefreshFontPicker: set by UI/Config/Appearance.lua
 }
@@ -390,17 +534,18 @@ function BNB._BuildConfigTabPanels(parent, topOffset)
         tabPanels[i]  = sf
         tabContent[i] = ct
         local builder = BUILDERS[tab.key]
+        buildOwner = { parent = parent, topOffset = topOffset, idx = i }
         if builder then builder(sf, ct) end
     end
+    buildOwner = nil
 
     -- Re-apply font TTF paths whenever the Appearance tab is shown.
     -- The picker labels are built at BuildAppearanceTab time; if the renderer
     -- hasn't registered the .ttf files yet (first session, fast login) they
     -- render blank. Hooking OnShow guarantees the paths are re-set when the
     -- tab becomes visible, by which point PLAYER_LOGIN + InitFonts have run.
-    local appearanceIdx = 2   -- "appearance" is the second tab in TABS
-    if panels[appearanceIdx] then
-        panels[appearanceIdx]:HookScript("OnShow", RefreshConfigFonts)
+    for i, tab in ipairs(TABS) do
+        if tab.key == "appearance" then panels[i]:HookScript("OnShow", RefreshConfigFonts) end
     end
 
     return panels, contents
@@ -498,6 +643,8 @@ function BNB.OpenConfig()
             cfgFrame = CreateConfigWindow()
         end
         BNB.HookConfigHeightTracking()
+        -- A sub-page never outlives the window (ALL-84); reopening shows its tab.
+        cfgFrame:HookScript("OnHide", CloseSubPage)
         -- Report-a-bug button beside Settings (Retail; ALL-77)
         if BNB.AttachSettingsBugButton then pcall(BNB.AttachSettingsBugButton, cfgFrame) end
     end

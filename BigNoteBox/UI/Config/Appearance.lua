@@ -469,6 +469,52 @@ local function BuildAppearanceTab(sf, ct)
         y = y - math.ceil(hint:GetStringHeight() or 12) - 8
     end
 
+    -- Fonts from other addons (LibSharedMedia); moved from Advanced (ALL-84).
+    -- Needs a reload, so it offers one as soon as the value changes.
+    local lsmAvail = LibStub and LibStub("LibSharedMedia-3.0", true) ~= nil
+    if lsmAvail then
+        local lsmWasOn = db.lsmFonts == true
+        local lsmReloadLbl  -- shown after toggle
+        y = AddCheck(ct, y, L["CFG_LSM_FONTS"],
+            function() return db.lsmFonts == true end,
+            function(v)
+                db.lsmFonts = v
+                if lsmReloadLbl then lsmReloadLbl:SetShown(v ~= lsmWasOn) end
+            end,
+            L["CFG_LSM_FONTS_TIP"])
+
+        -- Inline "Reload required" label + button, hidden until the value changes
+        lsmReloadLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lsmReloadLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 22, y + 2)
+        lsmReloadLbl:SetTextColor(1, 0.82, 0, 1)
+        lsmReloadLbl:SetText(L["CFG_LSM_FONTS_RELOAD"])
+        lsmReloadLbl:Hide()
+
+        local lsmReloadBtn = BNB.CreateButton(nil, ct, L["CFG_RELOAD_UI_BTN"], 90, 20)
+        lsmReloadBtn:SetPoint("LEFT", lsmReloadLbl, "RIGHT", 8, 0)
+        lsmReloadBtn:SetScript("OnClick", function()
+            C_UI.Reload()
+        end)
+        lsmReloadBtn:Hide()
+
+        -- Wire both to show together
+        hooksecurefunc(lsmReloadLbl, "SetShown", function(_, shown)
+            lsmReloadBtn:SetShown(shown)
+        end)
+
+        y = y - 26
+    else
+        -- LSM not present: show a greyed notice so the user knows why there's no checkbox
+        local lsmMissingLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lsmMissingLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lsmMissingLbl:SetWidth(CONTENT_W)
+        lsmMissingLbl:SetJustifyH("LEFT")
+        lsmMissingLbl:SetTextColor(0.45, 0.45, 0.45)
+        lsmMissingLbl:SetText(L["CFG_LSM_FONTS_MISSING"] .. " -- install an addon that provides LibSharedMedia-3.0 to enable this option.")
+        y = y - 28
+    end
+    y = y - 4
+
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on
     y, _refreshLSMDropdown = BuildLSMFontDropdown(ct, y,
         -- getter: returns the current global font choice if it is an LSM font, else nil

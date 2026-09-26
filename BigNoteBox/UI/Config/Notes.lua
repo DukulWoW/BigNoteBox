@@ -1,4 +1,4 @@
--- BigNoteBox UI/Config/Editor.lua - Settings Editor tab
+-- BigNoteBox UI/Config/Notes.lua - Settings Notes tab (was Editor, ALL-84)
 -- Split out of ConfigWindow.lua (ALL-65.10).
 
 local BNB = BigNoteBox
@@ -8,13 +8,169 @@ local K = BNB._ConfigKit
 local CONTENT_W, ROW_H, ROW_GAP, SLIDER_H = K.CONTENT_W, K.ROW_H, K.ROW_GAP, K.SLIDER_H
 local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
 
+-- A smaller gold heading for a group inside a section (Trash, Tag tree under Notes).
+local function AddSubHeader(ct, y, text)
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 6)
+    lbl:SetTextColor(1, 0.82, 0)
+    lbl:SetText(text)
+    return y - 26
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
--- TAB 4 (new) -- EDITOR
--- Undo/redo depth + WYSIWYG toolbar toggle.
+-- TAB 2 -- NOTES
+-- Notes (new note, lock, trash, tag tree), then the editor: saving, toolbar,
+-- rich notes, live preview, undo/redo, session history.
 -- ─────────────────────────────────────────────────────────────────────────────
-local function BuildEditorTab(sf, ct)
+local function BuildNotesTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
+
+    -- ── Notes (moved from the Features tab, ALL-84) ─────────────────────────────
+    y = AddHeader(ct, y, L["CFG_HDR_NOTES"])
+
+    -- New note behaviour dropdown
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_NEWNOTE_BEHAVIOUR"])
+        y = y - (ROW_H + 2)
+
+        local NEW_NOTE_ITEMS = {
+            { key = "prompt",    label = L["CFG_NEWNOTE_ITEM_PROMPT"] },
+            { key = "immediate", label = L["CFG_NEWNOTE_ITEM_IMMEDIATE"]             },
+        }
+        local curBehaviour = db.newNoteBehaviour or "prompt"
+        local nnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        nnDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        nnDD:SetWidth(CONTENT_W)
+        nnDD:SetupMenu(function(_, root)
+            for _, item in ipairs(NEW_NOTE_ITEMS) do
+                root:CreateRadio(item.label,
+                    function() return curBehaviour == item.key end,
+                    function()
+                        curBehaviour = item.key
+                        db.newNoteBehaviour = item.key
+                        nnDD:GenerateMenu()
+                    end)
+            end
+        end)
+        nnDD:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_NEWNOTE_BEHAVIOUR"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_NEWNOTE_PROMPT"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_NEWNOTE_IMMEDIATE"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        nnDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - (32 + ROW_GAP)
+    end
+
+    -- Moved from Advanced > Keybindings (ALL-84)
+    y = MakeKeybindRow(ct, y, L["CFG_KB_NEW_NOTE"],
+        "BIGNOTEBOXNEWNOTE",   L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_NEW_NOTE"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
+        function() return db.lockNotes == true end,
+        function(v)
+            db.lockNotes = v
+            -- Refresh the editor lock state for the currently open note
+            if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
+            if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons() end
+        end,
+        L["CFG_CHK_LOCK_NOTES_TIP"])
+
+    -- Trash and Tag tree are part of how notes work, not modules (ALL-84)
+    y = AddSubHeader(ct, y, L["CFG_HDR_TRASH"])
+    -- ── Trash enable/disable checkbox ─────────────────────────────────────────
+    -- Capture all child widget refs so we can grey them out when disabled.
+    local trashEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    trashEnableCb:SetSize(24, 24)
+    trashEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
+    trashEnableCb:SetChecked(db.trashFeature ~= false)
+    local trashEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    trashEnableLbl:SetPoint("LEFT",  trashEnableCb, "RIGHT", 4, 0)
+    trashEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
+    trashEnableLbl:SetJustifyH("LEFT"); trashEnableLbl:SetHeight(ROW_H)
+    trashEnableLbl:SetText(L["CFG_TRASH_ENABLE_LABEL"])
+    y = y - (ROW_H + ROW_GAP)
+
+    -- ── Warn before deleting checkbox ─────────────────────────────────────────
+    local warnCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    warnCb:SetSize(24, 24)
+    warnCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
+    warnCb:SetChecked(db.warnBeforeDelete ~= false)
+    warnCb:SetScript("OnClick", function(self)
+        db.warnBeforeDelete = self:GetChecked() and true or false
+    end)
+    warnCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_TRASH_WARN_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    warnCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    warnLbl:SetPoint("LEFT",  warnCb, "RIGHT", 4, 0)
+    warnLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
+    warnLbl:SetJustifyH("LEFT"); warnLbl:SetHeight(ROW_H)
+    warnLbl:SetText(L["CFG_TRASH_WARN_LABEL"])
+    y = y - (ROW_H + ROW_GAP)
+
+    -- ── Retention slider ───────────────────────────────────────────────────────
+    local retainSlider = BNB.CreateSlider(ct, L["CFG_TRASH_RETAIN_SLIDER"], 0, 90,
+        db.trashRetainDays ~= nil and db.trashRetainDays or 30, nil,
+        function(v) db.trashRetainDays = v end)
+    retainSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    retainSlider:SetWidth(CONTENT_W)
+    retainSlider:EnableMouse(true)
+    retainSlider:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_TRASH_RETAIN_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    retainSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- ── Apply greying / trash button visibility ────────────────────────────────
+    local function ApplyTrashSection(enabled)
+        local a = enabled and 1 or 0.35
+        warnCb:SetEnabled(enabled)
+        warnCb:SetAlpha(a)
+        warnLbl:SetAlpha(a)
+        retainSlider:SetAlpha(a)
+        retainSlider:EnableMouse(enabled)
+        -- Show/hide the trashcan icon in the main window toolbar; the row
+        -- closes up so no gap is left (reads db.trashFeature, set by the caller)
+        if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
+        -- Close the trash window if it's open and we're disabling
+        if not enabled and BNB.ToggleTrashWindow then
+            local tf = _G["BigNoteBoxTrashFrame"]
+            if tf and tf:IsShown() then tf:Hide() end
+        end
+    end
+
+    trashEnableCb:SetScript("OnClick", function(self)
+        local v = self:GetChecked() and true or false
+        db.trashFeature = v
+        ApplyTrashSection(v)
+    end)
+
+    -- Apply immediately (handles saved state on config open)
+    ApplyTrashSection(db.trashFeature ~= false)
+
+    y = AddSubHeader(ct, y, L["CFG_TAGTREE_HEADER"])
+    y = AddCheck(ct, y, L["CFG_TAGTREE_STAY_OPEN"],
+        function() return db.tagTreeStayOpen ~= false end,
+        function(v) db.tagTreeStayOpen = v end,
+        L["CFG_TAGTREE_STAY_OPEN_TIP"])
+
+    y = AddCheck(ct, y, L["CFG_TAGTREE_START_EXPANDED"],
+        function() return db.tagTreeStartExpanded == true end,
+        function(v) db.tagTreeStartExpanded = v end,
+        L["CFG_TAGTREE_START_EXPANDED_TIP"])
+
+    y = AddRule(ct, y) - 4
 
     -- ── Saving ───────────────────────────────────────────────────────────────
     -- Save mode (ALL-52): nil = automatic, "manual" = Save button. First in
@@ -399,4 +555,4 @@ local function BuildEditorTab(sf, ct)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
-K.BUILDERS.editor = BuildEditorTab
+K.BUILDERS.notes = BuildNotesTab

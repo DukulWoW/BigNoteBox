@@ -1,7 +1,7 @@
 -- BigNoteBox Features/PopupAnchor.lua — Draggable anchor for context popup
 --
 -- A small movable frame that lets the user position where context note
--- popups appear.  Toggled from the Config Features tab.
+-- popups appear.  Toggled from Settings > Modules > Context Popup.
 -- Position is saved as CENTER-relative offsets in BigNoteBoxDB.
 
 local BNB = BigNoteBox
