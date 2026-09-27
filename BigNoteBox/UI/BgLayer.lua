@@ -5,8 +5,13 @@
 -- Used by sticky notes (UI/StickyNote.lua) and the Background Lab
 -- (UI/BackgroundLab.lua), so the Lab preview is exactly what a sticky shows.
 --
--- A background def: { file = fileID or path, mode, anchor, scale, w, h }.
+-- A background def: { file = fileID or path, mode, anchor, scale, w, h, crop }.
 -- w / h = the file's native size; every mode but stretch needs them.
+-- crop = { x, y, w, h } in file pixels: the part of the file that holds the
+-- picture, when the rest is empty (the profession art fills 677 x 550 of a
+-- 1024 file, Dukul 2026-09-27). Only that part is drawn and every mode sizes
+-- it as the image. A crop cannot repeat (REPEAT wraps the whole file), so
+-- the tile modes draw one copy with a crop.
 -- Fill modes (per axis: a repeating axis tiles, anything else is one copy
 -- placed by the anchor and clipped to the area):
 --   tile     repeat both ways at native size x scale
@@ -67,7 +72,11 @@ end
 -- size for a mode that needs one, or the image falls outside the area).
 function BL.Place(W, H, def)
     local m, sc = def.mode or "stretch", def.scale or 1
-    local nw, nh = def.w, def.h
+    local fw, fh = def.w, def.h
+    local c = def.crop
+    if c and not (fw and fh and fw > 0 and fh > 0 and c[3] > 0 and c[4] > 0) then c = nil end
+    local nw, nh = fw, fh
+    if c then nw, nh = c[3], c[4] end
     local dw, dh, rx, ry
     if m == "stretch" then
         dw, dh = W, H
@@ -76,6 +85,7 @@ function BL.Place(W, H, def)
         if m == "tile" or m == "tileX" or m == "tileY" or m == "native" then
             dw, dh = nw * sc, nh * sc
             rx, ry = (m == "tile" or m == "tileX"), (m == "tile" or m == "tileY")
+            if c then rx, ry = false, false end
         else
             local s
             if     m == "cover" then s = math.max(W / nw, H / nh)
@@ -89,6 +99,10 @@ function BL.Place(W, H, def)
     local x, w, u0, u1 = Axis(W, dw, rx, al[1])
     local y, h, v0, v1 = Axis(H, dh, ry, al[2])
     if not (x and y) then return nil end
+    if c then
+        u0, u1 = (c[1] + u0 * c[3]) / fw, (c[1] + u1 * c[3]) / fw
+        v0, v1 = (c[2] + v0 * c[4]) / fh, (c[2] + v1 * c[4]) / fh
+    end
     return x, y, w, h, u0, u1, v0, v1, rx, ry
 end
 
@@ -133,6 +147,11 @@ function BL.Create(host)
     layer.base = layer:CreateTexture(nil, "BACKGROUND", nil, -8)
     layer.base:SetAllPoints()
     layer.tex = layer:CreateTexture(nil, "BACKGROUND", nil, 0)
+    -- Brightness above 0: a second copy of the art in ADD blend on top, so
+    -- light parts get brighter and dark lines stay dark (Dukul 2026-09-27)
+    layer.add = layer:CreateTexture(nil, "BACKGROUND", nil, 1)
+    layer.add:SetBlendMode("ADD")
+    layer.add:Hide()
     layer:SetScript("OnSizeChanged", function(self) BL.Layout(self) end)
     host:HookScript("OnShow", function() BL.Seat(layer) end)
     layer:Hide()
@@ -155,10 +174,21 @@ function BL.Set(layer, def, inset)
     BL.Layout(layer)
 end
 
--- Base colour under the art, and the tint multiplied into the art
-function BL.SetColors(layer, br, bg, bb, tr, tg, tb)
+-- Base colour under the art, and the tint multiplied into the art.
+-- bright = -1..1, nil = 0: below 0 darkens the art toward black, above 0
+-- adds that fraction of the tinted art again (ADD). The base is untouched.
+function BL.SetColors(layer, br, bg, bb, tr, tg, tb, bright)
+    local k = bright or 0
     layer.base:SetColorTexture(br, bg, bb, 1)
-    layer.tex:SetVertexColor(tr, tg, tb, 1)
+    local m = k < 0 and (1 + k) or 1
+    layer.tex:SetVertexColor(tr * m, tg * m, tb * m, 1)
+    layer._bright = k
+    if k > 0 then
+        layer.add:SetVertexColor(tr * k, tg * k, tb * k, 1)
+        BL.Layout(layer)
+    else
+        layer.add:Hide()
+    end
 end
 
 function BL.SetAlpha(layer, a)
@@ -167,5 +197,8 @@ function BL.SetAlpha(layer, a)
 end
 
 function BL.Layout(layer)
-    if layer._def and layer:IsShown() then BL.Draw(layer.tex, layer, layer._def) end
+    if not (layer._def and layer:IsShown()) then return end
+    local drawn = BL.Draw(layer.tex, layer, layer._def)
+    if drawn and (layer._bright or 0) > 0 then BL.Draw(layer.add, layer, layer._def)
+    else layer.add:Hide() end
 end

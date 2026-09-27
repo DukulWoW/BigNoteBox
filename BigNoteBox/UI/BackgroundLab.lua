@@ -118,7 +118,7 @@ local ANCHORS = BL.ANCHORS
 
 local DEF_BASE = { 0.07, 0.07, 0.09 }   -- sticky COL_BG (UI/StickyNote.lua)
 local INSET    = 3                        -- sticky "Default" border inset
-local C_W, C_H = 320, 690
+local C_W, C_H = 320, 736
 local C_PAD    = 16
 
 local _ctl, _pv
@@ -185,11 +185,18 @@ local function NativeSize(i)
     return w, h
 end
 
+-- Picture area (crop, UI/BgLayer.lua): x / y / w / h in file pixels, set
+-- when the art fills only part of its file. nil until W and H are both set.
+local function Crop(st)
+    if st.cw and st.ch then return { st.cx or 0, st.cy or 0, st.cw, st.ch } end
+end
+
 -- The current entry as a BgLayer def (UI/BgLayer.lua)
 local function LabDef(i)
     local st = State(i)
     local nw, nh = NativeSize(i)
-    return { file = LIST[i].id, mode = st.mode, anchor = st.anchor, scale = st.scale or 1, w = nw, h = nh }
+    return { file = LIST[i].id, mode = st.mode, anchor = st.anchor, scale = st.scale or 1, w = nw, h = nh,
+             crop = Crop(st) }
 end
 
 local function LayoutPreview()
@@ -292,9 +299,10 @@ local function ExportText()
             local nw, nh = NativeSize(i)
             local b = st.base
             local line = string.format(
-                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s },",
+                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s%s },",
                 Q(e.key), Q(st.name or ""), e.id, Q(e.path), tostring(nw or "nil"), tostring(nh or "nil"),
                 Q(st.mode), Q(st.anchor), tostring(st.scale or 1),
+                Crop(st) and string.format(", crop = { %d, %d, %d, %d }", unpack(Crop(st))) or "",
                 b and string.format(", base = { %.2f, %.2f, %.2f }", b[1], b[2], b[3]) or "",
                 _sizes[e.id] == false and ", loaded = false" or "",
                 st.skip and ", skip = true" or "")
@@ -564,6 +572,24 @@ local function BuildControl()
     f.wBox, f.hBox = wBox, hBox
     y = y - 30
 
+    -- Picture area: the part of the file that holds the art (Dukul 2026-09-27)
+    BNB.CreateSmallLabel(body, L["DEV_WIN_BGLAB_CROP"], y, cw)
+    y = y - 16
+    f.cropBoxes = {}
+    local last
+    for n, field in ipairs({ "cx", "cy", "cw", "ch" }) do
+        local box = NumBox(body, 54, function(v)
+            local st = State(_idx)
+            if n <= 2 then st[field] = (v and v >= 0) and v or nil
+            else st[field] = (v and v > 0) and v or nil end
+            Refresh()
+        end)
+        if last then box:SetPoint("LEFT", last, "RIGHT", 6, 0)
+        else box:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y) end
+        f.cropBoxes[field], last = box, box
+    end
+    y = y - 30
+
     -- Base colour, skip, sample text
     local baseBtn = SmallBtn(body, L["DEV_WIN_BGLAB_BASE"], 110, function()
         local st = State(_idx)
@@ -681,6 +707,9 @@ Refresh = function()
     f.sVal:SetText(string.format("%.2fx", st.scale or 1))
     if not f.wBox.eb:HasFocus() then f.wBox.eb:SetText(nw and tostring(nw) or "") end
     if not f.hBox.eb:HasFocus() then f.hBox.eb:SetText(nh and tostring(nh) or "") end
+    for field, box in pairs(f.cropBoxes) do
+        if not box.eb:HasFocus() then box.eb:SetText(st[field] and tostring(st[field]) or "") end
+    end
     local b = st.base or DEF_BASE
     f.swatch:SetColorTexture(b[1], b[2], b[3], 1)
     f.skip:SetChecked(st.skip == true)

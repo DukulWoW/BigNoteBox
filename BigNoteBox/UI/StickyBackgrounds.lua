@@ -25,13 +25,39 @@ BNB.StickyBG = SBG
 
 local BGS_ADDON = "BigNoteBox_BGs"
 
-local function E(key, label, cat, file, w, h, mode, anchor, scale)
+local function E(key, label, cat, file, w, h, mode, anchor, scale, crop)
     return { key = key, label = label, cat = cat, file = file, w = w, h = h,
-             mode = mode, anchor = anchor, scale = scale or 1 }
+             mode = mode, anchor = anchor, scale = scale or 1, crop = crop }
+end
+
+-- The profession art fills only the top left 677 x 550 of its 1024 file; the
+-- rest is transparent and showed the note colour on a big sticky (Dukul
+-- 2026-09-27, measured from wow.export PNGs). The specialization art fades
+-- out over its top and bottom 2 px, so its crop starts below that.
+local PROF_CROP = { 0, 0, 677, 550 }
+local SPEC_CROP = { 0, 2, 677, 546 }
+
+-- Art that exists on one client only draws as a green square on the other.
+-- Those entries are left out of LIST there, so the picker never shows them
+-- and a note that saved one reads None on that client; the key is kept.
+-- Found by Dukul 2026-09-27 (green on Retail, fine on Forever); a Retail-only
+-- list follows once he has been through the Retail files in wow.export.
+local FOREVER_ONLY = {
+    bankframebackgroundc60                        = true,   -- Dark Used Stone
+    creditsscreenbackground0wowc60                = true,   -- Red Cement
+    gamepadmapbackgroundtile                      = true,   -- Reddish Wood
+    professionspecializationbackgroundartfirstaid = true,
+    professionspecializationbackgroundartpoisons  = true,
+}
+local RETAIL_ONLY = {}
+
+local function OnThisClient(key)
+    if BNB.IsForever then return not RETAIL_ONLY[key] end
+    return not FOREVER_ONLY[key]
 end
 
 -- Labels are L key names here; resolved to text below
-local LIST = {
+local ALL = {
     { key = "none", label = "STICKY_BG_NONE" },
     -- Stone & Wood
     E("uicommonbackgrounds",               "STICKY_BG_BROWN_STONE",       "stone", 8198947,  256,  256, "tile",    "TOPLEFT"),
@@ -72,26 +98,30 @@ local LIST = {
     E("file1119242",                       "STICKY_BG_DARKEST_SKY",       "scenery", 1119242,  128,  128, "stretch", "TOPLEFT"),
     E("file1260093",                       "STICKY_BG_RISING_DAWN",       "scenery", 1260093, 1024, 1024, "stretch", "CENTER"),
     -- Professions (alphabetical)
-    E("professionbackgroundartalchemy",        "STICKY_BG_PROF_ALCHEMY",        "profession", 4625450, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartblacksmithing",  "STICKY_BG_PROF_BLACKSMITHING",  "profession", 4625448, 1024, 1024, "tile", "TOP"),
-    E("file4671747",                           "STICKY_BG_PROF_COOKING",        "profession", 4671747, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartenchanting",     "STICKY_BG_PROF_ENCHANTING",     "profession", 4723320, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartengineering",    "STICKY_BG_PROF_ENGINEERING",    "profession", 4722478, 1024, 1024, "tile", "TOP"),
-    E("professionspecializationbackgroundartfirstaid", "STICKY_BG_PROF_FIRST_AID", "profession", 7744229, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartfishing",        "STICKY_BG_PROF_FISHING",        "profession", 4723316, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartherbalism",      "STICKY_BG_PROF_HERBALISM",      "profession", 4723159, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartinscription",    "STICKY_BG_PROF_INSCRIPTION",    "profession", 4723119, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartjewelcrafting",  "STICKY_BG_PROF_JEWELCRAFTING",  "profession", 4723112, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartleatherworking", "STICKY_BG_PROF_LEATHERWORKING", "profession", 4723154, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartmining",         "STICKY_BG_PROF_MINING",         "profession", 4723189, 1024, 1024, "tile", "TOP"),
-    E("professionspecializationbackgroundartpoisons", "STICKY_BG_PROF_POISON",  "profession", 7744227, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundartskinning",       "STICKY_BG_PROF_SKINNING",       "profession", 4723308, 1024, 1024, "tile", "TOP"),
-    E("professionbackgroundarttailoring",      "STICKY_BG_PROF_TAILORING",      "profession", 4627497, 1024, 1024, "tile", "TOP"),
+    E("professionbackgroundartalchemy",        "STICKY_BG_PROF_ALCHEMY",        "profession", 4625450, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartblacksmithing",  "STICKY_BG_PROF_BLACKSMITHING",  "profession", 4625448, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("file4671747",                           "STICKY_BG_PROF_COOKING",        "profession", 4671747, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartenchanting",     "STICKY_BG_PROF_ENCHANTING",     "profession", 4723320, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartengineering",    "STICKY_BG_PROF_ENGINEERING",    "profession", 4722478, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionspecializationbackgroundartfirstaid", "STICKY_BG_PROF_FIRST_AID", "profession", 7744229, 1024, 1024, "cover", "TOP", 1, SPEC_CROP),
+    E("professionbackgroundartfishing",        "STICKY_BG_PROF_FISHING",        "profession", 4723316, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartherbalism",      "STICKY_BG_PROF_HERBALISM",      "profession", 4723159, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartinscription",    "STICKY_BG_PROF_INSCRIPTION",    "profession", 4723119, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartjewelcrafting",  "STICKY_BG_PROF_JEWELCRAFTING",  "profession", 4723112, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartleatherworking", "STICKY_BG_PROF_LEATHERWORKING", "profession", 4723154, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundartmining",         "STICKY_BG_PROF_MINING",         "profession", 4723189, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionspecializationbackgroundartpoisons", "STICKY_BG_PROF_POISON",  "profession", 7744227, 1024, 1024, "cover", "TOP", 1, SPEC_CROP),
+    E("professionbackgroundartskinning",       "STICKY_BG_PROF_SKINNING",       "profession", 4723308, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
+    E("professionbackgroundarttailoring",      "STICKY_BG_PROF_TAILORING",      "profession", 4627497, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
     -- Classic: the one old texture that stays in BigNoteBox (the Reference
     -- Box task panel uses it too); the rest come from BigNoteBox_BGs
     E("bg-stone", "STICKY_BG_STONE", "classic",
       "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga", 256, 256, "tile", "TOPLEFT"),
 }
+local LIST = {}
+for _, e in ipairs(ALL) do
+    if OnThisClient(e.key) then LIST[#LIST + 1] = e end
+end
 SBG.LIST = LIST
 
 local _byKey = {}
@@ -104,10 +134,13 @@ for _, e in ipairs(LIST) do Index(e) end
 -- Called by BigNoteBox_BGs when it loads. Entries use the fields above
 -- (label = an L key name, cat defaults to "classic"). A key already here is
 -- skipped. LIST is extended in place, so every holder of it sees the new ones.
+local _hasClassic = false
 function BNB.RegisterStickyBackgrounds(defs)
     if type(defs) ~= "table" then return end
+    _hasClassic = true
     for _, d in ipairs(defs) do
-        if type(d) == "table" and d.key and d.file and not _byKey[d.key] then
+        if type(d) == "table" and d.key and d.file and not _byKey[d.key]
+                and OnThisClient(d.key) then
             d.cat = d.cat or "classic"
             d.scale = d.scale or 1
             LIST[#LIST + 1] = d
@@ -134,6 +167,12 @@ function SBG.Get(key)
         e = _byKey[key]
     end
     return e or LIST[1]
+end
+
+-- True once BigNoteBox_BGs has registered its textures (the picker's
+-- Classic tab shows only then)
+function SBG.HasClassic()
+    return _hasClassic
 end
 
 function SBG.Label(key)

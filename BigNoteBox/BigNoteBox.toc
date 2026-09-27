@@ -54,6 +54,7 @@ UI\BgLayer.lua
 UI\StickyBackgrounds.lua
 UI\StickyNote.lua
 UI\StickySettings.lua
+UI\StickyBgPicker.lua
 UI\SendToChat.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua

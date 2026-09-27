@@ -427,11 +427,12 @@ local function ApplyBgAlpha(frame, bgAlpha, cfg)
         local layer = frame._bgLayer
         if layer and layer._def and ec then
             -- Texture layer (ALL-110): the note's colour as the base under
-            -- the art, the Colorize tint on the art, opacity on the layer.
-            -- The backdrop centre goes clear so only the border draws.
+            -- the art, the Colorize tint and brightness on the art, opacity
+            -- on the layer. The backdrop centre goes clear so only the
+            -- border draws.
             local tr, tg, tb = TintedBgColor(ec)
             BNB.BgLayer.SetColors(layer, ec.bgR or COL_BG[1], ec.bgG or COL_BG[2], ec.bgB or COL_BG[3],
-                tr, tg, tb)
+                tr, tg, tb, ec.bgBrightness)
             BNB.BgLayer.SetAlpha(layer, a)
             pcall(function() frame:SetBackdropColor(0, 0, 0, 0) end)
         else
@@ -738,6 +739,8 @@ SN._kit = {
     ApplyBgAlpha          = ApplyBgAlpha,
     ApplyConfig           = ApplyConfig,
     FadeFrame             = FadeFrame,
+    TintedBgColor         = TintedBgColor,   -- UI/StickyBgPicker.lua thumbnails
+    COL_BG                = COL_BG,
 }
 
 -- ── Resize handle ─────────────────────────────────────────────────────────────

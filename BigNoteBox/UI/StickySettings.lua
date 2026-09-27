@@ -162,6 +162,7 @@ local function BuildStickySettingsWindow()
     -- The waypoint info popup is parented to UIParent, so it would outlive this window
     f:HookScript("OnHide", function()
         if BNBStickyWaypointInfoPopup then BNBStickyWaypointInfoPopup:Hide() end
+        if BNB.StickyBgPicker then BNB.StickyBgPicker.Close() end   -- ALL-110
     end)
 
     -- ── Tab buttons ───────────────────────────────────────────────────────────
@@ -308,17 +309,62 @@ local function PopulateStickySettings(noteID)
         ct._y = y - 10
     end
 
+    -- Label on top with the value right-aligned on the same line, slider at
+    -- full width under them, like NoteConfig's Appearance tab (Dukul
+    -- 2026-09-27); the old inline label wrapped into a narrow column. Returns
+    -- a holder frame: SetValue / SetEnabled reach the slider, SetAlpha and
+    -- EnableMouse (plainOnlyWidgets) work on the holder as before.
+    local useNativeSlider = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
+        and MinimalSliderWithSteppersMixin
     local function MakeSlider(ct, label, minV, maxV, initV, onChange)
         local y = ct._y or -8
-        local sl = BNB.CreateSlider(ct, label, minV, maxV, initV, nil,
-            function(v) onChange(v) end)
-        sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        -- Pull right edge in so the MinimalSlider's value label (rendered
-        -- outside the slider frame to the right) doesn't clip the scrollbar.
-        sl:SetWidth(SETTINGS_CW - 30)
-        sl:EnableMouseWheel(false)
+        if not useNativeSlider then
+            local sl = BNB.CreateSlider(ct, label, minV, maxV, initV, nil,
+                function(v) onChange(v) end)
+            sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            -- Pull right edge in so the MinimalSlider's value label (rendered
+            -- outside the slider frame to the right) doesn't clip the scrollbar.
+            sl:SetWidth(SETTINGS_CW - 30)
+            sl:EnableMouseWheel(false)
+            ct._y = y - 44
+            return sl
+        end
+
+        local h = CreateFrame("Frame", nil, ct)
+        h:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        h:SetSize(SETTINGS_CW, 38)
+        local lbl = h:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, 0)
+        lbl:SetPoint("RIGHT", h, "RIGHT", -40, 0)
+        lbl:SetJustifyH("LEFT")
+        lbl:SetWordWrap(false)
+        lbl:SetTextColor(0.78, 0.78, 0.78)
+        lbl:SetText(label)
+        local val = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        val:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, 0)
+        val:SetJustifyH("RIGHT")
+        val:SetText(tostring(math.floor(initV)))
+
+        local sl = CreateFrame("Slider", nil, h, "MinimalSliderWithSteppersTemplate")
+        sl:SetPoint("TOPLEFT",  h, "TOPLEFT",  0, -14)
+        sl:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -14)
+        sl:SetHeight(20)
+        sl:Init(initV, minV, maxV, maxV - minV)
+        local tracked = math.floor(initV)
+        sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
+            local n = math.floor(v)
+            if n == tracked then return end
+            tracked = n
+            val:SetText(tostring(n))
+            onChange(n)
+        end)
+
+        h.Slider = sl
+        function h:SetValue(v) sl:SetValue(v) end
+        function h:SetEnabled(on) pcall(sl.SetEnabled, sl, on) end
         ct._y = y - 44
-        return sl
+        return h
     end
 
     local function ColorBtn(ct, r, g, b, labelTxt, onPick)
@@ -915,56 +961,64 @@ local function PopulateStickySettings(noteID)
     SubLbl(ct2, L["STICKY_BG_TEXTURE_LABEL"])
     BNB.StickyBG.LoadClassic()   -- lists BigNoteBox_BGs' old TGAs too (ALL-110)
     local curTexKey   = cfg.bgTexture or "none"
-    local curTexLabel = BgTextureLabel(curTexKey)
+    local SBP = BNB.StickyBgPicker
 
-    local useNativeTexDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-    if useNativeTexDrop then
-        local texDrop = CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate")
-        texDrop:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
-        texDrop:SetWidth(SETTINGS_CW)
-        -- A saved key whose texture is unavailable (BigNoteBox_BGs missing)
-        -- matches no radio: the button reads "None", the key stays saved
-        if texDrop.SetDefaultText then pcall(texDrop.SetDefaultText, texDrop, L["STICKY_BG_NONE"]) end
-        texDrop:SetupMenu(function(_, root)
-            pcall(function() root:SetScrollMode(30 * 20) end)
-            for _, t in ipairs(BG_TEXTURES) do
-                local entry = t
-                root:CreateRadio(entry.label,
-                    function() return curTexKey == entry.key end,
-                    function()
-                        curTexKey   = entry.key
-                        curTexLabel = entry.label
-                        cfg.bgTexture = curTexKey
-                        SaveCfg(noteID, cfg)
-                        SN.SetBgOverride(nil)   -- ends a Background Lab trial (ALL-110)
-                        texDrop:GenerateMenu()
-                        if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-                        SyncColorizeSlider(curTexKey)
-                    end)
-            end
+    -- [<] [name] [>] (ALL-110 part 2b, Dukul 2026-09-27): the name opens the
+    -- thumbnail grid (UI/StickyBgPicker.lua), the arrows step through the
+    -- whole list and wrap. A saved key whose texture is unavailable
+    -- (BigNoteBox_BGs missing) reads "None"; the key stays saved until
+    -- another is picked.
+    local TEX_ARW = 22
+    local texPrev = BNB.CreateButton(nil, ct2, "<", TEX_ARW, 22)
+    local texBtn  = BNB.CreateButton(nil, ct2, BgTextureLabel(curTexKey),
+        SETTINGS_CW - 2 * (TEX_ARW + 4), 22)
+    local texNext = BNB.CreateButton(nil, ct2, ">", TEX_ARW, 22)
+    texPrev:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
+    texBtn:SetPoint("LEFT", texPrev, "RIGHT", 4, 0)
+    texNext:SetPoint("LEFT", texBtn, "RIGHT", 4, 0)
+    ct2._y = ct2._y - 30
+
+    local function SetTexKey(key)
+        curTexKey = key
+        cfg.bgTexture = key
+        SaveCfg(noteID, cfg)
+        SN.SetBgOverride(nil)   -- ends a Background Lab trial (ALL-110)
+        texBtn:SetText(BgTextureLabel(key))
+        if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+        SyncColorizeSlider(key)
+    end
+    local function StepTex(d)
+        local cur, idx = BNB.StickyBG.Get(curTexKey).key, 1
+        for i, t in ipairs(BG_TEXTURES) do
+            if t.key == cur then idx = i; break end
+        end
+        SetTexKey(BG_TEXTURES[(idx - 1 + d) % #BG_TEXTURES + 1].key)
+        if SBP then SBP.Refresh() end
+    end
+    local texHandlers = {
+        cfg = function() return cfg end,
+        get = function() return curTexKey end,
+        set = SetTexKey,
+    }
+    texPrev:SetScript("OnClick", function() StepTex(-1) end)
+    texNext:SetScript("OnClick", function() StepTex(1) end)
+    texBtn:SetScript("OnClick", function()
+        if SBP then SBP.Open(noteID, _stickySettingsFrame, texHandlers) end
+    end)
+    for btn, tip in pairs({ [texPrev] = "STICKY_BG_PREV", [texBtn] = "STICKY_BG_BROWSE_TIP",
+                            [texNext] = "STICKY_BG_NEXT" }) do
+        local text = L[tip]
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:Show()
         end)
-        ct2._y = ct2._y - 36
-    else
-        -- Fallback: cycle button
-        local texBtn = BNB.CreateButton(nil, ct2, curTexLabel, SETTINGS_CW, 22)
-        texBtn:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
-        texBtn:SetScript("OnClick", function(self)
-            local idx = 1
-            for i, t in ipairs(BG_TEXTURES) do
-                if t.key == curTexKey then idx = i; break end
-            end
-            idx = (idx % #BG_TEXTURES) + 1
-            curTexKey   = BG_TEXTURES[idx].key
-            curTexLabel = BG_TEXTURES[idx].label
-            self:SetText(curTexLabel)
-            cfg.bgTexture = curTexKey
-            SaveCfg(noteID, cfg)
-            SN.SetBgOverride(nil)   -- ends a Background Lab trial (ALL-110)
-            if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-            SyncColorizeSlider(curTexKey)
-        end)
-        ct2._y = ct2._y - 28
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    -- Settings rebuilt (Randomize, another note): an open grid follows the
+    -- new row, or closes when it belongs to another note
+    if SBP then
+        if SBP.IsOpenFor(noteID) then SBP.Rebind(noteID, texHandlers) else SBP.Close() end
     end
 
     -- "Colorize texture %" — lerps the backdrop tint between raw paper (0%, white
@@ -977,11 +1031,26 @@ local function PopulateStickySettings(noteID)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
         end)
 
+    -- "Texture brightness %" (ALL-110, Dukul 2026-09-27): -100..100, 0 = the
+    -- art as it is. Below 0 darkens it, above 0 adds an ADD-blend copy on top
+    -- (BNB.BgLayer.SetColors). Greyed with Colorize.
+    local slBright = MakeSlider(ct2, L["STICKY_TEX_BRIGHTNESS_PCT"], -100, 100,
+        math.floor((cfg.bgBrightness or 0) * 100 + 0.5),
+        function(v)
+            cfg.bgBrightness = (v ~= 0) and v / 100 or nil
+            SaveCfg(noteID, cfg)
+            if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+        end)
+
+    -- Greyed while the note draws no texture: None, or a saved key that is
+    -- unavailable here (BigNoteBox_BGs missing, art of the other client)
     SyncColorizeSlider = function(texKey)
-        local disabled = (not texKey or texKey == "none")
-        pcall(function() slColorize:SetAlpha(disabled and 0.4 or 1.0) end)
-        if slColorize.SetEnabled then
-            pcall(function() slColorize:SetEnabled(not disabled) end)
+        local disabled = not BNB.StickyBG.Get(texKey).file
+        for _, sl in ipairs({ slColorize, slBright }) do
+            pcall(function() sl:SetAlpha(disabled and 0.4 or 1.0) end)
+            if sl.SetEnabled then
+                pcall(function() sl:SetEnabled(not disabled) end)
+            end
         end
     end
     SyncColorizeSlider(curTexKey)
