@@ -268,6 +268,10 @@ function BNB.CreateSkinStrip(parent, lifted, isMain)
     else
         BNB.RegisterSkinTarget(f, lifted, true)
     end
+    -- ALL-95: a strip that registers for drag is a title bar, so it gets the
+    -- move cursor. Hooked on RegisterForDrag, not here, so strips that never
+    -- drag get no mouse scripts at all.
+    hooksecurefunc(f, "RegisterForDrag", function(self) BNB.SetMoveCursor(self) end)
     return f
 end
 

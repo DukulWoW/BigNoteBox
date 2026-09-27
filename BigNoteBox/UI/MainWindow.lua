@@ -800,10 +800,11 @@ function BNB.CreateMainWindow()
         -- Recalculate sidebar slot visibility after resize
         if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
     end)
+    BNB.SetHoverCursor(resizeHandle, "resize")   -- ALL-95
 
     -- ── Splitter drag handle (7px wide button over the divider) ─────────────
-    -- No SetCursor — it produces a black box on some clients.
-    -- Instead we make the splitter visually obvious with three grip dots.
+    -- Three grip dots, plus the game's Size cursor (ALL-95). An addon file
+    -- as a cursor draws a black box: only game cursors work (UI/Cursor.lua).
     local splitter = CreateFrame("Button", nil, f)
     f._splitter = splitter
     splitter:SetWidth(7)
@@ -862,6 +863,7 @@ function BNB.CreateMainWindow()
         self:SetScript("OnUpdate", nil)
         BigNoteBoxDB.splitX = BNB._listPaneW
     end)
+    BNB.SetHoverCursor(splitter, "size")   -- ALL-95
 
     -- ── Left pane (note list) ────────────────────────────────────────────────
     local listPane = CreateFrame("Frame", nil, f)

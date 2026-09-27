@@ -227,6 +227,7 @@ local function GetImportFrame()
     titleBar:RegisterForDrag("LeftButton")
     titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
     titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
+    BNB.SetMoveCursor(titleBar)   -- ALL-95
 
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)

@@ -442,6 +442,7 @@ local function BuildTaskPanel(f)
         captureFrame:Hide()
     end)
     f._taskSplitter = sp
+    BNB.SetHoverCursor(sp, "size")   -- ALL-95
 end
 
 -- Register the TasksChanged callback once, regardless of which build path

@@ -201,6 +201,7 @@ local function BuildFrameNormal(frameName, onClose, frameParent)
     grip:SetScript("OnMouseUp", function(self, btn)
         if btn == "LeftButton" then f:StopMovingOrSizing() end
     end)
+    BNB.SetHoverCursor(grip, "resize")   -- ALL-95
 
     return f, TITLE_H_NORMAL
 end

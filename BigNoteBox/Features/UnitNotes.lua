@@ -33,6 +33,7 @@ function UN.Dialog(globalName, w, h, title)
     else
         f = CreateFrame("Frame", globalName, UIParent, "BasicFrameTemplateWithInset")
         f.TitleText:SetText(title)
+        BNB.AddTitleMoveCursor(f)   -- ALL-95
     end
     f:SetSize(w, h)
     f:SetPoint("CENTER")

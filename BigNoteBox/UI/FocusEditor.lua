@@ -1172,6 +1172,9 @@ end
 --------------------------------------------------------------------------------
 function BNB.OpenFocusMode()
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
+    -- Focus mode does not honour the note lock, so a locked note stays out
+    -- (the title-bar button is greyed; this covers Oracle and anything else)
+    if BNB._editorLocked then BNB:Print(L["FOCUS_LOCKED"]); return end
     if BNB._dirty then BNB.SaveCurrentNote() end
     BNB.StampOpened(BNB._currentNoteID)
 

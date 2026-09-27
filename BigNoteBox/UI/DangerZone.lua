@@ -487,6 +487,7 @@ local function BuildWindow()
     titleBar:RegisterForDrag("LeftButton")
     titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
     titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
+    BNB.SetMoveCursor(titleBar)   -- ALL-95
 
     local titleTex = titleBar:CreateTexture(nil, "BACKGROUND")
     titleTex:SetAllPoints()

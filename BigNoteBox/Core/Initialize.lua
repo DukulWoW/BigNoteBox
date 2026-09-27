@@ -15,6 +15,33 @@ local function SafeCall(name, func, ...)
     return ok
 end
 
+-- Forever: a knownChars record for this character under its first name alone
+-- ("Dazil-Realm" next to "Dazil Dazal-Realm") is the duplicate the old bare
+-- UnitName key made. Fold it into the current record: notes scoped to it move
+-- to this character, the sidebar pin carries over, a sidebar selection on it
+-- follows, and the stale record goes. Matched on first name + realm + class.
+local function MergeBareNameRecord(db, name, realm, classToken)
+    local first = name:match("^(%S+) ")
+    if not first then return end
+    local oldKey = first .. "-" .. realm
+    local old, cur = db.knownChars[oldKey], db.knownChars[BNB.currentChar]
+    if not (old and cur) or oldKey == BNB.currentChar or old.class ~= classToken then return end
+    if old.slotPinned then cur.slotPinned = true end
+    local oldScope, newScope = "char:" .. oldKey, "char:" .. BNB.currentChar
+    local ndb = BigNoteBoxNotesDB
+    local moved = 0
+    for _, list in ipairs({ ndb and ndb.notes, ndb and ndb.trash }) do
+        for _, note in pairs(list or {}) do
+            if note.scope == oldScope then note.scope = newScope; moved = moved + 1 end
+        end
+    end
+    if db.sidebarActiveKey == oldScope then db.sidebarActiveKey = newScope end
+    db.knownChars[oldKey] = nil
+    if moved > 0 then
+        BNB:Print(string.format(L["CHAR_MERGED_FMT"], moved, BNB.currentChar))
+    end
+end
+
 function BNB.Initialize()
     -- 1. Database (should already be initialized from ADDON_LOADED, but guard)
     if not BNB._addonLoaded then
@@ -51,8 +78,14 @@ function BNB.Initialize()
     -- 1d. Register this character in the known-characters registry.
     --     BNB.currentChar is used throughout for scope filtering and send-to-alt.
     do
-        local name  = UnitName("player") or "Unknown"
-        local realm = GetNormalizedRealmName() or "Unknown"
+        -- Through UnitNameRealm (FOR-23), so a Forever surname is part of the
+        -- key whether UnitName hands it back joined ("Dazil Dazal", nil) or in
+        -- the second slot ("Dazil", "Dazal"). Forever moved it from the first
+        -- shape to the second between 2026-09-24 and 09-27, and the bare
+        -- UnitName key registered the same character twice (Dukul, 2026-09-27).
+        local name, realm = BNB.UnitNameRealm("player")
+        name = name or "Unknown"
+        if not realm or realm == "" then realm = "Unknown" end
         BNB.currentChar = name .. "-" .. realm
         local _, classToken = UnitClass("player")
         local level   = UnitLevel("player") or 0
@@ -71,6 +104,9 @@ function BNB.Initialize()
             if existing.slotHidden == nil  then existing.slotHidden  = false end
             if existing.slotPinned == nil  then existing.slotPinned  = false end
             BigNoteBoxDB.knownChars[BNB.currentChar] = existing
+            if BNB.IsForever then
+                SafeCall("MergeBareName", MergeBareNameRecord, BigNoteBoxDB, name, realm, classToken)
+            end
         end
 
         -- First-login sidebar bootstrap: if sidebar has never been configured,

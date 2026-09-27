@@ -1590,15 +1590,20 @@ end
 local function PositionSideTabs()
     local strip = _modeStrip
     local side  = SideTabSide()
+    local below = math.max(0, rbFrame:GetFrameLevel() - 1)
+    local above = rbFrame:GetFrameLevel() + 1
+    -- Skin mode: always below the frame, so its edge covers the tab's inner
+    -- end (Dukul, 2026-09-27: they drew on top of the window)
+    local skin  = BigNoteBoxDB and BigNoteBoxDB.skinMode
     strip:ClearAllPoints()
     if side == "left" then
         strip:SetPoint("BOTTOMRIGHT", rbFrame, "BOTTOMLEFT", TAB_OFF.left, TAB_BOTTOM)
-        strip:SetFrameLevel(rbFrame:GetFrameLevel() + 1)
+        strip:SetFrameLevel(skin and below or above)
     else
         strip:SetPoint("BOTTOMLEFT", rbFrame, "BOTTOMRIGHT", TAB_OFF.right, TAB_BOTTOM)
-        -- Below the frame on Forever (its border overlaps the tab), above on Retail
-        strip:SetFrameLevel(BNB.IsForever and math.max(0, rbFrame:GetFrameLevel() - 1)
-            or rbFrame:GetFrameLevel() + 1)
+        -- Normal mode: below the frame on Forever (its border overlaps the tab),
+        -- above on Retail
+        strip:SetFrameLevel((skin or BNB.IsForever) and below or above)
     end
     local c1,c2,c3,c4,c5,c6,c7,c8 = SideTabTexCoord(side)
     for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
@@ -2123,6 +2128,8 @@ BuildModelViewer = function(f)
         if btn == "LeftButton" then rotating = false end
         if btn == "RightButton" then panning = false end
     end)
+    -- ALL-95: open hand over the model, holding hand while rotating / panning
+    BNB.SetHoverCursor(model, "open", "hold")
     model:SetScript("OnUpdate", function(self)
         local cx, cy = GetCursorPosition()
         local scale = self:GetEffectiveScale()

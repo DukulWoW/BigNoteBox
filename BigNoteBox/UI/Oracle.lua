@@ -68,6 +68,11 @@ local BADGES = {
       show = function(note) return BNB.OracleSearch.HasItem(note) end },
     { file = "s-icon-rich",     tip = "ORACLE_BADGE_RICH",
       show = function(note) return note.richMode == true end },
+    -- A situation (the note settings Situation tab: zone, instance, player...)
+    { file = "s-icon-situation", tip = "ORACLE_BADGE_SITUATION", show = function(note)
+        return type(note.context) == "string" and note.context ~= "" end },
+    { file = "s-icon-alarm",    tip = "ORACLE_BADGE_ALARM",
+      show = function(note) return note.alarm ~= nil end },
 }
 
 local bar, panel, eb, placeholder, hintFS, emptyFS
@@ -927,6 +932,10 @@ local function Build()
     bar:SetScript("OnDragStop", DragStop)
     panel:SetScript("OnDragStart", DragStart)
     panel:SetScript("OnDragStop", DragStop)
+    -- ALL-95: move cursor while the settings page's preview lets it drag
+    local function MoveKind() if previewing then return "move" end end
+    BNB.SetHoverCursor(bar, MoveKind)
+    BNB.SetHoverCursor(panel, MoveKind)
     bar:Hide()
 end
 

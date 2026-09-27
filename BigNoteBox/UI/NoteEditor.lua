@@ -48,19 +48,26 @@ end
 --------------------------------------------------------------------------------
 -- SAVE BUTTON STATE
 --------------------------------------------------------------------------------
+-- Focus mode button: off with no note selected, and off while the note is
+-- locked, since Focus mode does not honour the lock (Dukul, 2026-09-27)
+local function RefreshFocusButton()
+    local btn = BNB._focusModeBtn
+    if not btn then return end
+    local ok = BNB._currentNoteID ~= nil and not BNB._editorLocked
+    btn:SetEnabled(ok)
+    btn:SetAlpha(ok and 1.0 or 0.35)
+    pcall(function() btn._n:SetDesaturated(not ok) end)
+end
+
 function BNB.UpdateSaveButtonState()
     if not saveBtn then return end
     local enabled = BNB._dirty == true
     saveBtn:SetEnabled(enabled)
     saveBtn:SetAlpha(enabled and 1.0 or 0.4)
     pcall(function() saveBtn._tx:SetDesaturated(not enabled) end)
-    -- Keep focus button in sync: disabled when no note is selected
+    -- Keep focus button in sync: disabled with no note or a locked note
     local hasNote = BNB._currentNoteID ~= nil
-    if BNB._focusModeBtn then
-        BNB._focusModeBtn:SetEnabled(hasNote)
-        BNB._focusModeBtn:SetAlpha(hasNote and 1.0 or 0.35)
-        pcall(function() BNB._focusModeBtn._n:SetDesaturated(not hasNote) end)
-    end
+    RefreshFocusButton()
     -- Share button: enabled whenever a note is selected
     if BNB._wysiwygShareBtn then
         BNB._wysiwygShareBtn:SetIconEnabled(hasNote)
@@ -836,7 +843,8 @@ local function BuildToolbar(parent)
     end)
     -- Send to Chat button (right side) — icon-only using send.tga
     local sendBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-send", L["SEND_TITLE"], 28, 28)
-    sendBtn:SetPoint("RIGHT", bar, "RIGHT", -10, 0)
+    -- -26 keeps it clear of the main window's 16 px resize grip (BOTTOMRIGHT -2, 2)
+    sendBtn:SetPoint("RIGHT", bar, "RIGHT", -26, 0)
     -- Override OnEnter to add the sub-line tooltip
     sendBtn:SetScript("OnEnter", function(self)
         self:SetSize(32, 32)
@@ -1292,6 +1300,7 @@ local function SetEditorLocked(locked)
     end
     -- Undo/redo buttons must also dim when the note is locked
     if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
+    RefreshFocusButton()
 end
 
 --------------------------------------------------------------------------------
@@ -1978,6 +1987,10 @@ function BNB.BuildNoteEditor()
     local bodyScroll, bodyEb = BuildBodyField(pane, topAnchor)
     BNB._editorBodyScroll = bodyScroll
     BNB._editorBody       = bodyEb
+    -- ALL-95: the lock cursor over a locked note's text
+    local function LockKind() if BNB._editorLocked then return "lock" end end
+    BNB.SetHoverCursor(bodyEb, LockKind)
+    if bodyScroll:IsMouseEnabled() then BNB.SetHoverCursor(bodyScroll, LockKind) end
 
     -- When focus enters the body, the user is still working on the new note —
     -- dismiss any open discard popup so it doesn't fire while they type.

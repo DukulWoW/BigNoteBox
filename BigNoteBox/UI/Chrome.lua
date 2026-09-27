@@ -171,6 +171,7 @@ end
 
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
+    BNB.AddTitleMoveCursor(f)   -- ALL-95: move cursor over the title band
     if BNB.IsForever then pcall(SkinBg, f) end
     local ok, pieces = pcall(Snapshot, f)
     if not ok then return end

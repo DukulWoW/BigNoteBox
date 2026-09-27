@@ -770,6 +770,7 @@ local function AddResizeHandle(frame, noteID)
         -- Hide only if cursor has left the frame entirely
         if not frame:IsMouseOver() then h:Hide() end
     end)
+    BNB.SetHoverCursor(h, "resize")   -- ALL-95
 
     -- Show/hide driven by the same IsMouseOver poll used for btnOverlay.
     -- This avoids relying on OnEnter/OnLeave from frame (which fires through
@@ -1541,6 +1542,7 @@ local function CreateStickyFrame(noteID)
     end)
     ForwardHover(header, f)
     f._headerBar = header
+    BNB.SetMoveCursor(header)   -- ALL-95, after ForwardHover (it uses SetScript)
 
     -- ── Overhanging icon badge ────────────────────────────────────────────────
     local titleLeft = BuildIconBadge(f, noteID, note)
@@ -2086,6 +2088,13 @@ local function CreateStickyFrame(noteID)
     end
     bodyEb:HookScript("OnMouseUp", OnBodyMouseUp)
     sf2:HookScript("OnMouseUp", OnBodyMouseUp)
+    -- ALL-95: the lock cursor over a locked note's text
+    local function LockKind()
+        local note = f._noteID and BNB.GetNote(f._noteID)
+        if note and StickyNoteIsLocked(note) then return "lock" end
+    end
+    BNB.SetHoverCursor(bodyEb, LockKind)
+    BNB.SetHoverCursor(sf2, LockKind)
     richScroll:HookScript("OnMouseUp", OnBodyMouseUp)
     richRender:HookScript("OnMouseUp", OnBodyMouseUp)
 

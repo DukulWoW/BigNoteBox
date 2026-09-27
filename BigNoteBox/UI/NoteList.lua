@@ -986,6 +986,7 @@ end
 
 local function EndDrag(commit)
     _dragTimer = nil
+    BNB.ClearCursor()   -- ALL-95
     local ghost = _dragGhost
     if ghost then ghost:Hide() end
     local dl = _dropLine; if dl then dl:Hide() end
@@ -1377,9 +1378,12 @@ local function CreateListEntry(parent)
         local noteID = self._noteID; if not noteID then return end
         local noteCheck = BNB.GetNote(noteID)
         if noteCheck and noteCheck.pinned then return end  -- pinned notes not draggable
+        -- ALL-95: holding hand once the note is carried (no open hand while
+        -- held first: Dukul, 2026-09-27, "Looks weird")
         _holdTimer = C_Timer.NewTimer(0.15, function()
             _holdTimer = nil
             _dragNoteID = noteID
+            BNB.ShowCursor("hold")
             local note  = BNB.GetNote(noteID)
             local ghost = GetOrCreateDragGhost()
             if ghost._lbl then ghost._lbl:SetText(note and note.title or "") end
@@ -1490,6 +1494,7 @@ local function CreateListEntry(parent)
     btn:SetScript("OnMouseUp", function(self, mouseBtn)
         if mouseBtn ~= "LeftButton" then return end
         if _holdTimer then _holdTimer:Cancel(); _holdTimer = nil end
+        BNB.ClearCursor()   -- ALL-95
         if _dragGhost then _dragGhost:SetScript("OnUpdate", nil) end
         if _dragNoteID then EndDrag(true) end
     end)

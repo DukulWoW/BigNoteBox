@@ -60,6 +60,7 @@ local function CreateAnchorEditor()
             end
         end
     end)
+    BNB.SetMoveCursor(f)   -- ALL-95
 
     -- Tooltip
     f:SetScript("OnEnter", function(self)
