@@ -1836,3 +1836,94 @@ L["IMPORT_DONE_KEEP"]      = "|cff55cc55已导入 %d 条笔记。保留原角色
 L["IMPORT_NOTHING"]        = "没有可导入的内容。"
 L["POPUP_IMPORT_CONFIRM"]  = "即将从粘贴的文本中导入 |cffffcc00%d|r 条笔记。\n\n是否继续？"
 L["INSPECT_TIP_OPEN"]      = "打开现有笔记"
+
+-- ── Translations delivered 2026-09-27 ────────────────────────────────────────
+-- Note list: right-click context menu, hidden stickies
+L["NL_CTX_CLOSE_STICKY"] = "关闭便笺"
+L["NL_CTX_CLOSE_ESC_STICKY"] = "关闭 ESC 便笺"
+L["STICKY_HIDDEN_KEY_FMT"] = "已隐藏 %d 条便笺。按 %s 再次显示。"
+L["STICKY_HIDDEN_BTN_FMT"] = "已隐藏 %d 条便笺。点击主窗口标题栏中的眼睛图标再次显示。"
+L["STICKY_HIDDEN_LOGIN_KEY_FMT"] = "仍有 %d 条便笺处于隐藏状态。按 %s 显示。"
+L["STICKY_HIDDEN_LOGIN_BTN_FMT"] = "仍有 %d 条便笺处于隐藏状态。点击主窗口标题栏中的眼睛图标显示。"
+L["MW_EYE_HIDE_TIP"] = "隐藏便笺"
+L["MW_EYE_HIDE_SUB"] = "隐藏游戏世界中的所有便笺。ESC 便笺不受影响。"
+L["MW_EYE_SHOW_TIP"] = "显示便笺"
+L["MW_EYE_SHOW_SUB_FMT"] = "已隐藏 %d 条便笺。"
+L["MW_EYE_KEY_FMT"] = "快捷键：%s"
+L["MINIMAP_STICKIES_HIDDEN_FMT"] = "已隐藏 %d 条便笺"
+L["MINIMAP_STICKIES_SHOW_KEY_FMT"] = "按 %s 显示"
+
+-- History window
+L["HW_CTX_OPEN_EDITOR"] = "在编辑器中打开笔记"
+L["HW_CTX_CLEAR_NOTE"] = "清除此笔记的历史记录"
+L["HW_CLEAR_NOTE_CONFIRM_FMT"] = "清除“%s”的全部历史记录？此操作无法撤销。"
+
+-- Setup wizard
+L["SW_KB_TARGETNOTE"] = "根据目标创建笔记"
+L["SW_KB_ORACLE"] = "Oracle 搜索"
+
+-- Sidebar
+L["FOCUS_LOCKED"] = "此笔记已锁定。解锁后才能使用专注模式。"
+L["CHAR_MERGED_FMT"] = "已将 %d 条笔记从此角色的旧重复副本移至 %s。"
+
+-- Slash commands
+L["SLASH_HELP_SEARCH"] = "  /bnb search [文本] - 搜索所有笔记（Oracle 搜索）"
+
+-- Config / settings
+L["CFG_TAB_MODULES"] = "模块"
+L["CFG_TAB_NOTES"] = "笔记"
+
+-- Tag manager
+L["TAG_MGR_SHOW_NOTES"] = "显示笔记"
+L["TAG_MGR_CTX_GOTO"] = "前往笔记"
+L["TAG_MGR_CTX_REMOVE_TAG"] = "移除此标签"
+
+-- Insert game info
+L["INSERT_TIME"] = "时间"
+
+-- Oracle search
+L["ORACLE_PLACEHOLDER"] = "搜索所有笔记..."
+L["ORACLE_NO_MATCHES"] = "没有符合搜索条件的笔记。"
+L["ORACLE_NO_NOTES"] = "你还没有任何笔记。"
+L["ORACLE_SCOPE_GLOBAL"] = "全局"
+L["ORACLE_HINT"] = "回车：打开    Shift：便笺    Ctrl：专注模式    Alt：参考框"
+L["ORACLE_HINT_EMPTY"] = "输入 ? 查看所有搜索前缀"
+L["ORACLE_BADGE_NPC"] = "NPC 笔记"
+L["ORACLE_BADGE_MOB"] = "NPC 笔记：可攻击"
+L["ORACLE_BADGE_ELITE"] = "NPC 笔记：精英、稀有或首领"
+L["ORACLE_BADGE_ALLIANCE"] = "玩家笔记：联盟"
+L["ORACLE_BADGE_HORDE"] = "玩家笔记：部落"
+L["ORACLE_BADGE_QUEST"] = "任务、对话或书籍笔记"
+L["ORACLE_BADGE_ITEM"] = "含有物品"
+L["ORACLE_BADGE_RICH"] = "富文本笔记"
+L["ORACLE_BADGE_SITUATION"] = "含有情境信息"
+L["ORACLE_BADGE_ALARM"] = "含有提醒"
+L["ORACLE_BADGE_TASKS"] = "含有任务"
+L["ORACLE_HINT_TRASH"] = "回车：在回收站中显示    Shift：恢复"
+L["ORACLE_RESTORED_FMT"] = "已从回收站恢复“%s”。"
+L["ORACLE_PREFIX_STICKY"] = "s"
+L["ORACLE_PREFIX_FOCUS"] = "f"
+L["ORACLE_PREFIX_REFBOX"] = "r"
+L["ORACLE_PREFIX_TRASH"] = "b"
+L["ORACLE_PREFIX_PLAYER"] = "p"
+L["ORACLE_PREFIX_NPC"] = "n"
+L["ORACLE_PREFIX_ITEM"] = "i"
+L["ORACLE_PREFIX_ZONE"] = "z"
+L["ORACLE_PREFIX_CHAR"] = "c"
+L["ORACLE_PREFIX_GLOBAL"] = "g"
+L["ORACLE_PREFIX_TASKS"] = "t"
+L["ORACLE_PREFIX_ALARM"] = "a"
+L["ORACLE_PREFIX_RICH"] = "x"
+L["ORACLE_PREFIX_PLAIN"] = "l"
+L["ORACLE_PREFIX_DATE"] = "d"
+L["ORACLE_DATE_TODAY"] = "今天"
+L["ORACLE_DATE_YESTERDAY"] = "昨天"
+L["ORACLE_DATE_WEEK"] = "一周"
+L["ORACLE_DATE_MONTH"] = "一个月"
+L["ORACLE_DATE_YEAR"] = "一年"
+L["ORACLE_HELP_SYNTAX"] = "先输入前缀字母，每个字母后面加一个空格，然后输入搜索词。"
+L["ORACLE_HELP_OPENAS"] = "打开方式，选择一项："
+L["ORACLE_HELP_FILTERS"] = "仅显示，可自由组合："
+L["ORACLE_HELP_OTHER"] = "在搜索的任意位置："
+L["ORACLE_HELP_EXAMPLES"] = "示例："
+L["ORACLE_HELP_DATE_NUMBERS"] = "7（天前）、2026、2026-09"
