@@ -32,7 +32,8 @@ local GROUPS = {
     stretch = { label = "Stretch",                 mode = "stretch", anchor = "CENTER" },
     menu    = { label = "Menu art (Forever, ALL-111)", mode = "stretch", anchor = "CENTER" },
 }
-local GROUP_ORDER = { "tile", "fit", "prof", "strip", "stretch", "menu" }
+GROUPS.added = { label = "Added in game", mode = "tile", anchor = "TOPLEFT" }
+local GROUP_ORDER = { "tile", "fit", "prof", "strip", "stretch", "menu", "added" }
 
 local LIST = {
     { g = "tile", id = 8198947, path = "interface/framegeneral/uicommonbackgrounds.blp" },
@@ -125,7 +126,7 @@ for _, a in ipairs(ANCHORS) do ANCHOR_AL[a[1]] = { a[2], a[3] } end
 
 local DEF_BASE = { 0.07, 0.07, 0.09 }   -- sticky COL_BG (UI/StickyNote.lua)
 local INSET    = 3                        -- sticky "Default" border inset
-local C_W, C_H = 320, 610
+local C_W, C_H = 320, 690
 local C_PAD    = 16
 
 local _ctl, _pv
@@ -392,6 +393,52 @@ local function NumBox(parent, w, onSet)
     return host
 end
 
+-- ── Textures added in game (file ID, path optional) ─────────────────────────
+-- Kept in devBgLab.custom as { id, path } and appended to LIST as group
+-- "added", so new finds from wow.export can be tried without a code change.
+local function CustomKey(id, path)
+    local base = path ~= "" and path:match("([^/]+)$") or nil
+    base = base and base:gsub("%.[^.]+$", "") or nil
+    return (base and base ~= "") and base or ("file" .. id)
+end
+
+local function AppendCustom(c)
+    for i, e in ipairs(LIST) do
+        if e.id == c.id then return i end
+    end
+    LIST[#LIST + 1] = { g = "added", id = c.id, path = c.path or "", key = CustomKey(c.id, c.path or "") }
+    return #LIST
+end
+
+local _customLoaded
+local function LoadCustom()
+    if _customLoaded then return end
+    _customLoaded = true
+    for _, c in ipairs(Store().custom or {}) do AppendCustom(c) end
+end
+
+local function AddCustom(id, path)
+    path = (path or ""):gsub("\\", "/"):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    local s = Store()
+    s.custom = s.custom or {}
+    for i, e in ipairs(LIST) do
+        if e.id == id then return i end   -- already in the list: just go there
+    end
+    s.custom[#s.custom + 1] = { id = id, path = path }
+    return AppendCustom(s.custom[#s.custom])
+end
+
+local function RemoveCustom(i)
+    local e = LIST[i]
+    if not (e and e.g == "added") then return end
+    local s = Store()
+    for n = #(s.custom or {}), 1, -1 do
+        if s.custom[n].id == e.id then table.remove(s.custom, n) end
+    end
+    s.e[e.key] = nil
+    table.remove(LIST, i)
+end
+
 local function Go(i)
     _idx = ((i - 1) % #LIST) + 1
     Store().idx = _idx
@@ -588,6 +635,51 @@ local function BuildControl()
         Refresh()
     end)
     f.sampleCb = sample
+    y = y - 34
+
+    -- Add a texture by file ID (path optional, only used for the key and export)
+    BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_ADD_HDR"], y, cw)
+    y = y - 20
+    local function PlainBox(w)
+        local host = BNB.CreateBackdropFrame("Frame", nil, body)
+        host:SetSize(w, 20)
+        BNB.SetBackdropDark(host)
+        local eb = CreateFrame("EditBox", nil, host)
+        eb:SetAllPoints()
+        eb:SetTextInsets(6, 6, 0, 0)
+        eb:SetFontObject("GameFontHighlightSmall")
+        eb:SetAutoFocus(false)
+        eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        host.eb = eb
+        return host
+    end
+    local idBox = PlainBox(80)
+    idBox:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
+    idBox.eb:SetNumeric(true)
+    local pathBox = PlainBox(cw - 80 - 60 - 12)
+    pathBox:SetPoint("LEFT", idBox, "RIGHT", 6, 0)
+    local function DoAdd()
+        local id = tonumber(idBox.eb:GetText())
+        if not id or id <= 0 then return end
+        local i = AddCustom(id, pathBox.eb:GetText())
+        idBox.eb:SetText(""); pathBox.eb:SetText("")
+        idBox.eb:ClearFocus(); pathBox.eb:ClearFocus()
+        Go(i)
+    end
+    idBox.eb:SetScript("OnEnterPressed", DoAdd)
+    idBox.eb:SetScript("OnTabPressed", function() pathBox.eb:SetFocus() end)
+    pathBox.eb:SetScript("OnEnterPressed", DoAdd)
+    local addBtn = SmallBtn(body, L["DEV_WIN_BGLAB_ADD"], 60, DoAdd)
+    addBtn:SetPoint("LEFT", pathBox, "RIGHT", 6, 0)
+    local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPLEFT", idBox, "BOTTOMLEFT", 0, -3)
+    hint:SetText(L["DEV_WIN_BGLAB_ADD_HINT"])
+    local removeBtn = SmallBtn(body, L["DEV_WIN_BGLAB_REMOVE"], 110, function()
+        RemoveCustom(_idx)
+        Go(math.min(_idx, #LIST))
+    end)
+    removeBtn:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y - 24)
+    f.removeBtn = removeBtn
     return f
 end
 
@@ -613,6 +705,7 @@ Refresh = function()
     f.skip:SetChecked(st.skip == true)
     local showSample = not Store().noSample
     f.sampleCb:SetChecked(showSample)
+    f.removeBtn:SetShown(e.g == "added")
     if _pv then
         if showSample then _pv.sample:Show() else _pv.sample:Hide() end
     end
@@ -621,6 +714,7 @@ end
 
 function BNB.OpenBackgroundLab()
     if not BigNoteBoxDB then return end
+    LoadCustom()
     if not _ctl then BuildControl() end
     _pv = _pv or BuildPreview()
     if not _pv:GetPoint() then _pv:SetPoint("RIGHT", _ctl, "LEFT", -12, 0) end
