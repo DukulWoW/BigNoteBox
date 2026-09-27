@@ -913,6 +913,7 @@ local function PopulateStickySettings(noteID)
     local SyncColorizeSlider
 
     SubLbl(ct2, L["STICKY_BG_TEXTURE_LABEL"])
+    BNB.StickyBG.LoadClassic()   -- lists BigNoteBox_BGs' old TGAs too (ALL-110)
     local curTexKey   = cfg.bgTexture or "none"
     local curTexLabel = BgTextureLabel(curTexKey)
 
@@ -922,7 +923,11 @@ local function PopulateStickySettings(noteID)
         local texDrop = CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate")
         texDrop:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
         texDrop:SetWidth(SETTINGS_CW)
+        -- A saved key whose texture is unavailable (BigNoteBox_BGs missing)
+        -- matches no radio: the button reads "None", the key stays saved
+        if texDrop.SetDefaultText then pcall(texDrop.SetDefaultText, texDrop, L["STICKY_BG_NONE"]) end
         texDrop:SetupMenu(function(_, root)
+            pcall(function() root:SetScrollMode(30 * 20) end)
             for _, t in ipairs(BG_TEXTURES) do
                 local entry = t
                 root:CreateRadio(entry.label,

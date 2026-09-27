@@ -64,7 +64,7 @@ local DEFAULT_CFG = {
     borderScale      = 100,
     borderOffset     = 2,
     borderBrightness = 100,
-    bgTexture      = "none", -- key into BG_TEXTURES; "none" = plain colour, no texture
+    bgTexture      = "none", -- key into BNB.StickyBG (UI/StickyBackgrounds.lua); "none" = plain colour
     bgColorOpacity = 1.0,    -- 0.0 = raw paper colour (white tint), 1.0 = full chosen colour
 }
 
@@ -248,52 +248,11 @@ local function LoadGeometry(noteID, frame)
 end
 
 -- ── Background texture registry ───────────────────────────────────────────────
--- Each entry: { key, label, file, mode, anchor, scale, w, h }, drawn by
--- BNB.BgLayer (UI/BgLayer.lua, ALL-110); w/h = native size, which the old
--- backdrop tiled at 256. "none" is always first (plain colour).
--- Add new textures here as assets are created; no other file needs changing.
-local BG_TEXTURES = {
-    { key = "none",         label = L["STICKY_BG_NONE"] },
-    { key = "bg-stone",     label = L["STICKY_BG_STONE"],          mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga" },
-    { key = "bgtexture-01", label = L["STICKY_BG_OLD_WHITE_PAPER"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
-    { key = "bgtexture-02", label = L["STICKY_BG_DAMAGED_STONE"],  mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-02.tga" },
-    { key = "bgtexture-03", label = L["STICKY_BG_BLACK_MARBLE"],   mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-03.tga" },
-    { key = "bgtexture-04", label = L["STICKY_BG_GOLDEN_PAPER"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-04.tga" },
-    { key = "bgtexture-05", label = L["STICKY_BG_OLD_DUTCH_PAPER"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-05.tga" },
-    { key = "bgtexture-06", label = L["STICKY_BG_PARCHMENT"],      mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-06.tga" },
-    { key = "bgtexture-08", label = L["STICKY_BG_CREASED_PAPER"],  mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-08.tga" },
-    { key = "bgtexture-12", label = L["STICKY_BG_DARK_MARBLE"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-12.tga" },
-    { key = "bgtexture-16", label = L["STICKY_BG_SANDSTONE"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-16.tga" },
-    { key = "bgtexture-17", label = L["STICKY_BG_WORN_LEATHER"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-17.tga" },
-    { key = "bgtexture-19", label = L["STICKY_BG_DARK_GRANITE"],   mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-19.tga" },
-    { key = "bgtexture-20", label = L["STICKY_BG_DARK_STONE"], mode = "stretch",
-      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-20.tga" },
-}
-
-local function GetBgTextureDef(key)
-    if key and key ~= "none" then
-        for _, t in ipairs(BG_TEXTURES) do
-            if t.key == key then return t end
-        end
-    end
-    return BG_TEXTURES[1]
-end
-
-local function BgTextureLabel(key)
-    return GetBgTextureDef(key).label
-end
+-- Lives in UI/StickyBackgrounds.lua (BNB.StickyBG, ALL-110). BG_TEXTURES is
+-- its LIST, extended in place when BigNoteBox_BGs registers the old TGAs.
+local BG_TEXTURES     = BNB.StickyBG.LIST
+local GetBgTextureDef = BNB.StickyBG.Get
+local BgTextureLabel  = BNB.StickyBG.Label
 
 -- Background Lab "Try on stickies" (ALL-110): one def shown on every open
 -- sticky instead of its own texture. Runtime only, never saved.

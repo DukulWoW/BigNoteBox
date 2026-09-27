@@ -24,8 +24,9 @@ local GROUPS = {
     stretch = { label = "Stretch",                 mode = "stretch", anchor = "CENTER" },
     menu    = { label = "Menu art (Forever, ALL-111)", mode = "stretch", anchor = "CENTER" },
 }
+GROUPS.batch2 = { label = "Second batch (added in game)", mode = "tile", anchor = "TOPLEFT" }
 GROUPS.added = { label = "Added in game", mode = "tile", anchor = "TOPLEFT" }
-local GROUP_ORDER = { "tile", "fit", "prof", "strip", "stretch", "menu", "added" }
+local GROUP_ORDER = { "tile", "fit", "prof", "strip", "stretch", "menu", "batch2", "added" }
 
 local LIST = {
     { g = "tile", id = 8198947, path = "interface/framegeneral/uicommonbackgrounds.blp" },
@@ -91,9 +92,24 @@ local LIST = {
     { g = "stretch", id = 4659666, path = "interface/professions/professionbackgroundart.blp" },
 
     { g = "menu", id = 1575078, path = "interface/encounterjournal/loottab-item-background.blp" },
+
+    -- Dukul's second batch, first added in game on Forever (ALL-110); listed
+    -- here so the Lab on the other client checks them too. No paths known.
+    { g = "batch2", id = 191123,  path = "" },
+    { g = "batch2", id = 235412,  path = "" },
+    { g = "batch2", id = 457640,  path = "" },
+    { g = "batch2", id = 609607,  path = "" },
+    { g = "batch2", id = 644000,  path = "" },
+    { g = "batch2", id = 650623,  path = "" },
+    { g = "batch2", id = 839173,  path = "" },
+    { g = "batch2", id = 1119242, path = "" },
+    { g = "batch2", id = 1260093, path = "" },
+    { g = "batch2", id = 4671747, path = "" },
+    { g = "batch2", id = 5703596, path = "" },
+    { g = "batch2", id = 7486947, path = "" },
 }
 for _, e in ipairs(LIST) do
-    e.key = e.path:match("([^/]+)%.blp$")
+    e.key = e.path:match("([^/]+)%.blp$") or ("file" .. e.id)
 end
 
 local BL      = BNB.BgLayer
