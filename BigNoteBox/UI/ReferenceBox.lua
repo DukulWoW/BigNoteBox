@@ -106,8 +106,17 @@ end
 local function GetMaxItems() return DB().refboxMaxItems or 20 end
 local function IsCompact()   return DB().refboxDisplayStyle == "compact" end
 
--- Returns true if the note has model viewer data (inspect notes or target notes with npcID)
+-- The Reference Box and Tasks switch off independently (ALL-102). With the
+-- Reference Box off and Tasks on, this window is a tasks-only window: no add
+-- strip, attachment list, side tabs or model, and the task panel fills it.
+local function RBOn()      return DB().referenceBoxEnabled ~= false end
+local function TasksOnly() return not RBOn() end   -- only ever open with Tasks on
+K.RBOn, K.TasksOnly = RBOn, TasksOnly
+
+-- Returns true if the note has model viewer data (inspect notes or target notes with npcID).
+-- The model belongs to the Reference Box: false for every note while it is off.
 local function IsInspectNote(id)
+    if not RBOn() then return false end
     local note = id and NDB() and NDB().notes and NDB().notes[id]
     if not note then return false end
     if note.source == "inspect" and note.inspectRaceID ~= nil then return true end
@@ -873,7 +882,7 @@ local _suppressShiftHook = false   -- set true while SendAttachmentToChat is ins
 
 local function TryAddLink(link)
     if _suppressShiftHook then return end
-    if not rbFrame or not rbFrame:IsShown() then return end
+    if not rbFrame or not rbFrame:IsShown() or TasksOnly() then return end
     if not IsShiftKeyDown() then return end
     if not _noteID then return end
     if not link or link == "" then return end
@@ -1194,7 +1203,7 @@ end
 -- ── Drag-and-drop ─────────────────────────────────────────────────────────────
 local function WireDragDrop(frame)
     frame:SetScript("OnReceiveDrag", function()
-        if not _noteID then return end
+        if not _noteID or TasksOnly() then return end
         -- On retail TWW/Midnight, GetCursorInfo for a spellbook drag returns:
         --   "spell", slotIndex, bookType, spellID
         -- The 4th return is the actual spellID; arg2 is the slot index.
@@ -1714,7 +1723,9 @@ function UpdateModeStrip()
         if _modeStrip then PositionModeStrip() end
     end
     if not _modeStrip then return end
-    local hasModel = IsInspectNote(_noteID)
+    -- The tabs switch between the model and the tasks view, so with Tasks off
+    -- both go and the note stays on its model (ALL-102)
+    local hasModel = IsInspectNote(_noteID) and BNB.TasksEnabled()
     _modeStrip:SetShown(hasModel)
     if not hasModel then return end
     if _modeStrip._sideTabs then UpdateSideTabs(); return end
@@ -1765,6 +1776,7 @@ local function BuildReferenceBox()
     manualStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(TITLE_H + 4))
     manualStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(TITLE_H + 4))
     manualStrip:SetHeight(MANUAL_H)
+    f._manualStrip = manualStrip   -- hidden in the tasks-only layout (ALL-102)
 
     local eb = CreateFrame("EditBox", nil, manualStrip, "BackdropTemplate")
     BNB.EnsureBackdrop(eb)
@@ -1917,6 +1929,7 @@ local function BuildReferenceBoxSkin()
     manualStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(SK_RB_TITLE_H + 4))
     manualStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(SK_RB_TITLE_H + 4))
     manualStrip:SetHeight(MANUAL_H)
+    f._manualStrip = manualStrip   -- hidden in the tasks-only layout (ALL-102)
 
     local eb = CreateFrame("EditBox", nil, manualStrip, "BackdropTemplate")
     BNB.EnsureBackdrop(eb)
@@ -2593,30 +2606,19 @@ local function HookMainWindowResize()
     end
 end
 
--- Returns the dynamic title string based on what the current note contains.
+-- The title lists what the window shows, joined with " + " (ALL-102):
+-- "Reference" whenever the Reference Box is on (its add strip and list are
+-- always there), "Model" for a note with a model, "Tasks" for a note with
+-- tasks. Tasks-only window (Reference Box off) = "Tasks".
 UpdateDynamicTitle = function()
     if not rbFrame then return end
-    local hasTasks   = BNB.Task and BNB.Task.HasTasks(_noteID)
-    local hasModel   = IsInspectNote(_noteID)
-    local note       = _noteID and BNB.GetNote(_noteID)
-    local hasAtts    = note and note.attachments and #note.attachments > 0
-
-    local title
-    if hasTasks and hasModel then
-        if _rbMode == "model" then
-            title = L["REFBOX_TITLE_TASKS_MODEL"]
-        else
-            title = L["REFBOX_TITLE_TASKS_REF"]
-        end
-    elseif hasTasks and hasAtts then
-        title = L["REFBOX_TITLE_TASKS_REF"]
-    elseif hasTasks then
-        title = L["REFBOX_TITLE_TASKS"]
-    elseif hasModel then
-        title = L["REFBOX_TITLE_REF_MODEL"]
-    else
-        title = L["REFBOX_TITLE"]
+    local parts = {}
+    if RBOn() then parts[#parts + 1] = L["REFBOX_PART_REF"] end
+    if IsInspectNote(_noteID) then parts[#parts + 1] = L["REFBOX_PART_MODEL"] end
+    if TasksOnly() or (BNB.Task and BNB.Task.Shows(_noteID)) then
+        parts[#parts + 1] = L["REFBOX_TITLE_TASKS"]
     end
+    local title = table.concat(parts, " + ")
 
     if rbFrame.SetTitle then
         rbFrame:SetTitle(title)
@@ -2631,17 +2633,34 @@ local function SetTitle(noteID)
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
+-- The window opens while either module is on (ALL-102).
+local function BoxUsable() return RBOn() or BNB.TasksEnabled() end
+
+-- True when the note has something this window shows: tasks (module on), and
+-- with the Reference Box on, attachments or a model.
+local function HasContent(noteID)
+    if BNB.Task and BNB.Task.Shows(noteID) then return true end
+    if not RBOn() then return false end
+    local atts = GetAttachments(noteID)
+    return (atts and #atts > 0) or IsInspectNote(noteID)
+end
+
+local function EnsureFrame()
+    if rbFrame then return end
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        rbFrame = BuildReferenceBoxSkin()
+    else
+        rbFrame = BuildReferenceBox()
+    end
+    HookMainWindowResize()
+    K.RegisterTaskCallback()
+end
+
 function BNB.OpenReferenceBox(noteID)
-    if DB().referenceBoxEnabled == false then return end
+    if not BoxUsable() then return end
     BNB.StampOpened(noteID)
     if not rbFrame then
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            rbFrame = BuildReferenceBoxSkin()
-        else
-            rbFrame = BuildReferenceBox()
-        end
-        HookMainWindowResize()
-        K.RegisterTaskCallback()
+        EnsureFrame()
         -- ESC normally reaches this box through the main window's key handler
         -- (MainWindow.lua OnEscapeKey), which stops the key there. Opened on
         -- its own (Oracle search, Alt) the main window is closed, so that
@@ -2693,6 +2712,40 @@ function BNB.ToggleReferenceBox()
     end
 end
 
+-- The editor bar's Tasks button (ALL-102). With the Reference Box on it adds a
+-- task, as it always did. As the tasks-only window's only way in, it opens or
+-- closes the window on a note with tasks, and adds the first task otherwise.
+function BNB.OnTasksBarButton(id)
+    if not id or not BNB.TasksEnabled() or not BNB.Task then return end
+    if TasksOnly() and BNB.Task.HasTasks(id) then
+        if rbFrame and rbFrame:IsShown() and _noteID == id then
+            BNB.CloseReferenceBox()
+        else
+            BNB.OpenReferenceBox(id)
+        end
+        return
+    end
+    local taskID = BNB.Task.AddTask(id, "")
+    if taskID then
+        BNB.OpenReferenceBox(id)
+        C_Timer.After(0.05, function()
+            if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
+        end)
+    end
+end
+
+-- Called when the Reference Box or Tasks switch changes (UI/Config/Modules.lua):
+-- relayout an open window for the new mode, or close it when it has nothing
+-- left to show.
+function BNB.ApplyRefBoxModules()
+    if not (rbFrame and rbFrame:IsShown()) then return end
+    if not BoxUsable() or (TasksOnly() and not HasContent(_noteID)) then
+        BNB.CloseReferenceBox()
+        return
+    end
+    BNB.OpenReferenceBox(_noteID)
+end
+
 -- Called by SelectNote on every note switch.
 -- Auto-opens if configured and note has attachments. Never auto-closes.
 function BNB.SyncReferenceBox(noteID)
@@ -2706,30 +2759,14 @@ function BNB.SyncReferenceBox(noteID)
     end
     _noteID = noteID
 
-    -- Auto-open: notes with attachments (inspect notes with gear), or target notes
-    -- with a stored NPC ID (model viewer via SetCreature, no attachments needed).
-    local note = NDB() and NDB().notes and NDB().notes[noteID]
-    local isTargetWithModel = note and note.source == "target" and note.targetNpcID ~= nil and not note.targetIsPet
-    -- Inspect notes always warrant opening: they have a model viewer and gear sections
-    -- even when note.attachments is empty (gear lives in inspectGearItems now).
-    local isInspectModel = note and note.source == "inspect" and note.inspectRaceID ~= nil
+    -- Auto-open on anything the window shows: attachments, a model (inspect
+    -- notes with gear, target notes with an NPC ID) or tasks (HasContent).
+    local hasContent = HasContent(noteID)
 
-    local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
-
-    if DB().refboxAutoOpen and DB().referenceBoxEnabled ~= false
+    if DB().refboxAutoOpen and BoxUsable()
        and BNB.mainFrame and BNB.mainFrame:IsShown() then
-        local atts = GetAttachments(noteID)
-        local shouldOpen = (atts and #atts > 0) or isTargetWithModel or isInspectModel or hasTasks
-        if shouldOpen then
-            if not rbFrame then
-                if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-                    rbFrame = BuildReferenceBoxSkin()
-                else
-                    rbFrame = BuildReferenceBox()
-                end
-                HookMainWindowResize()
-                K.RegisterTaskCallback()
-            end
+        if hasContent then
+            EnsureFrame()
             if not rbFrame:IsShown() then
                 _rbMode = IsInspectNote(noteID) and "model" or "attachments"
                 SetTitle(noteID)
@@ -2742,8 +2779,7 @@ function BNB.SyncReferenceBox(noteID)
 
     -- Already open: update title + content, or close if the new note has nothing
     if rbFrame and rbFrame:IsShown() then
-        local atts = GetAttachments(noteID)
-        if DB().refboxAutoOpen and (not atts or #atts == 0) and not isTargetWithModel and not isInspectModel and not hasTasks then
+        if DB().refboxAutoOpen and not hasContent then
             rbFrame:Hide()
             if _modeStrip then _modeStrip:Hide() end
             return

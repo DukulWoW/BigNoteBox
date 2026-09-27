@@ -1020,7 +1020,7 @@ local function RenderStickyTasks(noteID)
     for _, region in ipairs({ct:GetRegions()}) do region:Hide(); region:SetParent(nil) end
     ct._rows = {}
 
-    if not (BNB.Task and BNB.Task.HasTasks(noteID)) then
+    if not (BNB.Task and BNB.Task.Shows(noteID)) then
         ct:SetHeight(1)
         if f._taskFooterLbl then f._taskFooterLbl:SetText("") end
         return
@@ -1275,7 +1275,7 @@ end
 
 local function SN_SetTaskView(noteID, view)
     local f = openFrames[noteID]; if not f then return end
-    local showTasks = (view == "tasks") and BNB.Task and BNB.Task.HasTasks(noteID)
+    local showTasks = (view == "tasks") and BNB.Task and BNB.Task.Shows(noteID)
 
     -- When switching to tasks, render first so content is ready
     if showTasks then
@@ -1756,6 +1756,7 @@ local function CreateStickyFrame(noteID)
         ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
     end)
     f._tasksHdrBtn = tasksHdrBtn
+    if not BNB.TasksEnabled() then tasksHdrBtn:Hide() end   -- ALL-102
 
     -- ── Right-click context menu (ALL-83) ─────────────────────────────────────
     -- Same entries as the header buttons: Open in editor, Settings, Set/Edit
@@ -1801,7 +1802,7 @@ local function CreateStickyFrame(noteID)
                     end
                 end)
             end
-            do
+            if BNB.TasksEnabled() then   -- ALL-102
                 local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
                 local label
                 if not hasTasks then label = L["STICKY_CREATE_TASK_TIP"]
@@ -2231,7 +2232,7 @@ local function CreateStickyFrame(noteID)
 
     -- Determine initial view.
     local initView = GetStickyViewPref(noteID)
-    local openInTasks = initView == "tasks" and BNB.Task and BNB.Task.HasTasks(noteID)
+    local openInTasks = initView == "tasks" and BNB.Task and BNB.Task.Shows(noteID)
 
     if openInTasks then
         -- Defer one tick so frame geometry is resolved, then switch to task view.
@@ -2662,6 +2663,24 @@ function SN.RefreshNpcPortraits()
         if note and note.source == "target" then
             SetStickyNoteIcon(f._badgeTex, note)
             if f._miniTile then SetStickyNoteIcon(f._miniTile._iconTex, note) end
+        end
+    end
+end
+
+-- The Tasks switch changed (UI/Config/Modules.lua, ALL-102): show or hide
+-- each open sticky's Tasks header button; a sticky showing its tasks goes
+-- back to the note.
+function SN.ApplyTasksModule()
+    local on = BNB.TasksEnabled()
+    for id, f in pairs(openFrames) do
+        if f._tasksHdrBtn then f._tasksHdrBtn:SetShown(on) end
+        if not on and f._taskViewActive then
+            -- Keep the saved view, so Tasks back on reopens it in task view
+            local rec = StickyDB()[id]
+            local saved = rec and rec.view
+            SN_SetTaskView(id, "note")
+            rec = StickyDB()[id]
+            if rec then rec.view = saved end
         end
     end
 end

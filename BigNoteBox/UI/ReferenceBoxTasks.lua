@@ -19,6 +19,7 @@ local ASSETS = K.ASSETS
 -- never kept in a local, since the closures here run long after they are built.
 local RBFrame, NoteID, RBMode = K.RBFrame, K.NoteID, K.RBMode
 local IsInspectNote, OnModeClick = K.IsInspectNote, K.OnModeClick
+local TasksOnly = K.TasksOnly
 local UpdateModeStrip, UpdateModelViewer, UpdateDynamicTitle =
     K.UpdateModeStrip, K.UpdateModelViewer, K.UpdateDynamicTitle
 
@@ -72,7 +73,7 @@ ApplyTaskLayout = function(f)
     local sp      = f._taskSplitter
     local addWide = f._addTasksWide
 
-    local hasTasks   = BNB.Task and BNB.Task.HasTasks(NoteID())
+    local hasTasks   = BNB.Task and BNB.Task.Shows(NoteID())
     local hasModel   = IsInspectNote(NoteID())
     local hasAtts    = NoteID() and (function()
         local note = BNB.GetNote(NoteID())
@@ -94,6 +95,39 @@ ApplyTaskLayout = function(f)
     -- Hide wide add-tasks button by default
     if addWide then addWide:Hide() end
 
+    -- ── STATE: tasks-only window (Reference Box off, ALL-102) ─────────────────
+    -- No add strip, count, attachment list or splitter: the task panel fills
+    -- the window under the title, or the wide Add Tasks button sits there.
+    local strip, count = f._manualStrip, f._countLabel
+    local tasksOnly = TasksOnly()
+    if strip then strip:SetShown(not tasksOnly) end
+    if count then if tasksOnly then count:Hide() else count:Show() end end
+    if sf then sf:SetShown(not tasksOnly) end
+    if tasksOnly then
+        if sp then sp:Hide() end
+        local top = -(titleH + 4)
+        if hasTasks and taskPnl then
+            if _taskRowsNoteID ~= NoteID() or _taskRowsGen ~= _taskDataGen then
+                RenderTaskPanel()
+            end
+            taskPnl:Show()
+            taskPnl:SetFrameLevel(f:GetFrameLevel() + 50)
+            taskPnl:ClearAllPoints()
+            taskPnl:SetPoint("TOPLEFT",     f, "TOPLEFT",     0, top)
+            taskPnl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, botPad)
+        else
+            if taskPnl then taskPnl:Hide() end
+            if addWide then
+                addWide:ClearAllPoints()
+                addWide:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  top - 4)
+                addWide:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, top - 4)
+                addWide:SetHeight(26)
+                addWide:Show()
+            end
+        end
+        return
+    end
+
     -- ── STATE: inspect/target note, model mode ────────────────────────────────
     if hasModel and RBMode() == "model" then
         if taskPnl then taskPnl:Hide() end
@@ -110,14 +144,17 @@ ApplyTaskLayout = function(f)
     if not hasTasks then
         if taskPnl then taskPnl:Hide() end
         if sp      then sp:Hide()      end
-        -- Scroll frame leaves room for the Add Tasks button at the bottom
+        -- Scroll frame leaves room for the Add Tasks button at the bottom,
+        -- unless the Tasks module is off (no button, ALL-102)
+        local tasksOn = BNB.TasksEnabled()
         if sf then
             sf:ClearAllPoints()
             sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0, contentTop)
-            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, botPad + ADD_TASKS_H)
+            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,
+                botPad + (tasksOn and ADD_TASKS_H or 0))
         end
         -- Wide "Add Tasks" button pinned just above the bottom edge
-        if addWide then
+        if addWide and tasksOn then
             addWide:ClearAllPoints()
             addWide:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,  botPad + 4)
             addWide:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, botPad + 4)
@@ -529,7 +566,7 @@ local function DoRenderTaskPanel()
     _taskEdit = nil
     _taskRowsNoteID, _taskRowsGen = nil, _taskDataGen
 
-    local hasTasks = BNB.Task and BNB.Task.HasTasks(NoteID())
+    local hasTasks = BNB.Task and BNB.Task.Shows(NoteID())
     local taskPnl  = RBFrame()._taskPanel
 
     -- No tasks: hide task panel, ApplyTaskLayout shows the wide button instead

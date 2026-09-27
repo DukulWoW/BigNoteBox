@@ -230,7 +230,9 @@ function BNB.SetListCollapsed(collapsed)
         if collapsed then BNB._favBtn:Hide() else BNB._favBtn:Show() end
     end
     if BNB._taskFilterBtn then
-        if collapsed then BNB._taskFilterBtn:Hide() else BNB._taskFilterBtn:Show() end
+        -- Stays hidden while the Tasks module is off (ALL-102)
+        local show = not collapsed and BNB.TasksEnabled()
+        if show then BNB._taskFilterBtn:Show() else BNB._taskFilterBtn:Hide() end
     end
     if BNB._tagTreeBtn then
         if collapsed then BNB._tagTreeBtn:Hide() else BNB._tagTreeBtn:Show() end
@@ -542,6 +544,19 @@ local function BuildSearchBar(parent)
     BNB._searchOuterClear = outerClear
     BNB._applyOuterClearState = ApplyOuterClearState
 
+    -- Tasks module off (ALL-102): no task filter button, its filter cleared,
+    -- and the reset button and search bar close the gap it leaves.
+    function BNB.ApplyTaskFilterButton()
+        local on = BNB.TasksEnabled()
+        if not on and _taskFilterActive then SetTaskFilter(false) end
+        taskFilterBtn:SetShown(on and not BNB._listCollapsed)
+        outerClear:ClearAllPoints()
+        outerClear:SetPoint("LEFT", on and taskFilterBtn or favBtn, "RIGHT", OUTER_GAP, 0)
+        local room = OUTER_ROOM - (on and 0 or (OUTER_BTN + OUTER_GAP))
+        bar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -(2 + room), -2)
+    end
+    BNB.ApplyTaskFilterButton()
+
     -- Update reset button state whenever search text changes
     eb:HookScript("OnTextChanged", function()
         ApplyOuterClearState()
@@ -748,6 +763,8 @@ NOTE_ACTIONS.alarm     = function(noteID)
     end)
 end
 NOTE_ACTIONS.task      = function(noteID)
+    -- Tasks off (ALL-102): a double-click set to "Add task" just opens the note
+    if not BNB.TasksEnabled() then NOTE_ACTIONS.open(noteID); return end
     if BNB.SelectNote then BNB.SelectNote(noteID) end
     C_Timer.After(0.05, function()
         if not BNB._currentNoteID then return end
@@ -871,7 +888,7 @@ function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
                     end)
                 end
             end
-            do
+            if BNB.TasksEnabled() then   -- ALL-102
                 local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
                 local taskLabel = hasTasks and L["NL_CTX_ADD_TASK"] or L["NL_CTX_CREATE_TASK"]
                 root:CreateButton(taskLabel, function() NOTE_ACTIONS.task(noteID) end)
@@ -1678,7 +1695,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
     local isNoteLocked = (note.locked == true)
         or (note.locked == nil and BigNoteBoxDB.lockNotes == true)
     -- Task icon and lock icon: each shifts the title right by 13px.
-    local hasTasks = BNB.Task and BNB.Task.HasTasks(note.id) or false
+    local hasTasks = BNB.Task and BNB.Task.Shows(note.id) or false
     local showTaskIcon = hasTasks and not collapsed
     local showLockIcon = isNoteLocked and not collapsed
     local iconOffset = textLeft

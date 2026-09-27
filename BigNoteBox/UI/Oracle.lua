@@ -73,6 +73,9 @@ local BADGES = {
         return type(note.context) == "string" and note.context ~= "" end },
     { file = "s-icon-alarm",    tip = "ORACLE_BADGE_ALARM",
       show = function(note) return note.alarm ~= nil end },
+    -- Only while the Tasks module is on (ALL-102)
+    { file = "s-icon-tasks",    tip = "ORACLE_BADGE_TASKS", show = function(note)
+        return BNB.Task ~= nil and BNB.Task.Shows(note.id) end },
 }
 
 local bar, panel, eb, placeholder, hintFS, emptyFS

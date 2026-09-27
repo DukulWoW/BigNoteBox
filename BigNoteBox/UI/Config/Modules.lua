@@ -411,8 +411,28 @@ local function BuildPlayerNpcPage(sf, ct, y)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
-local function BuildTasksPage(sf, ct, y)
+local function BuildTasksPage(sf, ct, y, page)
     -- ── Tasks ────────────────────────────────────────────────────────────────────
+    -- Module switch (ALL-102). Applies live: off hides every way in (editor
+    -- bar, Reference Box panel, note list, stickies) and keeps the task data.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_TASKS_ENABLE_LABEL"],
+        function() return BNB.TasksEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.tasksEnabled = v
+            if not v and BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
+                BNB.TaskEditWindow.Close()
+            end
+            if BNB.ApplySaveMode         then BNB.ApplySaveMode()         end   -- editor bar button
+            if BNB.ApplyTaskFilterButton then BNB.ApplyTaskFilterButton() end   -- note list filter
+            if BNB.ApplyRefBoxModules    then BNB.ApplyRefBoxModules()    end   -- Reference Box / tasks window
+            if BNB.Sticky and BNB.Sticky.ApplyTasksModule then BNB.Sticky.ApplyTasksModule() end
+            if BNB.RefreshNoteList       then BNB.RefreshNoteList()       end   -- row task icons
+        end,
+        L["CFG_TASKS_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
     y = AddCheck(ct, y, L["CFG_CHK_TASK_REMOVE_LABEL"],
         function() return BigNoteBoxDB and BigNoteBoxDB.taskRemoveOnComplete == true end,
         function(v)
@@ -697,16 +717,16 @@ local function BuildRefBoxPage(sf, ct, y, page)
                 w:SetAlpha(a)
                 if w.SetEnabled then w:SetEnabled(enabled) end
             end
-            -- Hide the editor bar button and close its gap (NoteEditor.lua)
-            if BNB.ApplySaveMode then BNB.ApplySaveMode() end
-            if not enabled and BNB.CloseReferenceBox then
-                BNB.CloseReferenceBox()
-            end
         end
 
         rbEnableCb:SetScript("OnClick", function(self)
             db.referenceBoxEnabled = self:GetChecked() and true or false
             ApplyRBSection(db.referenceBoxEnabled)
+            -- Hide the editor bar button and close its gap (NoteEditor.lua)
+            if BNB.ApplySaveMode then BNB.ApplySaveMode() end
+            -- An open window switches to or from the tasks-only layout, or
+            -- closes when it has nothing left to show (ALL-102)
+            if BNB.ApplyRefBoxModules then BNB.ApplyRefBoxModules() end
         end)
 
         ApplyRBSection(db.referenceBoxEnabled ~= false)

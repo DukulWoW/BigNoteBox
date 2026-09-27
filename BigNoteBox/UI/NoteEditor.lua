@@ -83,22 +83,27 @@ end
 -- Automatic save mode hides the Save button and closes its gap: the buttons
 -- after it are anchored at fixed x offsets, so each moves left by one slot.
 -- The Reference Box button does the same when that module is off (Dukul,
--- 2026-09-28; it used to stay, greyed). _baseX is recorded once, when the
--- toolbar is built. Called on save-mode and Reference Box toggles.
+-- 2026-09-28; it used to stay, greyed), and so does the Tasks button when
+-- Tasks is off (ALL-102). _baseX is recorded once, when the toolbar is built.
+-- Called on save-mode, Reference Box and Tasks toggles.
 local SAVE_SLOT_W = 32
 function BNB.ApplySaveMode()
     local bar = BNB._editorToolbar
     if not (bar and saveBtn) then return end
     local auto = BNB.IsAutoSave and BNB.IsAutoSave()
     saveBtn:SetShown(not auto)
+    local hidden = {}   -- module buttons switched off, each closing its slot
     local rb    = BNB._editorRefBoxBtn
     local rbOff = BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled == false
-    if rb then rb:SetShown(not rbOff) end
+    if rb then rb:SetShown(not rbOff); if rbOff then hidden[#hidden + 1] = rb end end
+    local tb    = BNB._editorTasksBtn
+    local tbOff = BNB.TasksEnabled and not BNB.TasksEnabled()
+    if tb then tb:SetShown(not tbOff); if tbOff then hidden[#hidden + 1] = tb end end
     for _, c in ipairs({ bar:GetChildren() }) do
         if c._baseX then
             local shift = auto and SAVE_SLOT_W or 0
-            if rbOff and rb and rb._baseX and c._baseX > rb._baseX then
-                shift = shift + SAVE_SLOT_W
+            for _, h in ipairs(hidden) do
+                if h._baseX and c._baseX > h._baseX then shift = shift + SAVE_SLOT_W end
             end
             c:ClearAllPoints()
             c:SetPoint("LEFT", bar, "LEFT", c._baseX - shift, 0)
@@ -668,7 +673,7 @@ local function BuildToolbar(parent)
         btn:SetScript("OnEnter", function(self)
             self:SetSize(bw + 4, bh + 4)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(tip, 1, 1, 1)
+            GameTooltip:AddLine(type(tip) == "function" and tip() or tip, 1, 1, 1)
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function(self)
@@ -706,20 +711,24 @@ local function BuildToolbar(parent)
         BNB._editorRefBoxBtn = refboxBtn
     end
 
-    -- Tasks button — adds a task to the current note (same as + button in RefBox)
+    -- Tasks button: adds a task to the current note (same as + button in RefBox).
+    -- With the Reference Box off it opens/closes the tasks-only window on a note
+    -- that has tasks (BNB.OnTasksBarButton, ALL-102); hidden while Tasks is off.
     do
-        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", L["NE_ADD_TASK_TIP"])
+        local function TasksTip()
+            local id = BNB._currentNoteID
+            local rbOff = BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled == false
+            if rbOff and id and BNB.Task and BNB.Task.HasTasks(id) then
+                return L["NE_TOGGLE_TASKS_TIP"]
+            end
+            return L["NE_ADD_TASK_TIP"]
+        end
+        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", TasksTip)
         tasksBtn:SetPoint("LEFT", bar, "LEFT", 70, 0)
         tasksBtn:SetScript("OnClick", function()
-            local id = BNB._currentNoteID; if not id then return end
-            local taskID = BNB.Task and BNB.Task.AddTask(id, "")
-            if taskID then
-                if BNB.OpenReferenceBox then BNB.OpenReferenceBox(id) end
-                C_Timer.After(0.05, function()
-                    if BNB.FocusTaskEditBox then BNB.FocusTaskEditBox(taskID) end
-                end)
-            end
+            if BNB.OnTasksBarButton then BNB.OnTasksBarButton(BNB._currentNoteID) end
         end)
+        BNB._editorTasksBtn = tasksBtn
     end
 
     -- Delete

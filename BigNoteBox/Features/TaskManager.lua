@@ -132,6 +132,18 @@ function T.HasTasks(noteID)
     return note and note.tasks and #note.tasks > 0
 end
 
+-- The Tasks module switch (Settings > Modules > Tasks, ALL-102). Off hides
+-- every way in (editor bar, Reference Box panel, note list, stickies); the
+-- task data stays, so switching it back on brings every task back.
+function BNB.TasksEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.tasksEnabled ~= false
+end
+
+-- HasTasks for anything that draws tasks: false while the module is off.
+function T.Shows(noteID)
+    return BNB.TasksEnabled() and T.HasTasks(noteID) or false
+end
+
 -- Returns done count, total count.
 function T.GetCompletionCount(noteID)
     local tasks = T.GetTasks(noteID)

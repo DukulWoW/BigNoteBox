@@ -418,6 +418,7 @@ local function InitSettingsDB()
 
     -- Reference Box
     if db.referenceBoxEnabled  == nil then db.referenceBoxEnabled  = true     end
+    if db.tasksEnabled         == nil then db.tasksEnabled         = true     end   -- ALL-102
     if db.refboxDisplayStyle   == nil then db.refboxDisplayStyle   = "normal" end
     if db.refboxMaxItems       == nil then db.refboxMaxItems       = 50       end
     if db.refboxAutoOpen       == nil then db.refboxAutoOpen       = true     end
