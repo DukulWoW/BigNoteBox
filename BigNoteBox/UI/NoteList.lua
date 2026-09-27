@@ -31,7 +31,7 @@ local ICON_BORDER  = "Interface\\Common\\WhiteIconFrame"
 local COL_GOLD   = { 1,    0.82, 0,    1 }
 local COL_WHITE  = { 1,    1,    1,    1 }
 local COL_GREY   = { 0.58, 0.58, 0.58, 1 }
-local COL_SEL_BG = { 1,    0.82, 0,    0.12 }
+local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G/B (ALL-98)
 
 local listEntries   = {}
 BNB._listEntries    = listEntries   -- shared with TagTree.lua
@@ -45,7 +45,8 @@ function BNB.GetCurrentFilter()    return currentFilter    end
 -- Drag-reorder state
 local _dragNoteID   = nil   -- noteID being dragged
 local _dragGhost    = nil   -- semi-transparent overlay frame
-local _dragInsertAt = nil   -- target insert index in noteOrder
+local _dragTargetID = nil   -- drop goes before this note id (after it when _dragAfter)
+local _dragAfter    = false
 local _dragTimer    = nil   -- hold-to-drag delay timer
 
 -- Multi-select state
@@ -690,6 +691,119 @@ end
 
 -- extraTop(root) — optional, lets a caller elsewhere (e.g. Tag Manager note
 -- rows) inject its own entries right after the title, before "Open".
+--------------------------------------------------------------------------------
+-- NOTE ACTIONS
+-- One body per action, shared by the right-click menu and the list's
+-- double-click setting (BigNoteBoxDB.listDoubleClick, nil = "settings",
+-- ALL-100). Toggles flip the note's current state.
+--------------------------------------------------------------------------------
+local function NoteIsLocked(n)
+    return (n.locked == true) or (n.locked == nil and BigNoteBoxDB.lockNotes == true)
+end
+
+-- "esc" / "world" when the note is open as a sticky of that kind, else nil.
+-- An ESC sticky counts as open while the ESC menu is closed (SN.IsOpen).
+local function StickyOpenKind(noteID)
+    if not (BNB.Sticky and BNB.Sticky.IsOpen and BNB.Sticky.IsOpen(noteID)) then return nil end
+    local rec = BigNoteBoxDB and BigNoteBoxDB.postits and BigNoteBoxDB.postits[noteID]
+    return (rec and rec.cfg and rec.cfg.escOnly == true) and "esc" or "world"
+end
+
+-- A toggle: the same kind already open closes (as its X does); the other
+-- kind moves over; not open opens (Dukul, 2026-09-28).
+local function OpenAsSticky(noteID, escOnly)
+    if not (BNB.Sticky and BNB.Sticky.Open) then return end
+    if StickyOpenKind(noteID) == (escOnly and "esc" or "world") then
+        BNB.Sticky.Close(noteID); return
+    end
+    -- Close it first if already open, so SN.Open rebuilds it with the right
+    -- strata. Before writing escOnly: closing an ESC sticky resets escOnly to
+    -- false (the X "back to normal" gesture), which undid an ESC open every
+    -- second time, and the reset was saved across reloads.
+    if BNB.Sticky.IsOpen(noteID) then BNB.Sticky.Close(noteID) end
+    -- Write an explicit escOnly so the global stickyEscDefault doesn't re-apply.
+    local db = BigNoteBoxDB
+    if db then
+        db.postits = db.postits or {}
+        db.postits[noteID] = db.postits[noteID] or {}
+        db.postits[noteID].cfg = db.postits[noteID].cfg or {}
+        db.postits[noteID].cfg.escOnly = escOnly
+    end
+    BNB.Sticky.Open(noteID)   -- ESC-only mode shows the ESC menu
+end
+
+local NOTE_ACTIONS = {}
+NOTE_ACTIONS.open      = function(noteID) BNB.SaveCurrentNote(); BNB.SelectNote(noteID) end
+NOTE_ACTIONS.settings  = function(noteID)
+    if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
+end
+NOTE_ACTIONS.sticky    = function(noteID) OpenAsSticky(noteID, false) end
+NOTE_ACTIONS.escSticky = function(noteID) OpenAsSticky(noteID, true) end
+NOTE_ACTIONS.alarm     = function(noteID)
+    if BNB.SelectNote then BNB.SelectNote(noteID) end
+    C_Timer.After(0.05, function()
+        if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then
+            BNB.AlarmWindow.OpenLeftOfMain(noteID)
+        end
+    end)
+end
+NOTE_ACTIONS.task      = function(noteID)
+    if BNB.SelectNote then BNB.SelectNote(noteID) end
+    C_Timer.After(0.05, function()
+        if not BNB._currentNoteID then return end
+        local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
+        if taskID then
+            if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+            C_Timer.After(0.05, function()
+                if BNB.FocusTaskEditBox then
+                    BNB.FocusTaskEditBox(taskID)
+                end
+            end)
+        end
+    end)
+end
+-- OpenFocusMode refuses a locked note itself (FOCUS_LOCKED)
+NOTE_ACTIONS.focus     = function(noteID)
+    BNB.SaveCurrentNote(); BNB.SelectNote(noteID)
+    if BNB._currentNoteID == noteID and BNB.OpenFocusMode then BNB.OpenFocusMode() end
+end
+NOTE_ACTIONS.pin       = function(noteID)
+    local n = BNB.GetNote(noteID); if not n then return end
+    BNB.UpdateNote(noteID, { pinned = not n.pinned })
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+end
+NOTE_ACTIONS.fav       = function(noteID)
+    local n = BNB.GetNote(noteID); if not n then return end
+    if n.favorited then
+        BNB.UpdateNote(noteID, { _clear = {"favorited"} })
+    else
+        BNB.UpdateNote(noteID, { favorited = true })
+    end
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+end
+NOTE_ACTIONS.lock      = function(noteID)
+    local n = BNB.GetNote(noteID); if not n then return end
+    BNB.UpdateNote(noteID, { locked = not NoteIsLocked(n) })
+    if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
+    if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
+    if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
+    if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+end
+
+-- Settings > Notes lists these, in this order (UI/Config/Notes.lua)
+BNB.LIST_DOUBLE_CLICK_ACTIONS = {
+    { value = "settings",  key = "NL_CTX_OPEN_SETTINGS" },
+    { value = "open",      key = "CFG_DBL_NONE" },
+    { value = "sticky",    key = "NL_CTX_OPEN_STICKY" },
+    { value = "escSticky", key = "NL_CTX_OPEN_ESC_STICKY" },
+    { value = "focus",     key = "CFG_DBL_FOCUS" },
+    { value = "alarm",     key = "CFG_DBL_ALARM" },
+    { value = "task",      key = "NL_CTX_ADD_TASK" },
+    { value = "lock",      key = "CFG_DBL_LOCK" },
+    { value = "fav",       key = "CFG_DBL_FAV" },
+    { value = "pin",       key = "CFG_DBL_PIN" },
+}
+
 function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
     local note = BNB.GetNote(noteID)
     if not note then return end
@@ -735,55 +849,19 @@ function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
             if extraTop then extraTop(root) end
 
             -- Open
-            root:CreateButton(L["NL_CTX_OPEN"], function()
-                BNB.SaveCurrentNote(); BNB.SelectNote(noteID)
-            end)
-            root:CreateButton(L["NL_CTX_OPEN_SETTINGS"], function()
-                if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
-            end)
-            root:CreateButton(L["NL_CTX_OPEN_STICKY"], function()
-                if BNB.Sticky and BNB.Sticky.Open then
-                    -- Ensure this opens as a normal world sticky.
-                    -- Write explicit false so global stickyEscDefault doesn't re-apply.
-                    local db = BigNoteBoxDB
-                    if db then
-                        db.postits = db.postits or {}
-                        db.postits[noteID] = db.postits[noteID] or {}
-                        db.postits[noteID].cfg = db.postits[noteID].cfg or {}
-                        db.postits[noteID].cfg.escOnly = false
-                    end
-                    if BNB.Sticky.IsOpen(noteID) then BNB.Sticky.Close(noteID) end
-                    BNB.Sticky.Open(noteID)
-                end
-            end)
-            root:CreateButton(L["NL_CTX_OPEN_ESC_STICKY"], function()
-                if BNB.Sticky and BNB.Sticky.Open then
-                    -- Force ESC-only mode then open — SN.Open will show the ESC menu.
-                    local db = BigNoteBoxDB
-                    if db then
-                        db.postits = db.postits or {}
-                        db.postits[noteID] = db.postits[noteID] or {}
-                        db.postits[noteID].cfg = db.postits[noteID].cfg or {}
-                        db.postits[noteID].cfg.escOnly = true
-                    end
-                    -- Close the note first if already open as world sticky, so
-                    -- SN.Open rebuilds it with the correct strata.
-                    if BNB.Sticky.IsOpen(noteID) then BNB.Sticky.Close(noteID) end
-                    BNB.Sticky.Open(noteID)
-                end
-            end)
+            root:CreateButton(L["NL_CTX_OPEN"], function() NOTE_ACTIONS.open(noteID) end)
+            root:CreateButton(L["NL_CTX_OPEN_SETTINGS"], function() NOTE_ACTIONS.settings(noteID) end)
+            -- Labels say Close when the entry would close (it is a toggle)
+            local kind = StickyOpenKind(noteID)
+            root:CreateButton(kind == "world" and L["NL_CTX_CLOSE_STICKY"] or L["NL_CTX_OPEN_STICKY"],
+                function() NOTE_ACTIONS.sticky(noteID) end)
+            root:CreateButton(kind == "esc" and L["NL_CTX_CLOSE_ESC_STICKY"] or L["NL_CTX_OPEN_ESC_STICKY"],
+                function() NOTE_ACTIONS.escSticky(noteID) end)
             do
                 local n3 = BNB.GetNote(noteID)
                 local hasAlarm = n3 and n3.alarm ~= nil
                 local alarmLabel = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"]
-                root:CreateButton(alarmLabel, function()
-                    if BNB.SelectNote then BNB.SelectNote(noteID) end
-                    C_Timer.After(0.05, function()
-                        if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then
-                            BNB.AlarmWindow.OpenLeftOfMain(noteID)
-                        end
-                    end)
-                end)
+                root:CreateButton(alarmLabel, function() NOTE_ACTIONS.alarm(noteID) end)
                 if hasAlarm then
                     root:CreateButton(L["NL_CTX_REMOVE_ALARM"], function()
                         if BNB.Alarm and BNB.Alarm.ClearAlarm then
@@ -796,75 +874,20 @@ function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
             do
                 local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
                 local taskLabel = hasTasks and L["NL_CTX_ADD_TASK"] or L["NL_CTX_CREATE_TASK"]
-                root:CreateButton(taskLabel, function()
-                    if BNB.SelectNote then BNB.SelectNote(noteID) end
-                    C_Timer.After(0.05, function()
-                        if not BNB._currentNoteID then return end
-                        local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
-                        if taskID then
-                            if BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
-                            C_Timer.After(0.05, function()
-                                if BNB.FocusTaskEditBox then
-                                    BNB.FocusTaskEditBox(taskID)
-                                end
-                            end)
-                        end
-                    end)
-                end)
+                root:CreateButton(taskLabel, function() NOTE_ACTIONS.task(noteID) end)
             end
 
             root:CreateDivider()
 
-            -- Pin / Unpin
+            -- Pin / Unpin, Favorite / Unfavorite, Lock / Unlock
             local n = BNB.GetNote(noteID)
             if n then
-                if n.pinned then
-                    root:CreateButton(L["NL_CTX_UNPIN"], function()
-                        BNB.UpdateNote(noteID, { pinned = false })
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-                else
-                    root:CreateButton(L["NL_CTX_PIN"], function()
-                        BNB.UpdateNote(noteID, { pinned = true })
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-                end
-                -- Favorite / Unfavorite
-                if n.favorited then
-                    root:CreateButton(L["NL_CTX_UNFAV"], function()
-                        BNB.UpdateNote(noteID, { _clear = {"favorited"} })
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-                else
-                    root:CreateButton(L["NL_CTX_FAV"], function()
-                        BNB.UpdateNote(noteID, { favorited = true })
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-                end
-            end
-
-            -- Lock / Unlock
-            local n2 = BNB.GetNote(noteID)
-            if n2 then
-                local isLocked = (n2.locked == true)
-                    or (n2.locked == nil and BigNoteBoxDB.lockNotes == true)
-                if isLocked then
-                    root:CreateButton(L["NL_CTX_UNLOCK"], function()
-                        BNB.UpdateNote(noteID, { locked = false })
-                        if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
-                        if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
-                        if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
-                        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                    end)
-                else
-                    root:CreateButton(L["NL_CTX_LOCK"], function()
-                        BNB.UpdateNote(noteID, { locked = true })
-                        if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
-                        if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
-                        if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
-                        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                    end)
-                end
+                root:CreateButton(n.pinned and L["NL_CTX_UNPIN"] or L["NL_CTX_PIN"],
+                    function() NOTE_ACTIONS.pin(noteID) end)
+                root:CreateButton(n.favorited and L["NL_CTX_UNFAV"] or L["NL_CTX_FAV"],
+                    function() NOTE_ACTIONS.fav(noteID) end)
+                root:CreateButton(NoteIsLocked(n) and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"],
+                    function() NOTE_ACTIONS.lock(noteID) end)
             end
 
             root:CreateButton(L["NL_CTX_DUPLICATE"], function() DuplicateNote(noteID) end)
@@ -953,17 +976,20 @@ local function CanDragReorder()
         and (currentTagFilter == nil)
 end
 
+-- Ghost and drop line in BNB green, the Sidebar's ACTIVE_R/G/B (ALL-98)
+local DRAG_R, DRAG_G, DRAG_B = 0.40, 0.85, 0.40
+
 local function GetOrCreateDragGhost()
     if _dragGhost then return _dragGhost end
     local g = CreateFrame("Frame", nil, UIParent)
     g:SetFrameStrata("TOOLTIP")
     g:SetSize(200, ENTRY_H_NORMAL)
-    BNB.SetBackdrop(g, 0.15, 0.15, 0.20, 0.85, 0.55, 0.55, 0.60, 1)
+    BNB.SetBackdrop(g, 0.15, 0.15, 0.20, 0.85, DRAG_R, DRAG_G, DRAG_B, 1)
     local lbl = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbl:SetPoint("LEFT", g, "LEFT", 8, 0)
     lbl:SetPoint("RIGHT", g, "RIGHT", -8, 0)
     lbl:SetJustifyH("LEFT")
-    lbl:SetTextColor(1, 0.82, 0, 1)
+    lbl:SetTextColor(DRAG_R, DRAG_G, DRAG_B, 1)
     g._lbl = lbl
     g:Hide()
     _dragGhost = g
@@ -978,7 +1004,7 @@ local function GetOrCreateDropLine()
               BNB._listScrollChild:CreateTexture(nil, "OVERLAY") or
               UIParent:CreateTexture(nil, "OVERLAY")
     l:SetHeight(2)
-    l:SetColorTexture(1, 0.82, 0, 0.9)
+    l:SetColorTexture(DRAG_R, DRAG_G, DRAG_B, 0.9)
     l:Hide()
     _dropLine = l
     return l
@@ -991,8 +1017,10 @@ local function EndDrag(commit)
     if ghost then ghost:Hide() end
     local dl = _dropLine; if dl then dl:Hide() end
 
-    if commit and _dragNoteID and _dragInsertAt then
-        -- Reorder noteOrder: move the dragged ID to _dragInsertAt
+    -- Reorder noteOrder: move the dragged id next to the target row's id.
+    -- Placed by id, not index: noteOrder also holds pinned notes and notes the
+    -- sidebar / favourite / task filters hide, anywhere in the sequence (ALL-98).
+    if commit and _dragNoteID and _dragTargetID and _dragTargetID ~= _dragNoteID then
         local order = BigNoteBoxNotesDB and BigNoteBoxNotesDB.noteOrder
         if order then
             local fromIdx = nil
@@ -1001,18 +1029,24 @@ local function EndDrag(commit)
             end
             if fromIdx then
                 table.remove(order, fromIdx)
-                -- Adjust insert index after removal
-                local insertIdx = _dragInsertAt
-                if insertIdx > fromIdx then insertIdx = insertIdx - 1 end
-                insertIdx = math.max(1, math.min(#order + 1, insertIdx))
-                table.insert(order, insertIdx, _dragNoteID)
+                local toIdx = nil
+                for i, id in ipairs(order) do
+                    if id == _dragTargetID then toIdx = i; break end
+                end
+                if toIdx then
+                    if _dragAfter then toIdx = toIdx + 1 end
+                    table.insert(order, toIdx, _dragNoteID)
+                else
+                    table.insert(order, fromIdx, _dragNoteID)   -- target gone: put it back
+                end
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end
         end
     end
 
     _dragNoteID   = nil
-    _dragInsertAt = nil
+    _dragTargetID = nil
+    _dragAfter    = false
 end
 
 --------------------------------------------------------------------------------
@@ -1321,7 +1355,7 @@ local function CreateListEntry(parent)
     previewLbl:SetWordWrap(true)
     btn._previewLbl = previewLbl
 
-    -- Double-click → open note settings
+    -- Double-click -> the action picked in Settings > Notes (ALL-100)
     btn:SetScript("OnClick", function(self, mouseBtn)
         if mouseBtn == "RightButton" then
             BNB.ShowNoteContextMenu(self, self._noteID)
@@ -1344,7 +1378,9 @@ local function CreateListEntry(parent)
                 _deselectTimer:Cancel()
                 _deselectTimer = nil
             end
-            if BNB.OpenNoteConfig then BNB.OpenNoteConfig(self._noteID) end
+            local act = NOTE_ACTIONS[BigNoteBoxDB.listDoubleClick or "settings"]
+                     or NOTE_ACTIONS.settings
+            act(self._noteID)
             return
         end
         _lastClick   = now
@@ -1405,86 +1441,42 @@ local function CreateListEntry(parent)
                 local childTopY = child:GetTop()
                 if not childTopY then return end
 
-                -- flat list in exact noteOrder sequence (noFloat=true, no sort)
-                local flatNotes = BNB.GetOrderedNotes("", nil, true)
-                local n = #flatNotes
-                if n == 0 then return end
-
-                -- Count pinned notes — they sit at the top and are NOT draggable.
-                -- Drag only operates on the regular (non-pinned) entries.
-                local eH = ENTRY_H
-                local pinnedCount = 0
-                for _, note in ipairs(flatNotes) do
-                    if note.pinned then pinnedCount = pinnedCount + 1 end
-                end
-                local regularCount = n - pinnedCount
-                if regularCount == 0 then return end
-
-                -- Build pixel offsets for the TOP of each regular entry.
-                -- Layout (pixels from child top):
-                --   [18px — PINNED — header if any pinned]
-                --   [pinnedCount * eH  pinned entries]
-                --   [8px divider + 18px — Notes (X) — header  (always shown)]
-                --   [18px — Notes (X) — header  (no pinned section)]
-                --   [regular entries]
-                local regularStartY = 18  -- always: "— Notes (X) —" header
-                if pinnedCount > 0 then
-                    regularStartY = 18 + pinnedCount * eH + 8 + 18
-                end
-
-                -- entryTops[i] = pixel offset of the TOP of regular entry i (1-based)
-                local entryTops = {}
-                for i = 1, regularCount do
-                    entryTops[i] = regularStartY + (i - 1) * eH
-                end
-
-                -- Snap points sit at MIDPOINTS between entries, plus sentinels at
-                -- the very top and very bottom of the regular section.
-                -- snapY[k] is the Y where we draw the drop line if insertAt == k.
-                --   k = 1  → line above first regular entry  (insertAt = 1)
-                --   k = i  → line between entry i-1 and i    (insertAt = i)
-                --   k = regularCount+1 → line below last entry
-                --
-                -- The cursor snaps to slot k when it is closer to the midpoint
-                -- between entry k-1 and entry k than to any other midpoint.
-                -- Midpoint between entry k-1 and entry k = entryTops[k] - eH/2
-                -- (for k=1 the sentinel midpoint is above the first entry).
-
-                -- snapLineY[k] = pixel Y (from child top) where the drop line draws
-                local snapLineY = {}
-                snapLineY[1] = regularStartY  -- above first entry
-                for k = 2, regularCount do
-                    snapLineY[k] = entryTops[k]  -- top of entry k = bottom of entry k-1
-                end
-                snapLineY[regularCount + 1] = regularStartY + regularCount * eH  -- below last
-
-                -- midpoints used for snapping: midpoint[k] decides boundary between
-                -- slot k and slot k+1
-                -- cursor snaps to slot k if it's between midpoint[k-1] and midpoint[k]
-                local function snapSlot(cursorY)
-                    -- cursorY in pixels from child top (positive downward)
-                    -- slot 1: above midpoint between slot1 and slot2
-                    -- slot k: between mid[k-1] and mid[k]
-                    local best = 1
-                    local bestDist = math.huge
-                    for k = 1, regularCount + 1 do
-                        local dist = math.abs(cursorY - snapLineY[k])
-                        if dist < bestDist then
-                            bestDist = dist
-                            best     = k
-                        end
+                -- ALL-98: snap to the rows as drawn, not a modelled layout. The
+                -- old model counted every note (the list may be filtered by the
+                -- sidebar, favourites or tasks), assumed ENTRY_H rows with headers
+                -- (collapsed mode has neither) and measured the cursor in UIParent
+                -- scale while the rows live in the main window's scale.
+                -- Pinned rows are not targets.
+                local rows = {}
+                for _, b in ipairs(listEntries) do
+                    if b:IsShown() and b._noteID and b:GetTop() then
+                        local nt = BNB.GetNote(b._noteID)
+                        if nt and not nt.pinned then rows[#rows + 1] = b end
                     end
-                    return best
                 end
+                local nRows = #rows
+                if nRows == 0 then return end
+                -- Top to bottom on screen (TagTree.lua reuses these rows in its own order)
+                table.sort(rows, function(a, b) return a:GetTop() > b:GetTop() end)
 
-                local cursorFromTop = childTopY - (cy / s2)
-                local slot = snapSlot(cursorFromTop)
-                -- _dragInsertAt is an index into the FULL noteOrder, offset by pinnedCount
-                _dragInsertAt = pinnedCount + slot
+                -- Boundary k (1..nRows) = top of row k; nRows+1 = bottom of the last.
+                -- All in the rows' own coordinates, cursor converted to match.
+                local cursorY = cy / child:GetEffectiveScale()
+                local best, bestDist, bestY = 1, math.huge, rows[1]:GetTop()
+                for k = 1, nRows + 1 do
+                    local y = (k <= nRows) and rows[k]:GetTop() or rows[nRows]:GetBottom()
+                    local dist = math.abs(cursorY - y)
+                    if dist < bestDist then best, bestDist, bestY = k, dist, y end
+                end
+                if best <= nRows then
+                    _dragTargetID, _dragAfter = rows[best]._noteID, false
+                else
+                    _dragTargetID, _dragAfter = rows[nRows]._noteID, true
+                end
 
                 local dl = GetOrCreateDropLine()
                 dl:ClearAllPoints()
-                local lineY = -(snapLineY[slot])
+                local lineY = bestY - childTopY + 1   -- 2 px line centred on the boundary
                 dl:SetPoint("TOPLEFT",  child, "TOPLEFT",  0, lineY)
                 dl:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, lineY)
                 dl:Show()

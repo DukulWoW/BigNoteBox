@@ -193,13 +193,13 @@ local function BuildFrameNormal(frameName, onClose, frameParent)
     grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
     grip:SetScript("OnMouseDown", function(self, btn)
         if btn == "LeftButton" then
-            f:ClearAllPoints()
-            f:SetPoint("TOPLEFT", f, "TOPLEFT", 0, 0)
-            f:StartSizing("BOTTOMRIGHT")
+            -- It used to anchor f to itself before StartSizing, which left the
+            -- frame with no position and threw it to a corner (ALL-97)
+            BNB.StartGripSizing(f)   -- UI/Widgets.lua
         end
     end)
     grip:SetScript("OnMouseUp", function(self, btn)
-        if btn == "LeftButton" then f:StopMovingOrSizing() end
+        if btn == "LeftButton" then BNB.StopGripSizing(f) end
     end)
     BNB.SetHoverCursor(grip, "resize")   -- ALL-95
 

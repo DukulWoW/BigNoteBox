@@ -2028,15 +2028,15 @@ end
 
 -- ── Position / size ───────────────────────────────────────────────────────────
 -- ── Content-height calculation ─────────────────────────────────────────────────
--- Called after RenderList so the window shrinks/grows with item count.
--- Height = title + manual strip + gap + count label + scroll content, clamped
--- to the main window height (same cap as ConfigWindow).
+-- Called after RenderList, on position and on main window resize; the height
+-- is fixed (ALL-99), so these only restore it if something changed it.
 SyncRefBoxHeight = function()
     if not rbFrame then return end
 
-    -- Always match the main window height — gives room for tasks, model, and attachments.
-    local maxH = (BNB.mainFrame and BNB.mainFrame:GetHeight())
-    local desired = (maxH and maxH > 100) and maxH or 700
+    -- Fixed height, the same as Note Config (640 = the main window's default).
+    -- It used to follow the main window, so a short main window squashed the
+    -- model / attachments / tasks layout (ALL-99, Dukul 2026-09-28).
+    local desired = 640
     local cur = rbFrame:GetHeight()
     if cur and math.abs(cur - desired) > 2 then
         rbFrame:SetHeight(desired)

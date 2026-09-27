@@ -697,10 +697,8 @@ local function BuildRefBoxPage(sf, ct, y, page)
                 w:SetAlpha(a)
                 if w.SetEnabled then w:SetEnabled(enabled) end
             end
-            if BNB._editorRefBoxBtn then
-                BNB._editorRefBoxBtn:SetEnabled(enabled)
-                BNB._editorRefBoxBtn:SetAlpha(enabled and 1.0 or 0.4)
-            end
+            -- Hide the editor bar button and close its gap (NoteEditor.lua)
+            if BNB.ApplySaveMode then BNB.ApplySaveMode() end
             if not enabled and BNB.CloseReferenceBox then
                 BNB.CloseReferenceBox()
             end

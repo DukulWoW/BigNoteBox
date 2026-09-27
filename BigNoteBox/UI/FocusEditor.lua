@@ -529,7 +529,7 @@ local function BuildFocusFrame()
     f:SetTitle(L["FOCUS_MODE_TITLE"])
 
     if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() BNB.CloseFocusModeAndBNB() end)
+        f.CloseButton:SetScript("OnClick", function() BNB.CloseFocusMode() end)   -- ALL-96: same as ESC
         f.CloseButton:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
             GameTooltip:AddLine(L["FOCUS_RESTORE_TIP"], 1, 1, 1)
@@ -869,7 +869,7 @@ local function BuildFocusFrameSkin()
     titleLbl:SetText(L["FOCUS_MODE_TITLE"])
 
     -- Close (X) button
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseFocusModeAndBNB() end)
+    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseFocusMode() end)   -- ALL-96: same as ESC
     closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
     closeBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
@@ -1339,22 +1339,6 @@ function BNB.CloseFocusMode()
             if snap.richPreview and BNB.RichPreview          then BNB.RichPreview.Open()       end
         end)
     end
-end
-
---------------------------------------------------------------------------------
--- PUBLIC: CLOSE FOCUS MODE AND BNB  (X button path)
--- Same as CloseFocusMode but also hides the main BNB window afterwards.
---------------------------------------------------------------------------------
-function BNB.CloseFocusModeAndBNB()
-    BNB.CloseFocusMode()
-    -- Hide main window after the fade completes so it doesn't flash
-    C_Timer.After(FADE_TIME + 0.1, function()
-        if BNB.mainFrame and BNB.mainFrame:IsShown() then
-            BNB.mainFrame._skipConfirm = true
-            BNB.mainFrame:Hide()
-            BNB.mainFrame._skipConfirm = false
-        end
-    end)
 end
 
 --------------------------------------------------------------------------------

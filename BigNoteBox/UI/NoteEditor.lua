@@ -82,17 +82,26 @@ end
 
 -- Automatic save mode hides the Save button and closes its gap: the buttons
 -- after it are anchored at fixed x offsets, so each moves left by one slot.
--- _baseX is recorded once, when the toolbar is built.
+-- The Reference Box button does the same when that module is off (Dukul,
+-- 2026-09-28; it used to stay, greyed). _baseX is recorded once, when the
+-- toolbar is built. Called on save-mode and Reference Box toggles.
 local SAVE_SLOT_W = 32
 function BNB.ApplySaveMode()
     local bar = BNB._editorToolbar
     if not (bar and saveBtn) then return end
     local auto = BNB.IsAutoSave and BNB.IsAutoSave()
     saveBtn:SetShown(not auto)
+    local rb    = BNB._editorRefBoxBtn
+    local rbOff = BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled == false
+    if rb then rb:SetShown(not rbOff) end
     for _, c in ipairs({ bar:GetChildren() }) do
         if c._baseX then
+            local shift = auto and SAVE_SLOT_W or 0
+            if rbOff and rb and rb._baseX and c._baseX > rb._baseX then
+                shift = shift + SAVE_SLOT_W
+            end
             c:ClearAllPoints()
-            c:SetPoint("LEFT", bar, "LEFT", c._baseX - (auto and SAVE_SLOT_W or 0), 0)
+            c:SetPoint("LEFT", bar, "LEFT", c._baseX - shift, 0)
         end
     end
 end
@@ -1862,6 +1871,24 @@ function BNB.AM_EnterViewMode(id)
                 end
             end
         end)
+
+        -- Double-click the rendered text (or the empty area below it) opens the
+        -- editor, unless the note is locked (ALL-93). Neither frame type has
+        -- OnDoubleClick: two presses within 0.35s, as the sticky inline edit.
+        local lastPress = 0
+        local function OnPress(_, btn)
+            if btn ~= "LeftButton" then return end
+            local now = GetTime()
+            if now - lastPress > 0.35 then lastPress = now; return end
+            lastPress = 0
+            if not BNB._editorInViewMode or BNB._editorLocked then return end
+            BNB.AM_EnterEditMode()
+            C_Timer.After(0, function()
+                if BNB._editorBody and not BNB._editorInViewMode then BNB._editorBody:SetFocus() end
+            end)
+        end
+        rsf:EnableMouse(true); rsf:HookScript("OnMouseDown", OnPress)
+        rf:EnableMouse(true);  rf:HookScript("OnMouseDown", OnPress)
 
         rsf:Hide()
     end

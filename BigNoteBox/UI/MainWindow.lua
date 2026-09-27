@@ -73,8 +73,9 @@ end
 
 local function RestoreWindowPos(f)
     local pos = BigNoteBoxDB.windowPos
-    local w = math.max(pos.w or DEFAULT_W, MIN_W)
-    local h = math.max(pos.h or DEFAULT_H, MIN_H)
+    -- Capped at the screen, so a size saved at a smaller UI scale still fits (ALL-97)
+    local w = math.max(math.min(pos.w or DEFAULT_W, UIParent:GetWidth()),  MIN_W)
+    local h = math.max(math.min(pos.h or DEFAULT_H, UIParent:GetHeight()), MIN_H)
     f:SetSize(w, h)
     if pos.x and pos.x ~= 0 then
         local s = f:GetEffectiveScale()
@@ -293,6 +294,13 @@ end
 
 local function OnEscapeKey(self, key)
     if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
+    -- The game's ESC menu (an ESC sticky opens it) sits on top of our windows:
+    -- let the game close it first. Sticky settings opened over it still close
+    -- before it, below.
+    local ss = _G["BigNoteBoxStickySettingsFrame"]
+    if GameMenuFrame and GameMenuFrame:IsShown() and not (ss and ss:IsShown()) then
+        self:SetPropagateKeyboardInput(true); return
+    end
     self:SetPropagateKeyboardInput(false)
     -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
     -- (sidebar right-click → Change icon), Insert Info menu
@@ -422,7 +430,7 @@ function BNB.CreateMainWindow()
         if BNB.RaiseBNBWindows then BNB.RaiseBNBWindows() end
     end)
 
-    -- ── Title-bar buttons: focus mode, scale lock (right to left) ─────────────
+    -- ── Title-bar buttons: focus mode, sticky eye, scale lock (right to left) ─
     if chrome.closeBtn then
         local focusBtn = MakeTexBtn(chrome.btnParent, "bt-focus", chrome.btnSize,
             function() if BNB.OpenFocusMode then BNB.OpenFocusMode() end end,
@@ -434,8 +442,36 @@ function BNB.CreateMainWindow()
         focusBtn:SetAlpha(0.35)
         pcall(function() focusBtn._n:SetDesaturated(true) end)
 
+        -- Sticky eye (ALL-101): open = stickies shown (click hides them all),
+        -- closed = hidden by Hide all / its keybind. Two buttons, one shown.
+        local function ToggleStickies()
+            if BNB.Sticky and BNB.Sticky.ToggleHidden then BNB.Sticky.ToggleHidden() end
+        end
+        local eyeOpen = MakeTexBtn(chrome.btnParent, "bt-eye-open", chrome.btnSize,
+            ToggleStickies, L["MW_EYE_HIDE_TIP"], L["MW_EYE_HIDE_SUB"])
+        local eyeClosed = MakeTexBtn(chrome.btnParent, "bt-eye-closed", chrome.btnSize,
+            ToggleStickies, L["MW_EYE_SHOW_TIP"])
+        for _, eb in ipairs({ eyeOpen, eyeClosed }) do
+            eb:SetPoint("RIGHT", focusBtn, "LEFT", -chrome.btnGap, 0)
+            eb:HookScript("OnEnter", function(self)
+                local SN = BNB.Sticky
+                if self == eyeClosed and SN and SN.HiddenCount then
+                    GameTooltip:AddLine(string.format(L["MW_EYE_SHOW_SUB_FMT"], SN.HiddenCount()), 0.78, 0.78, 0.78)
+                end
+                local key = SN and SN.HideKeyText and SN.HideKeyText()
+                if key then GameTooltip:AddLine(string.format(L["MW_EYE_KEY_FMT"], key), 0.55, 0.55, 0.55) end
+                GameTooltip:Show()
+            end)
+        end
+        function BNB.RefreshStickyEyeBtn()
+            local hidden = BigNoteBoxDB and BigNoteBoxDB.stickiesHidden == true
+            eyeOpen:SetShown(not hidden)
+            eyeClosed:SetShown(hidden)
+        end
+        BNB.RefreshStickyEyeBtn()
+
         local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
-        lockBtn:SetPoint("RIGHT", focusBtn, "LEFT", -chrome.btnGap, 0)
+        lockBtn:SetPoint("RIGHT", eyeOpen, "LEFT", -chrome.btnGap, 0)
 
         if chrome.AddTitleButtons then chrome.AddTitleButtons(lockBtn, MakeTexBtn) end
     end
@@ -774,23 +810,16 @@ function BNB.CreateMainWindow()
 
     resizeHandle:SetScript("OnMouseDown", function(self, btn)
         if btn ~= "LeftButton" then return end
-        -- GetLeft/GetTop return nil if the frame hasn't been laid out yet;
-        -- otherwise they are already in UIParent coordinate space
-        local left, top = f:GetLeft(), f:GetTop()
-        if left and top then
-            f:ClearAllPoints()
-            f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
-        end
         _resizing = true
         -- Seed the label with current size before first OnSizeChanged fires
         UpdateSizeLabel()
         sizeLabel:Show()
-        f:StartSizing("BOTTOMRIGHT")
+        BNB.StartGripSizing(f)   -- ALL-97: not StartSizing (UI/Widgets.lua)
     end)
     resizeHandle:SetScript("OnMouseUp", function()
         _resizing = false
         sizeLabel:Hide()
-        f:StopMovingOrSizing()
+        BNB.StopGripSizing(f)
         local w = math.max(MIN_W, math.min(MAX_W, f:GetWidth()))
         local h = math.max(MIN_H, math.min(MAX_H, f:GetHeight()))
         f:SetSize(w, h)

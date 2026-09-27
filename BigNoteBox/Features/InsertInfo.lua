@@ -8,8 +8,8 @@
 --     • Set TomTom waypoint   — (shown only when TomTom is loaded)
 --     • Character name        — "Playername-Realm"
 --     • Target name           — name of current target (or "No target")
---     • Date                  — e.g. "2026-03-19"
---     • Date & time           — e.g. "2026-03-19 14:32"
+--     • Date / Time / Date and time — in the Appearance timestamp format,
+--       the same three choices as the toolbar stamp button (ALL-66)
 --
 -- Location format:
 --   /way Zone XX.X YY.Y
@@ -105,16 +105,6 @@ local function GetTargetName()
     return (BNB.UnitNameRealm("target")) or "Unknown"
 end
 
--- ── Date helpers ──────────────────────────────────────────────────────────────
-
-local function GetDateString()
-    return date("%Y-%m-%d")
-end
-
-local function GetDateTimeString()
-    return date("%Y-%m-%d %H:%M")
-end
-
 -- ── Insert into EditBox ───────────────────────────────────────────────────────
 
 local function InsertIntoEditBox(eb, text)
@@ -183,21 +173,19 @@ local function ShowInsertInfoMenuModern(eb)
 
         root:CreateDivider()
 
-        -- Date
-        root:CreateButton(
-            L["INSERT_DATE"] or "Date",
-            function()
-                InsertIntoEditBox(eb, GetDateString())
-            end
-        )
-
-        -- Date & time
-        root:CreateButton(
-            L["INSERT_DATETIME"] or "Date and time",
-            function()
-                InsertIntoEditBox(eb, GetDateTimeString())
-            end
-        )
+        -- Date / Time / Date and time: same choices and format as the
+        -- toolbar stamp menu (UI/WysiwygBar.lua), value previewed in grey
+        local now = time()
+        local d, t = BNB.FmtDate(now), BNB.FmtClock(now)
+        for _, it in ipairs({
+            { L["INSERT_DATE"],     d },
+            { L["INSERT_TIME"],     t },
+            { L["INSERT_DATETIME"], d .. " " .. t },
+        }) do
+            local value = it[2]
+            root:CreateButton(it[1] .. "  |cff888888" .. value .. "|r",
+                function() InsertIntoEditBox(eb, value) end)
+        end
     end)
 
     _infoDropdown:OpenMenu()

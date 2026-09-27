@@ -857,6 +857,7 @@ function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, 
     end)
 
     h.Slider = sl
+    h.Label  = lbl   -- for callers that re-lay the row (UI/Config/Appearance.lua)
     function h:SetValue(v)
         trackedVal = Snap(v)
         sl:SetValue(trackedVal)
@@ -1397,6 +1398,50 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         pcall(LCG2.AutoCastGlow_Start, hint,
             { 0.400, 0.733, 0.416, 1.0 }, nil, nil, nil, nil, nil, "bnb_clip")
     end
+end
+
+--------------------------------------------------------------------------------
+-- BOTTOM-RIGHT GRIP RESIZE (ALL-97)
+-- Replaces f:StartSizing("BOTTOMRIGHT"), which snapped the window's corner to
+-- the pointer (every click on the grip grew or shrank the window a little) and,
+-- with resize bounds larger than the screen and SetClampedToScreen, could throw
+-- the window to the top and blow it up to the whole screen (Dukul, 2026-09-28).
+-- Here the top-left is pinned, the size follows the pointer's movement from
+-- the press (not its position), within the frame's resize bounds and never past
+-- the screen's right or bottom edge. Call Start from the grip's OnMouseDown and
+-- Stop from its OnMouseUp; SetSize fires OnSizeChanged as StartSizing did.
+--------------------------------------------------------------------------------
+function BNB.StartGripSizing(f)
+    local left, top = f:GetLeft(), f:GetTop()
+    if not (left and top) then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+
+    local s        = f:GetEffectiveScale()
+    local cx, cy   = GetCursorPosition()
+    local w0, h0   = f:GetSize()
+    local minW, minH, maxW, maxH = f:GetResizeBounds()
+    -- Room to the screen's bottom-right, in the frame's own units
+    local screenW  = UIParent:GetWidth() * UIParent:GetEffectiveScale() / s
+    local roomW, roomH = screenW - left, top
+    maxW = (maxW and maxW > 0) and math.min(maxW, roomW) or roomW
+    maxH = (maxH and maxH > 0) and math.min(maxH, roomH) or roomH
+    -- No bounds set (Rich Preview): a floor so the window cannot vanish
+    if not minW or minW <= 0 then minW = 150 end
+    if not minH or minH <= 0 then minH = 100 end
+
+    local drv = f._gripDriver or CreateFrame("Frame")
+    f._gripDriver = drv
+    drv:SetScript("OnUpdate", function()
+        local x, y = GetCursorPosition()
+        local w = math.max(minW, math.min(maxW, w0 + (x - cx) / s))
+        local h = math.max(minH, math.min(maxH, h0 + (cy - y) / s))
+        f:SetSize(w, h)
+    end)
+end
+
+function BNB.StopGripSizing(f)
+    if f._gripDriver then f._gripDriver:SetScript("OnUpdate", nil) end
 end
 
 --------------------------------------------------------------------------------

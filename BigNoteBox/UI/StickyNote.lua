@@ -742,17 +742,11 @@ local function AddResizeHandle(frame, noteID)
     h:SetScript("OnMouseDown", function(_, btn)
         if btn ~= "LeftButton" or frame._minimized then return end
         h._sizing = true
-        local left = frame:GetLeft()
-        local top  = frame:GetTop()
-        if left and top then
-            frame:ClearAllPoints()
-            frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
-        end
-        frame:StartSizing("BOTTOMRIGHT")
+        BNB.StartGripSizing(frame)   -- ALL-97: not StartSizing (UI/Widgets.lua)
     end)
     h:SetScript("OnMouseUp", function()
         h._sizing = false
-        frame:StopMovingOrSizing()
+        BNB.StopGripSizing(frame)
         local w  = math.max(MIN_W, math.min(1200, frame:GetWidth()))
         local ht = math.max(MIN_H, math.min(800,  frame:GetHeight()))
         frame:SetSize(w, ht)
@@ -2473,6 +2467,7 @@ function SN.HideAll()
             if f._miniTile then f._miniTile:Hide() end
         end
     end
+    if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
 end
 
 -- Restore all open sticky frames and tiles that were hidden by HideAll().
@@ -2490,6 +2485,38 @@ function SN.ShowAll()
             end
         end
     end
+    if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
+end
+
+-- ALL-101: hiding is otherwise silent, so an accidental Ctrl+H looked like
+-- lost stickies. How many world stickies the hide flag is holding back.
+function SN.HiddenCount()
+    local db = BigNoteBoxDB
+    if not (db and db.stickiesHidden) then return 0 end
+    local n = 0
+    for _, f in pairs(openFrames) do
+        if not (f._cfg and f._cfg.escOnly) then n = n + 1 end
+    end
+    return n
+end
+
+-- The hide-all keybind as the player sees it ("CTRL-H"), or nil when unbound.
+function SN.HideKeyText()
+    local key = GetBindingKey("BIGNOTEBOXHIDESTICKIES")
+    return key and GetBindingText(key) or nil
+end
+
+-- Chat line saying how many are hidden and how to show them. atLogin picks
+-- the "still hidden" wording (stickiesHiddenPersist).
+function SN.PrintHiddenNotice(atLogin)
+    local n = SN.HiddenCount()
+    if n == 0 then return end
+    local key = SN.HideKeyText()
+    if key then
+        BNB:Print(string.format(L[atLogin and "STICKY_HIDDEN_LOGIN_KEY_FMT" or "STICKY_HIDDEN_KEY_FMT"], n, key))
+    else
+        BNB:Print(string.format(L[atLogin and "STICKY_HIDDEN_LOGIN_BTN_FMT" or "STICKY_HIDDEN_BTN_FMT"], n))
+    end
 end
 
 -- Toggle between HideAll and ShowAll based on current stickiesHidden flag.
@@ -2499,6 +2526,7 @@ function SN.ToggleHidden()
         SN.ShowAll()
     else
         SN.HideAll()
+        SN.PrintHiddenNotice(false)
     end
 end
 
@@ -2768,4 +2796,6 @@ function SN.RestoreSession()
             end)
         end
     end
+    -- ALL-101: say so when they come back hidden (after the 0.1s opens above)
+    if keepHidden then C_Timer.After(1, function() SN.PrintHiddenNotice(true) end) end
 end

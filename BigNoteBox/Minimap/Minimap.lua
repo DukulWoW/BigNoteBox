@@ -34,6 +34,16 @@ if LDB then
                 tooltip:AddLine(" ")
                 tooltip:AddLine(string.format(L["CONTEXT_BADGE"], BNB._contextNoteCount), 1, 0.82, 0)
             end
+            -- ALL-101: hidden stickies (Hide all / its keybind)
+            local hidden = BNB.Sticky and BNB.Sticky.HiddenCount and BNB.Sticky.HiddenCount() or 0
+            if hidden > 0 then
+                tooltip:AddLine(" ")
+                tooltip:AddLine(string.format(L["MINIMAP_STICKIES_HIDDEN_FMT"], hidden), 1, 0.5, 0.25)
+                local key = BNB.Sticky.HideKeyText and BNB.Sticky.HideKeyText()
+                if key then
+                    tooltip:AddLine(string.format(L["MINIMAP_STICKIES_SHOW_KEY_FMT"], key), 0.7, 0.7, 0.7)
+                end
+            end
         end,
     })
     BNB.ldbObject = ldbObject

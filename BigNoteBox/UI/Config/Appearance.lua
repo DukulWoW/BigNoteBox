@@ -267,6 +267,22 @@ local function BuildAppearanceTab(sf, ct)
     -- Forward declaration so preset callbacks above can call it before it's defined
     local RefreshBrightnessVisibility
 
+    -- One row per slider: slider, its value, "(Default: X.XX)", Reset
+    -- (Dukul, 2026-09-28: the Reset row and the left default label took space).
+    local function InlineSliderRow(sl, resetBtn)
+        resetBtn:ClearAllPoints()
+        resetBtn:SetPoint("RIGHT", sl, "RIGHT", 0, 0)
+        local lbl = sl.Label
+        lbl:ClearAllPoints()
+        lbl:SetPoint("RIGHT", resetBtn, "LEFT", -8, 0)
+        lbl:SetJustifyH("RIGHT")
+        lbl:SetText((lbl:GetText():gsub("^%s+", "")))
+        lbl:SetWidth(math.max(90, lbl:GetUnboundedStringWidth() + 2))
+        sl.Slider:ClearAllPoints()
+        sl.Slider:SetPoint("LEFT",  sl, "LEFT", 18, 0)
+        sl.Slider:SetPoint("RIGHT", lbl, "LEFT", -44, 0)   -- room for the value text
+    end
+
     -- Brightness slider (float 0.5–2.0, step 0.05)
     -- Hidden when OLED preset is selected (brightness is meaningless on pure black)
     local skinBrightnessLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -288,7 +304,7 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (36 + ROW_GAP)
 
     local skinBrightnessReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
-    skinBrightnessReset:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    InlineSliderRow(skinBrightnessSl, skinBrightnessReset)
     skinBrightnessReset:SetScript("OnClick", function()
         db.skinBrightness = nil
         skinBrightnessSl:SetValue(1.0)
@@ -296,7 +312,6 @@ local function BuildAppearanceTab(sf, ct)
             BNB.ApplyMainWindowSkin()
         end
     end)
-    y = y - (22 + ROW_GAP)
 
     -- Window opacity slider (0.0 - 1.0, step 0.05, default 0.97)
     local skinOpacityLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -318,7 +333,7 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (36 + ROW_GAP)
 
     local skinOpacityReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
-    skinOpacityReset:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    InlineSliderRow(skinOpacitySl, skinOpacityReset)
     skinOpacityReset:SetScript("OnClick", function()
         db.skinBgAlpha = nil
         skinOpacitySl:SetValue(0.97)
@@ -326,7 +341,6 @@ local function BuildAppearanceTab(sf, ct)
             BNB.ApplyMainWindowSkin()
         end
     end)
-    y = y - (22 + ROW_GAP)
     local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")

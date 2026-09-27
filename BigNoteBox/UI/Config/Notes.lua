@@ -67,6 +67,33 @@ local function BuildNotesTab(sf, ct)
         y = y - (32 + ROW_GAP)
     end
 
+    -- What double-clicking a note in the list does (ALL-100); nil = settings
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_LIST_DBLCLICK"])
+        y = y - (ROW_H + 2)
+
+        local entries = {}
+        for _, a in ipairs(BNB.LIST_DOUBLE_CLICK_ACTIONS) do
+            entries[#entries + 1] = { label = L[a.key], value = a.value }
+        end
+        local dcDD = BNB.CreateValueDropdown(ct, entries, db.listDoubleClick or "settings",
+            function(v) db.listDoubleClick = (v ~= "settings") and v or nil end,
+            CONTENT_W, 26)
+        dcDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        local tipOwner = dcDD._dd or dcDD
+        tipOwner:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_LIST_DBLCLICK"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_LIST_DBLCLICK_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - (32 + ROW_GAP)
+    end
+
     -- Moved from Advanced > Keybindings (ALL-84)
     y = MakeKeybindRow(ct, y, L["CFG_KB_NEW_NOTE"],
         "BIGNOTEBOXNEWNOTE",   L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_NEW_NOTE"])
