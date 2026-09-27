@@ -678,7 +678,7 @@ local function CreateSendDialog()
     end
 
     -- Send button (send.tga)
-    local sendBtn = MakeBottomIcon("Actionbar\\ab-send", L["STC_SEND_TIP"],
+    local sendBtn = MakeBottomIcon(BNB.AbIcon("send"), L["STC_SEND_TIP"],
         L["STC_SEND_TIP_SUB"])
     sendBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconLeftX, ICON_BTN_Y)
     sendBtn:SetScript("OnClick", function()

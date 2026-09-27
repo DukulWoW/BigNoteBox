@@ -1561,7 +1561,7 @@ local function CreateStickyFrame(noteID)
     -- Lock before the title on locked notes (same asset as the note list)
     local titleLock = header:CreateTexture(nil, "ARTWORK")
     titleLock:SetSize(TITLE_LOCK_SZ, TITLE_LOCK_SZ)
-    titleLock:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Actionbar\\ab-lock")
+    titleLock:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("lock"))
     titleLock:SetAlpha(TITLE_LOCK_ALPHA)
     titleLock:Hide()
     f._titleLock  = titleLock

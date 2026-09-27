@@ -1336,7 +1336,7 @@ local function CreateListEntry(parent)
     local lockIcon = btn:CreateTexture(nil, "OVERLAY")
     lockIcon:SetSize(12, 12)
     lockIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", textLeft, -8)
-    lockIcon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Actionbar\\ab-lock")
+    lockIcon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("lock"))
     lockIcon:SetAlpha(0.65)
     lockIcon:Hide()
     btn._lockIcon = lockIcon

@@ -19,6 +19,16 @@ BNB.version = BNB.ADDON_VERSION
 local _, _, _, _tocVersion = GetBuildInfo()
 BNB.IsForever = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE) and (_tocVersion or 0) < 100000
 
+-- Action bar icon path relative to Assets\ ("Actionbar\\ab-lock"). On Forever, icons
+-- that have an ab-forever-<name> variant use it; the rest keep the shared art.
+local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,
+                     send = true, tasks = true, unlock = true, duplicate = true,
+                     stickynote = true }
+function BNB.AbIcon(name)
+    if BNB.IsForever and FOREVER_AB[name] then return "Actionbar\\ab-forever-" .. name end
+    return "Actionbar\\ab-" .. name
+end
+
 -- A unit's name and realm, for note titles and player keys (FOR-23). Forever
 -- characters have a surname, and UnitName hands it back in the realm slot for
 -- other players ("Mango", "Thellama") but joined for yourself ("Dakdak Lo", nil).

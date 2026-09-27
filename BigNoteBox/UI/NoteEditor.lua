@@ -86,7 +86,10 @@ end
 -- 2026-09-28; it used to stay, greyed), and so does the Tasks button when
 -- Tasks is off (ALL-102). _baseX is recorded once, when the toolbar is built.
 -- Called on save-mode, Reference Box and Tasks toggles.
-local SAVE_SLOT_W = 32
+-- Forever's action bar art is more detailed, so its icons (and slots) are drawn
+-- AB_GROW px larger there (Dukul, 2026-09-27).
+local AB_GROW     = BNB.IsForever and 6 or 0
+local SAVE_SLOT_W = 32 + AB_GROW
 function BNB.ApplySaveMode()
     local bar = BNB._editorToolbar
     if not (bar and saveBtn) then return end
@@ -660,8 +663,9 @@ local function BuildToolbar(parent)
     -- Returns btn, tx. Calling btn:SetIconEnabled(bool) sets alpha + desaturation.
     -- Hover: button grows to 30×30 and restores to 26×26 on leave (no colour flash).
     local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-    local BTN_NORMAL = 26
-    local BTN_HOVER  = 30
+    local BTN_NORMAL = 26 + AB_GROW
+    local BTN_HOVER  = 30 + AB_GROW
+    local function SlotX(i) return 6 + i * SAVE_SLOT_W end   -- left edge of slot i
     local function MakeIconBtn(parent, texName, tip, w, h)
         local btn = CreateFrame("Button", nil, parent)
         local bw = w or BTN_NORMAL
@@ -692,7 +696,7 @@ local function BuildToolbar(parent)
 
     -- Save
     saveBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-save", L["BTN_SAVE_NOTE"])
-    saveBtn:SetPoint("LEFT", bar, "LEFT", 6, 0)
+    saveBtn:SetPoint("LEFT", bar, "LEFT", SlotX(0), 0)
     saveBtn:SetEnabled(false)
     saveBtn:SetAlpha(0.4)
     pcall(function() saveBtn._tx:SetDesaturated(true) end)
@@ -703,8 +707,8 @@ local function BuildToolbar(parent)
 
     -- Reference Box toggle
     do
-        local refboxBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-refbox", L["NE_TOGGLE_REFBOX_TIP"])
-        refboxBtn:SetPoint("LEFT", bar, "LEFT", 38, 0)
+        local refboxBtn, _ = MakeIconBtn(bar, BNB.AbIcon("refbox"), L["NE_TOGGLE_REFBOX_TIP"])
+        refboxBtn:SetPoint("LEFT", bar, "LEFT", SlotX(1), 0)
         refboxBtn:SetScript("OnClick", function()
             if BNB.ToggleReferenceBox then BNB.ToggleReferenceBox() end
         end)
@@ -723,8 +727,8 @@ local function BuildToolbar(parent)
             end
             return L["NE_ADD_TASK_TIP"]
         end
-        local tasksBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-tasks", TasksTip)
-        tasksBtn:SetPoint("LEFT", bar, "LEFT", 70, 0)
+        local tasksBtn, _ = MakeIconBtn(bar, BNB.AbIcon("tasks"), TasksTip)
+        tasksBtn:SetPoint("LEFT", bar, "LEFT", SlotX(2), 0)
         tasksBtn:SetScript("OnClick", function()
             if BNB.OnTasksBarButton then BNB.OnTasksBarButton(BNB._currentNoteID) end
         end)
@@ -732,8 +736,8 @@ local function BuildToolbar(parent)
     end
 
     -- Delete
-    local delBtn = MakeIconBtn(bar, "Actionbar\\ab-delete", L["BTN_DELETE_NOTE"])
-    delBtn:SetPoint("LEFT", bar, "LEFT", 102, 0)
+    local delBtn = MakeIconBtn(bar, BNB.AbIcon("delete"), L["BTN_DELETE_NOTE"])
+    delBtn:SetPoint("LEFT", bar, "LEFT", SlotX(3), 0)
     delBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -757,8 +761,8 @@ local function BuildToolbar(parent)
     end)
 
     -- Duplicate
-    local dupBtn = MakeIconBtn(bar, "Actionbar\\ab-duplicate", L["NE_DUPLICATE_NOTE_TIP"])
-    dupBtn:SetPoint("LEFT", bar, "LEFT", 134, 0)
+    local dupBtn = MakeIconBtn(bar, BNB.AbIcon("duplicate"), L["NE_DUPLICATE_NOTE_TIP"])
+    dupBtn:SetPoint("LEFT", bar, "LEFT", SlotX(4), 0)
     dupBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local src = BNB.GetNote(id);   if not src then return end
@@ -772,8 +776,8 @@ local function BuildToolbar(parent)
     end)
 
     -- Copy to clipboard — copies title + body silently via editbox trick
-    local copyBtn = MakeIconBtn(bar, "Actionbar\\ab-copy", L["BTN_COPY_NOTE"])
-    copyBtn:SetPoint("LEFT", bar, "LEFT", 166, 0)
+    local copyBtn = MakeIconBtn(bar, BNB.AbIcon("copy"), L["BTN_COPY_NOTE"])
+    copyBtn:SetPoint("LEFT", bar, "LEFT", SlotX(5), 0)
     copyBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -789,8 +793,8 @@ local function BuildToolbar(parent)
     -- Lock / Unlock icon button — always visible in the toolbar.
     -- lock.tga   = note is unlocked → click to lock it persistently.
     -- unlock.tga = note is locked   → click to unlock it persistently.
-    local lockBtn, lockTx = MakeIconBtn(bar, "Actionbar\\ab-lock", "")   -- tip set dynamically below
-    lockBtn:SetPoint("LEFT", bar, "LEFT", 228, 0)
+    local lockBtn, lockTx = MakeIconBtn(bar, BNB.AbIcon("lock"), "")   -- tip set dynamically below
+    lockBtn:SetPoint("LEFT", bar, "LEFT", SlotX(7) - 2, 0)
     lockBtn:Hide()
     lockBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
@@ -829,11 +833,11 @@ local function BuildToolbar(parent)
 
     -- Sticky Note pin button — offset 132, always visible
     local pinBtn = CreateFrame("Button", nil, bar)
-    pinBtn:SetSize(24, 24)
-    pinBtn:SetPoint("LEFT", bar, "LEFT", 198, 0)
+    pinBtn:SetSize(24 + AB_GROW, 24 + AB_GROW)
+    pinBtn:SetPoint("LEFT", bar, "LEFT", SlotX(6), 0)
     local pinTx = pinBtn:CreateTexture(nil, "ARTWORK")
     pinTx:SetAllPoints()
-    pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Actionbar\\ab-stickynote")
+    pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("stickynote"))
     pinBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
@@ -848,7 +852,7 @@ local function BuildToolbar(parent)
         end)
     end)
     pinBtn:SetScript("OnEnter", function(self)
-        self:SetSize(28, 28)
+        self:SetSize(28 + AB_GROW, 28 + AB_GROW)
         local id   = BNB._currentNoteID
         local open = id and BNB.Sticky and BNB.Sticky.IsOpen(id)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -856,23 +860,23 @@ local function BuildToolbar(parent)
         GameTooltip:Show()
     end)
     pinBtn:SetScript("OnLeave", function(self)
-        self:SetSize(24, 24)
+        self:SetSize(24 + AB_GROW, 24 + AB_GROW)
         GameTooltip:Hide()
     end)
     -- Send to Chat button (right side) — icon-only using send.tga
-    local sendBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-send", L["SEND_TITLE"], 28, 28)
+    local sendBtn, _ = MakeIconBtn(bar, BNB.AbIcon("send"), L["SEND_TITLE"], 28 + AB_GROW, 28 + AB_GROW)
     -- -26 keeps it clear of the main window's 16 px resize grip (BOTTOMRIGHT -2, 2)
     sendBtn:SetPoint("RIGHT", bar, "RIGHT", -26, 0)
     -- Override OnEnter to add the sub-line tooltip
     sendBtn:SetScript("OnEnter", function(self)
-        self:SetSize(32, 32)
+        self:SetSize(32 + AB_GROW, 32 + AB_GROW)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SEND_TITLE"], 1, 1, 1)
         GameTooltip:AddLine(L["NE_SEND_TIP_BODY"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     sendBtn:SetScript("OnLeave", function(self)
-        self:SetSize(28, 28)
+        self:SetSize(28 + AB_GROW, 28 + AB_GROW)
         GameTooltip:Hide()
     end)
     sendBtn:SetScript("OnClick", function()
@@ -1301,7 +1305,7 @@ local function SetEditorLocked(locked)
             toolbar._lockBtn:SetShown(true)
             if toolbar._lockTx then
                 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-                toolbar._lockTx:SetTexture(ASSETS .. (noteLocked and "Actionbar\\ab-unlock" or "Actionbar\\ab-lock"))
+                toolbar._lockTx:SetTexture(ASSETS .. (noteLocked and BNB.AbIcon("unlock") or BNB.AbIcon("lock")))
             end
         end
         -- Pin button: always visible (lock state does not hide it)
@@ -1735,6 +1739,86 @@ end
 local TAB_H        = 32   -- height of the Editor/View icon button strip
 local _richTabStrip = nil
 
+-- Forever: text tabs cut from the game's own UIFrameTabsPaperdollInfo sheet
+-- (64x512, file id 4200159; not shipped with the addon). Blue (Source) is the black tab with the blue
+-- overlay on top; yellow (View) is the gold tab. The inactive tab is dimmed with
+-- vertex colour, never alpha (Dukul, 2026-09-27). Pieces are {x0, x1, y0, y1} px.
+local FTAB_TEX   = "Interface\\PaperDollInfoFrame\\UIFrameTabsPaperdollInfo"
+local FTAB_H     = 32     -- drawn height, incl. ~5 px of shadow under the border
+local FTAB_CAP   = 16     -- width of the left and right end pieces
+local FTAB_MIN_W = 96
+local FTAB_X, FTAB_Y, FTAB_GAP = 6, 2, 2   -- first tab's offset in the strip, gap between tabs
+local FTAB_DIM   = 0.45   -- vertex colour of the inactive tab and its text
+local FTAB_PIECES = {
+    -- gold tab with its top 7 rows cropped, so it matches the black tab's height
+    yellow = { l = { 0, 16, 139, 171 }, m = { 16, 48,   7,  39 }, r = { 45, 61, 100, 132 } },
+    black  = { l = { 0, 16, 203, 235 }, m = { 16, 48,  39,  71 }, r = { 40, 56, 171, 203 } },
+    -- overlay, drawn over the black tab: top 3 rows cropped, inset to sit inside its border
+    blue   = { l = { 0, 16, 260, 279 }, m = { 16, 48,  74,  93 }, r = { 35, 51, 238, 257 } },
+}
+local FTAB_BLUE_L, FTAB_BLUE_R, FTAB_BLUE_Y = 4, 3, 8
+
+-- Three textures (left cap, stretched middle, right cap) for one piece set, filling
+-- `frame` between the given insets. Returns them for vertex colouring.
+local function AddForeverTabPieces(frame, set, layer, sub, li, ri, top)
+    local P, out = FTAB_PIECES[set], {}
+    local function Tex(p)
+        local t = frame:CreateTexture(nil, layer, nil, sub)
+        t:SetTexture(FTAB_TEX)
+        -- Half a texel in from top and bottom: the pieces are packed edge to edge, and
+        -- filtering pulled the next piece's opaque top row in as a black line under each tab.
+        t:SetTexCoord(p[1] / 64, p[2] / 64, (p[3] + 0.5) / 512, (p[4] - 0.5) / 512)
+        t:SetHeight(p[4] - p[3])
+        out[#out + 1] = t
+        return t
+    end
+    local l, m, r = Tex(P.l), Tex(P.m), Tex(P.r)
+    l:SetWidth(FTAB_CAP); r:SetWidth(FTAB_CAP)
+    l:SetPoint("TOPLEFT",  frame, "TOPLEFT",  li,  -top)
+    r:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -ri, -top)
+    m:SetPoint("TOPLEFT", l, "TOPRIGHT"); m:SetPoint("TOPRIGHT", r, "TOPLEFT")
+    return out
+end
+
+-- A Forever bottom tab: "blue" or "yellow" art, a text label, a tooltip.
+-- tab:SetActive(bool) brightens or dims the art and label.
+local function MakeForeverTab(parent, color, label, tip)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetHeight(FTAB_H)
+    local texs
+    if color == "blue" then
+        texs = AddForeverTabPieces(btn, "black", "BACKGROUND", 0, 0, 0, 0)
+        for _, t in ipairs(AddForeverTabPieces(btn, "blue", "BACKGROUND", 1,
+                FTAB_BLUE_L, FTAB_BLUE_R, FTAB_BLUE_Y)) do texs[#texs + 1] = t end
+    else
+        texs = AddForeverTabPieces(btn, "yellow", "BACKGROUND", 0, 0, 0, 0)
+    end
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetPoint("CENTER", btn, "CENTER", 0, 2)   -- centred on the tab face, above the shadow
+    fs:SetText(label)
+    btn:SetWidth(math.max(FTAB_MIN_W, math.ceil(fs:GetStringWidth()) + 2 * FTAB_CAP))
+
+    local active, hover = true, false
+    local function Paint()
+        local v = active and 1 or (hover and 0.7 or FTAB_DIM)
+        for _, t in ipairs(texs) do t:SetVertexColor(v, v, v) end
+        fs:SetTextColor(v, v, v)
+    end
+    function btn:SetActive(on) active = on and true or false; Paint() end
+    btn:SetScript("OnEnter", function(self)
+        hover = true; Paint()
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(tip, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function()
+        hover = false; Paint()
+        GameTooltip:Hide()
+    end)
+    Paint()
+    return btn
+end
+
 local function BuildRichTabStrip()
     if _richTabStrip then return _richTabStrip end
     local mf = BNB.mainFrame
@@ -1794,8 +1878,18 @@ local function BuildRichTabStrip()
         return btn
     end
 
-    local editorTab = MakeRichBtn("bt-editor", L["NE_RICH_EDITOR_MODE_TIP"], 0)
-    local viewTab   = MakeRichBtn("bt-view",   L["NE_RICH_VIEW_MODE_TIP"],        36)
+    local editorTab, viewTab
+    if BNB.IsForever then
+        editorTab = MakeForeverTab(strip, "blue",   L["NE_RICH_TAB_MARKUP"], L["NE_RICH_EDITOR_MODE_TIP"])
+        viewTab   = MakeForeverTab(strip, "yellow", L["NE_RICH_TAB_NOTE"],   L["NE_RICH_VIEW_MODE_TIP"])
+        local w = math.max(editorTab:GetWidth(), viewTab:GetWidth())   -- same width, the wider label's
+        editorTab:SetWidth(w); viewTab:SetWidth(w)
+        editorTab:SetPoint("TOPLEFT", strip, "TOPLEFT", FTAB_X, FTAB_Y)
+        viewTab:SetPoint("LEFT", editorTab, "RIGHT", FTAB_GAP, 0)
+    else
+        editorTab = MakeRichBtn("bt-editor", L["NE_RICH_EDITOR_MODE_TIP"], 0)
+        viewTab   = MakeRichBtn("bt-view",   L["NE_RICH_VIEW_MODE_TIP"],        36)
+    end
 
     strip._editorTab = editorTab
     strip._viewTab   = viewTab
@@ -1829,6 +1923,11 @@ function BNB.AM_RefreshTabs()
     strip:Show()
     -- Active button: full alpha. Inactive: dimmed (transparency only, per design).
     local inView = BNB._editorInViewMode == true
+    if strip._editorTab and strip._editorTab.SetActive then   -- Forever text tabs: dim, not fade
+        strip._editorTab:SetActive(not inView)
+        strip._viewTab:SetActive(inView)
+        return
+    end
     local ACTIVE_ALPHA   = 1.0
     local INACTIVE_ALPHA = 0.40
     if strip._editorTab then strip._editorTab:SetAlpha(inView and INACTIVE_ALPHA or ACTIVE_ALPHA) end

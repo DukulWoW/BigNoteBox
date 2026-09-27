@@ -101,6 +101,7 @@ end
 -- That atlas is one fixed pane and does not tile, so this is our own 512x512
 -- tileable version of it. Retail keeps the template's Bg untouched.
 local FOREVER_BG = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-forever"
+BNB.FOREVER_BG_TEXTURE = FOREVER_BG   -- also the Forever notice's fill (Core/Events.lua)
 
 local function SkinBg(f)
     local bg = f.Bg
