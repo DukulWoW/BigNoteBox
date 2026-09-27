@@ -24,8 +24,9 @@ local L   = BNB.L
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
 local CFG_W      = 480
-local TITLE_H    = 60
-local TAB_BAR_H  = 32
+-- Top of the tab panels: tabs sit at y -25 and are ~32 tall, so this leaves a
+-- small gap under them (was 60 + 32 = 92, ~35 px of dead space)
+local CONTENT_TOP = 68
 local PAD        = 16
 local CONTENT_W  = CFG_W - PAD * 2 - 30   -- leave extra room so slider value clears bar
 local CONTENT_W2 = CFG_W - PAD * 2 - 10   -- bar hidden
@@ -63,7 +64,7 @@ local tabContent   = {}   -- content frames (scroll children)
 -- top of the scroll frame. Defaults to the classic chrome height (title bar +
 -- tab bar) for ButtonFrameTemplate. Skin mode passes its own smaller value.
 local function MakeScrollPanel(parent, topOffset)
-    topOffset = topOffset or (TITLE_H + TAB_BAR_H)
+    topOffset = topOffset or CONTENT_TOP
     local sf, ct = BNB.CreateAutoScrollPanel(parent, CONTENT_W, CONTENT_W2)
     -- Always leave 24px on the right for the scrollbar track.
     sf:SetPoint("TOPLEFT",     parent, "TOPLEFT",      PAD,  -topOffset)
@@ -149,6 +150,7 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     lbl:SetPoint("LEFT",  cb,  "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", ct,  "RIGHT", 0, 0)
     lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H); lbl:SetText(text)
+    cb._lbl = lbl   -- for callers that grey the row out
     return y - (ROW_H + ROW_GAP), cb   -- cb: for an overview-row twin (ALL-84)
 end
 
@@ -672,7 +674,7 @@ local function CreateConfigWindow()
     end
 
     -- Build the six scroll panels and their content (shared with skin chrome)
-    BNB._BuildConfigTabPanels(f, TITLE_H + TAB_BAR_H)
+    BNB._BuildConfigTabPanels(f, CONTENT_TOP)
 
     PanelTemplates_SetNumTabs(f, NUM_TABS)
     f.numTabs = NUM_TABS

@@ -124,8 +124,8 @@ local function NextRecurTime(alarm)
 
     if r == "weekly" then
         -- WoW weekly reset: next Tuesday 07:00 server time.
-        -- We approximate with local time; server offset not accessible in addon.
-        local t = date("*t", now)
+        -- Local time unless the player chose server time (ALL-104).
+        local t = BNB.Date("*t", now)
         -- days until next Tuesday (WOW_RESET_DOW=2 in 0-indexed Sun=0)
         local dow = t.wday - 1  -- 0=Sun, 1=Mon, 2=Tue ...
         local target = 2        -- Tuesday
@@ -133,22 +133,23 @@ local function NextRecurTime(alarm)
         if daysAhead == 0 then daysAhead = 7 end  -- next week if today is Tuesday
         t.day  = t.day + daysAhead
         t.hour = 7; t.min = 0; t.sec = 0
-        return time(t)
+        return BNB.Time(t)
 
     elseif r == "weekdays" then
         -- recurDays = {1,2,3,...} 1=Mon...7=Sun (mapped from Lua wday)
         local days = alarm.recurDays
         if not days or #days == 0 then return nil end
         -- Find the next weekday at the same HH:MM as original alarm
-        local orig = date("*t", alarm.time or now)
-        local t    = date("*t", now)
+        -- Wall-clock maths in the clock the player set the alarm in (ALL-104)
+        local orig = BNB.Date("*t", alarm.time or now)
+        local t    = BNB.Date("*t", now)
         for offset = 1, 8 do
-            t.day = (date("*t", now)).day + offset
-            local candidate = time({
+            t.day = (BNB.Date("*t", now)).day + offset
+            local candidate = BNB.Time({
                 year=t.year, month=t.month, day=t.day,
                 hour=orig.hour, min=orig.min, sec=0
             })
-            local ct = date("*t", candidate)
+            local ct = BNB.Date("*t", candidate)
             -- ct.wday: 1=Sun,2=Mon...7=Sat -> remap to 1=Mon..7=Sun
             local mapped = ct.wday == 1 and 7 or ct.wday - 1
             for _, d in ipairs(days) do
@@ -574,12 +575,14 @@ function AM.GetNextFireTime(noteID)
     if alarm.timeType == "ingame" then
         -- In-game time: convert today's HH:MM to a Unix timestamp
         -- If the time has already passed today, return tomorrow's timestamp
+        -- HH:MM is server time, always (ALL-104; it was read as local time)
         if not alarm.igTime then return nil end
         local h, m = alarm.igTime:match("^(%d+):(%d+)$")
         if not h then return nil end
-        local t = date("*t")
+        local off = BNB.ServerClockOffset()
+        local t = date("*t", time() + off)
         t.hour = tonumber(h); t.min = tonumber(m); t.sec = 0
-        local candidate = time(t)
+        local candidate = time(t) - off
         if candidate <= time() then candidate = candidate + 86400 end
         return candidate
     end

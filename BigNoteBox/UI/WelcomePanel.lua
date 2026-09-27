@@ -13,7 +13,7 @@ local COL_GREY = { 0.50, 0.50, 0.50, 1 }
 
 -- Returns the greeting prefix ("Good morning" etc.) for the current hour.
 local function GetGreeting()
-    local h = tonumber(date("%H"))
+    local h = tonumber(BNB.Date("%H"))
     if h >= 5  and h < 12 then return L["WELCOME_MORNING"]
     elseif h >= 12 and h < 17 then return L["WELCOME_AFTERNOON"]
     else return L["WELCOME_EVENING"] end
@@ -22,7 +22,7 @@ end
 -- Returns the time-of-day icon texture path for the current hour.
 -- dawn 05-08, day 08-18, dusk 18-21, night 21-05
 local function GetTimeIcon()
-    local h = tonumber(date("%H"))
+    local h = tonumber(BNB.Date("%H"))
     local BASE = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
     if     h >= 5  and h < 8  then return BASE .. "ui-dawn.tga"
     elseif h >= 8  and h < 18 then return BASE .. "ui-day.tga"
@@ -35,10 +35,10 @@ end
 local function GetClockString()
     local use24 = BigNoteBoxDB == nil or BigNoteBoxDB.use24Hour ~= false
     if use24 then
-        return date("%H:%M")
+        return BNB.Date("%H:%M")
     else
-        local h = tonumber(date("%H"))
-        local m = date("%M")
+        local h = tonumber(BNB.Date("%H"))
+        local m = BNB.Date("%M")
         local ampm = h >= 12 and "PM" or "AM"
         h = h % 12; if h == 0 then h = 12 end
         return h .. ":" .. m .. " " .. ampm
@@ -50,12 +50,12 @@ local function GetDateString()
     local weekdays = L["WELCOME_WEEKDAYS"]
     local months   = L["WELCOME_MONTHS"]
     -- date("%w") = 0 (Sunday) .. 6 (Saturday); our table is 1-indexed Sun=1
-    local wday  = tonumber(date("%w")) + 1
-    local day   = tonumber(date("%d"))
-    local month = tonumber(date("%m"))
-    local year  = date("%Y")
-    local dayName   = weekdays and weekdays[wday]   or date("%A")
-    local monthName = months   and months[month]    or date("%B")
+    local wday  = tonumber(BNB.Date("%w")) + 1
+    local day   = tonumber(BNB.Date("%d"))
+    local month = tonumber(BNB.Date("%m"))
+    local year  = BNB.Date("%Y")
+    local dayName   = weekdays and weekdays[wday]   or BNB.Date("%A")
+    local monthName = months   and months[month]    or BNB.Date("%B")
     return dayName .. ", " .. monthName .. " " .. day .. ", " .. year
 end
 
@@ -628,6 +628,8 @@ local function BuildEmptyState(parent)
             math.floor(r * 255), math.floor(g * 255), math.floor(b * 255), playerName)
         greetLbl:SetText(GetGreeting() .. ", " .. coloredName .. "!")
     end
+    -- For settings that change how the clock reads (24-hour, server time)
+    BNB.RefreshWelcomeClock = RefreshClock
 
     -- Run full refresh every time the panel becomes visible, and keep a
     -- 30-second repeating ticker running while it is shown so the clock

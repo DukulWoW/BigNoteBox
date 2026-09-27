@@ -1559,6 +1559,8 @@ L["CFG_EXPORT_HTML_STYLIZED"]       = "Stylized"
 
 L["CFG_CHK_24H_LABEL"]              = "24-hour clock  (14:30 vs 2:30 pm)"
 L["CFG_CHK_24H_TIP"]                = "Show timestamps in 24-hour format. Uncheck for 12-hour (AM/PM)."
+L["CFG_CHK_SERVER_TIME_LABEL"]      = "Use server time"
+L["CFG_CHK_SERVER_TIME_TIP"]        = "Show timestamps, the welcome clock, inserted dates and alarms in server time instead of your computer's local time. Alarm times are entered and shown in server time too. Everything is still saved with the real time, so switching back changes nothing: an alarm keeps its moment and shows it in local time again."
 L["CFG_CHK_OPEN_LOGIN_LABEL"]       = "Open main window on login / reload"
 L["CFG_CHK_OPEN_LOGIN_TIP"]         = "Automatically open the BigNoteBox window when you log in or reload the UI.\nOff by default."
 L["CFG_CHK_LOCK_NOTES_LABEL"]       = "Lock notes by default"

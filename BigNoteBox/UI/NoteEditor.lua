@@ -121,17 +121,17 @@ end
 --------------------------------------------------------------------------------
 local function FmtDatePart(ts, fmt)
     if fmt == "DD-MM-YYYY" then
-        return date("%d-%m-%Y", ts)
+        return BNB.Date("%d-%m-%Y", ts)
     elseif fmt == "MM-DD-YYYY" then
-        return date("%m-%d-%Y", ts)
+        return BNB.Date("%m-%d-%Y", ts)
     end
-    return date("%Y-%m-%d", ts)  -- YYYY-MM-DD (default)
+    return BNB.Date("%Y-%m-%d", ts)  -- YYYY-MM-DD (default)
 end
 
 local function FmtClockPart(ts, use24)
-    if use24 then return date("%H:%M", ts) end
-    local h = tonumber(date("%H", ts))
-    local m = date("%M", ts)
+    if use24 then return BNB.Date("%H:%M", ts) end
+    local h = tonumber(BNB.Date("%H", ts))
+    local m = BNB.Date("%M", ts)
     local ampm = h >= 12 and "pm" or "am"
     h = h % 12; if h == 0 then h = 12 end
     return h .. ":" .. m .. " " .. ampm
@@ -264,15 +264,15 @@ local function BuildTitleField(parent)
         local use24 = db == nil or db.use24Hour ~= false
         local function AbsTime(ts)
             if not ts or ts == 0 then return nil end
-            local d = date("%Y-%m-%d", ts)
+            local d = BNB.Date("%Y-%m-%d", ts)
             local t
             if use24 then
-                t = date("%H:%M", ts)
+                t = BNB.Date("%H:%M", ts)
             else
-                local h = tonumber(date("%H", ts))
+                local h = tonumber(BNB.Date("%H", ts))
                 local ampm = h >= 12 and "pm" or "am"
                 h = h % 12; if h == 0 then h = 12 end
-                t = h .. ":" .. date("%M", ts) .. " " .. ampm
+                t = h .. ":" .. BNB.Date("%M", ts) .. " " .. ampm
             end
             return d .. " " .. t
         end

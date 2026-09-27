@@ -272,14 +272,14 @@ local function FormatFireTime(noteID)
     if diff < 3600 then return string.format(L["AO_MIN_LEFT_FMT"], math.floor(diff / 60)) end
     if diff < 86400 then return string.format(L["AO_HOUR_MIN_LEFT_FMT"],
         math.floor(diff / 3600), math.floor((diff % 3600) / 60)) end
-    return string.format(L["AO_DATE_FMT"], date("%Y-%m-%d %H:%M", t))
+    return string.format(L["AO_DATE_FMT"], BNB.Date("%Y-%m-%d %H:%M", t))
 end
 
 -- Full timestamp for tooltip
 local function FullFireTime(noteID)
     local t = BNB.Alarm and BNB.Alarm.GetNextFireTime(noteID)
     if not t then return L["AO_NO_SCHEDULED_TIME"] end
-    return date("%Y-%m-%d %H:%M", t)
+    return BNB.Date("%Y-%m-%d %H:%M", t)
 end
 
 -- (status color now embedded in FormatFireTime via color codes)

@@ -1107,8 +1107,10 @@ local function BuildFocusPage(sf, ct, y)
     overlaySl:SetWidth(CONTENT_W)
     y = y - (SLIDER_H + ROW_GAP)
 
-    -- Skin color tint checkbox (only meaningful in skin mode, but always shown)
-    y = AddCheck(ct, y, L["CFG_FOCUS_OVERLAY_SKIN_COLOR"],
+    -- Skin color tint checkbox (only meaningful in skin mode, but always shown;
+    -- greyed and inactive in normal mode, ALL-24)
+    local tintCb
+    y, tintCb = AddCheck(ct, y, L["CFG_FOCUS_OVERLAY_SKIN_COLOR"],
         function()
             local db = BigNoteBoxDB
             return db ~= nil and db.focusOverlayUseSkinColor == true
@@ -1117,6 +1119,14 @@ local function BuildFocusPage(sf, ct, y)
             if BigNoteBoxDB then BigNoteBoxDB.focusOverlayUseSkinColor = v end
         end,
         L["CFG_FOCUS_OVERLAY_SKIN_COLOR_TIP"])
+    local function RefreshTintUI()
+        local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false
+        tintCb:SetEnabled(skin)
+        tintCb._lbl:SetAlpha(skin and 1 or 0.4)
+    end
+    RefreshTintUI()
+    -- Skin mode can be switched while Settings is open (it waits for a reload)
+    sf:HookScript("OnShow", RefreshTintUI)
 
     -- Grey/ungrey orbit-specific sub-controls based on master toggle
     local function RefreshOrbitUI()

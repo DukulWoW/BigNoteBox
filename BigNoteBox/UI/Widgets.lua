@@ -181,15 +181,15 @@ function BNB.FmtTs(ts)
     if not ts or ts == 0 then return "Unknown" end
     local db    = BigNoteBoxDB
     local use24 = db and db.use24Hour ~= false
-    local d     = date("%Y-%m-%d", ts)
+    local d     = BNB.Date("%Y-%m-%d", ts)
     local t
     if use24 then
-        t = date("%H:%M", ts)
+        t = BNB.Date("%H:%M", ts)
     else
-        local h    = tonumber(date("%H", ts))
+        local h    = tonumber(BNB.Date("%H", ts))
         local ampm = h >= 12 and "pm" or "am"
         h = h % 12; if h == 0 then h = 12 end
-        t = h .. ":" .. date("%M", ts) .. " " .. ampm
+        t = h .. ":" .. BNB.Date("%M", ts) .. " " .. ampm
     end
     return d .. "  " .. t
 end

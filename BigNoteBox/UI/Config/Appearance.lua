@@ -686,8 +686,22 @@ local function BuildAppearanceTab(sf, ct)
             if BNB._currentNoteID and BNB.LoadNoteInEditor then
                 BNB.LoadNoteInEditor(BNB._currentNoteID)
             end
+            if BNB.RefreshWelcomeClock then BNB.RefreshWelcomeClock() end
         end,
         L["CFG_CHK_24H_TIP"])
+
+    -- Server time (ALL-103): display only, saved timestamps stay local
+    y = AddCheck(ct, y, L["CFG_CHK_SERVER_TIME_LABEL"],
+        function() return db.useServerTime == true end,
+        function(v)
+            db.useServerTime = v or nil
+            if BNB._currentNoteID and BNB.LoadNoteInEditor then
+                BNB.LoadNoteInEditor(BNB._currentNoteID)
+            end
+            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+            if BNB.RefreshWelcomeClock then BNB.RefreshWelcomeClock() end
+        end,
+        L["CFG_CHK_SERVER_TIME_TIP"])
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end

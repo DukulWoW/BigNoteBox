@@ -47,6 +47,38 @@ function BNB.UnitNameRealm(unit)
     return name, (second and second ~= "") and second or ownRealm
 end
 
+-- Server time display (ALL-103). Timestamps are always saved as time(); with
+-- BigNoteBoxDB.useServerTime on, shown times are shifted by the gap between the
+-- server clock (GetGameTime, hour and minute only) and the local clock. The gap
+-- is wrapped to -12h..+12h and rounded to 15 minutes, so clock drift and the
+-- minute GetGameTime lags behind do not show up as an offset.
+-- ServerClockOffset is the gap itself, whatever the setting (In-game alarms,
+-- ALL-104); ServerTimeOffset is 0 unless the player chose server time.
+function BNB.ServerClockOffset()
+    if not GetGameTime then return 0 end
+    local h, m = GetGameTime()
+    if not h then return 0 end
+    local lt  = date("*t")
+    local off = ((h * 60 + m) - (lt.hour * 60 + lt.min)) * 60
+    if off > 43200 then off = off - 86400 elseif off <= -43200 then off = off + 86400 end
+    return math.floor(off / 900 + 0.5) * 900
+end
+function BNB.ServerTimeOffset()
+    local db = BigNoteBoxDB
+    if not (db and db.useServerTime) then return 0 end
+    return BNB.ServerClockOffset()
+end
+
+-- date() for anything shown to the player: same arguments, server time when set.
+-- BNB.Time is its inverse for a date table the player entered (alarm picker):
+-- the table is read as server time when set, and the result is a real time().
+function BNB.Date(fmt, ts)
+    return date(fmt, (ts or time()) + BNB.ServerTimeOffset())
+end
+function BNB.Time(t)
+    return time(t) - BNB.ServerTimeOffset()
+end
+
 -- Forced display language (ALL-14). BigNoteBoxLocale is its own SavedVariable so it is
 -- already loaded here, before the Locales/ files run. nil/"" /"client" = follow the WoW
 -- client locale; any other value is a forced locale code (e.g. "zhCN").

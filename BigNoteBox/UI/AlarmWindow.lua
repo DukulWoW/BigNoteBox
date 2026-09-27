@@ -893,7 +893,8 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
                 igHourDD:GetSelected() or 9,igMinDD:GetSelected() or 0)
             alarm.time=nil
         else
-            alarm.time=time({
+            -- Read as server time when the player chose it (ALL-104)
+            alarm.time=BNB.Time({
                 year=_calYear or 2026,month=_calMonth or 1,
                 day=_calSelDay or 1,
                 hour=hourDD:GetSelected() or 9,
@@ -979,7 +980,7 @@ local function Populate(noteID)
     _timeDDCont:SetSelected(tt); f._setTimeType(tt)
 
     -- Always set calendar to today (or alarm date if editing)
-    local t = alarm.time and date("*t",alarm.time) or date("*t")
+    local t = BNB.Date("*t", alarm.time)
     f._setCalDate(t.year, t.month, t.day)
     -- Always reset hour/min — explicit default 9:00 for new alarms
     _hourDD:SetSelected(alarm.time and t.hour or 9)

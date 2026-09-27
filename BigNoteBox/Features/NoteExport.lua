@@ -515,10 +515,10 @@ local function BuildMetaHtml(note)
         parts[#parts + 1] = "<strong>Context:</strong> " .. HtmlEsc(note.context)
     end
     if note.created then
-        parts[#parts + 1] = "<strong>Created:</strong> " .. date("%Y-%m-%d %H:%M", note.created)
+        parts[#parts + 1] = "<strong>Created:</strong> " .. BNB.Date("%Y-%m-%d %H:%M", note.created)
     end
     if note.updated then
-        parts[#parts + 1] = "<strong>Updated:</strong> " .. date("%Y-%m-%d %H:%M", note.updated)
+        parts[#parts + 1] = "<strong>Updated:</strong> " .. BNB.Date("%Y-%m-%d %H:%M", note.updated)
     end
     if #parts == 0 then return "" end
     return '<div class="meta">' .. table.concat(parts, " &middot; ") .. "</div>"
@@ -807,7 +807,7 @@ local function SerializeNotes(fmt)
         local hdr = string.format(
             "# BigNoteBox Export v%d | %s | %d note(s)\n",
             EXPORT_VERSION,
-            date("%Y-%m-%d %H:%M"),
+            BNB.Date("%Y-%m-%d %H:%M"),
             count)
         chunks[#chunks + 1] = hdr
 
