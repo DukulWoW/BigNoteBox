@@ -242,6 +242,16 @@ local function BuildWindow()
         L["CFG_DEV_CURSOR_BTN"], L["CFG_DEV_CURSOR_TIP_BODY"], function()
             if BNB.OpenCursorTest then BNB.OpenCursorTest() end
         end)
+    -- Game background preview for the sticky list (ALL-110, UI/BackgroundLab.lua)
+    local bgLabBtn = MakeButton(L["CFG_DEV_BGLAB_BTN"], 170,
+        L["CFG_DEV_BGLAB_BTN"], L["CFG_DEV_BGLAB_TIP_BODY"], function()
+            if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() end
+        end)
+    -- Beside Cursor Test rather than a new row, so the window keeps its height
+    bgLabBtn:ClearAllPoints()
+    bgLabBtn:SetPoint("LEFT", cursorBtn, "RIGHT", 8, 0)
+    y = y + ROW_H
+    dependents[#dependents + 1] = { btn = bgLabBtn }
     dependents[#dependents + 1] = { btn = toastBtn }
     dependents[#dependents + 1] = { btn = layoutBtn }
     dependents[#dependents + 1] = { btn = cursorBtn }

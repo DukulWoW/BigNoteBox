@@ -97,6 +97,14 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.ToggleSearchLayoutTool then BNB.ToggleSearchLayoutTool() end
 
+        -- ── Developer: game background preview (ALL-110, UI/BackgroundLab.lua) ─
+        elseif cmd == "bglab" then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() end
+
         -- ── Developer: chrome seating (FOR-05, UI/Chrome.lua) ─────────────────
         -- "chromeprobe" dumps the template layout; "chrome l t r b" re-seats
         -- every window live. Nothing is saved: Forever drops SavedVariables.
