@@ -59,6 +59,7 @@ UI\Config\Modules.lua
 UI\Config\Notes.lua
 UI\Config\Backup.lua
 UI\Config\Advanced.lua
+UI\Config\OracleSettings.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
@@ -68,6 +69,7 @@ Assets\Search\Kilrogg\theme.lua
 Assets\Search\Alliance\theme.lua
 Assets\Search\Horde\theme.lua
 Assets\Search\The-Eye\theme.lua
+Assets\Search\Molten-Core\theme.lua
 UI\Oracle.lua
 UI\TagManager.lua
 UI\OptionsPanel.lua

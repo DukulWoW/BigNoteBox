@@ -95,6 +95,24 @@ end
 -- Respects BigNoteBoxDB.dateFormat and BigNoteBoxDB.use24Hour.
 -- Relative format uses coarse buckets (< 1m, < 1h, < 1d, < 7d, < 30d, etc.)
 --------------------------------------------------------------------------------
+local function FmtDatePart(ts, fmt)
+    if fmt == "DD-MM-YYYY" then
+        return date("%d-%m-%Y", ts)
+    elseif fmt == "MM-DD-YYYY" then
+        return date("%m-%d-%Y", ts)
+    end
+    return date("%Y-%m-%d", ts)  -- YYYY-MM-DD (default)
+end
+
+local function FmtClockPart(ts, use24)
+    if use24 then return date("%H:%M", ts) end
+    local h = tonumber(date("%H", ts))
+    local m = date("%M", ts)
+    local ampm = h >= 12 and "pm" or "am"
+    h = h % 12; if h == 0 then h = 12 end
+    return h .. ":" .. m .. " " .. ampm
+end
+
 local function FmtTime(ts)
     if not ts or ts == 0 then return "" end
     local db       = BigNoteBoxDB
@@ -112,37 +130,38 @@ local function FmtTime(ts)
         else return string.format(L["REL_YEAR_AGO_FMT"], math.floor(diff/31536000)) end
     end
 
-    -- Build date part
-    local datePart
-    if fmt == "DD-MM-YYYY" then
-        datePart = date("%d-%m-%Y", ts)
-    elseif fmt == "MM-DD-YYYY" then
-        datePart = date("%m-%d-%Y", ts)
-    else  -- YYYY-MM-DD (default)
-        datePart = date("%Y-%m-%d", ts)
-    end
-
-    -- Build time part
-    local timePart
-    if use24 then
-        timePart = date("%H:%M", ts)
-    else
-        local h = tonumber(date("%H", ts))
-        local m = date("%M", ts)
-        local ampm = h >= 12 and "pm" or "am"
-        h = h % 12; if h == 0 then h = 12 end
-        timePart = h .. ":" .. m .. " " .. ampm
-    end
-
-    return datePart .. " " .. timePart
+    return FmtDatePart(ts, fmt) .. " " .. FmtClockPart(ts, use24)
 end
 -- Shared with UI/FocusEditor.lua (called at runtime, so load order does not matter)
 BNB.FmtTime = FmtTime
+
+-- Absolute date / clock in the Appearance format, for text inserted into a
+-- note (ALL-66). The Relative setting has no fixed date, so it gives YYYY-MM-DD.
+function BNB.FmtDate(ts)
+    local db = BigNoteBoxDB
+    return FmtDatePart(ts or time(), db and db.dateFormat)
+end
+function BNB.FmtClock(ts)
+    local db = BigNoteBoxDB
+    return FmtClockPart(ts or time(), db == nil or db.use24Hour ~= false)
+end
 
 --------------------------------------------------------------------------------
 -- TITLE FIELD
 -- AddPlaceholder called ONCE at build time.
 --------------------------------------------------------------------------------
+local RICH_BADGE_SIZE = 22
+
+-- Shows the rich badge for a rich note and moves the title's right edge
+-- clear of it. Run by LoadNoteInEditor, which every rich/plain switch calls.
+local function RefreshRichBadge(note)
+    local badge, eb = BNB._editorRichBadge, BNB._editorTitle
+    if not (badge and eb) then return end
+    local rich = note ~= nil and note.richMode == true
+    badge:SetShown(rich)
+    eb:SetPoint("BOTTOMRIGHT", eb:GetParent(), "BOTTOMRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, 0)
+end
+
 local function BuildTitleField(parent)
     local bg = BNB.CreateBackdropFrame("Frame", nil, parent)
     bg:SetPoint("TOPLEFT",  parent, "TOPLEFT",  PAD,  -PAD)
@@ -164,6 +183,25 @@ local function BuildTitleField(parent)
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(200)
     eb:SetTextInsets(2, 2, 2, 2)
+
+    -- Rich-note badge at the right end of the title, the icon Oracle search
+    -- shows on rich results (Dukul, 2026-09-27). Shown by RefreshRichBadge.
+    local richBadge = CreateFrame("Frame", nil, bg)
+    richBadge:SetSize(RICH_BADGE_SIZE, RICH_BADGE_SIZE)
+    richBadge:SetPoint("RIGHT", bg, "RIGHT", -6, 0)
+    local richTx = richBadge:CreateTexture(nil, "ARTWORK")
+    richTx:SetAllPoints()
+    richTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Search\\s-icon-rich")
+    richBadge:EnableMouse(true)
+    richBadge:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine(L["ORACLE_BADGE_RICH"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_RICH_BADGE_TIP"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    richBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    richBadge:Hide()
+    BNB._editorRichBadge = richBadge
 
     -- Underline (always visible)
     local underline = parent:CreateTexture(nil, "ARTWORK")
@@ -1261,6 +1299,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.LoadNoteInEditor(id)
     local note       = id and BNB.GetNote(id)
+    RefreshRichBadge(note)
     local emptyState = BNB._editorEmptyState
     local titleBg    = BNB._editorTitleBg
     local titleEb    = BNB._editorTitle

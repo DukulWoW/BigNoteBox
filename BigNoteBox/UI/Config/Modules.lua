@@ -1148,7 +1148,9 @@ local function BuildModulesTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
+    -- Optional 4th field: the page's key for BNB.OpenSettingsPage.
     local MODULES = {
+        { L["CFG_HDR_ORACLE"],         L["CFG_SUB_ORACLE_DESC"],     K.BuildOraclePage, "oracle" },   -- UI/Config/OracleSettings.lua
         { L["CFG_CELL_STICKY_HDR"],    L["CFG_SUB_STICKY_DESC"],     BuildStickyPage       },
         { L["CFG_HDR_TASKS"],          L["CFG_SUB_TASKS_DESC"],      BuildTasksPage        },
         { L["CFG_HDR_REFBOX"],         L["CFG_SUB_REFBOX_DESC"],     BuildRefBoxPage       },
@@ -1159,7 +1161,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage },
     }
     for _, m in ipairs(MODULES) do
-        local page = K.NewSubPage(m[1], m[3])
+        local page = K.NewSubPage(m[1], m[3], m[4])
         y = K.AddOverviewRow(ct, sf, y, page, m[1], m[2])
     end
 

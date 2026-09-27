@@ -103,6 +103,11 @@ BNB.SEARCH_DEFAULT_THEME = "kilrogg"
 --               panel. Left out = a copy of the bar's 9-slice
 --   def.panelSize optional { border, borderY } for the panel's art; left
 --               out = the bar's
+--   def.panelPad optional { left, right, top, bottom } in screen px: where
+--               the results (rows, hint line, "?" help) sit inside the
+--               panel art. Left out = 0.6 x the panel's border on each side
+--   def.hidden  optional; true keeps an unfinished theme out of the Oracle
+--               settings picker (the layout tool still lists it)
 --   def.panelFiles optional file name per piece for the panel only (false =
 --               none); left out = the same art as the bar
 -- Registering an id again replaces it and keeps its place in the list.
@@ -120,6 +125,7 @@ function BNB.RegisterSearchTheme(def)
         files = def.files, layout = def.layout, size = def.size,
         highlight = def.highlight, panelBg = def.panelBg, panelPos = def.panelPos,
         panelLayout = def.panelLayout, panelSize = def.panelSize, panelFiles = def.panelFiles,
+        hidden = def.hidden, panelPad = def.panelPad,
     }
     return true
 end
@@ -202,6 +208,22 @@ local function ThemePanel(d)
 end
 
 local NATIVE = 32
+
+-- The content inset of a theme's results panel (def.panelPad), in screen
+-- px. size: the panel's { border, borderY }, for the default inset; left
+-- out = the theme's own.
+function BNB.GetSearchPanelPad(id, size)
+    local d = BNB.GetSearchTheme(id)
+    local p = d and type(d.panelPad) == "table" and d.panelPad
+    if p then
+        return { left = p.left or 0, right = p.right or 0, top = p.top or 0, bottom = p.bottom or 0 }
+    end
+    if not size and d then size = select(2, ThemePanel(d)) end
+    size = size or { border = 24, borderY = 24 }
+    local px = math.floor(size.border * 0.6 + 0.5)
+    local py = math.floor((size.borderY or size.border) * 0.6 + 0.5)
+    return { left = px, right = px, top = py, bottom = py }
+end
 
 local function PlacePiece(tex, f, p, kx, ky)
     kx = kx or 1
@@ -300,13 +322,17 @@ BigNoteBox.RegisterSearchTheme = BNB.RegisterSearchTheme
 -- The Move anchor drags the whole preview (right-click: back to the centre).
 local tool
 
-local TOOL_W, TOOL_H = 300, 756
+local TOOL_W, TOOL_H = 300, 824
 local TOOL_PAD = 10
 local WHITE = "Interface\\Buttons\\WHITE8x8"
 
 -- The results panel's placement under the bar (panelPos) is not art; it is
 -- selected and moved like a piece of the panel.
 local PLACE = "placement"
+-- Where the results sit inside the panel (panelPad): selected and moved
+-- like the placement. Neither is a piece of art.
+local CONTENT = "content"
+local function Special(sel) return sel == PLACE or sel == CONTENT end
 
 -- Short button labels where the key is long.
 local LABEL = {
@@ -376,11 +402,37 @@ local function Work()
     end
     w.size.borderY = w.size.borderY or w.size.border
     w.panelSize.borderY = w.panelSize.borderY or w.panelSize.border
+    -- A theme with a panelPad of its own starts from it; otherwise
+    -- panelPad stays nil until the content is moved, so it keeps following
+    -- the panel border until then (WorkPad).
+    if w.panelPad == nil and type(BNB.GetSearchTheme(tool.theme).panelPad) == "table" then
+        w.panelPad = BNB.GetSearchPanelPad(tool.theme)
+    end
     if not w.panelPos then
         local pp = BNB.GetSearchPanelPos(tool.theme)
         w.panelPos = { left = pp.left, right = pp.right, gap = pp.gap, under = pp.under }
     end
     return w
+end
+
+-- The content inset in use: the working copy's, else the default for the
+-- working panel border. edit = true makes it the working copy's own.
+local function WorkPad(w, edit)
+    if w.panelPad then return w.panelPad end
+    local d = BNB.GetSearchPanelPad(nil, w.panelSize)
+    if edit then w.panelPad = d end
+    return d
+end
+
+-- The selected-result colour in use: the working copy's (set with the
+-- tool's Highlight swatch), else the theme's own. edit = true makes it the
+-- working copy's own.
+local function WorkHL(w, edit)
+    if w.highlight then return w.highlight end
+    local r, g, b, a = BNB.GetSearchHighlight(tool.theme)
+    local h = { r, g, b, a }
+    if edit then w.highlight = h end
+    return h
 end
 
 -- layout, size and removed list of one side of the working copy.
@@ -422,13 +474,14 @@ local function UsedList()
         end
     end
     out[#out + 1] = { "panel", PLACE }
+    out[#out + 1] = { "panel", CONTENT }
     return out
 end
 
 -- The selection, moved to the first used piece when the current one is not
 -- used (a theme switch, or the piece was removed).
 local function ValidSel()
-    if tool.sel == PLACE then return end
+    if Special(tool.sel) then return end
     if Side(tool.side)[tool.sel] then return end
     local first = UsedList()[1]
     tool.side, tool.sel = first[1], first[2]
@@ -448,6 +501,32 @@ local function PieceSize(p, axis, k)
     if not FixedSide(p, axis) then return nil end
     if axis == "h" then return (p.y1 - p.y2) * k end
     return (p.x2 - p.x1) * k
+end
+
+-- Where frame point pt sits, from the frame's top-left, in screen px.
+local function PointXY(pt, w, h)
+    local x = pt:find("LEFT") and 0 or pt:find("RIGHT") and w or w / 2
+    local y = pt:find("TOP") and 0 or pt:find("BOTTOM") and -h or -h / 2
+    return x, y
+end
+
+-- Size on screen, in px, of a piece that stretches on axis: where its two
+-- points land on host at the host's current size.
+local function StretchSize(p, axis, k, host)
+    local w, h = host:GetSize()
+    local x1, y1 = PointXY(p.a1, w, h)
+    local x2, y2 = PointXY(p.a2, w, h)
+    if axis == "h" then return (y1 + p.y1 * k) - (y2 + p.y2 * k) end
+    return (x2 + p.x2 * k) - (x1 + p.x1 * k)
+end
+
+-- Grows or shrinks a stretching piece to px on axis, evenly on both sides
+-- so it stays centred. It still hangs off both points, so it keeps
+-- following its frame (Dukul, 2026-09-27).
+local function SetStretchSize(p, axis, px, k, host)
+    local d = (px - StretchSize(p, axis, k, host)) / k / 2
+    if axis == "h" then p.y1 = p.y1 + d; p.y2 = p.y2 - d
+    else p.x1 = p.x1 - d; p.x2 = p.x2 + d end
 end
 
 local function SetPieceSize(p, axis, px, k)
@@ -501,6 +580,10 @@ local function ExportText()
         w.panelSize.border, w.panelSize.borderY)
     lines[#lines + 1] = string.format("    panelPos = { left = %s, right = %s, gap = %s, under = %s },",
         Num(w.panelPos.left), Num(w.panelPos.right), Num(w.panelPos.gap), tostring(w.panelPos.under ~= false))
+    if w.panelPad then
+        lines[#lines + 1] = string.format("    panelPad = { left = %s, right = %s, top = %s, bottom = %s },",
+            Num(w.panelPad.left), Num(w.panelPad.right), Num(w.panelPad.top), Num(w.panelPad.bottom))
+    end
     if type(d.files) == "table" and next(d.files) then
         lines[#lines + 1] = "    files = " .. FilesText(d.files) .. ","
     end
@@ -508,7 +591,7 @@ local function ExportText()
         lines[#lines + 1] = "    panelFiles = " .. FilesText(d.panelFiles) .. ","
     end
     if d.panelBg then lines[#lines + 1] = string.format("    panelBg = %q,", d.panelBg) end
-    local h = d.highlight
+    local h = w.highlight or d.highlight
     if type(h) == "table" then
         lines[#lines + 1] = string.format("    highlight = { %s, %s, %s, %s },",
             Num(h[1] or 1), Num(h[2] or 0.82), Num(h[3] or 0), Num(h[4] or 0.14))
@@ -526,6 +609,10 @@ local function PlaceHighlight()
     hl:ClearAllPoints()
     if tool.sel == PLACE then
         hl:SetAllPoints(host)
+    elseif tool.sel == CONTENT then
+        local pad = WorkPad(Work())
+        hl:SetPoint("TOPLEFT", host, "TOPLEFT", pad.left, -pad.top)
+        hl:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -pad.right, pad.bottom)
     else
         local layout, size = Side(tool.side)
         local p = layout[tool.sel]
@@ -541,6 +628,20 @@ end
 local DEPTHS = { "own", "back", "top" }
 local DEPTH_NAME = { own = "Over borders", back = "Behind borders", top = "Over everything" }
 
+-- A results-panel piece hung from TOP points whose middle sits in the
+-- panel's lower half: it keeps its distance from the top, so it drifts into
+-- the results as they grow (Horde 2026-09-26, Molten Core 2026-09-27).
+local function HangsWrong(p)
+    if tool.side ~= "panel" or not p or Special(tool.sel) then return false end
+    if not (p.a1:find("TOP") and p.a2:find("TOP")) then return false end
+    local _, size = Side("panel")
+    local ky = size.borderY / NATIVE
+    local w, h = tool.panel:GetSize()
+    local _, y1 = PointXY(p.a1, w, h)
+    local _, y2 = PointXY(p.a2, w, h)
+    return ((y1 + p.y1 * ky) + (y2 + p.y2 * ky)) / 2 < -h / 2
+end
+
 local function Refresh()
     local w = Work()
     ValidSel()
@@ -548,6 +649,8 @@ local function Refresh()
     BNB.ApplySearchChrome(bar, tool.theme, w.layout, w.size)
     panel._size = BNB.ApplySearchChrome(panel, tool.theme, w.panelLayout, w.panelSize, { panel = true })
     BNB.PlaceSearchPanel(panel, bar, tool.theme, w.panelPos)
+    panel._pad = WorkPad(w)
+    panel._hl = WorkHL(w)
     if BNB.Oracle and BNB.Oracle.DrawPreview then BNB.Oracle.DrawPreview(panel, tool.theme, tool.rows) end
     tool.title:SetText("Search bar layout (ALL-69)\n|cffffffff" .. BNB.GetSearchTheme(tool.theme).name .. "|r")
     PlaceHighlight()
@@ -556,18 +659,20 @@ local function Refresh()
     -- Every piece has a button; one the theme does not use is dimmed, and
     -- clicking it adds the piece.
     for _, b in ipairs(tool.pieceBtns) do
-        local used = (b.key == PLACE) or Side(b.side)[b.key] ~= nil
+        local used = Special(b.key) or Side(b.side)[b.key] ~= nil
         b:SetAlpha(used and 1 or 0.4)
         b.sel:SetShown(b.side == tool.side and b.key == tool.sel)
     end
-    tool.removeBtn:SetEnabled(tool.sel ~= PLACE and not KEEP[tool.sel])
+    tool.removeBtn:SetEnabled(not Special(tool.sel) and not KEEP[tool.sel])
     local orn = ORNAMENTS[tool.sel] and Side(tool.side)[tool.sel]
     tool.depthBtn:SetEnabled(orn and true or false)
     tool.depthBtn:SetText("Depth: " .. (orn and DEPTH_NAME[orn.layer or "own"] or "-"))
-    local ap = tool.sel ~= PLACE and Side(tool.side)[tool.sel]
+    local ap = not Special(tool.sel) and Side(tool.side)[tool.sel]
     local fixed = ap and ap.a1 == ap.a2
     tool.anchorBtn:SetEnabled(fixed and true or false)
-    tool.anchorBtn:SetText(fixed and ap.a1 or "Anchor: 2 points")
+    local warn = HangsWrong(ap)
+    tool.anchorBtn:SetText(fixed and ((warn and "|cffff4040" or "") .. ap.a1 .. (warn and "|r" or ""))
+        or "Anchor: 2 points")
 
     local layout, size = Side(tool.side)
     local p = layout[tool.sel]
@@ -575,10 +680,15 @@ local function Refresh()
         local v
         if tool.sel == PLACE then
             v = (axis == "w") and (w.size.w - w.panelPos.left - w.panelPos.right) or nil
+        elseif tool.sel == CONTENT then
+            local pad = WorkPad(w)
+            v = (axis == "w") and (panel:GetWidth() - pad.left - pad.right) or nil
         else
-            v = PieceSize(p, axis, ((axis == "h") and size.borderY or size.border) / NATIVE)
+            local k = ((axis == "h") and size.borderY or size.border) / NATIVE
+            v = PieceSize(p, axis, k)
+                or (p and StretchSize(p, axis, k, (tool.side == "panel") and panel or bar))
         end
-        if not eb:HasFocus() then eb:SetText(v and Num(v) or ((tool.sel == PLACE) and "auto" or "stretch")) end
+        if not eb:HasFocus() then eb:SetText(v and Num(v) or (Special(tool.sel) and "auto" or "stretch")) end
         eb:SetEnabled(v ~= nil)
         eb:SetTextColor(v and 1 or 0.5, v and 1 or 0.5, v and 1 or 0.5)
     end
@@ -586,6 +696,7 @@ local function Refresh()
         if not box.eb:HasFocus() then box.eb:SetText(Num(box.get())) end
     end
     tool.underCb:SetChecked(w.panelPos.under ~= false)
+    tool.hlSwatch:SetColorTexture(WorkHL(w)[1], WorkHL(w)[2], WorkHL(w)[3], 1)
 
     local where = (tool.side == "panel") and "Results panel" or "Search bar"
     if tool.sel == PLACE then
@@ -594,11 +705,20 @@ local function Refresh()
             .. "Left / Right: in from the bar's edges (negative = wider).\nGap: space under the bar (negative = overlap).",
             where, Num(w.panelPos.left), Num(w.panelPos.right), Num(w.panelPos.gap),
             Num(w.size.w - w.panelPos.left - w.panelPos.right)))
+    elseif tool.sel == CONTENT then
+        local pad = WorkPad(w)
+        tool.info:SetText(string.format(
+            "|cffffd100%s: content|r\nLeft %s   Right %s   Top %s   Bottom %s\n"
+            .. "Where the result rows sit inside the panel art, in from its edges.\n"
+            .. "Arrows move them, Alt: top-left edges, Ctrl: bottom-right edges.",
+            where, Num(pad.left), Num(pad.right), Num(pad.top), Num(pad.bottom)))
     else
         tool.info:SetText(string.format(
-            "|cffffd100%s: %s|r\nTOPLEFT -> %s %s, %s\nBOTTOMRIGHT -> %s %s, %s\n"
-            .. "Art px x border / 32.  Zoom %dx",
-            where, tool.sel, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2), tool.zoom))
+            "|cffffd100%s: %s|r\nTOPLEFT -> %s %s, %s\nBOTTOMRIGHT -> %s %s, %s\n%s",
+            where, tool.sel, p.a1, Num(p.x1), Num(p.y1), p.a2, Num(p.x2), Num(p.y2),
+            HangsWrong(p)
+                and "|cffff4040Hangs from TOP but sits low: will not follow the results. Anchor it to a BOTTOM point.|r"
+                or string.format("Art px x border / 32.  Zoom %dx", tool.zoom)))
     end
 end
 
@@ -610,6 +730,10 @@ local function Nudge(dx, dy, mode)
         if mode ~= "p2" then pos.left = pos.left + dx end
         if mode ~= "p1" then pos.right = pos.right - dx end
         pos.gap = pos.gap - dy
+    elseif tool.sel == CONTENT then
+        local pad = WorkPad(Work(), true)
+        if mode ~= "p2" then pad.left = pad.left + dx; pad.top = pad.top - dy end
+        if mode ~= "p1" then pad.right = pad.right - dx; pad.bottom = pad.bottom + dy end
     else
         local p = Side(tool.side)[tool.sel]
         if mode ~= "p2" then p.x1 = p.x1 + dx; p.y1 = p.y1 + dy end
@@ -627,7 +751,7 @@ end
 -- Click on a piece button: select it, adding it first when that side does
 -- not use it yet.
 local function SelectOrAdd(side, key)
-    if key ~= PLACE then
+    if not Special(key) then
         local layout, _, removed, w = Side(side)
         if not layout[key] then
             local def = BNB.SEARCH_THEMES[BNB.SEARCH_DEFAULT_THEME]
@@ -654,18 +778,11 @@ local function CycleDepth()
     Refresh()
 end
 
--- Where frame point pt sits, from the frame's top-left, in screen px.
-local function PointXY(pt, w, h)
-    local x = pt:find("LEFT") and 0 or pt:find("RIGHT") and w or w / 2
-    local y = pt:find("TOP") and 0 or pt:find("BOTTOM") and -h or -h / 2
-    return x, y
-end
-
 -- Hangs the selected fixed-size piece (both points on one frame point)
 -- from the next frame point, with its offsets changed so it stays put.
 local ANCHORS = { "TOPLEFT", "TOP", "TOPRIGHT", "RIGHT", "BOTTOMRIGHT", "BOTTOM", "BOTTOMLEFT", "LEFT", "CENTER" }
 local function CycleAnchor()
-    if tool.sel == PLACE then return end
+    if Special(tool.sel) then return end
     local layout, size = Side(tool.side)
     local p = layout[tool.sel]
     if not p or p.a1 ~= p.a2 then return end
@@ -685,7 +802,7 @@ local function CycleAnchor()
 end
 
 local function RemoveSelected()
-    if tool.sel == PLACE or KEEP[tool.sel] then return end
+    if Special(tool.sel) or KEEP[tool.sel] then return end
     local layout, _, removed = Side(tool.side)
     layout[tool.sel] = nil
     removed[tool.sel] = true
@@ -950,7 +1067,7 @@ local function BuildTool()
 
     -- Group: the results panel, its own pieces and where it sits.
     local close2 = Group("Results panel")
-    local panelKeys = { PLACE }
+    local panelKeys = { PLACE, CONTENT }
     for _, def in ipairs(PIECES) do
         if OnSide("panel", def) then panelKeys[#panelKeys + 1] = def.key end
     end
@@ -970,10 +1087,50 @@ local function BuildTool()
     g, s = PosField("gap")
     ValueBox(l, 4, g, s, true)
     Row()
+    local function PadField(key)
+        return function() return WorkPad(Work())[key] end,
+               function(v) WorkPad(Work(), true)[key] = v end
+    end
+    l = Label("Content L")
+    g, s = PadField("left")
+    bx = ValueBox(l, 4, g, s, true)
+    l = Label("R", bx, 6)
+    g, s = PadField("right")
+    bx = ValueBox(l, 4, g, s, true)
+    l = Label("T", bx, 6)
+    g, s = PadField("top")
+    bx = ValueBox(l, 4, g, s, true)
+    l = Label("B", bx, 6)
+    g, s = PadField("bottom")
+    ValueBox(l, 4, g, s, true)
+    Row()
     f.underCb = Check("Results under the search bar where they overlap", true, function(v)
         Work().panelPos.under = v
         Refresh()
     end)
+    -- Selected-result colour (the theme's highlight): swatch for the
+    -- colour, box for its alpha (0-1). Shown on the preview's first row.
+    l = Label("Highlight")
+    local sw = CreateFrame("Button", nil, f, "BackdropTemplate")
+    sw:SetSize(44, 18)
+    sw:SetPoint("LEFT", l, "RIGHT", 6, 0)
+    sw:SetBackdrop({ bgFile = WHITE, edgeFile = WHITE, edgeSize = 1 })
+    sw:SetBackdropColor(0, 0, 0, 1)
+    sw:SetBackdropBorderColor(0.6, 0.6, 0.6, 1)
+    f.hlSwatch = sw:CreateTexture(nil, "ARTWORK")
+    f.hlSwatch:SetPoint("TOPLEFT", 2, -2)
+    f.hlSwatch:SetPoint("BOTTOMRIGHT", -2, 2)
+    sw:SetScript("OnClick", function()
+        local h = WorkHL(Work(), true)
+        local old = { h[1], h[2], h[3] }
+        BNB.OpenColorPicker(h[1], h[2], h[3],
+            function(r, g, b) h[1], h[2], h[3] = r, g, b; Refresh() end,
+            function() h[1], h[2], h[3] = old[1], old[2], old[3]; Refresh() end)
+    end)
+    l = Label("Alpha", sw, 10)
+    ValueBox(l, 4, function() return WorkHL(Work())[4] end,
+        function(v) WorkHL(Work(), true)[4] = math.max(0, math.min(1, v)) end)
+    Row()
     close2()
 
     -- Group: the selected piece.
@@ -987,8 +1144,8 @@ local function BuildTool()
     f.info = info
     y = y - 60
 
-    -- Size in screen pixels. The edge that hangs off the frame stays put; a
-    -- stretching axis shows "stretch" and is locked. Placement: the panel's
+    -- Size in screen pixels. The edge that hangs off the frame stays put; on
+    -- a stretching axis the piece grows from its centre and keeps stretching. Placement: the panel's
     -- width (its right edge moves), height is automatic.
     f.sizeBoxes, f.linkSizes = {}, true
     local function PieceApply(axis)
@@ -996,6 +1153,15 @@ local function BuildTool()
             if tool.sel == PLACE then
                 local w = Work()
                 if axis == "w" then w.panelPos.right = w.size.w - w.panelPos.left - px end
+                return
+            end
+            -- Content: the width, evenly from both sides.
+            if tool.sel == CONTENT then
+                if axis == "w" then
+                    local pad = WorkPad(Work(), true)
+                    local d = (tool.panel:GetWidth() - pad.left - pad.right - px) / 2
+                    pad.left, pad.right = pad.left + d, pad.right + d
+                end
                 return
             end
             local layout, size = Side(tool.side)
@@ -1010,6 +1176,12 @@ local function BuildTool()
                 local cx, cy = (ep.x1 + ep.x2) / 2, (ep.y1 + ep.y2) / 2
                 local hw, hh = px / kx / 2, px / ky / 2
                 ep.x1, ep.x2, ep.y1, ep.y2 = cx - hw, cx + hw, cy + hh, cy - hh
+                return
+            end
+            -- A stretching piece (the background, an edge along its
+            -- length): only this one, from its centre.
+            if not FixedSide(ep, axis) then
+                SetStretchSize(ep, axis, px, k, (tool.side == "panel") and tool.panel or tool.bar)
                 return
             end
             local grp = GROUPS[tool.sel]
@@ -1073,6 +1245,7 @@ local function BuildTool()
     help:SetText("Arrows / drag: move.  Alt: top-left point only, Ctrl: bottom-right point "
         .. "only (resize).  Shift: 5 px.  Tab: next piece.  Dimmed button: not used, click to add.  "
         .. "Placement: arrows move the panel, Alt / Ctrl one edge, up / down the gap.  "
+        .. "Content: where the rows sit inside the panel; W sets their width.  "
         .. "Rows: check that results pieces follow the panel as it grows.")
 
     -- Tool buttons, four to a row from the bottom up.

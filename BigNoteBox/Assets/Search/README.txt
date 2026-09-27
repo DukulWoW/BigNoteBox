@@ -48,7 +48,15 @@ It is tiled, not stretched, so its size must be a power of two (128x128...),
 and the Forever highlight glow is drawn over it.
 
 The selected result is tinted with highlight = { r, g, b, alpha } (0-1
-each). Left out, it is BigNoteBox gold.
+each). Left out, it is BigNoteBox gold. The tool's Highlight swatch and
+Alpha box set it.
+
+Where the results sit inside the panel art: panelPad = { left, right,
+top, bottom } in screen px (the tool's "content" item). Left out, 0.6 x
+the panel border on each side.
+
+An unfinished theme: hidden = true keeps it out of the player's theme
+picker in Settings; the layout tool still lists it.
 
 Your own theme
 --------------

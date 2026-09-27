@@ -76,7 +76,55 @@ local rows    = {}
 local results = {}
 local sel     = 0
 local openT   = nil   -- GetTime() of the frame the bar opened in
-local drawnTheme      -- the oracleTheme value the bar was last drawn with
+local drawnTheme      -- the theme id the bar was last drawn with (ThemeID)
+local previewing = false   -- the settings page's move / preview mode is up
+local moveTip              -- "drag to move" strip under the panel, preview only
+
+--------------------------------------------------------------------------------
+-- SETTINGS (ALL-69.4, Settings > Modules > Oracle search). nil = default.
+--   oracleEnabled     false = the keybinding and /bnb search only say so
+--   oracleTheme       search theme id (UI/SearchChrome.lua); nil = the
+--                     character's faction theme (Dukul, 2026-09-27)
+--   oracleX / Y       bar centre, offset from the screen centre; nil =
+--                     DEFAULT_X / DEFAULT_Y (200 px above centre, Dukul)
+--   oracleMaxResults  rows shown, 1 to MAX_ROWS
+--   oracleKeepOpen    true = the bar stays open after a note opens
+--   oracleOpenMode    see ApplyOpenMode;  oracleWeights  see OracleSearch
+--------------------------------------------------------------------------------
+Oracle.MAX_ROWS = MAX_ROWS
+local DEFAULT_X, DEFAULT_Y = 0, 200
+
+-- Theme for a nil oracleTheme: Alliance or Horde by the character's faction,
+-- else nil (Neutral), which GetSearchTheme turns into the default theme.
+local FACTION_THEME = { Alliance = "alliance", Horde = "horde" }
+function Oracle.FactionTheme()
+    local faction = UnitFactionGroup("player")
+    local id = faction and FACTION_THEME[faction]
+    return (id and BNB.SEARCH_THEMES[id]) and id or nil
+end
+
+function Oracle.ThemeID()
+    local t = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
+    if t ~= nil then return t end
+    return Oracle.FactionTheme()
+end
+
+local function MaxRows()
+    local n = BigNoteBoxDB and tonumber(BigNoteBoxDB.oracleMaxResults)
+    if not n then return MAX_ROWS end
+    return math.max(1, math.min(MAX_ROWS, math.floor(n)))
+end
+
+local function KeepOpen()
+    return BigNoteBoxDB and BigNoteBoxDB.oracleKeepOpen == true
+end
+
+local function ApplyPosition()
+    local db = BigNoteBoxDB
+    bar:ClearAllPoints()
+    bar:SetPoint("CENTER", UIParent, "CENTER",
+        db and db.oracleX or DEFAULT_X, db and db.oracleY or DEFAULT_Y)
+end
 
 --------------------------------------------------------------------------------
 -- DATA
@@ -311,6 +359,8 @@ local function ApplyOpenMode(id)
     end
     local typeHere = (mode == "all") or (mode == "plain" and not rich)
     if not typeHere then return end
+    -- A bar that stays open keeps the keyboard (AfterOpen).
+    if KeepOpen() then return end
     if BNB.IsNoteLockedInEditor and BNB.IsNoteLockedInEditor(id) then return end
     -- A tick later, after the bar has closed and released its own focus.
     C_Timer.After(0.05, function()
@@ -392,12 +442,25 @@ end
 -- Shift wins over Ctrl, Ctrl over Alt, when more than one is held. With no
 -- modifier, an open-as prefix (s/f/r) picks the action instead of the main
 -- window.
+-- After a note opened: close the bar, or, with "Close after opening a note"
+-- off, keep it up with the keyboard so several notes can be opened in a row.
+-- A sticky or window that opened may have been raised over it.
+local function AfterOpen()
+    if not KeepOpen() then Oracle.Close(); return end
+    C_Timer.After(0, function()
+        if not bar:IsShown() then return end
+        bar:Raise()
+        BNB.PlaceSearchPanel(panel, bar, drawnTheme)
+        eb:SetFocus()
+    end)
+end
+
 local function OpenResult(i)
     local r = results[i]
     if not r then return end
     local id = r.note.id
     if Oracle._openAs == "trash" then
-        if OpenTrashResult(id) then Oracle.Close() end
+        if OpenTrashResult(id) then AfterOpen() end
         return
     end
     local ok
@@ -408,7 +471,7 @@ local function OpenResult(i)
     elseif Oracle._openAs == "focus" then ok = OpenInFocus(id)
     elseif Oracle._openAs == "refbox" then ok = OpenInRefBox(id)
     else ok = OpenInMain(id) end
-    if ok then Oracle.Close() end
+    if ok then AfterOpen() end
 end
 
 --------------------------------------------------------------------------------
@@ -496,7 +559,7 @@ local function BuildRow(parent, onEnter, onClick)
 
     local selTex = row:CreateTexture(nil, "BACKGROUND", nil, 1)
     selTex:SetAllPoints()
-    selTex:SetColorTexture(BNB.GetSearchHighlight(BigNoteBoxDB and BigNoteBoxDB.oracleTheme))
+    selTex:SetColorTexture(BNB.GetSearchHighlight(Oracle.ThemeID()))
     selTex:Hide()
     row.selTex = selTex
     row.badges = {}
@@ -540,7 +603,8 @@ end
 
 -- Lays out list (results) on the rows of parent from y down, building rows
 -- with build(i) as needed, one badge column for all. Returns the new y.
-local function PlaceRows(parent, rowList, list, y, padX, build)
+-- pad: the theme's content inset (BNB.GetSearchPanelPad), left / right used here.
+local function PlaceRows(parent, rowList, list, y, pad, build)
     local n = #list
     -- Badge column as wide as the row with the most badges, plus a little
     -- air between badges and text.
@@ -553,8 +617,8 @@ local function PlaceRows(parent, rowList, list, y, padX, build)
         if i <= n then
             row = row or build(i)
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", parent, "TOPLEFT", padX, y)
-            row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -padX, y)
+            row:SetPoint("TOPLEFT", parent, "TOPLEFT", pad.left, y)
+            row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -pad.right, y)
             RowText(row, list[i], textRight)
             row:Show()
             y = y - ROW_H - ROW_GAP
@@ -570,42 +634,41 @@ end
 local showingHelp = false
 
 local function Layout()
-    local size = panel._size
-    local padX = math.floor(size.border * 0.6 + 0.5)
-    local padY = math.floor((size.borderY or size.border) * 0.6 + 0.5)
-    local y = -padY
+    -- Where the content sits inside the panel art (the theme's panelPad).
+    local pad = panel._pad
+    local y = -pad.top
 
     if showingHelp then
         for _, row in ipairs(rows) do row:Hide() end
         emptyFS:Hide()
         if not helpFrame then BuildHelp() end
         helpFrame:ClearAllPoints()
-        helpFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 6)
-        helpFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX - 6, y - 6)
+        helpFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", pad.left + 6, y - 6)
+        helpFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -pad.right - 6, y - 6)
         helpFrame:SetHeight(helpLines * HELP_LINE_H)
         helpFrame:Show()
         hintFS:Hide()
-        panel:SetHeight(padY - y + helpLines * HELP_LINE_H + 12)
+        panel:SetHeight(pad.bottom - y + helpLines * HELP_LINE_H + 12)
         return
     end
     if helpFrame then helpFrame:Hide() end
     hintFS:Show()
 
     local n = #results
-    y = PlaceRows(panel, rows, results, y, padX, MainRow)
+    y = PlaceRows(panel, rows, results, y, pad, MainRow)
     if n == 0 then
         emptyFS:ClearAllPoints()
-        emptyFS:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 6)
-        emptyFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX - 6, y - 6)
+        emptyFS:SetPoint("TOPLEFT", panel, "TOPLEFT", pad.left + 6, y - 6)
+        emptyFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -pad.right - 6, y - 6)
         emptyFS:Show()
         y = y - 30
     else
         emptyFS:Hide()
     end
     hintFS:ClearAllPoints()
-    hintFS:SetPoint("TOPLEFT", panel, "TOPLEFT", padX + 6, y - 2)
-    hintFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padX - 6, y - 2)
-    panel:SetHeight(-y + HINT_H + padY)
+    hintFS:SetPoint("TOPLEFT", panel, "TOPLEFT", pad.left + 6, y - 2)
+    hintFS:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -pad.right - 6, y - 2)
+    panel:SetHeight(-y + HINT_H + pad.bottom)
 end
 
 -- Where the player is, for the "current zone" weight (ALL-69.3).
@@ -639,6 +702,7 @@ local function TargetCtx()
 end
 
 local function Refresh()
+    if previewing then return end   -- the preview draws its own rows
     local text = eb:GetText() or ""
     if text == "" then placeholder:Show() else placeholder:Hide() end
 
@@ -660,7 +724,7 @@ local function Refresh()
         weights = BigNoteBoxDB and BigNoteBoxDB.oracleWeights,
         zone = ZoneCtx(), target = TargetCtx(),
     }
-    results = BNB.OracleSearch.SearchParsed(notes, parsed, { max = MAX_ROWS, ctx = ctx })
+    results = BNB.OracleSearch.SearchParsed(notes, parsed, { max = MaxRows(), ctx = ctx })
     if #results == 0 then
         emptyFS:SetText(#notes == 0 and L["ORACLE_NO_NOTES"] or L["ORACLE_NO_MATCHES"])
     end
@@ -689,6 +753,61 @@ local function IsOracleBinding(key)
 end
 
 --------------------------------------------------------------------------------
+-- MOVE / PREVIEW (ALL-69.4)
+-- The settings page's "Move / preview" shows the real bar at its saved spot
+-- with sample results (the layout tool's fake notes, PREVIEW below). While it
+-- is up the bar takes no typing, a click outside leaves it open, and a drag
+-- on the bar or its results moves it; Done, Esc or leaving the page ends it.
+-- Theme and result-count changes redraw it at once (Oracle.RefreshPreview).
+--------------------------------------------------------------------------------
+local function SavePosition()
+    local cx, cy = bar:GetCenter()
+    local scx, scy = UIParent:GetCenter()
+    if not (cx and scx) then return end
+    if BigNoteBoxDB then
+        BigNoteBoxDB.oracleX = math.floor(cx - scx + 0.5)
+        BigNoteBoxDB.oracleY = math.floor(cy - scy + 0.5)
+    end
+    ApplyPosition()
+end
+
+local function BuildMoveTip()
+    moveTip = BNB.CreateBackdropFrame("Frame", nil, bar)
+    moveTip:SetSize(300, 30)
+    BNB.SetBackdrop(moveTip, 0.10, 0.10, 0.12, 0.92, 0.45, 0.70, 0.45, 1)
+    local done = BNB.CreateButton(nil, moveTip, L["ORACLE_MOVE_DONE"], 70, 22)
+    done:SetPoint("RIGHT", moveTip, "RIGHT", -4, 0)
+    done:SetScript("OnClick", function() Oracle.EndPreview() end)
+    local fs = moveTip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    fs:SetPoint("LEFT", moveTip, "LEFT", 8, 0)
+    fs:SetPoint("RIGHT", done, "LEFT", -6, 0)
+    fs:SetJustifyH("LEFT")
+    fs:SetWordWrap(false)
+    fs:SetText(L["ORACLE_MOVE_TIP"])
+end
+
+local function DrawPreviewRows()
+    for _, row in ipairs(rows) do row:Hide() end
+    emptyFS:Hide(); hintFS:Hide()
+    if helpFrame then helpFrame:Hide() end
+    Oracle.DrawPreview(panel, drawnTheme, MaxRows())
+    panel._hint:Show()
+    -- Under the results, which change height with the row count.
+    moveTip:ClearAllPoints()
+    moveTip:SetPoint("TOP", panel, "BOTTOM", 0, -8)
+end
+
+-- Run from the bar's OnHide: whatever hid it, the preview is over.
+local function ClearPreview()
+    if not previewing then return end
+    previewing = false
+    if moveTip then moveTip:Hide() end
+    eb:EnableMouse(true)
+    for _, row in ipairs(panel._rows or {}) do row:Hide() end
+    if panel._hint then panel._hint:Hide() end
+end
+
+--------------------------------------------------------------------------------
 -- BUILD
 --------------------------------------------------------------------------------
 local function Build()
@@ -699,13 +818,15 @@ local function Build()
     bar:SetToplevel(true)
     bar:SetClampedToScreen(true)
     bar:EnableMouse(true)
-    bar:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    drawnTheme = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
+    ApplyPosition()
+    drawnTheme = Oracle.ThemeID()
     BNB.ApplySearchChrome(bar, drawnTheme)
     -- A click on the bar's frame (not the text) puts the cursor back.
     -- A click raises the bar (SetToplevel), lifting the results with it:
     -- put them back under it after the raise.
-    bar:SetScript("OnMouseDown", function()
+    bar:SetScript("OnMouseDown", function(_, button)
+        if previewing then return end
+        if button == "RightButton" then Oracle.OpenSettings(); return end
         eb:SetFocus()
         C_Timer.After(0, function() BNB.PlaceSearchPanel(panel, bar, drawnTheme) end)
     end)
@@ -717,6 +838,11 @@ local function Build()
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(200)
 
+    -- A right-click in the text opens the settings page, as on the bar.
+    eb:HookScript("OnMouseDown", function(_, button)
+        if button == "RightButton" and not previewing then Oracle.OpenSettings() end
+    end)
+
     placeholder = bar:CreateFontString(nil, "OVERLAY", "GameFontDisableLarge")
     placeholder:SetPoint("LEFT", eb, "LEFT", 0, 0)
     placeholder:SetText(L["ORACLE_PLACEHOLDER"])
@@ -724,11 +850,14 @@ local function Build()
     panel = CreateFrame("Frame", nil, bar)
     BNB.PlaceSearchPanel(panel, bar, drawnTheme)   -- the theme's panelPos
     panel:EnableMouse(true)
-    panel:SetScript("OnMouseDown", function()
+    panel:SetScript("OnMouseDown", function(_, button)
+        if previewing then return end
+        if button == "RightButton" then Oracle.OpenSettings(); return end
         C_Timer.After(0, function() BNB.PlaceSearchPanel(panel, bar, drawnTheme) end)
     end)
     panel._size = BNB.ApplySearchChrome(panel, drawnTheme, nil, nil, { panel = true })
         or { border = 24, borderY = 24 }
+    panel._pad = BNB.GetSearchPanelPad(drawnTheme, panel._size)
     -- Esc still closes it if the box has lost focus to another window.
     tinsert(UISpecialFrames, "BigNoteBoxOracleFrame")
 
@@ -749,12 +878,19 @@ local function Build()
     end)
     eb:SetScript("OnEscapePressed", function() Oracle.Close() end)
     eb:SetScript("OnEnterPressed", function() OpenResult(sel) end)
+    -- Arrows and Tab wrap: down from the last result goes to the first,
+    -- up from the first to the last (Dukul, 2026-09-27).
+    local function Step(d)
+        local n = #results
+        if n == 0 then return end
+        SetSelection((sel - 1 + d) % n + 1)
+    end
     eb:SetScript("OnArrowPressed", function(_, key)
-        if key == "UP" then SetSelection(sel - 1)
-        elseif key == "DOWN" then SetSelection(sel + 1) end
+        if key == "UP" then Step(-1)
+        elseif key == "DOWN" then Step(1) end
     end)
     eb:SetScript("OnTabPressed", function()
-        SetSelection(IsShiftKeyDown() and sel - 1 or sel + 1)
+        Step(IsShiftKeyDown() and -1 or 1)
     end)
     eb:SetScript("OnKeyDown", function(self, key)
         if IsOracleBinding(key) then
@@ -764,16 +900,33 @@ local function Build()
 
     -- A click anywhere outside the bar and the results closes it.
     bar:SetScript("OnEvent", function(_, event)
-        if event == "GLOBAL_MOUSE_DOWN" and bar:IsShown()
+        if event == "GLOBAL_MOUSE_DOWN" and bar:IsShown() and not previewing
             and not bar:IsMouseOver() and not panel:IsMouseOver() then
             Oracle.Close()
         end
     end)
     bar:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
     bar:SetScript("OnHide", function(self)
+        ClearPreview()
         self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
         eb:ClearFocus()
     end)
+
+    -- Dragging moves the bar in the preview only. SetUserPlaced(false)
+    -- keeps WoW's layout cache out of it: the position is ours to save.
+    bar:SetMovable(true)
+    bar:RegisterForDrag("LeftButton")
+    panel:RegisterForDrag("LeftButton")
+    local function DragStart() if previewing then bar:StartMoving() end end
+    local function DragStop()
+        bar:StopMovingOrSizing()
+        bar:SetUserPlaced(false)
+        if previewing then SavePosition() end
+    end
+    bar:SetScript("OnDragStart", DragStart)
+    bar:SetScript("OnDragStop", DragStop)
+    panel:SetScript("OnDragStart", DragStart)
+    panel:SetScript("OnDragStop", DragStop)
     bar:Hide()
 end
 
@@ -785,16 +938,21 @@ end
 -- setting changed since the bar was last drawn, so a new theme shows on
 -- the next open without a reload.
 local function SyncTheme()
-    local want = BigNoteBoxDB and BigNoteBoxDB.oracleTheme
+    local want = Oracle.ThemeID()
     if want == drawnTheme then return end
     drawnTheme = want
     BNB.ApplySearchChrome(bar, want)
     panel._size = BNB.ApplySearchChrome(panel, want, nil, nil, { panel = true }) or panel._size
+    panel._pad = BNB.GetSearchPanelPad(want, panel._size)
     BNB.PlaceSearchPanel(panel, bar, want)
     for _, row in ipairs(rows) do row.selTex:SetColorTexture(BNB.GetSearchHighlight(want)) end
 end
 
 function Oracle.Open(text)
+    if BigNoteBoxDB and BigNoteBoxDB.oracleEnabled == false then
+        BNB:Print(L["ORACLE_OFF"]); return
+    end
+    Oracle.EndPreview()
     if not bar then Build() else SyncTheme() end
     openT = GetTime()
     eb:SetText(text or "")
@@ -831,7 +989,7 @@ local PREVIEW = {
 }
 
 -- Draws the preview rows on pv, a results panel the layout tool has
--- themed (pv._size set by ApplySearchChrome), and sizes it. Row 1 shows
+-- themed (pv._size set by ApplySearchChrome; pv._pad optional), and sizes it. Row 1 shows
 -- selected, in the theme's highlight colour. count: how many rows (1 to
 -- MAX_ROWS, the fake notes repeat); left out = all of them.
 function Oracle.DrawPreview(pv, themeID, count)
@@ -841,15 +999,16 @@ function Oracle.DrawPreview(pv, themeID, count)
         list = {}
         for i = 1, math.max(1, math.min(MAX_ROWS, count)) do list[i] = PREVIEW[(i - 1) % #PREVIEW + 1] end
     end
-    local size = pv._size or { border = 24, borderY = 24 }
-    local padX = math.floor(size.border * 0.6 + 0.5)
-    local padY = math.floor((size.borderY or size.border) * 0.6 + 0.5)
-    local y = PlaceRows(pv, pv._rows, list, -padY, padX, function(i)
+    -- pv._pad: the layout tool's working copy; else the theme's own.
+    local pad = pv._pad or BNB.GetSearchPanelPad(themeID, pv._size)
+    local y = PlaceRows(pv, pv._rows, list, -pad.top, pad, function(i)
         pv._rows[i] = BuildRow(pv)
         return pv._rows[i]
     end)
     for i, row in ipairs(pv._rows) do
-        row.selTex:SetColorTexture(BNB.GetSearchHighlight(themeID))
+        -- pv._hl: the layout tool's working colour; else the theme's.
+        if pv._hl then row.selTex:SetColorTexture(unpack(pv._hl))
+        else row.selTex:SetColorTexture(BNB.GetSearchHighlight(themeID)) end
         row.selTex:SetShown(i == 1)
         for _, badge in pairs(row.badges) do badge:EnableMouse(false) end
     end
@@ -860,9 +1019,9 @@ function Oracle.DrawPreview(pv, themeID, count)
     end
     pv._hint:SetText(L["ORACLE_HINT"])
     pv._hint:ClearAllPoints()
-    pv._hint:SetPoint("TOPLEFT", pv, "TOPLEFT", padX + 6, y - 2)
-    pv._hint:SetPoint("TOPRIGHT", pv, "TOPRIGHT", -padX - 6, y - 2)
-    pv:SetHeight(-y + HINT_H + padY)
+    pv._hint:SetPoint("TOPLEFT", pv, "TOPLEFT", pad.left + 6, y - 2)
+    pv._hint:SetPoint("TOPRIGHT", pv, "TOPRIGHT", -pad.right - 6, y - 2)
+    pv:SetHeight(-y + HINT_H + pad.bottom)
 end
 
 -- Redraws the NPC portraits of the shown results, after
@@ -877,6 +1036,53 @@ end
 
 function Oracle.Close()
     if bar then bar:Hide() end
+end
+
+-- Right-click on the bar: its settings page (the bar closes first).
+function Oracle.OpenSettings()
+    Oracle.Close()
+    if BNB.OpenSettingsPage then BNB.OpenSettingsPage("modules", "oracle") end
+end
+
+-- The settings page's Move / preview (see MOVE / PREVIEW above). Works
+-- with the module switched off too, so it can be set up first.
+function Oracle.StartPreview()
+    if not bar then Build() else SyncTheme() end
+    if bar:IsShown() then bar:Hide() end   -- a live search gives way
+    if not moveTip then BuildMoveTip() end
+    previewing = true
+    eb:SetText("")
+    eb:ClearFocus()
+    eb:EnableMouse(false)
+    placeholder:Show()
+    ApplyPosition()
+    DrawPreviewRows()
+    moveTip:Show()
+    bar:Show()
+    bar:Raise()
+    BNB.PlaceSearchPanel(panel, bar, drawnTheme)
+end
+
+function Oracle.EndPreview()
+    if previewing and bar then bar:Hide() end
+end
+
+function Oracle.IsPreviewing()
+    return previewing
+end
+
+-- Redraws the preview after a theme or result-count change.
+function Oracle.RefreshPreview()
+    if not previewing then return end
+    SyncTheme()
+    DrawPreviewRows()
+    BNB.PlaceSearchPanel(panel, bar, drawnTheme)
+end
+
+-- Settings page Reset: back to the default spot.
+function Oracle.ResetPosition()
+    if BigNoteBoxDB then BigNoteBoxDB.oracleX, BigNoteBoxDB.oracleY = nil, nil end
+    if bar then ApplyPosition() end
 end
 
 function Oracle.IsOpen()

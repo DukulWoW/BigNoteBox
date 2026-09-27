@@ -7,11 +7,12 @@ local Register = BigNoteBox.RegisterSearchTheme
 -- Full-height bracket on the left (no top/bottom-left corners), right end
 -- is two corners with no edge between them, and a middle piece on the top
 -- and bottom edge. A starting layout, not tuned yet: Dukul is redrawing
--- the art (2026-09-26). Registered so the layout tool can show it; keep it
--- out of the player's theme picker (ALL-69.4) until it is finished.
+-- the art (2026-09-26). Registered so the layout tool can show it; hidden
+-- keeps it out of the player's theme picker (ALL-69.4) until it is finished.
 Register({
     name   = "The Eye",
     folder = "The-Eye",
+    hidden = true,
     layout = {
         bg             = { a1 = "TOPLEFT",     x1 =  24, y1 =  -8, a2 = "BOTTOMRIGHT", x2 =  -8, y2 =   8 },
         top            = { a1 = "TOPLEFT",     x1 =  64, y1 =   0, a2 = "TOP",         x2 = -32, y2 = -32 },

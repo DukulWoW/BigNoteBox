@@ -77,6 +77,7 @@ end
 -- on that tab. The tab stays highlighted; selecting any tab (the same one
 -- included), the back button or closing the window returns to the tab.
 local activeSub  = nil   -- the open page, or nil
+local subPages   = {}    -- key -> page, for pages built with a key (BNB.OpenSettingsPage)
 local buildOwner = nil   -- { parent, topOffset, idx } while _BuildConfigTabPanels runs
 
 local function CloseSubPage()
@@ -196,12 +197,14 @@ end
 -- title is the page heading, beside the back button. build(sf, ct, y, page)
 -- fills it from y down and ends with sf:FinaliseHeight, like a tab builder;
 -- a page with a master checkbox stores it as page.enableCb (see AddOverviewRow).
+-- key: optional, lets BNB.OpenSettingsPage(tab, key) open the page from outside.
 -- Returns the page; page.Open() shows it.
-local function NewSubPage(title, build)
+local function NewSubPage(title, build, key)
     local o = buildOwner
     local sf, ct = MakeScrollPanel(o.parent, o.topOffset)
     local page = { sf = sf, ct = ct, idx = o.idx }
     function page.Open() OpenSubPage(page) end
+    if key then subPages[key] = page end
 
     -- Textured back arrow, same build as BNB.CreateSkinCloseButton; used in
     -- both chromes (the art is not skin-tinted).
@@ -741,4 +744,22 @@ function BNB.OpenConfig()
         cfgFrame:ClearAllPoints()
         cfgFrame:SetPoint("TOPLEFT", BNB.mainFrame, "TOPRIGHT", 8, 0)
     end
+end
+
+-- Opens Settings on a tab (TABS key, e.g. "modules") and, when pageKey is
+-- given, on the sub-page NewSubPage registered under it. Unlike OpenConfig it
+-- never closes an open window. Shared by the Oracle bar's right-click
+-- (ALL-69.4) and the developer page (ALL-87).
+function BNB.OpenSettingsPage(tabKey, pageKey)
+    if not (cfgFrame and cfgFrame:IsShown()) then BNB.OpenConfig() end
+    if not (cfgFrame and cfgFrame:IsShown()) then return end   -- combat
+    local idx
+    for i, tab in ipairs(TABS) do
+        if tab.key == tabKey then idx = i; break end
+    end
+    if not idx then return end
+    ReselectTab(idx)
+    local page = pageKey and subPages[pageKey]
+    if page and page.idx == idx then page.Open() end
+    cfgFrame:Raise()
 end

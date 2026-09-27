@@ -15,7 +15,7 @@ local _undoTimers, _undoForced = K.undoTimers, K.undoForced
 -- Sits between the timestamp strip and the body scroll frame.
 -- Toggle via BigNoteBoxDB.wysiwygBarVisible (persisted).
 --
--- Left  (left-anchored):  Undo | Redo | divider | FontType | Dec | Inc | FontSize
+-- Left  (left-anchored):  Undo | Redo | divider | FontType | Dec | Inc | FontSize | Bullet | Timestamp
 -- Right (right-anchored): Restore | History | divider | CopyMove | Waypoint
 --
 -- BNB._editorWysiwygBar   — the bar frame (shown/hidden on toggle)
@@ -518,6 +518,67 @@ local function BuildWysiwygBar(parent, tsStrip)
         -- The button click took keyboard focus from the body; give it back.
         C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
         BNB.MarkDirty()
+    end)
+
+    -- tb-timestamp: menu to insert the date, the time, or both at the cursor,
+    -- in the Appearance timestamp format (ALL-66). One undo step, like the bullet.
+    local function InsertAtCursor(snippet)
+        local eb = BNB._editorBody
+        if not eb or BNB._editorLocked or not eb:IsVisible() then return end
+        local id = BNB._currentNoteID; if not id then return end
+        local text   = eb:GetText() or ""
+        local cursor = eb:GetCursorPosition() or 0
+        local newText   = text:sub(1, cursor) .. snippet .. text:sub(cursor + 1)
+        local newCursor = cursor + #snippet
+        if not BNB._undoSnap[id] then
+            BNB._undoSnap[id]  = { text = text, cursor = cursor }
+            BNB._undoStack[id] = {}
+            BNB._redoStack[id] = {}
+        end
+        BNB._undoActive = true
+        eb:SetText(newText)
+        BNB._undoActive = false
+        BNB.UndoPush(id, newText, newCursor)
+        if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
+        C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
+        BNB.MarkDirty()
+    end
+
+    local stampBtn = WyBtn("tb-timestamp", L["NE_INSERT_TIMESTAMP_TIP"])
+    stampBtn:SetPoint("LEFT", bulletBtn, "RIGHT", 4, 0)
+    stampBtn:SetIconEnabled(true)
+    local _stampMenuDD
+    stampBtn:SetScript("OnClick", function(self)
+        if not (BNB._editorBody and BNB._currentNoteID) or BNB._editorLocked then return end
+        if not _stampMenuDD then
+            _stampMenuDD = CreateFrame("DropdownButton", "BNBWysiStampDD", UIParent,
+                "WowStyle1DropdownTemplate")
+            _stampMenuDD:SetSize(1, 1); _stampMenuDD:SetAlpha(0)
+            _stampMenuDD:SetToplevel(true)
+        end
+        _stampMenuDD:ClearAllPoints()
+        _stampMenuDD:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, 0)
+        _stampMenuDD:SetupMenu(function(_, root)
+            local now = time()
+            local d, t = BNB.FmtDate(now), BNB.FmtClock(now)
+            local items = {
+                { L["INSERT_DATE"],     d },
+                { L["INSERT_TIME"],     t },
+                { L["INSERT_DATETIME"], d .. " " .. t },
+            }
+            for _, it in ipairs(items) do
+                local value = it[2]
+                root:CreateButton(it[1] .. "  |cff888888" .. value .. "|r",
+                    function() InsertAtCursor(value) end)
+            end
+        end)
+        _stampMenuDD:OpenMenu()
+    end)
+    stampBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["NE_INSERT_TIMESTAMP_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_INSERT_TIMESTAMP_BODY"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
     end)
 
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
