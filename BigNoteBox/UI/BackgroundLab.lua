@@ -5,17 +5,9 @@
 -- added to the sticky background list. Export hands back one Lua line per
 -- entry. Work in progress is kept in BigNoteBoxDB.devBgLab across reloads.
 --
--- Fill modes (per axis: "repeat" tiles, anything else is one copy placed by
--- the anchor and clipped to the window):
---   tile     repeat both ways at native size x scale
---   tileX    repeat across, one copy high
---   tileY    repeat down, one copy wide
---   stretch  fill the window, aspect ignored
---   cover    keep aspect, fill the window, crop the overflow
---   fit      keep aspect, whole image visible, base colour around it
---   width    keep aspect, match the window width
---   height   keep aspect, match the window height
---   native   native size x scale, no stretching
+-- Fill modes and their maths live in UI/BgLayer.lua, shared with the
+-- sticky notes, so this preview is what a sticky shows. "Try on stickies"
+-- puts the current entry on every open sticky (not saved).
 -- Mode and anchor names are dev-only and not translated.
 
 local BNB = BigNoteBox
@@ -104,25 +96,9 @@ for _, e in ipairs(LIST) do
     e.key = e.path:match("([^/]+)%.blp$")
 end
 
-local MODES = {
-    { key = "tile",    label = "Tile" },
-    { key = "tileX",   label = "Tile across" },
-    { key = "tileY",   label = "Tile down" },
-    { key = "stretch", label = "Stretch" },
-    { key = "cover",   label = "Cover" },
-    { key = "fit",     label = "Fit" },
-    { key = "width",   label = "Fit width" },
-    { key = "height",  label = "Fit height" },
-    { key = "native",  label = "Native" },
-}
--- Anchor -> horizontal / vertical alignment (0 = left/top, 1 = right/bottom)
-local ANCHORS = {
-    { "TOPLEFT",    0,   0 },   { "TOP",    0.5, 0 },   { "TOPRIGHT",    1, 0 },
-    { "LEFT",       0, 0.5 },   { "CENTER", 0.5, 0.5 }, { "RIGHT",       1, 0.5 },
-    { "BOTTOMLEFT", 0,   1 },   { "BOTTOM", 0.5, 1 },   { "BOTTOMRIGHT", 1, 1 },
-}
-local ANCHOR_AL = {}
-for _, a in ipairs(ANCHORS) do ANCHOR_AL[a[1]] = { a[2], a[3] } end
+local BL      = BNB.BgLayer
+local MODES   = BL.MODES
+local ANCHORS = BL.ANCHORS
 
 local DEF_BASE = { 0.07, 0.07, 0.09 }   -- sticky COL_BG (UI/StickyNote.lua)
 local INSET    = 3                        -- sticky "Default" border inset
@@ -131,6 +107,7 @@ local C_PAD    = 16
 
 local _ctl, _pv
 local _idx = 1
+local _trying   -- "Try on stickies" is on
 
 -- ── Saved state ──────────────────────────────────────────────────────────────
 local function Store()
@@ -192,20 +169,11 @@ local function NativeSize(i)
     return w, h
 end
 
--- ── Layout maths ─────────────────────────────────────────────────────────────
--- One axis of length len, image length d, alignment al (0 start, 1 end).
--- Returns offset, visible length, texcoord start, texcoord end; nil = nothing
--- visible. rep = the axis repeats, so the texcoords run past 0..1.
-local function Axis(len, d, rep, al)
-    if rep then
-        local n = len / d
-        local t0 = al * (1 - n)
-        return 0, len, t0, t0 + n
-    end
-    local o = (len - d) * al
-    local v0, v1 = math.max(0, o), math.min(len, o + d)
-    if v1 - v0 < 0.5 then return nil end
-    return v0, v1 - v0, (v0 - o) / d, (v1 - o) / d
+-- The current entry as a BgLayer def (UI/BgLayer.lua)
+local function LabDef(i)
+    local st = State(i)
+    local nw, nh = NativeSize(i)
+    return { file = LIST[i].id, mode = st.mode, anchor = st.anchor, scale = st.scale or 1, w = nw, h = nh }
 end
 
 local function LayoutPreview()
@@ -228,36 +196,7 @@ local function LayoutPreview()
     end
     _pv.warn:Hide()
 
-    local sc, m = st.scale or 1, st.mode
-    local dw, dh, rx, ry
-    if m == "stretch" then
-        dw, dh = W, H
-    elseif m == "tile" or m == "tileX" or m == "tileY" or m == "native" then
-        dw, dh = nw * sc, nh * sc
-        rx, ry = (m == "tile" or m == "tileX"), (m == "tile" or m == "tileY")
-    else
-        local s
-        if     m == "cover"  then s = math.max(W / nw, H / nh)
-        elseif m == "fit"    then s = math.min(W / nw, H / nh)
-        elseif m == "width"  then s = W / nw
-        else                      s = H / nh end
-        dw, dh = nw * s * sc, nh * s * sc
-    end
-    local al = ANCHOR_AL[st.anchor] or ANCHOR_AL.CENTER
-    local x, w, u0, u1 = Axis(W, dw, rx, al[1])
-    local y, h, v0, v1 = Axis(H, dh, ry, al[2])
-    if not (x and y) then tex:Hide(); return end
-
-    local wrapH, wrapV = rx and "REPEAT" or "CLAMP", ry and "REPEAT" or "CLAMP"
-    if tex._id ~= e.id or tex._wh ~= wrapH or tex._wv ~= wrapV then
-        pcall(function() tex:SetTexture(e.id, wrapH, wrapV) end)
-        tex._id, tex._wh, tex._wv = e.id, wrapH, wrapV
-    end
-    tex:ClearAllPoints()
-    tex:SetPoint("TOPLEFT", area, "TOPLEFT", x, -y)
-    tex:SetSize(w, h)
-    tex:SetTexCoord(u0, u1, v0, v1)
-    tex:Show()
+    BL.Draw(tex, area, LabDef(_idx))
 end
 
 -- ── Preview window (sticky-like) ─────────────────────────────────────────────
@@ -410,14 +349,30 @@ local function AppendCustom(c)
     return #LIST
 end
 
+-- A usable file ID: a whole, finite, positive number
+local function ValidID(id)
+    return type(id) == "number" and id > 0 and id < 2^53 and id == math.floor(id)
+end
+
+-- Entries without a usable file ID are dropped from the saved list (one
+-- saved as { path = "" } on Forever 2026-09-27 broke opening the Lab)
 local _customLoaded
 local function LoadCustom()
     if _customLoaded then return end
     _customLoaded = true
-    for _, c in ipairs(Store().custom or {}) do AppendCustom(c) end
+    local s = Store()
+    local kept = {}
+    for _, c in ipairs(s.custom or {}) do
+        if type(c) == "table" and ValidID(c.id) then
+            kept[#kept + 1] = c
+            AppendCustom(c)
+        end
+    end
+    if s.custom then s.custom = kept end
 end
 
 local function AddCustom(id, path)
+    if not ValidID(id) then return nil end
     path = (path or ""):gsub("\\", "/"):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local s = Store()
     s.custom = s.custom or {}
@@ -664,7 +619,7 @@ local function BuildControl()
         local i = AddCustom(id, pathBox.eb:GetText())
         idBox.eb:SetText(""); pathBox.eb:SetText("")
         idBox.eb:ClearFocus(); pathBox.eb:ClearFocus()
-        Go(i)
+        if i then Go(i) end
     end
     idBox.eb:SetScript("OnEnterPressed", DoAdd)
     idBox.eb:SetScript("OnTabPressed", function() pathBox.eb:SetFocus() end)
@@ -680,6 +635,16 @@ local function BuildControl()
     end)
     removeBtn:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y - 24)
     f.removeBtn = removeBtn
+    y = y - 56
+
+    -- Try the current entry on every open sticky (runtime only, not saved)
+    local tryBtn = SmallBtn(body, L["DEV_WIN_BGLAB_TRY"], cw, function()
+        _trying = not _trying or nil
+        if not _trying then BNB.Sticky.SetBgOverride(nil) end
+        Refresh()
+    end)
+    tryBtn:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
+    f.tryBtn = tryBtn
     return f
 end
 
@@ -706,6 +671,8 @@ Refresh = function()
     local showSample = not Store().noSample
     f.sampleCb:SetChecked(showSample)
     f.removeBtn:SetShown(e.g == "added")
+    f.tryBtn:SetText(_trying and L["DEV_WIN_BGLAB_TRY_OFF"] or L["DEV_WIN_BGLAB_TRY"])
+    if _trying then BNB.Sticky.SetBgOverride(LabDef(_idx)) end
     if _pv then
         if showSample then _pv.sample:Show() else _pv.sample:Hide() end
     end

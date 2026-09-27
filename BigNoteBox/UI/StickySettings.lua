@@ -932,6 +932,7 @@ local function PopulateStickySettings(noteID)
                         curTexLabel = entry.label
                         cfg.bgTexture = curTexKey
                         SaveCfg(noteID, cfg)
+                        SN.SetBgOverride(nil)   -- ends a Background Lab trial (ALL-110)
                         texDrop:GenerateMenu()
                         if stickyFrame then ApplyConfig(stickyFrame, noteID) end
                         SyncColorizeSlider(curTexKey)
@@ -954,6 +955,7 @@ local function PopulateStickySettings(noteID)
             self:SetText(curTexLabel)
             cfg.bgTexture = curTexKey
             SaveCfg(noteID, cfg)
+            SN.SetBgOverride(nil)   -- ends a Background Lab trial (ALL-110)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
             SyncColorizeSlider(curTexKey)
         end)

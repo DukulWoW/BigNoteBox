@@ -248,36 +248,38 @@ local function LoadGeometry(noteID, frame)
 end
 
 -- ── Background texture registry ───────────────────────────────────────────────
--- Each entry: { key, label, path }. "none" is always first (plain colour).
+-- Each entry: { key, label, file, mode, anchor, scale, w, h }, drawn by
+-- BNB.BgLayer (UI/BgLayer.lua, ALL-110); w/h = native size, which the old
+-- backdrop tiled at 256. "none" is always first (plain colour).
 -- Add new textures here as assets are created; no other file needs changing.
 local BG_TEXTURES = {
     { key = "none",         label = L["STICKY_BG_NONE"] },
-    { key = "bg-stone",     label = L["STICKY_BG_STONE"],          tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga" },
-    { key = "bgtexture-01", label = L["STICKY_BG_OLD_WHITE_PAPER"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
-    { key = "bgtexture-02", label = L["STICKY_BG_DAMAGED_STONE"],  tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-02.tga" },
-    { key = "bgtexture-03", label = L["STICKY_BG_BLACK_MARBLE"],   tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-03.tga" },
-    { key = "bgtexture-04", label = L["STICKY_BG_GOLDEN_PAPER"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-04.tga" },
-    { key = "bgtexture-05", label = L["STICKY_BG_OLD_DUTCH_PAPER"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-05.tga" },
-    { key = "bgtexture-06", label = L["STICKY_BG_PARCHMENT"],      tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-06.tga" },
-    { key = "bgtexture-08", label = L["STICKY_BG_CREASED_PAPER"],  tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-08.tga" },
-    { key = "bgtexture-12", label = L["STICKY_BG_DARK_MARBLE"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-12.tga" },
-    { key = "bgtexture-16", label = L["STICKY_BG_SANDSTONE"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-16.tga" },
-    { key = "bgtexture-17", label = L["STICKY_BG_WORN_LEATHER"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-17.tga" },
-    { key = "bgtexture-19", label = L["STICKY_BG_DARK_GRANITE"],   tile = true,
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-19.tga" },
-    { key = "bgtexture-20", label = L["STICKY_BG_DARK_STONE"],
-      path = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-20.tga" },
+    { key = "bg-stone",     label = L["STICKY_BG_STONE"],          mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga" },
+    { key = "bgtexture-01", label = L["STICKY_BG_OLD_WHITE_PAPER"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-01.tga" },
+    { key = "bgtexture-02", label = L["STICKY_BG_DAMAGED_STONE"],  mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-02.tga" },
+    { key = "bgtexture-03", label = L["STICKY_BG_BLACK_MARBLE"],   mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-03.tga" },
+    { key = "bgtexture-04", label = L["STICKY_BG_GOLDEN_PAPER"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-04.tga" },
+    { key = "bgtexture-05", label = L["STICKY_BG_OLD_DUTCH_PAPER"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-05.tga" },
+    { key = "bgtexture-06", label = L["STICKY_BG_PARCHMENT"],      mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-06.tga" },
+    { key = "bgtexture-08", label = L["STICKY_BG_CREASED_PAPER"],  mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-08.tga" },
+    { key = "bgtexture-12", label = L["STICKY_BG_DARK_MARBLE"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-12.tga" },
+    { key = "bgtexture-16", label = L["STICKY_BG_SANDSTONE"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-16.tga" },
+    { key = "bgtexture-17", label = L["STICKY_BG_WORN_LEATHER"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-17.tga" },
+    { key = "bgtexture-19", label = L["STICKY_BG_DARK_GRANITE"],   mode = "tile", anchor = "TOPLEFT", w = 256, h = 256,
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-19.tga" },
+    { key = "bgtexture-20", label = L["STICKY_BG_DARK_STONE"], mode = "stretch",
+      file = "Interface\\AddOns\\BigNoteBox\\Assets\\Backgrounds\\bgtexture-20.tga" },
 }
 
 local function GetBgTextureDef(key)
@@ -293,8 +295,18 @@ local function BgTextureLabel(key)
     return GetBgTextureDef(key).label
 end
 
--- Returns the tinted backdrop colour for the paper texture.
--- SetBackdropColor multiplies against the bgFile texture, so:
+-- Background Lab "Try on stickies" (ALL-110): one def shown on every open
+-- sticky instead of its own texture. Runtime only, never saved.
+local _bgOverride
+
+-- The background def a sticky draws, or nil for plain colour.
+local function ActiveBgDef(cfg)
+    if _bgOverride then return _bgOverride end
+    local def = GetBgTextureDef(cfg and cfg.bgTexture)
+    return def.file and def or nil
+end
+
+-- Returns the tint multiplied into the background art (vertex colour):
 --   cop = 0.0  →  tint (1,1,1) = raw paper colour shows through unchanged
 --   cop = 1.0  →  tint is the full chosen colour (cfg.bgR/G/B)
 -- Lerp between white and the chosen colour using bgColorOpacity.
@@ -321,30 +333,21 @@ local function ApplyBorderToFrame(target, borderName, borderScale, borderOffset,
         local bPath = borderName and borderName ~= "" and borderName ~= "None"
             and borderName ~= "Default"
             and LSM and LSM:Fetch("border", borderName)
-        -- Paper texture: use as bgFile so tiling is handled natively by the
-        -- backdrop system. tileSize matches the texture's pixel dimensions.
-        -- Falls back to White8x8 when no texture is selected.
-        local texDef = GetBgTextureDef(cfg and cfg.bgTexture)
-        local bgFile, bgTile, bgTileSz
-        if texDef and texDef.path then
-            bgFile   = texDef.path
-            bgTile   = texDef.tile and true or false
-            bgTileSz = texDef.tile and 256 or 0
-        else
-            -- No texture — plain White8x8 so SetBackdropColor works as normal
-            bgFile   = "Interface\\Buttons\\White8x8"
-            bgTile   = true
-            bgTileSz = 8
-        end
+        -- Always plain White8x8: a background texture is drawn by the
+        -- texture layer under the border (ApplyBgLayer, ALL-110), which
+        -- takes the inset recorded here.
+        local bgFile, bgTile, bgTileSz = "Interface\\Buttons\\White8x8", true, 8
         if bPath then
             local es  = math.max(1, math.floor(16 * (borderScale or 100) / 100 + 0.5))
             local ins = math.max(0, math.floor(borderOffset or 4))
+            target._bgInset = ins
             target:SetBackdrop({
                 bgFile = bgFile, tile = bgTile, tileSize = bgTileSz,
                 edgeFile = bPath, edgeSize = es,
                 insets = { left = ins, right = ins, top = ins, bottom = ins },
             })
         elseif not borderName or borderName == "" or borderName == "None" then
+            target._bgInset = 0
             target:SetBackdrop({
                 bgFile = bgFile, tile = bgTile, tileSize = bgTileSz,
                 edgeSize = 0,
@@ -353,9 +356,9 @@ local function ApplyBorderToFrame(target, borderName, borderScale, borderOffset,
             local br, bg2, bb = BorderRGB(cfg)
             pcall(function() target:SetBackdropBorderColor(br, bg2, bb, 0) end)
         else
-            -- "Default" border — use the standard BNB backdrop but preserve
-            -- any selected background texture in bgFile/tile/tileSize.
+            -- "Default" border — the standard BNB backdrop
             local br, bg2, bb = BorderRGB(cfg)
+            target._bgInset = 3
             if target.SetBackdrop then
                 target:SetBackdrop({
                     bgFile   = bgFile,   tile = bgTile, tileSize = bgTileSz,
@@ -442,32 +445,104 @@ local function ApplyOutlineToEditBox(eb, outline)
     pcall(function() eb:SetShadowColor(sr, sg, sb, sa) end)
 end
 
+-- Shows the sticky's background texture on its texture layer (ALL-110), or
+-- hides the layer for plain colour. Colours and opacity: ApplyBgAlpha.
+local function ApplyBgLayer(frame, cfg)
+    local def = ActiveBgDef(cfg)
+    if not (def or frame._bgLayer) then return end
+    frame._bgLayer = frame._bgLayer or BNB.BgLayer.Create(frame)
+    BNB.BgLayer.Set(frame._bgLayer, def, frame._bgInset)
+end
+
 -- Apply background opacity via backdrop alpha only — never frame:SetAlpha.
 -- This keeps text opacity (bodyEb:SetAlpha) independent of background opacity.
 local function ApplyBgAlpha(frame, bgAlpha, cfg)
     local a = bgAlpha or 0.96
+    frame._bgA = a   -- where a hover fade starts from
     local c = frame._cfg
     local ec = cfg or c
     local br, bg2, bb = BorderRGB(ec)
     local effectiveBorder = ec and ec.borderName
     local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0 or a
     if c and frame.SetBackdropColor then
-        local hasTexture = ec and ec.bgTexture and ec.bgTexture ~= "none"
-        local tr, tg, tb
-        if hasTexture then
-            tr, tg, tb = TintedBgColor(ec)
+        local layer = frame._bgLayer
+        if layer and layer._def and ec then
+            -- Texture layer (ALL-110): the note's colour as the base under
+            -- the art, the Colorize tint on the art, opacity on the layer.
+            -- The backdrop centre goes clear so only the border draws.
+            local tr, tg, tb = TintedBgColor(ec)
+            BNB.BgLayer.SetColors(layer, ec.bgR or COL_BG[1], ec.bgG or COL_BG[2], ec.bgB or COL_BG[3],
+                tr, tg, tb)
+            BNB.BgLayer.SetAlpha(layer, a)
+            pcall(function() frame:SetBackdropColor(0, 0, 0, 0) end)
         else
-            tr = c.bgR or COL_BG[1]
-            tg = c.bgG or COL_BG[2]
-            tb = c.bgB or COL_BG[3]
+            local tr = c.bgR or COL_BG[1]
+            local tg = c.bgG or COL_BG[2]
+            local tb = c.bgB or COL_BG[3]
+            pcall(function() frame:SetBackdropColor(tr, tg, tb, a) end)
         end
-        pcall(function() frame:SetBackdropColor(tr, tg, tb, a) end)
         pcall(function() frame:SetBackdropBorderColor(br, bg2, bb, borderA) end)
     end
     if frame._headerBar and frame._headerBar.SetBackdropColor then
         pcall(function() frame._headerBar:SetBackdropColor(COL_HEADER[1], COL_HEADER[2], COL_HEADER[3], a) end)
         pcall(function() frame._headerBar:SetBackdropBorderColor(br, bg2, bb, 0) end)
     end
+end
+
+-- ── Hover fade ───────────────────────────────────────────────────────────────
+-- Hovering a sticky eases its background and body text up to full opacity and
+-- back down to the note's own levels instead of flipping (Dukul, 2026-09-27).
+-- Driven only by the sticky's hover poll (the "over" test in its OnUpdate,
+-- which counts inline editing and task rows too), never by OnEnter/OnLeave:
+-- rich text, task rows and scrollbars swallow those, so the note dimmed while
+-- the pointer was still on it. One shared driver frame runs every fade.
+-- ApplyBgAlpha records the current level in _bgA.
+local HOVER_FADE = 0.2   -- seconds for a full 0 -> 1 change
+local _hoverFades = {}   -- [frame] = { to, textTo }
+local _hoverDriver
+
+local function StepTo(cur, to, step)
+    if cur < to then return math.min(to, cur + step) end
+    return math.max(to, cur - step)
+end
+
+local function HoverFadeTick(self, elapsed)
+    local step = elapsed / HOVER_FADE
+    local any
+    for f, st in pairs(_hoverFades) do
+        local a = StepTo(f._bgA or st.to, st.to, step)
+        ApplyBgAlpha(f, a, f._cfg)
+        local done = a == st.to
+        local eb = f._bodyEb
+        if eb then
+            local ta = StepTo(eb:GetAlpha(), st.textTo, step)
+            pcall(function() eb:SetAlpha(ta) end)
+            done = done and ta == st.textTo
+        end
+        if done then _hoverFades[f] = nil else any = true end
+    end
+    if not any then self:Hide() end
+end
+
+-- hovered = true eases to full opacity, false back to the note's own levels
+local function HoverBgAlpha(frame, hovered)
+    local c = frame._cfg
+    _hoverFades[frame] = {
+        to     = hovered and 1 or (c and c.alpha or 0.96),
+        textTo = hovered and 1 or (c and c.textAlpha or 1.0),
+    }
+    if not _hoverDriver then
+        _hoverDriver = CreateFrame("Frame")
+        _hoverDriver:SetScript("OnUpdate", HoverFadeTick)
+    end
+    _hoverDriver:Show()
+end
+
+-- A direct set (config applied, texture tried) ends any running fade and
+-- makes the hover poll look again, so a hovered note fades back up
+local function StopHoverFade(frame)
+    _hoverFades[frame] = nil
+    frame._bgHover = nil
 end
 
 -- ── Scroll frame anchor helper ───────────────────────────────────────────────
@@ -511,16 +586,11 @@ local function ApplyConfig(frame, noteID)
     if focusMode then borderA = 0 end  -- border hidden in focus mode (lerped in OnUpdate on hover)
     pcall(function()
         ApplyBorderToFrame(frame, effectiveBorder, effectiveScale, effectiveOffset, cfg)
-        local hasTexture = cfg.bgTexture and cfg.bgTexture ~= "none"
-        local tr, tg, tb
-        if hasTexture then
-            tr, tg, tb = TintedBgColor(cfg)
-        else
-            tr, tg, tb = cfg.bgR, cfg.bgG, cfg.bgB
-        end
-        frame:SetBackdropColor(tr, tg, tb, cfg.alpha or 0.96)
+        -- Colours: ApplyBgAlpha further down, which also covers the texture layer
+        frame:SetBackdropColor(cfg.bgR, cfg.bgG, cfg.bgB, cfg.alpha or 0.96)
         frame:SetBackdropBorderColor(br, bg2, bb, borderA)
     end)
+    pcall(ApplyBgLayer, frame, cfg)
 
     -- Focus mode: reset lerp to 0 (hidden) so header animates in on first hover.
     -- Normal mode: snap lerp to 1 so header is immediately visible.
@@ -599,6 +669,7 @@ local function ApplyConfig(frame, noteID)
     end
     -- Apply background opacity via backdrop, keep frame alpha at 1.0
     frame:SetAlpha(1.0)
+    StopHoverFade(frame)
     ApplyBgAlpha(frame, cfg.alpha or 0.96, cfg)
     if frame._bodyEb then
         local r, g, b = cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88
@@ -629,27 +700,13 @@ local function ApplyConfig(frame, noteID)
 end
 
 -- ── Hover forwarding ──────────────────────────────────────────────────────────
--- Every child frame that covers the root must forward hover events, otherwise
--- only the thin backdrop border of the root fires OnEnter/OnLeave.
+-- Used to set the hover alpha from each child's OnEnter/OnLeave. The hover
+-- poll does that now (see Hover fade), so the handlers are empty; the calls
+-- stay so the scripts they replace (scrollbar pieces included) stay as they
+-- have always been.
 local function ForwardHover(child, root)
-    child:SetScript("OnEnter", function()
-        local c = root._cfg
-        ApplyBgAlpha(root, math.max(0.95, c and c.alpha or 0.95), c)
-        -- Also bring text alpha up to match background hover level
-        if root._bodyEb then
-            local ta = c and c.textAlpha or 1.0
-            pcall(function() root._bodyEb:SetAlpha(math.max(0.95, ta)) end)
-        end
-    end)
-    child:SetScript("OnLeave", function()
-        if root._inlineEditing then return end   -- stays at hover alpha while editing
-        local c = root._cfg
-        ApplyBgAlpha(root, c and c.alpha or 0.96, c)
-        -- Restore text alpha to its configured value
-        if root._bodyEb then
-            pcall(function() root._bodyEb:SetAlpha(c and c.textAlpha or 1.0) end)
-        end
-    end)
+    child:SetScript("OnEnter", function() end)
+    child:SetScript("OnLeave", function() end)
 end
 
 -- ── Frame fade (replaces LibAnimate, ALL-64) ──────────────────────────────────
@@ -692,6 +749,21 @@ local function FadeFrame(target, fromAlpha, toAlpha, duration, onDone)
     ag:Play()
 end
 
+-- Background Lab "Try on stickies" (ALL-110, developer tool): def shows on
+-- every open sticky until it is called with nil, a sticky texture is picked
+-- in its settings, or the UI reloads. Only the background is re-applied.
+function SN.SetBgOverride(def)
+    _bgOverride = def
+    for _, f in pairs(openFrames) do
+        local c = f._cfg
+        if c then
+            pcall(ApplyBgLayer, f, c)
+            StopHoverFade(f)
+            ApplyBgAlpha(f, c.alpha or 0.96, c)
+        end
+    end
+end
+
 -- Shared with UI/StickySettings.lua (ALL-65.10), which loads after this file.
 -- The settings window and the note it edits stay private there: this file
 -- asks through SN._IsSettingsOpenFor / _HideSettingsFor / _OpenSettings.
@@ -721,22 +793,9 @@ local function AddResizeHandle(frame, noteID)
 
     -- Hover forwarding — inline so we can also control visibility.
     -- ForwardHover is NOT called here; it uses SetScript which would overwrite these.
-    h:SetScript("OnEnter", function()
-        h:Show()
-        local c = frame._cfg
-        ApplyBgAlpha(frame, math.max(0.95, c and c.alpha or 0.95), c)
-        if frame._bodyEb then
-            local ta = c and c.textAlpha or 1.0
-            pcall(function() frame._bodyEb:SetAlpha(math.max(0.95, ta)) end)
-        end
-    end)
+    h:SetScript("OnEnter", function() h:Show() end)
     h:SetScript("OnLeave", function()
         if not h._sizing then h:Hide() end
-        local c = frame._cfg
-        ApplyBgAlpha(frame, c and c.alpha or 0.96, c)
-        if frame._bodyEb then
-            pcall(function() frame._bodyEb:SetAlpha(c and c.textAlpha or 1.0) end)
-        end
     end)
 
     h:SetScript("OnMouseDown", function(_, btn)
@@ -1406,11 +1465,6 @@ local function EndInlineEdit(f)
     eb:ClearFocus()
     eb:SetEnabled(false)
     eb:SetScript("OnCursorChanged", nil)
-    if not f:IsMouseOver() then
-        local c = f._cfg
-        ApplyBgAlpha(f, c and c.alpha or 0.96, c)
-        pcall(function() eb:SetAlpha(c and c.textAlpha or 1.0) end)
-    end
 
     local note = BNB.GetNote(noteID)
     local text = eb:GetText() or ""
@@ -1450,9 +1504,6 @@ local function StartInlineEdit(f)
     if eb:GetText() ~= (note.body or "") then eb:SetText(note.body or "") end
     eb:SetEnabled(true)
     if f._cursorFollow then eb:SetScript("OnCursorChanged", f._cursorFollow) end
-    local c = f._cfg
-    ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
-    pcall(function() eb:SetAlpha(math.max(0.95, c and c.textAlpha or 1.0)) end)
     eb:SetFocus()
     eb:SetCursorPosition(#(eb:GetText() or ""))
     local lcg = GetEditLCG()
@@ -1499,15 +1550,6 @@ local function CreateStickyFrame(noteID)
     end)
     BNB.SetBackdrop(f, COL_BG[1], COL_BG[2], COL_BG[3], 0.97,
         COL_BORDER[1], COL_BORDER[2], COL_BORDER[3], 1)
-    f:SetScript("OnEnter", function(self)
-        local c = self._cfg
-        ApplyBgAlpha(self, math.max(0.95, c and c.alpha or 0.95), c)
-    end)
-    f:SetScript("OnLeave", function(self)
-        if self._inlineEditing then return end
-        local c = self._cfg
-        ApplyBgAlpha(self, c and c.alpha or 0.96, c)
-    end)
 
     -- ── FRONT face ────────────────────────────────────────────────────────────
     local front = CreateFrame("Frame", nil, f)
@@ -1656,8 +1698,6 @@ local function CreateStickyFrame(noteID)
                 dynTip = (n and n.alarm) and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
             end
             GameTooltip:AddLine(dynTip, 1, 1, 1); GameTooltip:Show()
-            local c = f._cfg
-            ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
         end)
         btn:SetScript("OnLeave", function()
             pressTx:Hide(); hoverTx:Hide(); normalTx:Show()
@@ -1752,8 +1792,6 @@ local function CreateStickyFrame(noteID)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(tip, 1, 1, 1)
         GameTooltip:Show()
-        local c = f._cfg
-        ApplyBgAlpha(f, math.max(0.95, c and c.alpha or 0.95), c)
     end)
     f._tasksHdrBtn = tasksHdrBtn
     if not BNB.TasksEnabled() then tasksHdrBtn:Hide() end   -- ALL-102
@@ -1869,6 +1907,12 @@ local function CreateStickyFrame(noteID)
         local over = f._inlineEditing or f:IsMouseOver() or (f._focusHovered and f._focusHovered > 0)
         local cfg  = f._cfg
         local focusMode = cfg and cfg.focusMode
+
+        -- ── Background / text hover fade (acts on a change only) ─────────────
+        if over ~= f._bgHover then
+            f._bgHover = over
+            HoverBgAlpha(f, over)
+        end
 
         -- ── Button fade ───────────────────────────────────────────────────────
         if over and not _btnsShown then

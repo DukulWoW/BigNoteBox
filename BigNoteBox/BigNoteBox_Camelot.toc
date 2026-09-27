@@ -49,6 +49,7 @@ UI\WysiwygBar.lua
 UI\TagDialogs.lua
 UI\FocusEditor.lua
 UI\RichPreview.lua
+UI\BgLayer.lua
 UI\StickyNote.lua
 UI\StickySettings.lua
 UI\SendToChat.lua
