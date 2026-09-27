@@ -298,16 +298,16 @@ local function LoadNoteInFocus(id)
     if fo and BNB.ResolveFontDef then
         local def = BNB.ResolveFontDef(fo)
         local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
-        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, sz, "") end) end
-        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, 20, "") end) end
+        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
+        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
     else
         if BNB.GetBodyFont and focusBodyEb then
             local path, sz = BNB.GetBodyFont()
-            if path then pcall(function() focusBodyEb:SetFont(path, sz, "") end) end
+            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
         end
         if BNB.GetBoldFont and focusTitleEb then
             local path = BNB.GetBoldFont()
-            if path then pcall(function() focusTitleEb:SetFont(path, 20, "") end) end
+            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
         end
     end
 
@@ -350,16 +350,16 @@ function BNB.RefreshFocusFont()
     if fo and BNB.ResolveFontDef then
         local def = BNB.ResolveFontDef(fo)
         local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
-        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, sz, "") end) end
-        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, 20, "") end) end
+        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
+        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
     else
         if BNB.GetBodyFont and focusBodyEb then
             local path, sz = BNB.GetBodyFont()
-            if path then pcall(function() focusBodyEb:SetFont(path, sz, "") end) end
+            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
         end
         if BNB.GetBoldFont and focusTitleEb then
             local path = BNB.GetBoldFont()
-            if path then pcall(function() focusTitleEb:SetFont(path, 20, "") end) end
+            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
         end
     end
 end
@@ -603,7 +603,7 @@ local function BuildFocusFrame()
     titleEb:SetPoint("BOTTOMRIGHT", titleBg, "BOTTOMRIGHT", -6, 0)
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
     if boldPath then
-        pcall(function() titleEb:SetFont(boldPath, 20, "") end)
+        pcall(function() titleEb:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then titleEb:SetFont(font, 20, flags or "")
@@ -672,7 +672,7 @@ local function BuildFocusFrame()
     bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxFocusBodyScroll", content, bodySize)
-    if bodyPath then pcall(function() eb:SetFont(bodyPath, bodySize, "") end) end
+    if bodyPath then pcall(function() eb:SetFont(bodyPath, BNB.FontPx(bodyPath, bodySize), "") end) end
 
     sf:SetPoint("TOPLEFT",     content, "TOPLEFT",     0, BODY_TOP_OFFSET)
     sf:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -20, 0)
@@ -942,7 +942,7 @@ local function BuildFocusFrameSkin()
     titleEb:SetPoint("BOTTOMRIGHT", titleBg, "BOTTOMRIGHT", -6, 0)
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
     if boldPath then
-        pcall(function() titleEb:SetFont(boldPath, 20, "") end)
+        pcall(function() titleEb:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then titleEb:SetFont(font, 20, flags or "")
@@ -1012,7 +1012,7 @@ local function BuildFocusFrameSkin()
     bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxFocusBodyScroll", content, bodySize)
-    if bodyPath then pcall(function() eb:SetFont(bodyPath, bodySize, "") end) end
+    if bodyPath then pcall(function() eb:SetFont(bodyPath, BNB.FontPx(bodyPath, bodySize), "") end) end
 
     sf:SetPoint("TOPLEFT",     content, "TOPLEFT",     0, BODY_TOP_OFFSET)
     sf:SetPoint("BOTTOMRIGHT", content, "BOTTOMRIGHT", -20, 0)

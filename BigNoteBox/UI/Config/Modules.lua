@@ -128,7 +128,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
 
             -- Show the floating BNB button while Immersion is active
             y = AddCheck(ct, y,
-                "Show Quick Note button during Immersion dialogues",
+                L["CFG_IMM_BTN_LABEL"],
                 function() return db.quickNoteImmersionBtn ~= false end,
                 function(v)
                     db.quickNoteImmersionBtn = v
@@ -136,9 +136,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
                     local btn = _G["BNBQuickNoteImmersionBtn"]
                     if btn and not v then btn:Hide() end
                 end,
-                "Shows a draggable icon button while Immersion is active\n"
-                .. "so you can create a note from the current dialogue.\n"
-                .. "The button can be dragged to any position on screen.")
+                L["CFG_IMM_BTN_TIP"])
 
             -- "Reset button position" button
             local immResetBtn = BNB.CreateButton(nil, ct, L["CFG_IMM_RESET_BTN"], 160, 22)
@@ -1087,7 +1085,7 @@ local function BuildFocusPage(sf, ct, y)
             if BigNoteBoxDB then BigNoteBoxDB.focusOrbitResumeDelay = v end
         end,
         function(v)
-            if v <= 0 then return "Off" end
+            if v <= 0 then return L["CFG_FOCUS_ORBIT_OFF"] end
             return string.format("%.1f s", v)
         end)
     resumeSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)

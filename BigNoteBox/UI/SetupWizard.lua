@@ -850,7 +850,7 @@ local function BuildPage4(content)
                 local sz       = math.floor(v)
                 local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
                 if boldPath and boldPath ~= "" then
-                    pcall(function() _p4PreviewLbl:SetFont(boldPath, sz, "") end)
+                    pcall(function() _p4PreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, sz), "") end)
                 end
             end
         end,

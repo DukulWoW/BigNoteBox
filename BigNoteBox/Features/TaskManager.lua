@@ -234,10 +234,28 @@ function T.AddTask(noteID, text, parentID)
     return task.id
 end
 
+-- Clear a task's completed state with the ToggleTask propagation rules:
+-- a parent takes its sub-tasks along, a sub-task takes its parent.
+local function Uncomplete(noteID, task)
+    task.completed = false
+    if not task.parentID then
+        for _, sub in ipairs(T.GetSubTasks(noteID, task.id)) do
+            sub.completed = false
+        end
+    else
+        local parent = T.FindTask(noteID, task.parentID)
+        if parent then parent.completed = false end
+    end
+end
+
 -- Update fields on an existing task. Supports _clear array (same as UpdateNote).
+-- A new text on a completed task unchecks it (ALL-74: only when the text changed).
 function T.UpdateTask(noteID, taskID, changes)
     local task = T.FindTask(noteID, taskID)
     if not task then return end
+    if task.completed and changes.text ~= nil and changes.text ~= task.text then
+        Uncomplete(noteID, task)
+    end
     for k, v in pairs(changes) do
         if k ~= "_clear" then task[k] = v end
     end
@@ -306,18 +324,8 @@ function T.ToggleTask(noteID, taskID)
 
     else
         -- ── Uncompleting ─────────────────────────────────────────────────────
-        task.completed = false
-
-        if not task.parentID then
-            -- Parent unchecked: uncheck all sub-tasks
-            for _, sub in ipairs(T.GetSubTasks(noteID, taskID)) do
-                sub.completed = false
-            end
-        else
-            -- Sub-task unchecked: uncheck parent too
-            local parent = T.FindTask(noteID, task.parentID)
-            if parent then parent.completed = false end
-        end
+        -- Parent unchecked: uncheck all sub-tasks. Sub-task unchecked: uncheck parent too.
+        Uncomplete(noteID, task)
     end
 
     Persist(noteID)

@@ -53,12 +53,12 @@ local function BuildFontPicker(ct, y)
             if e.def then
                 if e.nameLbl then
                     if e.def.bold and e.def.bold ~= "" then
-                        pcall(function() e.nameLbl:SetFont(e.def.bold, 13, "") end)
+                        pcall(function() e.nameLbl:SetFont(e.def.bold, BNB.FontPx(e.def.bold, 13), "") end)
                     end
                 end
                 if e.prevLbl then
                     if e.def.regular and e.def.regular ~= "" then
-                        pcall(function() e.prevLbl:SetFont(e.def.regular, 11, "") end)
+                        pcall(function() e.prevLbl:SetFont(e.def.regular, BNB.FontPx(e.def.regular, 11), "") end)
                     end
                 end
             end

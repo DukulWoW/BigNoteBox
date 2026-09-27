@@ -20,7 +20,7 @@ local function BuildAdvancedTab(sf, ct)
     y = AddCheck(ct, y, L["CONFIG_SHOW_MINIMAP"],
         function() return not (db.minimapIcon and db.minimapIcon.hide) end,
         function(v) BNB.SetMinimapButtonShown(v) end,
-        "Show the BigNoteBox button on the minimap.")
+        L["CONFIG_SHOW_MINIMAP_TIP"])
 
     y = AddCheck(ct, y, L["CONFIG_HIDE_LOGIN_MSG"],
         function() return db.hideLoginMessage == true end,

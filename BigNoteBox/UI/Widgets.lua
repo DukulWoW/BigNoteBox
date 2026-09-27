@@ -178,7 +178,7 @@ end
 
 -- BNB.FmtTs — short "YYYY-MM-DD  H:MM am/pm" timestamp (distinct from BNB.FmtTime's relative/date-format logic)
 function BNB.FmtTs(ts)
-    if not ts or ts == 0 then return "Unknown" end
+    if not ts or ts == 0 then return L["TS_UNKNOWN"] end
     local db    = BigNoteBoxDB
     local use24 = db and db.use24Hour ~= false
     local d     = BNB.Date("%Y-%m-%d", ts)

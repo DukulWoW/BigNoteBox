@@ -198,7 +198,7 @@ local function BuildTitleField(parent)
     eb:SetPoint("BOTTOMRIGHT",bg, "BOTTOMRIGHT",-6, 0)
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
     if boldPath then
-        pcall(function() eb:SetFont(boldPath, 20, "") end)
+        pcall(function() eb:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then eb:SetFont(font, 20, flags or "")
@@ -472,7 +472,7 @@ local function BuildBodyField(parent, topAnchor)
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxBodyScroll", parent, bodySize)
     if bodyPath then
-        pcall(function() eb:SetFont(bodyPath, bodySize, "") end)
+        pcall(function() eb:SetFont(bodyPath, BNB.FontPx(bodyPath, bodySize), "") end)
     end
 
     sf:SetPoint("TOPLEFT",     topAnchor, "BOTTOMLEFT",  PAD, -4)
@@ -1103,7 +1103,8 @@ local function BuildTagStrip(parent, toolbarFrame)
     addEb:SetFontObject("GameFontNormalSmall")
     addEb:SetAutoFocus(false)
     addEb:SetMaxLetters(MAX_TAG_LEN)
-    BNB.AddPlaceholder(addEb, L["TAG_ADD_HINT"], 0.35, 0.35, 0.35)
+    -- Brighter than the other hints: at 0.35 players missed the field (ALL-61)
+    BNB.AddPlaceholder(addEb, L["TAG_ADD_HINT"], 0.55, 0.55, 0.55)
 
     addEb:SetScript("OnEnterPressed", function(self)
         local id = BNB._currentNoteID; if not id then return end
@@ -1456,8 +1457,8 @@ function BNB.LoadNoteInEditor(id)
         local def = BNB.ResolveFontDef(fontOverride)
         if def then
             local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
-            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, sz, "") end) end
-            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, 20, "") end) end
+            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
+            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
             appliedOverride = true
         end
     end
@@ -1467,7 +1468,7 @@ function BNB.LoadNoteInEditor(id)
     -- Apply per-note font size override regardless of font override
     if note.fontSize and BNB._editorBody then
         local path = select(1, BNB._editorBody:GetFont())
-        if path then pcall(function() BNB._editorBody:SetFont(path, note.fontSize, "") end) end
+        if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, note.fontSize), "") end) end
     end
     if BNB._editorBody then
         pcall(function() BNB._editorBody:SetJustifyH(note.textAlign or "LEFT") end)
@@ -1653,20 +1654,20 @@ local function BuildMarkupBar(parent, wysiwygBar)
     -- Button helper
     local MkBtn, Divider = BNB.MakeToolbarFactory(bar, PAD)
 
-    MkBtn("H1", "Insert H1 header: {h1}...{/h1}",
+    MkBtn("H1", L["NE_MU_H1_TIP"],
         function() InsertTagPair("{h1}", "{/h1}") end)
-    MkBtn("H2", "Insert H2 header: {h2}...{/h2}",
+    MkBtn("H2", L["NE_MU_H2_TIP"],
         function() InsertTagPair("{h2}", "{/h2}") end)
-    MkBtn("H3", "Insert H3 header: {h3}...{/h3}",
+    MkBtn("H3", L["NE_MU_H3_TIP"],
         function() InsertTagPair("{h3}", "{/h3}") end)
     Divider()
-    MkBtn("P",  "Insert paragraph: {p}...{/p}",
+    MkBtn("P",  L["NE_MU_P_TIP"],
         function() InsertTagPair("{p}", "{/p}") end)
-    MkBtn("Pc", "Insert centered paragraph: {p:c}...{/p}",
+    MkBtn("Pc", L["NE_MU_PC_TIP"],
         function() InsertTagPair("{p:c}", "{/p}") end)
-    MkBtn("Pr", "Insert right-aligned paragraph: {p:r}...{/p}",
+    MkBtn("Pr", L["NE_MU_PR_TIP"],
         function() InsertTagPair("{p:r}", "{/p}") end)
-    MkBtn("Br", "Insert line break: {br}",
+    MkBtn("Br", L["NE_MU_BR_TIP"],
         function() InsertTag("{br}") end)
     Divider()
     -- Color picker state for Col button (shared across clicks)
@@ -1675,7 +1676,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
     local _colPickerR, _colPickerG, _colPickerB = 1, 1, 1
     local _colPickerHooked = false
 
-    MkBtn("Col", "Pick a colour, then insert {col:rrggbb}...{/col}",
+    MkBtn("Col", L["NE_MU_COL_TIP"],
         function()
             local eb = BNB._editorBody
             if not eb then return end

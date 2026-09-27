@@ -68,6 +68,9 @@ BNB.FONTS = {
         bold    = BASE .. "EBGaramond-Bold.ttf",
         mono    = false,
         preview = "Aa Bb Çç Ää Üü",
+        -- Small x-height: drawn larger so a size setting looks the same as on the
+        -- other cards (ALL-60). Cap height says 1.10, x-height 1.34.
+        scale   = 1.2,
     },
     {
         id      = "notosans",
@@ -171,6 +174,27 @@ for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
 
 local function SetOf(def) return def.set or "latin" end
 
+-- ── Per-font size factor (ALL-60) ─────────────────────────────────────────────
+-- A card may carry `scale`; every SetFont on note text passes its size through
+-- BNB.FontPx(path, size), so the size settings mean the same visual size for
+-- every font. Keyed by file path, so a size re-applied from GetFont() must NOT go
+-- through it again (it is already scaled). Rebuilt when font packs add cards.
+local _scaleByPath, _scaleCount = {}, -1
+function BNB.FontPx(path, size)
+    if not size then return size end
+    if _scaleCount ~= #BNB.FONTS then
+        _scaleByPath, _scaleCount = {}, #BNB.FONTS
+        for _, def in ipairs(BNB.FONTS) do
+            if def.scale then
+                if def.regular then _scaleByPath[def.regular] = def.scale end
+                if def.bold    then _scaleByPath[def.bold]    = def.scale end
+            end
+        end
+    end
+    local s = path and _scaleByPath[path]
+    return s and size * s or size
+end
+
 -- ── Early preload (ALL-16) ────────────────────────────────────────────────────
 -- The client loads a TTF lazily, when a FontString using it is first drawn. On a
 -- cold first login SetFont still returns success before the file is ready, and the
@@ -247,6 +271,7 @@ function BNB.SetFontSafe(fs, path, size, fallbackObj)
     if not fs then return end
     fs:SetFontObject(fallbackObj or "GameFontNormal")
     if not path or path == "" then fs._bnbFontSpec = nil; return end
+    size = BNB.FontPx(path, size)
     fs._bnbFontSpec = { path = path, size = size }
     pcall(fs.SetFont, fs, path, size, "")
     ScheduleRefresh(fs)
@@ -520,15 +545,15 @@ function BNB.ApplyFont(id, size)
     local boldPath = def.bold
 
     if BNB._editorBody then
-        pcall(function() BNB._editorBody:SetFont(bodyPath, sz, "") end)
+        pcall(function() BNB._editorBody:SetFont(bodyPath, BNB.FontPx(bodyPath, sz), "") end)
     end
     if BNB._editorTitle then
-        pcall(function() BNB._editorTitle:SetFont(boldPath, 20, "") end)
+        pcall(function() BNB._editorTitle:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
     end
     if BNB._stickyFrames then
         for _, pi in pairs(BNB._stickyFrames) do
             if pi._bodyEb then
-                pcall(function() pi._bodyEb:SetFont(bodyPath, sz, "") end)
+                pcall(function() pi._bodyEb:SetFont(bodyPath, BNB.FontPx(bodyPath, sz), "") end)
             end
         end
     end

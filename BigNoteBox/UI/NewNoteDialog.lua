@@ -233,7 +233,7 @@ local function ApplyTitleFont()
         local fonts = BNB.FONTS or {}
         for _, def in ipairs(fonts) do
             if def.id == _selFont and def.bold and def.bold ~= "" then
-                pcall(function() _titleEB:SetFont(def.bold, 20, "") end)
+                pcall(function() _titleEB:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end)
                 return
             end
         end
@@ -241,7 +241,7 @@ local function ApplyTitleFont()
     -- Default: use BNB bold font or WoW's large font
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
     if boldPath then
-        pcall(function() _titleEB:SetFont(boldPath, 20, "") end)
+        pcall(function() _titleEB:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then pcall(function() _titleEB:SetFont(font, 20, flags or "") end)
@@ -408,13 +408,13 @@ local function BuildDialog()
             pcall(function()
                 for _, d in ipairs(BNB.FONTS or {}) do
                     if d.id == _selFont and d.bold and d.bold ~= "" then
-                        _sizePreviewLbl:SetFont(d.bold, _selSize, "")
+                        _sizePreviewLbl:SetFont(d.bold, BNB.FontPx(d.bold, _selSize), "")
                         return
                     end
                 end
                 local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
                 if boldPath and boldPath ~= "" then
-                    _sizePreviewLbl:SetFont(boldPath, _selSize, "")
+                    _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
                 end
             end)
         end
@@ -616,7 +616,7 @@ local function BuildDialog()
                             end
                         end)()) or (BNB.GetBoldFont and BNB.GetBoldFont())
                         if boldPath and boldPath ~= "" then
-                            _sizePreviewLbl:SetFont(boldPath, _selSize, "")
+                            _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
                         else
                             -- GameFontNormal is always valid; size override handles the rest
                             _sizePreviewLbl:SetFontObject(GameFontNormal)
@@ -654,7 +654,7 @@ local function BuildDialog()
     pcall(function()
         local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
         if boldPath and boldPath ~= "" then
-            previewLbl:SetFont(boldPath, defaultSize, "")
+            previewLbl:SetFont(boldPath, BNB.FontPx(boldPath, defaultSize), "")
         end
     end)
     previewLbl:SetText(L["NND_PREVIEW_SAMPLE"])
@@ -773,7 +773,7 @@ function NND.Open()
         pcall(function()
             local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
             if boldPath and boldPath ~= "" then
-                _sizePreviewLbl:SetFont(boldPath, _selSize, "")
+                _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
             else
                 _sizePreviewLbl:SetFont(GameFontNormalLarge:GetFont(), _selSize, "")
             end

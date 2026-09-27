@@ -736,7 +736,7 @@ local function DoRenderTaskPanel()
         -- Task text / inline editbox
         local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("LEFT",  cb,  "RIGHT", 2,  0)
-        lbl:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+        lbl:SetPoint("RIGHT", row, "RIGHT", -38, 0)   -- clear of X and toggle (ALL-109)
         lbl:SetHeight(rowH)
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
@@ -763,7 +763,7 @@ local function DoRenderTaskPanel()
         BNB.EnsureBackdrop(eb)
         BNB.SetBackdrop(eb, 0.06, 0.06, 0.08, 0.95, 0.20, 0.20, 0.25, 1)
         eb:SetPoint("LEFT",  cb,  "RIGHT", 2,  0)
-        eb:SetPoint("RIGHT", row, "RIGHT", -22, 0)
+        eb:SetPoint("RIGHT", row, "RIGHT", -38, 0)
         eb:SetHeight(rowH - 2)
         eb:SetAutoFocus(false)
         eb:SetMultiLine(false)
@@ -857,14 +857,44 @@ local function DoRenderTaskPanel()
             end
         end)
 
-        -- Sub-task toggle / add button (top-level tasks only).
-        -- No sub-tasks : dim >  → click adds an empty sub-task and focuses it.
-        -- Has sub-tasks, expanded  : full v  → click collapses.
-        -- Has sub-tasks, collapsed : full >  → click expands.
+        -- Hover-only buttons (ALL-109): shown while the pointer is over the row.
+        local hoverBtns = {}
+
+        -- Delete X left of the toggle slot, on every row, shown on hover. Deletes the
+        -- task (and its sub-tasks) without a confirm, like the context menu.
+        local delBtn = CreateFrame("Button", nil, row)
+        delBtn:SetSize(14, 14)
+        delBtn:SetPoint("RIGHT", row, "RIGHT", -20, 0)   -- one column on every row, left of the toggle slot
+        local delN = delBtn:CreateTexture(nil, "ARTWORK"); delN:SetAllPoints()
+        delN:SetTexture(ASSETS .. "Buttons\\bt-close-normal")
+        local delH = delBtn:CreateTexture(nil, "ARTWORK"); delH:SetAllPoints()
+        delH:SetTexture(ASSETS .. "Buttons\\bt-close-hover"); delH:Hide()
+        delBtn:SetScript("OnEnter", function(self)
+            delH:Show(); delN:Hide()
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["REFBOX_TASK_DELETE_TIP"], 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        delBtn:SetScript("OnLeave", function()
+            delH:Hide(); delN:Show(); GameTooltip:Hide()
+        end)
+        delBtn:SetScript("OnClick", function()
+            GameTooltip:Hide()
+            T.DeleteTask(NoteID(), task.id)
+            RenderTaskPanel()
+            ApplyTaskLayout(RBFrame())
+        end)
+        delBtn:Hide()
+        hoverBtns[#hoverBtns + 1] = delBtn
+
+        -- Sub-task toggle (top-level tasks with sub-tasks only).
+        -- Expanded : v  → click collapses.   Collapsed : >  → click expands.
+        -- Without sub-tasks the toggle stays hidden but keeps its slot, so the
+        -- hover + sits where the + of a task with sub-tasks sits (ALL-109).
         local subTasks = T.GetSubTasks(NoteID(), task.id)
         -- rightAnchor is declared here (row scope) so the R/S icon blocks below
         -- can use it regardless of whether this is a top-level or sub-task row.
-        local rightAnchor = nil
+        local rightAnchor = delBtn
         if not isSubTask then
             local hasSubTasks = #subTasks > 0
             -- Collapse state persists across re-renders via _collapsedTasks.
@@ -873,52 +903,22 @@ local function DoRenderTaskPanel()
 
             local togBtn = CreateFrame("Button", nil, row)
             togBtn:SetSize(14, 14)
-            togBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            togBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)   -- furthest right (Dukul 2026-09-27)
             local togN = togBtn:CreateTexture(nil, "ARTWORK"); togN:SetAllPoints()
-
-            local function UpdateTogBtn()
-                if hasSubTasks then
-                    togN:SetTexture(ASSETS .. "Buttons\\" ..
-                        (row._expanded and "bt-down-normal" or "bt-right-normal"))
-                    togBtn:SetAlpha(1.0)
-                else
-                    -- No sub-tasks: always > at low alpha (add affordance)
-                    togN:SetTexture(ASSETS .. "Buttons\\bt-right-normal")
-                    togBtn:SetAlpha(0.3)
-                end
-            end
-            UpdateTogBtn()
+            togN:SetTexture(ASSETS .. "Buttons\\" ..
+                (row._expanded and "bt-down-normal" or "bt-right-normal"))
+            togBtn:SetShown(hasSubTasks)
 
             togBtn:SetScript("OnClick", function()
-                if hasSubTasks then
-                    -- Toggle collapse/expand, persist state
-                    row._expanded = not row._expanded
-                    if row._expanded then
-                        _collapsedTasks[task.id] = nil
-                    else
-                        _collapsedTasks[task.id] = true
-                    end
-                    RenderTaskPanel()
-                    ApplyTaskLayout(RBFrame())
+                -- Toggle collapse/expand, persist state
+                row._expanded = not row._expanded
+                if row._expanded then
+                    _collapsedTasks[task.id] = nil
                 else
-                    -- No sub-tasks: add one and focus its inline editbox
-                    local subID = T.AddTask(NoteID(), "", task.id)
-                    if subID then
-                        _collapsedTasks[task.id] = nil  -- ensure parent is expanded
-                        RenderTaskPanel()
-                        ApplyTaskLayout(RBFrame())
-                        for _, tr in ipairs(_taskRows) do
-                            if tr._taskID == subID and tr._editBox then
-                                local lbl2 = ({ tr:GetRegions() })[1]
-                                if lbl2 and lbl2.Hide then lbl2:Hide() end
-                                tr._editBox:SetText("")
-                                tr._editBox:Show()
-                                tr._editBox:SetFocus()
-                                break
-                            end
-                        end
-                    end
+                    _collapsedTasks[task.id] = true
                 end
+                RenderTaskPanel()
+                ApplyTaskLayout(RBFrame())
             end)
             togBtn:SetScript("OnMouseUp", function(_, btn)
                 if btn == "RightButton" then
@@ -929,13 +929,13 @@ local function DoRenderTaskPanel()
             row._togBtn = togBtn
 
             -- Right-side extras: chain leftward from togBtn.
-            -- Order right-to-left: togBtn ← subAddBtn? (R/S icons now outside this block)
+            -- Order right-to-left: togBtn ← X ← subAddBtn (R/S icons now outside this block)
             local iconGap  = 2
-            rightAnchor = togBtn  -- each new element anchors RIGHT to this LEFT
+            rightAnchor = delBtn  -- each new element anchors RIGHT to this LEFT
 
-            -- + sub-task button (only when sub-tasks already exist), so more can be
-            -- added without right-clicking. Was built twice, same size and place (ALL-65.10e).
-            if hasSubTasks then
+            -- + sub-task button: hover only, with or without sub-tasks (ALL-109,
+            -- Dukul 2026-09-27). Was built twice, same size and place (ALL-65.10e).
+            do
                 local subAddBtn = CreateFrame("Button", nil, row)
                 subAddBtn:SetSize(14, 14)
                 subAddBtn:SetPoint("RIGHT", rightAnchor, "LEFT", -iconGap, 0)
@@ -968,20 +968,16 @@ local function DoRenderTaskPanel()
                 end)
                 _taskRows[#_taskRows + 1] = subAddBtn
                 rightAnchor = subAddBtn
+                subAddBtn:Hide()
+                hoverBtns[#hoverBtns + 1] = subAddBtn
             end
         end  -- end if not isSubTask (toggle/subAdd block)
 
         -- Situation and reset icons appear on both top-level and sub-tasks.
-        -- For top-level, rightAnchor is already set (togBtn or subAddBtn).
-        -- For sub-tasks, create a synthetic anchor at the row's right edge.
+        -- rightAnchor is already set: subAddBtn on top-level rows, the delete X
+        -- on sub-task rows.
         local iconSize = 12
         local iconGap  = 2
-        if isSubTask then
-            local anchor = CreateFrame("Frame", nil, row)
-            anchor:SetSize(1, 1)
-            anchor:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-            rightAnchor = anchor
-        end
 
         -- Situation icon (shown when task has a situation binding)
         if task.situation and task.situation ~= "" then
@@ -1032,6 +1028,26 @@ local function DoRenderTaskPanel()
             end)
             _taskRows[#_taskRows + 1] = rstIco
         end
+
+        -- Show the hover buttons while the pointer is anywhere on the row. The
+        -- children take the mouse from the row, so every mouse-enabled child
+        -- starts the watch too; it hides them once the pointer is off the row.
+        local function HoverWatch(self)
+            if self:IsMouseOver() then return end
+            for _, b in ipairs(hoverBtns) do b:Hide() end
+            self:SetScript("OnUpdate", nil)
+        end
+        local function StartHover()
+            for _, b in ipairs(hoverBtns) do b:Show() end
+            row:SetScript("OnUpdate", HoverWatch)
+        end
+        row:HookScript("OnEnter", StartHover)
+        for _, child in ipairs({ row:GetChildren() }) do
+            local ok, motion = pcall(child.IsMouseMotionEnabled or child.IsMouseEnabled, child)
+            if ok and motion then child:HookScript("OnEnter", StartHover) end
+        end
+        pcall(lbl.HookScript, lbl, "OnEnter", StartHover)   -- the label takes the mouse too
+
         row:SetScript("OnMouseUp", function(_, btn)
             if btn == "RightButton" then
                 BNB.ShowTaskContextMenu(row, NoteID(), task.id)

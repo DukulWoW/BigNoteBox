@@ -234,6 +234,7 @@ local function GetOrCreateFontObj(key, path, size, flags)
     end
     local fo = _fontObjs[cacheKey]
     if path and path ~= "" then
+        size = BNB.FontPx and BNB.FontPx(path, size) or size   -- per-font factor (ALL-60)
         pcall(function() fo:SetFont(path, math.max(math.floor(size + 0.5), 6), flags) end)
     end
     return fo

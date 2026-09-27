@@ -241,7 +241,7 @@ local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
         c.dropdown = dd
         c.SetSelected = function(self, n)
             curSel = n; dd:GenerateMenu()
-            if dd.Text then dd.Text:SetText((n or "None"):gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r","")) end
+            if dd.Text then dd.Text:SetText((n or L["NC_DD_NONE"]):gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r","")) end
         end
     else
         local btn = BNB.CreateBackdropFrame("Button", nil, c)
@@ -251,7 +251,7 @@ local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
             btn:SetBackdropColor(0.08,0.08,0.10,0.95); btn:SetBackdropBorderColor(0.35,0.35,0.35,1)
         end
         local st = btn:CreateFontString(nil,"ARTWORK","GameFontNormalSmall")
-        st:SetPoint("LEFT",6,0); st:SetPoint("RIGHT",-20,0); st:SetJustifyH("LEFT"); st:SetText(selected or "None")
+        st:SetPoint("LEFT",6,0); st:SetPoint("RIGHT",-20,0); st:SetJustifyH("LEFT"); st:SetText(selected or L["NC_DD_NONE"])
         local ar = btn:CreateTexture(nil,"ARTWORK"); ar:SetSize(12,12); ar:SetPoint("RIGHT",-3,0)
         ar:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
         local pp = CreateFrame("Frame",nil,btn,"BackdropTemplate"); pp:SetFrameStrata("FULLSCREEN_DIALOG"); pp:SetFrameLevel(500); pp:SetClampedToScreen(true)
@@ -273,7 +273,7 @@ local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
         end
         btn:SetScript("OnClick",function() if pp:IsShown() then pp:Hide(); return end; pp:SetWidth(btn:GetWidth()); Pop(); pp:ClearAllPoints()
             if (btn:GetBottom() or 0)-260<0 then pp:SetPoint("BOTTOMLEFT",btn,"TOPLEFT",0,2) else pp:SetPoint("TOPLEFT",btn,"BOTTOMLEFT",0,-2) end; pp:Show() end)
-        c.SetSelected = function(self,n) st:SetText(n or "None") end
+        c.SetSelected = function(self,n) st:SetText(n or L["NC_DD_NONE"]) end
     end
     return c
 end
@@ -429,8 +429,8 @@ local function BuildGeneralTab(sf, ct)
         btn:SetScript("OnClick", function()
             Save({fontOverride = def.id})
             local sz = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
-            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, sz, "") end) end
-            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, 20, "") end) end
+            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
+            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
             HLFonts()
             if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
@@ -491,7 +491,7 @@ local function BuildGeneralTab(sf, ct)
                 local ov = note and note.fontOverride
                 local def = ov and BNB.ResolveFontDef and BNB.ResolveFontDef(ov)
                 if def then
-                    pcall(function() eb:SetFont(def.regular, sz, "") end)
+                    pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
                 elseif BNB.ApplyFont then
                     BNB.ApplyFont()
                 end
@@ -536,7 +536,7 @@ local function BuildGeneralTab(sf, ct)
                 if eb and BNB._currentNoteID == _noteID then
                     local def = path and BNB.GetFontDef and BNB.GetFontDef(path)
                     if def then
-                        pcall(function() eb:SetFont(def.regular, sz, "") end)
+                        pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
                     elseif BNB.ApplyFont then
                         BNB.ApplyFont()
                     end
@@ -590,7 +590,7 @@ local function BuildGeneralTab(sf, ct)
             Save({fontSize = sz})
             if BNB._editorBody and BNB._currentNoteID == _noteID then
                 local path = select(1, BNB._editorBody:GetFont())
-                if path then pcall(function() BNB._editorBody:SetFont(path, sz, "") end) end
+                if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, sz), "") end) end
             end
             if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
@@ -602,7 +602,7 @@ local function BuildGeneralTab(sf, ct)
                 Save({fontSize = v})
                 if BNB._editorBody and BNB._currentNoteID == _noteID then
                     local path = select(1, BNB._editorBody:GetFont())
-                    if path then pcall(function() BNB._editorBody:SetFont(path, v, "") end) end
+                    if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, v), "") end) end
                 end
                 if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
             end,
@@ -623,7 +623,7 @@ local function BuildGeneralTab(sf, ct)
         if fsSl and fsSl.SetValue then pcall(fsSl.SetValue, fsSl, globalSz) end
         if BNB._editorBody and BNB._currentNoteID == _noteID then
             local path = select(1, BNB._editorBody:GetFont())
-            if path then pcall(function() BNB._editorBody:SetFont(path, globalSz, "") end) end
+            if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, globalSz), "") end) end
         end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     end)
@@ -2565,7 +2565,7 @@ local function BuildSituationTab(panel)
         }})
         RefreshWaypointDisplay()
         wpManualRow:Hide()
-        BNB:Print(string.format("Waypoint set manually: %s (%.1f, %.1f)", title, x, y))
+        BNB:Print(string.format(L["NC_WP_SET_MANUAL_MSG"], title, x, y))
         if BNB.Sticky and BNB.Sticky.RefreshSettingsSituation then BNB.Sticky.RefreshSettingsSituation(_noteID) end
     end
 
@@ -2679,7 +2679,7 @@ local function BuildSituationTab(panel)
         local title = (note.title and note.title ~= "") and note.title or zone
         BNB.UpdateNote(id, { waypoint = { mapID = mapID, x = x, y = y, label = zone, title = title } })
         RefreshWaypointDisplay()
-        BNB:Print(string.format("Waypoint pinned: %s %.1f, %.1f", title, x, y))
+        BNB:Print(string.format(L["NC_WP_PINNED_MSG"], title, x, y))
         if BNB.Sticky and BNB.Sticky.RefreshSettingsSituation then BNB.Sticky.RefreshSettingsSituation(id) end
     end)
     wpPinBtn:SetScript("OnEnter", function(self)
@@ -2709,7 +2709,7 @@ local function BuildSituationTab(panel)
                 })
             end)
             handled = true
-            BNB:Print(string.format("TomTom waypoint: %s (%.1f, %.1f)", wpTitle, wp.x, wp.y))
+            BNB:Print(string.format(L["NC_WP_TOMTOM_MSG"], wpTitle, wp.x, wp.y))
         end
 
         -- Retail built-in map pin (Dragonflight+)
@@ -2724,7 +2724,7 @@ local function BuildSituationTab(panel)
             end)
             if ok then
                 handled = true
-                BNB:Print(string.format("Map pin set: %s (%.1f, %.1f)", wpTitle, wp.x, wp.y))
+                BNB:Print(string.format(L["NC_WP_MAP_PIN_MSG"], wpTitle, wp.x, wp.y))
             end
         end
 

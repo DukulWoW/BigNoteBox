@@ -161,7 +161,7 @@ local function GetNoteRow(idx)
     titleLbl:SetWordWrap(false)
 
     -- Go to button
-    local goBtn = BNB.CreateButton(nil, f, "Go to", 54, 18)
+    local goBtn = BNB.CreateButton(nil, f, L["TAG_MGR_GOTO_BTN"], 54, 18)
     goBtn:SetPoint("RIGHT", f, "RIGHT", 0, 0)
 
     local row = { frame = f, iconTex = iconTex, titleLbl = titleLbl, goBtn = goBtn }
@@ -187,7 +187,7 @@ SetMultiMode = function(enabled)
     _multiMode = enabled
     _multiSel  = {}
     if _selectBtn then
-        _selectBtn:SetText(enabled and "Cancel" or "Select")
+        _selectBtn:SetText(enabled and L["CANCEL"] or L["MW_SELECT_BTN"])
         _selectBtn:SetScript("OnClick", function()
             SetMultiMode(not enabled)
         end)
@@ -440,12 +440,12 @@ local function BuildTagManager()
     tipLbl:SetWordWrap(true)
 
     -- ── Select strip (between title bar and tip) ──────────────────────────────
-    local selectBtn = BNB.CreateButton(nil, f, "Select", 68, 22)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 68, 22)
     selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -43)
     selectBtn:SetScript("OnClick", function() SetMultiMode(true) end)
     _selectBtn = selectBtn
 
-    local selAllBtn = BNB.CreateButton(nil, f, "Select all", 80, 22)
+    local selAllBtn = BNB.CreateButton(nil, f, L["TAG_MGR_SELECT_ALL_BTN"], 80, 22)
     selAllBtn:SetPoint("LEFT", selectBtn, "RIGHT", 6, 0)
     selAllBtn:SetScript("OnClick", function()
         local tags = BNB.GetAllTags()
@@ -549,12 +549,12 @@ local function BuildTagManagerSkin()
     -- Select strip (just below title bar)
     local SK_SEL_Y = -(SK_TM_TITLE_H + 8)
 
-    local selectBtn = BNB.CreateButton(nil, f, "Select", 68, 22)
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 68, 22)
     selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, SK_SEL_Y)
     selectBtn:SetScript("OnClick", function() SetMultiMode(true) end)
     _selectBtn = selectBtn
 
-    local selAllBtn = BNB.CreateButton(nil, f, "Select all", 80, 22)
+    local selAllBtn = BNB.CreateButton(nil, f, L["TAG_MGR_SELECT_ALL_BTN"], 80, 22)
     selAllBtn:SetPoint("LEFT", selectBtn, "RIGHT", 6, 0)
     selAllBtn:SetScript("OnClick", function()
         local tags = BNB.GetAllTags()

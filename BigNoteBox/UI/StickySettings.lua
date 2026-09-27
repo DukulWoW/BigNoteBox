@@ -544,7 +544,7 @@ local function PopulateStickySettings(noteID)
     end
 
     Rule(ct1)
-    Sec(ct1, "Font")
+    Sec(ct1, L["NC_HDR_FONT"])
 
     -- Font card picker — 2-column × 3-row grid layout
     -- Card dimensions: full height for readability, half width minus gap
@@ -683,7 +683,7 @@ local function PopulateStickySettings(noteID)
             cfg.fontSize = v; SaveCfg(noteID, cfg)
             if stickyFrame and stickyFrame._bodyEb then
                 local path = select(1, stickyFrame._bodyEb:GetFont())
-                if path then pcall(function() stickyFrame._bodyEb:SetFont(path, v, "") end) end
+                if path then pcall(function() stickyFrame._bodyEb:SetFont(path, BNB.FontPx(path, v), "") end) end
             end
         end)
     plainOnlyWidgets[#plainOnlyWidgets+1] = fontSizeSl
@@ -893,7 +893,7 @@ local function PopulateStickySettings(noteID)
     ct2._y = ct2._y - 32
 
     Rule(ct2)
-    Sec(ct2, "Background")
+    Sec(ct2, L["STICKY_HDR_BACKGROUND"])
     local bgSwatch = ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, L["STICKY_CLICK_PICK_COLOR"], function(r,g,b)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
         SaveCfg(noteID, cfg)
@@ -998,7 +998,7 @@ local function PopulateStickySettings(noteID)
         end)
 
     Rule(ct2)
-    Sec(ct2, "Border")
+    Sec(ct2, L["NC_HDR_BORDER"])
     -- Forward declaration so the dropdown/button closures below can reference it
     -- before the function body is assigned (Lua 5.1 upvalue capture fix).
     local SyncBorderSliders

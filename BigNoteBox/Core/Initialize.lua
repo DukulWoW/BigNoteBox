@@ -284,12 +284,12 @@ function BNB_KeybindQuickNote()
     if InCombatLockdown() then return end
     -- Replicate Quick Note button logic: next gap-filling number
     if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
-    local base   = "Quick Note"
+    local base   = L["NL_QUICK_NOTE_BTN"]   -- same title as the list's Quick Note button
     local taken  = {}
     for _, note in pairs(BigNoteBoxNotesDB and BigNoteBoxNotesDB.notes or {}) do
         local t = note.title or ""
         if t == base then taken[1] = true
-        else local n = t:match("^Quick Note (%d+)$"); if n then taken[tonumber(n)] = true end end
+        else local n = t:match("^" .. base .. " (%d+)$"); if n then taken[tonumber(n)] = true end end
     end
     local title = (not taken[1]) and base or (function()
         local i = 2; while taken[i] do i = i + 1 end; return base .. " " .. i

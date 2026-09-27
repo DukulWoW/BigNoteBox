@@ -234,6 +234,8 @@ local function MakeLockBtn(f, parent, size)
         db.scaleLocked = not db.scaleLocked
         RefreshLockBtn()
         if BNB._applyScaleLock then BNB._applyScaleLock() end
+        -- Still hovered: redraw the hover art and the Locked/Unlocked tooltip (ALL-59)
+        if lockBtn:IsMouseOver() then lockBtn:GetScript("OnEnter")(lockBtn) end
     end)
     lockBtn:SetScript("OnMouseDown", function()
         local locked = IsLocked()

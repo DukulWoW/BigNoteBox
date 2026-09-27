@@ -611,7 +611,7 @@ local function ApplyConfig(frame, noteID)
         if fid and BNB.ResolveFontDef then path = BNB.ResolveFontDef(fid).regular
         else path = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) end
         local flags = GetOutlineFlagsAndShadow(cfg.fontOutline or "None")
-        if path then pcall(function() frame._bodyEb:SetFont(path, sz, flags) end) end
+        if path then pcall(function() frame._bodyEb:SetFont(path, BNB.FontPx(path, sz), flags) end) end
         ApplyOutlineToEditBox(frame._bodyEb, cfg.fontOutline or "None")
     end
     -- Icon badge and mini tile use note-level border with scale/offset (matches note list)

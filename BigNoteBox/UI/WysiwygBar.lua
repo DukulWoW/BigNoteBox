@@ -261,7 +261,7 @@ local function BuildWysiwygBar(parent, tsStrip)
             local def = BNB.GetFontDef(globalID)
             if def then return def.label end
         end
-        return "Default"
+        return L["NE_FONT_DEFAULT"]
     end
 
     local function RefreshFontDDLabel()
@@ -286,7 +286,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
         local def = fontID and BNB.ResolveFontDef and BNB.ResolveFontDef(fontID)
         if def then
-            pcall(function() eb:SetFont(def.regular, sz, "") end)
+            pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
         elseif BNB.ApplyFont then
             BNB.ApplyFont()
         end
@@ -430,7 +430,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         local eb = BNB._editorBody
         if eb then
             local path = select(1, eb:GetFont())
-            if path then pcall(function() eb:SetFont(path, sz, "") end) end
+            if path then pcall(function() eb:SetFont(path, BNB.FontPx(path, sz), "") end) end
         end
         RefreshSizeLbl()
     end

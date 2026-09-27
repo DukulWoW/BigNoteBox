@@ -401,7 +401,7 @@ local NUM_W = 22   -- fixed width for line number column
 local function GetPreviewFont()
     if BNB.GetBodyFont then
         local path = BNB.GetBodyFont()
-        if path then return path, 11 end
+        if path then return path, BNB.FontPx(path, 11) end
     end
     return GameFontNormalSmall:GetFont(), 11
 end
