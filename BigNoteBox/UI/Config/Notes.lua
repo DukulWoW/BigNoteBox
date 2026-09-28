@@ -145,18 +145,13 @@ local function BuildNotesTab(sf, ct)
     y = y - (ROW_H + ROW_GAP)
 
     -- ── Retention slider ───────────────────────────────────────────────────────
-    local retainSlider = BNB.CreateSlider(ct, L["CFG_TRASH_RETAIN_SLIDER"], 0, 90,
-        db.trashRetainDays ~= nil and db.trashRetainDays or 30, nil,
-        function(v) db.trashRetainDays = v end)
+    local retainSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_TRASH_RETAIN_SLIDER"], min = 0, max = 90,
+        value = db.trashRetainDays ~= nil and db.trashRetainDays or 30, default = 30,
+        onChange = function(v) db.trashRetainDays = v end,
+        tip = L["CFG_TRASH_RETAIN_TIP"],
+    })
     retainSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    retainSlider:SetWidth(CONTENT_W)
-    retainSlider:EnableMouse(true)
-    retainSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_TRASH_RETAIN_TIP"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    retainSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- ── Apply greying / trash button visibility ────────────────────────────────
@@ -166,7 +161,7 @@ local function BuildNotesTab(sf, ct)
         warnCb:SetAlpha(a)
         warnLbl:SetAlpha(a)
         retainSlider:SetAlpha(a)
-        retainSlider:EnableMouse(enabled)
+        retainSlider:SetEnabled(enabled)
         -- Show/hide the trashcan icon in the main window toolbar; the row
         -- closes up so no gap is left (reads db.trashFeature, set by the caller)
         if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
@@ -274,8 +269,7 @@ local function BuildNotesTab(sf, ct)
     local function SetSlidersEnabled(enabled)
         for _, sl in ipairs(sizeSliders) do
             sl:SetAlpha(enabled and 1.0 or 0.4)
-            sl:EnableMouse(enabled)
-            if sl.Slider then sl.Slider:SetEnabled(enabled) end
+            sl:SetEnabled(enabled)
         end
     end
 
@@ -305,14 +299,15 @@ local function BuildNotesTab(sf, ct)
         local initVal = indepActive
             and (db and db[dbKey] or default)
             or  MultiplierSize(mult)
-        local sl = BNB.CreateSlider(ct, label, 6, 72, initVal, default,
-            function(v)
+        local sl = BNB.CreateStackedSlider(ct, CONTENT_W, {
+            label = label, min = 6, max = 72, value = initVal, default = default,
+            onChange = function(v)
                 if not (db and db.richIndependentSizes) then return end
-                if db then db[dbKey] = math.floor(v + 0.5) end
+                if db then db[dbKey] = v end
                 TriggerRichRerender()
-            end)
+            end,
+        })
         sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        sl:SetWidth(CONTENT_W)
         sizeSliders[#sizeSliders + 1] = sl
         return sl
     end
@@ -335,10 +330,10 @@ local function BuildNotesTab(sf, ct)
             psl:SetValue( db and db.richBodySize or 12)
         else
             -- Show multiplier ghost values when switching off
-            h1sl:SetValue(MultiplierSize(2.0))
-            h2sl:SetValue(MultiplierSize(1.6))
-            h3sl:SetValue(MultiplierSize(1.3))
-            psl:SetValue( MultiplierSize(1.0))
+            h1sl:SetValue(MultiplierSize(2.0), true)
+            h2sl:SetValue(MultiplierSize(1.6), true)
+            h3sl:SetValue(MultiplierSize(1.3), true)
+            psl:SetValue( MultiplierSize(1.0), true)
             TriggerRichRerender()
         end
     end)
@@ -382,26 +377,19 @@ local function BuildNotesTab(sf, ct)
         dlDesc:SetHeight(h); y = y - h - 2
     end
 
-    local SLIDER_W = CONTENT_W - 20
     local curDebounce = db and db.previewDebounce or 0.3
-    local debounceSlider = BNB.CreateSlider(ct, L["CFG_PREVIEW_DELAY_SLIDER"], 1, 10,
-        math.floor(curDebounce * 10 + 0.5), 3,
-        function(v)
+    local debounceSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_PREVIEW_DELAY_SLIDER"], min = 1, max = 10,
+        value = math.floor(curDebounce * 10 + 0.5), default = 3,
+        fmt = function(v) return string.format("%.1f", v / 10) end,
+        onChange = function(v)
             local val = v / 10
             if BigNoteBoxDB then BigNoteBoxDB.previewDebounce = val end
         end,
-        function(v) return string.format("%.1f", v / 10) end)
+        tipTitle = L["CFG_PREVIEW_DELAY_TIP_TITLE"],
+        tip = { L["CFG_PREVIEW_DELAY_TIP1"], L["CFG_PREVIEW_DELAY_TIP2"] },
+    })
     debounceSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    debounceSlider:SetWidth(SLIDER_W)
-    debounceSlider:EnableMouse(true)
-    debounceSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_PREVIEW_DELAY_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(L["CFG_PREVIEW_DELAY_TIP1"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_PREVIEW_DELAY_TIP2"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    debounceSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- ── Undo / Redo ───────────────────────────────────────────────────────────
@@ -427,25 +415,16 @@ local function BuildNotesTab(sf, ct)
     local curDepth = db and db.undoDepth or 50
     warnLbl:SetShown(curDepth > 50)
 
-    -- Slider width: subtract extra 20px so the 3-digit value label is never clipped.
-    local SLIDER_W = CONTENT_W - 20
-    local depthSlider = BNB.CreateSlider(ct, L["CFG_UNDO_DEPTH_SLIDER"], 10, 200,
-        curDepth, 50,
-        function(v)
-            local val = math.floor(v + 0.5)
-            if BigNoteBoxDB then BigNoteBoxDB.undoDepth = val end
-            warnLbl:SetShown(val > 50)
-        end)
+    local depthSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_UNDO_DEPTH_SLIDER"], min = 10, max = 200,
+        value = curDepth, default = 50,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.undoDepth = v end
+            warnLbl:SetShown(v > 50)
+        end,
+        tip = { L["CFG_UNDO_DEPTH_TIP1"], L["CFG_UNDO_DEPTH_TIP2"] },
+    })
     depthSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    depthSlider:SetWidth(SLIDER_W)
-    depthSlider:EnableMouse(true)
-    depthSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_UNDO_DEPTH_TIP1"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_UNDO_DEPTH_TIP2"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    depthSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Always reserve warning label height so layout stays stable
@@ -463,24 +442,18 @@ local function BuildNotesTab(sf, ct)
         lbl:SetHeight(h); y = y - h - 2
     end
     local curIdle = db and db.undoIdleDelay or 0.8
-    local idleSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_IDLE_SLIDER"], 3, 30,
-        math.floor(curIdle * 10 + 0.5), 8,
-        function(v)
+    local idleSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_AUTOSAVE_IDLE_SLIDER"], min = 3, max = 30,
+        value = math.floor(curIdle * 10 + 0.5), default = 8,
+        fmt = function(v) return string.format("%.1f", v / 10) end,
+        onChange = function(v)
             local val = v / 10
             if BigNoteBoxDB then BigNoteBoxDB.undoIdleDelay = val end
         end,
-        function(v) return string.format("%.1f", v / 10) end)
+        tipTitle = L["CFG_AUTOSAVE_IDLE_TIP_TITLE"],
+        tip = { L["CFG_AUTOSAVE_IDLE_TIP1"], L["CFG_AUTOSAVE_IDLE_TIP2"] },
+    })
     idleSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    idleSlider:SetWidth(SLIDER_W)
-    idleSlider:EnableMouse(true)
-    idleSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_IDLE_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_IDLE_TIP1"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_IDLE_TIP2"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    idleSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Forced interval slider (1 – 10 s, whole seconds, default 3)
@@ -495,24 +468,16 @@ local function BuildNotesTab(sf, ct)
         lbl:SetHeight(h); y = y - h - 2
     end
     local curForced = db and db.undoForcedInterval or 3
-    local forcedSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_FORCED_SLIDER"], 1, 10,
-        curForced, 3,
-        function(v)
-            local val = math.floor(v + 0.5)
-            if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = val end
-        end)
+    local forcedSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 1, max = 10,
+        value = curForced, default = 3,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = v end
+        end,
+        tipTitle = L["CFG_AUTOSAVE_FORCED_TIP_TITLE"],
+        tip = { L["CFG_AUTOSAVE_FORCED_TIP1"], L["CFG_AUTOSAVE_FORCED_TIP2"], L["CFG_AUTOSAVE_FORCED_TIP3"] },
+    })
     forcedSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    forcedSlider:SetWidth(SLIDER_W)
-    forcedSlider:EnableMouse(true)
-    forcedSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_FORCED_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_FORCED_TIP1"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_FORCED_TIP2"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_FORCED_TIP3"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    forcedSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- ── Session History ───────────────────────────────────────────────────────
@@ -529,24 +494,16 @@ local function BuildNotesTab(sf, ct)
 
     -- History slots slider
     local curSlots = BigNoteBoxDB and BigNoteBoxDB.historyMaxSlots or 5
-    local slotsSlider = BNB.CreateSlider(ct, L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"], 1, 20,
-        curSlots, 5,
-        function(v)
-            local val = math.floor(v + 0.5)
-            if BigNoteBoxDB then BigNoteBoxDB.historyMaxSlots = val end
-        end)
+    local slotsSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"], min = 1, max = 20,
+        value = curSlots, default = 5,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.historyMaxSlots = v end
+        end,
+        tipTitle = L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"],
+        tip = { L["CFG_AUTOSAVE_SLOTS_TIP1"], L["CFG_AUTOSAVE_SLOTS_TIP2"], L["CFG_AUTOSAVE_SLOTS_TIP3"] },
+    })
     slotsSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    slotsSlider:SetWidth(SLIDER_W)
-    slotsSlider:EnableMouse(true)
-    slotsSlider:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_SLOTS_TIP1"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_SLOTS_TIP2"], 0.8, 0.8, 0.8, true)
-        GameTooltip:AddLine(L["CFG_AUTOSAVE_SLOTS_TIP3"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    slotsSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Size readout — computed when the tab is shown

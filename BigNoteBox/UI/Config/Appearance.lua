@@ -5,7 +5,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
+local CONTENT_W, ROW_H, ROW_GAP, SLIDER_H = K.CONTENT_W, K.ROW_H, K.ROW_GAP, K.SLIDER_H
 local AddRule, AddHeader, AddCheck, AddSlider, BuildLSMFontDropdown = K.AddRule, K.AddHeader, K.AddCheck, K.AddSlider, K.BuildLSMFontDropdown
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -267,80 +267,33 @@ local function BuildAppearanceTab(sf, ct)
     -- Forward declaration so preset callbacks above can call it before it's defined
     local RefreshBrightnessVisibility
 
-    -- One row per slider: slider, its value, "(Default: X.XX)", Reset
-    -- (Dukul, 2026-09-28: the Reset row and the left default label took space).
-    local function InlineSliderRow(sl, resetBtn)
-        resetBtn:ClearAllPoints()
-        resetBtn:SetPoint("RIGHT", sl, "RIGHT", 0, 0)
-        local lbl = sl.Label
-        lbl:ClearAllPoints()
-        lbl:SetPoint("RIGHT", resetBtn, "LEFT", -8, 0)
-        lbl:SetJustifyH("RIGHT")
-        lbl:SetText((lbl:GetText():gsub("^%s+", "")))
-        lbl:SetWidth(math.max(90, lbl:GetUnboundedStringWidth() + 2))
-        sl.Slider:ClearAllPoints()
-        sl.Slider:SetPoint("LEFT",  sl, "LEFT", 18, 0)
-        sl.Slider:SetPoint("RIGHT", lbl, "LEFT", -44, 0)   -- room for the value text
+    -- Stacked sliders with Reset, as everywhere (ALL-121). Reset clears the
+    -- saved value, so a later change of the built-in default still reaches it.
+    local function ApplySkin()
+        if db.skinMode and BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
     end
 
-    -- Brightness slider (float 0.5–2.0, step 0.05)
+    -- Brightness slider (float 0.5-3.0, step 0.05)
     -- Hidden when OLED preset is selected (brightness is meaningless on pure black)
-    local skinBrightnessLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    skinBrightnessLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
-    skinBrightnessLbl:SetHeight(ROW_H); skinBrightnessLbl:SetJustifyH("LEFT")
-    skinBrightnessLbl:SetText(L["CFG_SKIN_BRIGHTNESS"])
-    y = y - (ROW_H + 2)
+    local skinBrightnessSl = BNB.CreateStackedSlider(ct, CONTENT_W - 18, {
+        label = L["CFG_SKIN_BRIGHTNESS"], min = 0.5, max = 3.0, step = 0.05,
+        value = db.skinBrightness or 1.0, default = 1.0,
+        onChange = function(v) db.skinBrightness = v; ApplySkin() end,
+        onReset  = function() db.skinBrightness = nil; ApplySkin() end,
+    })
+    skinBrightnessSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    y = y - (SLIDER_H + ROW_GAP)
 
-    local skinBrightnessSl = BNB.CreateFloatSlider(ct,
-        nil, 0.5, 3.0, db.skinBrightness or 1.0, 0.05, 1.0,
-        function(v)
-            db.skinBrightness = v
-            if db.skinMode and BNB.ApplyMainWindowSkin then
-                BNB.ApplyMainWindowSkin()
-            end
-        end)
-    skinBrightnessSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    skinBrightnessSl:SetWidth(CONTENT_W)
-    y = y - (36 + ROW_GAP)
+    -- Window opacity slider (0.0 - 1.0, step 0.01, default 0.97)
+    local skinOpacitySl = BNB.CreateStackedSlider(ct, CONTENT_W - 18, {
+        label = L["CFG_SKIN_OPACITY"], min = 0.0, max = 1.0, step = 0.01,
+        value = db.skinBgAlpha or 0.97, default = 0.97,
+        onChange = function(v) db.skinBgAlpha = v; ApplySkin() end,
+        onReset  = function() db.skinBgAlpha = nil; ApplySkin() end,
+    })
+    skinOpacitySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    y = y - (SLIDER_H + ROW_GAP)
 
-    local skinBrightnessReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
-    InlineSliderRow(skinBrightnessSl, skinBrightnessReset)
-    skinBrightnessReset:SetScript("OnClick", function()
-        db.skinBrightness = nil
-        skinBrightnessSl:SetValue(1.0)
-        if db.skinMode and BNB.ApplyMainWindowSkin then
-            BNB.ApplyMainWindowSkin()
-        end
-    end)
-
-    -- Window opacity slider (0.0 - 1.0, step 0.05, default 0.97)
-    local skinOpacityLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    skinOpacityLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
-    skinOpacityLbl:SetHeight(ROW_H); skinOpacityLbl:SetJustifyH("LEFT")
-    skinOpacityLbl:SetText(L["CFG_SKIN_OPACITY"])
-    y = y - (ROW_H + 2)
-
-    local skinOpacitySl = BNB.CreateFloatSlider(ct,
-        nil, 0.0, 1.0, db.skinBgAlpha or 0.97, 0.01, 0.97,
-        function(v)
-            db.skinBgAlpha = v
-            if db.skinMode and BNB.ApplyMainWindowSkin then
-                BNB.ApplyMainWindowSkin()
-            end
-        end)
-    skinOpacitySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    skinOpacitySl:SetWidth(CONTENT_W)
-    y = y - (36 + ROW_GAP)
-
-    local skinOpacityReset = BNB.CreateButton(nil, ct, L["RESET"], 52, 20)
-    InlineSliderRow(skinOpacitySl, skinOpacityReset)
-    skinOpacityReset:SetScript("OnClick", function()
-        db.skinBgAlpha = nil
-        skinOpacitySl:SetValue(0.97)
-        if db.skinMode and BNB.ApplyMainWindowSkin then
-            BNB.ApplyMainWindowSkin()
-        end
-    end)
     local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -393,36 +346,17 @@ local function BuildAppearanceTab(sf, ct)
 
     -- Single source of truth for the brightness controls' enabled/alpha state.
     -- Disables the slider if EITHER skin mode is off OR OLED preset is selected.
-    -- Disables mouse on both the outer frame and the inner Slider child so that
-    -- the retail MinimalSliderWithSteppersTemplate's thumb-drag also stops.
     RefreshBrightnessVisibility = function()
         local skinOn = db.skinMode == true
         local isOled = (db.skinPreset or "obsidian") == "oled"
         local enabled = skinOn and not isOled
         local alpha   = enabled and 1.0 or 0.35
 
-        skinBrightnessLbl:SetAlpha(alpha)
         skinBrightnessSl:SetAlpha(alpha)
-        skinBrightnessSl:EnableMouse(enabled)
-        if skinBrightnessSl.Slider then
-            skinBrightnessSl.Slider:EnableMouse(enabled)
-        end
-        if skinBrightnessSl.MinusBtn then skinBrightnessSl.MinusBtn:SetEnabled(enabled) end
-        if skinBrightnessSl.PlusBtn  then skinBrightnessSl.PlusBtn:SetEnabled(enabled)  end
-        skinBrightnessReset:SetEnabled(enabled)
-        skinBrightnessReset:SetAlpha(alpha)
-
+        skinBrightnessSl:SetEnabled(enabled)
         -- Opacity slider follows same enabled state as brightness
-        skinOpacityLbl:SetAlpha(alpha)
         skinOpacitySl:SetAlpha(alpha)
-        skinOpacitySl:EnableMouse(enabled)
-        if skinOpacitySl.Slider then
-            skinOpacitySl.Slider:EnableMouse(enabled)
-        end
-        if skinOpacitySl.MinusBtn then skinOpacitySl.MinusBtn:SetEnabled(enabled) end
-        if skinOpacitySl.PlusBtn  then skinOpacitySl.PlusBtn:SetEnabled(enabled)  end
-        skinOpacityReset:SetEnabled(enabled)
-        skinOpacityReset:SetAlpha(alpha)
+        skinOpacitySl:SetEnabled(enabled)
     end
     RefreshBrightnessVisibility()
 
@@ -551,7 +485,7 @@ local function BuildAppearanceTab(sf, ct)
     y = AddSlider(ct, y, L["CONFIG_FONT_SIZE"], 9, 22,
         function() return db.fontSize or 13 end,
         function(v) BNB.ApplyFont(nil, v) end,
-        L["CFG_FONTSIZE_TIP"])
+        L["CFG_FONTSIZE_TIP"], 13)
 
     y = AddRule(ct, y) - 4
 

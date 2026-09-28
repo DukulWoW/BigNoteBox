@@ -590,50 +590,32 @@ local function BuildDialog()
     rightY = rightY - 18
 
     local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
-    local szWidget
-    if MinimalSliderWithSteppersMixin then
-        local sl = CreateFrame("Slider", nil, f, "MinimalSliderWithSteppersTemplate")
-        sl:SetPoint("TOPLEFT",  colR, "TOPLEFT",   0, rightY)
-        sl:SetPoint("TOPRIGHT", colR, "TOPRIGHT", -36, rightY)
-        sl:SetHeight(20)
-        sl:Init(defaultSize, 8, 32, 24, {
-            [MinimalSliderWithSteppersMixin.Label.Right] =
-                CreateMinimalSliderFormatter(
-                    MinimalSliderWithSteppersMixin.Label.Right,
-                    function(v)
-                        return WHITE_FONT_COLOR:WrapTextInColorCode(
-                            string.format(L["NND_PT_SUFFIX_FMT"], math.floor(v)))
-                    end),
-        })
-        sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged,
-            function(_, v)
-                _selSize = math.floor(v)
-                if _sizePreviewLbl then
-                    pcall(function()
-                        local boldPath = (_selFont and (function()
-                            for _, d in ipairs(BNB.FONTS or {}) do
-                                if d.id == _selFont then return d.bold end
-                            end
-                        end)()) or (BNB.GetBoldFont and BNB.GetBoldFont())
-                        if boldPath and boldPath ~= "" then
-                            _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
-                        else
-                            -- GameFontNormal is always valid; size override handles the rest
-                            _sizePreviewLbl:SetFontObject(GameFontNormal)
-                            _sizePreviewLbl:SetFont(GameFontNormal:GetFont(), _selSize, "")
+    -- Stacked slider with Reset (ALL-121); the header above is its label
+    local szWidget = BNB.CreateStackedSlider(f, COL_R_W, {
+        label = "", min = 8, max = 32, value = defaultSize, default = defaultSize,
+        fmt = function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end,
+        onChange = function(v)
+            _selSize = v
+            if _sizePreviewLbl then
+                pcall(function()
+                    local boldPath = (_selFont and (function()
+                        for _, d in ipairs(BNB.FONTS or {}) do
+                            if d.id == _selFont then return d.bold end
                         end
-                    end)
-                end
-            end)
-        szWidget = sl
-    else
-        szWidget = BNB.CreateSlider(f, "", 8, 32, defaultSize, nil,
-            function(v) _selSize = v end,
-            function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end)
-        szWidget:SetPoint("TOPLEFT",  colR, "TOPLEFT",  0, rightY)
-        szWidget:SetPoint("TOPRIGHT", colR, "TOPRIGHT", 0, rightY)
-    end
-    rightY = rightY - 28
+                    end)()) or (BNB.GetBoldFont and BNB.GetBoldFont())
+                    if boldPath and boldPath ~= "" then
+                        _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
+                    else
+                        -- GameFontNormal is always valid; size override handles the rest
+                        _sizePreviewLbl:SetFontObject(GameFontNormal)
+                        _sizePreviewLbl:SetFont(GameFontNormal:GetFont(), _selSize, "")
+                    end
+                end)
+            end
+        end,
+    })
+    szWidget:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
+    rightY = rightY - (BNB.STACKED_SLIDER_H + 4)
     _sizeSlider = szWidget
 
     -- Font size preview label — live sample text at current size

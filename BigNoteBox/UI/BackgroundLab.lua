@@ -299,9 +299,10 @@ local function ExportText()
             local nw, nh = NativeSize(i)
             local b = st.base
             local line = string.format(
-                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s%s },",
+                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s%s%s },",
                 Q(e.key), Q(st.name or ""), e.id, Q(e.path), tostring(nw or "nil"), tostring(nh or "nil"),
                 Q(st.mode), Q(st.anchor), tostring(st.scale or 1),
+                e.atlas and (", atlas = " .. Q(e.atlas)) or "",
                 Crop(st) and string.format(", crop = { %d, %d, %d, %d }", unpack(Crop(st))) or "",
                 b and string.format(", base = { %.2f, %.2f, %.2f }", b[1], b[2], b[3]) or "",
                 _sizes[e.id] == false and ", loaded = false" or "",
@@ -356,20 +357,29 @@ local function NumBox(parent, w, onSet)
     return host
 end
 
--- ── Textures added in game (file ID, path optional) ─────────────────────────
--- Kept in devBgLab.custom as { id, path } and appended to LIST as group
--- "added", so new finds from wow.export can be tried without a code change.
-local function CustomKey(id, path)
+-- ── Textures added in game (file ID, path optional, or an atlas name) ───────
+-- Kept in devBgLab.custom as { id, path, atlas } and appended to LIST as
+-- group "added", so new finds from wow.export can be tried without a code
+-- change. An atlas entry is its file plus a Picture area taken from the
+-- atlas coordinates (ALL-120); one file can hold several atlases, so an entry
+-- is one file + atlas pair.
+local function CustomKey(id, path, atlas)
+    if atlas and atlas ~= "" then return atlas end
     local base = path ~= "" and path:match("([^/]+)$") or nil
     base = base and base:gsub("%.[^.]+$", "") or nil
     return (base and base ~= "") and base or ("file" .. id)
 end
 
+local function SameEntry(e, id, atlas)
+    return e.id == id and (e.atlas or "") == (atlas or "")
+end
+
 local function AppendCustom(c)
     for i, e in ipairs(LIST) do
-        if e.id == c.id then return i end
+        if SameEntry(e, c.id, c.atlas) then return i end
     end
-    LIST[#LIST + 1] = { g = "added", id = c.id, path = c.path or "", key = CustomKey(c.id, c.path or "") }
+    LIST[#LIST + 1] = { g = "added", id = c.id, path = c.path or "", atlas = c.atlas,
+                        key = CustomKey(c.id, c.path or "", c.atlas) }
     return #LIST
 end
 
@@ -395,16 +405,49 @@ local function LoadCustom()
     if s.custom then s.custom = kept end
 end
 
-local function AddCustom(id, path)
+local function AddCustom(id, path, atlas)
     if not ValidID(id) then return nil end
     path = (path or ""):gsub("\\", "/"):lower():gsub("^%s+", ""):gsub("%s+$", "")
     local s = Store()
     s.custom = s.custom or {}
     for i, e in ipairs(LIST) do
-        if e.id == id then return i end   -- already in the list: just go there
+        if SameEntry(e, id, atlas) then return i end   -- already in the list: just go there
     end
-    s.custom[#s.custom + 1] = { id = id, path = path }
+    s.custom[#s.custom + 1] = { id = id, path = path, atlas = atlas }
     return AppendCustom(s.custom[#s.custom])
+end
+
+-- An atlas name -> its file ID and atlas info, or nil. GetAtlasInfo gives the
+-- file as an ID; a client that gives only a path goes through GetFileIDFromPath.
+local function ResolveAtlas(name)
+    if name == "" or not (C_Texture and C_Texture.GetAtlasInfo) then return nil end
+    local ok, info = pcall(C_Texture.GetAtlasInfo, name)
+    if not ok or type(info) ~= "table" then return nil end
+    local id = info.file
+    if type(id) ~= "number" and type(info.filename) == "string" and GetFileIDFromPath then
+        local ok2, fid = pcall(GetFileIDFromPath, info.filename)
+        if ok2 then id = fid end
+    end
+    if ValidID(id) then return id, info end
+end
+
+-- Fills an atlas entry's Picture area from the atlas coordinates x the file's
+-- size, once the size is known, and only while no Picture area is set (a
+-- hand-tuned one survives later visits)
+local function ApplyAtlasCrop(i)
+    local e = LIST[i]
+    if not (e and e.atlas) then return end
+    local st, sz = State(i), _sizes[e.id]
+    if st.cw or not sz then return end
+    local _, info = ResolveAtlas(e.atlas)
+    if not info then return end
+    local W, H = sz[1], sz[2]
+    local function R(v) return math.floor(v + 0.5) end
+    st.cx = R(info.leftTexCoord * W)
+    st.cy = R(info.topTexCoord * H)
+    st.cw = R((info.rightTexCoord - info.leftTexCoord) * W)
+    st.ch = R((info.bottomTexCoord - info.topTexCoord) * H)
+    if st.cw <= 0 or st.ch <= 0 then st.cx, st.cy, st.cw, st.ch = nil, nil, nil, nil end
 end
 
 local function RemoveCustom(i)
@@ -412,7 +455,7 @@ local function RemoveCustom(i)
     if not (e and e.g == "added") then return end
     local s = Store()
     for n = #(s.custom or {}), 1, -1 do
-        if s.custom[n].id == e.id then table.remove(s.custom, n) end
+        if SameEntry(s.custom[n], e.id, e.atlas) then table.remove(s.custom, n) end
     end
     s.e[e.key] = nil
     table.remove(LIST, i)
@@ -423,7 +466,9 @@ local function Go(i)
     Store().idx = _idx
     State(_idx)
     Refresh()
-    ProbeSize(LIST[_idx], function() if LIST[_idx] then Refresh() end end)
+    ProbeSize(LIST[_idx], function()
+        if LIST[_idx] then ApplyAtlasCrop(_idx); Refresh() end
+    end)
 end
 
 local function BuildControl()
@@ -655,10 +700,23 @@ local function BuildControl()
     idBox.eb:SetNumeric(true)
     local pathBox = PlainBox(cw - 80 - 60 - 12)
     pathBox:SetPoint("LEFT", idBox, "RIGHT", 6, 0)
+    local hint
+    -- The second box takes a path or an atlas name (ALL-120). An atlas brings
+    -- its own file ID, so the ID box may stay empty.
     local function DoAdd()
         local id = tonumber(idBox.eb:GetText())
-        if not id or id <= 0 then return end
-        local i = AddCustom(id, pathBox.eb:GetText())
+        local text = pathBox.eb:GetText():gsub("^%s+", ""):gsub("%s+$", "")
+        local atlasID = not text:find("[/\\]") and ResolveAtlas(text)
+        local i
+        if atlasID then
+            i = AddCustom(atlasID, "", text)
+        elseif not id or id <= 0 then
+            if text ~= "" then hint:SetText(L["DEV_WIN_BGLAB_ATLAS_NONE"]) end
+            return
+        else
+            i = AddCustom(id, text)
+        end
+        hint:SetText(L["DEV_WIN_BGLAB_ADD_HINT"])
         idBox.eb:SetText(""); pathBox.eb:SetText("")
         idBox.eb:ClearFocus(); pathBox.eb:ClearFocus()
         if i then Go(i) end
@@ -668,7 +726,7 @@ local function BuildControl()
     pathBox.eb:SetScript("OnEnterPressed", DoAdd)
     local addBtn = SmallBtn(body, L["DEV_WIN_BGLAB_ADD"], 60, DoAdd)
     addBtn:SetPoint("LEFT", pathBox, "RIGHT", 6, 0)
-    local hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     hint:SetPoint("TOPLEFT", idBox, "BOTTOMLEFT", 0, -3)
     hint:SetText(L["DEV_WIN_BGLAB_ADD_HINT"])
     local removeBtn = SmallBtn(body, L["DEV_WIN_BGLAB_REMOVE"], 110, function()
@@ -699,7 +757,7 @@ Refresh = function()
     local status = (sz == nil and "loading...") or (sz == false and "|cffff5555did not load|r")
         or string.format("%dx%d", sz[1], sz[2])
     f.info:SetText(string.format("%d / %d  |cffffd100%s|r\n%s\nfile %d  -  %s",
-        _idx, #LIST, GROUPS[e.g].label, e.path, e.id, status))
+        _idx, #LIST, GROUPS[e.g].label, e.atlas and ("atlas " .. e.atlas) or e.path, e.id, status))
     pcall(function() f.dd:OverrideText((st.name and st.name ~= "") and st.name or e.key) end)
     if not f.nameEb:HasFocus() then f.nameEb:SetText(st.name or "") end
     PutRing(f.modeRing, f.modeBtns[st.mode] or f.modeBtns.tile)

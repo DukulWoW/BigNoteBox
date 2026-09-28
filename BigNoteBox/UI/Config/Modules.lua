@@ -680,17 +680,13 @@ local function BuildRefBoxPage(sf, ct, y, page)
         y = y - (22 + ROW_GAP)
 
         -- Max attachments slider
-        local rbMaxSlider = BNB.CreateSlider(ct, L["CFG_REFBOX_MAX_SLIDER"], 1, 100,
-            db.refboxMaxItems or 50, nil,
-            function(v) db.refboxMaxItems = v end)
+        local rbMaxSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+            label = L["CFG_REFBOX_MAX_SLIDER"], min = 1, max = 100,
+            value = db.refboxMaxItems or 50, default = 50,
+            onChange = function(v) db.refboxMaxItems = v end,
+            tip = L["CFG_REFBOX_MAX_TIP"],
+        })
         rbMaxSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        rbMaxSlider:SetWidth(CONTENT_W)
-        rbMaxSlider:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["CFG_REFBOX_MAX_TIP"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        rbMaxSlider:SetScript("OnLeave", function() GameTooltip:Hide() end)
         table.insert(rbWidgets, rbMaxSlider)
         y = y - (SLIDER_H + ROW_GAP)
 
@@ -1011,7 +1007,7 @@ local function BuildStickyPage(sf, ct, y)
     y = AddSlider(ct, y, L["CFG_SLIDER_MAX_STICKIES"], 1, 50,
         function() return db.stickyMaxCount or 20 end,
         function(v) db.stickyMaxCount = v end,
-        L["CFG_SLIDER_MAX_STICKIES_TIP"])
+        L["CFG_SLIDER_MAX_STICKIES_TIP"], 20)
 
     y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
         function() return db.stickiesHiddenPersist == true end,
@@ -1066,43 +1062,42 @@ local function BuildFocusPage(sf, ct, y)
         L["CFG_FOCUS_ORBIT_ENABLE_TIP"])
 
     -- Speed slider (greyed when orbit off)
-    local speedSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_SPEED"], 0.001, 0.020,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or 0.004,
-        0.001, 0.004,
-        function(v)
+    local speedSl = BNB.CreateStackedSlider(ct, CONTENT_W - 14, {
+        label = L["CFG_FOCUS_ORBIT_SPEED"], min = 0.001, max = 0.020, step = 0.001,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or 0.004, default = 0.004,
+        fmt = function(v) return string.format("%.3f", v) end,
+        onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.focusOrbitSpeed = v end
         end,
-        function(v) return string.format("%.3f", v) end)
+    })
     speedSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
-    speedSl:SetWidth(CONTENT_W - 14)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Resume-after-movement slider (greyed when orbit off)
-    local resumeSl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_ORBIT_RESUME"], 0, 10,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or 3.0,
-        0.5, 3.0,
-        function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitResumeDelay = v end
-        end,
-        function(v)
+    local resumeSl = BNB.CreateStackedSlider(ct, CONTENT_W - 14, {
+        label = L["CFG_FOCUS_ORBIT_RESUME"], min = 0, max = 10, step = 0.5,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or 3.0, default = 3.0,
+        fmt = function(v)
             if v <= 0 then return L["CFG_FOCUS_ORBIT_OFF"] end
             return string.format("%.1f s", v)
-        end)
+        end,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.focusOrbitResumeDelay = v end
+        end,
+    })
     resumeSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
-    resumeSl:SetWidth(CONTENT_W - 14)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Overlay darkness slider (always active — not tied to orbit toggle)
     y = y - 4
-    local overlaySl = BNB.CreateFloatSlider(ct, L["CFG_FOCUS_OVERLAY_ALPHA"], 0.0, 1.0,
-        (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or 0.6,
-        0.05, 0.6,
-        function(v)
+    local overlaySl = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_FOCUS_OVERLAY_ALPHA"], min = 0.0, max = 1.0, step = 0.05,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or 0.6, default = 0.6,
+        onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.focusOverlayAlpha = v end
         end,
-        function(v) return string.format("%.2f", v) end)
+    })
     overlaySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    overlaySl:SetWidth(CONTENT_W)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Skin color tint checkbox (only meaningful in skin mode, but always shown;
@@ -1131,8 +1126,8 @@ local function BuildFocusPage(sf, ct, y)
         local db = BigNoteBoxDB
         local on = db == nil or db.focusOrbitEnabled ~= false
         local alpha = on and 1.0 or 0.4
-        speedSl:SetAlpha(alpha);  speedSl:EnableMouse(on)
-        resumeSl:SetAlpha(alpha); resumeSl:EnableMouse(on)
+        speedSl:SetAlpha(alpha);  speedSl:SetEnabled(on)
+        resumeSl:SetAlpha(alpha); resumeSl:SetEnabled(on)
     end
     RefreshOrbitUI()
     BNB._focusOrbitRefreshUI = RefreshOrbitUI
@@ -1165,7 +1160,7 @@ local function BuildContextPopupPage(sf, ct, y, page)
     y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
         function() return db.popupHoldTime or 5 end,
         function(v) db.popupHoldTime = v end,
-        L["CFG_SLIDER_ALERT_SECONDS_TIP"])
+        L["CFG_SLIDER_ALERT_SECONDS_TIP"], 5)
     page.enableCb = cb   -- twin on the Features overview row
     sf:FinaliseHeight(math.abs(y) + 12)
 end

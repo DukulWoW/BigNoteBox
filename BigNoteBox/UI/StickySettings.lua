@@ -309,62 +309,20 @@ local function PopulateStickySettings(noteID)
         ct._y = y - 10
     end
 
-    -- Label on top with the value right-aligned on the same line, slider at
-    -- full width under them, like NoteConfig's Appearance tab (Dukul
-    -- 2026-09-27); the old inline label wrapped into a narrow column. Returns
-    -- a holder frame: SetValue / SetEnabled reach the slider, SetAlpha and
-    -- EnableMouse (plainOnlyWidgets) work on the holder as before.
-    local useNativeSlider = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
-        and MinimalSliderWithSteppersMixin
-    local function MakeSlider(ct, label, minV, maxV, initV, onChange)
+    -- The stacked slider with Reset used everywhere (ALL-121): label and
+    -- value on one line, slider at full width under them. default = what
+    -- Reset puts back, fmt = the value text (unit included), onReset = Reset
+    -- clears a saved value instead. SetAlpha / SetEnabled on the result.
+    local PCT = function(v) return v .. "%" end
+    local function MakeSlider(ct, label, minV, maxV, initV, onChange, default, fmt, onReset)
         local y = ct._y or -8
-        if not useNativeSlider then
-            local sl = BNB.CreateSlider(ct, label, minV, maxV, initV, nil,
-                function(v) onChange(v) end)
-            sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            -- Pull right edge in so the MinimalSlider's value label (rendered
-            -- outside the slider frame to the right) doesn't clip the scrollbar.
-            sl:SetWidth(SETTINGS_CW - 30)
-            sl:EnableMouseWheel(false)
-            ct._y = y - 44
-            return sl
-        end
-
-        local h = CreateFrame("Frame", nil, ct)
-        h:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        h:SetSize(SETTINGS_CW, 38)
-        local lbl = h:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, 0)
-        lbl:SetPoint("RIGHT", h, "RIGHT", -40, 0)
-        lbl:SetJustifyH("LEFT")
-        lbl:SetWordWrap(false)
-        lbl:SetTextColor(0.78, 0.78, 0.78)
-        lbl:SetText(label)
-        local val = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        val:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, 0)
-        val:SetJustifyH("RIGHT")
-        val:SetText(tostring(math.floor(initV)))
-
-        local sl = CreateFrame("Slider", nil, h, "MinimalSliderWithSteppersTemplate")
-        sl:SetPoint("TOPLEFT",  h, "TOPLEFT",  0, -14)
-        sl:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -14)
-        sl:SetHeight(20)
-        sl:Init(initV, minV, maxV, maxV - minV)
-        local tracked = math.floor(initV)
-        sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-            local n = math.floor(v)
-            if n == tracked then return end
-            tracked = n
-            val:SetText(tostring(n))
-            onChange(n)
-        end)
-
-        h.Slider = sl
-        function h:SetValue(v) sl:SetValue(v) end
-        function h:SetEnabled(on) pcall(sl.SetEnabled, sl, on) end
-        ct._y = y - 44
-        return h
+        local sl = BNB.CreateStackedSlider(ct, SETTINGS_CW, {
+            label = label, min = minV, max = maxV, value = initV, default = default,
+            fmt = fmt, onChange = onChange, onReset = onReset,
+        })
+        sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        ct._y = y - (BNB.STACKED_SLIDER_H + 6)
+        return sl
     end
 
     local function ColorBtn(ct, r, g, b, labelTxt, onPick)
@@ -564,7 +522,8 @@ local function PopulateStickySettings(noteID)
         for _, w in ipairs(plainOnlyWidgets) do
             pcall(function()
                 w:SetAlpha(a)
-                if w.EnableMouse then w:EnableMouse(isPlain) end
+                if w._slider then w:SetEnabled(isPlain)   -- stacked slider
+                elseif w.EnableMouse then w:EnableMouse(isPlain) end
             end)
         end
     end
@@ -723,14 +682,23 @@ local function PopulateStickySettings(noteID)
 
     HLStickyFonts()
 
+    -- Reset clears the note's own size, so it follows the global one again
+    local globalFontSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+    local function ApplyStickyFontSize(v)
+        if stickyFrame and stickyFrame._bodyEb then
+            local path = select(1, stickyFrame._bodyEb:GetFont())
+            if path then pcall(function() stickyFrame._bodyEb:SetFont(path, BNB.FontPx(path, v), "") end) end
+        end
+    end
     local fontSizeSl = MakeSlider(ct1, L["STICKY_FONT_SIZE"], 8, 24,
-        cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13,
+        cfg.fontSize or globalFontSize,
         function(v)
             cfg.fontSize = v; SaveCfg(noteID, cfg)
-            if stickyFrame and stickyFrame._bodyEb then
-                local path = select(1, stickyFrame._bodyEb:GetFont())
-                if path then pcall(function() stickyFrame._bodyEb:SetFont(path, BNB.FontPx(path, v), "") end) end
-            end
+            ApplyStickyFontSize(v)
+        end, globalFontSize, nil,
+        function()
+            cfg.fontSize = nil; SaveCfg(noteID, cfg)
+            ApplyStickyFontSize(globalFontSize)
         end)
     plainOnlyWidgets[#plainOnlyWidgets+1] = fontSizeSl
 
@@ -1023,24 +991,24 @@ local function PopulateStickySettings(noteID)
 
     -- "Colorize texture %" — lerps the backdrop tint between raw paper (0%, white
     -- tint) and the full chosen colour (100%). Greyed out when texture is "None".
-    local slColorize = MakeSlider(ct2, L["STICKY_COLORIZE_TEXTURE_PCT"], 0, 100,
+    local slColorize = MakeSlider(ct2, L["STICKY_COLORIZE_TEXTURE"], 0, 100,
         math.floor((cfg.bgColorOpacity or 1.0) * 100),
         function(v)
             cfg.bgColorOpacity = v / 100
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end)
+        end, 100, PCT)
 
     -- "Texture brightness %" (ALL-110, Dukul 2026-09-27): -100..100, 0 = the
     -- art as it is. Below 0 darkens it, above 0 adds an ADD-blend copy on top
     -- (BNB.BgLayer.SetColors). Greyed with Colorize.
-    local slBright = MakeSlider(ct2, L["STICKY_TEX_BRIGHTNESS_PCT"], -100, 100,
+    local slBright = MakeSlider(ct2, L["STICKY_TEX_BRIGHTNESS"], -100, 100,
         math.floor((cfg.bgBrightness or 0) * 100 + 0.5),
         function(v)
             cfg.bgBrightness = (v ~= 0) and v / 100 or nil
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end)
+        end, 0, PCT)
 
     -- Greyed while the note draws no texture: None, or a saved key that is
     -- unavailable here (BigNoteBox_BGs missing, art of the other client)
@@ -1057,21 +1025,21 @@ local function PopulateStickySettings(noteID)
 
     Rule(ct2)
     Sec(ct2, L["STICKY_OPACITY_SECTION"])
-    local textOpacitySl = MakeSlider(ct2, L["STICKY_TEXT_OPACITY_PCT"], 10, 100,
+    local textOpacitySl = MakeSlider(ct2, L["STICKY_TEXT_OPACITY"], 10, 100,
         math.floor((cfg.textAlpha or 1.0) * 100),
         function(v)
             cfg.textAlpha = v/100; SaveCfg(noteID, cfg)
             if stickyFrame and stickyFrame._bodyEb then
                 pcall(function() stickyFrame._bodyEb:SetAlpha(cfg.textAlpha) end)
             end
-        end)
+        end, 100, PCT)
     plainOnlyWidgets[#plainOnlyWidgets+1] = textOpacitySl
-    MakeSlider(ct2, L["STICKY_BG_OPACITY_PCT"], 0, 100,
+    MakeSlider(ct2, L["STICKY_BG_OPACITY"], 0, 100,
         math.floor((cfg.alpha or 0.96) * 100),
         function(v)
             cfg.alpha = v/100; SaveCfg(noteID, cfg)
             if stickyFrame then ApplyBgAlpha(stickyFrame, cfg.alpha) end
-        end)
+        end, 96, PCT)
 
     Rule(ct2)
     Sec(ct2, L["NC_HDR_BORDER"])
@@ -1121,28 +1089,28 @@ local function PopulateStickySettings(noteID)
     end
 
     -- Border Thickness slider
-    local slThickness = MakeSlider(ct2, L["STICKY_BORDER_THICKNESS_PCT"], 1, 200, cfg.borderScale or 100,
+    local slThickness = MakeSlider(ct2, L["STICKY_BORDER_THICKNESS"], 1, 200, cfg.borderScale or 100,
         function(v)
             cfg.borderScale = math.floor(v)
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end)
+        end, 100, PCT)
 
     -- Border Offset slider
-    local slOffset = MakeSlider(ct2, L["STICKY_BORDER_OFFSET_PX"], 0, 12, cfg.borderOffset or 2,
+    local slOffset = MakeSlider(ct2, L["STICKY_BORDER_OFFSET"], 0, 12, cfg.borderOffset or 2,
         function(v)
             cfg.borderOffset = math.floor(v)
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end)
+        end, 2, function(v) return v .. " px" end)
 
     -- Border Brightness slider
-    local slBrightness = MakeSlider(ct2, "Border brightness %", 10, 500, cfg.borderBrightness or 100,
+    local slBrightness = MakeSlider(ct2, L["STICKY_BORDER_BRIGHTNESS"], 10, 500, cfg.borderBrightness or 100,
         function(v)
             cfg.borderBrightness = math.floor(v)
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end)
+        end, 100, PCT)
 
     -- Grey out the three sliders when border is "None" (they have no effect).
     -- Assigned here (after sliders exist) but captured by the closures above
@@ -1153,8 +1121,7 @@ local function PopulateStickySettings(noteID)
         for _, sl in ipairs({ slThickness, slOffset, slBrightness }) do
             if sl then
                 sl:SetAlpha(a)
-                sl:EnableMouse(not disabled)
-                sl:EnableMouseWheel(not disabled)
+                sl:SetEnabled(not disabled)
             end
         end
     end

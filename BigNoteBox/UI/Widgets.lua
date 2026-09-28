@@ -795,11 +795,7 @@ function BNB.CreateSlider(parent, label, mn, mx, cur, def, onChange, fmt)
             if onChange then onChange(trackedVal) end
         end)
 
-    h:EnableMouseWheel(true)
-    h:SetScript("OnMouseWheel", function(_, delta)
-        local newVal = math.max(mn, math.min(mx, trackedVal + delta))
-        if newVal ~= trackedVal then sl:SetValue(newVal) end
-    end)
+    -- No mouse wheel: the wheel scrolls the page, never a slider (Dukul 2026-09-28)
 
     h.Slider = sl
     function h:SetValue(v)
@@ -822,24 +818,43 @@ end
 --   Label (Default: 100%)                      80%
 --   <-----------------|----------------->  [ Reset ]
 --
--- o = { label, min, max, value, default, fmt = fn(v) -> text, onChange(v) }
--- Whole-number values. Reset puts the default back (through onChange) and is
--- greyed while the value is already the default. Returns the container,
--- BNB.STACKED_SLIDER_H tall: :SetValue(v) (fires onChange), :GetValue(),
+-- o = { label, min, max, value, default, fmt = fn(v) -> text, onChange(v),
+--       step, tip, tipTitle, onReset }
+-- step: nil/1 = whole numbers; a fraction (0.05) snaps to it (ALL-121).
+-- Reset puts the default back (through onChange) and is greyed while the
+-- value is already the default. onReset: Reset moves the slider silently and
+-- calls it instead, for a setting whose default is "no saved value" (a note's
+-- font size). tip: a string or a list of grey lines, tipTitle a white first
+-- line, shown over the label row. Returns the container, BNB.STACKED_SLIDER_H
+-- tall: :SetValue(v, silent) (fires onChange unless silent), :GetValue(),
 -- :SetEnabled(on). The inner slider is ._slider, not .Slider, so greying
 -- code that looks for .Slider calls the container's SetEnabled instead.
--- Without MinimalSliderWithSteppersTemplate it falls back to CreateSlider.
+-- Every slider in the addon is one of these (ALL-121). Without
+-- MinimalSliderWithSteppersTemplate it falls back to CreateSlider.
 --------------------------------------------------------------------------------
 BNB.STACKED_SLIDER_H = 40
 function BNB.CreateStackedSlider(parent, width, o)
-    local fmt = o.fmt or function(v) return tostring(v) end
+    local step = o.step or 1
+    local fmt = o.fmt or (step < 1
+        and function(v) return string.format(step < 0.01 and "%.3f" or "%.2f", v) end
+        or  function(v) return tostring(v) end)
     local hasTpl = C_XMLUtil and C_XMLUtil.GetTemplateInfo
         and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
     if not hasTpl then
-        local sl = BNB.CreateSlider(parent, o.label, o.min, o.max, o.value, o.default, o.onChange, fmt)
+        local sl = step < 1
+            and BNB.CreateFloatSlider(parent, o.label, o.min, o.max, o.value, step, o.default, o.onChange, fmt)
+            or  BNB.CreateSlider(parent, o.label, o.min, o.max, o.value, o.default, o.onChange, fmt)
         sl:SetWidth(width - 30)
+        function sl:SetEnabled(on) if self.Slider then pcall(self.Slider.SetEnabled, self.Slider, on) end end
         return sl
     end
+
+    local function Snap(v)
+        v = math.max(o.min, math.min(o.max, v or o.min))
+        if step == 1 then return math.floor(v + 0.5) end
+        return o.min + math.floor((v - o.min) / step + 0.5) * step
+    end
+    local function Same(a, b) return a ~= nil and b ~= nil and math.abs(a - b) < step / 2 end
 
     local RESET_W, GAP = 52, 6
     local h = CreateFrame("Frame", nil, parent)
@@ -857,7 +872,8 @@ function BNB.CreateStackedSlider(parent, width, o)
     lbl:SetTextColor(0.78, 0.78, 0.78)
     local text = o.label or ""
     if o.default ~= nil then
-        text = text .. "  |cff888888" .. string.format(L["SLIDER_DEFAULT_FMT"], fmt(o.default)) .. "|r"
+        text = (text ~= "" and text .. "  " or "")
+            .. "|cff888888" .. string.format(L["SLIDER_DEFAULT_FMT"], fmt(o.default)) .. "|r"
     end
     lbl:SetText(text)
 
@@ -868,29 +884,53 @@ function BNB.CreateStackedSlider(parent, width, o)
     sl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, -16)
     sl:SetPoint("RIGHT", reset, "LEFT", -GAP, 0)
     sl:SetHeight(20)
-    local cur = math.floor((o.value or o.min) + 0.5)
-    sl:Init(cur, o.min, o.max, o.max - o.min)
+    local cur = Snap(o.value)
+    sl:Init(cur, o.min, o.max, math.floor((o.max - o.min) / step + 0.5))
 
-    local enabled = true
+    local enabled, muted = true, false
     local function Sync()
         val:SetText(fmt(cur))
-        local atDef = o.default == nil or cur == o.default
+        local atDef = o.default == nil or Same(cur, o.default)
         reset:SetEnabled(enabled and not atDef)
         reset:SetAlpha((enabled and not atDef) and 1 or 0.4)
     end
     sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-        local n = math.floor(v + 0.5)
-        if n == cur then return end
+        local n = Snap(v)
+        if Same(n, cur) then return end
         cur = n
         Sync()
-        if o.onChange then o.onChange(n) end
-    end)
-    reset:SetScript("OnClick", function()
-        if o.default ~= nil then sl:SetValue(o.default) end
+        if o.onChange and not muted then o.onChange(n) end
     end)
 
+    local function SetValue(v, silent)
+        muted = silent and true or false
+        sl:SetValue(Snap(v))
+        muted = false
+    end
+    reset:SetScript("OnClick", function()
+        if o.default == nil then return end
+        if o.onReset then SetValue(o.default, true); o.onReset()
+        else SetValue(o.default) end
+    end)
+
+    if o.tip or o.tipTitle then
+        -- A strip over the label row only, so the slider keeps its own mouse
+        local hot = CreateFrame("Frame", nil, h)
+        hot:SetPoint("TOPLEFT", h, "TOPLEFT", 0, 0)
+        hot:SetPoint("BOTTOMRIGHT", h, "TOPRIGHT", 0, -14)
+        hot:EnableMouse(true)
+        hot:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            if o.tipTitle then GameTooltip:AddLine(o.tipTitle, 1, 1, 1) end
+            local lines = type(o.tip) == "table" and o.tip or { o.tip }
+            for _, line in ipairs(lines) do GameTooltip:AddLine(line, 0.8, 0.8, 0.8, true) end
+            GameTooltip:Show()
+        end)
+        hot:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+
     h._slider = sl
-    function h:SetValue(v) sl:SetValue(v) end
+    function h:SetValue(v, silent) SetValue(v, silent) end
     function h:GetValue() return cur end
     function h:SetEnabled(on)
         enabled = on and true or false
@@ -946,11 +986,7 @@ function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, 
             end
         end)
 
-    h:EnableMouseWheel(true)
-    h:SetScript("OnMouseWheel", function(_, delta)
-        local newVal = math.max(mn, math.min(mx, Snap(trackedVal + delta * step)))
-        sl:SetValue(newVal)
-    end)
+    -- No mouse wheel: the wheel scrolls the page, never a slider (Dukul 2026-09-28)
 
     h.Slider = sl
     h.Label  = lbl   -- for callers that re-lay the row (UI/Config/Appearance.lua)

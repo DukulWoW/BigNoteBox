@@ -32,7 +32,7 @@ local CONTENT_W  = CFG_W - PAD * 2 - 30   -- leave extra room so slider value cl
 local CONTENT_W2 = CFG_W - PAD * 2 - 10   -- bar hidden
 local ROW_H      = 28
 local ROW_GAP    = 6
-local SLIDER_H   = 36
+local SLIDER_H   = BNB.STACKED_SLIDER_H + 2   -- stacked sliders (ALL-121)
 
 local ASSET = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
@@ -154,25 +154,16 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     return y - (ROW_H + ROW_GAP), cb   -- cb: for an overview-row twin (ALL-84)
 end
 
--- Slider using BNB.CreateSlider.
--- Width is set explicitly to CONTENT_W so the value label never escapes.
--- We subtract an extra 4px to ensure it clears the scrollbar track even when
--- the bar is hidden (the 24px gap is in the scroll frame anchor, but the
--- content frame width CONTENT_W2 expands when bar hidden — so we use the
--- smaller CONTENT_W here unconditionally to be safe on both states).
-local function AddSlider(ct, y, label, mn, mx, getter, setter, tip)
-    local sl = BNB.CreateSlider(ct, label, mn, mx, getter(), nil, setter)
+-- Stacked slider with Reset (ALL-121). Width is CONTENT_W, the narrower of
+-- the two content widths, so the row clears the scrollbar whether or not it
+-- shows. default = the value Reset puts back; fmt = the value text.
+local function AddSlider(ct, y, label, mn, mx, getter, setter, tip, default, fmt)
+    local sl = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = label, min = mn, max = mx, value = getter(), default = default,
+        fmt = fmt, onChange = setter, tip = tip,
+    })
     sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    sl:SetWidth(CONTENT_W)
-    if tip then
-        sl:EnableMouse(true)
-        sl:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true); GameTooltip:Show()
-        end)
-        sl:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    end
-    return y - (SLIDER_H + ROW_GAP)
+    return y - (SLIDER_H + ROW_GAP), sl
 end
 
 -- ── Sub-pages (ALL-84) ────────────────────────────────────────────────────────

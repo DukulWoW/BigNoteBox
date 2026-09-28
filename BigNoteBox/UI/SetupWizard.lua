@@ -674,16 +674,17 @@ local function BuildPage3(content)
     -- Brightness slider — float 0.5–3.0, step 0.05, default 1.0
     -- Matches main config → Appearance → Skins → Skin brightness exactly.
     local curBrt = (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or 1.0
-    local sl = BNB.CreateFloatSlider(ct, L["SW_BRIGHTNESS_SLIDER"], 0.5, 3.0, curBrt, 0.05, 1.0,
-        function(v)
+    local sl = BNB.CreateStackedSlider(ct, CW - 36, {
+        label = L["SW_BRIGHTNESS_SLIDER"], min = 0.5, max = 3.0, step = 0.05,
+        value = curBrt, default = 1.0,
+        onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.skinBrightness = v end
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
             RefreshOverlayColor()
         end,
-        function(v) return string.format("%.2f", v) end)
+    })
     sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    sl:SetWidth(CW - 36)
-    y = y - 44
+    y = y - (BNB.STACKED_SLIDER_H + 8)
 
     y = MakeRule(ct, y)
     y = MakeHeader(ct, y, L["SW_RANDOM_THEME_HDR"])
@@ -840,10 +841,11 @@ local function BuildPage4(content)
     end
 
     -- Font size slider
-    local fssl = BNB.CreateSlider(ct, L["SW_FONT_SIZE_SLIDER"], 9, 22,
-        (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13,
-        13,
-        function(v)
+    local fssl = BNB.CreateStackedSlider(ct, CW - 36, {
+        label = L["SW_FONT_SIZE_SLIDER"], min = 9, max = 22,
+        value = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13, default = 13,
+        fmt = function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end,
+        onChange = function(v)
             BNB.ApplyFont(nil, math.floor(v))
             -- Update preview size in real time
             if _p4PreviewLbl then
@@ -854,10 +856,9 @@ local function BuildPage4(content)
                 end
             end
         end,
-        function(v) return string.format(L["NND_PT_SUFFIX_FMT"], math.floor(v)) end)
+    })
     fssl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    fssl:SetWidth(CW - 36)
-    y = y - 44
+    y = y - (BNB.STACKED_SLIDER_H + 8)
 
     -- Font preview box — "Azeroth awaits!" rendered live in selected font + size
     local previewBox = BNB.CreateBackdropFrame("Frame", nil, ct)

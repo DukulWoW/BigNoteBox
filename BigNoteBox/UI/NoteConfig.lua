@@ -565,75 +565,40 @@ local function BuildGeneralTab(sf, ct)
     y = Hdr(panel,y,L["STICKY_FONT_SIZE"])
 
     local function GetNoteFontSize()
-        local n = GetNote(); return (n and n.fontSize) or 12
+        local n = GetNote()
+        return (n and n.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
     end
 
-    local fsVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    fsVal:SetPoint("TOPRIGHT", panel, "TOPLEFT", CW_SCROLL, y + 14)
-    fsVal:SetTextColor(0.60, 0.60, 0.60)
-    fsVal:SetText(GetNoteFontSize() .. "pt")
-
-    local useNativeFS = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
-        and MinimalSliderWithSteppersMixin
-
-    local fsSl  -- outer ref for refresh closure
-    if useNativeFS then
-        fsSl = CreateFrame("Slider", nil, panel, "MinimalSliderWithSteppersTemplate")
-        fsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        fsSl:SetPoint("RIGHT",   panel, "TOPLEFT", CW_SCROLL, 0)
-        fsSl:SetHeight(20)
-        fsSl:Init(GetNoteFontSize(), 8, 32, 24)
-        fsSl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-            local sz = math.floor(v)
-            fsVal:SetText(sz .. "pt")
-            Save({fontSize = sz})
-            if BNB._editorBody and BNB._currentNoteID == _noteID then
-                local path = select(1, BNB._editorBody:GetFont())
-                if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, sz), "") end) end
-            end
-            if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
-        end)
-        y = y - 26
-    else
-        fsSl = BNB.CreateSlider(panel, "", 8, 32, GetNoteFontSize(), nil,
-            function(v)
-                fsVal:SetText(v .. "pt")
-                Save({fontSize = v})
-                if BNB._editorBody and BNB._currentNoteID == _noteID then
-                    local path = select(1, BNB._editorBody:GetFont())
-                    if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, v), "") end) end
-                end
-                if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
-            end,
-            function(v) return math.floor(v) .. "pt" end)
-        fsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        fsSl:SetWidth(CW_SCROLL)
-        y = y - 38
-    end
-
-    -- Reset to default button
-    local fsResetBtn = BNB.CreateButton(nil, panel, L["NC_RESET_TO_DEFAULT_BTN"], 110, 20)
-    fsResetBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    fsResetBtn:SetScript("OnClick", function()
-        if not _noteID then return end
-        BNB.UpdateNote(_noteID, {_clear = {"fontSize"}})
-        local globalSz = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
-        fsVal:SetText(globalSz .. "pt")
-        if fsSl and fsSl.SetValue then pcall(fsSl.SetValue, fsSl, globalSz) end
+    -- Stacked slider (ALL-121). Reset clears the note's own size, so it
+    -- follows the global one again.
+    local function ApplyEditorSize(sz)
         if BNB._editorBody and BNB._currentNoteID == _noteID then
             local path = select(1, BNB._editorBody:GetFont())
-            if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, globalSz), "") end) end
+            if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, sz), "") end) end
         end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    end)
-    y = y - 28
+        if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
+    end
+    local fsSl = BNB.CreateStackedSlider(panel, CW_SCROLL, {
+        label = "", min = 8, max = 32, value = GetNoteFontSize(),
+        default = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12,
+        fmt = function(v) return v .. "pt" end,
+        onChange = function(sz)
+            Save({fontSize = sz})
+            ApplyEditorSize(sz)
+        end,
+        onReset = function()
+            if not _noteID then return end
+            BNB.UpdateNote(_noteID, {_clear = {"fontSize"}})
+            ApplyEditorSize((BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12)
+            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+        end,
+    })
+    fsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    y = y - (BNB.STACKED_SLIDER_H + 6)
 
-    -- Refresh callback for note switching
+    -- Refresh callback for note switching (silent: switching saves nothing)
     panel._refreshFontSize = function()
-        local sz = GetNoteFontSize()
-        fsVal:SetText(sz .. "pt")
-        if fsSl and fsSl.SetValue then pcall(fsSl.SetValue, fsSl, sz) end
+        fsSl:SetValue(GetNoteFontSize(), true)
     end
 
     -- E — Text alignment (applies to main editor body)
@@ -1130,144 +1095,33 @@ local function BuildAppearanceTab(panel)
     bDrop:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y); bDrop:SetWidth(CW)
     y = y - 50
 
-    -- Border thickness slider (label above, full-width slider with value)
+    -- Border sliders: stacked, with Reset (ALL-121)
     local function GetBorderScale()
         local n = GetNote(); return (n and n.borderScale) or 100
     end
-
-    local bsLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bsLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    bsLbl:SetTextColor(0.78, 0.78, 0.78); bsLbl:SetText(L["NC_BORDER_THICKNESS_LABEL"])
-    y = y - 14
-
-    local bsVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bsVal:SetPoint("TOPRIGHT", panel, "TOPLEFT", CW, y + 14)
-    bsVal:SetTextColor(0.60, 0.60, 0.60)
-    bsVal:SetText(GetBorderScale() .. "%")
-
-    local useNativeBS = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
-        and MinimalSliderWithSteppersMixin
-
-    local bsSl  -- outer ref for refresh closure
-    if useNativeBS then
-        bsSl = CreateFrame("Slider", nil, panel, "MinimalSliderWithSteppersTemplate")
-        bsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        bsSl:SetPoint("RIGHT", panel, "TOPLEFT", CW, 0)
-        bsSl:SetHeight(20)
-        bsSl:Init(GetBorderScale(), 1, 200, 199)
-        local bsTracked = GetBorderScale()
-        bsSl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-            bsTracked = math.floor(v)
-            bsVal:SetText(bsTracked .. "%")
-            Save({borderScale = bsTracked})
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        end)
-        y = y - 26
-    else
-        bsSl = BNB.CreateSlider(panel, "", 1, 200, GetBorderScale(), nil,
-            function(v)
-                bsVal:SetText(v .. "%")
-                Save({borderScale = v})
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-            end,
-            function(v) return math.floor(v) .. "%" end)
-        bsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        bsSl:SetWidth(CW)
-        y = y - 38
-    end
-
-    -- Border offset slider (controls gap between icon and border)
     local function GetBorderOffset()
         local n = GetNote(); return (n and n.borderOffset) or 2
     end
-
-    local boLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    boLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    boLbl:SetTextColor(0.78, 0.78, 0.78); boLbl:SetText(L["NC_BORDER_OFFSET_LABEL"])
-    y = y - 14
-
-    local boVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    boVal:SetPoint("TOPRIGHT", panel, "TOPLEFT", CW, y + 14)
-    boVal:SetTextColor(0.60, 0.60, 0.60)
-    boVal:SetText(GetBorderOffset() .. "px")
-
-    local boSl  -- outer ref for refresh closure
-    if useNativeBS then
-        boSl = CreateFrame("Slider", nil, panel, "MinimalSliderWithSteppersTemplate")
-        boSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        boSl:SetPoint("RIGHT", panel, "TOPLEFT", CW, 0)
-        boSl:SetHeight(20)
-        boSl:Init(GetBorderOffset(), 0, 12, 12)
-        local boTracked = GetBorderOffset()
-        boSl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-            boTracked = math.floor(v)
-            boVal:SetText(boTracked .. "px")
-            Save({borderOffset = boTracked})
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        end)
-        y = y - 26
-    else
-        boSl = BNB.CreateSlider(panel, "", 0, 12, GetBorderOffset(), nil,
-            function(v)
-                boVal:SetText(v .. "px")
-                Save({borderOffset = v})
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-            end,
-            function(v) return math.floor(v) .. "px" end)
-        boSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        boSl:SetWidth(CW)
-        y = y - 38
-    end
-
-    -- Border brightness slider
     local function GetBorderBrightness()
         local n = GetNote(); return (n and n.borderBrightness) or 100
     end
-
-    local bbLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bbLbl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    bbLbl:SetTextColor(0.78, 0.78, 0.78); bbLbl:SetText(L["NC_BORDER_BRIGHTNESS_LABEL"])
-    y = y - 14
-
-    local bbVal = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bbVal:SetPoint("TOPRIGHT", panel, "TOPLEFT", CW, y + 14)
-    bbVal:SetTextColor(0.60, 0.60, 0.60)
-    bbVal:SetText(GetBorderBrightness() .. "%")
-
-    local bbSl  -- outer ref for refresh closure
-    if useNativeBS then
-        bbSl = CreateFrame("Slider", nil, panel, "MinimalSliderWithSteppersTemplate")
-        bbSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        bbSl:SetPoint("RIGHT", panel, "TOPLEFT", CW, 0)
-        bbSl:SetHeight(20)
-        bbSl:Init(GetBorderBrightness(), 10, 200, 190)
-        local bbTracked = GetBorderBrightness()
-        bbSl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
-            bbTracked = math.floor(v)
-            bbVal:SetText(bbTracked .. "%")
-            Save({borderBrightness = bbTracked})
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        end)
-        y = y - 26
-    else
-        bbSl = BNB.CreateSlider(panel, "", 10, 200, GetBorderBrightness(), nil,
-            function(v)
-                bbVal:SetText(v .. "%")
-                Save({borderBrightness = v})
+    local function BorderSlider(label, mn, mx, value, default, field, unit)
+        local sl = BNB.CreateStackedSlider(panel, CW, {
+            label = label, min = mn, max = mx, value = value, default = default,
+            fmt = function(v) return v .. unit end,
+            onChange = function(v)
+                Save({[field] = v})
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end,
-            function(v) return math.floor(v) .. "%" end)
-        bbSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        bbSl:SetWidth(CW)
-        y = y - 38
+        })
+        sl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+        y = y - (BNB.STACKED_SLIDER_H + 6)
+        return sl
     end
+    local bsSl = BorderSlider(L["NC_BORDER_THICKNESS_LABEL"], 1, 200, GetBorderScale(), 100, "borderScale", "%")
+    local boSl = BorderSlider(L["NC_BORDER_OFFSET_LABEL"], 0, 12, GetBorderOffset(), 2, "borderOffset", "px")
+    local bbSl = BorderSlider(L["NC_BORDER_BRIGHTNESS_LABEL"], 10, 200, GetBorderBrightness(), 100, "borderBrightness", "%")
 
     -- Icon section with BNB Icons / Blizzard Icon tabs
     y = Rule(panel, y) - 4
@@ -1607,12 +1461,10 @@ local function BuildAppearanceTab(panel)
         local bs = (n and n.borderScale)      or 100
         local bo = (n and n.borderOffset)     or 2
         local bb = (n and n.borderBrightness) or 100
-        bsVal:SetText(bs .. "%")
-        boVal:SetText(bo .. "px")
-        bbVal:SetText(bb .. "%")
-        if bsSl and bsSl.SetValue then pcall(bsSl.SetValue, bsSl, bs) end
-        if boSl and boSl.SetValue then pcall(boSl.SetValue, boSl, bo) end
-        if bbSl and bbSl.SetValue then pcall(bbSl.SetValue, bbSl, bb) end
+        -- silent: switching notes saves nothing
+        bsSl:SetValue(bs, true)
+        boSl:SetValue(bo, true)
+        bbSl:SetValue(bb, true)
 
         SyncIconTab()
     end

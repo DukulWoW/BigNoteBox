@@ -70,7 +70,7 @@ local _saveBtn   -- ref so Populate can enable/disable it
 local function SetSliderVal(sl, v)
     if not sl then return end
     sl._rawVal = v
-    if sl.Slider then sl.Slider:SetValue(v) end
+    sl:SetValue(v)
 end
 
 -- Mark dirty and enable save button
@@ -542,33 +542,19 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local fmtF2 = function(v) return string.format("%.2f", v/100) end  -- ×100 int → "0.25"
     local fmtF1 = function(v) return string.format("%.1f", v/10)  end  -- ×10  int → "0.5"
 
-    -- Each slider row = 36px slider + 16px value label + 10px gap = 62px per param
-    local SL_H     = 36   -- slider widget height
-    local SL_VAL_H = 16   -- value label height
+    -- Each slider row = one stacked slider (label, value, Reset; ALL-121) + gap
     local SL_GAP   = 10   -- gap between param rows
-    local SL_ROW   = SL_H + SL_VAL_H + SL_GAP
+    local SL_ROW   = BNB.STACKED_SLIDER_H + SL_GAP
 
-    -- Helper: create one slider + value label inside a parent frame at yOff
-    -- Returns the slider widget; value label is updated by the slider's onChange.
+    -- Helper: one stacked slider inside a parent frame at yOff; def is also
+    -- what Reset puts back.
     local function MakeParamSlider(parent, label, mn, mx, def, yOff, onChange, fmt)
-        local valLbl = parent:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        valLbl:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yOff - SL_H)
-        valLbl:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yOff - SL_H)
-        valLbl:SetJustifyH("RIGHT")
-        valLbl:SetHeight(SL_VAL_H)
-        valLbl:SetTextColor(0.8, 0.8, 0.8, 1)
-
-        local sl = BNB.CreateSlider(parent, label, mn, mx, def, def,
-            function(v)
-                local display = fmt and fmt(v) or tostring(v)
-                valLbl:SetText(display)
-                onChange(v)
-            end)
-        sl:SetWidth(AW_CW)
+        local sl = BNB.CreateStackedSlider(parent, AW_CW, {
+            label = label, min = mn, max = mx, value = def, default = def,
+            fmt = fmt, onChange = onChange,
+        })
         sl:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yOff)
         sl._rawVal = def
-        -- Set initial label
-        valLbl:SetText(fmt and fmt(def) or tostring(def))
         return sl
     end
 
