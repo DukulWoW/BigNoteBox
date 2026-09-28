@@ -55,6 +55,13 @@ local _multiSel     = {}             -- { [noteID]=true }
 
 -- Module-level refs set in BuildNoteList, used by collapse toggle
 local _newBtn, _qBtn, _collapseBtn, _searchBar, _sf = nil,nil,nil,nil,nil
+
+-- The collapse button's arrow: right while collapsed, left while open, with
+-- Dukul's -hover art under the pointer (2026-09-28).
+local function PaintCollapseArrow(btn, hover)
+    local name = BNB._listCollapsed and "ui-arrow-right" or "ui-arrow-left"
+    btn._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\" .. name .. (hover and "-hover" or ""))
+end
 local _searchEb = nil   -- the search EditBox, stored for FilterByTag
 
 -- Public: filter note list by a tag (called from NoteEditor tag chip click)
@@ -219,7 +226,7 @@ function BNB.SetListCollapsed(collapsed)
 
     -- Update collapse button arrow texture
     if _collapseBtn and _collapseBtn._tx then
-        _collapseBtn._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. (collapsed and "UI\\ui-arrow-right" or "UI\\ui-arrow-left"))
+        PaintCollapseArrow(_collapseBtn, _collapseBtn:IsMouseOver())
     end
 
     -- Show/hide expanded-only elements
@@ -2118,13 +2125,13 @@ function BNB.BuildNoteList()
     colBtn:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -2, btnY)
     local colTex = colBtn:CreateTexture(nil, "ARTWORK")
     colTex:SetAllPoints()
-    colTex:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. (BNB._listCollapsed and "UI\\ui-arrow-right" or "UI\\ui-arrow-left"))
     colBtn._tx = colTex
+    PaintCollapseArrow(colBtn, false)
     colBtn:SetScript("OnClick", function()
         BNB.SetListCollapsed(not BNB._listCollapsed)
     end)
     colBtn:SetScript("OnEnter", function(self)
-        self:SetAlpha(0.85)
+        PaintCollapseArrow(self, true)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(
             BNB._listCollapsed and L["NL_COLLAPSE_EXPAND_TIP"] or L["NL_COLLAPSE_TIP"],
@@ -2132,7 +2139,7 @@ function BNB.BuildNoteList()
         GameTooltip:Show()
     end)
     colBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(1.0)
+        PaintCollapseArrow(self, false)
         GameTooltip:Hide()
     end)
     _collapseBtn = colBtn
