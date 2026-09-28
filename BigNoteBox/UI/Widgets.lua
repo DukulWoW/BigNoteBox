@@ -631,6 +631,8 @@ function BNB.CreateValueDropdown(parent, entries, initial, onChange, width, heig
                         if onChange then onChange(ev) end
                     end)
             end
+            -- Long lists (LibSharedMedia media, ALL-69.5) scroll.
+            if #entries > 20 then root:SetScrollMode(20 * 20) end
         end)
         for _, e in ipairs(entries) do
             if e.value == initial then dd:SetText(e.label); break end
@@ -711,13 +713,22 @@ end
 
 -- Blizzard colour picker, both APIs. onDone(r, g, b) fires on every change
 -- (swatchFunc runs while dragging, not just on OK); onCancel is optional.
-function BNB.OpenColorPicker(r, g, b, onDone, onCancel)
-    local function Swatch() local nr, ng, nb = ColorPickerFrame:GetColorRGB(); onDone(nr, ng, nb) end
+-- a: optional opacity (0-1); given, the picker shows its opacity slider and
+-- onDone gets (r, g, b, a) (current API only).
+function BNB.OpenColorPicker(r, g, b, onDone, onCancel, a)
+    local withAlpha = a ~= nil and ColorPickerFrame.SetupColorPickerAndShow ~= nil
+    local function Swatch()
+        local nr, ng, nb = ColorPickerFrame:GetColorRGB()
+        if withAlpha then onDone(nr, ng, nb, ColorPickerFrame:GetColorAlpha())
+        else onDone(nr, ng, nb) end
+    end
     local function Cancel() if onCancel then onCancel() end end
     if ColorPickerFrame.SetupColorPickerAndShow then
         ColorPickerFrame:SetupColorPickerAndShow({
             swatchFunc = Swatch, cancelFunc = Cancel,
-            hasOpacity = false, r = r, g = g, b = b,
+            opacityFunc = withAlpha and Swatch or nil,
+            hasOpacity = withAlpha, opacity = withAlpha and a or nil,
+            r = r, g = g, b = b,
         })
     else
         ColorPickerFrame.func       = Swatch
@@ -805,6 +816,91 @@ end
 -- step     : snap increment (e.g. 0.05)
 -- fmt      : optional display formatter, defaults to "%.2f"
 --------------------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- STACKED SLIDER  (sticky settings' layout, with Reset; Dukul 2026-09-28)
+--
+--   Label (Default: 100%)                      80%
+--   <-----------------|----------------->  [ Reset ]
+--
+-- o = { label, min, max, value, default, fmt = fn(v) -> text, onChange(v) }
+-- Whole-number values. Reset puts the default back (through onChange) and is
+-- greyed while the value is already the default. Returns the container,
+-- BNB.STACKED_SLIDER_H tall: :SetValue(v) (fires onChange), :GetValue(),
+-- :SetEnabled(on). The inner slider is ._slider, not .Slider, so greying
+-- code that looks for .Slider calls the container's SetEnabled instead.
+-- Without MinimalSliderWithSteppersTemplate it falls back to CreateSlider.
+--------------------------------------------------------------------------------
+BNB.STACKED_SLIDER_H = 40
+function BNB.CreateStackedSlider(parent, width, o)
+    local fmt = o.fmt or function(v) return tostring(v) end
+    local hasTpl = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
+    if not hasTpl then
+        local sl = BNB.CreateSlider(parent, o.label, o.min, o.max, o.value, o.default, o.onChange, fmt)
+        sl:SetWidth(width - 30)
+        return sl
+    end
+
+    local RESET_W, GAP = 52, 6
+    local h = CreateFrame("Frame", nil, parent)
+    h:SetSize(width, BNB.STACKED_SLIDER_H)
+
+    local val = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    val:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, 0)
+    val:SetJustifyH("RIGHT")
+
+    local lbl = h:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, 0)
+    lbl:SetPoint("RIGHT", val, "LEFT", -8, 0)
+    lbl:SetJustifyH("LEFT")
+    lbl:SetWordWrap(false)
+    lbl:SetTextColor(0.78, 0.78, 0.78)
+    local text = o.label or ""
+    if o.default ~= nil then
+        text = text .. "  |cff888888" .. string.format(L["SLIDER_DEFAULT_FMT"], fmt(o.default)) .. "|r"
+    end
+    lbl:SetText(text)
+
+    local reset = BNB.CreateButton(nil, h, L["RESET"], RESET_W, 20)
+    reset:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -16)
+
+    local sl = CreateFrame("Slider", nil, h, "MinimalSliderWithSteppersTemplate")
+    sl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, -16)
+    sl:SetPoint("RIGHT", reset, "LEFT", -GAP, 0)
+    sl:SetHeight(20)
+    local cur = math.floor((o.value or o.min) + 0.5)
+    sl:Init(cur, o.min, o.max, o.max - o.min)
+
+    local enabled = true
+    local function Sync()
+        val:SetText(fmt(cur))
+        local atDef = o.default == nil or cur == o.default
+        reset:SetEnabled(enabled and not atDef)
+        reset:SetAlpha((enabled and not atDef) and 1 or 0.4)
+    end
+    sl:RegisterCallback(MinimalSliderWithSteppersMixin.Event.OnValueChanged, function(_, v)
+        local n = math.floor(v + 0.5)
+        if n == cur then return end
+        cur = n
+        Sync()
+        if o.onChange then o.onChange(n) end
+    end)
+    reset:SetScript("OnClick", function()
+        if o.default ~= nil then sl:SetValue(o.default) end
+    end)
+
+    h._slider = sl
+    function h:SetValue(v) sl:SetValue(v) end
+    function h:GetValue() return cur end
+    function h:SetEnabled(on)
+        enabled = on and true or false
+        pcall(sl.SetEnabled, sl, enabled)
+        Sync()
+    end
+    Sync()
+    return h
+end
+
 function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, fmt)
     step = step or 0.05
     local fF = fmt or function(v) return string.format("%.2f", v) end

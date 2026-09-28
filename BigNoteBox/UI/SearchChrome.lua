@@ -110,13 +110,21 @@ BNB.SEARCH_DEFAULT_THEME = "kilrogg"
 --               settings picker (the layout tool still lists it)
 --   def.panelFiles optional file name per piece for the panel only (false =
 --               none); left out = the same art as the bar
+--   def.type    optional; "backdrop" = no art of its own: the bar and the
+--               results panel get a plain backdrop (ALL-69.5) built from
+--               def.backdrop (see BACKDROP_DEFAULTS below; LibSharedMedia
+--               names or texture paths), and folder / path / layout / files
+--               are not used. id is then required. highlight and panelPos
+--               still apply.
 -- Registering an id again replaces it and keeps its place in the list.
 function BNB.RegisterSearchTheme(def)
     if type(def) ~= "table" or type(def.name) ~= "string" then return false, "name missing" end
+    local backdrop = def.type == "backdrop"
     local art = def.path or (def.folder and (ASSETS .. def.folder .. "\\"))
-    if not art then return false, "folder or path missing" end
+    if not art and not backdrop then return false, "folder or path missing" end
     local id = def.id or (def.folder and def.folder:lower())
     if not id then return false, "id missing" end
+    id = id:lower()
     if not BNB.SEARCH_THEMES[id] then
         BNB.SEARCH_THEME_ORDER[#BNB.SEARCH_THEME_ORDER + 1] = id
     end
@@ -126,9 +134,291 @@ function BNB.RegisterSearchTheme(def)
         highlight = def.highlight, panelBg = def.panelBg, panelPos = def.panelPos,
         panelLayout = def.panelLayout, panelSize = def.panelSize, panelFiles = def.panelFiles,
         hidden = def.hidden, panelPad = def.panelPad,
+        type = backdrop and "backdrop" or nil, backdrop = def.backdrop, custom = def.custom,
     }
     return true
 end
+
+--------------------------------------------------------------------------------
+-- BACKDROP THEMES (ALL-69.5)
+--------------------------------------------------------------------------------
+-- A backdrop theme has no art of its own: a border (Blizzard's window
+-- border, an LSM border or none) around a background from the sticky note
+-- list (UI/StickyBackgrounds.lua, drawn by UI/BgLayer.lua) or a plain
+-- colour. Its settings are the sticky notes' own (UI/StickySettings.lua;
+-- Dukul, 2026-09-28), in a style table:
+--   border          "Default" = Blizzard's window border (the Dialog
+--                   nine-slice), "None", or an LSM border name / path
+--   borderScale     border thickness % (1-200)
+--   borderOffset    px from the frame edge to the background (0-12)
+--   borderLight     border brightness -100..100: 0 = as drawn, below
+--                   darkens, above adds a lighter copy on top
+--   bgR, bgG, bgB   background colour; alpha = its opacity (0-1)
+--   bgTexture       StickyBG key; "none" = plain colour
+--   bgColorOpacity  Colorize: how much the colour tints the texture (0-1)
+--   bgBrightness    texture brightness -1..1 (the sticky's own unit)
+--   highlight       { r, g, b, a } of the selected result; nil = BNB gold
+--   font            nil = WoW's font; "bnb:<id>" a BigNoteBox font card,
+--                   "lsm:<name>" a LibSharedMedia font
+--   fontSize        size of the typed text (result rows keep their sizes)
+-- Every field falls back to BACKDROP_DEFAULTS (the Default style). The
+-- built-in "custom" theme (custom = true) takes its style from
+-- BigNoteBoxDB.oracleCustom, which the Oracle settings page writes; a theme
+-- from another addon passes backdrop.
+BNB.SEARCH_CUSTOM_THEME = "custom"
+local BACKDROP_DEFAULTS = {
+    border = "Default", borderScale = 100, borderOffset = 7, borderLight = 0,
+    bgR = 0.07, bgG = 0.07, bgB = 0.09, alpha = 0.96,
+    bgTexture = "windowbg", bgColorOpacity = 1, bgBrightness = 0,
+    fontSize = 16,
+}
+BNB.SEARCH_BACKDROP_DEFAULTS = BACKDROP_DEFAULTS
+
+-- Bumped whenever the custom style changes, so the Oracle knows to redraw.
+BNB.SEARCH_STYLE_REV = 0
+function BNB.SearchStyleChanged()
+    BNB.SEARCH_STYLE_REV = BNB.SEARCH_STYLE_REV + 1
+end
+
+local function IsBackdrop(d) return d and d.type == "backdrop" end
+
+-- The style of a backdrop theme, every field filled in; nil for drawn ones.
+function BNB.GetSearchBackdrop(id)
+    local d = BNB.GetSearchTheme(id)
+    if not IsBackdrop(d) then return nil end
+    local src = d.custom and BigNoteBoxDB and BigNoteBoxDB.oracleCustom or d.backdrop
+    if type(src) ~= "table" then src = {} end
+    local s = {}
+    for k, v in pairs(BACKDROP_DEFAULTS) do s[k] = v end
+    for k, v in pairs(src) do s[k] = v end
+    local function Clamp(v, lo, hi, def) return math.max(lo, math.min(hi, tonumber(v) or def)) end
+    s.borderScale    = Clamp(s.borderScale, 1, 200, 100)
+    s.borderOffset   = Clamp(s.borderOffset, 0, 12, 7)
+    s.borderLight    = Clamp(s.borderLight, -100, 100, 0)
+    s.bgR, s.bgG, s.bgB = Clamp(s.bgR, 0, 1, 0.07), Clamp(s.bgG, 0, 1, 0.07), Clamp(s.bgB, 0, 1, 0.09)
+    s.alpha          = Clamp(s.alpha, 0, 1, 0.96)
+    s.bgColorOpacity = Clamp(s.bgColorOpacity, 0, 1, 1)
+    s.bgBrightness   = Clamp(s.bgBrightness, -1, 1, 0)
+    s.fontSize       = Clamp(s.fontSize, 8, 32, 16)
+    if type(s.border) ~= "string" or s.border == "" then s.border = "None" end
+    s.edge = math.max(1, math.floor(16 * s.borderScale / 100 + 0.5))   -- LSM border px
+    return s
+end
+
+local function LSM()
+    return LibStub and LibStub("LibSharedMedia-3.0", true)
+end
+
+-- An LSM name or a texture path to a path; nil when there is none.
+local function Media(kind, key)
+    if type(key) ~= "string" or key == "" then return nil end
+    if key:find("\\", 1, true) or key:find("/", 1, true) then return key end
+    local lsm = LSM()
+    local path = lsm and lsm:Fetch(kind, key, true)
+    if type(path) ~= "string" or path == "" then return nil end
+    return path
+end
+
+-- The font file of a style's font value; nil = WoW's own font objects
+-- (which keep the per-alphabet fallback). A font that is gone (pack or
+-- addon removed) is nil too; the saved value is never rewritten.
+function BNB.SearchFontPath(value)
+    if type(value) ~= "string" then return nil end
+    local kind, key = value:match("^(%a+):(.+)$")
+    if kind == "bnb" then
+        for _, def in ipairs(BNB.FONTS or {}) do
+            if def.id == key and not def._isLSM then return def.regular end
+        end
+    elseif kind == "lsm" then
+        return Media("font", key)
+    end
+    return nil
+end
+
+-- Font file and typed-text size of a theme; nil for drawn themes and for
+-- a backdrop theme on WoW's font (size is then still returned second).
+function BNB.GetSearchFont(id)
+    local s = BNB.GetSearchBackdrop(id)
+    if not s then return nil end
+    return BNB.SearchFontPath(s.font), s.fontSize
+end
+
+-- border = "Default": Blizzard's window border, on each client its own art
+-- (a Blizzard nine-slice, which Forever draws in its style). With the
+-- "windowbg" background (the main window's rock on Retail, wood grain plus
+-- glow on Forever) it is the built-in Default style (Dukul, 2026-09-28).
+-- Layout: "Dialog", picked by Dukul on both clients 2026-09-28. The main
+-- window's own ButtonFrameTemplateNoPortrait draws its title band on a
+-- 50 px bar; InsetFrameTemplate, SimplePanelTemplate and GenericMetal did
+-- not work.
+-- Tuning in game: /run BigNoteBox.SEARCH_WINDOW.pad = 14 (or layout)
+-- BigNoteBox.SearchStyleChanged() BigNoteBox.Oracle.RefreshPreview()
+local WINDOW = "Default"
+BNB.SEARCH_WINDOW = { layout = "Dialog", pad = 14 }
+function BNB.IsWindowStyle(s) return type(s) == "table" and s.border == WINDOW end
+
+-- The LSM edge file of a style, or nil (Default, None, unknown name).
+local function EdgeFile(s)
+    if s.border == WINDOW or s.border == "None" then return nil end
+    return Media("border", s.border)
+end
+
+BNB.GetSearchEdgeFile = EdgeFile   -- the background picker's tiles
+
+-- Inner padding of a backdrop theme: where the text and the results sit.
+local function BackdropPad(s)
+    local k = math.max(1, s.borderScale / 100)
+    if s.border == WINDOW then
+        return math.floor(BNB.SEARCH_WINDOW.pad * k + 0.5)
+    end
+    local edge = EdgeFile(s) and s.edge * 0.6 or 0
+    return math.floor(math.max(8, edge, s.borderOffset + 4) + 0.5)
+end
+
+--------------------------------------------------------------------------------
+-- SAVED STYLES (ALL-69.5, like BigChatBox's Designer styles)
+--------------------------------------------------------------------------------
+-- The Custom border theme's knobs write BigNoteBoxDB.oracleCustom. A style
+-- is a named copy of it: built-in (below, never changed) or the player's own
+-- in BigNoteBoxDB.oracleStyles[name] (account-wide). BigNoteBoxDB.oracleStyle
+-- is the one last picked or saved: "builtin:<key>" / "user:<name>"; nil =
+-- builtin:default. Picking a style copies it into oracleCustom; changing a
+-- knob afterwards changes only oracleCustom until the player saves.
+BNB.SEARCH_BUILTIN_STYLES = {
+    { key = "default", label = "SEARCH_STYLE_DEFAULT", style = {} },
+    { key = "plain",   label = "SEARCH_STYLE_PLAIN",
+      style = { border = "Blizzard Tooltip", borderOffset = 3, bgTexture = "none" } },
+}
+-- Built-in keys that were renamed (the Default style was "window" in testing).
+local BUILTIN_ALIAS = { window = "default" }
+
+-- What a style may hold, and of which kind. Anything else is dropped, so an
+-- imported string can only ever set these.
+local STYLE_KEYS = {
+    border = "string", bgTexture = "string", font = "string",
+    borderScale = "number", borderOffset = "number", borderLight = "number",
+    bgR = "number", bgG = "number", bgB = "number", alpha = "number",
+    bgColorOpacity = "number", bgBrightness = "number", fontSize = "number",
+    highlight = "colour",
+}
+
+local function CleanStyle(t)
+    if type(t) ~= "table" then return nil end
+    local out = {}
+    for k, kind in pairs(STYLE_KEYS) do
+        local v = t[k]
+        if kind == "string" and type(v) == "string" and #v <= 256 then
+            out[k] = v
+        elseif kind == "number" and type(v) == "number" and v == v then
+            out[k] = v
+        elseif kind == "colour" and type(v) == "table" then
+            local c = {}
+            for i = 1, 4 do
+                local n = tonumber(v[i]) or (i == 4 and 1) or 0
+                c[i] = math.max(0, math.min(1, n))
+            end
+            out[k] = c
+        end
+    end
+    return out
+end
+BNB.CleanSearchStyle = CleanStyle
+
+function BNB.GetSearchStyleID()
+    local id = (BigNoteBoxDB and BigNoteBoxDB.oracleStyle) or "builtin:default"
+    local key = id:match("^builtin:(.+)$")
+    if key and BUILTIN_ALIAS[key] then id = "builtin:" .. BUILTIN_ALIAS[key] end
+    return id
+end
+
+-- The saved style of an id, or nil when it is gone.
+function BNB.GetSearchStyle(id)
+    if type(id) ~= "string" then return nil end
+    local kind, key = id:match("^(%a+):(.+)$")
+    if kind == "builtin" then
+        key = BUILTIN_ALIAS[key] or key
+        for _, b in ipairs(BNB.SEARCH_BUILTIN_STYLES) do
+            if b.key == key then return b.style end
+        end
+    elseif kind == "user" then
+        local t = BigNoteBoxDB and BigNoteBoxDB.oracleStyles
+        return t and t[key]
+    end
+    return nil
+end
+
+-- The player's saved style names, sorted.
+function BNB.GetSearchStyleNames()
+    local out = {}
+    for name in pairs((BigNoteBoxDB and BigNoteBoxDB.oracleStyles) or {}) do out[#out + 1] = name end
+    table.sort(out, function(a, b) return a:lower() < b:lower() end)
+    return out
+end
+
+-- Copies a style into the Custom border theme. Returns true when it exists.
+function BNB.LoadSearchStyle(id)
+    local s = CleanStyle(BNB.GetSearchStyle(id))
+    if not s then return false end
+    BigNoteBoxDB.oracleCustom = next(s) and s or nil
+    BigNoteBoxDB.oracleStyle = id
+    BNB.SearchStyleChanged()
+    return true
+end
+
+-- Saves style (default: the current Custom border look) under name.
+function BNB.SaveSearchStyle(name, style)
+    local db = BigNoteBoxDB
+    db.oracleStyles = db.oracleStyles or {}
+    db.oracleStyles[name] = CleanStyle(style or db.oracleCustom or {})
+    db.oracleStyle = "user:" .. name
+    if style then
+        db.oracleCustom = CleanStyle(style)
+        BNB.SearchStyleChanged()
+    end
+end
+
+function BNB.DeleteSearchStyle(name)
+    local db = BigNoteBoxDB
+    if db.oracleStyles then db.oracleStyles[name] = nil end
+    if db.oracleStyles and next(db.oracleStyles) == nil then db.oracleStyles = nil end
+    if db.oracleStyle == "user:" .. name then db.oracleStyle = nil end
+end
+
+-- Export / import strings: "BNBOS1:" + LibSerialize + LibDeflate, the same
+-- libraries as note sharing (Features/ShareNote.lua).
+local STYLE_PREFIX = "BNBOS1:"
+function BNB.ExportSearchStyle(style)
+    local ls = LibStub and LibStub("LibSerialize", true)
+    local ld = LibStub and LibStub("LibDeflate", true)
+    if not (ls and ld) then return nil end
+    local data = ls:Serialize(CleanStyle(style or BigNoteBoxDB.oracleCustom or {}))
+    return STYLE_PREFIX .. ld:EncodeForPrint(ld:CompressDeflate(data))
+end
+
+-- Returns a clean style table, or nil.
+function BNB.ImportSearchStyle(str)
+    if type(str) ~= "string" then return nil end
+    str = str:match("^%s*(.-)%s*$")
+    if str:sub(1, #STYLE_PREFIX) ~= STYLE_PREFIX then return nil end
+    local ls = LibStub and LibStub("LibSerialize", true)
+    local ld = LibStub and LibStub("LibDeflate", true)
+    if not (ls and ld) then return nil end
+    local ok, style = pcall(function()
+        local c = ld:DecodeForPrint(str:sub(#STYLE_PREFIX + 1))
+        local raw = c and ld:DecompressDeflate(c)
+        if not raw then return nil end
+        local good, t = ls:Deserialize(raw)
+        return good and t or nil
+    end)
+    return ok and CleanStyle(style) or nil
+end
+
+-- The built-in "Custom border" theme: the player's own style. Listed last
+-- in the settings picker (UI/Config/OracleSettings.lua), never in the
+-- layout tool (it has no pieces to place).
+BNB.RegisterSearchTheme({
+    id = BNB.SEARCH_CUSTOM_THEME, name = "Custom border", type = "backdrop", custom = true,
+})
 
 -- A missing or removed theme id falls back to the default, then to the first.
 -- Ids are lower case; a saved "Horde" still finds "horde".
@@ -143,6 +433,7 @@ local DEFAULT_HIGHLIGHT = { 1, 0.82, 0, 0.14 }
 function BNB.GetSearchHighlight(id)
     local d = BNB.GetSearchTheme(id)
     local h = d and d.highlight
+    if IsBackdrop(d) then h = BNB.GetSearchBackdrop(id).highlight or h end
     if type(h) ~= "table" then h = DEFAULT_HIGHLIGHT end
     return h[1] or 1, h[2] or 0.82, h[3] or 0, h[4] or 0.14
 end
@@ -162,6 +453,8 @@ local function SetLevelTree(f, lvl)
     f:SetFrameLevel(lvl)
     for _, child in ipairs({ f:GetChildren() }) do
         if child == f._searchOver then child:SetFrameLevel(lvl + TOP_LIFT)
+        elseif child == f._searchNine then child:SetFrameLevel(lvl)   -- Window border
+        elseif child == f._searchBgLayer then child:SetFrameLevel(math.max(0, lvl - 1))   -- background art
         else SetLevelTree(child, lvl + 1) end
     end
 end
@@ -214,6 +507,10 @@ local NATIVE = 32
 -- out = the theme's own.
 function BNB.GetSearchPanelPad(id, size)
     local d = BNB.GetSearchTheme(id)
+    if IsBackdrop(d) then
+        local pad = BackdropPad(BNB.GetSearchBackdrop(id))
+        return { left = pad, right = pad, top = pad, bottom = pad }
+    end
     local p = d and type(d.panelPad) == "table" and d.panelPad
     if p then
         return { left = p.left or 0, right = p.right or 0, top = p.top or 0, bottom = p.bottom or 0 }
@@ -233,6 +530,242 @@ local function PlacePiece(tex, f, p, kx, ky)
     tex:SetPoint("BOTTOMRIGHT", f, p.a2, p.x2 * kx, p.y2 * ky)
 end
 
+--------------------------------------------------------------------------------
+-- BACKDROP DRAWING (ALL-69.5)
+--------------------------------------------------------------------------------
+-- A backdrop theme: every art piece hidden and either an LSM box on the
+-- frame itself (its textures sit under every child, so the text and the rows
+-- draw over it) or the Window chrome; the text region is inset by the pad.
+
+-- ── Brightness (-100..100, the sticky backgrounds' way, UI/BgLayer.lua) ──────
+-- Below 0 darkens the pieces toward black (their colour times 1 + k).
+-- Above 0 draws an ADD copy of each piece over it at k times its colour,
+-- so light parts get brighter and dark lines stay dark (Dukul, 2026-09-28).
+-- A copy lives on the piece's own frame, one sublevel up in the same draw
+-- layer, and is re-synced on every draw and size change (tiled edges change
+-- their texture coordinates with the size).
+local BOX_BORDER = { "TopLeftCorner", "TopRightCorner", "BottomLeftCorner", "BottomRightCorner",
+                     "TopEdge", "BottomEdge", "LeftEdge", "RightEdge" }
+
+local function SyncCopy(add, src)
+    local ht, vt = src:GetHorizTile(), src:GetVertTile()
+    add:SetTexture(src:GetTexture(), ht and "REPEAT" or nil, vt and "REPEAT" or nil)
+    add:SetTexCoord(src:GetTexCoord())
+    add:SetHorizTile(ht)
+    add:SetVertTile(vt)
+    add:ClearAllPoints()
+    add:SetAllPoints(src)
+end
+
+-- The ADD copies of sources (a list of regions) under f._searchAdds[key]:
+-- shown at k (0..1) times r, g, b while k > 0 and the source is shown.
+local function SetAddCopies(f, key, sources, k, r, g, b)
+    f._searchAdds = f._searchAdds or {}
+    local list = f._searchAdds[key] or {}
+    f._searchAdds[key] = list
+    list.k, list.r, list.g, list.b = k, r, g, b
+    for i, src in ipairs(sources) do
+        local add = list[i]
+        if not add or add._src ~= src then
+            if add then add:Hide() end
+            local layer, sub = src:GetDrawLayer()
+            add = src:GetParent():CreateTexture(nil, layer, nil, math.min(7, (sub or 0) + 1))
+            add:SetBlendMode("ADD")
+            add._src = src
+            list[i] = add
+        end
+        if k > 0 and src:IsShown() then
+            SyncCopy(add, src)
+            add:SetVertexColor(r * k, g * k, b * k, 1)
+            add:Show()
+        else
+            add:Hide()
+        end
+    end
+    for i = #sources + 1, #list do list[i]:Hide() end
+end
+
+local function HideAddCopies(f, key)
+    local list = f._searchAdds and f._searchAdds[key]
+    if list then for _, add in ipairs(list) do add:Hide() end end
+end
+
+-- Re-sync every shown copy (after a size change).
+local function ResyncAddCopies(f)
+    for _, list in pairs(f._searchAdds or {}) do
+        for _, add in ipairs(list) do
+            if add:IsShown() and add._src then SyncCopy(add, add._src) end
+        end
+    end
+end
+
+local function Pieces(owner, names)
+    local out = {}
+    for _, n in ipairs(names) do
+        local r = owner and owner[n]
+        if r and r.GetTexture then out[#out + 1] = r end
+    end
+    return out
+end
+
+-- Brightness as (multiplier for the base colour, ADD strength).
+local function Bright(v)
+    local k = (v or 0) / 100
+    if k < 0 then return 1 + k, 0 end
+    return 1, k
+end
+
+-- Size changes: the backdrop's tiled edges, then the ADD copies.
+local function HookSize(f)
+    if f._searchBdHooked then return end
+    f._searchBdHooked = true
+    f:HookScript("OnSizeChanged", function(self)
+        if self._searchBackdrop and self.OnBackdropSizeChanged then
+            pcall(self.OnBackdropSizeChanged, self)
+        end
+        ResyncAddCopies(self)
+    end)
+end
+
+-- The tint on a texture: the sticky's Colorize (UI/StickyNote.lua), so a
+-- background looks the same on the bar as on a note.
+local function Tinted(s)
+    local K = BNB.Sticky and BNB.Sticky._kit
+    if K and K.TintedBgColor then return K.TintedBgColor(s) end
+    return 1, 1, 1
+end
+
+-- The background texture on a BgLayer under the host, inset by the border
+-- offset. Returns true when a texture shows (the host's centre goes clear).
+local function ApplyBgTexture(f, s)
+    local SBG = BNB.StickyBG
+    local def = SBG and SBG.Get(s.bgTexture)
+    if not (def and def.file) then
+        if f._searchBgLayer then BNB.BgLayer.Set(f._searchBgLayer, nil) end
+        return false
+    end
+    f._searchBgLayer = f._searchBgLayer or BNB.BgLayer.Create(f)
+    local layer = f._searchBgLayer
+    BNB.BgLayer.Set(layer, def, s.borderOffset)
+    local tr, tg, tb = Tinted(s)
+    BNB.BgLayer.SetColors(layer, s.bgR, s.bgG, s.bgB, tr, tg, tb, s.bgBrightness)
+    BNB.BgLayer.SetAlpha(layer, s.alpha)
+    return true
+end
+
+-- The host's own backdrop: plain colour (clear under a texture) inside the
+-- border offset, and an LSM border's edge. Border brightness as above.
+local function ApplyHostBackdrop(f, s, texShown)
+    BNB.EnsureBackdrop(f)
+    HookSize(f)
+    local edgeFile = EdgeFile(s)
+    local ins = s.borderOffset
+    f._searchBackdrop = true
+    f:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = edgeFile, edgeSize = edgeFile and s.edge or nil,
+        insets = { left = ins, right = ins, top = ins, bottom = ins },
+    })
+    if texShown then f:SetBackdropColor(0, 0, 0, 0)
+    else f:SetBackdropColor(s.bgR, s.bgG, s.bgB, s.alpha) end
+    local m, a = Bright(s.borderLight)
+    f:SetBackdropBorderColor(m, m, m, edgeFile and 1 or 0)
+    SetAddCopies(f, "boxBorder", edgeFile and Pieces(f, BOX_BORDER) or {}, a, 1, 1, 1)
+end
+
+-- The Default border: Blizzard's nine-slice on a child frame at the host's
+-- own level (SetLevelTree keeps it there, under the text and the rows).
+local function ShowNine(f, s)
+    local W = BNB.SEARCH_WINDOW
+    local nine = f._searchNine
+    if not nine then
+        local ok, fr = pcall(CreateFrame, "Frame", nil, f, "NineSlicePanelTemplate")
+        nine = ok and fr or CreateFrame("Frame", nil, f)
+        nine:EnableMouse(false)
+        f._searchNine = nine
+    end
+    nine:SetFrameLevel(f:GetFrameLevel())
+    -- Thickness scales the border art; SetAllPoints keeps its outer edge on
+    -- the host at any scale.
+    nine:SetScale(s.borderScale / 100)
+    nine:ClearAllPoints()
+    nine:SetAllPoints(f)
+    if nine._layout ~= W.layout and NineSliceUtil and NineSliceUtil.ApplyLayoutByName then
+        if pcall(NineSliceUtil.ApplyLayoutByName, nine, W.layout) then nine._layout = W.layout end
+    end
+    nine:Show()
+    local m, a = Bright(s.borderLight)
+    local pieces = Pieces(nine, BOX_BORDER)
+    for _, r in ipairs(pieces) do r:SetVertexColor(m, m, m) end
+    SetAddCopies(f, "nineBorder", pieces, a, 1, 1, 1)
+end
+
+local function HideNine(f)
+    if f._searchNine then f._searchNine:Hide() end
+    HideAddCopies(f, "nineBorder")
+end
+
+-- Forever: the main window's glow over its wood grain, when that is the
+-- background (UI/Chrome.lua AddForeverGlow).
+local function ShowGlow(f, s, on)
+    local glow = f._searchWinGlow
+    if not on then if glow then glow:Hide() end return end
+    if not glow then
+        glow = f:CreateTexture(nil, "BACKGROUND", nil, -6)
+        glow:SetTexture(BNB.FOREVER_GLOW_TEXTURE)
+        f._searchWinGlow = glow
+    end
+    local ins = s.borderOffset
+    glow:ClearAllPoints()
+    glow:SetPoint("TOPLEFT", f, "TOPLEFT", ins, -ins)
+    glow:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -ins, ins)
+    glow:SetAlpha(s.alpha)
+    glow:Show()
+end
+
+-- Takes everything a backdrop theme drew off a frame (a drawn theme next).
+local function ClearBox(f)
+    HideAddCopies(f, "boxBorder")
+    HideNine(f)
+    ShowGlow(f, nil, false)
+    if f._searchBgLayer then BNB.BgLayer.Set(f._searchBgLayer, nil) end
+    if f._searchBackdrop then
+        f._searchBackdrop = nil
+        if f.ClearBackdrop then f:ClearBackdrop() else f:SetBackdrop(nil) end
+    end
+end
+
+local BAR_W = 500
+local function ApplyBackdrop(f, d, panel)
+    local s = BNB.GetSearchBackdrop(d.id)
+    local pad = BackdropPad(s)
+    f._searchPieces = f._searchPieces or {}
+    for key, tex in pairs(f._searchPieces) do
+        if key ~= "text" then tex:Hide() end
+    end
+    local texShown = ApplyBgTexture(f, s)
+    ApplyHostBackdrop(f, s, texShown)
+    if s.border == WINDOW then ShowNine(f, s) else HideNine(f) end
+    ShowGlow(f, s, BNB.IsForever and texShown and s.bgTexture == "windowbg")
+    local size = { border = pad, borderY = pad }
+    if not panel then
+        -- Tall enough for the typed text at its size.
+        size.w = BAR_W
+        size.h = math.floor(s.fontSize + 2 * pad + 12)
+        f:SetSize(size.w, size.h)
+        local text = f._searchPieces.text
+        if not text then
+            text = f:CreateTexture(nil, "ARTWORK", nil, 1)
+            f._searchPieces.text = text
+        end
+        text:ClearAllPoints()
+        text:SetPoint("TOPLEFT", f, "TOPLEFT", pad + 4, -pad)
+        text:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(pad + 4), pad)
+        text:Hide()
+    end
+    return size
+end
+
 -- Draws (or re-draws) a theme on f and sizes f to it. layout / size override
 -- the theme's own (the layout tool passes its working copy). The "text" piece
 -- gets no texture: f._searchPieces.text is a bare region marker the caller
@@ -246,6 +779,8 @@ function BNB.ApplySearchChrome(f, themeID, layout, size, opts)
     local d = BNB.GetSearchTheme(themeID)
     if not d then return end
     local panel = opts and opts.panel
+    if IsBackdrop(d) then return ApplyBackdrop(f, d, panel) end
+    ClearBox(f)
     local tl, ts
     if panel then tl, ts = ThemePanel(d) else tl, ts = ThemeLayout(d) end
     layout, size = layout or tl, size or ts
@@ -1262,14 +1797,22 @@ local function BuildTool()
         return b
     end
     -- Theme: steps through BNB.SEARCH_THEME_ORDER; each keeps its own copy.
+    -- Backdrop themes have no pieces to place and are skipped (ALL-69.5).
+    local function DrawnThemes()
+        local order = {}
+        for _, id in ipairs(BNB.SEARCH_THEME_ORDER) do
+            if not IsBackdrop(BNB.SEARCH_THEMES[id]) then order[#order + 1] = id end
+        end
+        return order
+    end
     local themeBtn = Btn("Theme", function()
-        local order = BNB.SEARCH_THEME_ORDER
+        local order = DrawnThemes()
         for i, id in ipairs(order) do
             if id == f.theme then f.theme = order[i % #order + 1]; break end
         end
         Refresh()
     end)
-    themeBtn:SetEnabled(#BNB.SEARCH_THEME_ORDER > 1)
+    themeBtn:SetEnabled(#DrawnThemes() > 1)
     Btn("Zoom", function()
         f.zoom = (f.zoom % 3) + 1
         bar:SetScale(f.zoom)

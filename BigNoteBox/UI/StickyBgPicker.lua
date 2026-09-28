@@ -9,6 +9,9 @@
 --
 --   SBP.Open(noteID, anchor, h)  h = the settings row: { cfg = fn -> cfg,
 --                                get = fn -> key, set = fn(key) }. Toggles.
+--                                Not a sticky: noteID is any unique key and
+--                                h.state = fn -> { w, h, inset, backdrop,
+--                                br, bg, bb, ba } (see NoteState).
 --   SBP.Rebind(noteID, h)        settings rebuilt for the same note
 --   SBP.Refresh()                the key changed elsewhere (the arrows)
 --   SBP.Close() / SBP.IsOpenFor(noteID)
@@ -67,8 +70,15 @@ local function CurKey()
     return BNB.StickyBG.Get(_h.get()).key
 end
 
--- What every tile copies from the open sticky; nil once it has closed
+-- What every tile copies from the open sticky; nil once it has closed.
+-- A caller that is not a sticky (the Oracle settings page, ALL-69.5) passes
+-- h.state() returning the same fields itself; nil closes the grid.
 local function NoteState()
+    if _h and _h.state then
+        local st = _h.state()
+        if st then st.cfg = st.cfg or _h.cfg() end
+        return st
+    end
     local K = Kit()
     local sf = K and _noteID and K.openFrames[_noteID]
     if not (sf and _h) then return nil end

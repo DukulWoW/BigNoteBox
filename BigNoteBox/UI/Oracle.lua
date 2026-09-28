@@ -44,12 +44,40 @@ local function NpcKind(note)
     return ELITE[note.targetClassification or ""] and "elite" or "mob"
 end
 
+-- Whose note it is, as the rightmost badge (Dukul, 2026-09-28; it was a
+-- "Global" / name label): the globe for a global note, else the owning
+-- character's class icon as the main window sidebar shows it (its custom
+-- slot icon when one is set), drawn round.
+local ROUND_MASK = "Interface\\CharacterFrame\\TempPortraitAlphaMask"
+local function ScopeKey(note)
+    local sc = note.scope
+    if not sc or sc == "global" then return nil end
+    return sc:match("^char:(.+)$")
+end
+-- Texture, and true when it is a class icon (drawn round).
+local function ScopeIcon(note)
+    local key = ScopeKey(note)
+    if not key then return BADGE_ART .. "s-icon-global", false end
+    local SB = BNB.Sidebar
+    return (SB and SB.IconForKey and SB.IconForKey("char:" .. key)) or DEFAULT_ICON, true
+end
+local function ScopeTip(note)
+    local key = ScopeKey(note)
+    if not key then return L["ORACLE_SCOPE_GLOBAL"] end
+    local rec = BigNoteBoxDB and BigNoteBoxDB.knownChars and BigNoteBoxDB.knownChars[key]
+    local name = rec and rec.name and rec.realm and (rec.name .. " - " .. rec.realm)
+        or (key:gsub("%-", " - ", 1))
+    return string.format(L["ORACLE_SCOPE_CHAR_TIP"], name)
+end
+
 -- Small icons on the right of a result, so a note's kind shows at a glance.
--- Drawn right to left in this order: the first five (who the note is about)
--- never share a note, so they keep the rightmost column. show(note) decides
--- each; tip is the L key of its hover text. Art by Dukul, 32x32 TGA in
--- Assets\Search\. More kinds are added here.
+-- Drawn right to left in this order: first whose note it is (scope, on every
+-- note), then the five that say who the note is about, which never share a
+-- note, so they keep the next column. show(note) decides each; tip is the L
+-- key of its hover text (tipFn(note) for text that depends on the note).
+-- Art by Dukul, 32x32 TGA in Assets\Search\. More kinds are added here.
 local BADGES = {
+    { scope = true, tipFn = ScopeTip, show = function() return true end },
     { file = "s-icon-npc",      tip = "ORACLE_BADGE_NPC",
       show = function(note) return NpcKind(note) == "npc" end },
     { file = "s-icon-mobs",     tip = "ORACLE_BADGE_MOB",
@@ -85,6 +113,8 @@ local results = {}
 local sel     = 0
 local openT   = nil   -- GetTime() of the frame the bar opened in
 local drawnTheme      -- the theme id the bar was last drawn with (ThemeID)
+local drawnRev        -- BNB.SEARCH_STYLE_REV it was drawn at (custom style edits)
+local fontPath        -- a backdrop theme's font file, nil = WoW's (ApplyFonts)
 local previewing = false   -- the settings page's move / preview mode is up
 local moveTip              -- "drag to move" strip under the panel, preview only
 
@@ -332,15 +362,6 @@ local function BuildHelp()
     helpLines = most + 2
 end
 
--- "Global", or the owning character's name.
-local function ScopeLabel(note)
-    local sc = note.scope
-    if not sc or sc == "global" then return L["ORACLE_SCOPE_GLOBAL"] end
-    local key = sc:match("^char:(.+)$")
-    if not key then return "" end
-    local rec = BigNoteBoxDB and BigNoteBoxDB.knownChars and BigNoteBoxDB.knownChars[key]
-    return (rec and rec.name) or key:match("^([^-]+)") or key
-end
 
 --------------------------------------------------------------------------------
 -- OPENING A NOTE
@@ -515,7 +536,7 @@ local function RowText(row, r, textRight)
     local tc = note.titleColor
     if tc then row.title:SetTextColor(tc.r, tc.g, tc.b) else row.title:SetTextColor(1, 1, 1) end
     row.snippet:SetText(r.snippet or "")
-    row.scope:SetText(ScopeLabel(note))
+    row.scope:SetText("")   -- the scope is the rightmost badge now
 
     -- Badges from the right edge, inside the column right of textRight.
     local x = -8
@@ -531,12 +552,21 @@ local function RowText(row, r, textRight)
                 badge:EnableMouse(true)
                 local tex = badge:CreateTexture(nil, "ARTWORK")
                 tex:SetAllPoints()
-                tex:SetTexture(BADGE_ART .. def.file)
+                if def.file then tex:SetTexture(BADGE_ART .. def.file) end
+                badge.tex = tex
+                if def.scope then
+                    -- A second, masked texture for the round class icon
+                    local round = badge:CreateTexture(nil, "ARTWORK")
+                    round:SetAllPoints()
+                    pcall(round.SetMask, round, ROUND_MASK)
+                    badge.round = round
+                end
                 badge:SetScript("OnEnter", function(self)
                     local onEnter = row:GetScript("OnEnter")
                     if onEnter then onEnter(row) end
                     GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                    GameTooltip:SetText(L[def.tip], 1, 1, 1)
+                    local text = def.tipFn and self._note and def.tipFn(self._note) or L[def.tip]
+                    GameTooltip:SetText(text, 1, 1, 1)
                     GameTooltip:Show()
                 end)
                 badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -544,6 +574,13 @@ local function RowText(row, r, textRight)
                     if button == "LeftButton" and self:IsMouseOver() then row:Click() end
                 end)
                 row.badges[b] = badge
+            end
+            badge._note = note
+            if def.scope then
+                local file, round = ScopeIcon(note)
+                badge.tex:SetShown(not round)
+                badge.round:SetShown(round)
+                if round then badge.round:SetTexture(file) else badge.tex:SetTexture(file) end
             end
             badge:ClearAllPoints()
             badge:SetPoint("RIGHT", row, "RIGHT", x, 0)
@@ -556,6 +593,16 @@ local function RowText(row, r, textRight)
     row.scope:ClearAllPoints()
     row.scope:SetPoint("TOPRIGHT", row, "TOPRIGHT", textRight, -4)
     row.snippet:SetPoint("RIGHT", row, "RIGHT", textRight, 0)
+end
+
+-- A row's text in the theme's font (ALL-69.5): only a backdrop theme sets
+-- one (fontPath); nil puts WoW's font objects back. The rows keep their
+-- own sizes; the font's size setting is for the typed text.
+local ROW_TITLE_PX, ROW_SMALL_PX = 13, 11
+local function RowFonts(row)
+    BNB.SetFontSafe(row.title,   fontPath, ROW_TITLE_PX, "GameFontHighlight")
+    BNB.SetFontSafe(row.snippet, fontPath, ROW_SMALL_PX, "GameFontDisableSmall")
+    BNB.SetFontSafe(row.scope,   fontPath, ROW_SMALL_PX, "GameFontDisableSmall")
 end
 
 -- A result row on parent. onEnter / onClick: nil for the layout tool's
@@ -600,6 +647,7 @@ local function BuildRow(parent, onEnter, onClick)
 
     if onEnter then row:SetScript("OnEnter", onEnter) end
     if onClick then row:SetScript("OnClick", onClick) else row:EnableMouse(false) end
+    if fontPath then RowFonts(row) end
     return row
 end
 
@@ -762,10 +810,10 @@ end
 
 --------------------------------------------------------------------------------
 -- MOVE / PREVIEW (ALL-69.4)
--- The settings page's "Move / preview" shows the real bar at its saved spot
--- with sample results (the layout tool's fake notes, PREVIEW below). While it
--- is up the bar takes no typing, a click outside leaves it open, and a drag
--- on the bar or its results moves it; Done, Esc or leaving the page ends it.
+-- The settings page shows the real bar at its saved spot with sample results
+-- (the layout tool's fake notes, PREVIEW below) for as long as the page is
+-- open. While it is up the bar takes no typing, a click outside leaves it
+-- open, and a drag on the bar or its results moves it; leaving the page ends it.
 -- Theme and result-count changes redraw it at once (Oracle.RefreshPreview).
 --------------------------------------------------------------------------------
 local function SavePosition()
@@ -779,19 +827,31 @@ local function SavePosition()
     ApplyPosition()
 end
 
+-- The preview lives exactly as long as the settings page (Dukul, 2026-09-28),
+-- so the tip has no Done button.
 local function BuildMoveTip()
     moveTip = BNB.CreateBackdropFrame("Frame", nil, bar)
-    moveTip:SetSize(300, 30)
+    moveTip:SetSize(240, 30)
     BNB.SetBackdrop(moveTip, 0.10, 0.10, 0.12, 0.92, 0.45, 0.70, 0.45, 1)
-    local done = BNB.CreateButton(nil, moveTip, L["ORACLE_MOVE_DONE"], 70, 22)
-    done:SetPoint("RIGHT", moveTip, "RIGHT", -4, 0)
-    done:SetScript("OnClick", function() Oracle.EndPreview() end)
     local fs = moveTip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     fs:SetPoint("LEFT", moveTip, "LEFT", 8, 0)
-    fs:SetPoint("RIGHT", done, "LEFT", -6, 0)
-    fs:SetJustifyH("LEFT")
+    fs:SetPoint("RIGHT", moveTip, "RIGHT", -8, 0)
+    fs:SetJustifyH("CENTER")
     fs:SetWordWrap(false)
     fs:SetText(L["ORACLE_MOVE_TIP"])
+end
+
+-- While previewing, the bar sits under dialogs (HIGH, not FULLSCREEN_DIALOG),
+-- so the colour picker and the style popups open over it, and it leaves
+-- UISpecialFrames, so Esc goes to the settings page (back one page) instead
+-- of closing it.
+local ORACLE_NAME = "BigNoteBoxOracleFrame"
+local function SetPreviewLayer(on)
+    bar:SetFrameStrata(on and "HIGH" or "FULLSCREEN_DIALOG")
+    for i = #UISpecialFrames, 1, -1 do
+        if UISpecialFrames[i] == ORACLE_NAME then table.remove(UISpecialFrames, i) end
+    end
+    if not on then tinsert(UISpecialFrames, ORACLE_NAME) end
 end
 
 local function DrawPreviewRows()
@@ -806,13 +866,42 @@ local function DrawPreviewRows()
 end
 
 -- Run from the bar's OnHide: whatever hid it, the preview is over.
+-- Only while the bar really is hidden: on the first open after a reload the
+-- OnHide from Build's own Hide came after StartPreview had set previewing,
+-- which cleared it with the bar up, and the next click closed the bar
+-- (Dukul, 2026-09-28).
 local function ClearPreview()
-    if not previewing then return end
+    if not previewing or bar:IsShown() then return end
     previewing = false
+    SetPreviewLayer(false)
     if moveTip then moveTip:Hide() end
     eb:EnableMouse(true)
     for _, row in ipairs(panel._rows or {}) do row:Hide() end
     if panel._hint then panel._hint:Hide() end
+end
+
+-- The typed text, the placeholder and the rows in the theme's font. A
+-- plain SetFont on the box (not SetFontSafe: its re-apply re-sets the text,
+-- which would move the cursor while typing).
+local function ApplyFonts(themeID)
+    local path, size = BNB.GetSearchFont(themeID)
+    fontPath = path
+    eb:SetFontObject("GameFontHighlightLarge")
+    placeholder:SetFontObject("GameFontDisableLarge")
+    if path then
+        local px = BNB.FontPx(path, size)
+        pcall(eb.SetFont, eb, path, px, "")
+        pcall(placeholder.SetFont, placeholder, path, px, "")
+    elseif size then
+        -- A backdrop theme on WoW's font still takes the size.
+        local file, _, flags = eb:GetFont()
+        if file then
+            pcall(eb.SetFont, eb, file, size, flags or "")
+            pcall(placeholder.SetFont, placeholder, file, size, flags or "")
+        end
+    end
+    for _, row in ipairs(rows) do RowFonts(row) end
+    for _, row in ipairs(panel._rows or {}) do RowFonts(row) end
 end
 
 --------------------------------------------------------------------------------
@@ -866,6 +955,8 @@ local function Build()
     panel._size = BNB.ApplySearchChrome(panel, drawnTheme, nil, nil, { panel = true })
         or { border = 24, borderY = 24 }
     panel._pad = BNB.GetSearchPanelPad(drawnTheme, panel._size)
+    drawnRev = BNB.SEARCH_STYLE_REV
+    ApplyFonts(drawnTheme)
     -- Esc still closes it if the box has lost focus to another window.
     tinsert(UISpecialFrames, "BigNoteBoxOracleFrame")
 
@@ -951,8 +1042,9 @@ end
 -- the next open without a reload.
 local function SyncTheme()
     local want = Oracle.ThemeID()
-    if want == drawnTheme then return end
-    drawnTheme = want
+    if want == drawnTheme and drawnRev == BNB.SEARCH_STYLE_REV then return end
+    drawnTheme, drawnRev = want, BNB.SEARCH_STYLE_REV
+    ApplyFonts(want)
     BNB.ApplySearchChrome(bar, want)
     panel._size = BNB.ApplySearchChrome(panel, want, nil, nil, { panel = true }) or panel._size
     panel._pad = BNB.GetSearchPanelPad(want, panel._size)
@@ -1063,6 +1155,7 @@ function Oracle.StartPreview()
     if bar:IsShown() then bar:Hide() end   -- a live search gives way
     if not moveTip then BuildMoveTip() end
     previewing = true
+    SetPreviewLayer(true)
     eb:SetText("")
     eb:ClearFocus()
     eb:EnableMouse(false)

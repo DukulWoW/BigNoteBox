@@ -59,6 +59,14 @@ end
 -- Labels are L key names here; resolved to text below
 local ALL = {
     { key = "none", label = "STICKY_BG_NONE" },
+    -- The main window's own background: grey rock on Retail, our wood grain
+    -- on Forever (UI/Chrome.lua). The Oracle's Default style uses it (ALL-69.5,
+    -- Dukul 2026-09-28). Rock size 256 assumed; check the tiling in game.
+    BNB.IsForever
+        and E("windowbg", "STICKY_BG_WINDOW", "stone",
+              "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-forever", 512, 512, "tile", "TOPLEFT")
+        or  E("windowbg", "STICKY_BG_WINDOW", "stone",
+              "Interface\\FrameGeneral\\UI-Background-Rock", 256, 256, "tile", "TOPLEFT"),
     -- Stone & Wood
     E("uicommonbackgrounds",               "STICKY_BG_BROWN_STONE",       "stone", 8198947,  256,  256, "tile",    "TOPLEFT"),
     E("bankframebackgroundc60",            "STICKY_BG_DARK_USED_STONE",   "stone", 8118796,  256,  256, "tile",    "TOPLEFT"),

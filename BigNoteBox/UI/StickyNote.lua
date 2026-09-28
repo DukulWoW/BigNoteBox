@@ -276,11 +276,17 @@ local function TintedBgColor(cfg)
     local b = 1 + ((cfg.bgB or COL_BG[3]) - 1) * cop
     r = math.max(0, r); g = math.max(0, g); b = math.max(0, b)
     -- Safety: if the resulting colour is too dark the texture is invisible.
-    -- Clamp to white so the texture always shows. The stored bgR/G/B is
+    -- Lift it toward white just enough to keep that floor, so the slider
+    -- stays smooth (a jump to white made Colorize go black near 94 % and
+    -- then do nothing above it, Dukul 2026-09-28). The stored bgR/G/B is
     -- never modified -- the user's colour choice is preserved and reapplies
     -- if they switch the texture back to None.
+    local FLOOR = 0.12
     local luma = 0.299 * r + 0.587 * g + 0.114 * b
-    if luma < 0.12 then r, g, b = 1, 1, 1 end
+    if luma < FLOOR then
+        local t = (FLOOR - luma) / (1 - luma)   -- white's luma is 1
+        r, g, b = r + (1 - r) * t, g + (1 - g) * t, b + (1 - b) * t
+    end
     return r, g, b
 end
 

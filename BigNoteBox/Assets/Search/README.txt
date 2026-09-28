@@ -58,6 +58,34 @@ the panel border on each side.
 An unfinished theme: hidden = true keeps it out of the player's theme
 picker in Settings; the layout tool still lists it.
 
+A theme without art
+-------------------
+type = "backdrop" draws the bar and the results the way a sticky note is
+drawn: a border around a background colour or texture, with the sticky
+settings' own options. No folder, no files, but an id is required:
+
+  Register({ id = "mybox", name = "My box", type = "backdrop", backdrop = {
+      border = "Blizzard Tooltip", borderScale = 100, borderOffset = 3,
+      borderLight = 0,
+      bgR = 0.07, bgG = 0.07, bgB = 0.09, alpha = 0.96,
+      bgTexture = "none", bgColorOpacity = 1, bgBrightness = 0,
+      highlight = { 0.40, 0.73, 0.42, 0.18 },
+      font = "lsm:Friz Quadrata TT", fontSize = 16,
+  } })
+
+border: "Default" (Blizzard's window border), "None", or a
+LibSharedMedia border name / texture path. borderScale is its thickness
+in % (1-200), borderOffset the px between the edge and the background
+(0-12), borderLight its brightness -100..100 (0 = as drawn, below
+darkens, above adds a lighter copy on top). bgTexture is a key from the
+sticky note background list (UI\StickyBackgrounds.lua; "windowbg" = the
+main window's own background), bgColorOpacity how much the colour tints
+it (0-1), bgBrightness its brightness (-1..1), alpha the background's
+opacity (0-1). font is "lsm:<name>", "bnb:<BigNoteBox font id>" or left
+out for WoW's font. Anything left out takes the Default style's value
+(Default border, windowbg background). The built-in "Custom border" theme
+is this type, set by the player in Settings.
+
 Your own theme
 --------------
 WoW only loads the files an addon's .toc lists, and an addon update

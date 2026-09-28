@@ -182,6 +182,15 @@ local function ReselectTab(idx)
     else SelectTab(idx) end
 end
 
+-- Esc on a sub-page goes back to its tab before anything closes (Dukul,
+-- 2026-09-28). True when it did; the main window's Esc chain and the
+-- window's own Esc handler (OpenConfig) both ask this first.
+function BNB.ConfigSubPageBack()
+    if not (activeSub and cfgFrame and cfgFrame:IsShown()) then return false end
+    ReselectTab(activeSub.idx)
+    return true
+end
+
 local function OpenSubPage(page)
     CloseSubPage()
     if tabPanels[page.idx] then tabPanels[page.idx]:Hide() end
@@ -719,6 +728,17 @@ function BNB.OpenConfig()
         BNB.HookConfigHeightTracking()
         -- A sub-page never outlives the window (ALL-84); reopening shows its tab.
         cfgFrame:HookScript("OnHide", CloseSubPage)
+        -- Esc while the main window is closed (the Oracle page hides it, or
+        -- Settings opened on its own): back one page, then close. While the
+        -- main window is up, its Esc chain owns the key.
+        cfgFrame:EnableKeyboard(true)
+        cfgFrame:SetScript("OnKeyDown", function(self, key)
+            if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
+                self:SetPropagateKeyboardInput(true); return
+            end
+            self:SetPropagateKeyboardInput(false)
+            if not BNB.ConfigSubPageBack() then self:Hide() end
+        end)
         -- Report-a-bug button beside Settings (Retail; ALL-77)
         if BNB.AttachSettingsBugButton then pcall(BNB.AttachSettingsBugButton, cfgFrame) end
     end

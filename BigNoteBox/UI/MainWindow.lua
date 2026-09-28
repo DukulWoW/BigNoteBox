@@ -336,7 +336,8 @@ local function OnEscapeKey(self, key)
     if TryHide("BNBSharePreviewFrame", BNB.CloseSharePreview) then return end
     if TryHide("BNBShareFrame",        BNB.CloseShareWindow)  then return end
     if TryHide("BNBImportFrame",       BNB.CloseImportWindow) then return end
-    -- Addon settings window
+    -- Addon settings window: a sub-page goes back to its tab first
+    if BNB.ConfigSubPageBack and BNB.ConfigSubPageBack() then return end
     if TryHide("BigNoteBoxConfigFrame") then return end
     -- Otherwise close main window (with confirm if enabled)
     BNB.RequestCloseMainWindow()
@@ -1072,6 +1073,22 @@ function BNB.RequestCloseMainWindow()
     end
 end
 
+-- Hides the main window but leaves Settings open: the Oracle settings page
+-- shows its preview in the main window's place (UI/Config/OracleSettings.lua).
+-- The note is saved as on any close; no close confirmation. Returns true
+-- when the window was shown, so the caller knows to bring it back.
+-- BNB._keepSettingsOpen is the page's own flag, set for as long as the page
+-- is open (not just around this Hide: a close that ran outside it, traced
+-- 2026-09-28, still took Settings with it).
+function BNB.HideMainWindowKeepSettings()
+    local f = BNB.mainFrame
+    if not (f and f:IsShown()) then return false end
+    f._skipConfirm = true
+    f:Hide()
+    f._skipConfirm = false
+    return true
+end
+
 -- Close all companion windows (NoteConfig, Config, SendToChat).
 -- Called from OnHide and from RequestCloseMainWindow so all close paths are covered.
 function BNB.CloseCompanionWindows()
@@ -1082,7 +1099,7 @@ function BNB.CloseCompanionWindows()
     local cm  = _G["BigNoteBoxCopyMoveFrame"]
     local ex  = _G["BigNoteBoxExportFrame"]
     if nc  and nc:IsShown()  then nc:Hide()  end
-    if cfg and cfg:IsShown() then cfg:Hide() end
+    if cfg and cfg:IsShown() and not BNB._keepSettingsOpen then cfg:Hide() end
     if tw  and tw:IsShown()  then tw:Hide()  end
     if tm  and tm:IsShown()  then tm:Hide()  end
     if cm  and cm:IsShown()  then cm:Hide()  end
