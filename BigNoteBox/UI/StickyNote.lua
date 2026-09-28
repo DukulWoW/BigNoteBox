@@ -382,6 +382,14 @@ local function ApplyIconBorder(target, borderName, borderScale, borderOffset, bo
     end
 end
 
+-- ALL-127: draws note.iconFrame on iconTex when set, else falls back to the
+-- LSM edge border on target (the icon badge or mini tile frame). The two are
+-- never both on: picking one in the picker clears the other.
+local function ApplyIconDecoration(target, iconTex, note, borderName, borderScale, borderOffset, borderBright)
+    local hasFrame = iconTex and BNB.ApplyIconFrame and BNB.ApplyIconFrame(iconTex, note)
+    ApplyIconBorder(target, not hasFrame and borderName, borderScale, borderOffset, borderBright)
+end
+
 -- ── Font outline helper ───────────────────────────────────────────────────────
 -- Returns flags string and shadow (ox, oy, r, g, b, a) for a given outline name.
 -- Used by ApplyConfig and PopulateStickySettings.
@@ -656,8 +664,8 @@ local function ApplyConfig(frame, noteID)
     local borderScale = note and note.borderScale or 100
     local borderOffset = note and note.borderOffset or 2
     local borderBright = note and note.borderBrightness or 100
-    ApplyIconBorder(frame._miniTile,  noteBorder, borderScale, borderOffset, borderBright)
-    ApplyIconBorder(frame._iconFrame, noteBorder, borderScale, borderOffset, borderBright)
+    ApplyIconDecoration(frame._miniTile,  frame._miniTile  and frame._miniTile._iconTex,  note, noteBorder, borderScale, borderOffset, borderBright)
+    ApplyIconDecoration(frame._iconFrame, frame._iconFrame and frame._iconFrame._iconTex, note, noteBorder, borderScale, borderOffset, borderBright)
     -- Refresh mini tile icon texture in case the note's icon changed since the
     -- tile was first built (tile._iconTex is set at CreateMiniTile time).
     if frame._miniTile and frame._miniTile._iconTex then
@@ -938,18 +946,20 @@ local function BuildIconBadge(f, noteID, note)
         COL_HEADER[1], COL_HEADER[2], COL_HEADER[3], 0.97,
         COL_BORDER[1], COL_BORDER[2], COL_BORDER[3], 1)
 
-    -- Apply note-level border (matches note list icon)
-    local noteBorder = note and note.borderOverride
-    local borderScale = note and note.borderScale or 100
-    local borderOffset = note and note.borderOffset or 2
-    local borderBright = note and note.borderBrightness or 100
-    ApplyIconBorder(iconFrame, noteBorder, borderScale, borderOffset, borderBright)
-
     local iconTex = iconFrame:CreateTexture(nil, "ARTWORK")
     iconTex:SetPoint("TOPLEFT",     iconFrame, "TOPLEFT",     ICON_PAD,  -ICON_PAD)
     iconTex:SetPoint("BOTTOMRIGHT", iconFrame, "BOTTOMRIGHT", -ICON_PAD,  ICON_PAD)
     SetStickyNoteIcon(iconTex, note)
     f._badgeTex = iconTex   -- re-drawn by SN.RefreshNpcPortraits
+    iconFrame._iconTex = iconTex
+
+    -- Icon frame or note-level LSM border (matches note list icon; ALL-127:
+    -- the icon frame takes over from the edge border when set)
+    local noteBorder = note and note.borderOverride
+    local borderScale = note and note.borderScale or 100
+    local borderOffset = note and note.borderOffset or 2
+    local borderBright = note and note.borderBrightness or 100
+    ApplyIconDecoration(iconFrame, iconTex, note, noteBorder, borderScale, borderOffset, borderBright)
 
     -- Markers from the note list icon (UI/NoteList.lua): situation top-right,
     -- class icon of the owning character bottom-left. Same size ratio as the
@@ -2795,8 +2805,8 @@ function SN.RefreshNote(noteID)
     local borderScale3 = note3 and note3.borderScale or 100
     local borderOffset3 = note3 and note3.borderOffset or 2
     local borderBright3 = note3 and note3.borderBrightness or 100
-    ApplyIconBorder(f._iconFrame, noteBorder3, borderScale3, borderOffset3, borderBright3)
-    ApplyIconBorder(f._miniTile,  noteBorder3, borderScale3, borderOffset3, borderBright3)
+    ApplyIconDecoration(f._iconFrame, f._iconFrame and f._iconFrame._iconTex, note3, noteBorder3, borderScale3, borderOffset3, borderBright3)
+    ApplyIconDecoration(f._miniTile,  f._miniTile  and f._miniTile._iconTex,  note3, noteBorder3, borderScale3, borderOffset3, borderBright3)
 end
 
 function SN.RestoreSession()

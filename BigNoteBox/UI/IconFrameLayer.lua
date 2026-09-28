@@ -77,3 +77,28 @@ function IFL.Apply(icon, tex, def, size, bright)
     tex:Show()
     IFL.SetShape(icon, def.shape)
 end
+
+-- Applies note.iconFrame to icon (a note icon texture whose parent has room
+-- for the frame art to overhang it). Returns true when a frame was drawn, so
+-- the caller can skip its own LSM edge border for this icon (ALL-127: the
+-- two are drawn one at a time, picking one clears the other). Reuses the
+-- note's borderScale/Offset/Brightness sliders, the same ones the LSM edge
+-- border already uses.
+function BNB.ApplyIconFrame(icon, note)
+    if not icon then return false end
+    local def = BNB.IconFrames and BNB.IconFrames.Get(note and note.iconFrame)
+    if not def then
+        if icon._ifTex then icon._ifTex:Hide() end
+        IFL.SetShape(icon, nil)
+        return false
+    end
+    if not icon._ifTex then
+        icon._ifTex = icon:GetParent():CreateTexture(nil, "OVERLAY")
+    end
+    local scale  = (note.borderScale or 100) / 100
+    local bright = (note.borderBrightness or 100) / 100
+    local size = (icon.GetWidth and icon:GetWidth() or 0) * scale
+    if size <= 0 then size = 20 end
+    IFL.Apply(icon, icon._ifTex, def, size, bright)
+    return true
+end

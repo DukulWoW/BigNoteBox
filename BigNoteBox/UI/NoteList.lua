@@ -1566,14 +1566,19 @@ local function PopulateEntry(btn, note, selected, collapsed)
     -- Icon border always hidden (user sets per-note border via LSM; WhiteIconFrame removed)
     if btn._iconBorder then btn._iconBorder:Hide() end
 
+    -- Icon frame (ALL-127) takes over from the LSM edge border below when set
+    local hasIconFrame = BNB.ApplyIconFrame and BNB.ApplyIconFrame(btn._icon, note)
+
     -- Per-note LSM border — rendered on a separate overlay Frame around the icon.
     -- edgeSize controls thickness; the overlay grows outward so the border never
     -- eats into the icon texture.
-    local bord = note.borderOverride
+    local bord = not hasIconFrame and note.borderOverride
     local bordScale = note.borderScale or 100
     local bordOffset = note.borderOffset or 2
     local bordBright = (note.borderBrightness or 100) / 100
-    if bord and bord ~= "" then
+    if hasIconFrame then
+        if btn._borderFrame then btn._borderFrame:Hide() end
+    elseif bord and bord ~= "" then
         local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
         local path = LSM and LSM:Fetch("border", bord)
         if path then

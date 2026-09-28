@@ -26,21 +26,6 @@ local ROW_H   = 28
 local ROW_GAP = 4
 local ASSETS  = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
--- ── LSM helpers ───────────────────────────────────────────────────────────────
-local function GetLSM() return LibStub and LibStub("LibSharedMedia-3.0", true) end
-local function LSMBorderList()
-    -- De-duplicate: LSM sometimes includes "None" as an entry
-    local l = GetLSM()
-    local seen = { ["None"] = true }
-    local r = { "None" }
-    if l then
-        for _, v in ipairs(l:List("border")) do
-            if not seen[v] then seen[v] = true; r[#r+1] = v end
-        end
-    end
-    return r
-end
-
 -- ── Module state ──────────────────────────────────────────────────────────────
 local ncFrame   = nil
 local _noteID   = nil
@@ -1076,24 +1061,57 @@ end
 local function BuildAppearanceTab(panel)
     local y = -4
 
-    -- Border dropdown
+    -- Icon frame / edge border picker (ALL-127: replaces the old LSM border
+    -- dropdown; a game-art frame and an LSM edge border are mutually
+    -- exclusive, the picker's two tabs enforce that)
     y = Hdr(panel, y, L["NC_HDR_BORDER"])
-    local note0   = GetNote()
-    local curBord = (note0 and note0.borderOverride) or "None"
-    local bDrop = CreateDropdown(panel, L["NC_BORDER_STYLE_LABEL"],
-        LSMBorderList, curBord,
-        function(name)
-            if name == "None" then
-                BNB.UpdateNote(_noteID, {_clear = {"borderOverride"}})
-            else
-                BNB.UpdateNote(_noteID, {borderOverride = name})
-            end
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        end,
-        nil)
-    bDrop:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y); bDrop:SetWidth(CW)
-    y = y - 50
+    local function CurIconFrameLabel()
+        local n = GetNote()
+        if n and n.iconFrame and n.iconFrame ~= "" and n.iconFrame ~= "none" then
+            return BNB.IconFrames.Label(n.iconFrame) or n.iconFrame
+        end
+        if n and n.borderOverride and n.borderOverride ~= "" and n.borderOverride ~= "None" then
+            return n.borderOverride
+        end
+        return L["STICKY_BG_NONE"]
+    end
+    local ifBtn = BNB.CreateButton(nil, panel, L["NC_ICON_FRAME_BTN"], CW, 22)
+    local function RefreshIconFrameBtn()
+        ifBtn:SetText(L["NC_ICON_FRAME_BTN"] .. ": " .. CurIconFrameLabel())
+    end
+    RefreshIconFrameBtn()
+    ifBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    local function IconFrameHandlers()
+        return {
+            getFrame = function() local n = GetNote(); return (n and n.iconFrame) or "none" end,
+            setFrame = function(key)
+                if key == "none" then BNB.UpdateNote(_noteID, {_clear = {"iconFrame"}})
+                else BNB.UpdateNote(_noteID, {iconFrame = key}) end
+                RefreshIconFrameBtn()
+                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
+            end,
+            getBorder = function() local n = GetNote(); return (n and n.borderOverride) or "None" end,
+            setBorder = function(name)
+                if name == "None" then BNB.UpdateNote(_noteID, {_clear = {"borderOverride"}})
+                else BNB.UpdateNote(_noteID, {borderOverride = name}) end
+                RefreshIconFrameBtn()
+                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
+            end,
+            getBright = function()
+                local n = GetNote(); return ((n and n.borderBrightness) or 100) / 100
+            end,
+            getIcon = function()
+                local n = GetNote()
+                return n and (BNB.NpcNoteIcon and BNB.NpcNoteIcon(n) or n.icon)
+            end,
+        }
+    end
+    ifBtn:SetScript("OnClick", function(self)
+        BNB.IconFramePicker.Open(_noteID, ncFrame or self, IconFrameHandlers())
+    end)
+    y = y - 28
 
     -- Border sliders: stacked, with Reset (ALL-121)
     local function GetBorderScale()
@@ -1455,8 +1473,10 @@ local function BuildAppearanceTab(panel)
     -- Refresh all border controls when switching notes (called by OpenNoteConfig/SyncNoteConfig)
     panel._refreshAppearance = function()
         local n    = GetNote()
-        local bord = (n and n.borderOverride) or "None"
-        bDrop:SetSelected(bord)
+        RefreshIconFrameBtn()
+        if BNB.IconFramePicker.IsOpenFor(_noteID) then
+            BNB.IconFramePicker.Rebind(_noteID, IconFrameHandlers())
+        end
 
         local bs = (n and n.borderScale)      or 100
         local bo = (n and n.borderOffset)     or 2

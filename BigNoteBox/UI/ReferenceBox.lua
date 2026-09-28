@@ -1661,6 +1661,10 @@ local function UpdateSideTabs()
         local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
         BNB.SetNpcNotePortrait(icon, note)
     end
+    if BNB.ApplyIconFrame then
+        local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
+        BNB.ApplyIconFrame(icon, note)
+    end
     for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
         local on = (_rbMode == btn._mode)
         btn._active:SetShown(on)

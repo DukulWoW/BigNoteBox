@@ -162,6 +162,7 @@ local function JsonEncodeNote(note)
         field("borderScale",   note.borderScale),
         field("borderOffset",  note.borderOffset),
         field("borderBrightness", note.borderBrightness),
+        field("iconFrame",     note.iconFrame),
         field("lineHeight",    note.lineHeight),
         field("scope",         note.scope),
         -- Waypoint: {mapID, x, y, label} table or null
@@ -244,6 +245,7 @@ local function MdEncodeNote(note)
     if note.borderOverride then lines[#lines + 1] = "borderOverride: " .. note.borderOverride end
     if note.borderScale    then lines[#lines + 1] = "borderScale: "    .. tostring(note.borderScale)  end
     if note.borderOffset   then lines[#lines + 1] = "borderOffset: "   .. tostring(note.borderOffset) end
+    if note.iconFrame      then lines[#lines + 1] = "iconFrame: "      .. note.iconFrame      end
     if note.lineHeight     then lines[#lines + 1] = "lineHeight: "     .. note.lineHeight     end
     if note.created        then lines[#lines + 1] = "created: "        .. tostring(note.created)      end
     if note.updated        then lines[#lines + 1] = "updated: "        .. tostring(note.updated)      end
@@ -1075,6 +1077,7 @@ local function ParseMarkdownNotes(text)
                     elseif key == "borderScale"      then note.borderScale      = tonumber(val)
                     elseif key == "borderOffset"     then note.borderOffset     = tonumber(val)
                     elseif key == "borderBrightness" then note.borderBrightness = tonumber(val)
+                    elseif key == "iconFrame"        then note.iconFrame        = val
                     elseif key == "scope"            then note.scope            = val
                     elseif key == "wpClearOnLeave"   then note.wpClearOnLeave   = (val == "true") or nil
                     elseif key == "waypoint" and val ~= "" and val ~= "null" then
@@ -1172,6 +1175,7 @@ local function ImportNotes(noteList, remapScope)
                 borderScale      = src.borderScale,
                 borderOffset     = src.borderOffset,
                 borderBrightness = src.borderBrightness,
+                iconFrame        = src.iconFrame,
                 lineHeight       = src.lineHeight,
                 scope            = resolvedScope,
                 waypoint         = src.waypoint,

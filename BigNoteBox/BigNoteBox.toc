@@ -52,10 +52,12 @@ UI\FocusEditor.lua
 UI\RichPreview.lua
 UI\BgLayer.lua
 UI\IconFrameLayer.lua
+UI\IconFrames.lua
 UI\StickyBackgrounds.lua
 UI\StickyNote.lua
 UI\StickySettings.lua
 UI\StickyBgPicker.lua
+UI\IconFramePicker.lua
 UI\SendToChat.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua

@@ -276,6 +276,7 @@ function BNB.PopulateTrashWindow()
         -- Icon
         local iconPath = (note.icon and note.icon ~= "") and note.icon or DEFAULT_ICON
         row._icon:SetTexture(iconPath)
+        if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row._icon, note) end
 
         -- Title
         row._titleLbl:SetText(

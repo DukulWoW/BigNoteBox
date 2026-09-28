@@ -558,6 +558,7 @@ local function RowText(row, r, textRight, m)
     -- display ID is looked up the note icon stays; Oracle.RefreshPortraits
     -- redraws when the lookup finishes.
     if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(row.icon, note) end
+    if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row.icon, note) end
     local title = (note.title and note.title ~= "") and note.title or L["UNTITLED"]
     row.title:SetText(title)
     local tc = note.titleColor
