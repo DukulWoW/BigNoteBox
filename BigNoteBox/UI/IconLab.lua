@@ -36,6 +36,13 @@ local C_W, C_H = 340, 690
 local C_PAD    = 16
 local SHEET_BGS = {      -- behind the sheet and the preview, cycled with Bg
     { 0.08, 0.08, 0.10 }, { 0.55, 0.55, 0.58 }, { 0.85, 0.20, 0.75 },
+    -- Pictures, by atlas (the art is a 1022x602 region of a 1024x1024 file):
+    -- behind the whole window, cover-fitted (fills it, keeps the aspect,
+    -- crops the overflow evenly). The colour shows if the atlas is missing.
+    { 0.08, 0.08, 0.10, atlas = "scoreboard-background-islands-horde" },
+    { 0.08, 0.08, 0.10, atlas = "scoreboard-background-islands-alliance" },
+    { 0.08, 0.08, 0.10, atlas = "scoreboard-background-warfronts-alliance" },
+    { 0.08, 0.08, 0.10, atlas = "scoreboard-background-warfronts-horde" },
 }
 local COL_CROP  = { 1, 0.82, 0, 1 }
 local COL_HOLE  = { 0.30, 1, 0.40, 1 }
@@ -582,12 +589,34 @@ local function LayoutGrid()
     end
 end
 
+-- A picture Bg (b.atlas) behind the whole window f, on f.pic. Cover fit
+-- inside the atlas region: fills the window at the art's aspect, the side
+-- that overflows is cropped evenly at both ends. True when it drew one, so
+-- the caller clears its colour base.
+local function DrawPictureBg(f, b)
+    local pic = f.pic
+    local id, info = K.ResolveAtlas(b.atlas)
+    local FW, FH = f:GetSize()
+    if not (id and info.width and info.width > 0 and info.height > 0 and FW > 8 and FH > 8) then
+        pic:Hide(); return false
+    end
+    local l, r, t, bt = info.leftTexCoord, info.rightTexCoord, info.topTexCoord, info.bottomTexCoord
+    local BW, BH = FW - 8, FH - 8
+    local sc = math.max(BW / info.width, BH / info.height)
+    local u, v = BW / (info.width * sc), BH / (info.height * sc)   -- visible share of the region
+    local cu, cv, du, dv = (l + r) / 2, (t + bt) / 2, (r - l) * u / 2, (bt - t) * v / 2
+    pic:SetTexture(id)
+    pic:SetTexCoord(cu - du, cu + du, cv - dv, cv + dv)
+    pic:Show()
+    return true
+end
+
 function LayoutSheet()
     if not (_sh and _sh:IsShown() and LIST[_idx]) then return end
     local e = LIST[_idx]
     local area, tex = _sh.area, _sh.tex
     local b = SHEET_BGS[Store().bg or 1] or SHEET_BGS[1]
-    _sh.base:SetColorTexture(b[1], b[2], b[3], 1)
+    _sh.base:SetColorTexture(b[1], b[2], b[3], DrawPictureBg(_sh, b) and 0 or 1)
     _sh.title:SetText(e.atlas or e.key)
 
     local AW, AH = area:GetSize()
@@ -859,6 +888,10 @@ local function BuildSheet()
     f.area = area
     f.base = area:CreateTexture(nil, "BACKGROUND", nil, -8)
     f.base:SetAllPoints()
+    f.pic = f:CreateTexture(nil, "BACKGROUND", nil, 7)   -- picture Bg, the whole window
+    f.pic:SetPoint("TOPLEFT", 4, -4)
+    f.pic:SetPoint("BOTTOMRIGHT", -4, 4)
+    f.pic:Hide()
     f.tex = area:CreateTexture(nil, "ARTWORK")
     f.pool = {}
     f.crop  = Outline(area, COL_CROP)
@@ -1084,7 +1117,7 @@ LayoutPreview = function()
     local st = State(_idx)
     local def, standIn = FrameDef(_idx)
     local b = SHEET_BGS[Store().bg or 1] or SHEET_BGS[1]
-    _pv.base:SetColorTexture(b[1], b[2], b[3], 1)
+    _pv.base:SetColorTexture(b[1], b[2], b[3], DrawPictureBg(_pv, b) and 0 or 1)
     _pv.title:SetText((st.name and st.name ~= "") and st.name or (LIST[_idx].atlas or LIST[_idx].key))
     if not def then
         _pv.warn:SetText("Waiting for the file size...")
@@ -1176,6 +1209,10 @@ local function BuildPreview()
     band:SetFrameLevel(f:GetFrameLevel() + 1)
     f.base = band:CreateTexture(nil, "BACKGROUND")
     f.base:SetAllPoints()
+    f.pic = f:CreateTexture(nil, "BACKGROUND", nil, 7)   -- picture Bg, the whole window
+    f.pic:SetPoint("TOPLEFT", 4, -4)
+    f.pic:SetPoint("BOTTOMRIGHT", -4, 4)
+    f.pic:Hide()
     local top = CreateFrame("Frame", nil, f)
     top:SetAllPoints()
     top:SetFrameLevel(f:GetFrameLevel() + 5)
