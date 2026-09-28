@@ -32,7 +32,7 @@ Register({
         topright       = { a1 = "TOPRIGHT", x1 = -45, y1 = 22, a2 = "TOPRIGHT", x2 = 19, y2 = -10 },
         bottomleft     = { a1 = "BOTTOMLEFT", x1 = -20, y1 = 75, a2 = "BOTTOMLEFT", x2 = 44, y2 = -53 },
         bottomright    = { a1 = "BOTTOMRIGHT", x1 = -50, y1 = 75, a2 = "BOTTOMRIGHT", x2 = 14, y2 = -53 },
-        pornament1     = { a1 = "BOTTOMRIGHT", x1 = -179.67, y1 = 9.67, a2 = "BOTTOMRIGHT", x2 = -9, y2 = -75.67 },
+        pornament1     = { a1 = "BOTTOMRIGHT", x1 = -179.67, y1 = 11, a2 = "BOTTOMRIGHT", x2 = -9, y2 = -74.33 },
     },
     panelSize = { border = 24, borderY = 24 },
     panelPos = { left = 0, right = 0, gap = -16, under = true },

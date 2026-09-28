@@ -26,12 +26,9 @@ local Oracle = {}
 BNB.Oracle = Oracle
 
 local MAX_ROWS   = 8
-local ROW_H      = 36
 local ROW_GAP    = 2
-local ICON_SIZE  = 26
 local HINT_H     = 18
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
-local BADGE_SIZE = 18
 local BADGE_GAP  = 4
 local BADGE_ART  = "Interface\\AddOns\\BigNoteBox\\Assets\\Search\\"
 
@@ -151,6 +148,35 @@ local function MaxRows()
     local n = BigNoteBoxDB and tonumber(BigNoteBoxDB.oracleMaxResults)
     if not n then return MAX_ROWS end
     return math.max(1, math.min(MAX_ROWS, math.floor(n)))
+end
+
+-- Result rows (ALL-69.6, every theme; nil = the default here):
+--   oracleTitleSize / oracleSnippetSize   title and preview text, px
+--   oracleIconSize  / oracleShowIcons     note icon on the left, false = off
+--   oracleBadgeSize / oracleShowBadges    badges on the right, false = off
+-- The row height follows them (RowMetrics).
+local RESULT_SIZES = {
+    title  = { key = "oracleTitleSize",   min = 10, max = 20, def = 13 },
+    small  = { key = "oracleSnippetSize", min = 8,  max = 18, def = 11 },
+    icon   = { key = "oracleIconSize",    min = 16, max = 40, def = 26, show = "oracleShowIcons" },
+    badge  = { key = "oracleBadgeSize",   min = 12, max = 28, def = 18, show = "oracleShowBadges" },
+}
+Oracle.RESULT_SIZES = RESULT_SIZES
+
+local function RowMetrics()
+    local db = BigNoteBoxDB or {}
+    local m = {}
+    for name, s in pairs(RESULT_SIZES) do
+        local n = tonumber(db[s.key])
+        n = n and math.max(s.min, math.min(s.max, math.floor(n))) or s.def
+        if s.show and db[s.show] == false then n = 0 end
+        m[name] = n
+    end
+    -- Text block: title over preview, at least as tall as the icon, so at
+    -- the defaults (26 px icon, 13 + 11 text) the row is the old 36 px.
+    m.text = math.max(m.title + m.small + 2, m.icon)
+    m.rowH = math.max(m.text + 10, m.badge + 8)
+    return m
 end
 
 local function KeepOpen()
@@ -511,9 +537,10 @@ local function SetSelection(i)
     for n, row in ipairs(rows) do row.selTex:SetShown(n == sel) end
 end
 
--- How many badges a note shows.
-local function BadgeCount(note)
+-- How many badges a note shows (none while badges are off).
+local function BadgeCount(note, m)
     local n = 0
+    if m.badge == 0 then return 0 end
     for _, def in ipairs(BADGES) do
         if def.show(note) then n = n + 1 end
     end
@@ -523,7 +550,7 @@ end
 -- textRight: x offset from the row's right edge where the scope label and
 -- snippet end. The same for every row (Layout sizes it to the row with the
 -- most badges), so the text lines up and does not shift with the badges.
-local function RowText(row, r, textRight)
+local function RowText(row, r, textRight, m)
     local note = r.note
     local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     row.icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
@@ -542,13 +569,13 @@ local function RowText(row, r, textRight)
     local x = -8
     for b, def in ipairs(BADGES) do
         local badge = row.badges[b]
-        if def.show(note) then
+        if m.badge > 0 and def.show(note) then
             if not badge then
                 -- A small frame, not a bare texture, so it can show what it
                 -- means on hover. It takes the mouse from the row, so it
                 -- passes hover (selection) and clicks (open) on to it.
                 badge = CreateFrame("Frame", nil, row)
-                badge:SetSize(BADGE_SIZE, BADGE_SIZE)
+                badge:SetSize(m.badge, m.badge)
                 badge:EnableMouse(true)
                 local tex = badge:CreateTexture(nil, "ARTWORK")
                 tex:SetAllPoints()
@@ -582,10 +609,11 @@ local function RowText(row, r, textRight)
                 badge.round:SetShown(round)
                 if round then badge.round:SetTexture(file) else badge.tex:SetTexture(file) end
             end
+            badge:SetSize(m.badge, m.badge)
             badge:ClearAllPoints()
             badge:SetPoint("RIGHT", row, "RIGHT", x, 0)
             badge:Show()
-            x = x - BADGE_SIZE - BADGE_GAP
+            x = x - m.badge - BADGE_GAP
         elseif badge then
             badge:Hide()
         end
@@ -596,20 +624,49 @@ local function RowText(row, r, textRight)
 end
 
 -- A row's text in the theme's font (ALL-69.5): only a backdrop theme sets
--- one (fontPath); nil puts WoW's font objects back. The rows keep their
--- own sizes; the font's size setting is for the typed text.
-local ROW_TITLE_PX, ROW_SMALL_PX = 13, 11
-local function RowFonts(row)
-    BNB.SetFontSafe(row.title,   fontPath, ROW_TITLE_PX, "GameFontHighlight")
-    BNB.SetFontSafe(row.snippet, fontPath, ROW_SMALL_PX, "GameFontDisableSmall")
-    BNB.SetFontSafe(row.scope,   fontPath, ROW_SMALL_PX, "GameFontDisableSmall")
+-- one (fontPath); nil puts WoW's font objects back. The font's size setting
+-- is for the typed text; the rows take the Results sizes (ALL-69.6). On
+-- WoW's font they scale the font object (SetTextScale) instead of a raw
+-- SetFont, which would drop its per-alphabet fallback on translated titles;
+-- the scale is relative to the default size, so the defaults look as before.
+local function ScaleText(fs, px, def)
+    if fs.SetTextScale then pcall(fs.SetTextScale, fs, fontPath and 1 or px / def) end
+end
+local function RowFonts(row, m)
+    m = m or RowMetrics()
+    local T, S = RESULT_SIZES.title.def, RESULT_SIZES.small.def
+    BNB.SetFontSafe(row.title,   fontPath, m.title, "GameFontHighlight")
+    BNB.SetFontSafe(row.snippet, fontPath, m.small, "GameFontDisableSmall")
+    BNB.SetFontSafe(row.scope,   fontPath, m.small, "GameFontDisableSmall")
+    ScaleText(row.title, m.title, T)
+    ScaleText(row.snippet, m.small, S)
+    ScaleText(row.scope, m.small, S)
+    row._fontSig = (fontPath or "") .. ":" .. m.title .. ":" .. m.small
+end
+
+-- Sizes a row for m (RowMetrics): height, icon (hidden at 0) and the two
+-- text lines centred as a block, left of them the icon when it shows.
+local function RowLayout(row, m)
+    row:SetHeight(m.rowH)
+    local icon = row.icon
+    icon:SetShown(m.icon > 0)
+    if m.icon > 0 then icon:SetSize(m.icon, m.icon) end
+    local left = (m.icon > 0) and (6 + m.icon + 8) or 8
+    local top = math.floor((m.rowH - m.text) / 2 + 0.5)
+    row.title:ClearAllPoints()
+    row.title:SetPoint("TOPLEFT", row, "TOPLEFT", left, -top)
+    row.title:SetPoint("RIGHT", row.scope, "LEFT", -8, 0)
+    row.snippet:ClearAllPoints()
+    row.snippet:SetPoint("BOTTOMLEFT", row, "TOPLEFT", left, -(top + m.text))
+    local sig = (fontPath or "") .. ":" .. m.title .. ":" .. m.small
+    if row._fontSig ~= sig then RowFonts(row, m) end
 end
 
 -- A result row on parent. onEnter / onClick: nil for the layout tool's
--- preview rows, which take no mouse at all.
+-- preview rows, which take no mouse at all. Sizes and text anchors are set
+-- by RowLayout on every layout.
 local function BuildRow(parent, onEnter, onClick)
     local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(ROW_H)
     row:RegisterForClicks("LeftButtonUp")
 
     local selTex = row:CreateTexture(nil, "BACKGROUND", nil, 1)
@@ -620,7 +677,6 @@ local function BuildRow(parent, onEnter, onClick)
     row.badges = {}
 
     local icon = row:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(ICON_SIZE, ICON_SIZE)
     icon:SetPoint("LEFT", 6, 0)
     icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     row.icon = icon
@@ -632,22 +688,18 @@ local function BuildRow(parent, onEnter, onClick)
     row.scope = scope
 
     local title = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    title:SetPoint("TOPLEFT", icon, "TOPRIGHT", 8, 0)
-    title:SetPoint("RIGHT", scope, "LEFT", -8, 0)
     title:SetJustifyH("LEFT")
     title:SetWordWrap(false)
     row.title = title
 
     local snippet = row:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    snippet:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 8, 0)
-    snippet:SetPoint("RIGHT", row, "RIGHT", -8, 0)
     snippet:SetJustifyH("LEFT")
     snippet:SetWordWrap(false)
     row.snippet = snippet
 
     if onEnter then row:SetScript("OnEnter", onEnter) end
     if onClick then row:SetScript("OnClick", onClick) else row:EnableMouse(false) end
-    if fontPath then RowFonts(row) end
+    RowLayout(row, RowMetrics())
     return row
 end
 
@@ -662,12 +714,13 @@ end
 -- pad: the theme's content inset (BNB.GetSearchPanelPad), left / right used here.
 local function PlaceRows(parent, rowList, list, y, pad, build)
     local n = #list
+    local m = RowMetrics()
     -- Badge column as wide as the row with the most badges, plus a little
     -- air between badges and text.
     local most = 0
-    for i = 1, n do most = math.max(most, BadgeCount(list[i].note)) end
+    for i = 1, n do most = math.max(most, BadgeCount(list[i].note, m)) end
     local textRight = -8
-    if most > 0 then textRight = -8 - most * (BADGE_SIZE + BADGE_GAP) - 4 end
+    if most > 0 then textRight = -8 - most * (m.badge + BADGE_GAP) - 4 end
     for i = 1, math.max(MAX_ROWS, #rowList) do
         local row = rowList[i]
         if i <= n then
@@ -675,9 +728,10 @@ local function PlaceRows(parent, rowList, list, y, pad, build)
             row:ClearAllPoints()
             row:SetPoint("TOPLEFT", parent, "TOPLEFT", pad.left, y)
             row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -pad.right, y)
-            RowText(row, list[i], textRight)
+            RowLayout(row, m)
+            RowText(row, list[i], textRight, m)
             row:Show()
-            y = y - ROW_H - ROW_GAP
+            y = y - m.rowH - ROW_GAP
         elseif row then
             row:Hide()
         end

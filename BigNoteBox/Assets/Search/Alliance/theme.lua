@@ -33,8 +33,10 @@ Register({
         topright       = { a1 = "TOPRIGHT", x1 = -32, y1 = 0, a2 = "TOPRIGHT", x2 = 0, y2 = -32 },
         bottomleft     = { a1 = "BOTTOMLEFT", x1 = 0, y1 = 32, a2 = "BOTTOMLEFT", x2 = 32, y2 = 0 },
         bottomright    = { a1 = "BOTTOMRIGHT", x1 = -32, y1 = 32, a2 = "BOTTOMRIGHT", x2 = 0, y2 = 0 },
-        pornament1     = { a1 = "TOPLEFT", x1 = 456, y1 = -419, a2 = "TOPLEFT", x2 = 613.54, y2 = -497.77 },
-        pornament2     = { a1 = "TOPRIGHT", x1 = -186, y1 = -414, a2 = "TOPRIGHT", x2 = -136.77, y2 = -463.23 },
+        -- From the bottom, so they follow the panel's height (they hung from
+        -- the top and sat inside the results with fewer than 8 rows).
+        pornament1     = { a1 = "BOTTOMLEFT", x1 = 456, y1 = 16.69, a2 = "BOTTOMLEFT", x2 = 613.54, y2 = -62.08 },
+        pornament2     = { a1 = "BOTTOMRIGHT", x1 = -186, y1 = 21.69, a2 = "BOTTOMRIGHT", x2 = -136.77, y2 = -27.54 },
     },
     panelSize = { border = 26, borderY = 26 },
     panelPos = { left = 0, right = 0, gap = 2, under = true },

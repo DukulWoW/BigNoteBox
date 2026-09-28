@@ -583,6 +583,10 @@ local function BuildOraclePage(sf, ct, y, page)
     lower:SetPoint("TOPRIGHT", top, "TOPRIGHT", 0, 0)
     ct, y = lower, 0
 
+    -- ── Results (ALL-69.6, every theme) ───────────────────────────────────────
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["CFG_ORACLE_HDR_RESULTS"])
+
     local maxSl = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_ORACLE_MAX_ROWS"], min = 1, max = Oracle.MAX_ROWS,
         value = db.oracleMaxResults or Oracle.MAX_ROWS, default = Oracle.MAX_ROWS,
@@ -594,6 +598,54 @@ local function BuildOraclePage(sf, ct, y, page)
     maxSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     widgets[#widgets + 1] = maxSl
     y = y - (BNB.STACKED_SLIDER_H + ROW_GAP + 2)
+
+    -- Sizes: nil saved at the default. A size slider is greyed while its
+    -- Show box is off (SyncResults, also after the module switch).
+    local RS = Oracle.RESULT_SIZES
+    local function SizeSlider(s, label)
+        local sl = BNB.CreateStackedSlider(ct, CONTENT_W, {
+            label = label, min = s.min, max = s.max, default = s.def,
+            value = db[s.key] or s.def, fmt = function(v) return v .. " px" end,
+            onChange = function(v)
+                db[s.key] = (v ~= s.def) and v or nil
+                Oracle.RefreshPreview()
+            end,
+        })
+        sl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        widgets[#widgets + 1] = sl
+        y = y - (BNB.STACKED_SLIDER_H + ROW_GAP + 2)
+        return sl
+    end
+    SizeSlider(RS.title, L["CFG_ORACLE_TITLE_SIZE"])
+    SizeSlider(RS.small, L["CFG_ORACLE_PREVIEW_SIZE"])
+
+    local SyncResults
+    local function ShowCheck(s, label, tip)
+        local cb
+        y, cb = AddCheck(ct, y, label,
+            function() return db[s.show] ~= false end,
+            function(v)
+                db[s.show] = (not v) and false or nil
+                SyncResults()
+                Oracle.RefreshPreview()
+            end, tip)
+        widgets[#widgets + 1] = cb
+    end
+    ShowCheck(RS.icon, L["CFG_ORACLE_SHOW_ICONS"], L["CFG_ORACLE_SHOW_ICONS_TIP"])
+    local iconSl = SizeSlider(RS.icon, L["CFG_ORACLE_ICON_SIZE"])
+    ShowCheck(RS.badge, L["CFG_ORACLE_SHOW_BADGES"], L["CFG_ORACLE_SHOW_BADGES_TIP"])
+    local badgeSl = SizeSlider(RS.badge, L["CFG_ORACLE_BADGE_SIZE"])
+
+    function SyncResults()
+        local moduleOn = db.oracleEnabled ~= false
+        for _, pair in ipairs({ { iconSl, RS.icon }, { badgeSl, RS.badge } }) do
+            local on = moduleOn and db[pair[2].show] ~= false
+            local w = pair[1]
+            w:SetAlpha(on and 1 or 0.35)
+            local t = w.Slider or w
+            if t.SetEnabled then t:SetEnabled(on) end
+        end
+    end
 
     -- ── Position ──────────────────────────────────────────────────────────────
     y = AddRule(ct, y) - 4
@@ -713,6 +765,7 @@ local function BuildOraclePage(sf, ct, y, page)
             local t = w._dd or w.Slider or w   -- value dropdown, slider, button
             if t.SetEnabled then t:SetEnabled(on) end
         end
+        SyncResults()
     end
     enableCb:SetScript("OnClick", function(self)
         if self:GetChecked() then
