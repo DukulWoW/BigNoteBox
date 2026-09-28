@@ -173,16 +173,20 @@ local function FrameDef(i)
 end
 
 -- ── The list: seed files, then files and regions added in game ───────────────
-local function SameEntry(e, id, atlas)
-    return e.id == id and (e.atlas or "") == (atlas or "")
+-- An entry is a file, or a file + atlas pair, plus an optional variant
+-- number: "New frame from this file" makes another entry on the same file
+-- (or region) for a sheet that holds several frames, keyed "<key>-2" etc.
+local function SameEntry(e, id, atlas, variant)
+    return e.id == id and (e.atlas or "") == (atlas or "") and (e.variant or 1) == (variant or 1)
 end
 
-local function Append(g, id, path, atlas)
+local function Append(g, id, path, atlas, variant)
     for i, e in ipairs(LIST) do
-        if SameEntry(e, id, atlas) then return i end
+        if SameEntry(e, id, atlas, variant) then return i end
     end
-    LIST[#LIST + 1] = { g = g, id = id, path = path or "", atlas = atlas,
-                        key = K.EntryKey(id, path or "", atlas) }
+    local key = K.EntryKey(id, path or "", atlas)
+    if variant and variant > 1 then key = key .. "-" .. variant end
+    LIST[#LIST + 1] = { g = g, id = id, path = path or "", atlas = atlas, variant = variant, key = key }
     return #LIST
 end
 
@@ -202,21 +206,34 @@ local function LoadList()
     for _, c in ipairs(s.custom or {}) do
         if type(c) == "table" and K.ValidID(c.id) then
             kept[#kept + 1] = c
-            Append("added", c.id, c.path, c.atlas)
+            Append("added", c.id, c.path, c.atlas, c.variant)
         end
     end
     if s.custom then s.custom = kept end
 end
 
-local function AddCustom(id, path, atlas)
+local function AddCustom(id, path, atlas, variant)
     if not K.ValidID(id) then return nil end
     for i, e in ipairs(LIST) do
-        if SameEntry(e, id, atlas) then return i end   -- already listed: just go there
+        if SameEntry(e, id, atlas, variant) then return i end   -- already listed: just go there
     end
     local s = Store()
     s.custom = s.custom or {}
-    s.custom[#s.custom + 1] = { id = id, path = path or "", atlas = atlas }
-    return Append("added", id, path, atlas)
+    s.custom[#s.custom + 1] = { id = id, path = path or "", atlas = atlas, variant = variant }
+    return Append("added", id, path, atlas, variant)
+end
+
+-- Another entry on the current entry's file (and region), next free number
+local function NewVariant()
+    local e = LIST[_idx]
+    if not e then return nil end
+    local n = 2
+    for _, o in ipairs(LIST) do
+        if o.id == e.id and (o.atlas or "") == (e.atlas or "") then
+            n = math.max(n, (o.variant or 1) + 1)
+        end
+    end
+    return AddCustom(e.id, e.path ~= "" and e.path or FilePath(e.id), e.atlas, n)
 end
 
 local function RemoveCustom(i)
@@ -224,7 +241,7 @@ local function RemoveCustom(i)
     if not (e and e.g == "added") then return end
     local s = Store()
     for n = #(s.custom or {}), 1, -1 do
-        if SameEntry(s.custom[n], e.id, e.atlas) then table.remove(s.custom, n) end
+        if SameEntry(s.custom[n], e.id, e.atlas, e.variant) then table.remove(s.custom, n) end
     end
     s.e[e.key] = nil
     table.remove(LIST, i)
@@ -1129,6 +1146,7 @@ Go = function(i)
     if #LIST == 0 then Refresh(); return end
     _idx = ((i - 1) % #LIST) + 1
     Store().idx = _idx
+    if _ctl and _ctl.nameEb then _ctl.nameEb._pending = nil end   -- a new entry shows its saved name
     _hoverRegion = nil
     Refresh()
     local e = LIST[_idx]
@@ -1236,7 +1254,7 @@ local function BuildControl()
         for i, e in ipairs(LIST) do
             if not byFile[e.id] then byFile[e.id] = {}; order[#order + 1] = e.id end
             local l = byFile[e.id]
-            if e.atlas then l[#l + 1] = i else table.insert(l, 1, i) end
+            if e.atlas or e.variant then l[#l + 1] = i else table.insert(l, 1, i) end
         end
         for n, id in ipairs(order) do
             if n > 1 then root:CreateDivider() end
@@ -1248,7 +1266,7 @@ local function BuildControl()
                 local st = Store().e[e.key]
                 local hidden = Store().hideDone and st and st.done and _idx ~= i
                 local lbl = (st and st.name and st.name ~= "") and st.name
-                    or (e.atlas and ("  " .. e.atlas) or "  (whole file)")
+                    or ((e.atlas and ("  " .. e.atlas) or "  (whole file)") .. (e.variant and (" #" .. e.variant) or ""))
                 if st and st.done then lbl = "|cff888888" .. lbl .. " (done)|r"
                 elseif st and st.name and st.name ~= "" then lbl = "|cff66bb6a" .. lbl .. "|r" end
                 if not hidden then
@@ -1270,14 +1288,20 @@ local function BuildControl()
     BNB.CreateSmallLabel(body, L["DEV_WIN_ICONLAB_NAME"], y, cw)
     y = y - 14
     -- The name is saved only when accepted (Tab, Enter or OK). A named entry
-    -- is green in the list and goes into Export; leaving the box or Esc
-    -- puts the saved name back.
+    -- is green in the list and goes into Export; Esc puts the saved name
+    -- back. Leaving the box keeps the typed text: clicking OK takes the
+    -- focus away before its OnClick, and a revert there emptied the box.
+    -- The next entry switch shows the saved name again.
     local nameHost = K.PlainBox(body, cw - 40, 22)
     nameHost:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
     local nameEb = nameHost.eb
     nameEb:SetFontObject("GameFontHighlight")
     nameEb:SetMaxLetters(40)
+    nameEb:SetScript("OnTextChanged", function(self, user)
+        if user then self._pending = true end   -- typed, not accepted yet
+    end)
     local function AcceptName()
+        nameEb._pending = nil
         local v = nameEb:GetText():gsub("^%s+", ""):gsub("%s+$", "")
         State(_idx).name = (v ~= "") and v or nil
         nameEb:ClearFocus()
@@ -1285,8 +1309,7 @@ local function BuildControl()
     end
     nameEb:SetScript("OnEnterPressed", AcceptName)
     nameEb:SetScript("OnTabPressed", function() AcceptName(); Step(1) end)
-    nameEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    nameEb:SetScript("OnEditFocusLost", function() Refresh() end)
+    nameEb:SetScript("OnEscapePressed", function(self) self._pending = nil; self:ClearFocus(); Refresh() end)
     local okBtn = K.SmallBtn(body, "OK", 34, AcceptName)
     okBtn:SetPoint("LEFT", nameHost, "RIGHT", 6, 0)
     f.nameEb = nameEb
@@ -1377,6 +1400,18 @@ local function BuildControl()
 
     -- Add: paste listfile lines, file IDs or atlas names, one per line
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_ADD_HDR"], y, cw)
+    local variantBtn = K.SmallBtn(body, L["DEV_WIN_ICONLAB_VARIANT"], 170, function()
+        local i = NewVariant()
+        if i then Go(i) end
+    end)
+    variantBtn:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y + 2)
+    variantBtn:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["DEV_WIN_ICONLAB_VARIANT"], 1, 1, 1)
+        GameTooltip:AddLine(L["DEV_WIN_ICONLAB_VARIANT_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    variantBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - 20
     local addHost = K.PlainBox(body, cw - 66, 44)
     addHost:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
@@ -1490,7 +1525,7 @@ Refresh = function()
         _idx, #LIST, GROUPS[e.g].label, e.atlas and ("atlas " .. e.atlas) or e.path,
         e.id, status, live))
     pcall(function() f.dd:OverrideText((st.name and st.name ~= "") and st.name or (e.atlas or e.key)) end)
-    if not f.nameEb:HasFocus() then f.nameEb:SetText(st.name or "") end
+    if not (f.nameEb:HasFocus() or f.nameEb._pending) then f.nameEb:SetText(st.name or "") end
     f.doneCb:SetChecked(st.done == true)
     f.hideDoneCb:SetChecked(Store().hideDone == true)
     if not f.wBox.eb:HasFocus() then f.wBox.eb:SetText(W and tostring(W) or "") end
