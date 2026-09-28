@@ -1,9 +1,10 @@
 -- BigNoteBox UI/IconLabData.lua  (GENERATED, do not edit)
--- By _work/tools/iconlab-regions.py from _work/iconlab-files.txt and
--- OneWoW DevTool AtlasInfo-wow.lua, build 12.1.0.69323 (Retail). ALL-126.
--- Dev only: the TOC lists it inside #@debug@. Regions are
--- { name, w, h, left, right, top, bottom } in texture coordinates; the
--- Icon Lab prefers the live C_Texture.GetAtlasInfo when the client has it.
+-- The Lab's seed files (_work/iconlab-files.txt) and their regions.
+-- By _work/tools/iconlab-regions.py from OneWoW DevTool AtlasInfo-wow.lua,
+-- build 12.1.0.69323 (Retail). ALL-126. Dev only: the TOC lists it inside #@debug@.
+-- Regions are { name, w, h, left, right, top, bottom } in texture
+-- coordinates; the Icon Lab prefers the live C_Texture.GetAtlasInfo when
+-- the client has it.
 
 local BNB = BigNoteBox
 if not BNB then return end

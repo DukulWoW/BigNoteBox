@@ -75,6 +75,7 @@ UI\LabKit.lua
 UI\BackgroundLab.lua
 #@debug@
 UI\IconLabData.lua
+UI\IconLabAtlas.lua
 #@end-debug@
 UI\IconLab.lua
 UI\SearchChrome.lua

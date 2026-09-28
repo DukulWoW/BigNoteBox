@@ -1,7 +1,8 @@
 -- BigNoteBox UI/IconFramePicker.lua
 -- Thumbnail grid for note icon frames (ALL-127), opened from the Icon Frame
--- button in NoteConfig's Appearance tab. Two tabs: Frames (BNB.IconFrames,
--- the game-art registry) and Edge borders (the existing LSM border list).
+-- button in NoteConfig's Appearance tab. Tabs All / Square / Circle (the
+-- game-art registry BNB.IconFrames, filtered by its cat, like the sticky
+-- background picker) and Edge borders (the existing LSM border list).
 -- Every tile wears the note's own current icon (Dukul, 2026-09-28), so what
 -- you pick is what you'll actually see. Picking one clears the other, since
 -- a note only ever draws one.
@@ -24,7 +25,7 @@ local L = BNB.L
 local IFP = {}
 BNB.IconFramePicker = IFP
 
-local W, H       = 400, 460
+local W, H       = 410, 460
 local PAD        = 14
 local CONTENT_Y  = 62
 local FOOT_H     = 38
@@ -39,10 +40,14 @@ local WHITE      = "Interface\\Buttons\\White8x8"
 local SEL_R, SEL_G, SEL_B = 0.40, 0.85, 0.40
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 
+-- Frame tabs filter by the registry's cat ("all" = every frame)
 local TABS = {
-    { id = "frame", label = "ICON_FRAME_PICKER_TAB_FRAMES" },
-    { id = "edge",  label = "ICON_FRAME_PICKER_TAB_EDGE" },
+    { id = "frame", cat = "all",    label = "ICON_FRAME_PICKER_TAB_ALL" },
+    { id = "frame", cat = "square", label = "ICON_FRAME_PICKER_TAB_SQUARE" },
+    { id = "frame", cat = "circle", label = "ICON_FRAME_PICKER_TAB_CIRCLE" },
+    { id = "edge",                  label = "ICON_FRAME_PICKER_TAB_EDGE" },
 }
+local EDGE_TAB = 4
 
 local function GetLSM() return LibStub and LibStub("LibSharedMedia-3.0", true) end
 local function LSMBorderNames()
@@ -58,6 +63,7 @@ local function LSMBorderNames()
 end
 
 local _f, _sf, _ct, _revertBtn
+local _tabIdx = 1   -- remembered for the session
 local _tabVisual
 local _tiles = {}
 local _noteID, _h, _origFrame, _origBorder
@@ -79,9 +85,11 @@ local function Outline(parent, r, g, b, a, size)
     return o
 end
 
-local function FrameEntries()
+local function FrameEntries(cat)
     local out = { { key = "none", label = L["STICKY_BG_NONE"] } }
-    for _, e in ipairs(BNB.IconFrames.LIST) do out[#out + 1] = e end
+    for _, e in ipairs(BNB.IconFrames.LIST) do
+        if cat == "all" or e.cat == cat then out[#out + 1] = e end
+    end
     return out
 end
 
@@ -96,7 +104,7 @@ end
 local function CurTabID() return TABS[_tabIdx].id end
 
 local function EntriesForTab()
-    return CurTabID() == "frame" and FrameEntries() or BorderEntries()
+    return CurTabID() == "frame" and FrameEntries(TABS[_tabIdx].cat) or BorderEntries()
 end
 
 local function CurKey()
@@ -268,7 +276,7 @@ local function Build()
             local btn = CreateFrame("Button", "BigNoteBoxIconFramePickerTab" .. i, f, tpl)
             btn:SetText(text)
             pcall(function()
-                if tpl == "PanelTopTabButtonTemplate" then PanelTemplates_TabResize(btn, 8, nil, 90)
+                if tpl == "PanelTopTabButtonTemplate" then PanelTemplates_TabResize(btn, 8, nil, 60)
                 else PanelTemplates_TabResize(btn, 0) end
             end)
             btn:SetID(i)
@@ -288,7 +296,6 @@ local function Build()
     _sf, _ct = BNB.CreateAutoScrollPanel(f, GRID_W, GRID_W)
     _sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     PAD, -CONTENT_Y)
     _sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(W - PAD - GRID_W), FOOT_H + 6)
-    if _sf.ScrollBar then _sf.ScrollBar:AdjustPointsOffset(-10, 0) end
 end
 
 function IFP.IsOpenFor(noteID)
@@ -303,7 +310,8 @@ function IFP.Open(noteID, anchor, h)
     _origBorder = h.getBorder()
     local hasFrame  = _origFrame and _origFrame ~= "" and _origFrame ~= "none"
     local hasBorder = _origBorder and _origBorder ~= "" and _origBorder ~= "None"
-    if hasBorder and not hasFrame then _tabIdx = 2 else _tabIdx = 1 end
+    if hasBorder and not hasFrame then _tabIdx = EDGE_TAB
+    elseif _tabIdx == EDGE_TAB then _tabIdx = 1 end
     -- Top-aligned beside anchor (its window, not a button inside it), unlike
     -- BNB.PlaceBeside's vertical-center placement: Dukul wanted this window's
     -- top level with the config window's top, 2026-09-28.

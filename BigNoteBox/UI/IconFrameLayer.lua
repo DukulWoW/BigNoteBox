@@ -83,10 +83,13 @@ end
 -- the caller can skip its own LSM edge border for this icon (ALL-127: the
 -- two are drawn one at a time, picking one clears the other). Reuses the
 -- note's borderScale/Offset/Brightness sliders, the same ones the LSM edge
--- border already uses.
-function BNB.ApplyIconFrame(icon, note)
+-- border already uses. size: the icon's size, for an icon sized by two
+-- anchors whose width is not laid out yet (else GetWidth). A hidden icon
+-- (Oracle with icons off) gets no frame.
+function BNB.ApplyIconFrame(icon, note, size)
     if not icon then return false end
     local def = BNB.IconFrames and BNB.IconFrames.Get(note and note.iconFrame)
+    if not icon:IsShown() then def = nil end
     if not def then
         if icon._ifTex then icon._ifTex:Hide() end
         IFL.SetShape(icon, nil)
@@ -97,8 +100,9 @@ function BNB.ApplyIconFrame(icon, note)
     end
     local scale  = (note.borderScale or 100) / 100
     local bright = (note.borderBrightness or 100) / 100
-    local size = (icon.GetWidth and icon:GetWidth() or 0) * scale
+    size = size or icon:GetWidth() or 0
     if size <= 0 then size = 20 end
+    size = size * scale
     IFL.Apply(icon, icon._ifTex, def, size, bright)
     return true
 end

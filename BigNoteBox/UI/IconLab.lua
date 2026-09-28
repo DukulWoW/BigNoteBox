@@ -40,7 +40,7 @@ local SHEET_BGS = {      -- behind the sheet and the preview, cycled with Bg
 local COL_CROP  = { 1, 0.82, 0, 1 }
 local COL_HOLE  = { 0.30, 1, 0.40, 1 }
 local COL_HOVER = { 0.35, 0.85, 1, 1 }
-local COL_REG   = { 0.55, 0.55, 0.60, 0.55 }
+local COL_REG   = { 1, 0, 1, 1 }            -- bright magenta (Dukul)
 local COL_EVEN  = { 0.30, 1, 0.40 }      -- guide gaps that match their pair
 local COL_ODD   = { 1, 0.25, 0.25 }
 
@@ -122,10 +122,11 @@ local function Bounds(i, which)
     if W and H then return 0, 0, W, H end
 end
 
--- Stores a box, kept inside the file; nil x clears it. Sizes are whole
--- pixels. The hole's position may sit on a half pixel, so an even hole can
--- be centred in an odd gap (it only positions the icon); the picture area
--- is cut from the file and stays on whole pixels.
+-- Stores a box; nil x clears it. Sizes are whole pixels. The picture area
+-- is cut from the file, so it stays inside it on whole pixels. The hole only
+-- positions the icon, so it may sit on a half pixel (an even hole centred in
+-- an odd gap) and outside the file (negative x/y), which puts the art beside
+-- or below the icon rather than around it.
 local function SetBox(i, which, x, y, w, h)
     local st, f = State(i), BOX_FIELDS[which]
     if not x then
@@ -139,7 +140,7 @@ local function SetBox(i, which, x, y, w, h)
     end
     x, y, w, h = P(x), P(y), math.max(1, R(w)), math.max(1, R(h))
     local W, H = NativeSize(i)
-    if W and H then
+    if W and H and which == "area" then
         x, y = math.max(0, math.min(x, W - 1)), math.max(0, math.min(y, H - 1))
         w, h = math.min(w, W - x), math.min(h, H - y)
     end
@@ -187,6 +188,13 @@ local function Append(g, id, path, atlas, variant)
     local key = K.EntryKey(id, path or "", atlas)
     if variant and variant > 1 then key = key .. "-" .. variant end
     LIST[#LIST + 1] = { g = g, id = id, path = path or "", atlas = atlas, variant = variant, key = key }
+    -- Any other file: the full atlas table (UI/IconLabAtlas.lua), keyed by
+    -- lower-case path without extension, or by file ID
+    local A = BNB.IconLabAtlas
+    if not REGIONS[id] and A then
+        local p = (path or ""):gsub("\\", "/"):lower():gsub("%.[^./]+$", "")
+        REGIONS[id] = A[id] or (p ~= "" and A[p]) or nil
+    end
     return #LIST
 end
 
@@ -455,7 +463,126 @@ local function Place(o, x, y, w, h)
     o:Show()
 end
 
-local function LayoutSheet()
+-- Wheel zoom and right-drag pan on the sheet (session only): the file-pixel
+-- rect the whole area shows, with the area's aspect, for the file at idx.
+-- nil = the fitted view (ViewRect). A new file drops it.
+local _mview
+
+local function ManualView()
+    return _mview and _mview.idx == _idx and _mview or nil
+end
+
+-- The file-pixel rect the whole area shows now, margins included
+local function ShownRect()
+    local v = _sh._view
+    local AW, AH = _sh.area:GetSize()
+    return v.vx - v.ox / v.s, v.vy - v.oy / v.s, AW / v.s, AH / v.s
+end
+
+local LayoutSheet
+
+-- Wheel over the sheet: zoom around the pointer. Out past the fitted view
+-- goes back to it; in stops at about 64 screen px per file pixel.
+local function ZoomAt(delta)
+    local v = _sh and _sh._view
+    if not v then return end
+    local AW = _sh.area:GetWidth()
+    local sc = _sh.area:GetEffectiveScale()
+    local mx, my = GetCursorPosition()
+    local x, y, w = ShownRect()
+    local px = x + (mx / sc - _sh.area:GetLeft()) / v.s
+    local py = y + (_sh.area:GetTop() - my / sc) / v.s
+    local k = delta > 0 and 0.8 or 1.25
+    local nw = math.max(AW / 64, w * k)
+    if AW / nw <= (_sh._fitS or 0) then
+        _mview = nil
+    else
+        local f = nw / w
+        _mview = { idx = _idx, x = px - (px - x) * f, y = py - (py - y) * f, w = nw }
+    end
+    LayoutSheet()
+end
+
+-- Pointer in area units: x right, y down from the area's TOPLEFT
+local function PointerArea()
+    local sc = _sh.area:GetEffectiveScale()
+    local mx, my = GetCursorPosition()
+    return mx / sc - _sh.area:GetLeft(), _sh.area:GetTop() - my / sc
+end
+
+-- The file pixel under the pointer as a float, not clamped to the file
+local function PointerFile()
+    local v = _sh._view
+    local ax, ay = PointerArea()
+    return v.vx + (ax - v.ox) / v.s, v.vy + (ay - v.oy) / v.s
+end
+
+-- The saved box edge(s) under the pointer, active box first: which, and
+-- { l, r, t, b } (a corner sets two). Within EDGE_TOL area units.
+local EDGE_TOL = 5
+local function EdgeAt()
+    local v = _sh and _sh._view
+    if not (v and _sh.area:IsMouseOver()) then return nil end
+    local ax, ay = PointerArea()
+    local first = Active()
+    for _, which in ipairs({ first, first == "hole" and "area" or "hole" }) do
+        local x, y, w, h = Box(_idx, which)
+        if x then
+            local l, t = v.ox + (x - v.vx) * v.s, v.oy + (y - v.vy) * v.s
+            local r, b = l + w * v.s, t + h * v.s
+            local inX = ax >= l - EDGE_TOL and ax <= r + EDGE_TOL
+            local inY = ay >= t - EDGE_TOL and ay <= b + EDGE_TOL
+            local e = {}
+            if inY then
+                local dl, dr = math.abs(ax - l), math.abs(ax - r)
+                if dl <= EDGE_TOL and dl <= dr then e.l = true
+                elseif dr <= EDGE_TOL then e.r = true end
+            end
+            if inX then
+                local dt, db = math.abs(ay - t), math.abs(ay - b)
+                if dt <= EDGE_TOL and dt <= db then e.t = true
+                elseif db <= EDGE_TOL then e.b = true end
+            end
+            if next(e) then return which, e end
+        end
+    end
+end
+
+-- One line per file pixel over the shown picture, from 4 screen px per file
+-- pixel up (below that it is a grey wash); every 8th line stronger
+local function LayoutGrid()
+    local g = _sh.grid
+    for _, t in ipairs(g.lines) do t:Hide() end
+    local v = _sh._view
+    if not (Store().grid and v and v.s >= 4) then return end
+    local n = 0
+    local function Line(vertical, pos, strong)
+        n = n + 1
+        local t = g.lines[n]
+        if not t then
+            t = g:CreateTexture(nil, "ARTWORK")
+            g.lines[n] = t
+        end
+        t:SetColorTexture(1, 1, 1, strong and 0.35 or 0.14)
+        t:ClearAllPoints()
+        if vertical then
+            t:SetPoint("TOPLEFT", _sh.area, "TOPLEFT", pos, -v.oy)
+            t:SetSize(1, v.vh * v.s)
+        else
+            t:SetPoint("TOPLEFT", _sh.area, "TOPLEFT", v.ox, -pos)
+            t:SetSize(v.vw * v.s, 1)
+        end
+        t:Show()
+    end
+    for x = math.ceil(v.vx), math.floor(v.vx + v.vw) do
+        Line(true, v.ox + (x - v.vx) * v.s, x % 8 == 0)
+    end
+    for y = math.ceil(v.vy), math.floor(v.vy + v.vh) do
+        Line(false, v.oy + (y - v.vy) * v.s, y % 8 == 0)
+    end
+end
+
+function LayoutSheet()
     if not (_sh and _sh:IsShown() and LIST[_idx]) then return end
     local e = LIST[_idx]
     local area, tex = _sh.area, _sh.tex
@@ -470,6 +597,7 @@ local function LayoutSheet()
     for _, t in ipairs(_sh.guides.lines) do t:Hide() end
     for _, fs in pairs(_sh.guides.labels) do fs:Hide() end
     _sh.guides.crossH:Hide(); _sh.guides.crossV:Hide()
+    for _, t in ipairs(_sh.grid.lines) do t:Hide() end
     if not (AW > 1 and AH > 1) then return end
     if not (W and H and W > 0 and H > 0) then
         tex:Hide()
@@ -484,7 +612,21 @@ local function LayoutSheet()
     local s = math.min(AW / vw, AH / vh)
     local dw, dh = vw * s, vh * s
     local ox, oy = (AW - dw) / 2, (AH - dh) / 2
-    _sh._view = { vx = vx, vy = vy, s = s, ox = ox, oy = oy, W = W, H = H }
+    _sh._fitS = s
+    local mv = ManualView()
+    if mv then
+        -- The area's aspect; the view's centre kept on the file, so some of
+        -- it always shows
+        s = AW / mv.w
+        local mh = AH / s
+        mv.x = math.max(-mv.w / 2, math.min(W - mv.w / 2, mv.x))
+        mv.y = math.max(-mh / 2, math.min(H - mh / 2, mv.y))
+        vx, vy = math.max(0, mv.x), math.max(0, mv.y)
+        vw, vh = math.min(W, mv.x + mv.w) - vx, math.min(H, mv.y + mh) - vy
+        dw, dh = vw * s, vh * s
+        ox, oy = (vx - mv.x) * s, (vy - mv.y) * s
+    end
+    _sh._view = { vx = vx, vy = vy, vw = vw, vh = vh, s = s, ox = ox, oy = oy, W = W, H = H }
 
     tex:SetTexture(e.id)
     tex:SetTexCoord(vx / W, (vx + vw) / W, vy / H, (vy + vh) / H)
@@ -524,10 +666,14 @@ local function LayoutSheet()
     _sh.hole:SetFrameLevel(lv + 21)
     _sh.hover:SetFrameLevel(lv + 22)
     _sh.guides:SetFrameLevel(lv + 23)
+    _sh.grid:SetFrameLevel(lv + 10)
+    LayoutGrid()
     LayoutGuides()
     LayoutCross()
+    _sh.gridBtn:SetText(Store().grid and "Grid on" or "Grid off")
 
-    _sh.zoomBtn:SetText(Store().zoom and "Whole file" or "Zoom to box")
+    _sh.zoomBtn:SetText(ManualView() and "Reset view"
+        or Store().zoom and "Whole file" or "Zoom to box")
     _sh.regBtn:SetText(Store().showRegions ~= false and "Hide regions" or "Show regions")
     _sh.guideBtn:SetText(GuidesOn() and "Guides on" or "Guides off")
     K.PutRing(_sh.boxRing, active == "hole" and _sh.holeBtn or _sh.areaBtn)
@@ -646,7 +792,7 @@ local function BuildSheet()
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -9)
-    f.title:SetPoint("RIGHT", f, "RIGHT", -300, 0)
+    f.title:SetPoint("RIGHT", f, "RIGHT", -376, 0)
     f.title:SetJustifyH("LEFT")
 
     -- Top bar: view
@@ -655,13 +801,22 @@ local function BuildSheet()
     end)
     f.bgBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -6)
     f.regBtn = K.SmallBtn(f, "Hide regions", 110, function()
-        local s = Store(); s.showRegions = (s.showRegions == false) and nil or false; LayoutSheet()
+        -- nil = shown, false = hidden. Not `x and nil or false`: always false
+        local s = Store()
+        if s.showRegions == false then s.showRegions = nil else s.showRegions = false end
+        LayoutSheet()
     end)
     f.regBtn:SetPoint("RIGHT", f.bgBtn, "LEFT", -6, 0)
     f.zoomBtn = K.SmallBtn(f, "Zoom to box", 110, function()
-        local s = Store(); s.zoom = not s.zoom or nil; LayoutSheet()
+        if ManualView() then _mview = nil
+        else local s = Store(); s.zoom = not s.zoom or nil end
+        LayoutSheet()
     end)
     f.zoomBtn:SetPoint("RIGHT", f.regBtn, "LEFT", -6, 0)
+    f.gridBtn = K.SmallBtn(f, "Grid off", 70, function()
+        local s = Store(); s.grid = not s.grid or nil; LayoutSheet()
+    end)
+    f.gridBtn:SetPoint("RIGHT", f.zoomBtn, "LEFT", -6, 0)
 
     -- Bottom bar: box tools
     local function SetActive(which)
@@ -711,6 +866,9 @@ local function BuildSheet()
     f.hover = Outline(area, COL_HOVER)
     f.draw  = Outline(area, { 1, 1, 1, 1 })
     f.draw:SetFrameLevel(area:GetFrameLevel() + 25)
+    f.grid = CreateFrame("Frame", nil, area)
+    f.grid:SetAllPoints()
+    f.grid.lines = {}
     f.guides = CreateFrame("Frame", nil, area)
     f.guides:SetAllPoints()
     f.guides.lines, f.guides.labels = {}, {}
@@ -731,10 +889,37 @@ local function BuildSheet()
 
     -- Left-drag draws the active box; a click without a drag picks the
     -- region under the pointer
-    local drag, last
+    local drag, last, pan
     area:SetScript("OnUpdate", function()
+        if pan then
+            if not IsMouseButtonDown(pan.btn) then pan = nil; return end
+            local sx, sy = GetCursorPosition()
+            local k = area:GetEffectiveScale() * pan.s
+            _mview = { idx = _idx, w = pan.w,
+                       x = pan.x - (sx - pan.sx) / k, y = pan.y + (sy - pan.sy) / k }
+            LayoutSheet()
+            return
+        end
         if drag then
             if not IsMouseButtonDown("LeftButton") then drag = nil; f.draw:Hide(); return end
+            if drag.edge then
+                -- Dragging a box edge: whole pixels, never past the opposite
+                -- edge; saved on release like a drawn box
+                local fx, fy = PointerFile()
+                local x, y, w, h = unpack(drag.box)
+                local r, b = x + w, y + h
+                local e = drag.edge
+                local function R(n) return math.floor(n + 0.5) end
+                if e.l then x = math.min(R(fx), r - 1) end
+                if e.r then r = math.max(R(fx), x + 1) end
+                if e.t then y = math.min(R(fy), b - 1) end
+                if e.b then b = math.max(R(fy), y + 1) end
+                drag.rect = { x, y, r - x, b - y }
+                Place(f.draw, x, y, r - x, b - y)
+                f.coords:SetText(string.format("%s  x %g  y %g   %g x %g",
+                    drag.which, x, y, r - x, b - y))
+                return
+            end
             local px, py = PointerPixel(true)
             if not px then return end
             if not drag.moved then
@@ -753,6 +938,11 @@ local function BuildSheet()
             f.coords:SetText(string.format("x %d  y %d   drawing %d x %d", px, py, w, h))
             return
         end
+        local onEdge = EdgeAt() ~= nil
+        if onEdge ~= (f._edgeCursor or false) then
+            f._edgeCursor = onEdge
+            if onEdge then BNB.ShowCursor("size") else BNB.ClearCursor() end
+        end
         local px, py = PointerPixel()
         local reg = px and RegionAt(px, py)
         local key = px and (px .. "," .. py .. (reg and reg[1] or "")) or ""
@@ -760,13 +950,26 @@ local function BuildSheet()
         last = key
         f.coords:SetText(px and string.format("x %d  y %d%s", px, py,
             reg and ("   |cff59d9ff" .. reg[1] .. "|r (click to pick)") or "") or
-            "Drag: draw the box   Arrows: move 1 (Shift 10)   Ctrl+arrows: resize")
+            "Drag: draw the box   Drag an edge: resize   Wheel: zoom   Right-drag: pan   Arrows: move 1 (Shift 10)   Ctrl+arrows: resize")
         local name = reg and reg[1] or nil
         if name ~= _hoverRegion then _hoverRegion = name; LayoutSheet() end
     end)
     area:EnableMouse(true)
+    area:EnableMouseWheel(true)
+    area:SetScript("OnMouseWheel", function(_, delta) ZoomAt(delta) end)
     area:SetScript("OnMouseDown", function(_, btn)
+        if (btn == "RightButton" or btn == "MiddleButton") and _sh._view and not drag then
+            local x, y, w = ShownRect()
+            local sx, sy = GetCursorPosition()
+            pan = { btn = btn, sx = sx, sy = sy, x = x, y = y, w = w, s = _sh._view.s }
+            return
+        end
         if btn ~= "LeftButton" then return end
+        local which, edges = EdgeAt()
+        if which then
+            drag = { edge = edges, which = which, box = { Box(_idx, which) } }
+            return
+        end
         local px, py = PointerPixel(true)
         if not px then return end
         local sx, sy = GetCursorPosition()
@@ -777,6 +980,14 @@ local function BuildSheet()
         local d = drag
         drag, last = nil, nil
         f.draw:Hide()
+        if d.edge then
+            if d.rect then
+                Store().active = (d.which == "hole") and "hole" or nil
+                SetBox(_idx, d.which, unpack(d.rect))
+                Refresh()
+            end
+            return
+        end
         if d.moved then
             if d.rect then SetBox(_idx, Active(), unpack(d.rect)); Refresh() end
             return
@@ -792,6 +1003,7 @@ local function BuildSheet()
     end)
     area:SetScript("OnLeave", function(self)
         if not InCombatLockdown() then self:EnableKeyboard(false) end
+        if f._edgeCursor then f._edgeCursor = nil; BNB.ClearCursor() end
         if _hoverRegion then _hoverRegion = nil; LayoutSheet() end
     end)
 
@@ -1241,8 +1453,28 @@ local function BuildControl()
     end
     local prev = K.SmallBtn(body, "<", 30, function() Step(-1) end)
     prev:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
+    -- Hide done: a list filter for < >, the dropdown, and every entry, so it
+    -- sits on this row rather than beside the entry's own Done
+    local hideCb = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+    hideCb:SetSize(24, 24)
+    hideCb.text = hideCb.text or hideCb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hideCb.text:ClearAllPoints()
+    hideCb.text:SetPoint("LEFT", hideCb, "RIGHT", 0, 0)
+    hideCb.text:SetFontObject("GameFontHighlightSmall")
+    hideCb.text:SetText(L["DEV_WIN_ICONLAB_HIDE_DONE"])
+    hideCb:SetPoint("TOPLEFT", body, "TOPLEFT", cw - hideCb.text:GetStringWidth() - 22, y + 2)
+    hideCb:SetScript("OnClick", function(self)
+        Store().hideDone = self:GetChecked() or nil
+    end)
+    hideCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["DEV_WIN_ICONLAB_HIDE_DONE_TIP"], 1, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    hideCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.hideDoneCb = hideCb
     local nextB = K.SmallBtn(body, ">", 30, function() Step(1) end)
-    nextB:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y)
+    nextB:SetPoint("TOPRIGHT", hideCb, "TOPLEFT", -4, -2)
     local dd = CreateFrame("DropdownButton", nil, body, "WowStyle1DropdownTemplate")
     dd:SetPoint("LEFT", prev, "RIGHT", 6, 0)
     dd:SetPoint("RIGHT", nextB, "LEFT", -6, 0)
@@ -1315,7 +1547,8 @@ local function BuildControl()
     f.nameEb = nameEb
     y = y - 28
 
-    -- Done: left out of Export; Hide done: out of the dropdown and < >
+    -- Done: left out of Export (Hide done, on the navigation row, keeps it
+    -- out of the dropdown and < >)
     local function Check(label, x, onClick)
         local cb = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
         cb:SetSize(24, 24)
@@ -1330,9 +1563,6 @@ local function BuildControl()
     f.doneCb = Check(L["DEV_WIN_ICONLAB_DONE"], 0, function(self)
         State(_idx).done = self:GetChecked() or nil
         Refresh()
-    end)
-    f.hideDoneCb = Check(L["DEV_WIN_ICONLAB_HIDE_DONE"], cw / 2, function(self)
-        Store().hideDone = self:GetChecked() or nil
     end)
     y = y - 30
 
@@ -1364,7 +1594,8 @@ local function BuildControl()
             local x, yy, w, h = ToolBox(_idx, which)
             if not x then return end
             local vals = { x, yy, w, h }
-            if v and ((n <= 2 and v >= 0) or (n > 2 and v > 0)) then vals[n] = v end
+            -- x/y of the hole may be negative (SetBox); the area's are kept in the file
+            if n <= 2 or v > 0 then vals[n] = v end
             SetBox(_idx, which, vals[1], vals[2], vals[3], vals[4])
             Refresh()
         end, function() Refresh() end)
@@ -1372,6 +1603,7 @@ local function BuildControl()
         else box:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y) end
         f.boxBoxes[n], last = box, box
     end
+    K.TabChain({ wBox, hBox, f.boxBoxes[1], f.boxBoxes[2], f.boxBoxes[3], f.boxBoxes[4] })
     local clear = K.SmallBtn(body, L["DEV_WIN_BGLAB_RESET"], cw - 4 * 55 - 5, function()
         SetBox(_idx, Active(), nil)
         if Active() == "area" then ApplyAtlasCrop(_idx) end

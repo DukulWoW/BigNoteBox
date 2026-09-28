@@ -143,3 +143,17 @@ function K.NumBox(parent, w, onSet, onCancel)
     eb:SetScript("OnEditFocusLost", function(self) onSet(tonumber(self:GetText())) end)
     return host
 end
+
+-- Tab / Shift+Tab steps through hosts (NumBox / PlainBox) in list order,
+-- wrapping at both ends. Leaving a box commits it through its focus-lost.
+function K.TabChain(hosts)
+    for i, host in ipairs(hosts) do
+        host.eb:SetScript("OnTabPressed", function()
+            local n = #hosts
+            local j = IsShiftKeyDown() and ((i - 2) % n + 1) or (i % n + 1)
+            local eb = hosts[j].eb
+            eb:SetFocus()
+            eb:HighlightText()
+        end)
+    end
+end

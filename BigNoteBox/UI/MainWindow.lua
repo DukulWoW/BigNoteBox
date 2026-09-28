@@ -327,6 +327,9 @@ local function OnEscapeKey(self, key)
     -- Trash view popup before the trash window itself
     if TryHide("BNBTrashViewPopup")    then return end
     if TryHide("BigNoteBoxTrashFrame") then return end
+    -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
+    if TryHide("BigNoteBoxIconFramePicker",
+        BNB.IconFramePicker and BNB.IconFramePicker.Close) then return end
     if TryHide("BigNoteBoxNoteConfigFrame") then return end
     -- Task Edit Window before the Reference Box
     if TryHide("BNBTaskEditWindow",

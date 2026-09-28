@@ -386,7 +386,7 @@ end
 -- LSM edge border on target (the icon badge or mini tile frame). The two are
 -- never both on: picking one in the picker clears the other.
 local function ApplyIconDecoration(target, iconTex, note, borderName, borderScale, borderOffset, borderBright)
-    local hasFrame = iconTex and BNB.ApplyIconFrame and BNB.ApplyIconFrame(iconTex, note)
+    local hasFrame = iconTex and BNB.ApplyIconFrame and BNB.ApplyIconFrame(iconTex, note, iconTex._size)
     ApplyIconBorder(target, not hasFrame and borderName, borderScale, borderOffset, borderBright)
 end
 
@@ -952,6 +952,7 @@ local function BuildIconBadge(f, noteID, note)
     SetStickyNoteIcon(iconTex, note)
     f._badgeTex = iconTex   -- re-drawn by SN.RefreshNpcPortraits
     iconFrame._iconTex = iconTex
+    iconTex._size = ICON_SZ - 2 * ICON_PAD   -- two-anchor sized: no width until laid out
 
     -- Icon frame or note-level LSM border (matches note list icon; ALL-127:
     -- the icon frame takes over from the edge border when set)
@@ -1723,7 +1724,9 @@ local function CreateStickyFrame(noteID)
             return
         end
         if BNB.AlarmWindow and BNB.AlarmWindow.Open then
-            BNB.AlarmWindow.Open(noteID, alarmHdrBtn, f)
+            -- f._alarmHdrBtn: the local below is not in scope inside its own
+            -- initialiser, so alarmHdrBtn here was a nil global
+            BNB.AlarmWindow.Open(noteID, f._alarmHdrBtn, f)
         end
     end)
     f._alarmHdrBtn = alarmHdrBtn

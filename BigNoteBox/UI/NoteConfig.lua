@@ -1078,6 +1078,7 @@ local function BuildAppearanceTab(panel)
     local ifBtn = BNB.CreateButton(nil, panel, L["NC_ICON_FRAME_BTN"], CW, 22)
     local function RefreshIconFrameBtn()
         ifBtn:SetText(L["NC_ICON_FRAME_BTN"] .. ": " .. CurIconFrameLabel())
+        if ifBtn._syncOffset then ifBtn._syncOffset() end
     end
     RefreshIconFrameBtn()
     ifBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
@@ -1140,6 +1141,13 @@ local function BuildAppearanceTab(panel)
     local bsSl = BorderSlider(L["NC_BORDER_THICKNESS_LABEL"], 1, 200, GetBorderScale(), 100, "borderScale", "%")
     local boSl = BorderSlider(L["NC_BORDER_OFFSET_LABEL"], 0, 12, GetBorderOffset(), 2, "borderOffset", "px")
     local bbSl = BorderSlider(L["NC_BORDER_BRIGHTNESS_LABEL"], 10, 200, GetBorderBrightness(), 100, "borderBrightness", "%")
+    -- An icon frame ignores the offset (only scale and brightness apply), so
+    -- the slider is greyed while one is set
+    ifBtn._syncOffset = function()
+        local n = GetNote()
+        boSl:SetEnabled(not (n and BNB.IconFrames.Get(n.iconFrame)))
+    end
+    ifBtn._syncOffset()
 
     -- Icon section with BNB Icons / Blizzard Icon tabs
     y = Rule(panel, y) - 4
@@ -2736,6 +2744,8 @@ local function CreateNoteConfigWindow()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
         -- The waypoint info popup is parented to UIParent, so it would outlive NoteConfig
         if BNBWaypointInfoPopup then BNBWaypointInfoPopup:Hide() end
+        -- The icon frame picker belongs to this window (ALL-127)
+        if BNB.IconFramePicker then BNB.IconFramePicker.Close() end
     end)
 
     local tabDefs = {
