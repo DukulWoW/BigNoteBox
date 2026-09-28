@@ -251,6 +251,15 @@ local function BuildWindow()
     bgLabBtn:ClearAllPoints()
     bgLabBtn:SetPoint("LEFT", cursorBtn, "RIGHT", 8, 0)
     y = y + ROW_H
+    -- Note icon frame measuring (ALL-126, UI/IconLab.lua), beside Search layout
+    local iconLabBtn = MakeButton(L["CFG_DEV_ICONLAB_BTN"], 170,
+        L["CFG_DEV_ICONLAB_BTN"], L["CFG_DEV_ICONLAB_TIP_BODY"], function()
+            if BNB.OpenIconLab then BNB.OpenIconLab() end
+        end)
+    iconLabBtn:ClearAllPoints()
+    iconLabBtn:SetPoint("LEFT", layoutBtn, "RIGHT", 8, 0)
+    y = y + ROW_H
+    dependents[#dependents + 1] = { btn = iconLabBtn }
     dependents[#dependents + 1] = { btn = bgLabBtn }
     dependents[#dependents + 1] = { btn = toastBtn }
     dependents[#dependents + 1] = { btn = layoutBtn }

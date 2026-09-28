@@ -105,6 +105,14 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() end
 
+        -- ── Developer: note icon frame measuring (ALL-126, UI/IconLab.lua) ────
+        elseif cmd == "iconlab" then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            if BNB.OpenIconLab then BNB.OpenIconLab() end
+
         -- ── Developer: chrome seating (FOR-05, UI/Chrome.lua) ─────────────────
         -- "chromeprobe" dumps the template layout; "chrome l t r b" re-seats
         -- every window live. Nothing is saved: Forever drops SavedVariables.

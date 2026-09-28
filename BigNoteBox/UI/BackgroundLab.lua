@@ -13,6 +13,7 @@
 local BNB = BigNoteBox
 if not BNB then return end
 local L = BNB.L
+local K = BNB._LabKit   -- shared with the Icon Lab (UI/LabKit.lua, ALL-126)
 
 -- ── The candidates (Dukul, 2026-09-27, picked in wow.export) ─────────────────
 -- g = the group Dukul sorted them into; it sets the starting mode/anchor.
@@ -144,40 +145,12 @@ local function State(i)
     return st
 end
 
--- ── Native size probe ────────────────────────────────────────────────────────
--- A texture with one anchor and no size of its own takes the file's size once
--- it has loaded. Polled for up to 3 s; a manual W/H in the panel wins.
--- A fresh texture per probe: a reused one reports the previous file's size
--- until the new file loads (read 512x256 as 256x256, ALL-120).
-local _probe
-local _sizes = {}   -- [id] = { w, h } or false (did not load)
+-- ── Native size probe (UI/LabKit.lua) ────────────────────────────────────────
+-- A manual W/H in the panel wins over the probe.
+local _prober = K.NewProber()
+local _sizes  = _prober.sizes   -- [id] = { w, h } or false (did not load)
 
-local function ProbeSize(e, onDone)
-    if _sizes[e.id] ~= nil then onDone(); return end
-    if _probe then _probe:SetTexture(nil); _probe:Hide() end
-    _probe = _ctl:CreateTexture(nil, "BACKGROUND")
-    _probe:SetAlpha(0)
-    _probe:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", -5000, 0)
-    local ok = pcall(function() _probe:SetTexture(e.id) end)
-    _probe._id = e.id
-    local tries = 0
-    local function Poll()
-        -- Moved on before this one loaded: drop it, it re-probes when revisited
-        if _probe._id ~= e.id then return end
-        tries = tries + 1
-        local w, h = _probe:GetSize()
-        if ok and w and w > 1 and h and h > 1 then
-            _sizes[e.id] = { math.floor(w + 0.5), math.floor(h + 0.5) }
-            onDone()
-        elseif tries >= 30 then
-            _sizes[e.id] = false
-            onDone()
-        else
-            C_Timer.After(0.1, Poll)
-        end
-    end
-    Poll()
-end
+local function ProbeSize(e, onDone) _prober:Probe(_ctl, e.id, onDone) end
 
 local function NativeSize(i)
     local st, sz = State(i), _sizes[LIST[i].id]
@@ -320,43 +293,8 @@ end
 -- ── Control window ───────────────────────────────────────────────────────────
 local Refresh
 
-local function SmallBtn(parent, text, w, onClick)
-    local b = BNB.CreateButton(nil, parent, text, w, 20)
-    b:SetScript("OnClick", onClick)
-    return b
-end
-
--- Gold ring shown around the selected button of a group
-local function Ring(parent)
-    local r = BNB.CreateBackdropFrame("Frame", nil, parent)
-    r:SetBackdrop({ edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 2 })
-    r:SetBackdropBorderColor(1, 0.82, 0, 1)
-    r:EnableMouse(false)
-    return r
-end
-local function PutRing(r, btn)
-    r:ClearAllPoints()
-    r:SetPoint("TOPLEFT", btn, "TOPLEFT", -2, 2)
-    r:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 2, -2)
-    r:SetFrameLevel(btn:GetFrameLevel() + 2)
-    r:Show()
-end
-
-local function NumBox(parent, w, onSet)
-    local host = BNB.CreateBackdropFrame("Frame", nil, parent)
-    host:SetSize(w, 20)
-    BNB.SetBackdropDark(host)
-    local eb = CreateFrame("EditBox", nil, host)
-    eb:SetAllPoints()
-    eb:SetTextInsets(6, 6, 0, 0)
-    eb:SetFontObject("GameFontHighlightSmall")
-    eb:SetAutoFocus(false)
-    eb:SetScript("OnEnterPressed", function(self) onSet(tonumber(self:GetText())); self:ClearFocus() end)
-    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); Refresh() end)
-    eb:SetScript("OnEditFocusLost", function(self) onSet(tonumber(self:GetText())) end)
-    host.eb = eb
-    return host
-end
+local SmallBtn, Ring, PutRing = K.SmallBtn, K.Ring, K.PutRing
+local function NumBox(parent, w, onSet) return K.NumBox(parent, w, onSet, function() Refresh() end) end
 
 -- ── Textures added in game (file ID, path optional, or an atlas name) ───────
 -- Kept in devBgLab.custom as { id, path, atlas } and appended to LIST as
@@ -364,12 +302,7 @@ end
 -- change. An atlas entry is its file plus a Picture area taken from the
 -- atlas coordinates (ALL-120); one file can hold several atlases, so an entry
 -- is one file + atlas pair.
-local function CustomKey(id, path, atlas)
-    if atlas and atlas ~= "" then return atlas end
-    local base = path ~= "" and path:match("([^/]+)$") or nil
-    base = base and base:gsub("%.[^.]+$", "") or nil
-    return (base and base ~= "") and base or ("file" .. id)
-end
+local CustomKey = K.EntryKey
 
 local function SameEntry(e, id, atlas)
     return e.id == id and (e.atlas or "") == (atlas or "")
@@ -384,10 +317,7 @@ local function AppendCustom(c)
     return #LIST
 end
 
--- A usable file ID: a whole, finite, positive number
-local function ValidID(id)
-    return type(id) == "number" and id > 0 and id < 2^53 and id == math.floor(id)
-end
+local ValidID = K.ValidID
 
 -- Entries without a usable file ID are dropped from the saved list (one
 -- saved as { path = "" } on Forever 2026-09-27 broke opening the Lab)
@@ -418,19 +348,7 @@ local function AddCustom(id, path, atlas)
     return AppendCustom(s.custom[#s.custom])
 end
 
--- An atlas name -> its file ID and atlas info, or nil. GetAtlasInfo gives the
--- file as an ID; a client that gives only a path goes through GetFileIDFromPath.
-local function ResolveAtlas(name)
-    if name == "" or not (C_Texture and C_Texture.GetAtlasInfo) then return nil end
-    local ok, info = pcall(C_Texture.GetAtlasInfo, name)
-    if not ok or type(info) ~= "table" then return nil end
-    local id = info.file
-    if type(id) ~= "number" and type(info.filename) == "string" and GetFileIDFromPath then
-        local ok2, fid = pcall(GetFileIDFromPath, info.filename)
-        if ok2 then id = fid end
-    end
-    if ValidID(id) then return id, info end
-end
+local ResolveAtlas = K.ResolveAtlas
 
 -- Fills an atlas entry's Picture area from the atlas coordinates x the file's
 -- size, once the size is known, and only while no Picture area is set (a
@@ -443,12 +361,8 @@ local function ApplyAtlasCrop(i)
     if st.cw or not (W and H) then return end
     local _, info = ResolveAtlas(e.atlas)
     if not info then return end
-    local function R(v) return math.floor(v + 0.5) end
-    st.cx = R(info.leftTexCoord * W)
-    st.cy = R(info.topTexCoord * H)
-    st.cw = R((info.rightTexCoord - info.leftTexCoord) * W)
-    st.ch = R((info.bottomTexCoord - info.topTexCoord) * H)
-    if st.cw <= 0 or st.ch <= 0 then st.cx, st.cy, st.cw, st.ch = nil, nil, nil, nil end
+    st.cx, st.cy, st.cw, st.ch = K.CropFromTexCoords(info.leftTexCoord, info.rightTexCoord,
+        info.topTexCoord, info.bottomTexCoord, W, H)
 end
 
 local function RemoveCustom(i)
@@ -683,19 +597,7 @@ local function BuildControl()
     -- Add a texture by file ID (path optional, only used for the key and export)
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_ADD_HDR"], y, cw)
     y = y - 20
-    local function PlainBox(w)
-        local host = BNB.CreateBackdropFrame("Frame", nil, body)
-        host:SetSize(w, 20)
-        BNB.SetBackdropDark(host)
-        local eb = CreateFrame("EditBox", nil, host)
-        eb:SetAllPoints()
-        eb:SetTextInsets(6, 6, 0, 0)
-        eb:SetFontObject("GameFontHighlightSmall")
-        eb:SetAutoFocus(false)
-        eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-        host.eb = eb
-        return host
-    end
+    local function PlainBox(w) return K.PlainBox(body, w) end
     local idBox = PlainBox(80)
     idBox:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
     idBox.eb:SetNumeric(true)
@@ -707,6 +609,9 @@ local function BuildControl()
     local function DoAdd()
         local id = tonumber(idBox.eb:GetText())
         local text = pathBox.eb:GetText():gsub("^%s+", ""):gsub("%s+$", "")
+        -- A pasted wow.export listfile line, path;fileID (ALL-126)
+        local lfID, lfPath = K.ParseListfileLine(text)
+        if lfID and text:find(";") then id, text = lfID, lfPath end
         local atlasID = not text:find("[/\\]") and ResolveAtlas(text)
         local i
         if atlasID then

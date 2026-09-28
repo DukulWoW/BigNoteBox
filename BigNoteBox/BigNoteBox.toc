@@ -51,6 +51,7 @@ UI\TagDialogs.lua
 UI\FocusEditor.lua
 UI\RichPreview.lua
 UI\BgLayer.lua
+UI\IconFrameLayer.lua
 UI\StickyBackgrounds.lua
 UI\StickyNote.lua
 UI\StickySettings.lua
@@ -68,7 +69,12 @@ UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
 UI\DebugWindow.lua
+UI\LabKit.lua
 UI\BackgroundLab.lua
+#@debug@
+UI\IconLabData.lua
+#@end-debug@
+UI\IconLab.lua
 UI\SearchChrome.lua
 Assets\Search\Kilrogg\theme.lua
 Assets\Search\Alliance\theme.lua
