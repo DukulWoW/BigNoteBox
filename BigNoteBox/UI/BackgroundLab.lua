@@ -147,16 +147,17 @@ end
 -- ── Native size probe ────────────────────────────────────────────────────────
 -- A texture with one anchor and no size of its own takes the file's size once
 -- it has loaded. Polled for up to 3 s; a manual W/H in the panel wins.
+-- A fresh texture per probe: a reused one reports the previous file's size
+-- until the new file loads (read 512x256 as 256x256, ALL-120).
 local _probe
 local _sizes = {}   -- [id] = { w, h } or false (did not load)
 
 local function ProbeSize(e, onDone)
     if _sizes[e.id] ~= nil then onDone(); return end
-    if not _probe then
-        _probe = _ctl:CreateTexture(nil, "BACKGROUND")
-        _probe:SetAlpha(0)
-        _probe:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", -5000, 0)
-    end
+    if _probe then _probe:SetTexture(nil); _probe:Hide() end
+    _probe = _ctl:CreateTexture(nil, "BACKGROUND")
+    _probe:SetAlpha(0)
+    _probe:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", -5000, 0)
     local ok = pcall(function() _probe:SetTexture(e.id) end)
     _probe._id = e.id
     local tries = 0
@@ -437,11 +438,11 @@ end
 local function ApplyAtlasCrop(i)
     local e = LIST[i]
     if not (e and e.atlas) then return end
-    local st, sz = State(i), _sizes[e.id]
-    if st.cw or not sz then return end
+    local st = State(i)
+    local W, H = NativeSize(i)   -- a manual W/H wins over the probe
+    if st.cw or not (W and H) then return end
     local _, info = ResolveAtlas(e.atlas)
     if not info then return end
-    local W, H = sz[1], sz[2]
     local function R(v) return math.floor(v + 0.5) end
     st.cx = R(info.leftTexCoord * W)
     st.cy = R(info.topTexCoord * H)
