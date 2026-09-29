@@ -457,13 +457,14 @@ function BNB.CheckContextualNotes()
         UpdateMinimapBadge(0)
         return
     end
-    if not BigNoteBoxNotesDB or not BigNoteBoxNotesDB.notes then return end
+    local ndb = BNB.NotesDB()
+    if not ndb or not ndb.notes then return end
 
     local matches   = {}
     local matchSet  = {}
     local stickyIDs = {}
     local popupIDs  = {}
-    for _, note in pairs(BigNoteBoxNotesDB.notes) do
+    for _, note in pairs(ndb.notes) do
         if note and note.context and note.context ~= "" then
             if NoteMatches(note) then
                 matches[#matches + 1]  = note.id

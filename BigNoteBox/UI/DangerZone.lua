@@ -300,7 +300,7 @@ local function PopulateContent(ct, sf)
         L["DZ_CLEARHIST_BTN"], 140,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
-            local ndb = BigNoteBoxNotesDB
+            local ndb = BNB.NotesDB()
             if ndb and ndb.notes then
                 local count = 0
                 for _, note in pairs(ndb.notes) do
@@ -325,7 +325,7 @@ local function PopulateContent(ct, sf)
         L["DZ_CLEARRESTORE_BTN"], 180,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
-            local ndb = BigNoteBoxNotesDB
+            local ndb = BNB.NotesDB()
             if ndb and ndb.notes then
                 local count = 0
                 for _, note in pairs(ndb.notes) do
@@ -417,8 +417,8 @@ local function PopulateContent(ct, sf)
         L["DZ_DELETEALL_BTN"], 160,
         L["DZ_CONFIRM_DELETE_ALL"], 220,
         function()
-            BigNoteBoxNotesDB.notes     = {}
-            BigNoteBoxNotesDB.noteOrder = {}
+            BNB.NotesDB().notes     = {}
+            BNB.NotesDB().noteOrder = {}
             BNB._currentNoteID = nil
             if BigNoteBoxDB then BigNoteBoxDB.selectedNoteID = nil end
             if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
@@ -435,7 +435,7 @@ local function PopulateContent(ct, sf)
         L["DZ_FACTORY_BTN"], 140,
         L["DZ_CONFIRM_FACTORY"], 220,
         function()
-            BigNoteBoxNotesDB = {}
+            BNB.SetNotesDB({})
             BigNoteBoxDB      = {}
             BNB:Print(L["DZ_MSG_FACTORY_DONE"])
             C_Timer.After(0.5, function()

@@ -6,7 +6,7 @@
 ## Version: 1.14.0
 ## SavedVariables: BigNoteBoxDB BigNoteBoxLocale
 ## LoadSavedVariablesFirst: 1
-## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB
+## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB, BigNoteBox_Dev
 ## AddonCompartmentFunc: BNB_OnAddonCompartmentClick
 ## AddonCompartmentFuncOnEnter: BNB_OnAddonCompartmentEnter
 ## AddonCompartmentFuncOnLeave: BNB_OnAddonCompartmentLeave

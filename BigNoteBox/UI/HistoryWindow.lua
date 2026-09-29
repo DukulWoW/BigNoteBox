@@ -177,7 +177,7 @@ function BNB.PopulateHistoryWindow()
     _rows = {}
 
     -- Collect notes with history, sorted by most recent snapshot timestamp
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then
         _emptyLbl:Show()
         child:SetHeight(40)
@@ -349,7 +349,7 @@ local function BuildHistoryWindowSkin()
             button1       = L["HISTORY_OVERRIDE_OVERRIDE"],
             button2       = L["CANCEL"],
             OnAccept      = function()
-                local ndb = BigNoteBoxNotesDB
+                local ndb = BNB.NotesDB()
                 if ndb and ndb.notes then
                     for id in pairs(ndb.notes) do BNB.HistoryDeleteAuto(id) end
                 end
@@ -466,7 +466,7 @@ local function BuildHistoryWindow()
             button1       = L["HISTORY_OVERRIDE_OVERRIDE"],
             button2       = L["CANCEL"],
             OnAccept      = function()
-                local ndb = BigNoteBoxNotesDB
+                local ndb = BNB.NotesDB()
                 if ndb and ndb.notes then
                     for id in pairs(ndb.notes) do
                         BNB.HistoryDeleteAuto(id)

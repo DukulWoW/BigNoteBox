@@ -530,7 +530,7 @@ end
 
 -- Called on PLAYER_LOGIN and by the daily ticker. Iterates all notes' tasks.
 function T.CheckResets()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
     local now = time()
@@ -570,7 +570,7 @@ end
 -- Called by ContextNotes after it finishes its own evaluation pass, or directly
 -- when zone/target changes. Checks all tasks across all notes for situation hits.
 function T.OnContextChanged()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
     -- Use ContextNotes' NoteMatches-equivalent if exposed, else a simple stub.

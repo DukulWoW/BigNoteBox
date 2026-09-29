@@ -100,7 +100,7 @@ end
 -- INTERNAL: access notes DB safely
 --------------------------------------------------------------------------------
 local function NDB()
-    return BigNoteBoxNotesDB or {}
+    return BNB.NotesDB() or {}
 end
 
 local function MaxSlots()

@@ -936,10 +936,11 @@ function BNB.CreateMainWindow()
         if chrome.OnShow then chrome.OnShow() end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         local sel = BigNoteBoxDB.selectedNoteID
+        local ndb = BNB.NotesDB()
         -- Recovery: if the previously selected note is a title-less stub (abandoned
         -- new-note creation from a prior session), purge it silently before restoring.
-        if sel and BigNoteBoxNotesDB.notes[sel] then
-            local stub = BigNoteBoxNotesDB.notes[sel]
+        if sel and ndb.notes[sel] then
+            local stub = ndb.notes[sel]
             if stub.title == nil or stub.title == "" then
                 if BNB.PurgeNote then BNB.PurgeNote(sel) end
                 BigNoteBoxDB.selectedNoteID = nil
@@ -947,7 +948,7 @@ function BNB.CreateMainWindow()
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end
         end
-        if sel and BigNoteBoxNotesDB.notes[sel] then
+        if sel and ndb.notes[sel] then
             if BNB.SelectNote then BNB.SelectNote(sel) end
         end
         -- Apply scale lock state from saved DB

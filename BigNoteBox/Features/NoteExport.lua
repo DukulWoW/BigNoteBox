@@ -778,7 +778,7 @@ end
 -- ── Serialize all notes ───────────────────────────────────────────────────────
 
 local function SerializeNotes(fmt)
-    local ndb   = BigNoteBoxNotesDB
+    local ndb   = BNB.NotesDB()
     local order = ndb and ndb.noteOrder or {}
     local notes = ndb and ndb.notes     or {}
     local count = 0

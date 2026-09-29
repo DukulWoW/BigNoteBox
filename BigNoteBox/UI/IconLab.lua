@@ -8,7 +8,7 @@
 --             with the arrow keys, shrink/grow/centre it, corner guides
 --   preview - a frame around real icons at every size the addon uses, with
 --             shape (square / circle), layer (over / under) and tint
--- Work in progress is kept in BigNoteBoxDB.devIconLab across reloads.
+-- Work in progress is kept in BNB.LabDB().devIconLab across reloads.
 --
 -- Seed files and their atlas regions come from UI/IconLabData.lua, generated
 -- by _work/tools/iconlab-regions.py and loaded only in dev builds (#@debug@
@@ -71,8 +71,9 @@ local _sizes  = _prober.sizes
 
 -- ── Saved state ──────────────────────────────────────────────────────────────
 local function Store()
-    BigNoteBoxDB.devIconLab = BigNoteBoxDB.devIconLab or { e = {} }
-    return BigNoteBoxDB.devIconLab
+    local db = BNB.LabDB()
+    db.devIconLab = db.devIconLab or { e = {} }
+    return db.devIconLab
 end
 
 local function State(i)

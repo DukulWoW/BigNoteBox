@@ -233,7 +233,7 @@ end
 local GetDeflate = BNB.GetDeflate
 
 function BNB.ShareEncode(noteID, optionKey)
-    local ndb  = BigNoteBoxNotesDB
+    local ndb  = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[noteID]
     if not note then return nil, L["SHARE_ERR_NOTFOUND"] end
 

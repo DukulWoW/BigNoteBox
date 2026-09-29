@@ -599,7 +599,7 @@ local function Tick()
     if now - _lastTick < TICK_INTERVAL then return end
     _lastTick = now
 
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
     for noteID, note in pairs(ndb.notes) do
@@ -657,7 +657,7 @@ end
 -- LOGIN SCAN — fire missed alarms
 -- ---------------------------------------------------------------------------
 local function LoginScan()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
     _missedOnLogin = {}

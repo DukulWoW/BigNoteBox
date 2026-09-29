@@ -7,7 +7,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 -- Convenience accessor — keeps all reads/writes in one place
-local function NDB() return BigNoteBoxNotesDB end
+local function NDB() return BNB.NotesDB() end
 
 --------------------------------------------------------------------------------
 -- TAG NORMALIZATION
@@ -29,7 +29,7 @@ end
 function BNB.SyncTrashBtnState()
     local btn = BNB._toolbarTrashBtn
     if not btn then return end
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local hasItems = false
     if ndb and ndb.trash then
         for _ in pairs(ndb.trash) do hasItems = true; break end
@@ -77,7 +77,7 @@ end
 function BNB.TagIndexRebuild()
     local db = BigNoteBoxDB; if not db then return end
     db.tagIndex = {}
-    local ndb = BigNoteBoxNotesDB; if not ndb or not ndb.notes then return end
+    local ndb = BNB.NotesDB(); if not ndb or not ndb.notes then return end
     for id, note in pairs(ndb.notes) do
         for _, tag in ipairs(note.tags or {}) do
             BNB.TagIndexAdd(id, tag)
@@ -112,7 +112,7 @@ function BNB.RenameTag(oldTag, newTag)
     local idx = TagDB(); if not idx then return false end
     local ids = idx[oldTag]
     if not ids then return false end
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return false end
     -- Update every note that has oldTag
     for id in pairs(ids) do
@@ -145,7 +145,7 @@ function BNB.DeleteTag(tag)
     local idx = TagDB(); if not idx then return end
     local ids = idx[tag]
     if not ids then return end
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
     for id in pairs(ids) do
         local note = ndb.notes[id]

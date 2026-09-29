@@ -162,7 +162,7 @@ end
 -- note made with default settings: no warning, and auto mode made a new
 -- "(Duplicate)" note on every inspect.
 function UN.FindPlayerNote(playerName, realm)
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes or not playerName then return nil end
     local ctx = "player:" .. playerName
     if realm and realm ~= "" then ctx = ctx .. "-" .. realm end
@@ -185,7 +185,7 @@ end
 
 -- baseName when free, else "Name (Duplicate)", "Name (Duplicate 2)", ...
 function UN.UniqueTitle(baseName)
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return baseName end
     if not TitleTaken(ndb, baseName) then return baseName end
     for i = 1, 100 do

@@ -97,7 +97,7 @@ K.ASSETS = ASSETS
 
 -- ── DB helpers ────────────────────────────────────────────────────────────────
 local function DB()  return BigNoteBoxDB     end
-local function NDB() return BigNoteBoxNotesDB end
+local function NDB() return BNB.NotesDB() end
 
 local function GetAttachments(id)
     local note = id and NDB() and NDB().notes and NDB().notes[id]

@@ -200,7 +200,7 @@ BNB.ApplyListMode = ApplyListMode
 local function GetNextQuickNoteTitle()
     local base = L["NL_QUICK_NOTE_BTN"]
     local taken = {}
-    for _, note in pairs(BigNoteBoxNotesDB.notes or {}) do
+    for _, note in pairs(BNB.NotesDB().notes or {}) do
         local t = note.title or ""
         if t == base then
             taken[1] = true
@@ -314,7 +314,7 @@ end
 -- Collect all unique tags across all notes
 local function GetAllTags()
     local seen, list = {}, {}
-    local notes = BigNoteBoxNotesDB and BigNoteBoxNotesDB.notes or {}
+    local notes = (BNB.NotesDB() or {}).notes or {}
     for _, note in pairs(notes) do
         for _, tag in ipairs(note.tags or {}) do
             local lo = tag:lower()
@@ -1045,7 +1045,7 @@ local function EndDrag(commit)
     -- Placed by id, not index: noteOrder also holds pinned notes and notes the
     -- sidebar / favourite / task filters hide, anywhere in the sequence (ALL-98).
     if commit and _dragNoteID and _dragTargetID and _dragTargetID ~= _dragNoteID then
-        local order = BigNoteBoxNotesDB and BigNoteBoxNotesDB.noteOrder
+        local order = (BNB.NotesDB() or {}).noteOrder
         if order then
             local fromIdx = nil
             for i, id in ipairs(order) do
@@ -1157,7 +1157,7 @@ local function MultiDeleteSummary(ids)
         lines[#lines + 1] = string.format(L["POPUP_MULTI_MORE"], #ids - MULTI_TITLES_SHOWN)
     end
     local live = 0
-    for _ in pairs(BigNoteBoxNotesDB.notes) do live = live + 1 end
+    for _ in pairs(BNB.NotesDB().notes) do live = live + 1 end
     if #ids >= live then
         lines[#lines + 1] = "\n|cffff5555" .. L["POPUP_MULTI_ALL_WARN"] .. "|r"
     end
@@ -1168,7 +1168,7 @@ function BNB.DeleteMultiSelected()
     -- Selected ids in note order (so the confirm lists them as the list does),
     -- live notes only
     local ids = {}
-    for _, id in ipairs(BigNoteBoxNotesDB.noteOrder) do
+    for _, id in ipairs(BNB.NotesDB().noteOrder) do
         if _multiSel[id] and BNB.GetNote(id) then ids[#ids + 1] = id end
     end
     if #ids == 0 then return end

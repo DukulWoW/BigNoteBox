@@ -3,7 +3,7 @@
 -- Previews the game's own background textures in a resizable, sticky-like
 -- window so each can be given a name, a fill mode and an anchor before it is
 -- added to the sticky background list. Export hands back one Lua line per
--- entry. Work in progress is kept in BigNoteBoxDB.devBgLab across reloads.
+-- entry. Work in progress is kept in BNB.LabDB().devBgLab across reloads.
 --
 -- Fill modes and their maths live in UI/BgLayer.lua, shared with the
 -- sticky notes, so this preview is what a sticky shows. "Try on stickies"
@@ -128,8 +128,9 @@ local _trying   -- "Try on stickies" is on
 
 -- ── Saved state ──────────────────────────────────────────────────────────────
 local function Store()
-    BigNoteBoxDB.devBgLab = BigNoteBoxDB.devBgLab or { e = {} }
-    return BigNoteBoxDB.devBgLab
+    local db = BNB.LabDB()
+    db.devBgLab = db.devBgLab or { e = {} }
+    return db.devBgLab
 end
 
 -- The saved settings for entry i, created from its group defaults on first use.

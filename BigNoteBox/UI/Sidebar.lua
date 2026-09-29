@@ -156,7 +156,7 @@ SB.IconForKey = IconForKey
 
 -- Count notes matching a sidebar filter key
 local function CountForKey(key)
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return 0 end
     if key == "all" then
         local n = 0
@@ -970,7 +970,7 @@ end
 function BNB.OpenCopyMovePopup(noteID, mode)
     if not IsEnabled() then return end
     local db  = BigNoteBoxDB
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not db or not ndb or not ndb.notes then return end
     local note = ndb.notes[noteID]
     if not note then return end
@@ -1094,7 +1094,7 @@ end
 function BNB.OpenCopyMovePopupMulti(noteIDs)
     if not noteIDs or #noteIDs == 0 then return end
     local db  = BigNoteBoxDB
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not db or not ndb or not ndb.notes then return end
 
     local f = BuildCopyMovePopup()

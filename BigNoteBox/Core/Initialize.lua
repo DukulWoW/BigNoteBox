@@ -28,7 +28,7 @@ local function MergeBareNameRecord(db, name, realm, classToken)
     if not (old and cur) or oldKey == BNB.currentChar or old.class ~= classToken then return end
     if old.slotPinned then cur.slotPinned = true end
     local oldScope, newScope = "char:" .. oldKey, "char:" .. BNB.currentChar
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local moved = 0
     for _, list in ipairs({ ndb and ndb.notes, ndb and ndb.trash }) do
         for _, note in pairs(list or {}) do
@@ -57,7 +57,7 @@ function BNB.Initialize()
     -- a reload, so these stubs would otherwise block SelectNote with the
     -- "must have a title" message on every login.
     do
-        local ndb = BigNoteBoxNotesDB
+        local ndb = BNB.NotesDB()
         if ndb and ndb.notes then
             for noteID, note in pairs(ndb.notes) do
                 local emptyTitle = not note.title or note.title == ""
@@ -223,6 +223,17 @@ function BNB.Initialize()
         local bcbStatus = BNB.hasBCB and " |cff5599ff(BCB detected)|r" or ""
         print(string.format(L["LOADED_MSG"], BNB.ADDON_VERSION) .. bcbStatus)
     end
+    -- Dev mode (ALL-129) always says so, whatever the login message setting:
+    -- it decides which notes are on screen
+    if BNB.IsDevMode() then
+        if BNB._devNotesCopied then
+            BNB:Print(string.format(L["CFG_DEV_MODE_COPIED_FMT"], BNB._devNotesCopied))
+        else
+            local n = 0
+            for _ in pairs(BNB.NotesDB().notes or {}) do n = n + 1 end
+            BNB:Print(string.format(L["CFG_DEV_MODE_LOGIN_FMT"], n))
+        end
+    end
 
     -- 11. Wire config and trash height tracking now that main window exists
     if BNB.HookConfigHeightTracking then
@@ -286,7 +297,7 @@ function BNB_KeybindQuickNote()
     if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
     local base   = L["NL_QUICK_NOTE_BTN"]   -- same title as the list's Quick Note button
     local taken  = {}
-    for _, note in pairs(BigNoteBoxNotesDB and BigNoteBoxNotesDB.notes or {}) do
+    for _, note in pairs((BNB.NotesDB() or {}).notes or {}) do
         local t = note.title or ""
         if t == base then taken[1] = true
         else local n = t:match("^" .. base .. " (%d+)$"); if n then taken[tonumber(n)] = true end end

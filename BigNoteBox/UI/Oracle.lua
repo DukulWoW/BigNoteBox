@@ -196,7 +196,7 @@ end
 -- Every live note, in list order. Trashed notes live elsewhere and never show
 -- in a normal search: only the `b` prefix (open-as "trash") reaches them.
 local function AllNotes()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local out = {}
     if not (ndb and ndb.notes) then return out end
     for _, id in ipairs(ndb.noteOrder or {}) do
@@ -207,7 +207,7 @@ local function AllNotes()
 end
 
 local function TrashNotes()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local out = {}
     if not (ndb and ndb.trash) then return out end
     for _, n in pairs(ndb.trash) do out[#out + 1] = n end
@@ -484,7 +484,7 @@ end
 local function OpenTrashResult(id)
     if IsShiftKeyDown() then
         if not BNB.RestoreNote then return false end
-        local tn = BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash and BigNoteBoxNotesDB.trash[id]
+        local tn = ((BNB.NotesDB() or {}).trash or {})[id]
         local title = tn and tn.title ~= "" and tn.title or L["UNTITLED"]
         BNB.RestoreNote(id)
         BNB:Print(L["ORACLE_RESTORED_FMT"]:format(title))

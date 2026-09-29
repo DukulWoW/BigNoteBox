@@ -908,11 +908,11 @@ local function CopyLayout(src)
     return out
 end
 
--- The working copy lives in BigNoteBoxDB, one per theme, so a /reload
+-- The working copy lives in BNB.LabDB(), one per theme, so a /reload
 -- keeps it. It starts as a copy of the theme's built-in layouts. removed /
 -- panelRemoved list pieces taken out in the tool, so built-in ones stay out.
 local function Work()
-    local db = BigNoteBoxDB
+    local db = BNB.LabDB()
     db.devSearchLayout, db.devSearchSize = nil, nil   -- pre-theme keys (never shipped)
     db.devSearch = db.devSearch or {}
     local d = BNB.GetSearchTheme(tool.theme)
@@ -1830,7 +1830,8 @@ local function BuildTool()
         Refresh()
     end)
     Btn("Reset", function()
-        if BigNoteBoxDB.devSearch then BigNoteBoxDB.devSearch[f.theme] = nil end
+        local db = BNB.LabDB()
+        if db.devSearch then db.devSearch[f.theme] = nil end
         Refresh()
     end)
     Btn("Export", function() BNB.ShowClipboardHint(ExportText(), f, true) end)

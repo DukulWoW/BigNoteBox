@@ -74,13 +74,74 @@ function BNB.GenerateID()
 end
 
 --------------------------------------------------------------------------------
--- INITIALIZE NOTES DB  (BigNoteBoxNotesDB)
+-- DEV MODE (ALL-129)
+-- The BigNoteBox_Dev addon (never packaged) is dev mode: while it is enabled,
+-- notes come from its own SavedVariable BigNoteBoxDevDB.notesDB (same shape as
+-- BigNoteBoxNotesDB) and the labs keep their work in BigNoteBoxDevDB too.
+-- Settings stay shared. Nothing swaps tables at logout: every reader goes
+-- through BNB.NotesDB() / BNB.LabDB(), so each file saves only its own set.
+-- Never read the BigNoteBoxNotesDB global directly outside this file.
+--------------------------------------------------------------------------------
+function BNB.IsDevMode() return BNB._devMode == true end
+
+-- The active notes set: { notes, noteOrder, trash, dbVersion }
+function BNB.NotesDB()
+    if BNB._devMode then return BigNoteBoxDevDB.notesDB end
+    return BigNoteBoxNotesDB
+end
+
+-- Replace the active notes set (Factory Reset)
+function BNB.SetNotesDB(t)
+    if BNB._devMode then BigNoteBoxDevDB.notesDB = t else BigNoteBoxNotesDB = t end
+end
+
+-- Where the developer labs (Background Lab, Icon Lab, search layout tool) keep
+-- their work: devBgLab, devIconLab, devSearch
+function BNB.LabDB()
+    if BNB._devMode then return BigNoteBoxDevDB end
+    return BigNoteBoxDB
+end
+
+local function DeepCopy(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, x in pairs(v) do out[k] = DeepCopy(x) end
+    return out
+end
+
+local LAB_KEYS = { "devBgLab", "devIconLab", "devSearch" }
+
+-- Runs at ADDON_LOADED. The first dev-mode login copies the current notes into
+-- the dev set (only while the dev set does not exist yet, so never again) and,
+-- once, the lab work out of the settings DB. The originals are left untouched.
+local function InitDevMode()
+    if not BigNoteBoxDev_Loaded then return end
+    if type(BigNoteBoxDevDB) ~= "table" then BigNoteBoxDevDB = {} end
+    local dev = BigNoteBoxDevDB
+    BNB._devMode = true
+    if dev.notesDB == nil then
+        local src = BigNoteBoxNotesDB_Loaded and BigNoteBoxNotesDB
+        dev.notesDB = type(src) == "table" and DeepCopy(src) or {}
+        local n = 0
+        for _ in pairs(dev.notesDB.notes or {}) do n = n + 1 end
+        BNB._devNotesCopied = n
+    end
+    if not dev.labsCopied then
+        for _, k in ipairs(LAB_KEYS) do
+            if dev[k] == nil and BigNoteBoxDB[k] ~= nil then dev[k] = DeepCopy(BigNoteBoxDB[k]) end
+        end
+        dev.labsCopied = true
+    end
+end
+
+--------------------------------------------------------------------------------
+-- INITIALIZE NOTES DB  (the active set: BigNoteBoxNotesDB, or the dev set)
 -- Called first. Notes are precious — only ever add missing keys, never reset.
 -- Public so BigNoteBoxDB.lua (the companion data addon) can call it directly.
 --------------------------------------------------------------------------------
 function BNB.InitNotesDB()
-    BigNoteBoxNotesDB = BigNoteBoxNotesDB or {}
-    local ndb = BigNoteBoxNotesDB
+    if not BNB.NotesDB() then BNB.SetNotesDB({}) end
+    local ndb = BNB.NotesDB()
     if ndb.notes     == nil then ndb.notes     = {} end
     if ndb.noteOrder == nil then ndb.noteOrder = {} end
     if ndb.dbVersion == nil then ndb.dbVersion = 1  end
@@ -106,7 +167,7 @@ end
 --------------------------------------------------------------------------------
 -- Public so BigNoteBoxDB.lua can call it after owning BigNoteBoxNotesDB.
 function BNB.MigrateNotesDB()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local v   = ndb.dbVersion or 1
 
     -- ── v1 → v2: introduce trash table ───────────────────────────────────────
@@ -583,7 +644,9 @@ function BNB.InitializeDB()
     -- Notes DB is owned by BigNoteBoxDB companion addon.
     -- BigNoteBoxNotesDB_Loaded is set at file-load time by BigNoteBoxDB.lua,
     -- before SavedVariables are available — but it persists into ADDON_LOADED.
-    if BigNoteBoxNotesDB_Loaded then
+    -- Dev mode (BigNoteBox_Dev enabled) brings its own notes set.
+    InitDevMode()
+    if BigNoteBoxNotesDB_Loaded or BNB._devMode then
         -- Companion addon is loaded and notes are available.
         BNB._notesAvailable = true
     else

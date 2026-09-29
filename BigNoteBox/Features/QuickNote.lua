@@ -157,7 +157,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
                 if t == "" then t = self._qnTitle or "" end
                 local id = BNB.CreateNote(t, self._qnBody or "")
                 if not id then return end
-                local n = BigNoteBoxNotesDB and BigNoteBoxNotesDB.notes and BigNoteBoxNotesDB.notes[id]
+                local n = BNB.GetNote(id)
                 if n then
                     n.icon = self._qnIcon or RandomIcon()
                     n.source = "quicknote"   -- Oracle search badge (ALL-69)
@@ -188,7 +188,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     if not id then return end
 
     -- Set icon and tags directly on the new note record
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[id]
     if note then
         note.icon    = icon or RandomIcon()

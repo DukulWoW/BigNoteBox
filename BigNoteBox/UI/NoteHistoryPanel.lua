@@ -271,7 +271,7 @@ function BNB.PopulateNoteHistoryPanel()
     _nhpFrame:SetHeight(ComputeHeight(numAuto, hasManual))
 
     -- Update title
-    local ndb  = BigNoteBoxNotesDB
+    local ndb  = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[_currentID]
     local title = note and note.title or "(untitled)"
     local nhpTitle = string.format(L["HISTORY_NOTE_TITLE"], title)

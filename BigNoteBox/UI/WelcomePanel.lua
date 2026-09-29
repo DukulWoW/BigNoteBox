@@ -62,7 +62,8 @@ end
 -- Collect up to `max` notes whose context matches the current zone/instance.
 -- Uses the same matching logic as ContextNotes.lua.
 local function GetLocationNotes(max)
-    if not BigNoteBoxNotesDB or not BigNoteBoxNotesDB.notes then return {} end
+    local ndb = BNB.NotesDB()
+    if not ndb or not ndb.notes then return {} end
     local inInst, instType = IsInInstance()
     local curKind, curVal
     if inInst and instType ~= "none" then
@@ -75,7 +76,7 @@ local function GetLocationNotes(max)
     if curVal == "" then return {} end
 
     local results = {}
-    for id, note in pairs(BigNoteBoxNotesDB.notes) do
+    for id, note in pairs(ndb.notes) do
         if note.context then
             local kind, value = note.context:match("^(%w+):(.+)$")
             if kind and value and kind == curKind and value:lower() == curVal then
@@ -89,9 +90,10 @@ end
 
 -- Collect up to `max` favorited notes.
 local function GetFavoriteNotes(max)
-    if not BigNoteBoxNotesDB or not BigNoteBoxNotesDB.notes then return {} end
+    local ndb = BNB.NotesDB()
+    if not ndb or not ndb.notes then return {} end
     local results = {}
-    for id, note in pairs(BigNoteBoxNotesDB.notes) do
+    for id, note in pairs(ndb.notes) do
         if note.favorited then
             results[#results + 1] = { id = id, note = note }
             if #results >= max then break end

@@ -519,7 +519,7 @@ local function BuildNotesTab(sf, ct)
     sf:HookScript("OnShow", function()
         if BNB.HistoryTotalSize then
             local bytes = BNB.HistoryTotalSize()
-            local ndb   = BigNoteBoxNotesDB
+            local ndb   = BNB.NotesDB()
             local noteCount = 0
             if ndb and ndb.notes then
                 for id in pairs(ndb.notes) do

@@ -4,6 +4,8 @@
 # top level of the zip. The result must list exactly BigNoteBox\, BigNoteBoxDB\,
 # BigNoteBox_Icons\ (load-on-demand icon list, ALL-62) and BigNoteBox_BGs\
 # (load-on-demand old sticky backgrounds, ALL-110) and nothing else.
+# BigNoteBox_Dev\ (dev mode, ALL-129) is tracked but never packaged: it is in
+# ignore below, or it would land inside the zip's BigNoteBox\ folder.
 
 package-as: BigNoteBox
 
@@ -30,3 +32,4 @@ ignore:
   - FILEMAP.md
   - README.md
   - CONTRIBUTING.md
+  - BigNoteBox_Dev

@@ -1,0 +1,9 @@
+## Interface: 120105, 120100
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r |cffff9900Dev|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: Developer mode for BigNoteBox: a separate set of notes and the labs' saved work. Not needed to play.
+## Author: Dukul
+## Version: 1.0.0
+## SavedVariables: BigNoteBoxDevDB
+
+BigNoteBox_Dev.lua

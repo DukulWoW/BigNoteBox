@@ -298,7 +298,7 @@ local function SetOvMultiMode(enabled)
 
     -- How many alarms exist? Hide Select entirely on empty list.
     local hasAlarms = false
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if ndb and ndb.notes then
         for _, note in pairs(ndb.notes) do
             if note.alarm then hasAlarms = true; break end
@@ -412,7 +412,7 @@ local function BuildOverview()
     selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function()
-        local ndb = BigNoteBoxNotesDB
+        local ndb = BNB.NotesDB()
         if ndb and ndb.notes then
             for noteID, note in pairs(ndb.notes) do
                 if note.alarm then _ovMultiSel[noteID] = true end
@@ -524,7 +524,7 @@ local function BuildOverviewSkin()
     selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function()
-        local ndb = BigNoteBoxNotesDB
+        local ndb = BNB.NotesDB()
         if ndb and ndb.notes then
             for noteID, note in pairs(ndb.notes) do
                 if note.alarm then _ovMultiSel[noteID] = true end
@@ -650,7 +650,7 @@ local function MakeRow(parent)
 end
 
 local function GetSortedAlarmNotes()
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return {} end
     local list = {}
     for noteID, note in pairs(ndb.notes) do

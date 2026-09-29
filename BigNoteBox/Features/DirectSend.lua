@@ -131,7 +131,7 @@ function DS.SendNote(noteID, optionKey, targetName, onSent, onFail)
     end
 
     -- Resolve note
-    local ndb  = BigNoteBoxNotesDB
+    local ndb  = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[noteID]
     if not note then
         return fail(L["DS_ERR_NO_NOTE_DATA"])

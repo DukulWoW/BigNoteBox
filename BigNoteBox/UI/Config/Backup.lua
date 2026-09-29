@@ -279,7 +279,7 @@ local function BuildBackupTab(sf, ct)
     local largestBytes = 0
     local trashCount   = 0
     local trashBytes   = 0
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if ndb then
         if ndb.notes then
             for _, note in pairs(ndb.notes) do

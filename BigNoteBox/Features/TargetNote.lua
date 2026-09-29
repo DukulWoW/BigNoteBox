@@ -106,7 +106,7 @@ local function RefreshAfterResolve()
 end
 
 local function StoreDisplayID(npcID, displayID)
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not (ndb and ndb.notes) then return end
     for _, note in pairs(ndb.notes) do
         if note.source == "target" and note.targetNpcID == npcID and not note.targetIsPet then
@@ -549,7 +549,7 @@ end
 -- Never checks title — title can be renamed freely.
 --------------------------------------------------------------------------------
 local function FindExistingNote(data)
-    local ndb = BigNoteBoxNotesDB
+    local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return nil end
 
     if data.isPlayer then

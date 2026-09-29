@@ -58,7 +58,7 @@ local function SetTrashMultiMode(enabled)
     -- Normal-mode buttons: visible only when NOT selecting
     if _emptyBtn    then
         local hasItems = false
-        local ndb = BigNoteBoxNotesDB
+        local ndb = BNB.NotesDB()
         if ndb and ndb.trash then
             for _ in pairs(ndb.trash) do hasItems = true; break end
         end
@@ -116,7 +116,7 @@ local function PurgeSelectedConfirm()
             OnAccept = function(self, data)
                 local sel = data or self.data
                 if type(sel) ~= "table" then return end
-                local trash = BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash
+                local trash = (BNB.NotesDB() or {}).trash
                 if trash then
                     for _, id in ipairs(sel) do trash[id] = nil end
                 end
@@ -220,8 +220,8 @@ end
 function BNB.PopulateTrashWindow()
     if not _twFrame then return end
 
-    -- Never rebind ndb — always read/write BigNoteBoxNotesDB directly
-    local ndb = BigNoteBoxNotesDB
+    -- Never cache ndb across calls: always read it through BNB.NotesDB() (ALL-129)
+    local ndb = BNB.NotesDB()
     if not ndb then return end
     if not ndb.trash then ndb.trash = {} end
 
@@ -397,8 +397,9 @@ function BNB.PopulateTrashWindow()
             -- Sure?: permanently delete from trash
             row._sureBtn:SetScript("OnClick", function()
                 if row._sureTimer then row._sureTimer:Cancel(); row._sureTimer = nil end
-                if BigNoteBoxNotesDB and BigNoteBoxNotesDB.trash then
-                    BigNoteBoxNotesDB.trash[id] = nil
+                local ndb = BNB.NotesDB()
+                if ndb and ndb.trash then
+                    ndb.trash[id] = nil
                 end
                 BNB.RefreshTrashWindow()
             end)
