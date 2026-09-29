@@ -791,9 +791,9 @@ local function BuildToolbar(parent)
     end)
 
     -- Lock / Unlock icon button — always visible in the toolbar.
-    -- lock.tga   = note is unlocked → click to lock it persistently.
-    -- unlock.tga = note is locked   → click to unlock it persistently.
-    local lockBtn, lockTx = MakeIconBtn(bar, BNB.AbIcon("lock"), "")   -- tip set dynamically below
+    -- lock.tga   = note is locked (shows current state); click unlocks it.
+    -- unlock.tga = note is unlocked; click locks it.
+    local lockBtn, lockTx = MakeIconBtn(bar, BNB.AbIcon("unlock"), "")   -- tip set dynamically below
     lockBtn:SetPoint("LEFT", bar, "LEFT", SlotX(7) - 2, 0)
     lockBtn:Hide()
     lockBtn:SetScript("OnClick", function()
@@ -1297,8 +1297,8 @@ local function SetEditorLocked(locked)
     local toolbar = BNB._editorToolbar
     if toolbar then
         -- Lock button: always visible.
-        -- lock.tga   = note is unlocked  → click to lock
-        -- unlock.tga = note is locked    → click to unlock
+        -- lock.tga   = note is locked (current state)
+        -- unlock.tga = note is unlocked (current state)
         local id2      = BNB._currentNoteID
         local note2    = id2 and BNB.GetNote(id2)
         local noteLocked = note2 and NoteIsLocked(note2)
@@ -1306,7 +1306,7 @@ local function SetEditorLocked(locked)
             toolbar._lockBtn:SetShown(true)
             if toolbar._lockTx then
                 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-                toolbar._lockTx:SetTexture(ASSETS .. (noteLocked and BNB.AbIcon("unlock") or BNB.AbIcon("lock")))
+                toolbar._lockTx:SetTexture(ASSETS .. (noteLocked and BNB.AbIcon("lock") or BNB.AbIcon("unlock")))
             end
         end
         -- Pin button: always visible (lock state does not hide it)
