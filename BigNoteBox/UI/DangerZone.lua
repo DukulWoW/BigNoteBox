@@ -250,6 +250,7 @@ local function PopulateContent(ct, sf)
 
     if not StaticPopupDialogs["BNB_RUN_SETUP_AGAIN"] then
         StaticPopupDialogs["BNB_RUN_SETUP_AGAIN"] = {
+            preferredIndex = 3,
             text    = L["DZ_SETUP_POPUP_TEXT"],
             button1 = L["DZ_POPUP_RELOAD"],
             button2 = L["DZ_POPUP_LATER"],
@@ -270,7 +271,7 @@ local function PopulateContent(ct, sf)
     -- ── 1. Reset Settings ────────────────────────────────────────────────────
     y = MakeHeader(ct, y, L["DZ_RESETSET_HDR"])
     y = MakeDesc(ct, y, L["DZ_RESETSET_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_RESETSET_BTN"], 140,
         L["DZ_CONFIRM_RESET"], 160,
         function()
@@ -283,7 +284,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_EMPTYTRASH_HDR"])
     y = MakeDesc(ct, y, L["DZ_EMPTYTRASH_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_EMPTYTRASH_BTN"], 130,
         L["DZ_CONFIRM_EMPTY"], 160,
         function()
@@ -296,7 +297,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_CLEARHIST_HDR"])
     y = MakeDesc(ct, y, L["DZ_CLEARHIST_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_CLEARHIST_BTN"], 140,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
@@ -321,7 +322,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_CLEARRESTORE_HDR"])
     y = MakeDesc(ct, y, L["DZ_CLEARRESTORE_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_CLEARRESTORE_BTN"], 180,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
@@ -347,7 +348,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_RESETSTICKY_HDR"])
     y = MakeDesc(ct, y, L["DZ_RESETSTICKY_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_RESETSTICKY_BTN"], 180,
         L["DZ_CONFIRM_RESET"], 160,
         function()
@@ -368,7 +369,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_CLEARMIG_HDR"])
     y = MakeDesc(ct, y, L["DZ_CLEARMIG_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_CLEARMIG_BTN"], 200,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
@@ -388,7 +389,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_REMOVECHARS_HDR"])
     y = MakeDesc(ct, y, L["DZ_REMOVECHARS_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_REMOVECHARS_BTN"], 200,
         L["DZ_CONFIRM_REMOVE"], 160,
         function()
@@ -413,7 +414,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_DELETEALL_HDR"])
     y = MakeDesc(ct, y, L["DZ_DELETEALL_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_DELETEALL_BTN"], 160,
         L["DZ_CONFIRM_DELETE_ALL"], 220,
         function()
@@ -431,7 +432,7 @@ local function PopulateContent(ct, sf)
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_FACTORY_HDR"])
     y = MakeDesc(ct, y, L["DZ_FACTORY_DESC"])
-    y, _, _ = MakeActionRow(ct, y,
+    y = MakeActionRow(ct, y,
         L["DZ_FACTORY_BTN"], 140,
         L["DZ_CONFIRM_FACTORY"], 220,
         function()

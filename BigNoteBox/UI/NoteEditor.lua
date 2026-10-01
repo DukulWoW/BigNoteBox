@@ -370,6 +370,7 @@ local function BuildTitleField(parent)
     -- Register the discard confirmation popup (once, idempotent).
     if not StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] then
         StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] = {
+            preferredIndex = 3,
             text      = L["NE_DISCARD_POPUP_TEXT"],
             button1   = L["NE_DISCARD_BTN"],
             button2   = L["NE_KEEP_EDITING_BTN"],
@@ -695,7 +696,7 @@ local function BuildToolbar(parent)
     end
 
     -- Save
-    saveBtn, _ = MakeIconBtn(bar, "Actionbar\\ab-save", L["BTN_SAVE_NOTE"])
+    saveBtn = MakeIconBtn(bar, "Actionbar\\ab-save", L["BTN_SAVE_NOTE"])
     saveBtn:SetPoint("LEFT", bar, "LEFT", SlotX(0), 0)
     saveBtn:SetEnabled(false)
     saveBtn:SetAlpha(0.4)

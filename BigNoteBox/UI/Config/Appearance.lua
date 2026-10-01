@@ -223,6 +223,9 @@ local function BuildAppearanceTab(sf, ct)
 
     local skinPresetDD, skinPresetCycleBtn
 
+    -- Forward declaration so preset callbacks below can call it before it's defined
+    local RefreshBrightnessVisibility
+
     if useNativeSkinDrop then
         skinPresetDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         skinPresetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
@@ -263,9 +266,6 @@ local function BuildAppearanceTab(sf, ct)
         end)
         y = y - 30
     end
-
-    -- Forward declaration so preset callbacks above can call it before it's defined
-    local RefreshBrightnessVisibility
 
     -- Stacked sliders with Reset, as everywhere (ALL-121). Reset clears the
     -- saved value, so a later change of the built-in default still reaches it.

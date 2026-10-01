@@ -564,7 +564,7 @@ local function UpdateInspectGear(noteID, richMode)
         fields.body = richMode and BuildRichBody(data) or BuildNormalBody(data)
     end
     BNB.UpdateNote(noteID, fields)
-    if BNB.RenderRefBox     then BNB.RenderRefBox() end
+    if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
     if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
 end
 

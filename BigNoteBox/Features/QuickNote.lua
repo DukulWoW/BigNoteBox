@@ -140,6 +140,7 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     if action == "confirm" then
         -- Small static popup to confirm/edit the title before creating
         StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] = StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] or {
+            preferredIndex = 3,
             text         = BNB.L["QN_CONFIRM_TEXT"],
             button1      = BNB.L["QN_CONFIRM_CREATE"],
             button2      = BNB.L["CANCEL"],

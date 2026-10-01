@@ -237,8 +237,8 @@ end
 BNB.AlarmOverview = BNB.AlarmOverview or {}
 local AO = BNB.AlarmOverview
 
-local OV_W    = 310
-local OV_H    = 400
+local OV_W    = 400
+local OV_H    = 640
 local OV_PAD  = 10
 local OV_ROW  = 36
 
@@ -861,6 +861,7 @@ end
 -- Called by AlarmManager when missed alarms are detected on login
 -- StaticPopup for alarm delete confirmation
 StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
+    preferredIndex = 3,
     text = L["AO_DELETE_CONFIRM_TEXT"],
     button1 = L["DELETE"],
     button2 = L["CANCEL"],

@@ -370,6 +370,7 @@ function AM.ConvertToPlain(id, onDone)
     -- Register the confirm popup once
     if not StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] then
         StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] = {
+            preferredIndex = 3,
             text     = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?",
             button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
             button2  = BNB.L["CANCEL"],

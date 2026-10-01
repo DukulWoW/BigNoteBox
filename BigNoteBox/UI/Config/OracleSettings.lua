@@ -154,6 +154,7 @@ local function TrySave(name, data)
 end
 
 StaticPopupDialogs["BNB_ORACLE_SAVE_STYLE"] = {
+    preferredIndex = 3,
     text = L["ORACLE_STYLE_SAVE_TEXT"], hasEditBox = true, maxLetters = 40,
     button1 = SAVE, button2 = CANCEL,
     OnShow = function(self, data)
@@ -175,12 +176,14 @@ StaticPopupDialogs["BNB_ORACLE_SAVE_STYLE"] = {
 }
 
 StaticPopupDialogs["BNB_ORACLE_OVERWRITE_STYLE"] = {
+    preferredIndex = 3,
     text = L["ORACLE_STYLE_OVERWRITE"], button1 = YES, button2 = NO,
     OnAccept = function(self, data) if data then SaveAs(data.name, data.style) end end,
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
 StaticPopupDialogs["BNB_ORACLE_DELETE_STYLE"] = {
+    preferredIndex = 3,
     text = L["ORACLE_STYLE_DELETE"], button1 = DELETE, button2 = CANCEL,
     OnAccept = function(self, data)
         if not data then return end
@@ -192,6 +195,7 @@ StaticPopupDialogs["BNB_ORACLE_DELETE_STYLE"] = {
 }
 
 StaticPopupDialogs["BNB_ORACLE_EXPORT_STYLE"] = {
+    preferredIndex = 3,
     -- maxLetters = 0: no limit; the default cut the string short (Dukul, 2026-09-28)
     text = L["ORACLE_STYLE_EXPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,
     button1 = CLOSE,
@@ -213,6 +217,7 @@ local function TryImport(text)
 end
 
 StaticPopupDialogs["BNB_ORACLE_IMPORT_STYLE"] = {
+    preferredIndex = 3,
     text = L["ORACLE_STYLE_IMPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,
     button1 = L["ORACLE_STYLE_IMPORT"], button2 = CANCEL,
     OnShow = function(self) local eb = PopupEditBox(self); if eb then eb:SetText("") end end,

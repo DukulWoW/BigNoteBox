@@ -202,6 +202,7 @@ end
 local function RegisterQuitDialog()
     if StaticPopupDialogs["BNB_QUIT_SETUP"] then return end
     StaticPopupDialogs["BNB_QUIT_SETUP"] = {
+        preferredIndex = 3,
         text    = L["SW_QUIT_CONFIRM_TEXT"],
         button1 = L["SW_QUIT_BTN"],
         button2 = L["SW_KEEP_GOING_BTN"],
@@ -228,6 +229,7 @@ end
 local function RegisterLangChangeDialog()
     if StaticPopupDialogs["BNB_WIZARD_CHANGE_LANGUAGE"] then return end
     StaticPopupDialogs["BNB_WIZARD_CHANGE_LANGUAGE"] = {
+        preferredIndex = 3,
         text    = L["SW_POPUP_WIZARD_CHANGE_LANGUAGE"],
         button1 = L["CFG_RELOAD_NOW_BTN"],
         button2 = L["CANCEL"],
@@ -646,7 +648,8 @@ local function BuildPage3(content)
         ragnaros   = L["SW_PRESET_RAGNAROS"],   earthen  = L["SW_PRESET_EARTHEN"],    argent     = L["SW_PRESET_ARGENT"],
         oled       = L["SW_PRESET_OLED"],
     }
-    local dd, ddy = MakeDropdown(ct, y, CW - 16, function(_, root)
+    local dd, ddy   -- declared first: the menu callback below regenerates dd
+    dd, ddy = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.skinPreset) or "obsidian"
         for _, key in ipairs(PRESET_ORDER) do
             local k = key
@@ -966,7 +969,8 @@ local function BuildPage4(content)
     y = MakeRule(ct, y)
     y = MakeHeader(ct, y, L["SW_SIDEBAR_PLACEMENT_HDR"])
 
-    local sideDD, sideY = MakeDropdown(ct, y, CW - 16, function(_, root)
+    local sideDD, sideY
+    sideDD, sideY = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.sidebarSide) or "right"
         local items = {
             { key="right", label=L["SW_SIDEBAR_RIGHT"] },
@@ -990,7 +994,8 @@ local function BuildPage4(content)
     y = MakeRule(ct, y)
     y = MakeHeader(ct, y, L["SW_COMBAT_HDR"])
 
-    local combatDD, combatY = MakeDropdown(ct, y, CW - 16, function(_, root)
+    local combatDD, combatY
+    combatDD, combatY = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.combatAction) or "nothing"
         local items = {
             { key="nothing",          label=L["SW_COMBAT_NOTHING"] },
@@ -1492,10 +1497,11 @@ function BNB.ShowSetupWizard()
         local cfg = BigNoteBoxConfigFrame
         if cfg and cfg:IsShown() then cfg:Hide() end
         if BNB.DangerZone and BNB.DangerZone.Close then BNB.DangerZone.Close() end
-        if BNB.RichPreview and BNB.RichPreview.Hide then BNB.RichPreview.Hide() end
-        if BNB.ShareNote and BNB.ShareNote.Close then BNB.ShareNote.Close() end
-        if BNB.AlarmManager and BNB.AlarmManager.CloseWindow then BNB.AlarmManager.CloseWindow() end
-        if BNB.HistoryWindow and BNB.HistoryWindow:IsShown() then BNB.HistoryWindow:Hide() end
+        if BNB.RichPreview and BNB.RichPreview.Close then BNB.RichPreview.Close() end
+        if BNB.RichPreviewFocus and BNB.RichPreviewFocus.Close then BNB.RichPreviewFocus.Close() end
+        if BNB.CloseShareWindow then BNB.CloseShareWindow() end
+        if BNB.AlarmWindow and BNB.AlarmWindow.Close then BNB.AlarmWindow.Close() end
+        if BNB.CloseHistoryWindow then BNB.CloseHistoryWindow() end
         -- Sticky notes: hide all open ones
         if BNB._stickyFrames then
             for _, sf in pairs(BNB._stickyFrames) do

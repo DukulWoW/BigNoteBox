@@ -384,6 +384,7 @@ local _focusFrame = nil
 local _focusRSF   = nil
 local _focusRF    = nil
 local _focusGen   = { n = 0 }
+local _focusDebounceTimer = nil   -- pending live render; RPF.Close cancels it
 
 local function BuildFocusPreviewFrame(w, h)
     if not _focusFrame then
@@ -475,8 +476,6 @@ local function GetFocusLiveBody()
     if eb and not eb._showingPlaceholder then return eb:GetText() end
     return nil
 end
-
-local _focusDebounceTimer = nil
 
 local function DoFocusRender()
     _focusDebounceTimer = nil

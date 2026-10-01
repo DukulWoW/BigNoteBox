@@ -63,6 +63,9 @@ local _pendingSpells = {}   -- spellID → true
 local _pendingQuests = {}   -- questID → true
 local _modelHidden   = {}   -- noteID  → true (session-only, resets on /reload)
 local _gearViewTmog  = {}   -- noteID  → true = showing transmog, false/nil = regular
+-- Set true while SendAttachmentToChat is inserting, read by TryAddLink (shift-click hook).
+-- Declared up here because SendAttachmentToChat comes first in the file.
+local _suppressShiftHook = false
 
 -- ── Mode state ────────────────────────────────────────────────────────────────
 -- "attachments" = show attachments pane (default when no tasks)
@@ -878,7 +881,6 @@ end
 -- ── Shift-click hook (Baganator-safe) ────────────────────────────────────────
 local _shiftHookInstalled = false
 local _lastAddedLink = nil
-local _suppressShiftHook = false   -- set true while SendAttachmentToChat is inserting
 
 local function TryAddLink(link)
     if _suppressShiftHook then return end

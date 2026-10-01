@@ -90,7 +90,8 @@ local function BuildInstancesFromEJ()
 
     for t = 1, numTiers do
         pcall(EJ_SelectTier, t)
-        local tierName = select(1, pcall(EJ_GetTierInfo, t))
+        local okT, tierName = pcall(EJ_GetTierInfo, t)
+        if not okT then tierName = nil end
         for isRaid = 0, 1 do
             local j = 1
             while true do

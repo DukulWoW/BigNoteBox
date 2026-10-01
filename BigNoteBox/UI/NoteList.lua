@@ -425,6 +425,8 @@ local function BuildSearchBar(parent)
     BNB.AddPlaceholder(eb, L["SEARCH_PLACEHOLDER"], 0.40, 0.40, 0.40)
     _searchEb = eb
 
+    local _tagAC   -- tag autocomplete dropdown, built further down; the clear buttons hide it
+
     -- Inner X: resets only the editbox + tag filter (stays inside bar)
     local innerClear = CreateFrame("Button", nil, bar)
     innerClear:SetSize(18, 18)
@@ -571,7 +573,7 @@ local function BuildSearchBar(parent)
 
     -- ── Tag autocomplete dropdown ─────────────────────────────────────────────
     -- Appears below the search bar when user types "#" + 3 or more characters.
-    local _tagAC = CreateFrame("Frame", nil, parent)
+    _tagAC = CreateFrame("Frame", nil, parent)
     BNB.SetBackdrop(_tagAC, 0.08, 0.08, 0.10, 0.97, 0.40, 0.40, 0.42, 1)
     _tagAC:SetFrameLevel(bar:GetFrameLevel() + 20)
     _tagAC:SetPoint("TOPLEFT",  bar, "BOTTOMLEFT",  0, -2)
@@ -1648,7 +1650,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
         if not alarm then
             btn._alarmTex:Hide()
         else
-            local active = BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID)
+            local active = BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(note.id)
             if active then
                 btn._alarmTex:Hide()
             elseif alarm.fired then
@@ -1665,13 +1667,22 @@ local function PopulateEntry(btn, note, selected, collapsed)
 
     -- Register/unregister glow target based on whether note has an alarm
     if btn._iconGlowFrame and BNB.Alarm then
+        -- Rows are pooled: a row that showed another note drops that note's registration
+        -- and any glow still running on it, or the old note's alarm would glow here.
+        local gf   = btn._iconGlowFrame
+        local prev = gf._bnbGlowNoteID
+        if prev and prev ~= note.id then
+            if BNB.Alarm.UnregisterGlowTarget then BNB.Alarm.UnregisterGlowTarget(prev, gf) end
+            if BNB.Alarm._LCGStop then BNB.Alarm._LCGStop(gf) end
+            gf._bnbGlowNoteID = nil
+        end
         if note.alarm then
             if BNB.Alarm.RegisterGlowTarget then
-                BNB.Alarm.RegisterGlowTarget(noteID, btn._iconGlowFrame)
+                BNB.Alarm.RegisterGlowTarget(note.id, gf)
             end
         else
             if BNB.Alarm.UnregisterGlowTarget then
-                BNB.Alarm.UnregisterGlowTarget(noteID, btn._iconGlowFrame)
+                BNB.Alarm.UnregisterGlowTarget(note.id, gf)
             end
         end
     end

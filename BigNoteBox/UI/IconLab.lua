@@ -239,6 +239,14 @@ local function AddCustom(id, path, atlas, variant)
     return Append("added", id, path, atlas, variant)
 end
 
+-- The path of a file as the list knows it (an atlas entry has none of its own)
+local function FilePath(id)
+    for _, e in ipairs(LIST) do
+        if e.id == id and e.path ~= "" then return e.path end
+    end
+    return ""
+end
+
 -- Another entry on the current entry's file (and region), next free number
 local function NewVariant()
     local e = LIST[_idx]
@@ -261,14 +269,6 @@ local function RemoveCustom(i)
     end
     s.e[e.key] = nil
     table.remove(LIST, i)
-end
-
--- The path of a file as the list knows it (an atlas entry has none of its own)
-local function FilePath(id)
-    for _, e in ipairs(LIST) do
-        if e.id == id and e.path ~= "" then return e.path end
-    end
-    return ""
 end
 
 -- ── Regions ──────────────────────────────────────────────────────────────────

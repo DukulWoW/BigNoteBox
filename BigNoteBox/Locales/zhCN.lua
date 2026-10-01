@@ -18,8 +18,6 @@ L["SAVE"]         = "保存"
 L["DELETE"]       = "删除"
 L["CANCEL"]       = "取消"
 L["OK"]           = "确定"
-L["YES"]          = "是"
-L["NO"]           = "否"
 L["CONFIRM"]      = "确认"
 L["RESET"]        = "重置"
 L["UNTITLED"]     = "无标题笔记"
@@ -712,7 +710,6 @@ L["STICKY_MAX"]         = "已达到最大 %d 个打开的便签。"
 -- ── Icon picker ───────────────────────────────────────────────────────────────
 
 -- ── Tag editing ───────────────────────────────────────────────────────────────
-L["TAG_ADD_HINT"]        = "添加标签..."
 L["TAG_MAX"]             = "每条笔记最多 24 个标签。"
 L["TAG_TOO_LONG"]        = "标签长度必须在 20 个字符以内。"
 
@@ -817,6 +814,7 @@ L["REFBOX_TASK_CLEAR_TIP_SUB"]  = "从所有已完成的任务中移除复选标
 L["REFBOX_TASK_DELETE_TIP"]     = "删除已完成的任务"
 L["REFBOX_TASK_DELETE_TIP_SUB"] = "从列表中永久移除所有已完成的任务。"
 L["REFBOX_TASK_ADD_WIDE_BTN"]   = "+ 添加任务"
+L["REFBOX_TASK_ROW_DELETE_TIP"] = "删除任务"
 L["REFBOX_TASK_HDR_DEFAULT"]    = "任务"
 L["REFBOX_TASK_HDR_DAILY"]      = "日常任务"
 L["REFBOX_TASK_HDR_WEEKLY"]     = "周常任务"
@@ -860,7 +858,6 @@ L["KEYBIND_TOOLTIP_UNBIND"] = "右键点击取消绑定"
 L["KEYBIND_TOOLTIP_SET"]    = "点击设置按键绑定"
 
 -- ── Config — General tab keybinds ─────────────────────────────────────────────
-L["CFG_KB_OPEN_BNB"]        = "打开 / 关闭 BigNoteBox："
 
 -- ── Config — Advanced tab keybinds ────────────────────────────────────────────
 L["CFG_KB_NEW_NOTE"]        = "创建新笔记："
@@ -1378,7 +1375,6 @@ L["ICONLIST_MISSING"]               = "暴雪图标自动补全功能需要 BigN
 L["ICONLIST_DISABLED"]              = "暴雪图标自动补全功能需要 BigNoteBox Icons 插件，但该插件已被禁用。请在插件列表中启用它，然后重新加载。"
 L["ICONLIST_FAILED_FMT"]            = "暴雪图标自动补全功能无法加载图标列表（%s）。"
 
-L["CFG_KB_HINT_CTRL_N"]             = "(默认：Ctrl+N)"
 L["CFG_KB_HINT_CTRL_H"]             = "(默认：Ctrl+H)"
 L["CFG_KB_HINT_UNBOUND"]            = "(默认：未绑定)"
 L["CFG_KB_HINT_NONE"]               = "(无默认)"
@@ -1514,7 +1510,6 @@ L["STICKY_LEAVE_HIDE"]              = "隐藏"
 L["STICKY_ALIGN_LEFT"]              = "左对齐"
 L["STICKY_ALIGN_CENTER"]            = "居中"
 L["STICKY_ALIGN_RIGHT"]             = "右对齐"
-L["STICKY_CTX_DISMISS_ALARM"]       = "解除闹钟"
 L["STICKY_CTX_CLOSE"]               = "关闭便签"
 
 -- ── Note Settings window (ALL-08 sweep pass 1: NoteConfig.lua) ────────────────
@@ -1576,7 +1571,6 @@ L["OUTLINE_SLUG_THICK"]             = "SLUG 粗轮廓"
 L["OUTLINE_SHADOW"]                 = "阴影"
 L["OUTLINE_SHADOW_STRONG"]          = "强阴影"
 L["OUTLINE_SHADOW_STRONGEST"]       = "最强阴影"
-L["NC_BORDER_STYLE_LABEL"]          = "边框样式"
 L["NC_NO_NOTE_SELECTED"]            = "未选择笔记。"
 
 -- ── Note editor (ALL-08 sweep pass 1: NoteEditor.lua) ──────────────────────────

@@ -37,8 +37,6 @@ L["SAVE"]         = "Save"
 L["DELETE"]       = "Delete"
 L["CANCEL"]       = "Cancel"
 L["OK"]           = "OK"
-L["YES"]          = "Yes"
-L["NO"]           = "No"
 L["CONFIRM"]      = "Confirm"
 L["RESET"]        = "Reset"
 L["SLIDER_DEFAULT_FMT"] = "(Default: %s)"
@@ -756,7 +754,6 @@ L["STICKY_MAX"]         = "Maximum of %d sticky notes already open."
 -- ── Icon picker ───────────────────────────────────────────────────────────────
 
 -- ── Tag editing ───────────────────────────────────────────────────────────────
-L["TAG_ADD_HINT"]        = "Add tag..."
 L["TAG_MAX"]             = "Maximum 24 tags per note."
 L["TAG_TOO_LONG"]        = "Tags must be 20 characters or less."
 
@@ -990,7 +987,6 @@ L["CFG_ORACLE_HDR_LOOK"]        = "Look"
 L["CFG_ORACLE_THEME_LABEL"]     = "Theme"
 L["CFG_ORACLE_THEME_FACTION_FMT"] = "Match my faction (%s)"
 L["CFG_ORACLE_MAX_ROWS"]        = "Results shown"
-L["CFG_ORACLE_MAX_ROWS_TIP"]    = "How many notes the results list shows at most."
 L["CFG_ORACLE_HDR_RESULTS"]     = "Results"
 L["CFG_ORACLE_TITLE_SIZE"]      = "Title text size"
 L["CFG_ORACLE_PREVIEW_SIZE"]    = "Preview text size"
@@ -1100,7 +1096,6 @@ L["KEYBIND_TOOLTIP_UNBIND"] = "Right-click to unbind"
 L["KEYBIND_TOOLTIP_SET"]    = "Click to set a keybinding"
 
 -- ── Config — General tab keybinds ─────────────────────────────────────────────
-L["CFG_KB_OPEN_BNB"]        = "Open / close BigNoteBox:"
 
 -- ── Config — Advanced tab keybinds ────────────────────────────────────────────
 L["CFG_KB_NEW_NOTE"]        = "Create new note:"
@@ -1711,7 +1706,6 @@ L["ICONLIST_MISSING"]               = "Blizzard icon autocomplete needs the BigN
 L["ICONLIST_DISABLED"]              = "Blizzard icon autocomplete needs the BigNoteBox Icons addon, which is disabled. Enable it in the AddOns list and reload."
 L["ICONLIST_FAILED_FMT"]            = "Blizzard icon autocomplete could not load its icon list (%s)."
 
-L["CFG_KB_HINT_CTRL_N"]             = "(Default: Ctrl+N)"
 L["CFG_KB_HINT_CTRL_H"]             = "(Default: Ctrl+H)"
 L["CFG_KB_HINT_UNBOUND"]            = "(Default: unbound)"
 L["CFG_KB_HINT_NONE"]               = "(No default)"
@@ -1972,7 +1966,6 @@ L["STICKY_LEAVE_HIDE"]              = "Hide"
 L["STICKY_ALIGN_LEFT"]              = "Left"
 L["STICKY_ALIGN_CENTER"]            = "Center"
 L["STICKY_ALIGN_RIGHT"]             = "Right"
-L["STICKY_CTX_DISMISS_ALARM"]       = "Dismiss Alarm"
 L["STICKY_CTX_CLOSE"]               = "Close Sticky"
 
 -- ── Note Settings window (ALL-08 sweep pass 1: NoteConfig.lua) ────────────────
@@ -2036,7 +2029,6 @@ L["OUTLINE_SLUG_THICK"]             = "SLUG Thick Outline"
 L["OUTLINE_SHADOW"]                 = "Drop Shadow"
 L["OUTLINE_SHADOW_STRONG"]          = "Strong Drop Shadow"
 L["OUTLINE_SHADOW_STRONGEST"]       = "Strongest Drop Shadow"
-L["NC_BORDER_STYLE_LABEL"]          = "Border style"
 L["NC_ICON_FRAME_BTN"]              = "Icon Frame"
 L["NC_NO_NOTE_SELECTED"]            = "No note selected."
 
@@ -2332,4 +2324,4 @@ L["TAG_MGR_SELECT_ALL_BTN"]  = "Select all"
 L["WELCOME_UNTITLED"]        = "Untitled"
 L["NE_FONT_DEFAULT"]         = "Default"
 L["TS_UNKNOWN"]              = "Unknown"
-L["REFBOX_TASK_DELETE_TIP"]  = "Delete task"
+L["REFBOX_TASK_ROW_DELETE_TIP"] = "Delete task"

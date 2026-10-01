@@ -1438,6 +1438,9 @@ local function PopulateStickySettings(noteID)
         for i, k in ipairs(SIT_DISPLAY_MODES) do if k == m then return SIT_DISPLAY_LABELS[i] end end
         return SIT_DISPLAY_LABELS[1]
     end
+    -- Declared here, before SitSetDispText / SitSetLeaveText read them; built further down
+    local sitDispDropdown, sitDispCycleBtn
+    local sitLeaveDropdown, sitLeaveCycleBtn
     local function SitSetDispText(label)
         if sitDispDropdown and sitDispDropdown.Text then sitDispDropdown.Text:SetText(label) end
         if sitDispCycleBtn then sitDispCycleBtn:SetText(label) end
@@ -1454,8 +1457,6 @@ local function PopulateStickySettings(noteID)
     end
 
     local useNativeDisp3 = useNativeSit3
-    local sitDispDropdown
-    local sitDispCycleBtn
 
     if useNativeDisp3 then
         sitDispDropdown = CreateFrame("DropdownButton", "BNBStickySetDispDD", ct3,
@@ -1535,8 +1536,6 @@ local function PopulateStickySettings(noteID)
     sitLeaveLabel:SetTextColor(0.78, 0.78, 0.78); sitLeaveLabel:Hide()
 
     local useNativeLeave3 = useNativeDisp3
-    local sitLeaveDropdown
-    local sitLeaveCycleBtn
 
     if useNativeLeave3 then
         sitLeaveDropdown = CreateFrame("DropdownButton", "BNBStickySetLeaveDD", ct3,

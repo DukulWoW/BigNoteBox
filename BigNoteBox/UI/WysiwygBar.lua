@@ -279,7 +279,7 @@ local function BuildWysiwygBar(parent, tsStrip)
             BNB.UpdateNote(id, {fontOverride = fontID})
         end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-        if BNB.NoteConfig and BNB.SyncNoteConfig then BNB.SyncNoteConfig(id) end
+        if BNB.SyncNoteConfig then BNB.SyncNoteConfig(id) end
         -- Apply to editor body live
         local eb = BNB._editorBody; if not eb then return end
         local note = BNB.GetNote(id); if not note then return end

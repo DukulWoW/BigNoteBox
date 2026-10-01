@@ -35,9 +35,9 @@ local function BuildCursorLink()
     if not ctype then return nil end
 
     if ctype == "item" then
-        -- id is itemID; GetItemInfo returns the full link as return #2
-        local _, link = C_Item.GetItemInfo(id)
-        return link  -- may be nil if not yet cached; caller should handle
+        -- GetCursorInfo gives "item", itemID, itemLink: the link is there even for an
+        -- item not in the cache yet, where C_Item.GetItemInfo would return nil.
+        return subtype or select(2, C_Item.GetItemInfo(id))
 
     elseif ctype == "spell" then
         -- On retail TWW/Midnight, GetCursorInfo returns:
@@ -110,11 +110,10 @@ local function HandleDrop(eb)
 
     local link = BuildCursorLink()
 
-    -- Always clear the cursor — if we can't build a link we still consume
-    -- the drag so WoW doesn't try to process it as something else.
-    ClearCursor()
-
+    -- Clear the cursor only once a link was built; a drop we cannot handle
+    -- leaves the object on the cursor instead of swallowing it.
     if not link then return end
+    ClearCursor()
 
     -- Give the EditBox focus so Insert() places text at cursor position.
     -- If it already had focus the cursor position is preserved.
@@ -132,7 +131,7 @@ local function UpdateDragTooltip(eb)
     -- Only show hint for types we actually handle
     local supported = {
         item=true, spell=true, macro=true,
-        mount=true, currency=true, battlepet=true,
+        mount=true, currency=true, quest=true, battlepet=true,
     }
     if not supported[ctype] then return end
     GameTooltip:SetOwner(eb, "ANCHOR_CURSOR")

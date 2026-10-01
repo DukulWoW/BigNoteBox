@@ -1217,7 +1217,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
             if note then
                 BNB.UpdateNote(id, { scope = selected[1] })
                 for i = 2, #selected do
-                    CopyNoteToScope(note, selected[i])
+                    CopyNoteToScope(id, selected[i])
                 end
             end
         end

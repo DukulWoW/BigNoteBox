@@ -649,10 +649,11 @@ local function BuildDialog()
     -- that same value both to place the checkbox and to size the dialog below it
     -- (ALL-29 fix: the two used to disagree, so the checkbox overlapped the footer).
     local colMaxH = math.max(math.abs(leftColH or 0), math.abs(rightY))
+    local chromeTopH = skinMode and (SK_NND_TITLE_H + 8) or 36
     local richCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
-        -(chromeTopH or 36) - ICON_SZ - 10 - colMaxH - 4)
+        -chromeTopH - ICON_SZ - 10 - colMaxH - 4)
     local richLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     richLbl:SetPoint("LEFT",  richCheck, "RIGHT",  4, 0)
     richLbl:SetPoint("RIGHT", f,         "RIGHT", -DLG_PAD, 0)
@@ -684,7 +685,6 @@ local function BuildDialog()
 
     -- ── FOOTER ───────────────────────────────────────────────────────────────
     local totalContentH = colMaxH + RICH_ROW_H
-    local chromeTopH    = skinMode and (SK_NND_TITLE_H + 8) or 36
     local dlgH = chromeTopH + ICON_SZ + 10 + totalContentH + DLG_FOOT + 8
     f:SetHeight(dlgH)
 

@@ -30,9 +30,10 @@ if LDB then
             tooltip:AddLine(L["MINIMAP_DRAG"], 0.7, 0.7, 0.7)
 
             -- Badge: show contextual note count if available
-            if BNB._contextNoteCount and BNB._contextNoteCount > 0 then
+            local ctxCount = BNB._contextMatches and #BNB._contextMatches or 0
+            if ctxCount > 0 then
                 tooltip:AddLine(" ")
-                tooltip:AddLine(string.format(L["CONTEXT_BADGE"], BNB._contextNoteCount), 1, 0.82, 0)
+                tooltip:AddLine(string.format(L["CONTEXT_BADGE"], ctxCount), 1, 0.82, 0)
             end
             -- ALL-101: hidden stickies (Hide all / its keybind)
             local hidden = BNB.Sticky and BNB.Sticky.HiddenCount and BNB.Sticky.HiddenCount() or 0
