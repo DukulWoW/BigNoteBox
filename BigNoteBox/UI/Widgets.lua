@@ -98,6 +98,76 @@ function BNB.MakeLangLabel(entry)
     return label
 end
 
+--------------------------------------------------------------------------------
+-- KEYBOARD WINDOWS AND COMBAT (BUG-05, ALL-136.4)
+-- SetPropagateKeyboardInput is protected in combat: a call raises
+-- ADDON_ACTION_BLOCKED and the value stays as it was (confirmed by Dukul,
+-- 2026-10-01). EnableKeyboard is kept out of combat as well. So:
+--  * every propagation change goes through BNB.SetPropagate (skipped in combat);
+--  * a window that closes on ESC uses BNB.AttachEscClose. In combat it does
+--    nothing, so every key, ESC included, goes to the game, which closes the
+--    windows in UISpecialFrames, clears the target or opens the game menu;
+--  * every registered frame is set to propagate when combat starts
+--    (PLAYER_REGEN_DISABLED fires before the lockdown), and AttachEscClose
+--    sets it back to propagate one frame after taking an ESC, so a window is
+--    never left swallowing keys.
+--------------------------------------------------------------------------------
+function BNB.SetPropagate(f, on)
+    if not InCombatLockdown() then f:SetPropagateKeyboardInput(on) end
+end
+
+local _kbFrames      = {}   -- [frame] = onCombat function or true
+local _kbEnableLater = {}   -- frames built in combat, keyboard on when it ends
+
+-- onCombat(f), optional: runs when combat starts, before the reset to
+-- propagate (the keybind capture ends a running capture there).
+function BNB.RegisterKeyboardFrame(f, onCombat)
+    _kbFrames[f] = onCombat or true
+end
+
+local function EnableKeyboardSafe(f)
+    if InCombatLockdown() then _kbEnableLater[f] = true; return end
+    f:EnableKeyboard(true)
+    f:SetPropagateKeyboardInput(true)
+end
+
+-- stepAside for windows that leave ESC to the main window's cascade while it is up
+function BNB.MainWindowShown()
+    return BNB.mainFrame and BNB.mainFrame:IsShown() or false
+end
+
+-- closeFn(self): what ESC does (may close a child window first).
+-- stepAside(self), optional: true = leave this ESC to the game or to the main
+-- window's cascade (callers pass "main window is shown" or "game menu is up").
+function BNB.AttachEscClose(f, closeFn, stepAside)
+    BNB.RegisterKeyboardFrame(f)
+    f:SetScript("OnKeyDown", function(self, key)
+        if InCombatLockdown() then return end
+        if key ~= "ESCAPE" or (stepAside and stepAside(self)) then
+            self:SetPropagateKeyboardInput(true); return
+        end
+        self:SetPropagateKeyboardInput(false)
+        C_Timer.After(0, function() BNB.SetPropagate(self, true) end)
+        closeFn(self)
+    end)
+    EnableKeyboardSafe(f)
+end
+
+BNB.RegisterEvent("PLAYER_REGEN_DISABLED", function()
+    if InCombatLockdown() then return end
+    for f, onCombat in pairs(_kbFrames) do
+        if onCombat ~= true then pcall(onCombat, f) end
+        f:SetPropagateKeyboardInput(true)
+    end
+end)
+
+BNB.RegisterEvent("PLAYER_REGEN_ENABLED", function()
+    for f in pairs(_kbEnableLater) do
+        _kbEnableLater[f] = nil
+        EnableKeyboardSafe(f)
+    end
+end)
+
 -- BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
 -- Shared keybind-row click handling: right-click clears the binding,
 -- left-click enters capture mode and applies the next non-modifier key
@@ -119,11 +189,17 @@ end
 
 function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
     local function StopCapture(btn)
+        btn._capturing = false
         btn:EnableKeyboard(false)
         btn:SetScript("OnKeyDown", nil)
-        btn:SetPropagateKeyboardInput(true)
+        BNB.SetPropagate(btn, true)
         UpdateText()
     end
+    -- A capture still running when combat starts ends there, while
+    -- EnableKeyboard and SetBinding are still allowed
+    BNB.RegisterKeyboardFrame(kbBtn, function(btn)
+        if btn._capturing then StopCapture(btn) end
+    end)
 
     local function ApplyBind(fullKey)
         local k1, k2 = GetBindingKey(action)
@@ -136,8 +212,9 @@ function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
 
     local function OnKeyCaptured(btn, key)
         if _KB_MODIFIER_KEYS[key] then return end
+        if InCombatLockdown() then return end
         btn:SetPropagateKeyboardInput(false)
-        if key == "ESCAPE" or InCombatLockdown() then StopCapture(btn); return end
+        if key == "ESCAPE" then StopCapture(btn); return end
         local mods = {}
         if IsAltKeyDown()     then mods[#mods+1] = "ALT"   end
         if IsControlKeyDown() then mods[#mods+1] = "CTRL"  end
@@ -157,6 +234,8 @@ function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
     end
 
     kbBtn:SetScript("OnClick", function(btn, button)
+        -- SetBinding and EnableKeyboard are blocked in combat
+        if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
         if button == "RightButton" then
             local k1, k2 = GetBindingKey(action)
             if k1 then SetBinding(k1, nil) end
@@ -165,6 +244,7 @@ function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
             UpdateText(); GameTooltip:Hide()
         else
             btn:SetText(pressText)
+            btn._capturing = true
             btn:EnableKeyboard(true)
             btn:SetPropagateKeyboardInput(false)
             btn:SetScript("OnKeyDown", OnKeyCaptured)
@@ -1426,24 +1506,24 @@ function BNB.AttachTagAutocomplete(eb)
     local PASSTHROUGH = { ESCAPE = true, TAB = true }
     eb:HookScript("OnKeyDown", function(self, key)
         if self._showingPlaceholder and (key == "BACKSPACE" or key == "DELETE") then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             return
         end
         -- Pass Escape/Tab through so WoW handles focus/close; eat everything else
-        self:SetPropagateKeyboardInput(PASSTHROUGH[key] == true)
+        BNB.SetPropagate(self, PASSTHROUGH[key] == true)
     end)
 
     eb:HookScript("OnKeyDown", function(self, key)
         if not ac:IsShown() or ac._eb ~= self then return end
         if key == "UP" then
             ac:MoveSelection(-1)
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "DOWN" then
             ac:MoveSelection(1)
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "ESCAPE" then
             ac:Hide()
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "ENTER" or key == "NUMPADENTER" then
             -- Fill the field with the highlighted suggestion so OnEnterPressed
             -- receives the completed tag text rather than the partial typed text.
@@ -1623,13 +1703,13 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
     -- ESC: swallow and dismiss without copying.
     helper:SetScript("OnKeyDown", function(self, key)
         if key == "C" and IsControlKeyDown() then
-            self:SetPropagateKeyboardInput(false)         -- copy happens; swallow to block keybinds
+            BNB.SetPropagate(self, false)         -- copy happens; swallow to block keybinds
             hint._dismiss()
         elseif key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             hint._dismiss()
         else
-            self:SetPropagateKeyboardInput(true)
+            BNB.SetPropagate(self, true)
         end
     end)
 

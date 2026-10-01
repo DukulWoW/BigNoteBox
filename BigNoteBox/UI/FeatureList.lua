@@ -189,12 +189,7 @@ local function BuildFrameNormal(onClose)
     if f.CloseButton then f.CloseButton:SetScript("OnClick", onClose) end
     -- ESC handled via OnKeyDown below; do NOT add to UISpecialFrames
     -- (UISpecialFrames calls Hide() directly, bypassing FL.Close())
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
-        onClose()
-    end)
+    BNB.AttachEscClose(f, function() onClose() end)
     return f, TITLE_H_N
 end
 
@@ -233,12 +228,7 @@ local function BuildFrameSkin(onClose)
     end)
 
     -- ESC handled via OnKeyDown; do NOT add to UISpecialFrames
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
-        onClose()
-    end)
+    BNB.AttachEscClose(f, function() onClose() end)
 
     return f, TITLE_H_S
 end

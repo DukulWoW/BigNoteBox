@@ -1837,8 +1837,10 @@ local function BuildTool()
     Btn("Export", function() BNB.ShowClipboardHint(ExportText(), f, true) end)
 
     -- Keys: handled ones are swallowed, the rest propagate.
+    BNB.RegisterKeyboardFrame(f)
     f:EnableKeyboard(true)
     f:SetScript("OnKeyDown", function(self, key)
+        if InCombatLockdown() then return end
         local step = IsShiftKeyDown() and 5 or 1
         local mode = ModMode()
         local _, size = Side("bar")

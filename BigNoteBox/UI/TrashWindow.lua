@@ -803,13 +803,7 @@ end
 local function HookStandaloneEscape(f)
     if f._escHooked then return end
     f._escHooked = true
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
-            self:SetPropagateKeyboardInput(true)
-            return
-        end
-        self:SetPropagateKeyboardInput(false)
+    BNB.AttachEscClose(f, function(self)
         local vp = self._viewPopup
         if vp and vp:IsShown() then vp:Hide(); return end
         if _multiMode then SetTrashMultiMode(false) end

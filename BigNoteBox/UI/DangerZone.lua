@@ -534,12 +534,7 @@ local function BuildWindow()
 
     -- ESC: handle via OnKeyDown so DZ.Close() runs (cleans up overlay + glow).
     -- Do NOT use UISpecialFrames — it calls Hide() directly, bypassing DZ.Close().
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
-        DZ.Close()
-    end)
+    BNB.AttachEscClose(f, function() DZ.Close() end)
 
     f._sf = sf
     f._ct = ct

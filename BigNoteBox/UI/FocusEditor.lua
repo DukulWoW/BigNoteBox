@@ -126,16 +126,13 @@ local function GetAfkOverlay()
     end)
 
     -- Dismiss on any keypress (ESC stays as overlay-only dismiss, propagates nothing)
+    BNB.RegisterKeyboardFrame(ov)
     ov:EnableKeyboard(true)
-    ov:SetPropagateKeyboardInput(false)
+    BNB.SetPropagate(ov, false)
     ov:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then
-            -- ESC: dismiss overlay only, do not close focus mode
-            self:SetPropagateKeyboardInput(false)
-        else
-            -- Any other key: dismiss overlay and let the key through
-            self:SetPropagateKeyboardInput(true)
-        end
+        -- ESC: dismiss overlay only, do not close focus mode.
+        -- Any other key: dismiss overlay and let the key through
+        BNB.SetPropagate(self, key ~= "ESCAPE")
         HideAfkOverlay()
     end)
 
@@ -729,7 +726,7 @@ local function BuildFocusFrame()
         local ctrl  = IsControlKeyDown()
         local shift = IsShiftKeyDown()
         if ctrl and key == "Z" and not shift then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanUndo(id) then
                 local ft = BNB._focusUndoTimers
@@ -746,7 +743,7 @@ local function BuildFocusFrame()
                 BNB._undoActive = false
             end
         elseif ctrl and ((key == "Z" and shift) or key == "Y") then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanRedo(id) then
                 local ft = BNB._focusUndoTimers
@@ -806,11 +803,7 @@ local function BuildFocusFrame()
     sBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     focusSaveBtn = sBtn
 
-    f:SetPropagateKeyboardInput(false)
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
+    BNB.AttachEscClose(f, function()
         -- If AFK overlay is up, ESC only dismisses it — focus mode stays open
         if _afkOverlay and _afkOverlay:IsShown() then
             HideAfkOverlay()
@@ -1069,7 +1062,7 @@ local function BuildFocusFrameSkin()
         local ctrl  = IsControlKeyDown()
         local shift = IsShiftKeyDown()
         if ctrl and key == "Z" and not shift then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanUndo(id) then
                 local ft = BNB._focusUndoTimers
@@ -1086,7 +1079,7 @@ local function BuildFocusFrameSkin()
                 BNB._undoActive = false
             end
         elseif ctrl and ((key == "Z" and shift) or key == "Y") then
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanRedo(id) then
                 local ft = BNB._focusUndoTimers
@@ -1152,11 +1145,7 @@ local function BuildFocusFrameSkin()
     sBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     focusSaveBtn = sBtn
 
-    f:SetPropagateKeyboardInput(false)
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-        self:SetPropagateKeyboardInput(false)
+    BNB.AttachEscClose(f, function()
         -- If AFK overlay is up, ESC only dismisses it — focus mode stays open
         if _afkOverlay and _afkOverlay:IsShown() then
             HideAfkOverlay()

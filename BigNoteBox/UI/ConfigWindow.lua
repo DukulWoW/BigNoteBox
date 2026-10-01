@@ -722,14 +722,9 @@ function BNB.OpenConfig()
         -- Esc while the main window is closed (the Oracle page hides it, or
         -- Settings opened on its own): back one page, then close. While the
         -- main window is up, its Esc chain owns the key.
-        cfgFrame:EnableKeyboard(true)
-        cfgFrame:SetScript("OnKeyDown", function(self, key)
-            if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
-                self:SetPropagateKeyboardInput(true); return
-            end
-            self:SetPropagateKeyboardInput(false)
+        BNB.AttachEscClose(cfgFrame, function(self)
             if not BNB.ConfigSubPageBack() then self:Hide() end
-        end)
+        end, BNB.MainWindowShown)
         -- Report-a-bug button beside Settings (Retail; ALL-77)
         if BNB.AttachSettingsBugButton then pcall(BNB.AttachSettingsBugButton, cfgFrame) end
     end

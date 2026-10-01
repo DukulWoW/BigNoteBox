@@ -220,15 +220,7 @@ local function BuildPicker()
     f:SetFrameLevel(150)
     f:SetClampedToScreen(true)
     f:EnableMouse(true)
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
-            ZP.Close()
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
-    end)
+    BNB.AttachEscClose(f, function() ZP.Close() end)
 
     -- ── Tab bar: Zones | Instances ────────────────────────────────────────────
     local tabZone = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())

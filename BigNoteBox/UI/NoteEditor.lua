@@ -556,7 +556,7 @@ local function BuildBodyField(parent, topAnchor)
 
         if ctrl and key == "Z" and not shift then
             -- Undo
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanUndo(id) and not BNB._editorLocked then
                 -- Cancel pending debounce and forced-interval timer
@@ -575,7 +575,7 @@ local function BuildBodyField(parent, topAnchor)
 
         elseif ctrl and ((key == "Z" and shift) or key == "Y") then
             -- Redo
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
             local id = BNB._currentNoteID
             if id and BNB.UndoCanRedo(id) and not BNB._editorLocked then
                 if _undoTimers[id] then _undoTimers[id]:Cancel(); _undoTimers[id] = nil end

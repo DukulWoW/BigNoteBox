@@ -281,17 +281,17 @@ function BNB.AttachIconAutocomplete(eb, onSelect)
         if not ac:IsShown() or ac._eb ~= self then return end
         if key == "UP" then
             ac:MoveSelection(-1)
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "DOWN" then
             ac:MoveSelection(1)
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "ESCAPE" then
             ac:Hide()
-            self:SetPropagateKeyboardInput(false)
+            BNB.SetPropagate(self, false)
         elseif key == "ENTER" or key == "NUMPADENTER" then
             if #ac.matches > 0 then
                 ac:Commit(ac.selIdx)
-                self:SetPropagateKeyboardInput(false)
+                BNB.SetPropagate(self, false)
             end
         end
     end)

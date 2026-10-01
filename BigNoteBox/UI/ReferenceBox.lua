@@ -538,15 +538,7 @@ local function BuildPickerWindow()
         self:StopMovingOrSizing()
         PositionModeStrip()
     end)
-    f:SetScript("OnKeyDown",   function(self, key)
-        if key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
-            self:Hide()
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
-    end)
-    f:EnableKeyboard(true)
+    BNB.AttachEscClose(f, f.Hide)
 
     -- Title bar
     local titleBar = f:CreateTexture(nil, "ARTWORK")
@@ -2658,15 +2650,8 @@ function BNB.OpenReferenceBox(noteID)
         -- closed (it steps aside otherwise, so MainWindow's cascade order,
         -- e.g. Task Edit Window before Reference Box, is untouched).
         tinsert(UISpecialFrames, "BigNoteBoxReferenceBoxFrame")
-        rbFrame:SetScript("OnKeyDown", function(self, key)
-            if key ~= "ESCAPE" or (BNB.mainFrame and BNB.mainFrame:IsShown()) then
-                self:SetPropagateKeyboardInput(true)
-                return
-            end
-            self:SetPropagateKeyboardInput(false)
-            BNB.CloseReferenceBox()
-        end)
-        rbFrame:EnableKeyboard(true)
+        BNB.AttachEscClose(rbFrame, function() BNB.CloseReferenceBox() end,
+            BNB.MainWindowShown)
         rbFrame:HookScript("OnHide", function()
             if _modeStrip then _modeStrip:Hide() end
         end)

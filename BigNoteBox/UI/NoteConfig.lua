@@ -2269,10 +2269,7 @@ local function BuildSituationTab(panel)
             -- NoteConfig via UISpecialFrames (ALL-21). A keyboard-enabled frame gets
             -- keys before the copy box's focused editbox, so close the box here
             -- first, the same way MainWindow's ESC chain does
-            f:EnableKeyboard(true)
-            f:SetScript("OnKeyDown", function(self, key)
-                if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-                self:SetPropagateKeyboardInput(false)
+            BNB.AttachEscClose(f, function(self)
                 local ch = BNB._clipboardHint
                 if ch and ch:IsShown() and ch._dismiss then
                     ch._dismiss()

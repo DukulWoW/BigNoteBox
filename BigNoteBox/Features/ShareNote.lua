@@ -487,18 +487,10 @@ local function BuildSharePreview()
     discardBtn:SetPoint("LEFT", addBtn, "RIGHT", 8, 0)
     discardBtn:SetScript("OnClick", function() BNB.CloseSharePreview() end)
 
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        -- Propagate non-ESCAPE keys so they can reach focused editboxes below
-        -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
-        -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
-        if key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
-            BNB.CloseSharePreview()
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
-    end)
+    -- Non-ESC keys propagate so they can reach focused editboxes below
+    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
+    -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
+    BNB.AttachEscClose(f, function() BNB.CloseSharePreview() end)
     f:Hide()
     _previewFrame = f
     return f
@@ -1066,20 +1058,14 @@ local function BuildShareWindow()
     -- Resize window to fit content
     f:SetHeight(math.abs(y) + PAD)
 
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        -- Propagate non-ESCAPE keys so they can reach focused editboxes below
-        -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
-        -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
-        if key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
-            -- Preview closes first if open, then the share window
-            local spv = _previewFrame
-            if spv and spv:IsShown() then BNB.CloseSharePreview(); return end
-            BNB.CloseShareWindow()
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
+    -- Non-ESC keys propagate so they can reach focused editboxes below
+    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
+    -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
+    BNB.AttachEscClose(f, function()
+        -- Preview closes first if open, then the share window
+        local spv = _previewFrame
+        if spv and spv:IsShown() then BNB.CloseSharePreview(); return end
+        BNB.CloseShareWindow()
     end)
     f:Hide()
     _shareFrame = f
@@ -1282,19 +1268,13 @@ local function BuildImportWindow()
     y = y - 36
 
     f:SetHeight(math.abs(y) + PAD)
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", function(self, key)
-        -- Propagate non-ESCAPE keys so they can reach focused editboxes below
-        -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
-        -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
-        if key == "ESCAPE" then
-            self:SetPropagateKeyboardInput(false)
-            local spv = _previewFrame
-            if spv and spv:IsShown() then BNB.CloseSharePreview(); return end
-            BNB.CloseImportWindow()
-        else
-            self:SetPropagateKeyboardInput(true)
-        end
+    -- Non-ESC keys propagate so they can reach focused editboxes below
+    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
+    -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
+    BNB.AttachEscClose(f, function()
+        local spv = _previewFrame
+        if spv and spv:IsShown() then BNB.CloseSharePreview(); return end
+        BNB.CloseImportWindow()
     end)
     f:Hide()
     _importFrame = f

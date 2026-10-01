@@ -111,11 +111,7 @@ function BNB.ShowForeverNotice()
         tinsert(UISpecialFrames, "BNBForeverNoticeFrame")
         -- ESC by hand as well: UISpecialFrames alone does not close a standalone
         -- window on Forever (see the Reference Box)
-        f:EnableKeyboard(true)
-        f:SetScript("OnKeyDown", function(self, key)
-            if key == "ESCAPE" then self:SetPropagateKeyboardInput(false); self:Hide()
-            else self:SetPropagateKeyboardInput(true) end
-        end)
+        BNB.AttachEscClose(f, f.Hide)
 
         local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         title:SetPoint("TOP", f, "TOP", 0, -26)
@@ -357,7 +353,11 @@ BNB.RegisterEvent("PLAYER_REGEN_DISABLED", function()
     -- Hide main window + all companion windows if they are open.
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         BNB.CloseCompanionWindows()
+        -- _skipConfirm: with "Confirm before closing" on, OnHide would re-show
+        -- the window and open the confirm popup in combat (BUG-20)
+        BNB.mainFrame._skipConfirm = true
         BNB.mainFrame:Hide()
+        BNB.mainFrame._skipConfirm = false
         BNB._combatHiddenMain = true
     end
 

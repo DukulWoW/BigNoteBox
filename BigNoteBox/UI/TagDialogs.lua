@@ -88,11 +88,7 @@ function BNB.OpenImgDialog(insertFn)
         f:SetScript("OnShow", function()
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
         end)
-        f:SetScript("OnKeyDown", function(_, key)
-            if key == "ESCAPE" then f:Hide() end
-            f:SetPropagateKeyboardInput(key ~= "ESCAPE")
-        end)
-        f:EnableKeyboard(true)
+        BNB.AttachEscClose(f, f.Hide)
 
         -- ── Layout helpers ────────────────────────────────────────────────────
         local INNER_W = DW - DPAD * 2  -- usable width between left/right padding
@@ -415,11 +411,7 @@ function BNB.OpenLnkDialog(insertFn)
         f:SetScript("OnShow", function()
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
         end)
-        f:SetScript("OnKeyDown", function(_, key)
-            if key == "ESCAPE" then f:Hide() end
-            f:SetPropagateKeyboardInput(key ~= "ESCAPE")
-        end)
-        f:EnableKeyboard(true)
+        BNB.AttachEscClose(f, f.Hide)
 
         local INNER_W = DW - DPAD * 2
         local curY = -(TITLE_H + 10)
@@ -573,11 +565,7 @@ function BNB.OpenIcoDialog(insertFn)
         f:SetScript("OnShow", function()
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
         end)
-        f:SetScript("OnKeyDown", function(_, key)
-            if key == "ESCAPE" then f:Hide() end
-            f:SetPropagateKeyboardInput(key ~= "ESCAPE")
-        end)
-        f:EnableKeyboard(true)
+        BNB.AttachEscClose(f, f.Hide)
 
         -- ── Tabs ─────────────────────────────────────────────────────────────
         local TAB_LABELS = { L["NC_TAB_BNB_ICONS"], L["NC_TAB_BLIZZARD_ICON"] }

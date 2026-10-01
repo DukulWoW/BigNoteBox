@@ -1807,10 +1807,7 @@ local function PopulateStickySettings(noteID)
             -- the settings window via UISpecialFrames (ALL-21). A keyboard-enabled frame gets
             -- keys before the copy box's focused editbox, so close the box here
             -- first, the same way MainWindow's ESC chain does
-            fp:EnableKeyboard(true)
-            fp:SetScript("OnKeyDown", function(self, key)
-                if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-                self:SetPropagateKeyboardInput(false)
+            BNB.AttachEscClose(fp, function(self)
                 local ch = BNB._clipboardHint
                 if ch and ch:IsShown() and ch._dismiss then
                     ch._dismiss()

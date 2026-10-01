@@ -294,16 +294,16 @@ local function TryHide(name, closeFn)
     end
 end
 
-local function OnEscapeKey(self, key)
-    if key ~= "ESCAPE" then self:SetPropagateKeyboardInput(true); return end
-    -- The game's ESC menu (an ESC sticky opens it) sits on top of our windows:
-    -- let the game close it first. Sticky settings opened over it still close
-    -- before it, below.
+-- The game's ESC menu (an ESC sticky opens it) sits on top of our windows:
+-- let the game close it first. Sticky settings opened over it still close
+-- before it, below.
+local function EscToGameMenu()
     local ss = _G["BigNoteBoxStickySettingsFrame"]
-    if GameMenuFrame and GameMenuFrame:IsShown() and not (ss and ss:IsShown()) then
-        self:SetPropagateKeyboardInput(true); return
-    end
-    self:SetPropagateKeyboardInput(false)
+    return GameMenuFrame and GameMenuFrame:IsShown() and not (ss and ss:IsShown())
+end
+
+-- ESC on the main window (BNB.AttachEscClose; in combat the game has ESC)
+local function OnEscapeKey()
     -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
     -- (sidebar right-click → Change icon), Insert Info menu
     if TryHide("BNBNewNoteDialogFrame",
@@ -766,9 +766,7 @@ function BNB.CreateMainWindow()
 
     C_Timer.After(0, ApplySort)
 
-    f:SetPropagateKeyboardInput(false)
-    f:EnableKeyboard(true)
-    f:SetScript("OnKeyDown", OnEscapeKey)
+    BNB.AttachEscClose(f, OnEscapeKey, EscToGameMenu)
 
     -- ── Resize (whole window, bottom-right) ─────────────────────────────────
     f:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
@@ -1240,10 +1238,7 @@ local function BuildBCBPromo()
         end
     end
     tinsert(UISpecialFrames, "BigNoteBoxBCBPromoFrame")
-    f:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then f:Hide() end
-    end)
-    f:EnableKeyboard(true)
+    BNB.AttachEscClose(f, f.Hide)
 
     -- Running Y cursor, starts just below the title bar
     local y = -(titleH + PAD_P)

@@ -526,10 +526,7 @@ local function CreateSendDialog()
     tinsert(UISpecialFrames, "BigNoteBoxSendDialog")
 
     -- Esc closes
-    f:SetScript("OnKeyDown", function(self, key)
-        if key == "ESCAPE" then BNB.CloseSendToChat() end
-    end)
-    f:EnableKeyboard(true)
+    BNB.AttachEscClose(f, function() BNB.CloseSendToChat() end)
 
     local y = skinMode and -(SK_STC_TITLE_H + 8) or -TITLE_H
 
