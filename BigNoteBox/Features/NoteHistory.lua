@@ -53,20 +53,14 @@ local SNAP_SKIP = BNB.NOTE_COPY_SKIP
 
 --------------------------------------------------------------------------------
 -- INTERNAL: deep-copy a value (handles tables, arrays, primitives)
--- Only goes two levels deep — sufficient for note field types.
+-- Fully recursive. It used to stop at two levels, so a snapshot shared each
+-- task, attachment and gear table with the live note: ticking a task changed
+-- the snapshot too (BUG-22).
 --------------------------------------------------------------------------------
 local function DeepCopy(v)
     if type(v) ~= "table" then return v end
     local copy = {}
-    for k, val in pairs(v) do
-        if type(val) == "table" then
-            local inner = {}
-            for k2, v2 in pairs(val) do inner[k2] = v2 end
-            copy[k] = inner
-        else
-            copy[k] = val
-        end
-    end
+    for k, val in pairs(v) do copy[k] = DeepCopy(val) end
     return copy
 end
 
@@ -323,17 +317,22 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
     -- Apply snapshot fields to live note. Clear any content field the note
     -- currently has that the snapshot doesn't (a field added after the
     -- snapshot was taken), then copy every field the snapshot does carry.
+    -- Through UpdateNote, so the tag index follows the restored tags (BUG-22);
+    -- tags is always passed for that, as {} when the snapshot has none.
+    local fields, clear = {}, {}
     for field in pairs(note) do
-        if not SNAP_SKIP[field] and snap[field] == nil then
-            note[field] = nil
+        if not SNAP_SKIP[field] and snap[field] == nil and field ~= "tags" then
+            clear[#clear + 1] = field
         end
     end
     for field, v in pairs(snap) do
         if field ~= "timestamp" then
-            note[field] = DeepCopy(v)
+            fields[field] = DeepCopy(v)
         end
     end
-    note.updated = time()
+    if fields.tags == nil then fields.tags = {} end
+    if #clear > 0 then fields._clear = clear end
+    BNB.UpdateNote(id, fields)
 
     -- Refresh the editor if this note is currently open
     if BNB._currentNoteID == id then

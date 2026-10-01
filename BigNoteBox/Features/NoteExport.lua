@@ -108,11 +108,15 @@ local function JsonEncodeNote(note)
         local function abool(v) if v == nil then return "null" end return v and "true" or "false" end
         local function anum(v)  if v == nil then return "null" end return tostring(v) end
         local function astr(v)  if v == nil then return "null" end return JsonEscapeStr(tostring(v)) end
-        -- recurDays is an array of booleans [{1=bool,...,7=bool}]
+        -- recurDays is a list of day numbers, 1 = Mon .. 7 = Sun (AlarmWindow
+        -- saves the ticked days, AlarmManager matches them), e.g. [2,4].
+        -- It used to be written as seven true/false flags, which lost the days.
         local recurDaysJson = "null"
         if a.recurDays then
             local dp = {}
-            for i = 1, 7 do dp[i] = a.recurDays[i] and "true" or "false" end
+            for _, d in ipairs(a.recurDays) do
+                if type(d) == "number" then dp[#dp + 1] = tostring(d) end
+            end
             recurDaysJson = "[" .. table.concat(dp, ",") .. "]"
         end
         alarmJson = string.format(
@@ -777,6 +781,25 @@ end
 
 -- ── Serialize all notes ───────────────────────────────────────────────────────
 
+-- The backup wrapper around encoded note objects. Every JSON export goes
+-- through it, a single note too, so anything exported can be imported in
+-- Settings > Backup (a bare note object used to fail as "unrecognized").
+local function JsonEnvelope(noteParts)
+    local header = string.format(
+        "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
+        EXPORT_VERSION,
+        JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
+        #noteParts)
+    return header .. table.concat(noteParts, ",\n") .. "\n]}"
+end
+
+-- A list of note tables as one importable JSON export
+local function JsonEncodeNotes(list)
+    local parts = {}
+    for _, note in ipairs(list) do parts[#parts + 1] = JsonEncodeNote(note) end
+    return JsonEnvelope(parts)
+end
+
 local function SerializeNotes(fmt)
     local ndb   = BNB.NotesDB()
     local order = ndb and ndb.noteOrder or {}
@@ -797,12 +820,7 @@ local function SerializeNotes(fmt)
             if not seen[id] then noteParts[#noteParts + 1] = JsonEncodeNote(note) end
         end
 
-        local header = string.format(
-            "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
-            EXPORT_VERSION,
-            JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
-            #noteParts)
-        return header .. table.concat(noteParts, ",\n") .. "\n]}", #noteParts
+        return JsonEnvelope(noteParts), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -835,6 +853,12 @@ end
 -- Returns array of raw note tables, or nil on failure.
 
 local function ParseJsonNotes(text)
+    -- A bare note object (the single-note export before ALL-136.2 wrote one)
+    -- is wrapped in the envelope so it imports like any other export
+    if not text:find("\"export_version\"") and text:find("^%s*{")
+        and text:find("\"title\"") and not text:find("\"notes\"%s*:%s*%[") then
+        text = "{\"export_version\":1,\"notes\":[" .. text .. "]}"
+    end
     -- Quick sanity: must look like our envelope
     if not text:find("\"export_version\"") then return nil end
     if not text:find("\"notes\"") then return nil end
@@ -883,9 +907,11 @@ local function ParseJsonNotes(text)
                 note[key] = tonumber(val)
             end
         end
-        -- Extract boolean fields
-        for key, val in obj:gmatch("\"([^\"]+)\"%s*:%s*(true|false)") do
-            note[key] = (val == "true")
+        -- Extract boolean fields. Lua patterns have no alternation: the old
+        -- "(true|false)" matched nothing, so every boolean (pinned, locked,
+        -- favorited, richMode...) was lost on import.
+        for key, val in obj:gmatch("\"([^\"]+)\"%s*:%s*(%a+)") do
+            if val == "true" or val == "false" then note[key] = (val == "true") end
         end
         -- Extract titleColor sub-object
         local cr, cg, cb = obj:match("\"titleColor\"%s*:%s*{[^}]*\"r\"%s*:%s*(%-?[%d.]+)[^}]*\"g\"%s*:%s*(%-?[%d.]+)[^}]*\"b\"%s*:%s*(%-?[%d.]+)")
@@ -985,8 +1011,8 @@ local function ParseJsonNotes(text)
             for k, v in alarmRaw:gmatch("\"([^\"]+)\"%s*:%s*(%-?%d+%.?%d*)") do
                 if not a[k] then a[k] = tonumber(v) end
             end
-            for k, v in alarmRaw:gmatch("\"([^\"]+)\"%s*:%s*(true|false)") do
-                if a[k] == nil then a[k] = (v == "true") end
+            for k, v in alarmRaw:gmatch("\"([^\"]+)\"%s*:%s*(%a+)") do
+                if a[k] == nil and (v == "true" or v == "false") then a[k] = (v == "true") end
             end
             -- glowColor array [r,g,b,a]
             local gcRaw = alarmRaw:match("\"glowColor\"%s*:%s*(%b[])")
@@ -997,13 +1023,24 @@ local function ParseJsonNotes(text)
                     a.glowColor = { vals[1], vals[2], vals[3], vals[4] or 1 }
                 end
             end
-            -- recurDays boolean array
+            -- recurDays: a list of day numbers [2,4] (1 = Mon .. 7 = Sun).
+            -- Exports before ALL-136.2 wrote seven true/false flags instead;
+            -- those read as "flag i set = day i", the best that format allows.
             local rdRaw = alarmRaw:match("\"recurDays\"%s*:%s*(%b[])")
             if rdRaw then
                 a.recurDays = {}
-                local i = 1
-                for v in rdRaw:gmatch("(true|false)") do
-                    a.recurDays[i] = (v == "true"); i = i + 1
+                for d in rdRaw:gmatch("%d+") do
+                    d = tonumber(d)
+                    if d >= 1 and d <= 7 then a.recurDays[#a.recurDays + 1] = d end
+                end
+                if #a.recurDays == 0 then
+                    local i = 0
+                    for v in rdRaw:gmatch("%a+") do
+                        if v == "true" or v == "false" then
+                            i = i + 1
+                            if v == "true" then a.recurDays[#a.recurDays + 1] = i end
+                        end
+                    end
                 end
             end
             -- null cleanup for alarm
@@ -1015,6 +1052,7 @@ local function ParseJsonNotes(text)
         note.r = nil; note.g = nil; note.b = nil
         note.mapID = nil; note.x = nil; note.y = nil; note.label = nil
         note.slot = nil; note.slotIdx = nil; note.appearanceID = nil
+        note.fired = nil; note.combatPost = nil; note.snoozeEnabled = nil
 
         if note.title then parsed[#parsed + 1] = note end
     end
@@ -1180,6 +1218,7 @@ local function ImportNotes(noteList, remapScope)
                 scope            = resolvedScope,
                 waypoint         = src.waypoint,
                 wpClearOnLeave   = src.wpClearOnLeave,
+                richMode         = src.richMode,
                 iconSource       = src.iconSource,
                 source           = src.source,
                 targetNpcID      = src.targetNpcID,
@@ -1220,7 +1259,8 @@ BNB.NoteExport = {
     FMT_MARKDOWN       = FMT_MARKDOWN,
     FMT_JSON           = FMT_JSON,
     JsonEncodeNote     = JsonEncodeNote,
-    MdEncodeNote       = MdEncodeNote,
+    JsonEncodeNotes    = JsonEncodeNotes,
+    MdEncodeNote      = MdEncodeNote,
     HtmlEncodeNote     = HtmlEncodeNote,
     SerializeNotes     = SerializeNotes,
     ParseJsonNotes     = ParseJsonNotes,

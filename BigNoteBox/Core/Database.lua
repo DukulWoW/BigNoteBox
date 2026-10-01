@@ -6,9 +6,10 @@
 --   BigNoteBoxDB       — owned by BigNoteBox (this addon).
 --                        Settings, window state, minimap, UI prefs.
 --
--- BigNoteBoxDB.lua (companion) calls BNB.InitNotesDB() and BNB.MigrateNotesDB()
--- directly after WoW loads it. BigNoteBox checks BigNoteBoxNotesDB_Loaded (set
--- by the companion) to know whether notes are available.
+-- BigNoteBoxDB.lua (companion) only sets BigNoteBoxNotesDB_Loaded. It loads
+-- first (BigNoteBox lists it in OptionalDeps and it lists nothing back, SV-04);
+-- BNB.InitializeDB() then runs InitNotesDB() / MigrateNotesDB() at BigNoteBox's
+-- ADDON_LOADED. Events.lua still copes with the reverse order.
 --
 -- SCHEMA VERSIONING:
 --   NOTES_SCHEMA_VERSION  — bump when the note table structure changes in a way
@@ -45,7 +46,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 5   -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 6   -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 15  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -67,10 +68,19 @@ BNB.defaults = {
 --------------------------------------------------------------------------------
 -- UUID GENERATOR
 --------------------------------------------------------------------------------
+-- Seconds plus 32 random bits, drawn again until the id is free in both notes
+-- and trash. A bulk import or migration creates many notes within one second,
+-- and the old 16-bit suffix could hand out the same id twice (BUG-01). Ids are
+-- only ever compared as strings, so the longer form mixes fine with old ones.
 function BNB.GenerateID()
-    local t = time()
-    local r = math.random(0, 0xFFFF)
-    return string.format("bnb-%08x%04x", t, r)
+    local ndb   = BNB.NotesDB()
+    local notes = ndb and ndb.notes or {}
+    local trash = ndb and ndb.trash or {}
+    local id
+    repeat
+        id = string.format("bnb-%08x%04x%04x", time(), math.random(0, 0xFFFF), math.random(0, 0xFFFF))
+    until not notes[id] and not trash[id]
+    return id
 end
 
 --------------------------------------------------------------------------------
@@ -223,7 +233,25 @@ function BNB.MigrateNotesDB()
         v = 5
     end
 
-    ndb.dbVersion = NOTES_SCHEMA_VERSION
+    -- ++ v5 -> v6: repair notes migrated from other addons (BUG-06 / SV-01) +++++
+    -- MigrateNotes saved per-character notes as scope = "character" plus a
+    -- character field. Everything else reads "char:Name-Realm", so those notes
+    -- only ever showed under "All".
+    if v < 6 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                if note.scope == "character" then
+                    note.scope = note.character and ("char:" .. note.character) or "global"
+                    note.character = nil
+                end
+            end
+        end
+        v = 6
+    end
+
+    -- Never lower the stored version: running an older build must not make the
+    -- next upgrade run the migrations again (SV-10)
+    ndb.dbVersion = math.max(ndb.dbVersion or 1, NOTES_SCHEMA_VERSION)
 end
 
 --------------------------------------------------------------------------------
@@ -370,7 +398,8 @@ local function MigrateSettingsDB()
         v = 15
     end
 
-    db.dbVersion = SETTINGS_SCHEMA_VERSION
+    -- Never lower the stored version (SV-10, as in MigrateNotesDB)
+    db.dbVersion = math.max(db.dbVersion or 1, SETTINGS_SCHEMA_VERSION)
 end
 
 --------------------------------------------------------------------------------

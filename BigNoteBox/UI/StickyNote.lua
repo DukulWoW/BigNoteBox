@@ -1528,7 +1528,8 @@ pcall(_editWatch.RegisterEvent, _editWatch, "GLOBAL_MOUSE_DOWN")
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
     for _, f in pairs(openFrames) do
         f._loggingOut = true
-        pcall(EndInlineEdit, f)
+        -- xpcall so a failed save is reported, not swallowed (SV-02)
+        xpcall(function() EndInlineEdit(f) end, geterrorhandler())
     end
 end)
 

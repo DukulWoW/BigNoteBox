@@ -418,8 +418,17 @@ local function PopulateContent(ct, sf)
         L["DZ_DELETEALL_BTN"], 160,
         L["DZ_CONFIRM_DELETE_ALL"], 220,
         function()
+            -- Close open stickies first, while their notes still exist: Close
+            -- saves an inline edit and dismisses an alarm through the note
+            local open = {}
+            for id in pairs(BNB._stickyFrames or {}) do open[#open + 1] = id end
+            for _, id in ipairs(open) do pcall(BNB.Sticky.Close, id) end
             BNB.NotesDB().notes     = {}
             BNB.NotesDB().noteOrder = {}
+            -- Derived state that still pointed at the deleted notes (BUG-23)
+            BNB.TagIndexRebuild()
+            BNB._contextMatches = {}
+            if BNB.RefreshTagManager then BNB.RefreshTagManager() end
             BNB._currentNoteID = nil
             if BigNoteBoxDB then BigNoteBoxDB.selectedNoteID = nil end
             if BNB.RefreshNoteList  then BNB.RefreshNoteList() end

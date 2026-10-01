@@ -598,7 +598,8 @@ function BNB.ExportNoteJSON(noteID)
     local NE = BNB.NoteExport
     local note = BNB.GetNote(noteID)
     if not note then return end
-    BNB.OpenExportWindow(NE.JsonEncodeNote(note))
+    -- Wrapped like a backup, so it imports in Settings > Backup
+    BNB.OpenExportWindow(NE.JsonEncodeNotes({ note }))
 end
 
 function BNB.ExportNoteMD(noteID)

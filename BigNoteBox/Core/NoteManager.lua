@@ -733,7 +733,9 @@ local _autoIdle, _autoForced
 local function RunAutoSave()
     if _autoIdle   then _autoIdle:Cancel();   _autoIdle   = nil end
     if _autoForced then _autoForced:Cancel(); _autoForced = nil end
-    if BNB.IsAutoSave() then pcall(BNB.SaveCurrentNoteQuiet) end
+    -- xpcall, not pcall: a failed save must still reach BugSack / scriptErrors,
+    -- or the lost text goes unnoticed (SV-02)
+    if BNB.IsAutoSave() then xpcall(BNB.SaveCurrentNoteQuiet, geterrorhandler()) end
 end
 
 -- Called from BNB.MarkDirty (UI/NoteEditor.lua) on every editor change.
@@ -748,7 +750,7 @@ function BNB.ScheduleAutoSave()
 end
 
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
-    pcall(BNB.SaveCurrentNoteQuiet)
+    xpcall(BNB.SaveCurrentNoteQuiet, geterrorhandler())
 end)
 
 --------------------------------------------------------------------------------

@@ -116,7 +116,7 @@ local function CreateMigratedNote(title, body, tags, charKey)
     if not id then return end
     -- Scope
     if charKey then
-        BNB.UpdateNote(id, { scope = "character", character = charKey })
+        BNB.UpdateNote(id, { scope = "char:" .. charKey })
     else
         BNB.UpdateNote(id, { scope = "global" })
     end
@@ -1338,6 +1338,21 @@ function M.ShowPopup()
     end
     y = y - 14
 
+    -- Everything from here to the "don't ask again" list scrolls (ALL-175):
+    -- one block per detected addon outgrew the screen with many installed
+    -- (all 13 when debug data is seeded), and the clamped window pushed the
+    -- Migrate / Not now buttons off the bottom. Header and buttons stay fixed.
+    local headerH = math.abs(y)
+    local FOOT_H  = PAD + 50            -- buttons (26) + reload warning above them
+    local SF_L    = PAD - 4             -- scroll frame left edge
+    local SF_W    = WIN_W - SF_L - 24   -- 24 px on the right for the bar
+    local X0      = PAD - SF_L          -- content x that lines up with PAD
+    local sf, sc  = BNB.CreateAutoScrollPanel(f, SF_W, SF_W)
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SF_L, y)
+    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24,  FOOT_H)
+    ct = sc
+    y  = 0
+
     -- Per-addon checkboxes + sub-options
     local sel            = {}
     local declinedCbs    = {}  -- "don't ask again" checkboxes
@@ -1368,7 +1383,7 @@ function M.ShowPopup()
 
         local cb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         cb:SetSize(24, 24)
-        cb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD - 2, y + 2)
+        cb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, y + 2)
         cb:SetChecked(false)
         local cbLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         cbLbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
@@ -1379,8 +1394,8 @@ function M.ShowPopup()
         -- NotepadChar / QuickNotes info text (per-character scope)
         if k == "NotepadChar" or k == "QuickNotes" then
             local infoLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD + 18, y)
-            infoLbl:SetWidth(WIN_W - PAD * 2 - 18)
+            infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 + 18, y)
+            infoLbl:SetWidth(SF_W - X0 - 18 - 4)
             infoLbl:SetJustifyH("LEFT")
             infoLbl:SetWordWrap(true)
             infoLbl:SetTextColor(0.5, 0.5, 0.5)
@@ -1394,7 +1409,7 @@ function M.ShowPopup()
             sel.takeANoteCategoryTags = false
             catCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
             catCb:SetSize(20, 20)
-            catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD + 18, y + 2)
+            catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 + 18, y + 2)
             catCb:SetChecked(false)
             catCb:SetEnabled(false)
             catCb:SetAlpha(0.4)
@@ -1429,7 +1444,7 @@ function M.ShowPopup()
     -- Preview button (disabled until at least one addon is checked)
     previewBtn = BNB.CreateButton(nil, ct, L["MIG_PREVIEW_BTN"], 100, 24)
     previewBtn:SetEnabled(false)
-    previewBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
+    previewBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", X0, y)
     previewBtn:SetScript("OnClick", function()
         M.ShowPreview(sel)
     end)
@@ -1438,7 +1453,7 @@ function M.ShowPopup()
     -- "Don't ask again" per addon
     local daaY = y
     local daaLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    daaLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, daaY)
+    daaLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", X0, daaY)
     daaLbl:SetTextColor(0.5, 0.5, 0.5)
     daaLbl:SetText(L["MIG_DONT_ASK_AGAIN"])
     daaY = daaY - 24
@@ -1446,7 +1461,7 @@ function M.ShowPopup()
     for _, k in ipairs(available) do
         local daaCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         daaCb:SetSize(20, 20)
-        daaCb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD - 2, daaY + 2)
+        daaCb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, daaY + 2)
         daaCb:SetChecked(false)
         local daaItemLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         daaItemLbl:SetPoint("LEFT", daaCb, "RIGHT", 4, 0)
@@ -1456,19 +1471,21 @@ function M.ShowPopup()
         daaY = daaY - 24
     end
 
-    -- The "don't ask" block sits below preview; track the bottom
-    local contentBottom = math.min(y, daaY) - 16
+    -- The "don't ask" block sits below preview; its bottom is the scroll height
+    local contentH = math.abs(math.min(y, daaY)) + 8
+    sf:FinaliseHeight(contentH)
 
+    -- Footer: on the window itself, not in the scroll content
     -- Reload warning, pinned above migrate button
-    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    warnLbl:SetPoint("BOTTOMRIGHT", ct, "BOTTOMRIGHT", -PAD, PAD + 32)
+    local warnLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    warnLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, PAD + 32)
     warnLbl:SetJustifyH("RIGHT")
     warnLbl:SetTextColor(1, 0.6, 0.0)
     warnLbl:SetText(L["MIG_WARN_WILL_RELOAD"])
 
     -- Migrate Now button, pinned to bottom centre
-    migrateBtn = BNB.CreateButton(nil, ct, L["MIG_MIGRATE_NOW_BTN"], 120, 26)
-    migrateBtn:SetPoint("BOTTOM", ct, "BOTTOM", 49, PAD)  -- shifts right so pair midpoint is at centre
+    migrateBtn = BNB.CreateButton(nil, f, L["MIG_MIGRATE_NOW_BTN"], 120, 26)
+    migrateBtn:SetPoint("BOTTOM", f, "BOTTOM", 49, PAD)  -- shifts right so pair midpoint is at centre
     migrateBtn:SetEnabled(false)
     migrateBtn:SetScript("OnClick", function()
         -- Apply "don't ask again" for checked boxes on all available addons
@@ -1484,7 +1501,7 @@ function M.ShowPopup()
     end)
 
     -- Cancel: anchored left of Migrate Now, together they are centred
-    local cancelBtn = BNB.CreateButton(nil, ct, L["MIG_NOT_NOW_BTN"], 90, 26)
+    local cancelBtn = BNB.CreateButton(nil, f, L["MIG_NOT_NOW_BTN"], 90, 26)
     cancelBtn:SetPoint("RIGHT", migrateBtn, "LEFT", -8, 0)
     cancelBtn:SetScript("OnClick", function()
         local db = BigNoteBoxDB
@@ -1497,9 +1514,10 @@ function M.ShowPopup()
         f:Hide()
     end)
 
-    -- Total height: from top to content bottom + space for buttons
-    local totalH = math.abs(contentBottom) + 26 + PAD * 2 + titleH
-    f:SetHeight(totalH)
+    -- Total height: header + scroll content + footer, capped at 90% of the
+    -- screen; past that the middle scrolls
+    local maxH = math.floor(UIParent:GetHeight() * 0.9)
+    f:SetHeight(math.min(headerH + contentH + FOOT_H, maxH))
 
     _popup = f
     f:Show()

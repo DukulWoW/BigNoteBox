@@ -5,6 +5,5 @@
 ## Author: Dukul
 ## Version: 1.0.0
 ## SavedVariables: BigNoteBoxNotesDB
-## OptionalDeps: BigNoteBox
 
 BigNoteBoxDB.lua

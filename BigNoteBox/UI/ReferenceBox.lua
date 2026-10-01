@@ -61,6 +61,11 @@ local _activeRows   = {}
 local _pendingItems  = {}   -- itemID  → true
 local _pendingSpells = {}   -- spellID → true
 local _pendingQuests = {}   -- questID → true
+-- _unavailable[type][id] = true when the game could not load an item's or
+-- spell's data this session. Runtime only: an attachment is never deleted for
+-- this (BUG-07, a retired quest or an item from the other client is still the
+-- player's data). The row shows it as unavailable; the X removes it.
+local _unavailable   = { item = {}, spell = {} }
 local _modelHidden   = {}   -- noteID  → true (session-only, resets on /reload)
 local _gearViewTmog  = {}   -- noteID  → true = showing transmog, false/nil = regular
 -- Set true while SendAttachmentToChat is inserting, read by TryAddLink (shift-click hook).
@@ -198,38 +203,46 @@ local function MoveAttachment(fromNoteID, attIndex, toNoteID)
 end
 
 -- ── Data resolution ───────────────────────────────────────────────────────────
+-- Mark an attachment's data unavailable (flag true) or loaded again (false)
+-- and redraw when that changes. Never touches the note (BUG-07).
+local function SetUnavailable(kind, id, flag)
+    local t = _unavailable[kind]
+    if (t[id] == true) == flag then return end
+    t[id] = flag or nil
+    if rbFrame and rbFrame:IsShown() then RenderList() end
+end
+
+-- Row data for an attachment whose data could not be loaded: grey, with its id
+local function UnavailableInfo(att, typeLabel)
+    return { name = string.format(L["REFBOX_UNAVAILABLE_FMT"], tostring(att.id)),
+             icon = "Interface\\Icons\\INV_Misc_QuestionMark",
+             qr = 0.50, qg = 0.50, qb = 0.50, typeLabel = typeLabel, quality = -1 }
+end
+
 local function ResolveAttachment(att)
     if att.type == "item" then
         local name, _, quality, _, _, _, _, _, _, iconTex = C_Item.GetItemInfo(att.id)
         if not name then
             C_Item.RequestLoadItemDataByID(att.id)
-            _pendingItems[att.id] = true
-            -- Timeout: if still pending after 10s, the ID is invalid — remove it
-            local pendingID = att.id
-            C_Timer.After(1, function()
-                if not _pendingItems[pendingID] then return end
-                _pendingItems[pendingID] = nil
-                -- Remove all attachments with this ID from the current note
-                local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-                if note and note.attachments then
-                    local removed = false
-                    for i = #note.attachments, 1, -1 do
-                        local a = note.attachments[i]
-                        if a.type == "item" and a.id == pendingID then
-                            table.remove(note.attachments, i)
-                            removed = true
-                        end
-                    end
-                    if removed then
-                        BNB:Print(string.format(L["REFBOX_INVALID_ITEM"], tostring(pendingID)))
-                        if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
-                        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                    end
-                end
-            end)
+            if _unavailable.item[att.id] then
+                return UnavailableInfo(att, L["REFBOX_TYPE_GEAR"])
+            end
+            -- One timeout per pending id, not one per render. Still nothing
+            -- after 10 s: show it as unavailable. (This used to be 1 s and
+            -- deleted the attachment from whichever note was shown, BUG-07.)
+            if not _pendingItems[att.id] then
+                _pendingItems[att.id] = true
+                local pendingID = att.id
+                C_Timer.After(10, function()
+                    if not _pendingItems[pendingID] then return end
+                    _pendingItems[pendingID] = nil
+                    SetUnavailable("item", pendingID, true)
+                end)
+            end
             return nil
         end
         _pendingItems[att.id] = nil
+        _unavailable.item[att.id] = nil
         local qc = QualityColor(quality)
         return { name=name, icon=iconTex or "Interface\\Icons\\INV_Misc_QuestionMark",
                  qr=qc.r, qg=qc.g, qb=qc.b, typeLabel=L["REFBOX_TYPE_GEAR"], quality=quality }
@@ -245,33 +258,24 @@ local function ResolveAttachment(att)
             if C_Spell and C_Spell.RequestLoadSpellData then
                 C_Spell.RequestLoadSpellData(att.id)
             end
-            _pendingSpells[att.id] = true
             EnsureSpellDataListener()
-            -- Timeout: if still pending after 5s the ID is invalid — remove it
-            local pendingID = att.id
-            C_Timer.After(5, function()
-                if not _pendingSpells[pendingID] then return end
-                _pendingSpells[pendingID] = nil
-                local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-                if note and note.attachments then
-                    local removed = false
-                    for i = #note.attachments, 1, -1 do
-                        local a = note.attachments[i]
-                        if a.type == "spell" and a.id == pendingID then
-                            table.remove(note.attachments, i)
-                            removed = true
-                        end
-                    end
-                    if removed then
-                        BNB:Print(string.format(L["REFBOX_INVALID_ITEM"], tostring(pendingID)))
-                        if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
-                        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                    end
-                end
-            end)
+            if _unavailable.spell[att.id] then
+                return UnavailableInfo(att, L["REFBOX_TYPE_SPELL"])
+            end
+            -- Still nothing after 5 s: show it as unavailable, never delete (BUG-07)
+            if not _pendingSpells[att.id] then
+                _pendingSpells[att.id] = true
+                local pendingID = att.id
+                C_Timer.After(5, function()
+                    if not _pendingSpells[pendingID] then return end
+                    _pendingSpells[pendingID] = nil
+                    SetUnavailable("spell", pendingID, true)
+                end)
+            end
             return nil
         end
         _pendingSpells[att.id] = nil
+        _unavailable.spell[att.id] = nil
         -- icon from C_Spell is a fileDataID number; SetTexture accepts both paths and IDs
         return { name=name, icon=icon or "Interface\\Icons\\INV_Misc_QuestionMark",
                  qr=0.40, qg=0.70, qb=1.00, typeLabel=L["REFBOX_TYPE_SPELL"], quality=-1 }
@@ -335,32 +339,20 @@ local function ResolveAttachment(att)
     end
 end
 
--- ── GET_ITEM_INFO_RECEIVED — re-render on cache fill, remove on failure ───────
+-- ── GET_ITEM_INFO_RECEIVED — re-render on cache fill, mark on failure ─────────
 local _itemInfoFrame
 local function EnsureItemInfoListener()
     if _itemInfoFrame then return end
     _itemInfoFrame = CreateFrame("Frame")
     _itemInfoFrame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     _itemInfoFrame:SetScript("OnEvent", function(_, _, itemID, success)
-        if not _pendingItems[itemID] then return end
+        local wasUnavailable = _unavailable.item[itemID]
+        if not _pendingItems[itemID] and not wasUnavailable then return end
         _pendingItems[itemID] = nil
-        if success then
-            if rbFrame and rbFrame:IsShown() then RenderList() end
-        else
-            -- Invalid ID — remove all attachments with this itemID and notify
-            local note = _noteID and NDB().notes[_noteID]
-            if note and note.attachments then
-                for i = #note.attachments, 1, -1 do
-                    local a = note.attachments[i]
-                    if a.type == "item" and a.id == itemID then
-                        table.remove(note.attachments, i)
-                        BNB:Print(string.format(L["REFBOX_INVALID_ITEM"], tostring(itemID)))
-                    end
-                end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if rbFrame and rbFrame:IsShown() then RenderList() end
-            end
-        end
+        -- Failure marks the attachment unavailable; it is never removed (BUG-07).
+        -- A late success brings an unavailable one back.
+        SetUnavailable("item", itemID, not success)
+        if success and not wasUnavailable and rbFrame and rbFrame:IsShown() then RenderList() end
     end)
 end
 
@@ -371,25 +363,12 @@ EnsureSpellDataListener = function()
     _spellDataFrame = CreateFrame("Frame")
     _spellDataFrame:RegisterEvent("SPELL_DATA_LOAD_RESULT")
     _spellDataFrame:SetScript("OnEvent", function(_, _, spellID, success)
-        if not _pendingSpells[spellID] then return end
+        local wasUnavailable = _unavailable.spell[spellID]
+        if not _pendingSpells[spellID] and not wasUnavailable then return end
         _pendingSpells[spellID] = nil
-        if success then
-            if rbFrame and rbFrame:IsShown() then RenderList() end
-        else
-            -- Invalid spell ID — remove matching attachments from current note
-            local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-            if note and note.attachments then
-                for i = #note.attachments, 1, -1 do
-                    local a = note.attachments[i]
-                    if a.type == "spell" and a.id == spellID then
-                        table.remove(note.attachments, i)
-                        BNB:Print(string.format(L["REFBOX_INVALID_ITEM"], tostring(spellID)))
-                    end
-                end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if rbFrame and rbFrame:IsShown() then RenderList() end
-            end
-        end
+        -- Same as items: mark, never remove (BUG-07)
+        SetUnavailable("spell", spellID, not success)
+        if success and not wasUnavailable and rbFrame and rbFrame:IsShown() then RenderList() end
     end)
 end
 
@@ -415,22 +394,10 @@ EnsureQuestDataListener = function()
     _questDataFrame:SetScript("OnEvent", function(_, _, questID, success)
         if not _pendingQuests[questID] then return end
         _pendingQuests[questID] = nil
-        if success then
-            if rbFrame and rbFrame:IsShown() then RenderList() end
-        else
-            local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-            if note and note.attachments then
-                for i = #note.attachments, 1, -1 do
-                    local a = note.attachments[i]
-                    if a.type == "quest" and a.id == questID then
-                        table.remove(note.attachments, i)
-                        BNB:Print(string.format(L["REFBOX_INVALID_ITEM"], tostring(questID)))
-                    end
-                end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if rbFrame and rbFrame:IsShown() then RenderList() end
-            end
-        end
+        -- On failure the row already reads "Quest <id>" (unknown), so it stays
+        -- as it is: retired and seasonal quests fail here, and the attachment is
+        -- never removed for it (BUG-07)
+        if success and rbFrame and rbFrame:IsShown() then RenderList() end
     end)
 end
 
