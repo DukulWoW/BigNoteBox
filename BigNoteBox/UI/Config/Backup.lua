@@ -196,18 +196,9 @@ local function BuildBackupTab(sf, ct)
         end
 
         -- Check if any notes are scoped to a different character
-        local foreignChar = nil
-        for _, note in ipairs(notes) do
-            if note.scope and note.scope:find("^char:") then
-                local charPart = note.scope:sub(6)
-                if charPart ~= (BNB.currentChar or "") then
-                    foreignChar = charPart
-                    break
-                end
-            end
-        end
+        local foreignChar = BNB.ForeignScopeChar(notes)
 
-        if foreignChar and BNB.currentChar and foreignChar ~= BNB.currentChar then
+        if foreignChar and BNB.currentChar then
             -- Store pending data for the popup callbacks
             BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
             BNB._pendingImportForeign = foreignChar

@@ -306,16 +306,17 @@ local function GetImportFrame()
             BNB:Print(L["IMPORT_ERR_JSON"])
             return
         end
-        local hasChar = false
-        for _, n in ipairs(noteList) do
-            if n.scope and n.scope:find("^char:") then hasChar = true; break end
-        end
-        if hasChar then
-            BNB._pendingImportNotes = noteList
-            StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP")
+        -- Same remap question as Settings > Backup. This used to set
+        -- _pendingImportNotes, which the popup never read, and showed the
+        -- popup without its two names: notes for another character never
+        -- imported from here. The import itself reports in chat (ALL-180).
+        local foreignChar = BNB.ForeignScopeChar(noteList)
+        if foreignChar and BNB.currentChar then
+            BNB._pendingImport = { notes = noteList }
+            BNB._pendingImportForeign = foreignChar
+            StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
         else
-            local count = BNB._DoImport(noteList, false)
-            BNB:Print(string.format(L["IMPORT_SUCCESS"], count or 0))
+            BNB._DoImport(noteList, false)
         end
         f:Hide()
     end)

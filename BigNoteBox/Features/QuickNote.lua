@@ -128,6 +128,26 @@ local function AttachQuestID(noteID, questID)
     if not BNB.RBAddAttachment then return end
     BNB.RBAddAttachment(noteID, { type = "quest", id = questID })
 end
+-- Creates the note and fills it in. Shared by the confirm popup and the
+-- silent/open path, which used to carry two copies of this.
+local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
+    local id = BNB.CreateNote(title or "", body or "")
+    if not id then return end
+    local note = BNB.GetNote(id)
+    if note then
+        note.icon    = icon or RandomIcon()
+        note.source  = "quicknote"   -- made from a quest, gossip or book frame; Oracle badge (ALL-69)
+        note.tags    = tags or {}
+        note.updated = time()
+        for _, tag in ipairs(note.tags) do
+            BNB.TagIndexAdd(id, tag)
+        end
+    end
+    if rewardAttacher then rewardAttacher(id) end
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    return id
+end
+
 -- icon:   full texture path or nil (falls back to random)
 -- tags:   array of tag strings
 -- title, body: strings
@@ -138,7 +158,10 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
     local action = GetAction()
 
     if action == "confirm" then
-        -- Small static popup to confirm/edit the title before creating
+        -- Small static popup to confirm/edit the title before creating.
+        -- The note's parts travel as the popup's data (BUG-15): they used to
+        -- be set on the popup frame after StaticPopup_Show, when OnShow had
+        -- already run, so the box showed nothing or the previous title.
         StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] = StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] or {
             preferredIndex = 3,
             text         = BNB.L["QN_CONFIRM_TEXT"],
@@ -146,63 +169,32 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
             button2      = BNB.L["CANCEL"],
             hasEditBox   = true,
             maxLetters   = 100,
-            whileDead    = false,
+            whileDead    = true,
             hideOnEscape = true,
-            OnShow = function(self)
-                self.EditBox:SetText(self._qnTitle or "")
+            OnShow = function(self, data)
+                self.EditBox:SetText(data and data.title or "")
                 self.EditBox:SetFocus()
                 self.EditBox:HighlightText()
             end,
-            OnAccept = function(self)
+            OnAccept = function(self, data)
+                if not data then return end
                 local t = self.EditBox:GetText()
-                if t == "" then t = self._qnTitle or "" end
-                local id = BNB.CreateNote(t, self._qnBody or "")
-                if not id then return end
-                local n = BNB.GetNote(id)
-                if n then
-                    n.icon = self._qnIcon or RandomIcon()
-                    n.source = "quicknote"   -- Oracle search badge (ALL-69)
-                    n.tags = self._qnTags or {}
-                    n.updated = time()
-                    for _, tag in ipairs(n.tags) do
-                        BNB.TagIndexAdd(id, tag)
-                    end
+                if t == "" then t = data.title or "" end
+                if MakeQuickNote(t, data.body, data.icon, data.tags, data.reward) then
+                    BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], t))
                 end
-                if self._qnReward then self._qnReward(id) end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], t))
             end,
         }
-        local dlg = StaticPopup_Show("BNB_QUICKNOTE_CONFIRM")
-        if dlg then
-            dlg._qnTitle  = title
-            dlg._qnBody   = body
-            dlg._qnIcon   = icon or RandomIcon()
-            dlg._qnTags   = tags
-            dlg._qnReward = rewardAttacher
-        end
+        StaticPopup_Show("BNB_QUICKNOTE_CONFIRM", nil, nil, {
+            title = title, body = body, icon = icon or RandomIcon(),
+            tags = tags, reward = rewardAttacher,
+        })
         return
     end
 
     -- Silent or open: create immediately
-    local id = BNB.CreateNote(title or "", body or "")
+    local id = MakeQuickNote(title, body, icon, tags, rewardAttacher)
     if not id then return end
-
-    -- Set icon and tags directly on the new note record
-    local ndb = BNB.NotesDB()
-    local note = ndb and ndb.notes and ndb.notes[id]
-    if note then
-        note.icon    = icon or RandomIcon()
-        note.source  = "quicknote"   -- made from a quest, gossip or book frame; Oracle badge (ALL-69)
-        note.tags    = tags or {}
-        note.updated = time()
-        for _, tag in ipairs(note.tags) do
-            BNB.TagIndexAdd(id, tag)
-        end
-    end
-
-    if rewardAttacher then rewardAttacher(id) end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 
     if action == "open" then
         if BNB.mainFrame and not BNB.mainFrame:IsShown() then

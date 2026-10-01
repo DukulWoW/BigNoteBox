@@ -2,9 +2,13 @@
 -- Note sharing via compressed, printable share strings.
 --
 -- Pipeline (share):
---   Serialize note fields -> CompressDeflate -> EncodeForPrint -> "BNB1:<data>"
+--   Note fields of the ticked groups (BNB.CleanNoteFields, Core/NoteFields.lua)
+--   -> LibSerialize -> CompressDeflate -> EncodeForPrint -> "BNB2:<data>"
 -- Pipeline (import):
---   Strip prefix -> DecodeForPrint -> DecompressDeflate -> deserialize -> preview -> create note
+--   Strip prefix -> DecodeForPrint -> DecompressDeflate -> LibSerialize
+--   -> BNB.ShareReadPayload (share fields only) -> preview -> create note
+--   "BNB1:" strings (before ALL-136.5) are still read, by BNB.ShareReadV1.
+-- Direct Send (DirectSend.lua) uses the same payload and readers.
 --
 -- Public API:
 --   BNB.OpenShareWindow(noteID)
@@ -17,73 +21,98 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
-local SHARE_PREFIX  = "BNB1:"
+local SHARE_PREFIX    = "BNB2:"   -- LibSerialize payload (ALL-136.5)
+local SHARE_PREFIX_V1 = "BNB1:"   -- the old hand-made format, still read
 local SHARE_W       = 420
 local PREVIEW_W     = 420
 local PREVIEW_H     = 380
 local PAD           = 12
-
--- Dropdown option definitions
-local SHARE_OPTIONS = {
-    { key = "basic",      labelKey = "SHARE_OPT_BASIC" },
-    { key = "tasks",      labelKey = "SHARE_OPT_TASKS" },
-    { key = "refbox",     labelKey = "SHARE_OPT_REFBOX" },
-    { key = "tags",       labelKey = "SHARE_OPT_TAGS" },
-    { key = "icon",       labelKey = "SHARE_OPT_ICON" },
-    { key = "inspect",    labelKey = "SHARE_OPT_INSPECT" },
-    { key = "everything", labelKey = "SHARE_OPT_EVERYTHING" },
-}
-local SHARE_FIELDS = {
-    basic      = { "title", "body", "richMode" },
-    tasks      = { "title", "body", "richMode", "tasks", "taskList" },
-    refbox     = { "title", "body", "richMode", "attachments" },
-    tags       = { "title", "body", "richMode", "attachments", "tags" },
-    icon       = { "title", "body", "richMode", "attachments", "tags", "icon", "iconSource" },
-    inspect    = {
-        "title", "body", "richMode", "attachments", "tags", "icon", "iconSource",
-        "source", "targetNpcID", "targetPlayerKey", "targetIsPet",
-        "inspectRaceID", "inspectSexID",
-        "inspectGearItems", "inspectTransmogItems",
-    },
-    everything = {
-        "title", "body", "richMode", "attachments", "tags", "icon", "iconSource",
-        "context", "contextDisplay", "contextLeave",
-        "titleColor", "fontOverride", "fontSize",
-        "textAlign", "fontOutline",
-        "borderOverride", "borderScale", "borderOffset", "borderBrightness",
-        "lineHeight", "scope", "waypoint", "wpClearOnLeave",
-        "source", "targetNpcID", "targetPlayerKey", "targetIsPet",
-        "inspectRaceID", "inspectSexID",
-        "inspectGearItems", "inspectTransmogItems",
-        "tasks", "taskList",
-    },
-}
 
 -- Module state
 local _shareFrame   = nil
 local _previewFrame = nil
 local _importFrame  = nil
 local _shareNoteID  = nil
-local _selOption    = "basic"
 
 --------------------------------------------------------------------------------
--- ATTACHMENT ENCODE / DECODE
--- Flat format: "type:id|type:id" e.g. "item:12345|spell:67890"
--- Attachment objects are always {type=string, id=number}.
+-- WHAT TO SEND (ALL-179)
+-- One checkbox per share group of the note schema (BNB.SHARE_GROUPS in
+-- Core/NoteFields.lua); title, body and rich mode always go. The ticks are
+-- remembered in BigNoteBoxDB.shareGroups ({ tags = true, ... }); nil =
+-- DEFAULT_GROUPS. They replaced seven cumulative presets in a dropdown.
 --------------------------------------------------------------------------------
-local ATT_SEP = "|"
-local ATT_KV  = ":"
+local DEFAULT_GROUPS = { tags = true, tasks = true, refbox = true, look = true, unit = true }
 
-local function EncodeAttachments(arr)
-    if not arr or #arr == 0 then return "" end
-    local parts = {}
-    for _, a in ipairs(arr) do
-        if a.type and a.id then
-            parts[#parts + 1] = tostring(a.type) .. ATT_KV .. tostring(a.id)
-        end
-    end
-    return table.concat(parts, ATT_SEP)
+function BNB.GetShareGroups()
+    local db = BigNoteBoxDB
+    return db and db.shareGroups or DEFAULT_GROUPS
 end
+
+local function SetShareGroup(key, on)
+    local db = BigNoteBoxDB
+    if not db then return end
+    if not db.shareGroups then
+        db.shareGroups = {}
+        for k, v in pairs(DEFAULT_GROUPS) do db.shareGroups[k] = v end
+    end
+    db.shareGroups[key] = on or nil
+end
+
+-- Share fields of the schema that a receiver accepts: never scope, alarm,
+-- pin, lock or timestamps, whatever the sender put in (review question 6)
+local function IsShareField(def) return def.share ~= nil end
+
+-- The note's fields for the ticked groups, as plain data
+function BNB.ShareBuildPayload(noteID, groups)
+    local ndb  = BNB.NotesDB()
+    local note = ndb and ndb.notes and ndb.notes[noteID]
+    if not note then return nil, L["SHARE_ERR_NOTFOUND"] end
+    groups = groups or BNB.GetShareGroups()
+    local data = BNB.CleanNoteFields(note, function(def)
+        return def.share == "text" or (def.share ~= nil and groups[def.share] == true)
+    end)
+    return { v = 2, note = data }
+end
+
+-- A received payload (share string or Direct Send) back to note fields, or
+-- nil when it is not one. Only share fields of the right type and shape get
+-- through (BNB.CleanNoteFields), so nothing the sender adds can reach code
+-- that expects another shape.
+function BNB.ShareReadPayload(payload)
+    if type(payload) ~= "table" or type(payload.note) ~= "table" then return nil end
+    local data = BNB.CleanNoteFields(payload.note, IsShareField)
+    if not data.title and not data.body then return nil end
+    return data
+end
+
+local function GetLibSerialize()
+    return LibStub and LibStub("LibSerialize", true)
+end
+
+-- LibSerialize handles nested tables (tasks, gear lists) and escaping; the
+-- old format turned every nested table into the string "null" (BUG-03)
+function BNB.ShareSerialize(payload)
+    local ls = GetLibSerialize()
+    return ls and ls:Serialize(payload)
+end
+
+function BNB.ShareDeserialize(serialized)
+    local ls = GetLibSerialize()
+    if not ls or type(serialized) ~= "string" then return nil end
+    local ok, payload = ls:Deserialize(serialized)
+    if not ok then return nil end
+    return BNB.ShareReadPayload(payload)
+end
+
+--------------------------------------------------------------------------------
+-- THE OLD FORMAT (BNB1: share strings, BNB2 Direct Send) - read only
+-- Kept so codes already pasted around the internet, and notes sent by players
+-- on older versions, still open. key\030value fields joined by \031; tables
+-- one level deep only. Attachments were a flat "type:id|type:id" string.
+--------------------------------------------------------------------------------
+local SEP_FIELD = "\031"
+local SEP_KV    = "\030"
+local ATT_SEP   = "|"
 
 local function DecodeAttachments(str)
     if not str or str == "" then return nil end
@@ -100,69 +129,11 @@ local function DecodeAttachments(str)
     return #result > 0 and result or nil
 end
 
---------------------------------------------------------------------------------
--- SERIALIZATION
--- Simple key=value format. Values are JSON-escaped strings or numbers.
--- Tables (tags, titleColor) are encoded as nested JSON arrays/objects.
--- Delimiter: unit separator \031 between fields, \030 between key and value.
---------------------------------------------------------------------------------
-local SEP_FIELD = "\031"
-local SEP_KV    = "\030"
-
-local function EscStr(s)
-    return (tostring(s or ""))
-        :gsub("\\", "\\\\")
-        :gsub(SEP_FIELD, "\\f")
-        :gsub(SEP_KV,    "\\k")
-end
-
 local function UnescStr(s)
     return (s or "")
         :gsub("\\k",  SEP_KV)
         :gsub("\\f",  SEP_FIELD)
         :gsub("\\\\", "\\")
-end
-
-local function SerializeValue(v)
-    local t = type(v)
-    if t == "string" then
-        return "s" .. EscStr(v)
-    elseif t == "number" then
-        return "n" .. tostring(v)
-    elseif t == "boolean" then
-        return "b" .. (v and "1" or "0")
-    elseif t == "table" then
-        -- Encode as a simple JSON-like string for safety
-        local parts = {}
-        for k, val in pairs(v) do
-            local vt = type(val)
-            local enc
-            if vt == "string" then
-                enc = '"' .. EscStr(val) .. '"'
-            elseif vt == "number" then
-                enc = tostring(val)
-            elseif vt == "boolean" then
-                enc = val and "true" or "false"
-            else
-                enc = "null"
-            end
-            if type(k) == "number" then
-                parts[k] = enc
-            else
-                parts[#parts + 1] = '"' .. EscStr(tostring(k)) .. '":' .. enc
-            end
-        end
-        -- Detect array vs object: arrays have only numeric keys 1..n
-        local isArray = (#v > 0)
-        if isArray then
-            local arr = {}
-            for i = 1, #v do arr[i] = parts[i] or "null" end
-            return "t[" .. table.concat(arr, ",") .. "]"
-        else
-            return "t{" .. table.concat(parts, ",") .. "}"
-        end
-    end
-    return "s"
 end
 
 local function DeserializeValue(s)
@@ -207,24 +178,18 @@ local function DeserializeValue(s)
     return nil
 end
 
-local function Serialize(tbl)
-    local parts = {}
-    for k, v in pairs(tbl) do
-        parts[#parts + 1] = EscStr(tostring(k)) .. SEP_KV .. SerializeValue(v)
-    end
-    return table.concat(parts, SEP_FIELD)
-end
-
-local function Deserialize(str)
-    if not str or str == "" then return nil end
-    local result = {}
-    for field in (str .. SEP_FIELD):gmatch("(.-)" .. SEP_FIELD) do
+-- An old-format payload to note fields (same rules as BNB.ShareReadPayload)
+function BNB.ShareReadV1(serialized)
+    if not serialized or serialized == "" then return nil end
+    local raw = {}
+    for field in (serialized .. SEP_FIELD):gmatch("(.-)" .. SEP_FIELD) do
         local k, v = field:match("^(.-)" .. SEP_KV .. "(.+)$")
         if k and v then
-            result[UnescStr(k)] = DeserializeValue(v)
+            raw[UnescStr(k)] = DeserializeValue(v)
         end
     end
-    return result
+    if raw._att then raw.attachments = DecodeAttachments(raw._att) end
+    return BNB.ShareReadPayload({ note = raw })
 end
 
 --------------------------------------------------------------------------------
@@ -232,67 +197,35 @@ end
 --------------------------------------------------------------------------------
 local GetDeflate = BNB.GetDeflate
 
-function BNB.ShareEncode(noteID, optionKey)
-    local ndb  = BNB.NotesDB()
-    local note = ndb and ndb.notes and ndb.notes[noteID]
-    if not note then return nil, L["SHARE_ERR_NOTFOUND"] end
-
-    local fields = SHARE_FIELDS[optionKey] or SHARE_FIELDS.basic
-    local data   = {}
-    for _, field in ipairs(fields) do
-        if field == "attachments" then
-            -- Encode attachment array as flat string; skip if empty
-            if note.attachments and #note.attachments > 0 then
-                data["_att"] = EncodeAttachments(note.attachments)
-            end
-        elseif note[field] ~= nil then
-            data[field] = note[field]
-        end
-    end
-
-    local serialized = Serialize(data)
+function BNB.ShareEncode(noteID, groups)
+    local payload, err = BNB.ShareBuildPayload(noteID, groups)
+    if not payload then return nil, err end
     local ld = GetDeflate()
-    local encoded
-    if ld then
-        local compressed = ld:CompressDeflate(serialized)
-        encoded = ld:EncodeForPrint(compressed)
-    else
-        -- Fallback: no compression, Base64-like via EncodeForPrint stub
-        -- This path should never be hit if LibDeflate is loaded
-        encoded = serialized
-    end
-    return SHARE_PREFIX .. encoded
+    local serialized = BNB.ShareSerialize(payload)
+    if not ld or not serialized then return nil, L["SHARE_ERR_GENERATE"] end
+    return SHARE_PREFIX .. ld:EncodeForPrint(ld:CompressDeflate(serialized))
 end
 
 function BNB.ShareDecode(str)
     if not str or str == "" then return nil, L["SHARE_ERR_EMPTY"] end
     str = str:match("^%s*(.-)%s*$")  -- trim whitespace
 
-    if str:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
+    local v1 = str:sub(1, #SHARE_PREFIX_V1) == SHARE_PREFIX_V1
+    if not v1 and str:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then
         return nil, L["SHARE_ERR_PREFIX"]
     end
-    local encoded = str:sub(#SHARE_PREFIX + 1)
+    local encoded = str:sub((v1 and #SHARE_PREFIX_V1 or #SHARE_PREFIX) + 1)
 
     local ld = GetDeflate()
-    local serialized
-    if ld then
-        local compressed = ld:DecodeForPrint(encoded)
-        if not compressed then return nil, L["SHARE_ERR_DECODE"] end
-        serialized = ld:DecompressDeflate(compressed)
-        if not serialized then return nil, L["SHARE_ERR_DECOMPRESS"] end
-    else
-        serialized = encoded
-    end
+    if not ld then return nil, L["SHARE_ERR_DECODE"] end
+    local compressed = ld:DecodeForPrint(encoded)
+    if not compressed then return nil, L["SHARE_ERR_DECODE"] end
+    local serialized = ld:DecompressDeflate(compressed)
+    if not serialized then return nil, L["SHARE_ERR_DECOMPRESS"] end
 
-    local data = Deserialize(serialized)
-    if not data or not data.title and not data.body then
-        return nil, L["SHARE_ERR_DESERIALIZE"]
-    end
-    -- Decode flat attachment string back into array
-    if data._att then
-        data.attachments = DecodeAttachments(data._att)
-        data._att = nil
-    end
+    local data
+    if v1 then data = BNB.ShareReadV1(serialized) else data = BNB.ShareDeserialize(serialized) end
+    if not data then return nil, L["SHARE_ERR_DESERIALIZE"] end
     return data
 end
 
@@ -447,23 +380,16 @@ local function BuildSharePreview()
     addBtn:SetScript("OnClick", function()
         local data = f._pendingData
         if not data then return end
-        local id = BNB.CreateNote(data.title or "")
+        -- Share fields only, checked again here: TakeANote notes come in
+        -- through Direct Send without going through BNB.ShareReadPayload.
+        -- No scope (the note lands where CreateNote puts it, under the
+        -- active sidebar character), no alarm; tasks come along (BUG-03).
+        data = BNB.CleanNoteFields(data, function(def) return def.share ~= nil end)
+        local id = BNB.CreateNote(data.title or "", data.body or "")
         if id then
             local updates = {}
-            local skip = { title = true, attachments = true }
-            for _, field in ipairs({
-                "body", "richMode", "tags", "icon", "iconSource",
-                "context", "contextDisplay", "contextLeave",
-                "titleColor", "fontOverride", "fontSize", "textAlign", "fontOutline",
-                "borderOverride", "borderScale", "borderOffset", "borderBrightness",
-                "lineHeight", "scope", "waypoint", "wpClearOnLeave",
-                "source", "targetNpcID", "targetPlayerKey", "targetIsPet",
-                "inspectRaceID", "inspectSexID",
-                "inspectGearItems", "inspectTransmogItems",
-            }) do
-                if data[field] ~= nil and not skip[field] then
-                    updates[field] = data[field]
-                end
+            for k, v in pairs(data) do
+                if k ~= "title" and k ~= "body" and k ~= "attachments" then updates[k] = v end
             end
             if next(updates) then BNB.UpdateNote(id, updates) end
             -- Import attachments via the proper API so refbox badge updates
@@ -538,7 +464,15 @@ function BNB.OpenSharePreview(data)
             f._attLbl:SetText(string.format(L["SHARE_REFBOX_FMT"], table.concat(parts, ", ")))
             f._attLbl:Show()
         else
+            f._attLbl:SetText("")
             f._attLbl:Hide()
+        end
+        -- Tasks travel too since ALL-136.5; say how many
+        local tasks = type(data.tasks) == "table" and #data.tasks or 0
+        if tasks > 0 then
+            local cur = f._attLbl:IsShown() and (f._attLbl:GetText() .. "\n") or ""
+            f._attLbl:SetText(cur .. string.format(L["SHARE_TASKS_FMT"], tasks))
+            f._attLbl:Show()
         end
         -- Re-measure content height after attachments shown/hidden
         C_Timer.After(0.05, function()
@@ -651,19 +585,17 @@ local function BuildShareWindow()
     shareHdr:SetText(L["SHARE_HDR"])
     y = y - 20
 
-    -- What to include dropdown
+    -- What to include: one checkbox per share group (ALL-179), three columns.
+    -- Title, body and rich mode always go, so they have no box.
     local ddLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     ddLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     ddLbl:SetTextColor(0.78, 0.78, 0.78)
     ddLbl:SetText(L["SHARE_INCLUDE"])
     y = y - 18
 
-    local useNativeDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
     local function RegenerateShareString()
         if not _shareNoteID then return end
-        local str, err = BNB.ShareEncode(_shareNoteID, _selOption)
+        local str, err = BNB.ShareEncode(_shareNoteID)
         if str and f._shareEB then
             f._shareEB:SetText(str)
         elseif f._shareEB then
@@ -671,51 +603,35 @@ local function BuildShareWindow()
         end
     end
 
-    if useNativeDD then
-        local dd = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
-        dd:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
-        dd:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
-        dd:SetHeight(26)
-        local function RebuildDD()
-            dd:SetupMenu(function(_, root)
-                for _, opt in ipairs(SHARE_OPTIONS) do
-                    local key = opt.key
-                    root:CreateRadio(L[opt.labelKey],
-                        function() return _selOption == key end,
-                        function()
-                            _selOption = key
-                            dd:GenerateMenu()
-                            RegenerateShareString()
-                        end)
-                end
-            end)
-        end
-        RebuildDD()
-        f._shareDD = dd
-        f._rebuildDD = RebuildDD
-    else
-        -- Fallback: cycling button
-        local function GetCurrentLabel()
-            for _, opt in ipairs(SHARE_OPTIONS) do
-                if opt.key == _selOption then return L[opt.labelKey] end
-            end
-            return L[SHARE_OPTIONS[1].labelKey]
-        end
-        local cycleBtn = BNB.CreateButton(nil, f, GetCurrentLabel(), CW, 24)
-        cycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
-        cycleBtn:SetScript("OnClick", function(self)
-            local idx = 1
-            for i, opt in ipairs(SHARE_OPTIONS) do
-                if opt.key == _selOption then idx = i; break end
-            end
-            idx = (idx % #SHARE_OPTIONS) + 1
-            _selOption = SHARE_OPTIONS[idx].key
-            self:SetText(L[SHARE_OPTIONS[idx].labelKey])
+    local COLS, ROW_H = 3, 24
+    local colW = CW / COLS
+    f._groupCbs = {}
+    for i, g in ipairs(BNB.SHARE_GROUPS) do
+        local col, row = (i - 1) % COLS, math.floor((i - 1) / COLS)
+        local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        cb:SetSize(24, 24)
+        cb:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 2 + col * colW, y - row * ROW_H + 2)
+        -- The label is part of the button, so a click on it ticks the box
+        cb:SetHitRectInsets(0, -(colW - 30), 0, 0)
+        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        lbl:SetWidth(colW - 30); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false)
+        lbl:SetText(L[g.label])
+        local key = g.key
+        cb:SetScript("OnClick", function(self)
+            SetShareGroup(key, self:GetChecked() and true or false)
             RegenerateShareString()
         end)
-        f._shareCycleBtn = cycleBtn
+        cb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L[g.label], 1, 0.82, 0)
+            GameTooltip:AddLine(L[g.tip], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        f._groupCbs[key] = cb
     end
-    y = y - 32
+    y = y - math.ceil(#BNB.SHARE_GROUPS / COLS) * ROW_H - 8
 
     -- Share string editbox
     local shareBg = BNB.CreateBackdropFrame("Frame", nil, f)
@@ -958,7 +874,7 @@ local function BuildShareWindow()
             return
         end
         if BNB.DS and BNB.DS.SendNote then
-            BNB.DS.SendNote(_shareNoteID, _selOption, target, function(chunks)
+            BNB.DS.SendNote(_shareNoteID, BNB.GetShareGroups(), target, function(chunks)
                 if f._dsStatus and f:IsShown() then
                     f._dsStatus:SetTextColor(0.40, 0.85, 0.45)
                     f._dsStatus:SetText(string.format(L["DS_STATUS_SENT"], target, chunks))
@@ -1076,15 +992,12 @@ function BNB.OpenShareWindow(noteID)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
 
     _shareNoteID = noteID
-    _selOption   = "basic"
 
     local f = BuildShareWindow()
 
-    -- Reset dropdown to default
-    if f._shareDD and f._rebuildDD then f._rebuildDD() end
-    if f._shareCycleBtn then
-        f._shareCycleBtn:SetText(L[SHARE_OPTIONS[1].labelKey])
-    end
+    -- The ticks are remembered between notes and sessions (ALL-179)
+    local groups = BNB.GetShareGroups()
+    for key, cb in pairs(f._groupCbs or {}) do cb:SetChecked(groups[key] == true) end
     -- Reset import field
     if f._importEB then
         f._importEB:SetText("")
@@ -1094,7 +1007,7 @@ function BNB.OpenShareWindow(noteID)
 
     -- Generate initial share string
     if noteID then
-        local str = BNB.ShareEncode(noteID, _selOption)
+        local str = BNB.ShareEncode(noteID)
         if str and f._shareEB then f._shareEB:SetText(str) end
     else
         if f._shareEB then f._shareEB:SetText("") end
@@ -1304,16 +1217,3 @@ function BNB.CloseImportWindow()
     BNB.CloseSharePreview()
     if _importFrame then _importFrame:Hide() end
 end
-
---------------------------------------------------------------------------------
--- DIRECT SEND INTERNALS EXPOSED
--- DirectSend.lua uses BNB's own Serialize/Deserialize for the BNB2 wire format.
--- These are the same functions used by ShareEncode/ShareDecode above; exposed
--- here so DirectSend.lua (loaded after this file) can reference them without
--- duplicating the implementation.
---------------------------------------------------------------------------------
-BNB.DS_Serialize         = Serialize
-BNB.DS_Deserialize       = Deserialize
-BNB.DS_SHARE_FIELDS      = SHARE_FIELDS
-BNB.DS_EncodeAttachments = EncodeAttachments
-BNB.DS_DecodeAttachments = DecodeAttachments

@@ -30,6 +30,8 @@ Locales\zhCN.lua
 Core\Database.lua
 Core\Events.lua
 Core\SlashCommands.lua
+Core\Json.lua
+Core\NoteFields.lua
 Core\NoteManager.lua
 Core\Initialize.lua
 

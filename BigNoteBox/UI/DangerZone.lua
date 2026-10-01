@@ -378,6 +378,9 @@ local function PopulateContent(ct, sf)
                 db.migrationDone     = {}
                 db.migrationDeclined = {}
             end
+            -- Where migrationDone lives since NOTES v7 (SV-06)
+            local ndb = BNB.NotesDB()
+            if ndb then ndb.migrationDone = {} end
             BNB:Print(L["DZ_MSG_MIGRATION_CLEARED"])
             C_Timer.After(0.5, function()
                 C_UI.Reload()

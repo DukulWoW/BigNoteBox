@@ -13,14 +13,24 @@ local L   = BNB.L
 --   ShowPopup()             -> shows the login popup
 --   ShowAddonPopup(key)     -> shows the per-addon confirm popup from Advanced tab
 --
--- SavedVariables flags (in BigNoteBoxDB):
---   migrationDone     = { NoteworthyII=true, ... }   set after successful run
---   migrationDeclined = { NoteworthyII=true, ... }   set when "Don't ask again" ticked
+-- SavedVariables flags:
+--   migrationDone     = { NoteworthyII=true, ... }   set after successful run,
+--                       in the notes DB (BNB.NotesDB()) since ALL-136.5 (SV-06)
+--   migrationDeclined = { NoteworthyII=true, ... }   set when "Don't ask again"
+--                       ticked, in BigNoteBoxDB (a preference)
 
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 
 BNB.Migration = BNB.Migration or {}
 local M = BNB.Migration
+
+-- Where migrationDone lives: the notes DB, next to the notes it describes.
+-- In the settings DB, "Reset settings" wiped it, the popup came back at the
+-- next login and accepting it imported every note a second time (SV-06).
+-- NOTES v7 (Core/Database.lua) copied the old settings flags over.
+local function MigrationState()
+    return BNB.NotesDB()
+end
 
 local ADDON_KEYS  = { "NoteworthyII", "TakeANote", "YetAnotherNotepad", "Notepad", "NotepadChar", "Notes", "TinyPad", "PurpleNotes", "SimpleNote", "QuickNotes", "OneWoWNotes", "MyNotepad", "AmmeNotepad" }
 local ADDON_NAMES = {
@@ -542,7 +552,7 @@ end
 
 -- ── Run migration ─────────────────────────────────────────────────────────────
 function M.Run(sel)
-    local db = BigNoteBoxDB
+    local db = MigrationState()
     db.migrationDone = db.migrationDone or {}
 
     if sel.NoteworthyII and Noteworthy_DB then
@@ -839,10 +849,11 @@ end
 
 function M.DetectAvailable()
     local db  = BigNoteBoxDB
+    local mig = MigrationState()
     local out = {}
     for _, k in ipairs(ADDON_KEYS) do
         if M.IsAddonAvailable(k) then
-            local done     = not M._debugForceAll and db.migrationDone     and db.migrationDone[k]
+            local done     = not M._debugForceAll and mig.migrationDone     and mig.migrationDone[k]
             local declined = not M._debugForceAll and db.migrationDeclined and db.migrationDeclined[k]
             if not done and not declined then
                 tinsert(out, k)

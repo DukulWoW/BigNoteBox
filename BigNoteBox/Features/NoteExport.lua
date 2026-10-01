@@ -7,194 +7,34 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 -- ── Export version — bump when the serialized format changes ─────────────────
+-- Markdown is still version 1. JSON is 2 since ALL-136.5: real JSON with
+-- nested tables (tasks), no null fields. Version 1 files still import.
 local EXPORT_VERSION = 1
+local JSON_VERSION   = 2
 
 -- ── Format constants ──────────────────────────────────────────────────────────
 local FMT_MARKDOWN = "markdown"
 local FMT_JSON     = "json"
 
--- ── Minimal JSON helpers (no library required) ────────────────────────────────
--- Handles only the types present in our note schema:
---   string, number, boolean, nil, array-of-strings, {r,g,b} color table.
--- Does NOT handle arbitrary nested tables — intentional.
+-- ── JSON note encoder ──────────────────────────────────────────────────────────
+-- Every backed-up field of the note schema (Core/NoteFields.lua), in schema
+-- order, nested tables included (tasks, alarm, gear lists), through the
+-- generic encoder in Core/Json.lua (ALL-136.5). The hand-written field list
+-- this replaced never wrote tasks, fontSize or the newer unit fields.
+local Json = BNB.Json
 
 local function JsonEscapeStr(s)
-    s = tostring(s)
-    s = s:gsub("\\", "\\\\")
-    s = s:gsub("\"", "\\\"")
-    s = s:gsub("\n", "\\n")
-    s = s:gsub("\r", "\\r")
-    s = s:gsub("\t", "\\t")
-    return "\"" .. s .. "\""
+    return Json.EncodeString(tostring(s))
 end
 
 local function JsonEncodeNote(note)
-    -- Encode tags array
-    local tagParts = {}
-    for _, t in ipairs(note.tags or {}) do
-        tagParts[#tagParts + 1] = JsonEscapeStr(t)
-    end
-    local tagsJson = "[" .. table.concat(tagParts, ",") .. "]"
-
-    -- Encode titleColor table or null
-    local colorJson
-    if note.titleColor then
-        colorJson = string.format("{\"r\":%.4f,\"g\":%.4f,\"b\":%.4f}",
-            note.titleColor.r or 1, note.titleColor.g or 1, note.titleColor.b or 1)
-    else
-        colorJson = "null"
-    end
-
-    -- Encode attachments array or null
-    local attJson
-    if note.attachments and #note.attachments > 0 then
-        local attParts = {}
-        for _, att in ipairs(note.attachments) do
-            if att.type == "item" or att.type == "spell" then
-                attParts[#attParts + 1] = string.format("{\"type\":\"%s\",\"id\":%d}", att.type, att.id)
-            end
+    local parts = {}
+    for _, def in ipairs(BNB.NOTE_FIELDS) do
+        local v = note[def.key]
+        if v ~= nil and not def.internal then
+            parts[#parts + 1] = JsonEscapeStr(def.key) .. ":" .. Json.Encode(v)
         end
-        attJson = "[" .. table.concat(attParts, ",") .. "]"
-    else
-        attJson = "null"
     end
-
-    -- Encode inspectGearItems array or null: [{id,slot,slotIdx}, ...]
-    local gearJson
-    if note.inspectGearItems and #note.inspectGearItems > 0 then
-        local gp = {}
-        for _, g in ipairs(note.inspectGearItems) do
-            gp[#gp + 1] = string.format("{\"id\":%d,\"slot\":%s,\"slotIdx\":%d}",
-                g.id or 0, JsonEscapeStr(g.slot or ""), g.slotIdx or 0)
-        end
-        gearJson = "[" .. table.concat(gp, ",") .. "]"
-    else
-        gearJson = "null"
-    end
-
-    -- Encode inspectTransmogItems array or null: [{id,slot,slotIdx,appearanceID}, ...]
-    local tmogJson
-    if note.inspectTransmogItems and #note.inspectTransmogItems > 0 then
-        local tp = {}
-        for _, t in ipairs(note.inspectTransmogItems) do
-            tp[#tp + 1] = string.format("{\"id\":%d,\"slot\":%s,\"slotIdx\":%d,\"appearanceID\":%d}",
-                t.id or 0, JsonEscapeStr(t.slot or ""), t.slotIdx or 0, t.appearanceID or 0)
-        end
-        tmogJson = "[" .. table.concat(tp, ",") .. "]"
-    else
-        tmogJson = "null"
-    end
-
-    -- Encode inspectTransmogAppearances object or null: {"slotIdx":appearanceID, ...}
-    local tmogAppJson
-    if note.inspectTransmogAppearances and next(note.inspectTransmogAppearances) then
-        local ap = {}
-        for slotIdx, appID in pairs(note.inspectTransmogAppearances) do
-            ap[#ap + 1] = string.format("\"%d\":%d", slotIdx, appID)
-        end
-        tmogAppJson = "{" .. table.concat(ap, ",") .. "}"
-    else
-        tmogAppJson = "null"
-    end
-
-    -- Encode alarm sub-object or null
-    local alarmJson
-    if note.alarm then
-        local a = note.alarm
-        local gc = a.glowColor
-        local glowColorJson = gc
-            and string.format("[%.4f,%.4f,%.4f,%.4f]", gc[1] or 0, gc[2] or 0, gc[3] or 0, gc[4] or 1)
-            or "null"
-        local function abool(v) if v == nil then return "null" end return v and "true" or "false" end
-        local function anum(v)  if v == nil then return "null" end return tostring(v) end
-        local function astr(v)  if v == nil then return "null" end return JsonEscapeStr(tostring(v)) end
-        -- recurDays is a list of day numbers, 1 = Mon .. 7 = Sun (AlarmWindow
-        -- saves the ticked days, AlarmManager matches them), e.g. [2,4].
-        -- It used to be written as seven true/false flags, which lost the days.
-        local recurDaysJson = "null"
-        if a.recurDays then
-            local dp = {}
-            for _, d in ipairs(a.recurDays) do
-                if type(d) == "number" then dp[#dp + 1] = tostring(d) end
-            end
-            recurDaysJson = "[" .. table.concat(dp, ",") .. "]"
-        end
-        alarmJson = string.format(
-            "{\"time\":%s,\"timeType\":%s,\"fired\":%s,\"snoozedUntil\":%s," ..
-            "\"recur\":%s,\"recurDays\":%s,\"recurEvery\":%s," ..
-            "\"label\":%s,\"sound\":%s,\"fireMode\":%s," ..
-            "\"combatMode\":%s,\"combatPost\":%s," ..
-            "\"snoozeEnabled\":%s,\"snoozeDefault\":%s,\"snoozeRepeat\":%s," ..
-            "\"soundRepeat\":%s,\"igTime\":%s," ..
-            "\"glowType\":%s,\"glowMode\":%s,\"glowColor\":%s," ..
-            "\"glowLines\":%s,\"glowFrequency\":%s,\"glowLength\":%s," ..
-            "\"glowParticles\":%s,\"glowScale\":%s,\"glowDuration\":%s}",
-            anum(a.time),        astr(a.timeType),    abool(a.fired),      anum(a.snoozedUntil),
-            astr(a.recur),       recurDaysJson,        anum(a.recurEvery),
-            astr(a.label),       astr(a.sound),        astr(a.fireMode),
-            astr(a.combatMode),  astr(a.combatPost),
-            abool(a.snoozeEnabled), anum(a.snoozeDefault), anum(a.snoozeRepeat),
-            anum(a.soundRepeat), astr(a.igTime),
-            anum(a.glowType),    astr(a.glowMode),     glowColorJson,
-            anum(a.glowLines),   anum(a.glowFrequency), anum(a.glowLength),
-            anum(a.glowParticles), anum(a.glowScale),  anum(a.glowDuration))
-    else
-        alarmJson = "null"
-    end
-
-    local function field(k, v)
-        if v == nil then return "\"" .. k .. "\":null" end
-        if type(v) == "boolean" then return "\"" .. k .. "\":" .. (v and "true" or "false") end
-        if type(v) == "number"  then return "\"" .. k .. "\":" .. tostring(v) end
-        return "\"" .. k .. "\":" .. JsonEscapeStr(v)
-    end
-
-    local parts = {
-        field("title",         note.title),
-        field("body",          note.body),
-        "\"tags\":"            .. tagsJson,
-        field("context",       note.context),
-        field("contextDisplay",note.contextDisplay),
-        field("contextLeave",  note.contextLeave),
-        field("pinned",        note.pinned or false),
-        field("favorited",     note.favorited),
-        field("locked",        note.locked),
-        field("icon",          note.icon),
-        "\"titleColor\":"      .. colorJson,
-        field("fontOverride",  note.fontOverride),
-        field("textAlign",     note.textAlign),
-        field("fontOutline",   note.fontOutline),
-        field("borderOverride",note.borderOverride),
-        field("borderScale",   note.borderScale),
-        field("borderOffset",  note.borderOffset),
-        field("borderBrightness", note.borderBrightness),
-        field("iconFrame",     note.iconFrame),
-        field("lineHeight",    note.lineHeight),
-        field("scope",         note.scope),
-        -- Waypoint: {mapID, x, y, label} table or null
-        "\"waypoint\":"        .. (note.waypoint and string.format(
-            "{\"mapID\":%d,\"x\":%.6f,\"y\":%.6f,\"label\":%s}",
-            note.waypoint.mapID or 0,
-            note.waypoint.x     or 0,
-            note.waypoint.y     or 0,
-            JsonEscapeStr(note.waypoint.label or "")) or "null"),
-        field("wpClearOnLeave",note.wpClearOnLeave),
-        field("richMode",      note.richMode),
-        field("iconSource",    note.iconSource),
-        field("source",        note.source),
-        field("targetNpcID",       note.targetNpcID),
-        field("targetPlayerKey",   note.targetPlayerKey),
-        field("targetIsPet",       note.targetIsPet),
-        field("inspectRaceID",     note.inspectRaceID),
-        field("inspectSexID",      note.inspectSexID),
-        field("created",       note.created),
-        field("updated",       note.updated),
-        "\"attachments\":"              .. attJson,
-        "\"inspectGearItems\":"         .. gearJson,
-        "\"inspectTransmogItems\":"     .. tmogJson,
-        "\"inspectTransmogAppearances\":" .. tmogAppJson,
-        "\"alarm\":"                    .. alarmJson,
-    }
     return "  {" .. table.concat(parts, ",") .. "}"
 end
 
@@ -789,7 +629,7 @@ end
 local function JsonEnvelope(noteParts)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
-        EXPORT_VERSION,
+        JSON_VERSION,
         JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
         #noteParts)
     return header .. table.concat(noteParts, ",\n") .. "\n]}"
@@ -854,24 +694,12 @@ end
 -- ── Deserialize — JSON ────────────────────────────────────────────────────────
 -- Returns array of raw note tables, or nil on failure.
 
-local function ParseJsonNotes(text)
-    -- A bare note object (the single-note export before ALL-136.2 wrote one)
-    -- is wrapped in the envelope so it imports like any other export
-    if not text:find("\"export_version\"") and text:find("^%s*{")
-        and text:find("\"title\"") and not text:find("\"notes\"%s*:%s*%[") then
-        text = "{\"export_version\":1,\"notes\":[" .. text .. "]}"
-    end
-    -- Quick sanity: must look like our envelope
-    if not text:find("\"export_version\"") then return nil end
-    if not text:find("\"notes\"") then return nil end
-
-    -- Check version
-    local expVer = tonumber(text:match("\"export_version\"%s*:%s*(%d+)"))
-    if not expVer then return nil end
-    if expVer > EXPORT_VERSION then
-        BNB:Print(string.format(L["BACKUP_IMPORT_VERSION_WARN"], expVer, EXPORT_VERSION))
-    end
-
+-- The regex reader every export before ALL-136.5 was read with, kept as the
+-- fallback for files the strict parser refuses: exports before ALL-136.3 wrote
+-- igTime unquoted ("igTime":09:30), which is not JSON. It counts braces
+-- without knowing about strings, so it can still trip over an unbalanced "{"
+-- in a body (BUG-17); the strict parser does not.
+local function ParseJsonNotesLegacy(text)
     local parsed = {}
 
     -- Extract each note object {...} from the notes array.
@@ -1069,6 +897,60 @@ local function ParseJsonNotes(text)
     return #parsed > 0 and parsed or nil
 end
 
+-- recurDays is a list of day numbers (1 = Mon .. 7 = Sun). Exports before
+-- ALL-136.2 wrote seven true/false flags, read as "flag i set = day i";
+-- before ALL-136.3 combatPost could be a boolean (= the default, dropped).
+local function FixOldAlarm(a)
+    if type(a) ~= "table" then return end
+    if type(a.recurDays) == "table" then
+        local days = {}
+        for i, d in ipairs(a.recurDays) do
+            if d == true then days[#days + 1] = i
+            elseif type(d) == "number" and d >= 1 and d <= 7 then days[#days + 1] = d end
+        end
+        a.recurDays = days
+    end
+    if a.combatPost ~= nil and type(a.combatPost) ~= "string" then a.combatPost = nil end
+    if a.igTime ~= nil and type(a.igTime) ~= "string" then a.igTime = nil end
+end
+
+-- Returns an array of note field tables, or nil when the text is not a BNB
+-- JSON export. Every note goes through BNB.CleanNoteFields, so only schema
+-- fields of the right type and shape come back. A note without a title stays
+-- in the list (title nil) so the import can count it as skipped (ALL-180).
+local function ParseJsonNotes(text)
+    -- A bare note object (the single-note export before ALL-136.2 wrote one)
+    -- is wrapped in the envelope so it imports like any other export
+    if not text:find("\"export_version\"") and text:find("^%s*{")
+        and text:find("\"title\"") and not text:find("\"notes\"%s*:%s*%[") then
+        text = "{\"export_version\":1,\"notes\":[" .. text .. "]}"
+    end
+    -- Quick sanity: must look like our envelope
+    if not text:find("\"export_version\"") then return nil end
+    if not text:find("\"notes\"") then return nil end
+
+    local expVer = tonumber(text:match("\"export_version\"%s*:%s*(%d+)"))
+    if not expVer then return nil end
+    if expVer > JSON_VERSION then
+        BNB:Print(string.format(L["BACKUP_IMPORT_VERSION_WARN"], expVer, JSON_VERSION))
+    end
+
+    local doc = Json.Decode(text)
+    local list = type(doc) == "table" and type(doc.notes) == "table" and doc.notes
+    if not list then list = ParseJsonNotesLegacy(text) end
+    if not list then return nil end
+
+    local parsed = {}
+    for _, raw in ipairs(list) do
+        if type(raw) == "table" then
+            local note = BNB.CleanNoteFields(raw)
+            FixOldAlarm(note.alarm)
+            parsed[#parsed + 1] = note
+        end
+    end
+    return #parsed > 0 and parsed or nil
+end
+
 -- ── Deserialize — Markdown ────────────────────────────────────────────────────
 
 local function ParseMarkdownNotes(text)
@@ -1193,67 +1075,93 @@ end
 
 -- ── Import notes into NoteManager ────────────────────────────────────────────
 
+-- One chat line after every backup import (ALL-180): how many came in, how
+-- many were skipped and why, and what they carried.
+local function ReportImport(count, total, stats)
+    local msg = string.format(L["IMPORT_REPORT"], count, total)
+    if total > count then
+        msg = msg .. " " .. string.format(L["IMPORT_REPORT_SKIPPED"], total - count)
+    end
+    if stats.tasks + stats.alarms + stats.attachments > 0 then
+        msg = msg .. " " .. string.format(L["IMPORT_REPORT_EXTRAS"],
+            stats.tasks, stats.alarms, stats.attachments)
+    end
+    BNB:Print("|cff66bb6a" .. msg .. "|r")
+end
+
+-- Creates one note per entry of noteList (from ParseJsonNotes or
+-- ParseMarkdownNotes) and returns how many it made. Every backed-up schema
+-- field comes along (Core/NoteFields.lua); the hand-written list this
+-- replaced dropped tasks and every field added after it.
+-- remapScope: if true, any note with scope "char:X" is rewritten to current char.
 local function ImportNotes(noteList, remapScope)
-    -- remapScope: if true, any note with scope "char:X" is rewritten to current char.
     if not noteList or #noteList == 0 then return 0 end
     local now = time()
     local count = 0
-    for _, src in ipairs(noteList) do
-        if src.title and src.title ~= "" then
-            local id = BNB.CreateNote(src.title, src.body or "")
-            -- Resolve scope: remap char-scoped notes to current char if requested
-            local resolvedScope = src.scope
-            if remapScope and resolvedScope and resolvedScope:find("^char:") then
-                resolvedScope = "char:" .. (BNB.currentChar or resolvedScope:sub(6))
+    local stats = { tasks = 0, alarms = 0, attachments = 0 }
+    for _, raw in ipairs(noteList) do
+        local src = BNB.CleanNoteFields(raw)
+        local id = src.title and src.title ~= "" and BNB.CreateNote(src.title, src.body or "")
+        if id then
+            local fields = {}
+            for k, v in pairs(src) do
+                if k ~= "title" and k ~= "body" then fields[k] = v end
             end
-            local fields = {
-                tags             = src.tags or {},
-                context          = src.context,
-                contextDisplay   = src.contextDisplay,
-                contextLeave     = src.contextLeave,
-                pinned           = src.pinned or false,
-                locked           = src.locked,
-                icon             = src.icon,
-                titleColor       = src.titleColor,
-                fontOverride     = src.fontOverride,
-                textAlign        = src.textAlign,
-                fontOutline      = src.fontOutline,
-                borderOverride   = src.borderOverride,
-                borderScale      = src.borderScale,
-                borderOffset     = src.borderOffset,
-                borderBrightness = src.borderBrightness,
-                iconFrame        = src.iconFrame,
-                lineHeight       = src.lineHeight,
-                scope            = resolvedScope,
-                waypoint         = src.waypoint,
-                wpClearOnLeave   = src.wpClearOnLeave,
-                richMode         = src.richMode,
-                iconSource       = src.iconSource,
-                source           = src.source,
-                targetNpcID      = src.targetNpcID,
-                targetPlayerKey  = src.targetPlayerKey,
-                targetIsPet      = src.targetIsPet,
-                inspectRaceID    = src.inspectRaceID,
-                inspectSexID     = src.inspectSexID,
-                inspectGearItems          = src.inspectGearItems,
-                inspectTransmogItems      = src.inspectTransmogItems,
-                inspectTransmogAppearances = src.inspectTransmogAppearances,
-                alarm            = src.alarm,
-                created          = src.created or now,
-                updated          = src.updated or now,
-            }
-            -- favorited: only set if truthy (nil-safe)
-            if src.favorited then fields.favorited = true end
-            -- attachments: only set if non-empty
-            if src.attachments and #src.attachments > 0 then
-                fields.attachments = src.attachments
+            -- Resolve scope: remap char-scoped notes to current char if requested.
+            -- No scope at all keeps the one CreateNote gave (the sidebar's).
+            if remapScope and fields.scope and fields.scope:find("^char:") then
+                fields.scope = "char:" .. (BNB.currentChar or fields.scope:sub(6))
             end
+            fields.tags    = fields.tags or {}
+            fields.pinned  = fields.pinned or false
+            fields.created = fields.created or now
             BNB.UpdateNote(id, fields)
+            -- UpdateNote stamps "updated" with now; a restore keeps the
+            -- backup's own edit time
+            local note = BNB.GetNote and BNB.GetNote(id)
+            if note and src.updated then note.updated = src.updated end
             count = count + 1
+            if src.tasks and #src.tasks > 0 then stats.tasks = stats.tasks + 1 end
+            if src.alarm then stats.alarms = stats.alarms + 1 end
+            if src.attachments and #src.attachments > 0 then stats.attachments = stats.attachments + 1 end
         end
     end
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    ReportImport(count, #noteList, stats)
     return count
+end
+
+-- The first character other than the current one that a note in the list is
+-- scoped to, or nil. Decides whether an import asks to remap scopes.
+function BNB.ForeignScopeChar(noteList)
+    for _, note in ipairs(noteList or {}) do
+        if type(note.scope) == "string" and note.scope:find("^char:") then
+            local charPart = note.scope:sub(6)
+            if charPart ~= (BNB.currentChar or "") then return charPart end
+        end
+    end
+end
+
+-- Multi-select "Export (N)" (BUG-12): the selected notes as one JSON export,
+-- in list order, in the same export window as Settings > Backup.
+function BNB.ExportMultiJSON(ids)
+    local ndb = BNB.NotesDB()
+    if not ndb or not ids or #ids == 0 then return end
+    local want = {}
+    for _, id in ipairs(ids) do want[id] = true end
+    local list = {}
+    for _, id in ipairs(ndb.noteOrder or {}) do
+        if want[id] and ndb.notes[id] then
+            list[#list + 1] = ndb.notes[id]
+            want[id] = nil
+        end
+    end
+    for id in pairs(want) do
+        if ndb.notes[id] then list[#list + 1] = ndb.notes[id] end
+    end
+    if #list > 0 and BNB.OpenExportWindow then
+        BNB.OpenExportWindow(JsonEncodeNotes(list))
+    end
 end
 
 -- Public wrapper so the BNB_IMPORT_SCOPE_REMAP popup callback (defined in

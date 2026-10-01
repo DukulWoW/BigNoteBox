@@ -244,12 +244,11 @@ end
 -- alarm (one reminder would ring twice). Everything else, including richMode,
 -- tasks, attachments and inspect data, is copied. The hand-written field lists
 -- this replaced each missed some (a rich note duplicated as a normal one).
-local COPY_SKIP = {
-    id = true, created = true, updated = true, updatedAt = true,
-    coordX = true, coordY = true, coordMapID = true, coordZone = true,
-    history = true, manualSnapshot = true, alarm = true,
-    lastOpened = true,
-}
+-- The set is the `nocopy` fields of the note schema (Core/NoteFields.lua).
+local COPY_SKIP = {}
+for _, def in ipairs(BNB.NOTE_FIELDS) do
+    if def.nocopy then COPY_SKIP[def.key] = true end
+end
 -- Shared with NoteHistory.lua (ALL-65.6), so a snapshot/restore skips the same
 -- identity/meta fields as a copy instead of keeping its own hand-written list.
 BNB.NOTE_COPY_SKIP = COPY_SKIP

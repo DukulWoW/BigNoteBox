@@ -20,16 +20,11 @@
 --   Each migration step is a guarded block:  if v < N then ... v = N end
 --   Always update the stored dbVersion at the end of the function.
 --
--- NOTE FIELD CATALOGUE (v1 — update this comment when fields are added/removed):
---   CORE:       id, title, body, tags, created, updated
---   BEHAVIOUR:  context, contextDisplay, contextLeave, pinned, favorited, locked
---   APPEARANCE: icon, titleColor, fontOverride, textAlign, fontOutline,
---               borderOverride, borderScale, borderOffset, lineHeight
---   ALARM:      alarm = { label, timeType, time, igTime, recur, recurDays,
---                         recurEvery, sound, combatMode, combatPost,
---                         snoozeDefault, glowType, glowColor, glowMode,
---                         showSticky, fired, snoozedUntil }
---   INTERNAL:   scope  ("global" | "char:Name-Realm"; not exported)
+-- NOTE FIELDS: the one list is Core/NoteFields.lua (BNB.NOTE_FIELDS, CMP-01).
+--   A new note field is one line there; copy, history, backup, share and
+--   every import read it.
+--
+-- NOTES DB ROOT: notes, noteOrder, trash, dbVersion, migrationDone (v7)
 --
 -- TRASH DB  (BigNoteBoxNotesDB.trash):
 --   Full note copy + deletedAt (unix timestamp). Purged after trashRetainDays days.
@@ -46,7 +41,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 6   -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 7   -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 16  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -247,6 +242,21 @@ function BNB.MigrateNotesDB()
             end
         end
         v = 6
+    end
+
+    -- ++ v6 -> v7: migrationDone moves to the notes DB (SV-06, ALL-136.5) +++++
+    -- It lived in BigNoteBoxDB, so "Reset settings" wiped it and the next
+    -- login offered (and imported) the same addon's notes again. The old
+    -- settings copy is left in place and no longer read.
+    if v < 7 then
+        local old = BigNoteBoxDB and BigNoteBoxDB.migrationDone
+        if type(old) == "table" then
+            ndb.migrationDone = ndb.migrationDone or {}
+            for k, done in pairs(old) do
+                if done then ndb.migrationDone[k] = true end
+            end
+        end
+        v = 7
     end
 
     -- Never lower the stored version: running an older build must not make the

@@ -2,25 +2,29 @@
 -- Direct addon-message note sharing between players.
 --
 -- Protocols supported:
---   BNB2  (send + receive)  — BNB-to-BNB direct send.
+--   BNB3  (send + receive)  — BNB-to-BNB direct send, LibSerialize payload
+--                             (ALL-136.5), the same one as a BNB2: share string.
+--   BNB2  (receive only)    — the old hand-made format, from players on
+--                             versions before ALL-136.5.
 --   TAN1  (receive only)    — TakeANote compatibility; incoming TAN notes/
 --                             categories are translated and queued as BNB notes.
 --
 -- Transport pipeline (send):
---   Build data table -> BNB.DS_Serialize -> CompressDeflate
+--   BNB.ShareBuildPayload -> BNB.ShareSerialize -> CompressDeflate
 --   -> EncodeForWoWAddonChannel -> chunk (180 chars, CHUNK_TICK intervals)
---   -> C_ChatInfo.SendAddonMessage("BNB2", chunk, "WHISPER", target)
+--   -> C_ChatInfo.SendAddonMessage("BNB3", chunk, "WHISPER", target)
 --
--- Transport pipeline (receive BNB2):
+-- Transport pipeline (receive BNB3 / BNB2):
 --   Reassemble chunks -> DecodeForWoWAddonChannel -> DecompressDeflate
---   -> BNB.DS_Deserialize -> queue -> incoming prompt -> BNB.OpenSharePreview
+--   -> BNB.ShareDeserialize (BNB3) / BNB.ShareReadV1 (BNB2)
+--   -> queue -> incoming prompt -> BNB.OpenSharePreview
 --
 -- Transport pipeline (receive TAN1):
 --   Reassemble chunks -> DecodeForWoWAddonChannel -> DecompressDeflate
 --   -> LibSerialize:Deserialize -> map fields -> queue -> prompt
 --
 -- Public API:
---   BNB.DS.SendNote(noteID, optionKey, targetName, onSent, onFail)
+--   BNB.DS.SendNote(noteID, groups, targetName, onSent, onFail)
 --   BNB.DS.IsAutoReject()
 
 local BNB = BigNoteBox
@@ -32,7 +36,8 @@ local DS = BNB.DS
 --------------------------------------------------------------------------------
 -- CONSTANTS
 --------------------------------------------------------------------------------
-local PREFIX_BNB   = "BNB2"
+local PREFIX_BNB   = "BNB3"
+local PREFIX_BNB_V1 = "BNB2"   -- old format, receive only
 local PREFIX_TAN   = "TAN1"
 local MAX_CHUNK    = 180     -- chars per SendAddonMessage call
 local CHUNK_TICK   = 0.35    -- seconds between chunk sends
@@ -120,12 +125,12 @@ end
 --------------------------------------------------------------------------------
 -- SEND NOTE
 -- noteID    : BNB note ID string
--- optionKey : "basic" | "refbox" | "tags" | "icon" | "everything"
+-- groups    : share groups to include, { tags = true, ... } (BNB.GetShareGroups)
 -- target    : player name (realm appended if missing)
 -- onSent(chunks) : called immediately after chunks are queued (fire-and-forget)
 -- onFail(err)    : called if encoding fails before queuing
 --------------------------------------------------------------------------------
-function DS.SendNote(noteID, optionKey, targetName, onSent, onFail)
+function DS.SendNote(noteID, groups, targetName, onSent, onFail)
     local function fail(msg)
         if onFail then onFail(msg) end
     end
@@ -143,17 +148,10 @@ function DS.SendNote(noteID, optionKey, targetName, onSent, onFail)
         return fail(L["DS_ERR_NO_TARGET"])
     end
 
-    -- Build data table (same logic as ShareEncode)
-    local fields = (BNB.DS_SHARE_FIELDS or {})[optionKey] or { "title", "body", "richMode" }
-    local data   = {}
-    for _, field in ipairs(fields) do
-        if field == "attachments" then
-            if note.attachments and #note.attachments > 0 and BNB.DS_EncodeAttachments then
-                data["_att"] = BNB.DS_EncodeAttachments(note.attachments)
-            end
-        elseif note[field] ~= nil then
-            data[field] = note[field]
-        end
+    -- Same payload as a share string (ShareNote.lua)
+    local payload = BNB.ShareBuildPayload and BNB.ShareBuildPayload(noteID, groups)
+    if not payload then
+        return fail(L["DS_ERR_NO_NOTE_DATA"])
     end
 
     -- Serialize + compress + encode
@@ -161,7 +159,7 @@ function DS.SendNote(noteID, optionKey, targetName, onSent, onFail)
     if not ld then
         return fail(L["DS_ERR_GENERIC"])
     end
-    local serialized = BNB.DS_Serialize and BNB.DS_Serialize(data)
+    local serialized = BNB.ShareSerialize(payload)
     if not serialized then
         return fail(L["DS_ERR_NO_NOTE_DATA"])
     end
@@ -206,22 +204,18 @@ local function CleanupIncoming()
     end
 end
 
--- Called when all chunks for a BNB2 message have arrived.
-local function HandleBNBPayload(encoded, sender)
+-- Called when all chunks for a BNB3 (or old BNB2) message have arrived.
+-- Both readers keep only share fields of the right type and shape.
+local function HandleBNBPayload(encoded, sender, oldFormat)
     local ld = GetDeflate()
     if not ld then return end
     local compressed = ld:DecodeForWoWAddonChannel(encoded)
     if not compressed then return end
     local serialized = ld:DecompressDeflate(compressed)
     if not serialized then return end
-    local data = BNB.DS_Deserialize and BNB.DS_Deserialize(serialized)
-    if not data or (not data.title and not data.body) then return end
-
-    -- Decode flat attachment string back into array (same as ShareDecode)
-    if data._att and BNB.DS_DecodeAttachments then
-        data.attachments = BNB.DS_DecodeAttachments(data._att)
-        data._att = nil
-    end
+    local data
+    if oldFormat then data = BNB.ShareReadV1(serialized) else data = BNB.ShareDeserialize(serialized) end
+    if not data then return end
 
     data._sender    = sender
     data._senderVia = "BNB"
@@ -333,7 +327,7 @@ end
 -- CHUNK ROUTER
 --------------------------------------------------------------------------------
 local function OnAddonMessage(prefix, msg, _, sender)
-    if prefix ~= PREFIX_BNB and prefix ~= PREFIX_TAN then return end
+    if prefix ~= PREFIX_BNB and prefix ~= PREFIX_BNB_V1 and prefix ~= PREFIX_TAN then return end
     if not msg or msg == "" then return end
 
     -- Ignore our own echoes
@@ -378,8 +372,8 @@ local function OnAddonMessage(prefix, msg, _, sender)
     end
     local full = table.concat(parts, "")
 
-    if prefix == PREFIX_BNB then
-        HandleBNBPayload(full, sender)
+    if prefix == PREFIX_BNB or prefix == PREFIX_BNB_V1 then
+        HandleBNBPayload(full, sender, prefix == PREFIX_BNB_V1)
     else
         HandleTANPayload(full, sender)
     end
@@ -565,6 +559,7 @@ evtFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
             C_ChatInfo.RegisterAddonMessagePrefix(PREFIX_BNB)
+            C_ChatInfo.RegisterAddonMessagePrefix(PREFIX_BNB_V1)
             C_ChatInfo.RegisterAddonMessagePrefix(PREFIX_TAN)
         end
     elseif event == "CHAT_MSG_ADDON" then
