@@ -29,11 +29,11 @@ local FadeFrame             = K.FadeFrame
 -- A standalone ButtonFrameTemplate window (same look as the main BNB window)
 -- that fades in (FadeFrame) when the user clicks "=" on a sticky.
 
-local SETTINGS_W = 264   -- matches NoteConfig NCW
+local SETTINGS_W = 290   -- matches NoteConfig NCW (the Reference Box width)
 -- Content starts just below the tab button bottoms (~y=-45 from frame top) + small pad
 local SETTINGS_TAB_CONTENT_Y = 62
 local SETTINGS_PAD = 12  -- matches NoteConfig PAD
-local SETTINGS_CW = 224  -- matches NoteConfig CW_SCROLL (NCW - PAD - 28)
+local SETTINGS_CW = SETTINGS_W - SETTINGS_PAD - 28  -- matches NoteConfig CW_SCROLL (NCW - PAD - 28)
 
 local _stickySettingsFrame = nil   -- single reusable settings window
 local _stickySettingsNoteID = nil  -- noteID it's currently editing

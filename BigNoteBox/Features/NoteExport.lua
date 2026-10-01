@@ -124,15 +124,17 @@ local function JsonEncodeNote(note)
             "\"recur\":%s,\"recurDays\":%s,\"recurEvery\":%s," ..
             "\"label\":%s,\"sound\":%s,\"fireMode\":%s," ..
             "\"combatMode\":%s,\"combatPost\":%s," ..
-            "\"snoozeEnabled\":%s,\"snoozeDefault\":%s,\"igTime\":%s," ..
+            "\"snoozeEnabled\":%s,\"snoozeDefault\":%s,\"snoozeRepeat\":%s," ..
+            "\"soundRepeat\":%s,\"igTime\":%s," ..
             "\"glowType\":%s,\"glowMode\":%s,\"glowColor\":%s," ..
             "\"glowLines\":%s,\"glowFrequency\":%s,\"glowLength\":%s," ..
             "\"glowParticles\":%s,\"glowScale\":%s,\"glowDuration\":%s}",
             anum(a.time),        astr(a.timeType),    abool(a.fired),      anum(a.snoozedUntil),
             astr(a.recur),       recurDaysJson,        anum(a.recurEvery),
             astr(a.label),       astr(a.sound),        astr(a.fireMode),
-            astr(a.combatMode),  abool(a.combatPost),
-            abool(a.snoozeEnabled), anum(a.snoozeDefault), anum(a.igTime),
+            astr(a.combatMode),  astr(a.combatPost),
+            abool(a.snoozeEnabled), anum(a.snoozeDefault), anum(a.snoozeRepeat),
+            anum(a.soundRepeat), astr(a.igTime),
             anum(a.glowType),    astr(a.glowMode),     glowColorJson,
             anum(a.glowLines),   anum(a.glowFrequency), anum(a.glowLength),
             anum(a.glowParticles), anum(a.glowScale),  anum(a.glowDuration))
@@ -1043,6 +1045,13 @@ local function ParseJsonNotes(text)
                     end
                 end
             end
+            -- Exports before ALL-136.3 wrote igTime unquoted ("igTime":09:30),
+            -- which the number pass reads as 9, and combatPost as true/false.
+            -- Read the time from the raw text; drop the boolean (= default).
+            if type(a.igTime) ~= "string" then
+                a.igTime = alarmRaw:match("\"igTime\"%s*:%s*(%d%d?:%d%d)")
+            end
+            if type(a.combatPost) ~= "string" then a.combatPost = nil end
             -- null cleanup for alarm
             for k in alarmRaw:gmatch("\"([^\"]+)\"%s*:%s*null") do a[k] = nil end
             if next(a) then note.alarm = a end

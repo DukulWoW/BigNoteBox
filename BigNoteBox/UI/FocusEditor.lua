@@ -103,7 +103,9 @@ local HideAfkOverlay  -- forward declaration (defined below)
 
 local function GetAfkOverlay()
     if _afkOverlay then return _afkOverlay end
-    local ov = CreateFrame("Frame", nil, UIParent)
+    -- On WorldFrame like the focus overlay: a child of UIParent is invisible
+    -- while "hide UI" has hidden it, which is when this overlay matters (BUG-10)
+    local ov = CreateFrame("Frame", nil, WorldFrame)
     ov:SetAllPoints(UIParent)
     ov:SetFrameStrata("FULLSCREEN_DIALOG")
     ov:SetFrameLevel(200)
@@ -1258,6 +1260,8 @@ function BNB.OpenFocusMode()
     -- Hide entire WoW UI if setting is enabled
     if BigNoteBoxDB and BigNoteBoxDB.focusHideUI then
         C_Timer.After(FADE_TIME, function()
+            -- UIParent:Hide() is blocked in combat, and combat can start inside the fade
+            if InCombatLockdown() then return end
             if focusFrame and focusFrame:IsShown() then
                 UIParent:Hide()
             end

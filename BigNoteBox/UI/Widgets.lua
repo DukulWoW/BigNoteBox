@@ -668,6 +668,125 @@ function BNB.CreateValueDropdown(parent, entries, initial, onChange, width, heig
     return c
 end
 
+-- Number field with a value list: a value dropdown whose text part is a
+-- typeable box (alarm hour/minute, ALL-136.3). Type a number, pick it from the
+-- arrow's list (every value from lo to hi), or turn the mouse wheel while the
+-- box has focus (wraps). Leaving the box clamps and pads the value to two
+-- digits; GetValue() reads the box as typed, so nothing needs confirming.
+-- opts: { onDirty, onTab(shift), onEnter } -- onTab moves focus, ":" counts as Tab;
+-- Enter always just leaves the box, onEnter runs after that.
+-- Returns a container with :GetValue() / :SetValue(n) / :SetRange(lo, hi) /
+-- :SetFieldWidth(w) and .eb (the EditBox).
+function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
+    opts = opts or {}
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetSize(width, height)
+
+    local dd, eb
+    if BNB.HasWowStyle1() then
+        dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+        dd:SetToplevel(true); dd:SetSize(width, height); dd:SetPoint("TOPLEFT")
+        -- The box shows the value; the template's own label stays empty
+        if dd.Text then dd.Text:SetAlpha(0) end
+        eb = CreateFrame("EditBox", nil, dd)
+        eb:SetPoint("TOPLEFT", dd, "TOPLEFT", 4, 0)
+        eb:SetPoint("BOTTOMRIGHT", dd, "BOTTOMRIGHT", -22, 0)  -- leave the arrow clickable
+        eb:SetFrameLevel(dd:GetFrameLevel() + 2)
+    else
+        local box = BNB.CreateBackdropFrame("Frame", nil, c)
+        box:SetAllPoints(); BNB.SetBackdropDark(box)
+        eb = CreateFrame("EditBox", nil, box)
+        eb:SetAllPoints()
+    end
+    eb:SetAutoFocus(false); eb:SetMaxLetters(3)
+    eb:SetFontObject("GameFontHighlightSmall"); eb:SetJustifyH("CENTER")
+    eb:SetTextInsets(6, 6, 0, 0)
+
+    local function Clamp(n)
+        n = math.floor(tonumber(n) or lo)
+        if n < lo then n = lo elseif n > hi then n = hi end
+        return n
+    end
+    function c:SetValue(n)
+        n = Clamp(n)
+        eb:SetText(string.format("%02d", n))
+        if dd then dd._selected = n end
+    end
+    function c:GetValue()
+        local t = eb:GetText():gsub("%D", "")
+        if t == "" then return dd and dd._selected or lo end
+        return Clamp(t)
+    end
+    c.eb = eb
+    -- Range and width can change after creation (12/24-hour clock)
+    function c:SetRange(a, b) lo, hi = a, b; c:SetValue(c:GetValue()) end
+    function c:SetFieldWidth(w)
+        c:SetWidth(w)
+        if dd then dd:SetWidth(w) end
+    end
+
+    -- Digits only, two at most; ":" or "." jumps to the next field like Tab
+    local function DigitsOnly(self)
+        local t = self:GetText()
+        local digits = t:gsub("%D", ""):sub(1, 2)
+        if digits ~= t then self:SetText(digits) end
+    end
+    eb:SetScript("OnChar", function(self, ch)
+        if ch == ":" or ch == "." then
+            DigitsOnly(self)
+            if opts.onTab then opts.onTab(false) end
+        end
+    end)
+    eb:SetScript("OnTextChanged", function(self, user)
+        if not user then return end
+        DigitsOnly(self)
+        if opts.onDirty then opts.onDirty() end
+    end)
+    eb:SetScript("OnEditFocusGained", function(self)
+        self:HighlightText()
+        self:EnableMouseWheel(true)
+    end)
+    eb:SetScript("OnEditFocusLost", function(self)
+        self:HighlightText(0, 0)
+        -- The wheel only steps while typing; otherwise it scrolls the page
+        self:EnableMouseWheel(false)
+        c:SetValue(c:GetValue())
+    end)
+    eb:SetScript("OnTabPressed", function()
+        if opts.onTab then opts.onTab(IsShiftKeyDown()) end
+    end)
+    eb:SetScript("OnEnterPressed", function(self)
+        self:ClearFocus()
+        if opts.onEnter then opts.onEnter() end
+    end)
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    eb:SetScript("OnMouseWheel", function(_, delta)
+        local n = c:GetValue() + (delta > 0 and 1 or -1)
+        if n > hi then n = lo elseif n < lo then n = hi end
+        c:SetValue(n)
+        if opts.onDirty then opts.onDirty() end
+    end)
+    eb:EnableMouseWheel(false)
+
+    if dd then
+        dd:SetupMenu(function(_, root)
+            local cur = c:GetValue()
+            for n = lo, hi do
+                root:CreateRadio(string.format("%02d", n),
+                    function() return cur == n end,
+                    function()
+                        c:SetValue(n)
+                        if opts.onDirty then opts.onDirty() end
+                    end)
+            end
+            if hi - lo + 1 > 20 then root:SetScrollMode(20 * 20) end
+        end)
+    end
+
+    c:SetValue(initial or lo)
+    return c
+end
+
 -- Scroll panel whose bar stays invisible (alpha, never Hide) until the
 -- content outgrows it. While it fits, the content frame widens to cwNoBar
 -- and takes the bar's space. The caller anchors sf (leave 24px on the right

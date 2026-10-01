@@ -16,6 +16,7 @@
 
 local BNB = BigNoteBox
 if not BNB then return end
+local L = BNB.L
 
 local LCG -- assigned after PLAYER_LOGIN once LibStub is available
 
@@ -29,6 +30,7 @@ local AM = BNB.Alarm
 -- CONSTANTS
 -- ---------------------------------------------------------------------------
 local TICK_INTERVAL   = 10      -- seconds between alarm checks
+local SOUND_REPEAT    = 10      -- alarm.soundRepeat nil: seconds between sound repeats while ringing
 local PULSE_ON        = 10      -- glow-on duration for "pulse" mode (seconds)
 local PULSE_OFF       = 10      -- glow-off duration for "pulse" mode (seconds)
 local ONCE_DURATION   = 10      -- glow duration for "once" mode (seconds)
@@ -52,11 +54,18 @@ local SOUND_CHANNEL   = "Master"
 local _glowTargets   = {}
 -- { [noteID] = { pulseTimer, mode, glowActive } } -- per-note glow state
 local _glowState     = {}
--- Alarms that fired during combat, queued for post-combat delivery
--- { { noteID, firedAt } }
+-- Alarms that fired during combat, queued for post-combat delivery { noteID, ... }
 local _combatQueue   = {}
--- Active popup note IDs (at most one visible popup per note; table for extensibility)
+-- Sticky/minimized alarms that fired in combat (SN.Open refuses there) { [noteID] = true }
+local _stickyAfterCombat = {}
+-- Alarms that fired and are not yet dismissed, snoozed or cleared. FireAlarm
+-- runs once per ring; Tick skips these (BUG-08, it re-fired every 10 s)
+local _ringing       = {}
+-- { [noteID] = ticker } repeating the sound while ringing (alarm.soundRepeat)
+local _nag           = {}
+-- Popup note IDs: on screen or waiting their turn in _popupQueue (one popup frame)
 local _activePopups  = {}
+local _popupQueue    = {}
 -- Alarms that fired in sticky/minimized mode and haven't been dismissed yet
 local _activeStickyAlarms = {}
 -- Accumulated offline-missed alarms shown in overview on login
@@ -84,11 +93,20 @@ local function Defaults()
         snoozeDefault = 5,
         glowType      = 2,
         glowColor     = { 0.400, 0.733, 0.416, 1.0 },
-        glowMode      = "pulse",
+        glowMode      = "continuous",
     }
 end
 
--- Safe wrapper around LibSharedMedia sound lookup
+-- The alarm window's own sounds (its Sound list). These were only known to
+-- the window's Test button: ringing went to LSM, which answered an unknown key
+-- with its silent "None" sound, so every one of them rang silent (ALL-136.3).
+local SOUND_DIR   = "Interface/AddOns/BigNoteBox/Assets/Sounds/"
+local SOUND_FILES = {}
+for i = 1, 10 do
+    SOUND_FILES[string.format("sound%02d", i)] = string.format("%ssound%02d.ogg", SOUND_DIR, i)
+end
+
+-- File path for an alarm sound key; nil for "silent"
 local function ResolveSoundPath(soundKey)
     if not soundKey or soundKey == "default" then
         return DEFAULT_SOUND
@@ -96,20 +114,51 @@ local function ResolveSoundPath(soundKey)
     if soundKey == "silent" then
         return nil
     end
-    -- Try LSM
+    if SOUND_FILES[soundKey] then return SOUND_FILES[soundKey] end
+    -- A LibSharedMedia sound; noDefault, so an unknown key is not LSM's silent default
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
     if LSM then
-        local path = LSM:Fetch("sound", soundKey)
+        local path = LSM:Fetch("sound", soundKey, true)
         if path then return path end
     end
     return DEFAULT_SOUND
 end
+AM.SoundPath = ResolveSoundPath
 
 local function PlayAlarmSound(alarm)
     local path = ResolveSoundPath(alarm and alarm.sound)
     if path then
         PlaySoundFile(path, SOUND_CHANNEL)
     end
+end
+
+-- The wall clock an alarm is set in: in-game alarms always read the server
+-- clock (ALL-104), real-time alarms follow the player's server-time setting.
+local function ClockDate(alarm, fmt, ts)
+    if alarm.timeType == "ingame" then return date(fmt, ts + BNB.ServerClockOffset()) end
+    return BNB.Date(fmt, ts)
+end
+local function ClockTime(alarm, t)
+    if alarm.timeType == "ingame" then return time(t) - BNB.ServerClockOffset() end
+    return BNB.Time(t)
+end
+
+-- Next time the server clock reads igTime ("HH:MM"), strictly after `after`
+-- (default now). nil for a missing or malformed igTime.
+function AM.NextInGameTime(igTime, after)
+    if type(igTime) ~= "string" then return nil end
+    local h, m = igTime:match("^(%d+):(%d+)$")
+    if not h then return nil end
+    after = after or time()
+    local off = BNB.ServerClockOffset()
+    local t = date("*t", after + off)
+    t.hour = tonumber(h); t.min = tonumber(m); t.sec = 0
+    local candidate = time(t) - off
+    if candidate <= after then
+        t.day = t.day + 1   -- tomorrow by the calendar, not +86400 (DST)
+        candidate = time(t) - off
+    end
+    return candidate
 end
 
 -- ---------------------------------------------------------------------------
@@ -123,17 +172,15 @@ local function NextRecurTime(alarm)
     local now = time()
 
     if r == "weekly" then
-        -- WoW weekly reset: next Tuesday 07:00 server time.
-        -- Local time unless the player chose server time (ALL-104).
-        local t = BNB.Date("*t", now)
-        -- days until next Tuesday (WOW_RESET_DOW=2 in 0-indexed Sun=0)
-        local dow = t.wday - 1  -- 0=Sun, 1=Mon, 2=Tue ...
-        local target = 2        -- Tuesday
-        local daysAhead = (target - dow + 7) % 7
-        if daysAhead == 0 then daysAhead = 7 end  -- next week if today is Tuesday
-        t.day  = t.day + daysAhead
-        t.hour = 7; t.min = 0; t.sec = 0
-        return BNB.Time(t)
+        -- WoW weekly reset, from the client's own reset clock: the region's
+        -- day and hour, no hard-coded Tuesday 07:00 (BUG-09)
+        local secs = C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset
+                     and C_DateAndTime.GetSecondsUntilWeeklyReset()
+        if not secs then return nil end
+        local nextReset = now + secs
+        -- Dismissed in the same minute as the reset: that one has fired, take the next
+        if nextReset <= now + 60 then nextReset = nextReset + 7 * 86400 end
+        return nextReset
 
     elseif r == "weekdays" then
         -- recurDays = {1,2,3,...} 1=Mon...7=Sun (mapped from Lua wday)
@@ -141,15 +188,15 @@ local function NextRecurTime(alarm)
         if not days or #days == 0 then return nil end
         -- Find the next weekday at the same HH:MM as original alarm
         -- Wall-clock maths in the clock the player set the alarm in (ALL-104)
-        local orig = BNB.Date("*t", alarm.time or now)
-        local t    = BNB.Date("*t", now)
+        local orig = ClockDate(alarm, "*t", alarm.time or now)
+        local t    = ClockDate(alarm, "*t", now)
         for offset = 1, 8 do
-            t.day = (BNB.Date("*t", now)).day + offset
-            local candidate = BNB.Time({
+            t.day = (ClockDate(alarm, "*t", now)).day + offset
+            local candidate = ClockTime(alarm, {
                 year=t.year, month=t.month, day=t.day,
                 hour=orig.hour, min=orig.min, sec=0
             })
-            local ct = BNB.Date("*t", candidate)
+            local ct = ClockDate(alarm, "*t", candidate)
             -- ct.wday: 1=Sun,2=Mon...7=Sat -> remap to 1=Mon..7=Sun
             local mapped = ct.wday == 1 and 7 or ct.wday - 1
             for _, d in ipairs(days) do
@@ -331,7 +378,7 @@ function AM.GlowStart(noteID)
     if not alarm then return end
 
     local def      = Defaults()
-    local mode     = alarm.glowMode or def.glowMode or "pulse"
+    local mode     = alarm.glowMode or def.glowMode or "continuous"
     local targets  = _glowTargets[noteID] or {}
 
     -- Cancel any existing glow timers
@@ -393,51 +440,106 @@ function AM.GlowStop(noteID)
 end
 
 -- ---------------------------------------------------------------------------
--- POPUP
+-- SOUND REPEAT ("nag")
+-- The sound repeats every alarm.soundRepeat seconds (nil = SOUND_REPEAT, 0 =
+-- once) until the alarm is answered. Was a side effect of the 10 s re-fire;
+-- kept as an option (Dukul, review question 1).
 -- ---------------------------------------------------------------------------
-local function ShowAlarmPopup(noteID, missedList)
-    -- missedList: optional table of {noteID} for multiple missed alarms
-    -- For now show popup for single noteID; overview window handles missed list
-    local note  = GetNote(noteID)
-    if not note then return end
-    local alarm = note.alarm
-    if not alarm then return end
-
-    if _activePopups[noteID] then return end  -- already showing
-    _activePopups[noteID] = true
-
-    -- Build a simple StaticPopup-style frame
-    -- We use a custom frame (not StaticPopup_Show) because we need a snooze dropdown
-    if BNB.AlarmPopup and BNB.AlarmPopup.Show then
-        BNB.AlarmPopup.Show(noteID, alarm, missedList)
+local function StopNag(noteID)
+    if _nag[noteID] then
+        _nag[noteID]:Cancel()
+        _nag[noteID] = nil
     end
 end
 
--- ---------------------------------------------------------------------------
--- FIRE ALARM
--- ---------------------------------------------------------------------------
-local function FireAlarm(noteID, offline)
+local function StartNag(noteID)
+    StopNag(noteID)
     local note  = GetNote(noteID)
-    if not note then return end
-    local alarm = note.alarm
+    local alarm = note and note.alarm
+    if not alarm or alarm.sound == "silent" then return end
+    local every = tonumber(alarm.soundRepeat) or SOUND_REPEAT
+    if every <= 0 then return end
+    _nag[noteID] = C_Timer.NewTicker(every, function()
+        local n = GetNote(noteID)
+        local a = n and n.alarm
+        if not a or not _ringing[noteID] then StopNag(noteID); return end
+        if InCombatLockdown() and a.combatMode == "queue" then return end
+        PlayAlarmSound(a)
+    end)
+end
+
+-- ---------------------------------------------------------------------------
+-- POPUP
+-- There is one popup frame. An alarm that fires while it shows another one
+-- waits in _popupQueue and gets the popup when that one is answered; it used to
+-- take the frame over and leave the first alarm ringing with no popup (ALL-136.3).
+-- ---------------------------------------------------------------------------
+local function ShowAlarmPopup(noteID)
+    local note  = GetNote(noteID)
+    local alarm = note and note.alarm
     if not alarm then return end
 
-    -- Sound (skip if silent, skip in combat if combatMode="queue")
-    local inCombat   = InCombatLockdown()
-    local combatWait = inCombat and alarm.combatMode == "queue"
+    if _activePopups[noteID] then return end  -- on screen or already queued
+    _activePopups[noteID] = true
 
-    if not combatWait then
-        PlayAlarmSound(alarm)
+    local AP = BNB.AlarmPopup
+    if AP and AP.IsShowingOther and AP.IsShowingOther(noteID) then
+        -- Quiet while it waits: its sound starts again with its popup
+        _popupQueue[#_popupQueue + 1] = noteID
+        StopNag(noteID)
+        return
+    end
+    -- A custom frame (not StaticPopup_Show) because we need a snooze dropdown
+    if AP and AP.Show then AP.Show(noteID, alarm) end
+end
+
+-- Deferred one frame: the popup's buttons hide the frame after Dismiss/Snooze return
+local function ShowNextPopup()
+    C_Timer.After(0, function()
+        local AP = BNB.AlarmPopup
+        if not (AP and AP.Show) then return end
+        if AP.IsShowingOther and AP.IsShowingOther(nil) then return end
+        while #_popupQueue > 0 do
+            local id    = table.remove(_popupQueue, 1)
+            local note  = GetNote(id)
+            local alarm = note and note.alarm
+            if _activePopups[id] and alarm then
+                AP.Show(id, alarm)
+                -- Its sound with its popup, not up to one repeat later
+                if not (InCombatLockdown() and alarm.combatMode == "queue") then
+                    PlayAlarmSound(alarm)
+                end
+                StartNag(id)
+                return
+            end
+        end
+    end)
+end
+
+-- ---------------------------------------------------------------------------
+-- DELIVER: show a ringing alarm the way its fire mode asks
+-- noPopup: login scan, which shows the popups itself after the missed list
+-- ---------------------------------------------------------------------------
+local function Deliver(noteID, noPopup)
+    local note  = GetNote(noteID)
+    local alarm = note and note.alarm
+    if not alarm then return end
+
+    local fireMode = alarm.fireMode or "popup"
+    -- Stickies live on UIParent: while it is hidden (Focus mode "hide UI",
+    -- Alt+Z) use the popup, which AP.Show puts on WorldFrame (BUG-10)
+    if fireMode ~= "popup" and not UIParent:IsShown() then fireMode = "popup" end
+
+    if fireMode ~= "popup" and InCombatLockdown() then
+        -- SN.Open refuses in combat (and printed STICKY_COMBAT every 10 s):
+        -- open it when combat ends. The note list row glows meanwhile.
+        _activeStickyAlarms[noteID] = true
+        _stickyAfterCombat[noteID] = true
+        AM.GlowStart(noteID)
+        return
     end
 
-    -- Mark alarm as active for all fire modes (used by sticky close to know when to dismiss)
-    -- popup mode: _activePopups is set by ShowAlarmPopup itself
-    -- sticky/minimized modes: use _activeStickyAlarms so the popup guard isn't tripped
-
-    -- Resolve fire mode (default = "popup")
-    local fireMode = alarm.fireMode or "popup"
-
-    -- Handle sticky modes — open/minimize the sticky note, then start glow on its icon.
+    -- Sticky modes: open/minimize the sticky note, then start glow on its icon.
     -- Glow must start AFTER the sticky frame exists, so we defer via C_Timer.After.
     if fireMode == "sticky" then
         _activeStickyAlarms[noteID] = true
@@ -445,7 +547,7 @@ local function FireAlarm(noteID, offline)
             BNB.Sticky.Open(noteID)
         end
         C_Timer.After(0.1, function()
-            AM.GlowStart(noteID)
+            if _ringing[noteID] then AM.GlowStart(noteID) end
         end)
     elseif fireMode == "minimized" then
         _activeStickyAlarms[noteID] = true
@@ -454,36 +556,70 @@ local function FireAlarm(noteID, offline)
         end
         -- Icon frame registered by EnsureMinimizedForAlarm after 0.05s; use 0.1s to be safe
         C_Timer.After(0.1, function()
-            AM.GlowStart(noteID)
+            if _ringing[noteID] then AM.GlowStart(noteID) end
         end)
     else
-        -- "popup" (default): glow fires immediately on popup frame
+        -- "popup" (default): glow on the note list row now, AP.Show adds the popup
         AM.GlowStart(noteID)
+        if not noPopup then ShowAlarmPopup(noteID) end
     end
+end
+
+-- ---------------------------------------------------------------------------
+-- FIRE ALARM
+-- Runs once per ring: Dismiss / Snooze / SetAlarm / ClearAlarm end it.
+-- ---------------------------------------------------------------------------
+local function FireAlarm(noteID, offline)
+    local note  = GetNote(noteID)
+    if not note then return end
+    local alarm = note.alarm
+    if not alarm then return end
+    if _ringing[noteID] then return end
+    _ringing[noteID] = true
+
+    -- Sound (skip if silent, skip in combat if combatMode="queue")
+    local combatWait = InCombatLockdown() and alarm.combatMode == "queue"
+    if not combatWait then
+        PlayAlarmSound(alarm)
+    end
+    StartNag(noteID)
 
     if combatWait then
-        table.insert(_combatQueue, { noteID = noteID, firedAt = time() })
+        -- One chat line now; glow on the note list row and an open sticky's
+        -- icon or tile; sound and popup or sticky come after combat
+        local now = time()
+        BNB:Print(string.format(L["ALARM_COMBAT_NOTICE"],
+            (note.title and note.title ~= "") and note.title or "?",
+            BNB.FmtDate(now) .. " " .. BNB.FmtClock(now)))
+        AM.GlowStart(noteID)
+        table.insert(_combatQueue, noteID)
         return
     end
 
+    Deliver(noteID, offline)
     if offline then
         table.insert(_missedOnLogin, noteID)
-        return
-    end
-
-    -- Show popup for "popup" mode; sticky modes handle their own display above
-    if fireMode == "popup" then
-        ShowAlarmPopup(noteID)
     end
 end
 
 -- ---------------------------------------------------------------------------
 -- DISMISS / SNOOZE / RESET
 -- ---------------------------------------------------------------------------
-function AM.Dismiss(noteID)
-    _activePopups[noteID] = nil
+-- Ends a ring: sound, glow, popup and the "active" flags. The popup frame is
+-- hidden when it shows this note (answered elsewhere: overview, sticky close).
+local function StopRinging(noteID)
+    _ringing[noteID]           = nil
+    _activePopups[noteID]      = nil
     _activeStickyAlarms[noteID] = nil
+    _stickyAfterCombat[noteID] = nil
+    StopNag(noteID)
     AM.GlowStop(noteID)
+    if BNB.AlarmPopup and BNB.AlarmPopup.HideFor then BNB.AlarmPopup.HideFor(noteID) end
+    ShowNextPopup()
+end
+
+function AM.Dismiss(noteID)
+    StopRinging(noteID)
 
     local note  = GetNote(noteID)
     local alarm = note and note.alarm
@@ -508,9 +644,7 @@ function AM.Dismiss(noteID)
 end
 
 function AM.Snooze(noteID, minutes)
-    _activePopups[noteID] = nil
-    _activeStickyAlarms[noteID] = nil
-    AM.GlowStop(noteID)
+    StopRinging(noteID)
 
     local note  = GetNote(noteID)
     local alarm = note and note.alarm
@@ -536,21 +670,26 @@ function AM.ResetFired(noteID)
     if not alarm then return end
     alarm.fired        = false
     alarm.snoozedUntil = nil
+    -- An in-game alarm re-arms for the next time the server clock reads its
+    -- HH:MM, not for the past due time (that would ring at once)
+    if alarm.timeType == "ingame" and (alarm.time or 0) <= time() then
+        alarm.time = AM.NextInGameTime(alarm.igTime)
+    end
     SaveAlarm(noteID, alarm)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
 function AM.SetAlarm(noteID, alarmData)
+    -- A ringing alarm that gets edited starts over from its new settings
+    if _ringing[noteID] then StopRinging(noteID) end
     SaveAlarm(noteID, alarmData)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
 function AM.ClearAlarm(noteID)
-    AM.GlowStop(noteID)
-    _activePopups[noteID] = nil
-    _activeStickyAlarms[noteID] = nil
+    StopRinging(noteID)
     SaveAlarm(noteID, nil)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
@@ -572,19 +711,12 @@ function AM.GetNextFireTime(noteID)
     if not alarm then return nil end
     if alarm.fired then return nil end
     if alarm.snoozedUntil then return alarm.snoozedUntil end
-    if alarm.timeType == "ingame" then
-        -- In-game time: convert today's HH:MM to a Unix timestamp
-        -- If the time has already passed today, return tomorrow's timestamp
-        -- HH:MM is server time, always (ALL-104; it was read as local time)
-        if not alarm.igTime then return nil end
-        local h, m = alarm.igTime:match("^(%d+):(%d+)$")
-        if not h then return nil end
-        local off = BNB.ServerClockOffset()
-        local t = date("*t", time() + off)
-        t.hour = tonumber(h); t.min = tonumber(m); t.sec = 0
-        local candidate = time(t) - off
-        if candidate <= time() then candidate = candidate + 86400 end
-        return candidate
+    if alarm.timeType == "ingame" and not alarm.time then
+        -- In-game alarms keep a concrete due time in alarm.time (BUG-04: the
+        -- next HH:MM was always in the future, so they never fired). Alarms
+        -- saved before ALL-136.3 have none yet: the next time the server
+        -- clock reads igTime. Written directly: runtime state, not an edit.
+        alarm.time = AM.NextInGameTime(alarm.igTime)
     end
     return alarm.time
 end
@@ -592,19 +724,14 @@ end
 -- ---------------------------------------------------------------------------
 -- TICK — checks all notes for due alarms
 -- ---------------------------------------------------------------------------
-local _lastTick = 0
-
 local function Tick()
     local now = time()
-    if now - _lastTick < TICK_INTERVAL then return end
-    _lastTick = now
-
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
     for noteID, note in pairs(ndb.notes) do
         local alarm = note.alarm
-        if alarm and not alarm.fired then
+        if alarm and not alarm.fired and not _ringing[noteID] then
             local fireAt = AM.GetNextFireTime(noteID)
             if fireAt and now >= fireAt then
                 FireAlarm(noteID, false)
@@ -617,18 +744,27 @@ end
 -- COMBAT EVENT HANDLERS
 -- ---------------------------------------------------------------------------
 local function OnCombatEnd()
+    -- Sticky/minimized alarms that fired in combat: open their stickies now
+    local stickies = _stickyAfterCombat
+    _stickyAfterCombat = {}
+    for id in pairs(stickies) do
+        if _ringing[id] then Deliver(id) end
+    end
+
     if #_combatQueue == 0 then return end
 
-    -- Collect unique notes that fired during combat
+    -- Collect unique notes that fired during combat and still ring
+    -- (one may have been dismissed from the overview in the meantime)
     local seen = {}
     local batch = {}
-    for _, entry in ipairs(_combatQueue) do
-        if not seen[entry.noteID] then
-            seen[entry.noteID] = true
-            table.insert(batch, entry.noteID)
+    for _, id in ipairs(_combatQueue) do
+        if not seen[id] and _ringing[id] then
+            seen[id] = true
+            table.insert(batch, id)
         end
     end
     _combatQueue = {}
+    if #batch == 0 then return end
 
     -- Determine post-combat delivery mode
     -- Use the first queued alarm's combatPost setting as representative
@@ -638,17 +774,11 @@ local function OnCombatEnd()
 
     if mode == "summary" then
         BNB:Print(string.format("[BNB] %d alarm(s) fired during combat.", #batch))
-        for _, id in ipairs(batch) do ShowAlarmPopup(id) end
-    elseif mode == "chat" then
-        -- Chat messages were shown during combat; now show popups
+        for _, id in ipairs(batch) do Deliver(id) end
+    else  -- "immediate" and "chat"
         for _, id in ipairs(batch) do
             PlayAlarmSound(GetNote(id) and GetNote(id).alarm)
-            ShowAlarmPopup(id)
-        end
-    else  -- "immediate"
-        for _, id in ipairs(batch) do
-            PlayAlarmSound(GetNote(id) and GetNote(id).alarm)
-            ShowAlarmPopup(id)
+            Deliver(id)
         end
     end
 end
@@ -696,19 +826,12 @@ function BNB.Alarm.Init()
         BNB:Print("[BNB] LibCustomGlow-1.0 not found. Alarm glow types Pixel/AutoCast/Proc unavailable.")
     end
 
-    -- OnUpdate ticker frame
-    local tickFrame = CreateFrame("Frame", "BNBAlarmTicker", UIParent)
-    local _elapsed  = 0
-    tickFrame:SetScript("OnUpdate", function(_, dt)
-        _elapsed = _elapsed + dt
-        if _elapsed >= TICK_INTERVAL then
-            _elapsed = 0
-            Tick()
-        end
-    end)
+    -- A timer, not a frame's OnUpdate: OnUpdate stops while UIParent is hidden
+    -- (Focus mode "hide UI", Alt+Z), and alarms must still ring then (BUG-10)
+    C_Timer.NewTicker(TICK_INTERVAL, Tick)
 
     -- Combat events
-    local combatFrame = CreateFrame("Frame", "BNBAlarmCombat")
+    local combatFrame = CreateFrame("Frame")
     combatFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
     combatFrame:SetScript("OnEvent", function(_, event)
         if event == "PLAYER_REGEN_ENABLED" then

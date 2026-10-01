@@ -210,8 +210,19 @@ function AP.Show(noteID, alarm, missedList)
         f:Hide()
     end)
 
+    -- While the UI is hidden (Focus mode "hide UI", Alt+Z) the popup goes on
+    -- WorldFrame, as the focus window does, so the alarm is still seen (BUG-10).
+    -- Above the focus window (FULLSCREEN_DIALOG) while Focus mode is open.
+    local parent = UIParent:IsShown() and UIParent or WorldFrame
+    if f:GetParent() ~= parent then
+        f:SetParent(parent)
+        f:SetScale(parent == WorldFrame and UIParent:GetScale() or 1)
+    end
+    local inFocus = BNB.IsFocusModeOpen and BNB.IsFocusModeOpen()
+    f:SetFrameStrata(inFocus and "FULLSCREEN_DIALOG" or "DIALOG")
+
     f:ClearAllPoints()
-    f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    f:SetPoint("CENTER", parent, "CENTER", 0, 60)
     f:Show()
     f:Raise()
 
@@ -229,6 +240,24 @@ function AP.Show(noteID, alarm, missedList)
         end
     end
     f._glowNoteID = noteID
+end
+
+-- True while the popup shows an alarm other than noteID (nil = any alarm).
+-- AlarmManager queues the next alarm instead of taking the frame over.
+function AP.IsShowingOther(noteID)
+    local f = _popupFrame
+    return f ~= nil and f:IsShown() and f._currentNoteID ~= noteID
+end
+
+-- Hide the popup if it shows noteID: the alarm was answered elsewhere
+-- (overview, sticky close, alarm edited or removed)
+function AP.HideFor(noteID)
+    local f = _popupFrame
+    if not (f and f:IsShown() and f._currentNoteID == noteID) then return end
+    if f._iconHost and BNB.Alarm and BNB.Alarm.UnregisterGlowTarget then
+        BNB.Alarm.UnregisterGlowTarget(f._glowNoteID, f._iconHost)
+    end
+    f:Hide()
 end
 
 -- ============================================================================

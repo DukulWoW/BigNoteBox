@@ -1026,10 +1026,20 @@ local function AcquireRow(parent)
     end)
     row._xBtn = xBtn
 
+    -- Lock in the X's place on a locked note: says why it cannot be removed
+    local lockTex = row:CreateTexture(nil, "OVERLAY")
+    lockTex:SetSize(12, 12)
+    lockTex:SetPoint("CENTER", xBtn, "CENTER", 0, 0)
+    lockTex:SetTexture(ASSETS .. BNB.AbIcon("lock"))
+    lockTex:SetAlpha(0.65)
+    lockTex:Hide()
+    row._lockTex = lockTex
+
     row:SetScript("OnEnter", function(self)
         local qr = self._qr or 0; local qg = self._qg or 0; local qb = self._qb or 0
         self:SetBackdropColor(qr*0.20+0.06, qg*0.20+0.06, qb*0.20+0.08, 0.90)
-        xBtn:SetAlpha(1)
+        -- No X on a row that cannot be removed (it showed, but did not work)
+        if not self._noX then xBtn:SetAlpha(1) end
         if self._att then ShowTooltip(self, self._att) end
     end)
     row:SetScript("OnLeave", function(self)
@@ -1110,9 +1120,11 @@ local function SetupRow(row, att, data, index, compact, locked)
     row._iconBorder:SetAlpha(alpha)
     row._nameLabel:SetAlpha(alpha)
     row._typeLabel:SetAlpha(alpha)
-    -- Hide X on locked rows (can't remove)
+    -- Locked rows: no X (can't remove), the lock icon in its place
     row._xBtn:SetAlpha(0)
     row._xBtn:EnableMouse(not locked)
+    row._noX = locked or nil
+    row._lockTex:SetShown(locked or false)
 
     if data then
         local qr, qg, qb = data.qr, data.qg, data.qb
@@ -1271,6 +1283,8 @@ RenderList = function()
         if isSubject then
             row._xBtn:SetAlpha(0)
             row._xBtn:EnableMouse(false)
+            row._noX = true
+            row._lockTex:Hide()
         end
 
         row:Show()

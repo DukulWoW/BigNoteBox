@@ -47,7 +47,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 6   -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 15  -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 16  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS
@@ -398,6 +398,16 @@ local function MigrateSettingsDB()
         v = 15
     end
 
+    if v < 16 then
+        -- Default alarm glow mode Pulse -> Continuous (ALL-136.3, Dukul). No
+        -- setting ever changed alarmDefaults, so "pulse" here is the old built-in
+        -- default, not a choice. Pulse picked on an alarm itself is kept.
+        if db.alarmDefaults and db.alarmDefaults.glowMode == "pulse" then
+            db.alarmDefaults.glowMode = "continuous"
+        end
+        v = 16
+    end
+
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)
     db.dbVersion = math.max(db.dbVersion or 1, SETTINGS_SCHEMA_VERSION)
 end
@@ -643,7 +653,7 @@ local function InitSettingsDB()
             snoozeDefault = 5,
             glowType      = 2,   -- 1=Pixel 2=AutoCast 3=Border 4=Proc
             glowColor     = { 0.400, 0.733, 0.416, 1.0 },
-            glowMode      = "pulse",  -- "continuous"|"pulse"|"once"
+            glowMode      = "continuous",  -- "continuous"|"pulse"|"once"
         }
     end
 

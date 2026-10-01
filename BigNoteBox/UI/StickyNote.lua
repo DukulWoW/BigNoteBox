@@ -891,6 +891,11 @@ local function CreateMiniTile(frame, noteID, note)
 
     tile:Hide()
     frame._miniTile = tile
+    -- A glow target from the start, like the icon: an alarm that rings while
+    -- the sticky is already minimized (in combat it cannot open one) shows here
+    if BNB.Alarm and BNB.Alarm.RegisterGlowTarget then
+        BNB.Alarm.RegisterGlowTarget(noteID, tile)
+    end
     return tile
 end
 

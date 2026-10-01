@@ -20,21 +20,21 @@ local AW = BNB.AlarmWindow
 -- ---------------------------------------------------------------------------
 -- LAYOUT
 -- ---------------------------------------------------------------------------
-local AW_W       = 264
-local AW_H       = 570   -- tall enough to avoid scrollbar on General tab
+local AW_W       = 290   -- same size as the Reference Box (Dukul 2026-10-01)
+local AW_H       = 640
 local AW_PAD     = 12
-local AW_CW      = 224   -- content width
+local AW_CW      = AW_W - 40   -- content width
 local AW_TAB_Y   = 62    -- top of tab content area
 local AW_FOOT_H  = 38    -- static footer height (Save / Delete)
 local AW_ROW     = 22
 local AW_GAP     = 8     -- increased gap between items
 local AW_LBL     = 14    -- section header height
 local AW_SECT_GAP = 12   -- gap between sections
+local SOUND_REPEAT_DEFAULT = 10  -- alarm.soundRepeat nil = every 10 s (AlarmManager SOUND_REPEAT)
 
 -- BNB green
 local BNB_GR, BNB_GG, BNB_GB = 0.400, 0.733, 0.416
 
-local DEFAULT_SOUND = "Interface/AddOns/BigNoteBox/Assets/Sounds/default.ogg"
 -- Keys, not resolved strings: this table is built at file load, before
 -- BigNoteBoxDB (and debugPseudoLocale) is restored, so caching L[...] results
 -- here would freeze them at their pre-SavedVariables value forever. Resolve
@@ -56,9 +56,9 @@ local _calYear, _calMonth, _calSelDay
 
 -- Widget refs
 local _labelEB, _timeDDCont, _realSection, _realTimeRow, _igSection
-local _igHourDD, _igMinDD, _hourDD, _minDD
+local _igTP, _realTP   -- hour/minute(/AM-PM) fields, see TimePair
 local _recurDD, _wdChecks, _wdRow, _ndaysEB, _ndaysRow
-local _soundDD, _glowTypeDD, _glowModeDD, _fireModeDD
+local _soundDD, _soundRepDD, _glowTypeDD, _glowModeDD, _fireModeDD
 local _snoozeEnableCB, _snoozeIntervalDD, _snoozeRepeatDD
 local _combatDD, _postDD
 local _saveBtn   -- ref so Populate can enable/disable it
@@ -88,23 +88,10 @@ local function SectionHdr(parent, text, y) return BNB.CreateSectionHeader(parent
 local function Lbl(parent, text, y)        return BNB.CreateSmallLabel(parent, text, y, AW_CW) end
 local function Div(parent, y)              BNB.CreateRule(parent, y, AW_CW) end
 
-local SOUND_FILES = {
-    sound01 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound01.ogg",
-    sound02 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound02.ogg",
-    sound03 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound03.ogg",
-    sound04 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound04.ogg",
-    sound05 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound05.ogg",
-    sound06 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound06.ogg",
-    sound07 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound07.ogg",
-    sound08 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound08.ogg",
-    sound09 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound09.ogg",
-    sound10 = "Interface/AddOns/BigNoteBox/Assets/Sounds/sound10.ogg",
-}
-
+-- The sound files live in AlarmManager (BNB.Alarm.SoundPath), which also
+-- rings the alarm: the Test button plays exactly what the alarm will
 local function SoundPath(key)
-    if not key or key == "default" then return DEFAULT_SOUND end
-    if key == "silent" then return nil end
-    return SOUND_FILES[key]
+    return BNB.Alarm and BNB.Alarm.SoundPath and BNB.Alarm.SoundPath(key)
 end
 
 -- ---------------------------------------------------------------------------
@@ -345,16 +332,54 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     -- Hour:Min (real-world)
     local realTimeRow = CreateFrame("Frame",nil,ct1)
     realTimeRow:SetSize(AW_CW,AW_ROW); realTimeRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
-    local hEntries,mEntries={},{}
-    for h=0,23 do table.insert(hEntries,{label=string.format("%02d",h),value=h}) end
-    for m=0,55,5 do table.insert(mEntries,{label=string.format("%02d",m),value=m}) end
-    local hw = math.floor(AW_CW/2)-6
-    local hourDD = MakeDD(realTimeRow,hEntries,9,nil,hw)
-    hourDD:SetPoint("LEFT",realTimeRow,"LEFT",0,0)
-    local cln = realTimeRow:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    cln:SetPoint("LEFT",realTimeRow,"LEFT",hw+4,0); cln:SetText(":")
-    local minDD = MakeDD(realTimeRow,mEntries,0,nil,hw)
-    minDD:SetPoint("LEFT",realTimeRow,"LEFT",hw+12,0)
+    -- Hour and minute are typeable fields with a value list (ALL-136.3):
+    -- Tab or ":" moves between them, Enter leaves the field, every minute
+    -- 00-59. With a 12-hour clock (Appearance > Timestamp format) the hour
+    -- runs 1-12 and an AM/PM field follows. tp:Set / tp:Get use 0-23 hours.
+    local function TimePair(row)
+        local tp = {}
+        local hBox, mBox
+        hBox = BNB.CreateNumberCombo(row,0,23,9,100,AW_ROW,{ onDirty=MarkDirty,
+            onTab=function() mBox.eb:SetFocus() end })
+        mBox = BNB.CreateNumberCombo(row,0,59,0,100,AW_ROW,{ onDirty=MarkDirty,
+            onTab=function() hBox.eb:SetFocus() end })
+        local cln = row:CreateFontString(nil,"OVERLAY","GameFontNormal"); cln:SetText(":")
+        local apDD = MakeDD(row,{ {label=L["AW_AM"],value="am"}, {label=L["AW_PM"],value="pm"} },"am",nil,
+            math.floor((AW_CW-20)/3))
+        local use24 = true
+        function tp:Layout()
+            local db = BigNoteBoxDB
+            local h, m = tp:Get()   -- in the old mode, before use24 changes
+            use24 = db == nil or db.use24Hour ~= false
+            local w = use24 and (math.floor(AW_CW/2)-6) or math.floor((AW_CW-20)/3)
+            hBox:SetFieldWidth(w); mBox:SetFieldWidth(w)
+            hBox:ClearAllPoints(); hBox:SetPoint("LEFT",row,"LEFT",0,0)
+            cln:ClearAllPoints();  cln:SetPoint("LEFT",row,"LEFT",w+4,0)
+            mBox:ClearAllPoints(); mBox:SetPoint("LEFT",row,"LEFT",w+12,0)
+            apDD:ClearAllPoints(); apDD:SetPoint("LEFT",row,"LEFT",w*2+20,0)
+            apDD:SetShown(not use24)
+            if use24 then hBox:SetRange(0,23) else hBox:SetRange(1,12) end
+            tp:Set(h, m)
+        end
+        function tp:Set(h, m)
+            h = tonumber(h) or 9
+            if use24 then
+                hBox:SetValue(h)
+            else
+                apDD:SetSelected(h >= 12 and "pm" or "am")
+                local h12 = h % 12; if h12 == 0 then h12 = 12 end
+                hBox:SetValue(h12)
+            end
+            mBox:SetValue(m or 0)
+        end
+        function tp:Get()
+            local h = hBox:GetValue()
+            if not use24 then h = h % 12 + (apDD:GetSelected() == "pm" and 12 or 0) end
+            return h, mBox:GetValue()
+        end
+        return tp
+    end
+    local realTP = TimePair(realTimeRow)
     y = y - AW_ROW - AW_GAP
 
     -- In-game time
@@ -373,10 +398,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
 
     local igRow = CreateFrame("Frame",nil,igSection)
     igRow:SetSize(AW_CW,AW_ROW); igRow:SetPoint("TOPLEFT",igSection,"TOPLEFT",0,-AW_LBL)
-    local igHourDD = MakeDD(igRow,hEntries,9,nil,hw); igHourDD:SetPoint("LEFT",igRow,"LEFT",0,0)
-    local igCln = igRow:CreateFontString(nil,"OVERLAY","GameFontNormal")
-    igCln:SetPoint("LEFT",igRow,"LEFT",hw+4,0); igCln:SetText(":")
-    local igMinDD = MakeDD(igRow,mEntries,0,nil,hw); igMinDD:SetPoint("LEFT",igRow,"LEFT",hw+12,0)
+    local igTP = TimePair(igRow)
 
     local function SetTimeType(v)
         local real=(v=="real" or not v)
@@ -479,6 +501,20 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     testSnd:SetScript("OnClick",function()
         local p=SoundPath(soundDD:GetSelected()); if p then PlaySoundFile(p,"Master") end
     end)
+    y = y - AW_ROW - AW_GAP
+
+    -- How often the sound repeats while the alarm rings (alarm.soundRepeat,
+    -- seconds; 0 = once; nil = every 10 s, the behaviour before ALL-136.3)
+    Lbl(ct1,L["AW_LBL_SOUND_REPEAT"],y); y = y - AW_LBL
+    local sndRepEntries={
+        {label=L["AW_SNDREP_ONCE"], value=0  },
+        {label=L["AW_SNDREP_10S"],  value=10 },
+        {label=L["AW_SNDREP_30S"],  value=30 },
+        {label=L["AW_SNDREP_1MIN"], value=60 },
+        {label=L["AW_SNDREP_5MIN"], value=300},
+    }
+    local soundRepDD = MakeDD(ct1,sndRepEntries,SOUND_REPEAT_DEFAULT,nil)
+    soundRepDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
     y = y - AW_ROW - 4
     ct1._contentH = math.abs(y)
 
@@ -829,16 +865,15 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     _realSection     = realSection
     _realTimeRow     = realTimeRow
     _igSection       = igSection
-    _igHourDD        = igHourDD
-    _igMinDD         = igMinDD
-    _hourDD          = hourDD
-    _minDD           = minDD
+    _igTP            = igTP
+    _realTP          = realTP
     _recurDD         = recurDD
     _wdChecks        = wdChecks
     _wdRow           = wdRow
     _ndaysEB         = ndEB
     _ndaysRow        = ndRow
     _soundDD         = soundDD
+    _soundRepDD      = soundRepDD
     _glowTypeDD      = glowTypeDD
     _glowModeDD      = glowModeDD
     -- _fireModeDD assigned below after Advanced tab builds it
@@ -872,19 +907,24 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         alarm.label=labelEB:GetRealText()
         if alarm.label=="" then alarm.label=nil end
 
+        local oldTT,oldTime,oldIg=alarm.timeType or "real",alarm.time,alarm.igTime
         local tt=timeDDCont:GetSelected() or "real"
         alarm.timeType=tt
         if tt=="ingame" then
-            alarm.igTime=string.format("%02d:%02d",
-                igHourDD:GetSelected() or 9,igMinDD:GetSelected() or 0)
-            alarm.time=nil
+            alarm.igTime=string.format("%02d:%02d",igTP:Get())
+            -- A concrete due time, the next time the server clock reads igTime
+            -- (BUG-04). Kept when only other settings changed.
+            if alarm.igTime~=oldIg or oldTT~="ingame" or not oldTime then
+                alarm.time=BNB.Alarm.NextInGameTime(alarm.igTime)
+            end
         else
             -- Read as server time when the player chose it (ALL-104)
+            local rh,rm=realTP:Get()
             alarm.time=BNB.Time({
                 year=_calYear or 2026,month=_calMonth or 1,
                 day=_calSelDay or 1,
-                hour=hourDD:GetSelected() or 9,
-                min=minDD:GetSelected() or 0,sec=0,
+                hour=rh,
+                min=rm,sec=0,
             })
             alarm.igTime=nil
         end
@@ -900,6 +940,8 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         else alarm.recurDays=nil; alarm.recurEvery=nil end
 
         alarm.sound         = soundDD:GetSelected()
+        local rep = soundRepDD:GetSelected()
+        alarm.soundRepeat   = (rep ~= SOUND_REPEAT_DEFAULT) and rep or nil
         local savedGlowType = glowTypeDD:GetSelected()
         alarm.glowType  = savedGlowType
         alarm.glowMode  = glowModeDD:GetSelected()
@@ -937,6 +979,15 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         alarm.combatMode    = combatDD:GetSelected()
         alarm.combatPost    = postDD:GetSelected()
         alarm.fired         = alarm.fired or false
+        -- A new time re-arms the alarm: an alarm that had fired stayed fired
+        -- after being moved to a future time (ALL-136.3). A stale snooze would
+        -- override the new time, so it goes too.
+        local moved = tt~=oldTT or (tt=="ingame" and alarm.igTime~=oldIg)
+                      or (tt~="ingame" and alarm.time~=oldTime)
+        if moved then
+            alarm.snoozedUntil = nil
+            if alarm.time and alarm.time > time() then alarm.fired = false end
+        end
 
         BNB.Alarm.SetAlarm(_noteID,alarm)
         AW.Close()
@@ -969,18 +1020,20 @@ local function Populate(noteID)
     local t = BNB.Date("*t", alarm.time)
     f._setCalDate(t.year, t.month, t.day)
     -- Always reset hour/min — explicit default 9:00 for new alarms
-    _hourDD:SetSelected(alarm.time and t.hour or 9)
-    _minDD:SetSelected(alarm.time and math.floor(t.min/5)*5 or 0)
+    -- A new alarm starts at the current time, in the clock the field uses
+    -- (local, or server with "use server time"); an existing one at its own
+    _realTP:Layout(); _igTP:Layout()   -- follows the 12/24-hour setting
+    _realTP:Set(t.hour, t.min)
     -- Always reset in-game time dropdowns
     if alarm.igTime then
         local h,m=alarm.igTime:match("^(%d+):(%d+)$")
         if h then
-            _igHourDD:SetSelected(tonumber(h))
-            _igMinDD:SetSelected(math.floor(tonumber(m)/5)*5)
+            _igTP:Set(tonumber(h), tonumber(m))
         end
     else
-        _igHourDD:SetSelected(9)
-        _igMinDD:SetSelected(0)
+        -- New in-game alarm: the current server time
+        local sh, sm = GetGameTime()
+        _igTP:Set(sh or 9, sm or 0)
     end
 
     _recurDD:SetSelected(alarm.recur); f._setRecur(alarm.recur)
@@ -995,6 +1048,7 @@ local function Populate(noteID)
     else _ndaysEB:SetText("7") end
 
     _soundDD:SetSelected(alarm.sound or "default")
+    _soundRepDD:SetSelected(alarm.soundRepeat or SOUND_REPEAT_DEFAULT)
     _glowTypeDD:SetSelected(alarm.glowType)
     _glowModeDD:SetSelected(alarm.glowMode)
     f._setGlowColor(alarm.glowColor)
@@ -1076,7 +1130,8 @@ function AW.OpenLeftOfMain(noteID)
     local f = DoOpen(noteID, nil, nil)
     f:ClearAllPoints()
     local mf = BNB.mainFrame
-    if mf then f:SetPoint("TOPRIGHT",mf,"TOPLEFT",-4,0)
+    -- Exactly where Note Settings opens (NoteConfig.lua: TOPRIGHT, -8, 0)
+    if mf then f:SetPoint("TOPRIGHT",mf,"TOPLEFT",-8,0)
     else       f:SetPoint("CENTER",UIParent,"CENTER",0,60) end
 end
 

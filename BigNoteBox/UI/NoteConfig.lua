@@ -13,7 +13,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
-local NCW     = 264
+local NCW     = 290   -- same width as the Reference Box (Dukul 2026-10-01)
 -- Tab buttons (PanelTopTabButtonTemplate) sit at y=-25, are ~20px tall, ending ~y=-45.
 -- TAB_CONTENT_Y = distance from frame top to content start.
 -- 60 (TITLE_H) - 25 (tab y-offset from top) + 20 (tab height) + 8 (padding) = 63
@@ -490,7 +490,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on.
     -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua.
-    -- CW_SCROLL (224px) used instead of CONTENT_W to match NoteConfig panel width.
+    -- CW_SCROLL (NCW - PAD - 28) used instead of CONTENT_W to match NoteConfig panel width.
     if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
        and BNB._BuildLSMFontDropdown then
         y = BNB._BuildLSMFontDropdown(panel, y,

@@ -28,11 +28,6 @@ local T = BNB.Task
 --------------------------------------------------------------------------------
 -- CONSTANTS
 --------------------------------------------------------------------------------
--- WoW weekly reset: Tuesday 07:00 UTC. Lua os.date %w: 0=Sun,1=Mon,2=Tue...
-local WEEKLY_RESET_DOW  = 2      -- Tuesday (0-indexed, Sun=0)
-local WEEKLY_RESET_HOUR = 7      -- 07:00 UTC
-local DAILY_RESET_HOUR  = 7      -- 07:00 UTC (matches WoW daily reset)
-
 -- Completion display colours
 local COLOR_DONE   = { r = 0.45, g = 0.45, b = 0.48 }  -- greyed text
 local COLOR_ACTIVE = { r = 1.00, g = 1.00, b = 1.00 }  -- normal text
@@ -234,17 +229,33 @@ function T.AddTask(noteID, text, parentID)
     return task.id
 end
 
+-- Every change to `completed` goes through these two. completedAt is when the
+-- task was checked: daily/weekly resets uncheck a task done before the last
+-- reset, "every N days" one done N days ago (ALL-136.3; lastReset alone made a
+-- task with no reset yet uncheck within a minute of being checked).
+local function SetDone(task)
+    if not task.completed then
+        task.completed   = true
+        task.completedAt = time()
+    end
+end
+
+local function SetUndone(task)
+    task.completed   = false
+    task.completedAt = nil
+end
+
 -- Clear a task's completed state with the ToggleTask propagation rules:
 -- a parent takes its sub-tasks along, a sub-task takes its parent.
 local function Uncomplete(noteID, task)
-    task.completed = false
+    SetUndone(task)
     if not task.parentID then
         for _, sub in ipairs(T.GetSubTasks(noteID, task.id)) do
-            sub.completed = false
+            SetUndone(sub)
         end
     else
         local parent = T.FindTask(noteID, task.parentID)
-        if parent then parent.completed = false end
+        if parent then SetUndone(parent) end
     end
 end
 
@@ -281,13 +292,13 @@ function T.ToggleTask(noteID, taskID)
 
     if not task.completed then
         -- ── Completing ───────────────────────────────────────────────────────
-        task.completed = true
+        SetDone(task)
 
         if not task.parentID then
             -- Parent: complete all sub-tasks first
             local subs = T.GetSubTasks(noteID, taskID)
             for _, sub in ipairs(subs) do
-                sub.completed = true
+                SetDone(sub)
             end
         end
 
@@ -318,7 +329,7 @@ function T.ToggleTask(noteID, taskID)
             end
             if allDone then
                 local parent = T.FindTask(noteID, task.parentID)
-                if parent then parent.completed = true end
+                if parent then SetDone(parent) end
             end
         end
 
@@ -378,7 +389,7 @@ function T.ClearCompleted(noteID)
     else
         -- Uncheck all completed tasks.
         for _, t in ipairs(tasks) do
-            if t.completed then t.completed = false end
+            if t.completed then SetUndone(t) end
         end
     end
 
@@ -433,43 +444,20 @@ end
 -- RESET LOGIC
 --------------------------------------------------------------------------------
 
--- Returns the UTC timestamp for the most recent weekly WoW reset before `now`.
-local function LastWeeklyReset(now)
-    local t = date("!*t", now)  -- UTC
-    -- Walk backwards from today to find the last Tuesday 07:00 UTC.
-    local dow = t.wday - 1  -- convert: Lua wday 1=Sun -> 0=Sun, 2=Mon -> 1, etc.
-    local daysSince = (dow - WEEKLY_RESET_DOW + 7) % 7
-    if daysSince == 0 and (t.hour < WEEKLY_RESET_HOUR or
-        (t.hour == WEEKLY_RESET_HOUR and t.min == 0 and t.sec == 0)) then
-        daysSince = 7
-    end
-    local resetDay = time({
-        year  = t.year,
-        month = t.month,
-        day   = t.day - daysSince,
-        hour  = WEEKLY_RESET_HOUR,
-        min   = 0,
-        sec   = 0,
-    })
-    return resetDay
+-- The most recent daily / weekly reset before `now`, from the client's own
+-- reset clock: the region's day and hour (BUG-09: a fixed Tuesday 07:00, read
+-- as UTC fields but built as local time, matched no region). Present on every
+-- client in the API dumps; nil only if the client has not got it yet.
+local function LastDailyReset(now)
+    local secs = C_DateAndTime and C_DateAndTime.GetSecondsUntilDailyReset
+                 and C_DateAndTime.GetSecondsUntilDailyReset()
+    return secs and (now + secs - 86400) or nil
 end
 
--- Returns the UTC timestamp for the most recent daily reset before `now`.
-local function LastDailyReset(now)
-    local t = date("!*t", now)  -- UTC
-    local resetToday = time({
-        year  = t.year,
-        month = t.month,
-        day   = t.day,
-        hour  = DAILY_RESET_HOUR,
-        min   = 0,
-        sec   = 0,
-    })
-    if now < resetToday then
-        -- Before today's reset -- use yesterday's.
-        return resetToday - 86400
-    end
-    return resetToday
+local function LastWeeklyReset(now)
+    local secs = C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset
+                 and C_DateAndTime.GetSecondsUntilWeeklyReset()
+    return secs and (now + secs - 7 * 86400) or nil
 end
 
 -- Check and apply resets for a single task. Returns true if the task was reset.
@@ -485,47 +473,42 @@ local function CheckTaskReset(task, now, noteTaskList)
         -- Explicit opt-out
         return false
     end
-    if not effectiveReset then return false end
+    if not effectiveReset or not task.completed then return false end
 
-    local lastReset = task.lastReset or 0
-
-    if effectiveReset == "daily" then
-        local resetTime = LastDailyReset(now)
-        if lastReset < resetTime and task.completed then
-            task.completed = false
-            task.lastReset = now
-            return true
-        end
-
-    elseif effectiveReset == "weekly" then
-        local resetTime = LastWeeklyReset(now)
-        if lastReset < resetTime and task.completed then
-            task.completed = false
-            task.lastReset = now
-            return true
-        end
-
-    elseif effectiveReset == "date" then
-        local rd = task.resetDate
-        if rd and now >= rd and lastReset < rd and task.completed then
-            task.completed = false
-            task.lastReset = now
-            task.resetType = nil
-            task.resetDate = nil
-            return true
-        end
-
-    elseif effectiveReset == "days" then
-        local every = task.resetEvery or 1
-        local nextReset = lastReset + (every * 86400)
-        if now >= nextReset and task.completed then
-            task.completed = false
-            task.lastReset = now
-            return true
-        end
+    local doneAt = task.completedAt
+    if not doneAt then
+        -- Checked before ALL-136.3, no stamp: count it as done now, so it stays
+        -- done until its next reset rather than unchecking at once
+        task.completedAt = now
+        return false
     end
 
-    return false
+    -- Due when it was checked before the last reset
+    local due = false
+    if effectiveReset == "daily" then
+        local r = LastDailyReset(now)
+        due = r ~= nil and doneAt < r
+    elseif effectiveReset == "weekly" then
+        local r = LastWeeklyReset(now)
+        due = r ~= nil and doneAt < r
+    elseif effectiveReset == "date" then
+        local rd = task.resetDate
+        due = rd ~= nil and now >= rd and doneAt < rd
+    elseif effectiveReset == "days" then
+        -- N days after it was checked
+        due = now >= doneAt + (task.resetEvery or 1) * 86400
+    end
+    if not due then return false end
+
+    task.completed   = false
+    task.completedAt = nil
+    task.lastReset   = now
+    if effectiveReset == "date" then
+        -- A one-off date reset is used up
+        task.resetType = nil
+        task.resetDate = nil
+    end
+    return true
 end
 
 -- Called on PLAYER_LOGIN and by the daily ticker. Iterates all notes' tasks.
