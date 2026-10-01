@@ -165,7 +165,34 @@ local function BuildQuickNotePage(sf, ct, y, page)
 
     -- Moved from Advanced > Keybindings (ALL-84): the key belongs to this module.
     y = MakeKeybindRow(ct, y, L["CFG_KB_QUICK_NOTE"],
-        "BIGNOTEBOXQUICKNOTE", L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_QUICK_NOTE"])
+        "BIGNOTEBOXQUICKNOTE", "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F7") .. ")", L["CFG_KB_DESC_QUICK_NOTE"])
+
+    -- Where the quick-note key puts the new note; nil = main window
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_QN_KEY_MODE_LABEL"])
+        y = y - (ROW_H + 2)
+
+        local entries = {
+            { label = L["CFG_QN_KEY_MODE_MAIN"],   value = "main" },
+            { label = L["CFG_QN_KEY_MODE_STICKY"], value = "sticky" },
+        }
+        local dd = BNB.CreateValueDropdown(ct, entries, db.quickNoteKeyMode or "main",
+            function(v) db.quickNoteKeyMode = (v == "sticky") and v or nil end,
+            CONTENT_W, 26)
+        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        local tipOwner = dd._dd or dd
+        tipOwner:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_QN_KEY_MODE_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_QN_KEY_MODE_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - (32 + ROW_GAP)
+    end
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 

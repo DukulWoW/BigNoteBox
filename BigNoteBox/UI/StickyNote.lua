@@ -1447,6 +1447,26 @@ local function EndInlineEdit(f)
 
     local note = BNB.GetNote(noteID)
     local text = eb:GetText() or ""
+    -- A quick-note sticky (SN.OpenQuick) left empty on its first edit is
+    -- removed outright: no trash, no note list entry. Deferred a tick when
+    -- SN.Close is what ended the edit, so the purge's own Close cannot nest
+    -- inside it; at logout there is no next tick, so it runs now.
+    if f._quickNew then
+        f._quickNew = nil
+        if note and text:match("^%s*$") then
+            local function Purge()
+                if not BNB.GetNote(noteID) then return end
+                BNB.PurgeNote(noteID)
+                local db = DB()
+                if db and db.postits then db.postits[noteID] = nil end
+                if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then
+                    pcall(BNB.RefreshNoteList)
+                end
+            end
+            if f._loggingOut then Purge() else C_Timer.After(0, Purge) end
+            return
+        end
+    end
     if not note or text == (note.body or "") then return end
     BNB.UpdateNote(noteID, { body = text })
     -- Keep the main window in step when it holds this note
@@ -1506,7 +1526,10 @@ pcall(_editWatch.RegisterEvent, _editWatch, "GLOBAL_MOUSE_DOWN")
 -- Logout saves any edit still open. Through BNB.RegisterEvent so it runs
 -- before NoteHistory's logout snapshot, which then holds the new text.
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
-    for _, f in pairs(openFrames) do pcall(EndInlineEdit, f) end
+    for _, f in pairs(openFrames) do
+        f._loggingOut = true
+        pcall(EndInlineEdit, f)
+    end
 end)
 
 -- ── Build a sticky note frame ─────────────────────────────────────────────────
@@ -2434,6 +2457,39 @@ function SN.Open(noteID, noESCOpen)
     end
     local rec = StickyDB()[noteID]
     if rec and rec.minimized then SN.SetMinimized(noteID, true) end
+end
+
+-- Quick-note key in sticky mode (BigNoteBoxDB.quickNoteKeyMode == "sticky"):
+-- opens a new note as a sticky at screen centre, each further open sticky
+-- offset down-right, and starts an inline edit. Returns false, with nothing
+-- opened, when the sticky cannot be typed in (inline edit off, rich or locked
+-- note) or the sticky limit is reached ("max" as the second value); the caller
+-- then uses the main window.
+function SN.OpenQuick(noteID)
+    local note = BNB.GetNote(noteID)
+    if not note or InCombatLockdown() then return false end
+    local db = DB()
+    if db and db.stickyInlineEdit == false then return false end
+    if (BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)) or StickyNoteIsLocked(note) then
+        return false
+    end
+    local max = db and db.stickyMaxCount or MAX_NOTES
+    if CountOpen() >= max then return false, "max" end
+
+    local off = CountOpen() * 26
+    local cfg = GetCfg(noteID)
+    cfg.escOnly = false   -- a note to type in now, never an ESC-screen sticky
+    SaveCfg(noteID, cfg)
+    SN.Open(noteID)
+    local f = openFrames[noteID]
+    if not f then return false end
+    f:ClearAllPoints()
+    f:SetPoint("CENTER", UIParent, "CENTER", off, -off)
+    SaveGeometry(noteID, f)
+    f._quickNew = true
+    StartInlineEdit(f)
+    if not f._inlineEditing then f._quickNew = nil end
+    return true
 end
 
 function SN.Close(noteID)

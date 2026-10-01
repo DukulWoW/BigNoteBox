@@ -96,7 +96,7 @@ local function BuildNotesTab(sf, ct)
 
     -- Moved from Advanced > Keybindings (ALL-84)
     y = MakeKeybindRow(ct, y, L["CFG_KB_NEW_NOTE"],
-        "BIGNOTEBOXNEWNOTE",   L["CFG_KB_HINT_UNBOUND"], L["CFG_KB_DESC_NEW_NOTE"])
+        "BIGNOTEBOXNEWNOTE",   "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F8") .. ")", L["CFG_KB_DESC_NEW_NOTE"])
 
     y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
         function() return db.lockNotes == true end,

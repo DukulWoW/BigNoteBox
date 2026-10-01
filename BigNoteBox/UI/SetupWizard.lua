@@ -1051,11 +1051,11 @@ local function BuildPage5(content)
 
     local KEYBINDS = {
         { action="BIGNOTEBOXOPEN",         label=L["SW_KB_OPEN"],         hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-N") },
-        { action="BIGNOTEBOXQUICKNOTE",    label=L["SW_KB_QUICKNOTE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
-        { action="BIGNOTEBOXNEWNOTE",      label=L["SW_KB_NEWNOTE"],          hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXQUICKNOTE",    label=L["SW_KB_QUICKNOTE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], "F7") },
+        { action="BIGNOTEBOXNEWNOTE",      label=L["SW_KB_NEWNOTE"],          hint=string.format(L["SW_KB_DEFAULT_FMT"], "F8") },
         { action="BIGNOTEBOXHIDESTICKIES", label=L["SW_KB_HIDESTICKIES"], hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-H") },
         { action="BIGNOTEBOXTOGGLERV",     label=L["SW_KB_RICHEDITOR"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
-        { action="BIGNOTEBOXNOTEONTARGET", label=L["SW_KB_TARGETNOTE"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], L["SW_KB_NONE"]) },
+        { action="BIGNOTEBOXNOTEONTARGET", label=L["SW_KB_TARGETNOTE"],    hint=string.format(L["SW_KB_DEFAULT_FMT"], "F6") },
         { action="BIGNOTEBOXORACLE",       label=L["SW_KB_ORACLE"],        hint=string.format(L["SW_KB_DEFAULT_FMT"], "CTRL-SPACE") },
     }
 

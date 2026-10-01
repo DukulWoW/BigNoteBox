@@ -756,6 +756,18 @@ end
 -- Returns the container frame.  container.Slider is the raw Slider widget.
 -- container:SetValue(n) — programmatic set.
 --------------------------------------------------------------------------------
+-- No mouse wheel on a slider: the wheel scrolls the page (Dukul 2026-09-28).
+-- MinimalSliderWithSteppersTemplate takes the wheel itself (inner Slider and
+-- the stepper arrows), so leaving out our own OnMouseWheel is not enough.
+-- With the wheel off, the event falls through to the scroll frame below.
+local function NoSliderWheel(frame)
+    pcall(frame.EnableMouseWheel, frame, false)
+    if frame.HasScript and frame:HasScript("OnMouseWheel") then
+        pcall(frame.SetScript, frame, "OnMouseWheel", nil)
+    end
+    for _, child in ipairs({ frame:GetChildren() }) do NoSliderWheel(child) end
+end
+
 function BNB.CreateSlider(parent, label, mn, mx, cur, def, onChange, fmt)
     local h = CreateFrame("Frame", nil, parent)
     h:SetHeight(36)
@@ -795,7 +807,7 @@ function BNB.CreateSlider(parent, label, mn, mx, cur, def, onChange, fmt)
             if onChange then onChange(trackedVal) end
         end)
 
-    -- No mouse wheel: the wheel scrolls the page, never a slider (Dukul 2026-09-28)
+    NoSliderWheel(sl)
 
     h.Slider = sl
     function h:SetValue(v)
@@ -886,6 +898,7 @@ function BNB.CreateStackedSlider(parent, width, o)
     sl:SetHeight(20)
     local cur = Snap(o.value)
     sl:Init(cur, o.min, o.max, math.floor((o.max - o.min) / step + 0.5))
+    NoSliderWheel(sl)
 
     local enabled, muted = true, false
     local function Sync()
@@ -986,7 +999,7 @@ function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, 
             end
         end)
 
-    -- No mouse wheel: the wheel scrolls the page, never a slider (Dukul 2026-09-28)
+    NoSliderWheel(sl)
 
     h.Slider = sl
     h.Label  = lbl   -- for callers that re-lay the row (UI/Config/Appearance.lua)

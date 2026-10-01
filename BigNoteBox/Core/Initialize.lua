@@ -259,6 +259,9 @@ function BNB.Initialize()
     -- 11e. Report-a-bug button outside the main window (ALL-73)
     if BNB.AttachBugButton then pcall(BNB.AttachBugButton) end
 
+    -- 11f. Default keys for players whose bindings predate them (once)
+    pcall(BNB.ApplyDefaultKeys)
+
     -- 12. First-time setup wizard
     -- Show if setupComplete is not true. Suppresses openOnLogin during setup
     -- so the wizard is the first thing the player sees.
@@ -278,6 +281,45 @@ function BNB.Initialize()
     end
 
     BNB._initialized = true
+end
+
+--------------------------------------------------------------------------------
+-- DEFAULT KEYS FOR EXISTING PLAYERS
+-- Bindings.xml defaults reach only a fresh binding set or "Reset to Default",
+-- so a player with saved bindings would never get them. Once per account,
+-- each key goes to its action when the action has no key and the key is
+-- free; the player's own bindings are never touched. SetBinding is blocked
+-- in combat, so a combat login waits for combat to end.
+--------------------------------------------------------------------------------
+local DEFAULT_KEYS_VERSION = 1
+local DEFAULT_KEYS = {
+    { "BIGNOTEBOXNOTEONTARGET", "F6" },
+    { "BIGNOTEBOXQUICKNOTE",    "F7" },
+    { "BIGNOTEBOXNEWNOTE",      "F8" },
+}
+
+function BNB.ApplyDefaultKeys()
+    local db = BigNoteBoxDB
+    if not db or (db.defaultKeysVersion or 0) >= DEFAULT_KEYS_VERSION then return end
+    if InCombatLockdown() then
+        local w = CreateFrame("Frame")
+        w:RegisterEvent("PLAYER_REGEN_ENABLED")
+        w:SetScript("OnEvent", function(self)
+            self:UnregisterAllEvents()
+            pcall(BNB.ApplyDefaultKeys)
+        end)
+        return
+    end
+    local changed = false
+    for _, d in ipairs(DEFAULT_KEYS) do
+        local action, key = d[1], d[2]
+        local cur = GetBindingAction(key)
+        if not GetBindingKey(action) and (cur == nil or cur == "") then
+            if SetBinding(key, action) then changed = true end
+        end
+    end
+    if changed then SaveBindings(GetCurrentBindingSet()) end
+    db.defaultKeysVersion = DEFAULT_KEYS_VERSION
 end
 
 --------------------------------------------------------------------------------
@@ -308,6 +350,21 @@ function BNB_KeybindQuickNote()
     local id = BNB.CreateNote and BNB.CreateNote(title)
     if not id then return end
     BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04" })
+    -- Sticky mode: the note opens as a sticky to type in. When that cannot
+    -- happen it opens in the main window as before; a full sticky set says so.
+    local db = BigNoteBoxDB
+    if db and db.quickNoteKeyMode == "sticky" and BNB.Sticky and BNB.Sticky.OpenQuick then
+        local ok, why = BNB.Sticky.OpenQuick(id)
+        if ok then
+            if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then BNB.RefreshNoteList() end
+            return
+        end
+        if why == "max" then
+            local msg = string.format(L["QN_KEY_STICKY_MAX"], db.stickyMaxCount or 10)
+            if UIErrorsFrame then UIErrorsFrame:AddMessage(msg, 1.0, 0.82, 0.0, 1.0) end
+            BNB:Print(msg)
+        end
+    end
     if not BNB.mainFrame then if BNB.OpenMainWindow then BNB.OpenMainWindow() elseif BNB.CreateMainWindow then BNB.CreateMainWindow() end end
     if BNB.mainFrame and not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end

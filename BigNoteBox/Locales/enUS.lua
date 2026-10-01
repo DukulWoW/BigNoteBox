@@ -1105,6 +1105,11 @@ L["CFG_KB_OPEN_BNB"]        = "Open / close BigNoteBox:"
 -- ── Config — Advanced tab keybinds ────────────────────────────────────────────
 L["CFG_KB_NEW_NOTE"]        = "Create new note:"
 L["CFG_KB_QUICK_NOTE"]      = "Create quick note:"
+L["CFG_QN_KEY_MODE_LABEL"]  = "The quick note key opens the new note in"
+L["CFG_QN_KEY_MODE_MAIN"]   = "The main window"
+L["CFG_QN_KEY_MODE_STICKY"] = "A sticky note to type in"
+L["CFG_QN_KEY_MODE_TIP"]    = "Sticky note: the new note opens as a sticky in the middle of the screen, ready to type in. Close it without typing anything and it is removed. If sticky editing is off, the note is locked or rich, or too many stickies are open, it opens in the main window instead."
+L["QN_KEY_STICKY_MAX"]      = "Maximum of %d sticky notes already open. The quick note opened in the main window."
 
 -- ── Session History ────────────────────────────────────────────────────────────
 -- History Window (main browser)
