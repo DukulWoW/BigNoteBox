@@ -72,7 +72,7 @@ local function BuildGeneralTab(sf, ct)
                 local tex = b:CreateTexture(nil, "ARTWORK")
                 tex:SetAllPoints()
                 tex:SetTexture(pack.icon)
-                tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+                if pack.iconCrop then tex:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
                 if not installed then
                     tex:SetDesaturated(true); tex:SetAlpha(0.55)
                     local hl = b:CreateTexture(nil, "HIGHLIGHT")
