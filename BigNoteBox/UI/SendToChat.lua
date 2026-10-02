@@ -13,6 +13,10 @@
 --   • Esc closes the dialog
 --   • Lines over 255 chars split at word boundaries, never silently truncated
 --   • Spam-warning confirm when > 3 lines would be sent
+--   • Paced sending (BUG-29): party/raid/guild/officer/whisper go out one
+--     message every CHAT_TICK seconds with a k/N status; say/yell need the
+--     click itself outdoors, so they send one message per click of Send
+--     (Dukul, 2026-10-02). Closing the dialog stops a send part way.
 --
 -- Public API:
 --   BNB.OpenSendToChat(noteID)
@@ -28,6 +32,7 @@ local PAD               = 12
 local TITLE_H           = 60
 local WOW_MSG_LIMIT     = 255
 local CONFIRM_THRESHOLD = 3
+local CHAT_TICK         = 0.35   -- seconds between paced messages
 
 -- ── Channel definitions ────────────────────────────────────────────────────────
 local CHANNELS = {
@@ -94,27 +99,83 @@ local function SplitLine(str)
     return chunks
 end
 
-local function DoSend(lines, chanType, target)
-    local bcb   = BNB.hasBCB and BigChatBox and BigChatBox.SendDirect
-    local count = 0
+-- ── Paced sending (BUG-29) ─────────────────────────────────────────────────────
+-- One send at a time. Sending every message in the same frame let the server's
+-- chat throttle drop lines of long notes, and every line was counted as sent.
+local PACED = { PARTY = true, RAID = true, GUILD = true, OFFICER = true, WHISPER = true }
+local _job  = nil   -- { items, chanType, target, label, pos, sent, perClick, ticker }
+
+-- Encounters, Mythic+ and rated PvP lock addon chat on Midnight
+local function ChatLocked()
+    return C_ChatInfo.InChatMessagingLockdown and C_ChatInfo.InChatMessagingLockdown() or false
+end
+
+-- Returns true when the message went out without an error.
+local function SendOne(text, chanType, target)
+    local bcb = BNB.hasBCB and BigChatBox and BigChatBox.SendDirect
+    if bcb then return (pcall(bcb, text, chanType, target, nil)) end
+    if chanType == "WHISPER" then return (pcall(SafeSend, text, chanType, nil, target)) end
+    return (pcall(SafeSend, text, chanType))
+end
+
+-- Lines -> messages, long lines split at word boundaries
+local function BuildItems(lines)
+    local items = {}
     for _, line in ipairs(lines) do
         if line ~= "" then
-            for _, chunk in ipairs(SplitLine(line)) do
-                if bcb then
-                    pcall(bcb, chunk, chanType, target, nil)
-                else
-                    if chanType == "WHISPER" then
-                        pcall(SafeSend, chunk, chanType, nil, target)
-                    else
-                        pcall(SafeSend, chunk, chanType)
-                    end
-                end
-                count = count + 1
-            end
+            for _, chunk in ipairs(SplitLine(line)) do items[#items + 1] = chunk end
         end
     end
+    return items
+end
+
+local function ShowJobStatus()
+    if not (_job and dlgFrame and dlgFrame._statsLbl) then return end
+    if _job.perClick then
+        dlgFrame._statsLbl:SetText(string.format(L["STC_STATUS_NEXT_FMT"], _job.pos, #_job.items))
+    else
+        dlgFrame._statsLbl:SetText(string.format(L["STC_STATUS_SENDING_FMT"], _job.pos - 1, #_job.items))
+    end
+end
+
+-- reason: "done" (closes the dialog), "locked" (closes it), "stopped" (the
+-- dialog closed, the channel or the line setting changed)
+local function EndJob(reason)
+    local job = _job
+    if not job then return end
+    _job = nil
+    if job.ticker then job.ticker:Cancel() end
+    if reason == "done" then
+        BNB:Print(string.format(L["SEND_COMPLETE"], job.sent, job.label))
+    elseif reason == "locked" then
+        BNB:Print(string.format(L["STC_LOCKED_FMT"], job.sent, #job.items))
+    elseif job.sent > 0 then
+        BNB:Print(string.format(L["STC_STOPPED_FMT"], job.sent, #job.items))
+    end
+    if reason ~= "stopped" then BNB.CloseSendToChat() end
+end
+
+local function SendNext()
+    local job = _job
+    if not job then return end
+    if ChatLocked() then EndJob("locked"); return end
+    if SendOne(job.items[job.pos], job.chanType, job.target) then job.sent = job.sent + 1 end
+    job.pos = job.pos + 1
+    if job.pos > #job.items then EndJob("done") else ShowJobStatus() end
+end
+
+-- The first message always goes out inside the click that started the send.
+local function StartJob(lines, chanType, target)
+    EndJob("stopped")
+    local items = BuildItems(lines)
+    if #items == 0 then return end
     local ch = CHANNELS[_selChannel]
-    BNB:Print(string.format(L["SEND_COMPLETE"], count, ch and ch.label or chanType))
+    _job = { items = items, chanType = chanType, target = target, pos = 1, sent = 0,
+             label = ch and ch.label or chanType, perClick = not PACED[chanType] }
+    SendNext()
+    if _job and not _job.perClick then
+        _job.ticker = C_Timer.NewTicker(CHAT_TICK, SendNext)
+    end
 end
 
 local function SendToBCB(body)
@@ -231,10 +292,10 @@ local function CreateConfirmDialog()
     local okBtn = BNB.CreateButton(nil, f, L["SEND_CONFIRM_BTN"], 90, 26)
     okBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, PAD)
     okBtn:SetScript("OnClick", function()
+        f:Hide()
         if f._pendingLines and f._pendingChanType then
-            DoSend(f._pendingLines, f._pendingChanType, f._pendingTarget)
+            StartJob(f._pendingLines, f._pendingChanType, f._pendingTarget)
         end
-        f:Hide(); BNB.CloseSendToChat()
     end)
     local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 70, 26)
     cancelBtn:SetPoint("LEFT", okBtn, "RIGHT", 6, 0)
@@ -538,6 +599,7 @@ local function CreateSendDialog()
 
     local chanDropContainer
     chanDropContainer = BuildChannelDropdown(f, function(idx)
+        EndJob("stopped")
         _selChannel = idx
         local needsTarget = CHANNELS[idx] and CHANNELS[idx].needsTarget
         if f._targetRow then f._targetRow:SetShown(needsTarget == true) end
@@ -679,6 +741,11 @@ local function CreateSendDialog()
         L["STC_SEND_TIP_SUB"])
     sendBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconLeftX, ICON_BTN_Y)
     sendBtn:SetScript("OnClick", function()
+        -- Say/yell: each click sends the next message; a paced send runs by itself
+        if _job then
+            if _job.perClick then SendNext() end
+            return
+        end
         local note = _noteID and BNB.GetNote(_noteID)
         if not note then BNB.CloseSendToChat(); return end
         local body = note.body or ""
@@ -698,11 +765,14 @@ local function CreateSendDialog()
         local lines = GetLines(body, _lineByLine)
         if #lines == 0 then BNB:Print(L["SEND_EMPTY"]); return end
 
+        if ChatLocked() then
+            BNB:Print(string.format(L["STC_LOCKED_FMT"], 0, #BuildItems(lines)))
+            return
+        end
         if #lines > CONFIRM_THRESHOLD then
             ShowConfirm(lines, chanType, target, ch)
         else
-            DoSend(lines, chanType, target)
-            BNB.CloseSendToChat()
+            StartJob(lines, chanType, target)
         end
     end)
     f._sendBtn = sendBtn
@@ -746,6 +816,11 @@ local function CreateSendDialog()
     if BigChatBox and BigChatBox.SendDirect then getBCBBtn:Hide() end
     f._getBCBBtn = getBCBBtn
 
+    f:HookScript("OnHide", function()
+        EndJob("stopped")
+        if confirmFrame then confirmFrame:Hide() end
+    end)
+
     f:Hide(); return f
 end
 
@@ -778,10 +853,12 @@ local function RefreshPreview()
 
     if dlgFrame._lineCheck then
         dlgFrame._lineCheck:SetScript("OnClick", function(self)
+            EndJob("stopped")
             _lineByLine = self:GetChecked()
             RefreshPreview()
         end)
     end
+    ShowJobStatus()
 end
 
 -- ── Public API ─────────────────────────────────────────────────────────────────
@@ -790,6 +867,7 @@ function BNB.OpenSendToChat(noteID)
     local note = noteID and BNB.GetNote(noteID)
     if not note then return end
 
+    EndJob("stopped")
     _noteID = noteID
     if not dlgFrame then dlgFrame = CreateSendDialog() end
 

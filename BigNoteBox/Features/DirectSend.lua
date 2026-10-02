@@ -11,8 +11,10 @@
 --
 -- Transport pipeline (send):
 --   BNB.ShareBuildPayload -> BNB.ShareSerialize -> CompressDeflate
---   -> EncodeForWoWAddonChannel -> chunk (180 chars, CHUNK_TICK intervals)
+--   -> EncodeForWoWAddonChannel -> chunk (MAX_CHUNK chars)
 --   -> C_ChatInfo.SendAddonMessage("BNB3", chunk, "WHISPER", target)
+--   Paced to the server's per-prefix allowance (BURST messages, then REGEN per
+--   second); a throttled chunk is sent again, a refused one ends the send (BUG-30).
 --
 -- Transport pipeline (receive BNB3 / BNB2):
 --   Reassemble chunks -> DecodeForWoWAddonChannel -> DecompressDeflate
@@ -23,8 +25,11 @@
 --   Reassemble chunks -> DecodeForWoWAddonChannel -> DecompressDeflate
 --   -> LibSerialize:Deserialize -> map fields -> queue -> prompt
 --
+-- Receive: whispers only (Dukul, 2026-10-02); at most MAX_CHUNKS chunks per
+-- message and MAX_INCOMING messages being put together at once.
+--
 -- Public API:
---   BNB.DS.SendNote(noteID, groups, targetName, onSent, onFail)
+--   BNB.DS.SendNote(noteID, groups, targetName, onSent, onFail, onProgress, onDone)
 --   BNB.DS.IsAutoReject()
 
 local BNB = BigNoteBox
@@ -39,9 +44,14 @@ local DS = BNB.DS
 local PREFIX_BNB   = "BNB3"
 local PREFIX_BNB_V1 = "BNB2"   -- old format, receive only
 local PREFIX_TAN   = "TAN1"
-local MAX_CHUNK    = 180     -- chars per SendAddonMessage call
-local CHUNK_TICK   = 0.35    -- seconds between chunk sends
-local MAX_CHUNKS   = 140     -- hard cap (~25 KB encoded); reject above this
+local MAX_CHUNK    = 230     -- chars per message; + "msgId:idx:total:" stays under 255
+local SEND_TICK    = 0.1     -- seconds between send attempts
+local BURST        = 10      -- the server's per-prefix allowance...
+local REGEN        = 1       -- ...refilled by this many messages per second
+local MAX_RETRIES  = 30      -- throttled attempts on one chunk before giving up
+local DONE_DELAY   = 1.5     -- seconds after the last chunk before "sent" (offline check)
+local MAX_CHUNKS   = 140     -- hard cap (~32 KB encoded); reject above this
+local MAX_INCOMING = 20      -- messages being reassembled at once; more are dropped
 local INCOMING_TTL = 180     -- seconds before a partial reassembly is purged
 local PROMPT_W     = 340
 local PROMPT_H     = 148
@@ -51,9 +61,14 @@ local PAD          = 12
 --------------------------------------------------------------------------------
 -- MODULE STATE
 --------------------------------------------------------------------------------
-local sendQueue       = {}   -- { msg, target }
+local sendQueue       = {}   -- { msg, target, job }
 local sendTicker      = nil
+local sendTokens      = BURST -- messages we may send right now
+local sendRefillAt    = 0     -- GetTime() of the last refill
+local activeJobs      = {}    -- job -> true from queueing until "sent" or a failure
 local incoming        = {}   -- keyed "sender|msgId" -> { chunks, count, total, t }
+local incomingCount   = 0
+local rejected        = {}   -- "sender|msgId" -> time(), so auto-reject prints once per note
 local tanParts        = {}   -- keyed "sender|sessionId" -> { parts, got, total, name, t }
 local pendingIncoming = {}   -- queue of decoded data tables waiting for prompt
 local currentPrompt   = nil  -- data table currently displayed in the prompt
@@ -91,9 +106,12 @@ local function NormName(name)
     return n and n:lower() or nil
 end
 
+-- FOR-23: BNB.UnitNameRealm, so a Forever surname is part of the name
 local function MyFullName()
-    local p = UnitName("player") or ""
-    return FullName(p)
+    local name, realm = BNB.UnitNameRealm("player")
+    if not name then return nil end
+    realm = (realm and realm ~= "") and realm:gsub("%s+", "") or GetRealmNorm()
+    return name .. "-" .. realm
 end
 
 --------------------------------------------------------------------------------
@@ -107,19 +125,122 @@ end
 --------------------------------------------------------------------------------
 -- SEND QUEUE TICKER
 --------------------------------------------------------------------------------
+-- SendAddonMessage returns an Enum.SendAddonMessageResult (a boolean, or
+-- nothing, on older builds). Sorted by name so new codes need no change here:
+-- "ok", "throttle" (send it again later), or a reason that ends the send.
+local RESULT_NAMES
+local function ClassifyResult(res)
+    if res == nil or res == true then return "ok" end
+    if res == false then return "throttle" end
+    if type(res) ~= "number" then return "ok" end
+    if not RESULT_NAMES then
+        RESULT_NAMES = {}
+        local enum = Enum and Enum.SendAddonMessageResult
+        if type(enum) == "table" then
+            for k, v in pairs(enum) do RESULT_NAMES[v] = tostring(k):lower() end
+        end
+    end
+    local name = RESULT_NAMES[res]
+    if not name then
+        if res == 0 then return "ok" end
+        if res == 3 or res == 8 then return "throttle" end
+        return "error"
+    end
+    if name == "success" then return "ok" end
+    if name:find("throttle", 1, true) then return "throttle" end
+    if name:find("lockdown", 1, true) then return "lockdown" end
+    if name:find("offline", 1, true) then return "offline" end
+    return name
+end
+
+local FAIL_TEXT = {
+    lockdown = "DS_FAIL_LOCKDOWN",
+    offline  = "DS_FAIL_OFFLINE",
+    throttle = "DS_FAIL_THROTTLE",
+}
+
+-- Ends a send early: drops its queued chunks and tells the sender why.
+local function FailJob(job, reason)
+    if job.ended then return end
+    job.ended = true
+    activeJobs[job] = nil
+    for i = #sendQueue, 1, -1 do
+        if sendQueue[i].job == job then table.remove(sendQueue, i) end
+    end
+    local key = FAIL_TEXT[reason]
+    local why = key and L[key] or string.format(L["DS_FAIL_CODE"], tostring(reason))
+    BNB:Print(string.format(L["DS_FAIL_PRINT"], job.title, job.target, why))
+    if job.onFail then pcall(job.onFail, why) end
+end
+
+local function SendTick()
+    local now = GetTime()
+    sendTokens = math.min(BURST, sendTokens + (now - sendRefillAt) * REGEN)
+    sendRefillAt = now
+
+    while sendTokens >= 1 and sendQueue[1] do
+        local pkt = sendQueue[1]
+        local job = pkt.job
+        local res
+        if C_ChatInfo and C_ChatInfo.SendAddonMessage then
+            res = C_ChatInfo.SendAddonMessage(PREFIX_BNB, pkt.msg, "WHISPER", pkt.target)
+        end
+        local kind = ClassifyResult(res)
+        if kind == "ok" then
+            table.remove(sendQueue, 1)
+            sendTokens = sendTokens - 1
+            job.sent = job.sent + 1
+            if job.onProgress then pcall(job.onProgress, job.sent, job.total) end
+            if job.sent >= job.total then
+                -- Wait a moment: an offline target only shows as a system line
+                C_Timer.After(DONE_DELAY, function()
+                    if job.ended then return end
+                    job.ended = true
+                    activeJobs[job] = nil
+                    BNB:Print(string.format(L["DS_SENT_PRINT"], job.title, job.target))
+                    if job.onDone then pcall(job.onDone) end
+                end)
+            end
+        elseif kind == "throttle" then
+            -- The server's allowance is lower than ours: wait for a refill
+            sendTokens = 0
+            pkt.tries = (pkt.tries or 0) + 1
+            if pkt.tries > MAX_RETRIES then FailJob(job, "throttle") end
+            break
+        else
+            FailJob(job, kind)
+        end
+    end
+
+    if not sendQueue[1] and sendTicker then
+        sendTicker:Cancel()
+        sendTicker = nil
+    end
+end
+
+-- A whisper to someone offline is not refused by SendAddonMessage: the server
+-- answers each chunk with ERR_CHAT_PLAYER_NOT_FOUND_S instead. End that send.
+local function OnSystemMessage(msg)
+    if not ERR_CHAT_PLAYER_NOT_FOUND_S or not next(activeJobs) then return end
+    local hit = {}
+    for job in pairs(activeJobs) do
+        local short = job.target:match("^([^-]+)") or job.target
+        if msg == ERR_CHAT_PLAYER_NOT_FOUND_S:format(job.target)
+        or msg == ERR_CHAT_PLAYER_NOT_FOUND_S:format(short) then
+            hit[#hit + 1] = job
+        end
+    end
+    for _, job in ipairs(hit) do FailJob(job, "offline") end
+end
+
 local function StartTicker()
     if sendTicker then return end
-    sendTicker = C_Timer.NewTicker(CHUNK_TICK, function()
-        local pkt = table.remove(sendQueue, 1)
-        if not pkt then
-            sendTicker:Cancel()
-            sendTicker = nil
-            return
-        end
-        if C_ChatInfo and C_ChatInfo.SendAddonMessage then
-            C_ChatInfo.SendAddonMessage(PREFIX_BNB, pkt.msg, "WHISPER", pkt.target)
-        end
-    end)
+    if not sendQueue[1] then return end
+    -- Refill for the time the ticker was idle, then send what the allowance takes
+    SendTick()
+    if sendQueue[1] and not sendTicker then
+        sendTicker = C_Timer.NewTicker(SEND_TICK, SendTick)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -127,10 +248,14 @@ end
 -- noteID    : BNB note ID string
 -- groups    : share groups to include, { tags = true, ... } (BNB.GetShareGroups)
 -- target    : player name (realm appended if missing)
--- onSent(chunks) : called immediately after chunks are queued (fire-and-forget)
--- onFail(err)    : called if encoding fails before queuing
+-- onSent(chunks) : called once the chunks are queued
+-- onFail(err)    : called if encoding fails, or the send is refused part way
+-- onProgress(sent, total) : called after each chunk goes out
+-- onDone()       : called when the last chunk went out
+-- A chat line reports the end of the send either way, since a long note takes
+-- a while and the Share window may be closed by then.
 --------------------------------------------------------------------------------
-function DS.SendNote(noteID, groups, targetName, onSent, onFail)
+function DS.SendNote(noteID, groups, targetName, onSent, onFail, onProgress, onDone)
     local function fail(msg)
         if onFail then onFail(msg) end
     end
@@ -176,15 +301,21 @@ function DS.SendNote(noteID, groups, targetName, onSent, onFail)
     local msgId = tostring(time()) .. tostring(math.random(1000, 9999))
 
     -- Enqueue
+    local job = {
+        target = target, total = total, sent = 0,
+        title  = (note.title and note.title ~= "") and note.title or L["TW_UNTITLED"],
+        onFail = onFail, onProgress = onProgress, onDone = onDone,
+    }
     for i = 1, total do
         local from = ((i - 1) * MAX_CHUNK) + 1
         local chunk = encoded:sub(from, from + MAX_CHUNK - 1)
         local msg   = msgId .. ":" .. i .. ":" .. total .. ":" .. chunk
-        sendQueue[#sendQueue + 1] = { msg = msg, target = target }
+        sendQueue[#sendQueue + 1] = { msg = msg, target = target, job = job }
     end
-    StartTicker()
+    activeJobs[job] = true
 
     if onSent then onSent(total) end
+    StartTicker()
 end
 
 --------------------------------------------------------------------------------
@@ -195,7 +326,11 @@ local function CleanupIncoming()
     for k, e in pairs(incoming) do
         if (now - (e.t or 0)) > INCOMING_TTL then
             incoming[k] = nil
+            incomingCount = incomingCount - 1
         end
+    end
+    for k, t in pairs(rejected) do
+        if (now - t) > INCOMING_TTL then rejected[k] = nil end
     end
     for k, e in pairs(tanParts) do
         if (now - (e.t or 0)) > INCOMING_TTL then
@@ -326,19 +461,15 @@ end
 --------------------------------------------------------------------------------
 -- CHUNK ROUTER
 --------------------------------------------------------------------------------
-local function OnAddonMessage(prefix, msg, _, sender)
+local function OnAddonMessage(prefix, msg, channel, sender)
     if prefix ~= PREFIX_BNB and prefix ~= PREFIX_BNB_V1 and prefix ~= PREFIX_TAN then return end
     if not msg or msg == "" then return end
+    -- Whispers only: a group or guild broadcast would prompt everyone in it
+    if channel ~= "WHISPER" then return end
 
     -- Ignore our own echoes
     local me = NormName(MyFullName())
     if me and NormName(sender) == me then return end
-
-    -- Auto-reject: drop before reassembly so we never show a prompt
-    if DS.IsAutoReject() then
-        print(string.format(L["DS_AUTO_REJECTED"], sender or "?"))
-        return
-    end
 
     CleanupIncoming()
 
@@ -349,13 +480,28 @@ local function OnAddonMessage(prefix, msg, _, sender)
     local idx   = tonumber(idxStr)
     local total = tonumber(totalStr)
     if not idx or not total or idx < 1 or total < 1 or idx > total then return end
+    if total > MAX_CHUNKS then return end
 
     local key = (sender or "?") .. "|" .. msgId
+
+    -- Auto-reject: drop before reassembly so we never show a prompt. One chat
+    -- line per note, not one per chunk.
+    if DS.IsAutoReject() then
+        if not rejected[key] then
+            print(string.format(L["DS_AUTO_REJECTED"], sender or "?"))
+        end
+        rejected[key] = time()
+        return
+    end
+
     local e   = incoming[key]
     if not e then
+        if incomingCount >= MAX_INCOMING then return end
         e = { total = total, chunks = {}, count = 0, t = time() }
         incoming[key] = e
+        incomingCount = incomingCount + 1
     end
+    if total ~= e.total then return end
     if not e.chunks[idx] then
         e.count = e.count + 1
     end
@@ -365,6 +511,7 @@ local function OnAddonMessage(prefix, msg, _, sender)
 
     -- All chunks in — assemble encoded string
     incoming[key] = nil
+    incomingCount = incomingCount - 1
     local parts = {}
     for i = 1, e.total do
         if not e.chunks[i] then return end
@@ -540,7 +687,7 @@ function DS.ShowNextPrompt()
     end
     if f._noteTitleLbl then
         local t = (currentPrompt.title and currentPrompt.title ~= "")
-            and currentPrompt.title or ("|cff666666(" .. "untitled" .. ")|r")
+            and currentPrompt.title or L["TW_UNTITLED"]
         f._noteTitleLbl:SetText(string.format(L["DS_PROMPT_NOTE_TITLE"], t))
     end
 
@@ -555,6 +702,7 @@ end
 local evtFrame = CreateFrame("Frame")
 evtFrame:RegisterEvent("PLAYER_LOGIN")
 evtFrame:RegisterEvent("CHAT_MSG_ADDON")
+evtFrame:RegisterEvent("CHAT_MSG_SYSTEM")
 evtFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
@@ -565,5 +713,8 @@ evtFrame:SetScript("OnEvent", function(_, event, ...)
     elseif event == "CHAT_MSG_ADDON" then
         local prefix, msg, channel, sender = ...
         OnAddonMessage(prefix, msg, channel, sender)
+    elseif event == "CHAT_MSG_SYSTEM" then
+        -- pcall: chat text can be a secret value on Midnight (DEP-01)
+        pcall(OnSystemMessage, (...))
     end
 end)

@@ -874,16 +874,23 @@ local function BuildShareWindow()
             return
         end
         if BNB.DS and BNB.DS.SendNote then
-            BNB.DS.SendNote(_shareNoteID, BNB.GetShareGroups(), target, function(chunks)
-                if f._dsStatus and f:IsShown() then
-                    f._dsStatus:SetTextColor(0.40, 0.85, 0.45)
-                    f._dsStatus:SetText(string.format(L["DS_STATUS_SENT"], target, chunks))
+            -- The status line belongs to this note: a later note shown in the
+            -- window must not get this send's progress
+            local sendID = _shareNoteID
+            local function Status(r, g, b, text)
+                if f._dsStatus and f:IsShown() and _shareNoteID == sendID then
+                    f._dsStatus:SetTextColor(r, g, b)
+                    f._dsStatus:SetText(text)
                 end
+            end
+            BNB.DS.SendNote(sendID, BNB.GetShareGroups(), target, function(chunks)
+                Status(0.40, 0.85, 0.45, string.format(L["DS_STATUS_SENT"], target, chunks))
             end, function(err)
-                if f._dsStatus and f:IsShown() then
-                    f._dsStatus:SetTextColor(1, 0.35, 0.35)
-                    f._dsStatus:SetText(err or L["DS_ERR_GENERIC"])
-                end
+                Status(1, 0.35, 0.35, err or L["DS_ERR_GENERIC"])
+            end, function(sent, total)
+                Status(0.40, 0.85, 0.45, string.format(L["DS_STATUS_PROGRESS"], target, sent, total))
+            end, function()
+                Status(0.40, 0.85, 0.45, string.format(L["DS_STATUS_DONE"], target))
             end)
         else
             if f._dsStatus then

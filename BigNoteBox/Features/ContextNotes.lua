@@ -23,6 +23,10 @@ local L   = BNB.L
 
 BNB._contextMatches = BNB._contextMatches or {}
 BNB._autoWaypoints  = BNB._autoWaypoints  or {}  -- noteID → TomTom uid (or true for retail)
+-- noteID -> "mapID:x:y" of the waypoint last set for it while it matched. A
+-- waypoint is set again only when the note newly matches or its waypoint changed,
+-- not on every check (every target change stole quest super-tracking, BUG-16).
+local _wpSent = {}
 
 -- Developer tools > "Trace situation checks" (ALL-192): one chat line per check,
 -- per sticky open and per toast, plus the state 3 s later. Needs debug mode too.
@@ -50,6 +54,33 @@ BNB.GetCurrentZone = GetCurrentZone
 
 local function GetCurrentPlayer()
     return (BNB.UnitNameRealm("target"))   -- nil if no target
+end
+
+-- Lower-case names of everyone in the group (and you), bare and "-Realm", built
+-- once per check from unit tokens. GetRaidRosterInfo only answers in a raid, so
+-- party members never matched (BUG-25). Reset by CheckContextualNotes.
+local _groupNames = nil
+
+local function GroupNames()
+    if _groupNames then return _groupNames end
+    local set = {}
+    local function add(unit)
+        local name, realm = BNB.UnitNameRealm(unit)
+        if not name then return end
+        name = name:lower()
+        set[name] = true
+        if realm and realm ~= "" then set[name .. "-" .. realm:lower()] = true end
+    end
+    add("player")
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 0
+    if n > 0 then
+        local raid = IsInRaid and IsInRaid()
+        for i = 1, raid and n or (n - 1) do
+            add((raid and "raid" or "party") .. i)
+        end
+    end
+    _groupNames = set
+    return set
 end
 
 -- ── Match a single note against current context ────────────────────────────────
@@ -84,15 +115,9 @@ local function NoteMatches(note)
             local valName = value:match("^([^-]+)") or value
             if tgt == value or tgt == valName then return true end
         end
-        for i = 1, GetNumGroupMembers and GetNumGroupMembers() or 0 do
-            local member = GetRaidRosterInfo and select(1, GetRaidRosterInfo(i))
-            if member then
-                member = member:lower()
-                local valName = value:match("^([^-]+)") or value
-                if member == value or member == valName then return true end
-            end
-        end
-        return false
+        local group   = GroupNames()
+        local valName = value:match("^([^-]+)") or value
+        return (group[value] or group[valName]) and true or false
     end
     return false
 end
@@ -469,6 +494,7 @@ function BNB.CheckContextualNotes()
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
+    _groupNames = nil   -- group may have changed since the last check
     local matches   = {}
     local matchSet  = {}
     local stickyIDs = {}
@@ -500,6 +526,7 @@ function BNB.CheckContextualNotes()
     local hasKeepWP = false  -- track if any departing note wants to keep its WP
     for _, id in ipairs(prev) do
         if not matchSet[id] then
+            _wpSent[id] = nil   -- set it again on the next entry
             local note = BNB.GetNote(id)
             local action = note and note.contextLeave  -- nil/"keep", "minimize", "hide"
             if action and action ~= "keep" and BNB.Sticky and BNB.Sticky.IsOpen(id) then
@@ -585,19 +612,29 @@ function BNB.CheckContextualNotes()
     end
 
     -- ── Waypoint dispatch on zone entry ───────────────────────────────────────
-    -- Fire for every currently-matching note that has a waypoint, each time the
-    -- zone changes. Not limited to "new" matches — the note may have been matched
-    -- already (e.g. you were already in the zone when you saved the waypoint).
+    -- Set for every matching note whose waypoint was not set yet while it has
+    -- been matching: a new match, or a waypoint added or moved since (e.g. saved
+    -- while already in the zone, picked up by the next check). Read when the
+    -- timer fires, so a check that ran in between (left the zone) wins.
     -- Uses TomTom:AddWaypoint (WaypointUI shims this) or the retail map pin API.
     C_Timer.After(1.0, function()
-        for _, id in ipairs(matches) do
+        for _, id in ipairs(BNB._contextMatches or {}) do
             local note = BNB.GetNote(id)
             local wp   = note and note.waypoint
-            if wp and wp.x and wp.y and wp.mapID then
+            local sig  = wp and wp.x and wp.y and wp.mapID
+                and (wp.mapID .. ":" .. wp.x .. ":" .. wp.y) or nil
+            local due  = sig and _wpSent[id] ~= sig
+            _wpSent[id] = sig
+            if due then
                 local wpTitle = (wp.title and wp.title ~= "") and wp.title
                            or  (note.title and note.title ~= "") and note.title
                            or  "BigNoteBox"
                 if TomTom and TomTom.AddWaypoint then
+                    -- A moved waypoint replaces the old one rather than adding a second
+                    local old = BNB._autoWaypoints[id]
+                    if type(old) == "table" and TomTom.RemoveWaypoint then
+                        pcall(function() TomTom:RemoveWaypoint(old) end)
+                    end
                     local ok, uid = pcall(function()
                         return TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, {
                             title = wpTitle,

@@ -623,10 +623,14 @@ end
 --     collect each page as ITEM_TEXT_READY fires.
 --   • When there are no more pages we create the note and navigate back to
 --     the original page.
---   • A 10-page safety cap prevents runaway loops on unexpectedly large books.
+--   • A 50-page safety cap prevents runaway loops on unexpectedly large books.
 --   • While collecting, the button is temporarily disabled to prevent re-entry.
+--   • Closing the book mid-capture cancels it (ITEM_TEXT_CLOSED).
 
-local _itCollecting = false   -- true while we are mid-collection
+local _itBusy       = false   -- true from the click until the capture ends or is cancelled (BUG-24)
+local _itCollecting = false   -- true while ITEM_TEXT_READY pages are being collected
+local _itGen        = 0       -- bumped by every start and cancel; stale timers check it
+local _itTicker     = nil     -- the page-turning ticker, cancelled with the capture
 local _itPages      = {}      -- accumulated page texts
 local _itTitle      = ""
 local _itTags       = {}
@@ -638,12 +642,53 @@ local MAX_PAGES     = 50      -- safety cap
 -- FinishItemTextCapture. Declaring local here lets Lua resolve it correctly.
 local FoundAtHeader
 
+local function SetItemTextBtnBusy(busy)
+    local btn = _G["BNBQuickNoteItemTextBtn"]
+    if btn then btn:SetAlpha(busy and 0.4 or 1); btn:SetEnabled(not busy) end
+end
+
+local function StopItemTextTicker()
+    if _itTicker then _itTicker:Cancel(); _itTicker = nil end
+end
+
+-- Ends the capture, whether it finished or was cancelled.
+local function EndItemTextCapture()
+    StopItemTextTicker()
+    _itBusy, _itCollecting = false, false
+    _itPages = {}
+    SetItemTextBtnBusy(false)
+end
+
+-- ITEM_TEXT_CLOSED: closing the book mid-capture throws the pages away (Dukul,
+-- 2026-10-02) and frees the button; it stayed greyed out for the session before.
+local function CancelItemTextCapture()
+    if not _itBusy then return end
+    _itGen = _itGen + 1
+    EndItemTextCapture()
+end
+
+-- Turns the book back `steps` pages, one per tick (never inside ITEM_TEXT_READY,
+-- documented gotcha), then calls onDone. Each PrevPage fires ITEM_TEXT_READY;
+-- _itCollecting stays false meanwhile, so the collector ignores those pages.
+local function TurnBack(steps, onDone)
+    local gen, ticks = _itGen, 0
+    StopItemTextTicker()
+    _itTicker = C_Timer.NewTicker(0.1, function(ticker)
+        if gen ~= _itGen then ticker:Cancel(); return end
+        ticks = ticks + 1
+        if ticks <= steps and ItemTextPrevPage then
+            ItemTextPrevPage()
+        else
+            ticker:Cancel()
+            if _itTicker == ticker then _itTicker = nil end
+            onDone()
+        end
+    end)
+end
+
 -- Called once all pages have been gathered.
 local function FinishItemTextCapture()
     _itCollecting = false
-    -- Re-enable the button
-    local btn = _G["BNBQuickNoteItemTextBtn"]
-    if btn then btn:SetAlpha(1); btn:SetEnabled(true) end
 
     local parts = {}
     for i, pageText in ipairs(_itPages) do
@@ -658,28 +703,16 @@ local function FinishItemTextCapture()
     body = body:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
 
     CreateQuickNote(_itTitle, body, RandomIcon(), _itTags, nil)
+    _itPages = {}
 
-    -- Navigate back to the original page.
-    -- We are currently on the last page; step back one page at a time.
-    -- Each call to ItemTextPrevPage() fires ITEM_TEXT_READY, but we don't
-    -- need to read those pages — just count steps back. We temporarily
-    -- stop our collector during this phase by leaving _itCollecting = false.
+    -- Navigate back to the original page. We are on the last page; the button
+    -- stays busy until the book is back where the reader left it.
     local stepsBack = _itCurrentPage - _itOrigPage
     if stepsBack > 0 then
-        -- Use a repeating timer that fires once per tick to avoid
-        -- calling ItemTextPrevPage() inside ITEM_TEXT_READY (documented gotcha)
-        local ticks = 0
-        C_Timer.NewTicker(0.1, function(ticker)
-            ticks = ticks + 1
-            if ticks <= stepsBack and ItemTextPrevPage then
-                ItemTextPrevPage()
-            else
-                ticker:Cancel()
-            end
-        end)
+        TurnBack(stepsBack, EndItemTextCapture)
+    else
+        EndItemTextCapture()
     end
-
-    _itPages = {}
 end
 
 -- Called on each ITEM_TEXT_READY while collecting.
@@ -690,62 +723,51 @@ local function OnItemTextReady()
     _itCurrentPage = _itCurrentPage + 1
     _itPages[#_itPages + 1] = text
 
+    local gen = _itGen
     if ItemTextHasNextPage and ItemTextHasNextPage() and _itCurrentPage < MAX_PAGES then
         -- Request next page on the next tick to avoid the documented
         -- synchronisation issue with calling NextPage inside ITEM_TEXT_READY.
         C_Timer.After(0, function()
-            if ItemTextNextPage then ItemTextNextPage() end
+            if gen == _itGen and ItemTextNextPage then ItemTextNextPage() end
         end)
     else
         -- All pages collected (or cap reached).
-        C_Timer.After(0, FinishItemTextCapture)
+        C_Timer.After(0, function()
+            if gen == _itGen and _itCollecting then FinishItemTextCapture() end
+        end)
     end
 end
 
 -- Start collection from whatever page the reader is currently on.
 -- We navigate to page 1 first so the note always contains all pages in order.
 local function StartItemTextCapture()
-    if _itCollecting then return end   -- already in progress
+    if _itBusy then return end   -- already in progress
 
+    _itGen        = _itGen + 1
+    _itBusy       = true
     _itTitle      = ItemTextGetItem and ItemTextGetItem() or ""
     _itTags       = ItemTextTags()
     _itPages      = {}
     _itCurrentPage= 0
-    _itCollecting = true
-
-    -- Disable button to prevent re-entry
-    local btn = _G["BNBQuickNoteItemTextBtn"]
-    if btn then btn:SetAlpha(0.4); btn:SetEnabled(false) end
+    SetItemTextBtnBusy(true)   -- prevent re-entry
 
     -- Figure out current page number: ItemTextGetPage() returns the current page.
     _itOrigPage = (ItemTextGetPage and ItemTextGetPage()) or 1
 
-    -- Navigate back to page 1 first using PrevPage.
-    -- Each PrevPage fires ITEM_TEXT_READY, but we don't want to collect yet.
-    -- We use a staged approach: suppress the collector until we reach page 1,
-    -- then start collecting.
-    if _itOrigPage > 1 then
-        local stepsBack = _itOrigPage - 1
-        local ticks = 0
-        -- Temporarily flag that we are navigating (not yet collecting)
-        _itCollecting = false
-        C_Timer.NewTicker(0.1, function(ticker)
-            ticks = ticks + 1
-            if ticks <= stepsBack and ItemTextPrevPage then
-                ItemTextPrevPage()
-            else
-                ticker:Cancel()
-                -- Now on page 1 — start collecting on next ITEM_TEXT_READY
-                _itCurrentPage = 0
-                _itCollecting  = true
-                -- Fire collection for page 1 immediately since ITEM_TEXT_READY
-                -- won't fire again unless we navigate. Read the current page now.
-                C_Timer.After(0, OnItemTextReady)
-            end
+    -- Collect from page 1. ITEM_TEXT_READY will not fire again for the page
+    -- already shown, so the first page is read directly.
+    local gen = _itGen
+    local function BeginCollecting()
+        _itCurrentPage = 0
+        _itCollecting  = true
+        C_Timer.After(0, function()
+            if gen == _itGen then OnItemTextReady() end
         end)
+    end
+    if _itOrigPage > 1 then
+        TurnBack(_itOrigPage - 1, BeginCollecting)
     else
-        -- Already on page 1 — collect it immediately.
-        C_Timer.After(0, OnItemTextReady)
+        BeginCollecting()
     end
 end
 
@@ -1428,7 +1450,10 @@ qnFrame:SetScript("OnEvent", function(_, event, arg1, arg2)
         -- Must not be called from inside the ITEM_TEXT_READY handler itself
         -- (documented gotcha), so we defer one tick.
         if event == "ITEM_TEXT_READY" and _itCollecting then
-            C_Timer.After(0, OnItemTextReady)
+            local gen = _itGen
+            C_Timer.After(0, function()
+                if gen == _itGen then OnItemTextReady() end
+            end)
             return
         end
 
@@ -1471,6 +1496,7 @@ qnFrame:SetScript("OnEvent", function(_, event, arg1, arg2)
         _duiCache   = nil    -- clear stale dialogue cache
         _duiQuestID = nil    -- clear stale quest ID
         _duiBookPages = {}   -- clear stale book page cache
+        if event == "ITEM_TEXT_CLOSED" then CancelItemTextCapture() end
         ImmersionBypassEnd()
         return
     end

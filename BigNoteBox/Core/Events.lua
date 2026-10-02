@@ -331,6 +331,20 @@ BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
 end)
 
 --------------------------------------------------------------------------------
+-- GROUP_ROSTER_UPDATE — someone joined or left (player situations match group
+-- members, BUG-25). Fires in bursts in a raid, so one check per second at most.
+--------------------------------------------------------------------------------
+local _rosterCheckPending = false
+BNB.RegisterEvent("GROUP_ROSTER_UPDATE", function()
+    if _rosterCheckPending or not BNB.CheckContextualNotes then return end
+    _rosterCheckPending = true
+    C_Timer.After(1, function()
+        _rosterCheckPending = false
+        BNB.CheckContextualNotes()
+    end)
+end)
+
+--------------------------------------------------------------------------------
 -- PLAYER_REGEN_DISABLED — entered combat
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_REGEN_DISABLED", function()

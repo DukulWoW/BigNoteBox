@@ -147,6 +147,14 @@ local _warnDialog
 local TYPE_DIALOG_GLOW_KEY = "bnb_inspect_typedlg"
 local _inspectReady = false
 local _autoCreatedThisInspect = false
+local _achieveGUID = nil   -- GUID whose achievement comparison data has arrived
+local _achieveSet  = false -- we set the comparison unit (cleared again on hide)
+
+-- The unit the Inspect frame shows. Everything about the inspected player is
+-- read from this, never from "target" (BUG-14).
+local function InspectUnit()
+    return InspectFrame and InspectFrame.unit or "target"
+end
 
 -- ── Config helpers ────────────────────────────────────────────────────────────
 local function GetMode()
@@ -164,22 +172,25 @@ end
 --------------------------------------------------------------------------------
 local function GatherInspectData()
     local data = {}
+    -- The inspected unit, not the target: a party member inspected from the
+    -- party frame is not your target (BUG-14)
+    local unit = InspectUnit()
 
-    local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
+    local name, realm = BNB.UnitNameRealm(unit)   -- FOR-23: Forever surname
     data.name  = name or UNKNOWN_STR
     data.realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
-    local pvpName = UnitPVPName("target")
+    local pvpName = UnitPVPName(unit)
     if pvpName and pvpName ~= data.name then
         data.displayTitle = pvpName
     end
 
-    data.level = UnitLevel("target")
+    data.level = UnitLevel(unit)
     if data.level == -1 then data.level = "??" end
-    local className, classFile = UnitClass("target")
+    local className, classFile = UnitClass(unit)
     data.className = className or UNKNOWN_STR
     data.classFile = classFile or "WARRIOR"
-    local raceName, raceFile, raceID = UnitRace("target")
+    local raceName, raceFile, raceID = UnitRace(unit)
     data.race     = raceName or UNKNOWN_STR
     data.raceFile = raceFile or "Human"
 
@@ -215,7 +226,7 @@ local function GatherInspectData()
     }
     data.raceID = raceID or RACE_FILE_TO_ID[data.raceFile] or 1
 
-    local sex = UnitSex("target")
+    local sex = UnitSex(unit)
     data.gender = (sex == 3) and "Female" or "Male"
     data.sexID  = (sex == 3) and 1 or 0   -- 0 = male, 1 = female for SetCustomRace
 
@@ -233,7 +244,7 @@ local function GatherInspectData()
 
     data.spec = nil
     if GetInspectSpecialization then
-        local specID = GetInspectSpecialization("target")
+        local specID = GetInspectSpecialization(unit)
         if specID and specID > 0 then
             local _, specName = GetSpecializationInfoByID(specID)
             -- A player without a chosen spec gets a starter spec named after the
@@ -244,17 +255,19 @@ local function GatherInspectData()
         end
     end
 
-    local guildName, guildRankName = GetGuildInfo("target")
+    local guildName, guildRankName = GetGuildInfo(unit)
     data.guild     = guildName
     data.guildRank = guildRankName
 
     -- faction = English token for logic (model crest); factionLabel = translated, for text and tag
-    local factionEn, factionLoc = UnitFactionGroup("target")
+    local factionEn, factionLoc = UnitFactionGroup(unit)
     data.faction      = factionEn
     data.factionLabel = factionLoc or factionEn
 
     data.achievePoints = nil
-    if GetComparisonAchievementPoints then
+    -- Only once the comparison data for this player has arrived
+    -- (INSPECT_ACHIEVEMENT_READY); before that it is 0 or someone else's.
+    if GetComparisonAchievementPoints and _achieveGUID and _achieveGUID == UnitGUID(unit) then
         local pts = GetComparisonAchievementPoints()
         if pts and pts > 0 then data.achievePoints = pts end
     end
@@ -269,7 +282,7 @@ local function GatherInspectData()
 
     data.ilvl = nil
     if C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel then
-        local ilvl = C_PaperDollInfo.GetInspectItemLevel("target")
+        local ilvl = C_PaperDollInfo.GetInspectItemLevel(unit)
         if ilvl and ilvl > 0 then
             data.ilvl = math.floor(ilvl + 0.5)
         end
@@ -282,10 +295,10 @@ local function GatherInspectData()
     -- Kept separately from note.attachments so they don't count toward the max.
     data.gearItems = {}
     for _, slot in ipairs(SLOT_INFO) do
-        local itemID = GetInventoryItemID("target", slot.id)
+        local itemID = GetInventoryItemID(unit, slot.id)
         if itemID then
             local itemName, _, quality, ilvl, _, _, _, _, _, iconTex = C_Item.GetItemInfo(itemID)
-            local link = GetInventoryItemLink("target", slot.id)
+            local link = GetInventoryItemLink(unit, slot.id)
             local actualIlvl = ilvl
             if link and C_Item.GetDetailedItemLevelInfo then
                 local effIlvl = C_Item.GetDetailedItemLevelInfo(link)
@@ -635,7 +648,7 @@ end
 local function StartInspectNoteFlow(isAutomatic)
     if not _inspectReady then return end
 
-    local name, realm = BNB.UnitNameRealm("target")
+    local name, realm = BNB.UnitNameRealm(InspectUnit())
     if not name then return end
     realm = realm and realm ~= "" and realm or GetNormalizedRealmName() or ""
 
@@ -714,7 +727,7 @@ local function CreateInspectButton()
             GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
             GameTooltip:AddLine(L["INSPECT_TIP_WAITING"], 1, 0.5, 0.25)
         else
-            local tName, tRealm = BNB.UnitNameRealm("target")
+            local tName, tRealm = BNB.UnitNameRealm(InspectUnit())
             tRealm = tRealm and tRealm ~= "" and tRealm or GetNormalizedRealmName() or ""
             local existing = tName and UN.FindPlayerNote(tName, tRealm)
             if existing then
@@ -763,6 +776,7 @@ end
 local evf = CreateFrame("Frame")
 evf:RegisterEvent("ADDON_LOADED")
 evf:RegisterEvent("INSPECT_READY")
+evf:RegisterEvent("INSPECT_ACHIEVEMENT_READY")
 
 -- GUID of the last INSPECT_READY. When the client already has a player's data
 -- (inspected recently, or close by), INSPECT_READY can fire before InspectFrame
@@ -773,8 +787,30 @@ evf:RegisterEvent("INSPECT_READY")
 local _readyGUID = nil
 
 local function InspectedGUID()
-    local unit = InspectFrame and InspectFrame.unit or "target"
-    return UnitGUID(unit)
+    return UnitGUID(InspectUnit())
+end
+
+-- Achievement points come from the comparison API, which needs the unit set
+-- first; the data arrives with INSPECT_ACHIEVEMENT_READY. Left alone while
+-- Blizzard's own achievement comparison is open, since it owns that unit then.
+local function ComparisonBusy()
+    return AchievementFrameComparison and AchievementFrameComparison:IsShown()
+end
+
+local function RequestAchievementPoints()
+    if not SetAchievementComparisonUnit or ComparisonBusy() then return end
+    local guid = InspectedGUID()
+    if not guid or guid == _achieveGUID then return end
+    _achieveGUID = nil
+    _achieveSet = pcall(SetAchievementComparisonUnit, InspectUnit()) or _achieveSet
+end
+
+local function ReleaseAchievementPoints()
+    _achieveGUID = nil
+    if _achieveSet and ClearAchievementComparisonUnit and not ComparisonBusy() then
+        pcall(ClearAchievementComparisonUnit)
+    end
+    _achieveSet = false
 end
 
 local OnInspectReady   -- defined below, shared by INSPECT_READY and OnShow
@@ -793,6 +829,7 @@ local function HookInspectFrame()
         DisableInspectBtn()
         _readyGUID = nil
         _autoCreatedThisInspect = false
+        ReleaseAchievementPoints()
         if _typeDialog then _typeDialog:Hide() end
         if _warnDialog then _warnDialog:Hide() end
     end)
@@ -811,11 +848,14 @@ evf:SetScript("OnEvent", function(_, event, arg1)
            and (not arg1 or arg1 == InspectedGUID()) then
             OnInspectReady()
         end
+    elseif event == "INSPECT_ACHIEVEMENT_READY" then
+        if _achieveSet then _achieveGUID = arg1 end
     end
 end)
 
 OnInspectReady = function()
     EnableInspectBtn()
+    RequestAchievementPoints()
     -- One-shot flag set by TargetNote right-click "Inspect & Create Note".
     -- Takes priority over auto-create mode so the user sees the type dialog.
     if BNB._inspectAndCreate then
