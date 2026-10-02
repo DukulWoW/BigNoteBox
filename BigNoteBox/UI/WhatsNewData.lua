@@ -26,8 +26,8 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "1.15.1",
+    version = "1.15.2",
     entries = {
-        "|cff66bb6aChange:|r Sticky backgrounds now show in their own colours when you first pick one, instead of tinted by the note colour (on a dark note they all looked black). The background picker always shows them as they are. Turn \"Colorize texture\" up to tint a background again",
+        "|cff66bb6aFixed:|r Enter did not start a new line while editing a sticky note (since v1.15.0), and Ctrl+Enter could remove a line break",
     },
 }
