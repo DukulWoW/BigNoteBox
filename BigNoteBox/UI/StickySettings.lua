@@ -947,6 +947,14 @@ local function PopulateStickySettings(noteID)
     ct2._y = ct2._y - 30
 
     local function SetTexKey(key)
+        -- Plain colour -> a texture: Colorize starts at 0 %, the art in its
+        -- own colours. At 100 % a dark note colour tinted every texture
+        -- near black and the addon looked broken (Dukul 2026-10-02). The
+        -- note colour is kept (base under the art, and None again). Texture
+        -- to texture keeps the player's Colorize.
+        if not BNB.StickyBG.Get(curTexKey).file and BNB.StickyBG.Get(key).file then
+            cfg.bgColorOpacity = 0
+        end
         curTexKey = key
         cfg.bgTexture = key
         SaveCfg(noteID, cfg)
@@ -997,7 +1005,7 @@ local function PopulateStickySettings(noteID)
             cfg.bgColorOpacity = v / 100
             SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        end, 100, PCT)
+        end, 0, PCT)
 
     -- "Texture brightness %" (ALL-110, Dukul 2026-09-27): -100..100, 0 = the
     -- art as it is. Below 0 darkens it, above 0 adds an ADD-blend copy on top
@@ -1014,6 +1022,8 @@ local function PopulateStickySettings(noteID)
     -- unavailable here (BigNoteBox_BGs missing, art of the other client)
     SyncColorizeSlider = function(texKey)
         local disabled = not BNB.StickyBG.Get(texKey).file
+        -- SetTexKey may have reset Colorize; silent, so nothing is saved twice
+        pcall(function() slColorize:SetValue(math.floor((cfg.bgColorOpacity or 1.0) * 100), true) end)
         for _, sl in ipairs({ slColorize, slBright }) do
             pcall(function() sl:SetAlpha(disabled and 0.4 or 1.0) end)
             if sl.SetEnabled then

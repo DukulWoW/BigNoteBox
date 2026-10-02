@@ -4,6 +4,12 @@
 -- window so each can be given a name, a fill mode and an anchor before it is
 -- added to the sticky background list. Export hands back one Lua line per
 -- entry. Work in progress is kept in BNB.LabDB().devBgLab across reloads.
+-- Three windows (2026-10-02, like the Icon Lab):
+--   control - picks the entry, name, fill, anchor, scale, exact numbers, Add
+--   sheet   - the file with the picture area (gold) and its atlas regions;
+--             draw the area by dragging, drag its edges, zoom, pan, aspect
+--             lock (UI/LabSheet.lua, shared with the Icon Lab later)
+--   preview - sticky-like, shows what a sticky would
 --
 -- Fill modes and their maths live in UI/BgLayer.lua, shared with the
 -- sticky notes, so this preview is what a sticky shows. "Try on stickies"
@@ -119,12 +125,25 @@ local ANCHORS = BL.ANCHORS
 
 local DEF_BASE = { 0.07, 0.07, 0.09 }   -- sticky COL_BG (UI/StickyNote.lua)
 local INSET    = 3                        -- sticky "Default" border inset
-local C_W, C_H = 320, 736
+local C_W, C_H = 360, 756
 local C_PAD    = 16
+local COL_CROP = { 1, 0.82, 0, 1 }
 
-local _ctl, _pv
+-- Aspect lock for the picture area on the sheet, cycled with its button.
+-- preview = the preview window's shape, which is what Cover shows on a
+-- sticky of that shape; file = the file's own shape.
+local ASPECTS = {
+    { nil,      "Aspect: off" },
+    { "preview", "Aspect: preview" },
+    { "file",    "Aspect: file" },
+    { "square",  "Aspect: 1:1" },
+}
+
+local _ctl, _pv, _sheet
 local _idx = 1
 local _trying   -- "Try on stickies" is on
+
+local function R(v) return math.floor(v + 0.5) end
 
 -- ── Saved state ──────────────────────────────────────────────────────────────
 local function Store()
@@ -146,17 +165,39 @@ local function State(i)
     return st
 end
 
--- ── Native size probe (UI/LabKit.lua) ────────────────────────────────────────
--- A manual W/H in the panel wins over the probe.
+-- The sheet's own view options (UI/LabSheet.lua)
+local function SheetView()
+    local s = Store()
+    s.sheet = s.sheet or {}
+    return s.sheet
+end
+
+-- ── Native size (UI/LabKit.lua probe) ────────────────────────────────────────
+-- Sizes are saved once probed (Store().sizes), so Export and the list know
+-- them for entries not opened this session. A failed probe is not saved: the
+-- file may load another time. A manual W/H in the panel wins over both.
 local _prober = K.NewProber()
 local _sizes  = _prober.sizes   -- [id] = { w, h } or false (did not load)
 
-local function ProbeSize(e, onDone) _prober:Probe(_ctl, e.id, onDone) end
+local function FileSize(id)
+    local sz = _sizes[id]
+    if sz == nil then sz = Store().sizes and Store().sizes[id] end
+    return sz
+end
+
+local function RememberSize(id)
+    local sz = _sizes[id]
+    if type(sz) == "table" then
+        local s = Store()
+        s.sizes = s.sizes or {}
+        s.sizes[id] = { sz[1], sz[2] }
+    end
+end
 
 local function NativeSize(i)
-    local st, sz = State(i), _sizes[LIST[i].id]
-    local w = st.w or (sz and sz[1])
-    local h = st.h or (sz and sz[2])
+    local st, sz = State(i), FileSize(LIST[i].id)
+    local w = st.w or (type(sz) == "table" and sz[1] or nil)
+    local h = st.h or (type(sz) == "table" and sz[2] or nil)
     return w, h
 end
 
@@ -166,12 +207,48 @@ local function Crop(st)
     if st.cw and st.ch then return { st.cx or 0, st.cy or 0, st.cw, st.ch } end
 end
 
+local function Flip(st)
+    if st.flipH and st.flipV then return "hv" end
+    return (st.flipH and "h") or (st.flipV and "v") or nil
+end
+
 -- The current entry as a BgLayer def (UI/BgLayer.lua)
 local function LabDef(i)
     local st = State(i)
     local nw, nh = NativeSize(i)
     return { file = LIST[i].id, mode = st.mode, anchor = st.anchor, scale = st.scale or 1, w = nw, h = nh,
-             crop = Crop(st) }
+             crop = Crop(st), flip = Flip(st), bright = st.bright }
+end
+
+-- ── The picture area as a sheet box ──────────────────────────────────────────
+local function Box()
+    local st = State(_idx)
+    if st.cw and st.ch then return st.cx or 0, st.cy or 0, st.cw, st.ch end
+end
+
+local function FileRect()
+    local W, H = NativeSize(_idx)
+    if W and H then return 0, 0, W, H end
+end
+
+-- The box the tools start from: the saved one, else the whole file
+local function ToolBox()
+    local x, y, w, h = Box()
+    if x then return x, y, w, h end
+    return FileRect()
+end
+
+-- Stores the picture area on whole pixels inside the file; nil x clears it
+local function SetBox(x, y, w, h)
+    local st = State(_idx)
+    if not x then st.cx, st.cy, st.cw, st.ch = nil, nil, nil, nil; return end
+    x, y, w, h = R(x), R(y), math.max(1, R(w)), math.max(1, R(h))
+    local W, H = NativeSize(_idx)
+    if W and H then
+        x, y = math.max(0, math.min(x, W - 1)), math.max(0, math.min(y, H - 1))
+        w, h = math.min(w, W - x), math.min(h, H - y)
+    end
+    st.cx, st.cy, st.cw, st.ch = x, y, w, h
 end
 
 local function LayoutPreview()
@@ -186,15 +263,24 @@ local function LayoutPreview()
     local nw, nh = NativeSize(_idx)
     if not (W > 1 and H > 1) then return end
     if not (nw and nh and nw > 0 and nh > 0) then
-        tex:Hide()
-        _pv.warn:SetText(_sizes[e.id] == false and "Texture did not load on this client"
+        BL.Draw(tex, area, nil); BL.Draw(_pv.add, area, nil)   -- hides tiled copies too
+        _pv.warn:SetText(FileSize(e.id) == false and "Texture did not load on this client"
             or "Native size unknown: type W and H in the panel")
         _pv.warn:Show()
         return
     end
     _pv.warn:Hide()
 
-    BL.Draw(tex, area, LabDef(_idx))
+    -- Curated brightness as a sticky draws it (BgLayer.ApplyTint): darker =
+    -- vertex colour, lighter = an ADD copy on top
+    local def = LabDef(_idx)
+    local k = BL.Brightness(0, def)
+    local m = k < 0 and (1 + k) or 1
+    tex:SetVertexColor(m, m, m, 1)
+    _pv.add:SetVertexColor(k, k, k, 1)   -- before Draw: tiled copies take it then
+    if not (BL.Draw(tex, area, def) and k > 0 and BL.Draw(_pv.add, area, def)) then
+        BL.Draw(_pv.add, area, nil)   -- hides it and its tiled copies
+    end
 end
 
 -- ── Preview window (sticky-like) ─────────────────────────────────────────────
@@ -224,6 +310,9 @@ local function BuildPreview()
     f.base = area:CreateTexture(nil, "BACKGROUND", nil, -8)
     f.base:SetAllPoints()
     f.tex = area:CreateTexture(nil, "BACKGROUND", nil, 0)
+    f.add = area:CreateTexture(nil, "BACKGROUND", nil, 1)
+    f.add:SetBlendMode("ADD")
+    f.add:Hide()
 
     f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -8)
@@ -265,29 +354,40 @@ end
 -- ── Export ───────────────────────────────────────────────────────────────────
 local function Q(s) return string.format("%q", s) end
 
+-- Only named entries go out, and not Done (already in the registry) or
+-- Skip (rejected), the same rule as the Icon Lab (Dukul 2026-10-02)
 local function ExportText()
-    local out, n, skipped = {}, 0, 0
+    local out, n, done, skipped, unnamed = {}, 0, 0, 0, 0
     for i, e in ipairs(LIST) do
         local st = Store().e[e.key]
-        if st then
+        if not st then
+            -- never looked at
+        elseif st.done then
+            done = done + 1
+        elseif st.skip then
+            skipped = skipped + 1
+        elseif not (st.name and st.name ~= "") then
+            unnamed = unnamed + 1
+        else
             n = n + 1
             local nw, nh = NativeSize(i)
             local b = st.base
             local line = string.format(
-                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s%s%s },",
+                "{ key = %s, name = %s, file = %d, path = %s, w = %s, h = %s, mode = %s, anchor = %s, scale = %s%s%s%s%s%s%s },",
                 Q(e.key), Q(st.name or ""), e.id, Q(e.path), tostring(nw or "nil"), tostring(nh or "nil"),
                 Q(st.mode), Q(st.anchor), tostring(st.scale or 1),
                 e.atlas and (", atlas = " .. Q(e.atlas)) or "",
                 Crop(st) and string.format(", crop = { %d, %d, %d, %d }", unpack(Crop(st))) or "",
+                Flip(st) and (", flip = " .. Q(Flip(st))) or "",
+                st.bright and string.format(", bright = %.2f", st.bright) or "",
                 b and string.format(", base = { %.2f, %.2f, %.2f }", b[1], b[2], b[3]) or "",
-                _sizes[e.id] == false and ", loaded = false" or "",
-                st.skip and ", skip = true" or "")
-            if st.skip then skipped = skipped + 1 end
+                FileSize(e.id) == false and ", loaded = false" or "")
             out[#out + 1] = line
         end
     end
-    table.insert(out, 1, string.format("-- Background Lab export: %d of %d looked at, %d skipped, client %s",
-        n, #LIST, skipped, BNB.IsForever and "Forever" or "Retail"))
+    table.insert(out, 1, string.format(
+        "-- Background Lab export: %d named of %d, left out: %d done, %d skipped, %d not named yet. Client %s",
+        n, #LIST, done, skipped, unnamed, BNB.IsForever and "Forever" or "Retail"))
     return table.concat(out, "\n")
 end
 
@@ -297,7 +397,7 @@ local Refresh
 local SmallBtn, Ring, PutRing = K.SmallBtn, K.Ring, K.PutRing
 local function NumBox(parent, w, onSet) return K.NumBox(parent, w, onSet, function() Refresh() end) end
 
--- ── Textures added in game (file ID, path optional, or an atlas name) ───────
+-- ── Textures added in game (listfile lines, file IDs or atlas names) ────────
 -- Kept in devBgLab.custom as { id, path, atlas } and appended to LIST as
 -- group "added", so new finds from wow.export can be tried without a code
 -- change. An atlas entry is its file plus a Picture area taken from the
@@ -349,21 +449,33 @@ local function AddCustom(id, path, atlas)
     return AppendCustom(s.custom[#s.custom])
 end
 
-local ResolveAtlas = K.ResolveAtlas
+-- The path of a file as the list knows it (an atlas entry has none of its own)
+local function FilePath(id)
+    for _, e in ipairs(LIST) do
+        if e.id == id and e.path ~= "" then return e.path end
+    end
+    return ""
+end
 
--- Fills an atlas entry's Picture area from the atlas coordinates x the file's
--- size, once the size is known, and only while no Picture area is set (a
--- hand-tuned one survives later visits)
-local function ApplyAtlasCrop(i)
-    local e = LIST[i]
-    if not (e and e.atlas) then return end
-    local st = State(i)
-    local W, H = NativeSize(i)   -- a manual W/H wins over the probe
-    if st.cw or not (W and H) then return end
-    local _, info = ResolveAtlas(e.atlas)
-    if not info then return end
-    st.cx, st.cy, st.cw, st.ch = K.CropFromTexCoords(info.leftTexCoord, info.rightTexCoord,
-        info.topTexCoord, info.bottomTexCoord, W, H)
+-- Adds every line of the paste box: listfile lines (path;fileID), bare file
+-- IDs and atlas names. Returns how many were added and the last index.
+local function AddLines(text)
+    local added, bad, last = 0, 0, nil
+    for line in (text or ""):gmatch("[^\r\n]+") do
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if line ~= "" then
+            local id, path = K.ParseListfileLine(line)
+            local i
+            if id then
+                i = AddCustom(id, path)
+            else
+                local aid = not line:find("[/\\;]") and K.ResolveAtlas(line)
+                if aid then i = AddCustom(aid, FilePath(aid), line) end
+            end
+            if i then added, last = added + 1, i else bad = bad + 1 end
+        end
+    end
+    return added, bad, last
 end
 
 local function RemoveCustom(i)
@@ -377,14 +489,163 @@ local function RemoveCustom(i)
     table.remove(LIST, i)
 end
 
+-- ── Atlas regions (UI/IconLabAtlas.lua, dev builds) ──────────────────────────
+local RegionRect = K.NewRegionRects()
+
+-- The regions of entry e's file, looked up once per entry
+local function Regions(e)
+    e = e or LIST[_idx]
+    if not e then return nil end
+    if e._regs == nil then
+        e._regs = K.AtlasRegions(e.id, e.path ~= "" and e.path or FilePath(e.id)) or false
+    end
+    return e._regs or nil
+end
+
+-- Fills an atlas entry's Picture area from the atlas coordinates x the file's
+-- size, once the size is known, and only while no Picture area is set (a
+-- hand-tuned one survives later visits). This client's own atlas wins; the
+-- generated coordinates stand in when it has none.
+local function ApplyAtlasCrop(i)
+    local e = LIST[i]
+    if not (e and e.atlas) then return end
+    local st = State(i)
+    local W, H = NativeSize(i)   -- a manual W/H wins over the probe
+    if st.cw or not (W and H) then return end
+    local reg = { e.atlas }
+    for _, r in ipairs(Regions(e) or {}) do
+        if r[1] == e.atlas then reg = r; break end
+    end
+    local x, y, w, h = RegionRect(e.id, reg, W, H)
+    if x then st.cx, st.cy, st.cw, st.ch = x, y, w, h end
+end
+
+-- Hidden by the Hide done filter: done, skipped, or the file did not load here
+local function FilteredOut(i)
+    if not Store().hideOut or i == _idx then return false end
+    local e = LIST[i]
+    local st = Store().e[e.key]
+    return (st and (st.done or st.skip)) or FileSize(e.id) == false
+end
+
 local function Go(i)
     _idx = ((i - 1) % #LIST) + 1
     Store().idx = _idx
     State(_idx)
+    if _ctl and _ctl.nameEb then _ctl.nameEb._pending = nil end   -- a new entry shows its saved name
+    if _sheet then _sheet.SetHoverRegion(nil) end
     Refresh()
-    ProbeSize(LIST[_idx], function()
-        if LIST[_idx] then ApplyAtlasCrop(_idx); Refresh() end
+    local e = LIST[_idx]
+    _prober:Probe(_ctl, e.id, function()
+        RememberSize(e.id)
+        if LIST[_idx] == e then ApplyAtlasCrop(_idx); Refresh() end
     end)
+end
+
+-- < > step over filtered entries
+local function Step(d)
+    local i = _idx
+    for _ = 1, #LIST do
+        i = ((i + d - 1) % #LIST) + 1
+        if not FilteredOut(i) then break end
+    end
+    Go(i)
+end
+
+-- A region picked on the sheet: an entry of its own (file + atlas pair)
+local function PickRegion(name)
+    local e = LIST[_idx]
+    local i = AddCustom(e.id, e.path ~= "" and e.path or FilePath(e.id), name)
+    if i then Go(i) end
+end
+
+-- Measures every listed file with no saved size, one at a time, on its own
+-- prober (the entry prober drops a probe when you move on). Files that do
+-- not load on this client show red in the list.
+local _bgProber = K.NewProber()
+local function ProbeAllSizes()
+    local queue, seen = {}, {}
+    for _, e in ipairs(LIST) do
+        if not seen[e.id] and type(FileSize(e.id)) ~= "table" then
+            seen[e.id] = true
+            queue[#queue + 1] = e.id
+        end
+    end
+    local n = 0
+    local function NextOne()
+        n = n + 1
+        local id = queue[n]
+        if not id then return end
+        _bgProber:Probe(_ctl, id, function()
+            if _sizes[id] == nil then   -- a table, or false: did not load here
+                _sizes[id] = _bgProber.sizes[id]
+                RememberSize(id)
+                if LIST[_idx] and LIST[_idx].id == id then Refresh() end
+            end
+            NextOne()
+        end)
+    end
+    NextOne()
+end
+
+local function AspectRatio()
+    local a = Store().aspect
+    if a == "preview" and _pv then
+        local w, h = _pv.area:GetSize()
+        if w > 1 and h > 1 then return w / h end
+    elseif a == "file" then
+        local W, H = NativeSize(_idx)
+        if W and H then return W / H end
+    elseif a == "square" then
+        return 1
+    end
+end
+
+local function BuildSheet()
+    _sheet = K.NewSheet({
+        name = "BigNoteBoxBgLabSheet", minW = 600,
+        View = SheetView,
+        File = function()
+            local e = LIST[_idx]
+            if not e then return nil end
+            local W, H = NativeSize(_idx)
+            return e.id, W, H, e.atlas or (e.path ~= "" and e.path) or ("file " .. e.id), FileSize(e.id) == false
+        end,
+        boxes = { { key = "area", label = "Area", col = COL_CROP } },
+        Active = function() return "area" end,
+        Box = function() return Box() end,
+        ToolBox = function() return ToolBox() end,
+        Bounds = function() return FileRect() end,
+        SetBox = function(_, x, y, w, h) SetBox(x, y, w, h) end,
+        Changed = function() Refresh() end,
+        Regions = function() return Regions() end,
+        RegionRect = function(reg, W, H) return RegionRect(LIST[_idx].id, reg, W, H) end,
+        PickRegion = PickRegion,
+        Aspect = AspectRatio,
+        AddTools = function(f, last, S)
+            local asp = SmallBtn(f, ASPECTS[1][2], 104, function()
+                local cur, s = 1, Store()
+                for n, a in ipairs(ASPECTS) do if a[1] == s.aspect then cur = n end end
+                s.aspect = ASPECTS[cur % #ASPECTS + 1][1]
+                Refresh()
+            end)
+            asp:SetPoint("LEFT", last, "RIGHT", 10, 0)
+            asp:HookScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine("Aspect lock", 1, 1, 1)
+                GameTooltip:AddLine("Holds the picture area to this shape while you draw, drag an edge or resize. Preview = the preview window's shape, which is what Cover shows on a sticky that shape. Match fits the current box to it.", 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            asp:HookScript("OnLeave", function() GameTooltip:Hide() end)
+            f.aspBtn = asp
+            local match = SmallBtn(f, "Match", 56, S.MatchAspect)
+            match:SetPoint("LEFT", asp, "RIGHT", 6, 0)
+            f.matchBtn = match
+            local whole = SmallBtn(f, "Whole file", 76, function() SetBox(nil); Refresh() end)
+            whole:SetPoint("LEFT", match, "RIGHT", 6, 0)
+        end,
+    })
+    return _sheet.Build()
 end
 
 local function BuildControl()
@@ -395,10 +656,13 @@ local function BuildControl()
         onClose = function() _ctl:Hide() end,
         toplevel = true, escClose = true,
     })
-    f:SetPoint("CENTER", UIParent, "CENTER", 220, 0)
+    f:SetPoint("CENTER", UIParent, "CENTER", 120, 0)   -- sheet to the left, preview to the right
     closeBtn:SetScript("OnClick", function() f:Hide() end)
     exportBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(ExportText(), f, true) end)
-    f:HookScript("OnHide", function() if _pv then _pv:Hide() end end)
+    f:HookScript("OnHide", function()
+        if _sheet and _sheet.frame then _sheet.frame:Hide() end
+        if _pv then _pv:Hide() end
+    end)
     _ctl = f
 
     local cw = C_W - C_PAD * 2
@@ -407,23 +671,52 @@ local function BuildControl()
     body:SetSize(cw, C_H - 80)
     local y = 0
 
-    -- Navigation: < jump list >
-    local prev = SmallBtn(body, "<", 30, function() Go(_idx - 1) end)
+    local function Check(label, x, yy, onClick)
+        local cb = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+        cb:SetSize(24, 24)
+        cb:SetPoint("TOPLEFT", body, "TOPLEFT", x - 4, yy)
+        cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        cb.text:ClearAllPoints()
+        cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        cb.text:SetFontObject("GameFontHighlightSmall")
+        cb.text:SetText(label)
+        cb:SetScript("OnClick", onClick)
+        return cb
+    end
+
+    -- Navigation: < jump list >, and the list filter
+    local prev = SmallBtn(body, "<", 30, function() Step(-1) end)
     prev:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
-    local nextB = SmallBtn(body, ">", 30, function() Go(_idx + 1) end)
-    nextB:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y)
+    local hideCb = Check(L["DEV_WIN_ICONLAB_HIDE_DONE"], 0, y + 2, function(self)
+        Store().hideOut = self:GetChecked() or nil
+    end)
+    hideCb:ClearAllPoints()
+    hideCb:SetPoint("TOPLEFT", body, "TOPLEFT", cw - hideCb.text:GetStringWidth() - 22, y + 2)
+    hideCb:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText(L["DEV_WIN_BGLAB_HIDE_OUT_TIP"], 1, 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    hideCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f.hideOutCb = hideCb
+    local nextB = SmallBtn(body, ">", 30, function() Step(1) end)
+    nextB:SetPoint("TOPRIGHT", hideCb, "TOPLEFT", -4, -2)
     local dd = CreateFrame("DropdownButton", nil, body, "WowStyle1DropdownTemplate")
     dd:SetPoint("LEFT", prev, "RIGHT", 6, 0)
     dd:SetPoint("RIGHT", nextB, "LEFT", -6, 0)
+    -- Green = named, grey = done or skipped, red = the file did not load here
     dd:SetupMenu(function(_, root)
         pcall(function() root:SetScrollMode(500) end)
         for _, gk in ipairs(GROUP_ORDER) do
-            root:CreateTitle(GROUPS[gk].label)
+            local titled
             for i, e in ipairs(LIST) do
-                if e.g == gk then
+                if e.g == gk and not FilteredOut(i) then
+                    if not titled then root:CreateTitle(GROUPS[gk].label); titled = true end
                     local st = Store().e[e.key]
-                    local lbl = (st and st.name and st.name ~= "") and st.name or e.key
-                    if st and st.skip then lbl = "|cff888888" .. lbl .. " (skip)|r"
+                    local lbl = (st and st.name and st.name ~= "") and st.name or (e.atlas or e.key)
+                    if FileSize(e.id) == false then lbl = "|cffff5555" .. lbl .. " (did not load)|r"
+                    elseif st and st.done then lbl = "|cff888888" .. lbl .. " (done)|r"
+                    elseif st and st.skip then lbl = "|cff888888" .. lbl .. " (skip)|r"
                     elseif st and st.name and st.name ~= "" then lbl = "|cff66bb6a" .. lbl .. "|r" end
                     root:CreateRadio(lbl, function() return _idx == i end, function() Go(i) end)
                 end
@@ -439,29 +732,47 @@ local function BuildControl()
     f.info = info
     y = y - 44
 
-    -- Name
-    BNB.CreateSmallLabel(body, L["DEV_WIN_BGLAB_NAME"], y, cw)
+    -- Name, as in the Icon Lab: saved only when accepted (Tab, Enter or OK).
+    -- A named entry is green in the list and goes into Export; Esc puts the
+    -- saved name back. Leaving the box keeps the typed text: clicking OK
+    -- takes the focus away before its OnClick. The next entry switch shows
+    -- the saved name again.
+    BNB.CreateSmallLabel(body, L["DEV_WIN_ICONLAB_NAME"], y, cw)
     y = y - 14
-    local nameHost = BNB.CreateBackdropFrame("Frame", nil, body)
-    nameHost:SetSize(cw, 22)
+    local nameHost = K.PlainBox(body, cw - 40, 22)
     nameHost:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
-    BNB.SetBackdropDark(nameHost)
-    local nameEb = CreateFrame("EditBox", nil, nameHost)
-    nameEb:SetAllPoints()
-    nameEb:SetTextInsets(6, 6, 0, 0)
+    local nameEb = nameHost.eb
     nameEb:SetFontObject("GameFontHighlight")
-    nameEb:SetAutoFocus(false)
     nameEb:SetMaxLetters(40)
     nameEb:SetScript("OnTextChanged", function(self, user)
-        if not user then return end
-        State(_idx).name = self:GetText()
-        LayoutPreview()
+        if user then self._pending = true end   -- typed, not accepted yet
     end)
-    nameEb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
-    nameEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-    nameEb:SetScript("OnTabPressed", function(self) self:ClearFocus(); Go(_idx + 1) end)
+    local function AcceptName()
+        nameEb._pending = nil
+        local v = nameEb:GetText():gsub("^%s+", ""):gsub("%s+$", "")
+        State(_idx).name = (v ~= "") and v or nil
+        nameEb:ClearFocus()
+        Refresh()
+    end
+    nameEb:SetScript("OnEnterPressed", AcceptName)
+    nameEb:SetScript("OnTabPressed", function() AcceptName(); Step(1) end)
+    nameEb:SetScript("OnEscapePressed", function(self) self._pending = nil; self:ClearFocus(); Refresh() end)
+    local okBtn = SmallBtn(body, "OK", 34, AcceptName)
+    okBtn:SetPoint("LEFT", nameHost, "RIGHT", 6, 0)
     f.nameEb = nameEb
-    y = y - 32
+    y = y - 28
+
+    -- Done (left out of Export; Hide done keeps it out of the list) and Skip
+    -- (rejected as a background)
+    f.doneCb = Check(L["DEV_WIN_ICONLAB_DONE"], 0, y, function(self)
+        State(_idx).done = self:GetChecked() or nil
+        Refresh()
+    end)
+    f.skip = Check(L["DEV_WIN_BGLAB_SKIP"], 196, y, function(self)
+        State(_idx).skip = self:GetChecked() or nil
+        Refresh()
+    end)
+    y = y - 28
 
     -- Fill mode, 3 x 3
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_FILL"], y, cw)
@@ -477,7 +788,7 @@ local function BuildControl()
         b:SetPoint("TOPLEFT", body, "TOPLEFT", c * (mw + 6), y - r * 26)
         f.modeBtns[m.key] = b
     end
-    y = y - 3 * 26 - 8
+    y = y - 3 * 26 - 6
 
     -- Anchor, 3 x 3
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_ANCHOR"], y, cw)
@@ -493,29 +804,53 @@ local function BuildControl()
         b:SetPoint("TOPLEFT", body, "TOPLEFT", c * (aw + 6), y - r * 26)
         f.anchorBtns[a[1]] = b
     end
-    y = y - 3 * 26 - 8
+    y = y - 3 * 26 - 6
 
-    -- Scale
+    -- Scale, and Brightness: the background's own, curated here; a
+    -- player's Texture brightness adds to it (UI/BgLayer.lua)
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_SCALE"], y, cw)
     y = y - 22
-    local function Step(d)
+    local function ScaleStep(d)
         local st = State(_idx)
         st.scale = math.max(0.05, math.floor(((st.scale or 1) + d) * 100 + 0.5) / 100)
         Refresh()
     end
-    local sMinus = SmallBtn(body, "-", 30, function() Step(IsShiftKeyDown() and -0.25 or -0.05) end)
+    local sMinus = SmallBtn(body, "-", 24, function() ScaleStep(IsShiftKeyDown() and -0.25 or -0.05) end)
     sMinus:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
     local sVal = body:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    sVal:SetPoint("LEFT", sMinus, "RIGHT", 8, 0)
-    sVal:SetWidth(50)
+    sVal:SetPoint("LEFT", sMinus, "RIGHT", 4, 0)
+    sVal:SetWidth(42)
     f.sVal = sVal
-    local sPlus = SmallBtn(body, "+", 30, function() Step(IsShiftKeyDown() and 0.25 or 0.05) end)
-    sPlus:SetPoint("LEFT", sVal, "RIGHT", 8, 0)
-    local s1 = SmallBtn(body, "1x", 40, function() State(_idx).scale = 1; Refresh() end)
-    s1:SetPoint("LEFT", sPlus, "RIGHT", 8, 0)
-    local s2 = SmallBtn(body, "0.5x", 44, function() State(_idx).scale = 0.5; Refresh() end)
-    s2:SetPoint("LEFT", s1, "RIGHT", 6, 0)
-    y = y - 30
+    local sPlus = SmallBtn(body, "+", 24, function() ScaleStep(IsShiftKeyDown() and 0.25 or 0.05) end)
+    sPlus:SetPoint("LEFT", sVal, "RIGHT", 4, 0)
+    local s1 = SmallBtn(body, "1x", 32, function() State(_idx).scale = 1; Refresh() end)
+    s1:SetPoint("LEFT", sPlus, "RIGHT", 6, 0)
+    local s2 = SmallBtn(body, "0.5x", 40, function() State(_idx).scale = 0.5; Refresh() end)
+    s2:SetPoint("LEFT", s1, "RIGHT", 4, 0)
+    local function BrightStep(d)
+        local st = State(_idx)
+        local v = math.max(-1, math.min(1, math.floor(((st.bright or 0) + d) * 100 + 0.5) / 100))
+        st.bright = (v ~= 0) and v or nil
+        Refresh()
+    end
+    local bPlus = SmallBtn(body, "+", 24, function() BrightStep(IsShiftKeyDown() and 0.25 or 0.05) end)
+    bPlus:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y)
+    local bVal = body:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    bVal:SetPoint("RIGHT", bPlus, "LEFT", -4, 0)
+    bVal:SetWidth(44)
+    f.bVal = bVal
+    local bMinus = SmallBtn(body, "-", 24, function() BrightStep(IsShiftKeyDown() and -0.25 or -0.05) end)
+    bMinus:SetPoint("RIGHT", bVal, "LEFT", -4, 0)
+    for _, btn in ipairs({ bMinus, bPlus }) do
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["DEV_WIN_BGLAB_BRIGHT"], 1, 1, 1)
+            GameTooltip:AddLine(L["DEV_WIN_BGLAB_BRIGHT_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    y = y - 28
 
     -- Native size override
     BNB.CreateSmallLabel(body, L["DEV_WIN_BGLAB_SIZE"], y, cw)
@@ -531,28 +866,37 @@ local function BuildControl()
     end)
     hBox:SetPoint("LEFT", xLbl, "RIGHT", 6, 0)
     f.wBox, f.hBox = wBox, hBox
-    y = y - 30
+    y = y - 28
 
-    -- Picture area: the part of the file that holds the art (Dukul 2026-09-27)
+    -- Picture area: the part of the file that holds the art (Dukul 2026-09-27).
+    -- Drawn on the sheet; these boxes are for exact numbers.
     BNB.CreateSmallLabel(body, L["DEV_WIN_BGLAB_CROP"], y, cw)
     y = y - 16
     f.cropBoxes = {}
     local last
     for n, field in ipairs({ "cx", "cy", "cw", "ch" }) do
         local box = NumBox(body, 54, function(v)
-            local st = State(_idx)
-            if n <= 2 then st[field] = (v and v >= 0) and v or nil
-            else st[field] = (v and v > 0) and v or nil end
+            if not v then return end   -- an empty box left alone sets nothing
+            local x, yy, w, h = ToolBox()
+            if not x then return end
+            local vals = { x, yy, w, h }
+            if n <= 2 and v >= 0 or v > 0 then vals[n] = v end
+            SetBox(vals[1], vals[2], vals[3], vals[4])
             Refresh()
         end)
         if last then box:SetPoint("LEFT", last, "RIGHT", 6, 0)
         else box:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y) end
         f.cropBoxes[field], last = box, box
     end
-    y = y - 30
+    local clearCrop = SmallBtn(body, L["DEV_WIN_BGLAB_CROP_ALL"], cw - 4 * 60, function()
+        SetBox(nil); Refresh()
+    end)
+    clearCrop:SetPoint("LEFT", last, "RIGHT", 6, 0)
+    K.TabChain({ wBox, hBox, f.cropBoxes.cx, f.cropBoxes.cy, f.cropBoxes.cw, f.cropBoxes.ch })
+    y = y - 28
 
-    -- Base colour, skip, sample text
-    local baseBtn = SmallBtn(body, L["DEV_WIN_BGLAB_BASE"], 110, function()
+    -- Base colour and skip
+    local baseBtn = SmallBtn(body, L["DEV_WIN_BGLAB_BASE"], 100, function()
         local st = State(_idx)
         local b = st.base or DEF_BASE
         local old = st.base
@@ -565,84 +909,50 @@ local function BuildControl()
     sw:SetSize(18, 18)
     sw:SetPoint("LEFT", baseBtn, "RIGHT", 6, 0)
     f.swatch = sw
-    local baseReset = SmallBtn(body, L["DEV_WIN_BGLAB_RESET"], 60, function()
+    local baseReset = SmallBtn(body, L["DEV_WIN_BGLAB_RESET"], 54, function()
         State(_idx).base = nil; Refresh()
     end)
     baseReset:SetPoint("LEFT", sw, "RIGHT", 6, 0)
-    y = y - 28
-
-    local skip = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
-    skip:SetSize(24, 24)
-    skip:SetPoint("TOPLEFT", body, "TOPLEFT", -4, y)
-    skip.text = skip.text or skip:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    skip.text:SetPoint("LEFT", skip, "RIGHT", 2, 0)
-    skip.text:SetFontObject("GameFontHighlightSmall")
-    skip.text:SetText(L["DEV_WIN_BGLAB_SKIP"])
-    skip:SetScript("OnClick", function(self) State(_idx).skip = self:GetChecked() or nil end)
-    f.skip = skip
-
-    local sample = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
-    sample:SetSize(24, 24)
-    sample:SetPoint("TOPLEFT", body, "TOPLEFT", cw / 2, y)
-    sample.text = sample.text or sample:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    sample.text:SetPoint("LEFT", sample, "RIGHT", 2, 0)
-    sample.text:SetFontObject("GameFontHighlightSmall")
-    sample.text:SetText(L["DEV_WIN_BGLAB_SAMPLE_CB"])
-    sample:SetScript("OnClick", function(self)
+    f.sampleCb = Check(L["DEV_WIN_BGLAB_SAMPLE_CB"], 196, y + 2, function(self)
         Store().noSample = not self:GetChecked() or nil
         Refresh()
     end)
-    f.sampleCb = sample
-    y = y - 34
+    y = y - 26
 
-    -- Add a texture by file ID (path optional, only used for the key and export)
+    -- Flip (ALL-187)
+    f.flipH = Check(L["DEV_WIN_BGLAB_FLIP_H"], 0, y, function(self)
+        State(_idx).flipH = self:GetChecked() or nil; Refresh()
+    end)
+    f.flipV = Check(L["DEV_WIN_BGLAB_FLIP_V"], 100, y, function(self)
+        State(_idx).flipV = self:GetChecked() or nil; Refresh()
+    end)
+    y = y - 32
+
+    -- Add: paste listfile lines, file IDs or atlas names, one per line
     BNB.CreateSectionHeader(body, L["DEV_WIN_BGLAB_ADD_HDR"], y, cw)
     y = y - 20
-    local function PlainBox(w) return K.PlainBox(body, w) end
-    local idBox = PlainBox(80)
-    idBox:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
-    idBox.eb:SetNumeric(true)
-    local pathBox = PlainBox(cw - 80 - 60 - 12)
-    pathBox:SetPoint("LEFT", idBox, "RIGHT", 6, 0)
+    local addHost = K.PlainBox(body, cw - 66, 44)
+    addHost:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
+    addHost:SetClipsChildren(true)   -- a long paste stayed drawn below the box (E12)
+    local addEb = addHost.eb
+    addEb:SetMultiLine(true)
+    addEb:SetMaxLetters(0)
+    addEb:SetTextInsets(6, 6, 4, 4)
     local hint
-    -- The second box takes a path or an atlas name (ALL-120). An atlas brings
-    -- its own file ID, so the ID box may stay empty.
     local function DoAdd()
-        local id = tonumber(idBox.eb:GetText())
-        local text = pathBox.eb:GetText():gsub("^%s+", ""):gsub("%s+$", "")
-        -- A pasted wow.export listfile line, path;fileID (ALL-126)
-        local lfID, lfPath = K.ParseListfileLine(text)
-        if lfID and text:find(";") then id, text = lfID, lfPath end
-        local atlasID = not text:find("[/\\]") and ResolveAtlas(text)
-        local i
-        if atlasID then
-            i = AddCustom(atlasID, "", text)
-        elseif not id or id <= 0 then
-            if text ~= "" then hint:SetText(L["DEV_WIN_BGLAB_ATLAS_NONE"]) end
-            return
-        else
-            i = AddCustom(id, text)
-        end
-        hint:SetText(L["DEV_WIN_BGLAB_ADD_HINT"])
-        idBox.eb:SetText(""); pathBox.eb:SetText("")
-        idBox.eb:ClearFocus(); pathBox.eb:ClearFocus()
-        if i then Go(i) end
+        local added, bad, i = AddLines(addEb:GetText())
+        hint:SetText(string.format(L["DEV_WIN_ICONLAB_ADDED"], added, bad))
+        if added > 0 then addEb:SetText("") end
+        addEb:ClearFocus()
+        if i then Go(i); ProbeAllSizes() end
     end
-    idBox.eb:SetScript("OnEnterPressed", DoAdd)
-    idBox.eb:SetScript("OnTabPressed", function() pathBox.eb:SetFocus() end)
-    pathBox.eb:SetScript("OnEnterPressed", DoAdd)
     local addBtn = SmallBtn(body, L["DEV_WIN_BGLAB_ADD"], 60, DoAdd)
-    addBtn:SetPoint("LEFT", pathBox, "RIGHT", 6, 0)
+    addBtn:SetPoint("TOPLEFT", addHost, "TOPRIGHT", 6, 0)
     hint = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hint:SetPoint("TOPLEFT", idBox, "BOTTOMLEFT", 0, -3)
-    hint:SetText(L["DEV_WIN_BGLAB_ADD_HINT"])
-    local removeBtn = SmallBtn(body, L["DEV_WIN_BGLAB_REMOVE"], 110, function()
-        RemoveCustom(_idx)
-        Go(math.min(_idx, #LIST))
-    end)
-    removeBtn:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y - 24)
-    f.removeBtn = removeBtn
-    y = y - 56
+    hint:SetPoint("TOPLEFT", addHost, "BOTTOMLEFT", 0, -3)
+    hint:SetWidth(cw); hint:SetJustifyH("LEFT")
+    hint:SetText(L["DEV_WIN_ICONLAB_ADD_HINT"])
+    y = y - 44 - 22
 
     -- Try the current entry on every open sticky (runtime only, not saved)
     local tryBtn = SmallBtn(body, L["DEV_WIN_BGLAB_TRY"], cw, function()
@@ -652,6 +962,24 @@ local function BuildControl()
     end)
     tryBtn:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
     f.tryBtn = tryBtn
+    y = y - 26
+
+    local bw = math.floor((cw - 12) / 3)
+    local removeBtn = SmallBtn(body, L["DEV_WIN_BGLAB_REMOVE"], bw, function()
+        RemoveCustom(_idx)
+        Go(math.min(_idx, #LIST))
+    end)
+    removeBtn:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
+    f.removeBtn = removeBtn
+    local sheetBtn = SmallBtn(body, L["DEV_WIN_ICONLAB_SHEET"], bw, function()
+        local s = _sheet.frame
+        if s:IsShown() then s:Hide() else s:Show() end
+    end)
+    sheetBtn:SetPoint("TOPLEFT", body, "TOPLEFT", bw + 6, y)
+    local pvBtn = SmallBtn(body, L["DEV_WIN_ICONLAB_PREVIEW"], bw, function()
+        if _pv:IsShown() then _pv:Hide() else _pv:Show() end
+    end)
+    pvBtn:SetPoint("TOPLEFT", body, "TOPLEFT", (bw + 6) * 2, y)
     return f
 end
 
@@ -659,17 +987,24 @@ Refresh = function()
     if not _ctl then return end
     local e, st = LIST[_idx], State(_idx)
     local f = _ctl
-    local sz = _sizes[e.id]
-    local nw, nh = NativeSize(_idx)
+    local sz = FileSize(e.id)
     local status = (sz == nil and "loading...") or (sz == false and "|cffff5555did not load|r")
         or string.format("%dx%d", sz[1], sz[2])
-    f.info:SetText(string.format("%d / %d  |cffffd100%s|r\n%s\nfile %d  -  %s",
-        _idx, #LIST, GROUPS[e.g].label, e.atlas and ("atlas " .. e.atlas) or e.path, e.id, status))
-    pcall(function() f.dd:OverrideText((st.name and st.name ~= "") and st.name or e.key) end)
-    if not f.nameEb:HasFocus() then f.nameEb:SetText(st.name or "") end
+    local regs = Regions(e)
+    local live = ""
+    if e.atlas then
+        live = K.ResolveAtlas(e.atlas) == e.id and "" or "  |cffff9900atlas not on this client|r"
+    end
+    f.info:SetText(string.format("%d / %d  |cffffd100%s|r\n%s\nfile %d  -  %s%s%s",
+        _idx, #LIST, GROUPS[e.g].label, e.atlas and ("atlas " .. e.atlas) or e.path, e.id, status,
+        regs and string.format("  -  %d regions", #regs) or "", live))
+    pcall(function() f.dd:OverrideText((st.name and st.name ~= "") and st.name or (e.atlas or e.key)) end)
+    if not (f.nameEb:HasFocus() or f.nameEb._pending) then f.nameEb:SetText(st.name or "") end
     PutRing(f.modeRing, f.modeBtns[st.mode] or f.modeBtns.tile)
     PutRing(f.anchorRing, f.anchorBtns[st.anchor] or f.anchorBtns.CENTER)
     f.sVal:SetText(string.format("%.2fx", st.scale or 1))
+    f.bVal:SetText(string.format("%+d%%", math.floor((st.bright or 0) * 100 + 0.5)))
+    local nw, nh = NativeSize(_idx)
     if not f.wBox.eb:HasFocus() then f.wBox.eb:SetText(nw and tostring(nw) or "") end
     if not f.hBox.eb:HasFocus() then f.hBox.eb:SetText(nh and tostring(nh) or "") end
     for field, box in pairs(f.cropBoxes) do
@@ -678,6 +1013,10 @@ Refresh = function()
     local b = st.base or DEF_BASE
     f.swatch:SetColorTexture(b[1], b[2], b[3], 1)
     f.skip:SetChecked(st.skip == true)
+    f.doneCb:SetChecked(st.done == true)
+    f.flipH:SetChecked(st.flipH == true)
+    f.flipV:SetChecked(st.flipV == true)
+    f.hideOutCb:SetChecked(Store().hideOut == true)
     local showSample = not Store().noSample
     f.sampleCb:SetChecked(showSample)
     f.removeBtn:SetShown(e.g == "added")
@@ -686,6 +1025,15 @@ Refresh = function()
     if _pv then
         if showSample then _pv.sample:Show() else _pv.sample:Hide() end
     end
+    local sh = _sheet and _sheet.frame
+    if sh then
+        local a = Store().aspect
+        for _, o in ipairs(ASPECTS) do
+            if o[1] == a then sh.aspBtn:SetText(o[2]) end
+        end
+        sh.matchBtn:SetEnabled(AspectRatio() ~= nil)
+        _sheet.Layout()
+    end
     LayoutPreview()
 end
 
@@ -693,9 +1041,14 @@ function BNB.OpenBackgroundLab()
     if not BigNoteBoxDB then return end
     LoadCustom()
     if not _ctl then BuildControl() end
+    if not _sheet then BuildSheet() end
     _pv = _pv or BuildPreview()
-    if not _pv:GetPoint() then _pv:SetPoint("RIGHT", _ctl, "LEFT", -12, 0) end
+    local sh = _sheet.frame
+    if not sh:GetPoint() then sh:SetPoint("RIGHT", _ctl, "LEFT", -12, 0) end
+    if not _pv:GetPoint() then _pv:SetPoint("TOPLEFT", _ctl, "TOPRIGHT", 12, 0) end
     _ctl:Show(); _ctl:Raise()
+    sh:Show()
     _pv:Show()
     Go(Store().idx or _idx)
+    ProbeAllSizes()
 end

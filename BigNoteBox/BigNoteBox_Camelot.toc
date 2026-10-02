@@ -73,6 +73,7 @@ UI\TrashWindow.lua
 UI\DangerZone.lua
 UI\DebugWindow.lua
 UI\LabKit.lua
+UI\LabSheet.lua
 UI\BackgroundLab.lua
 #@debug@
 UI\IconLabData.lua

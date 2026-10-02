@@ -57,6 +57,50 @@ function K.EntryKey(id, path, atlas)
     return (base and base ~= "") and base or ("file" .. id)
 end
 
+-- The atlas regions known for a file, from the full atlas table
+-- (UI/IconLabAtlas.lua, dev builds only), keyed by file ID or by lower-case
+-- path without extension. Each region is { name, w, h, l, r, t, b }. nil
+-- when none are known or the table is not loaded.
+function K.AtlasRegions(id, path)
+    local A = BNB.IconLabAtlas
+    if not A then return nil end
+    local p = (path or ""):gsub("\\", "/"):lower():gsub("%.[^./]+$", "")
+    return A[id] or (p ~= "" and A[p]) or nil
+end
+
+-- A region rectangle cache for one lab: rect(fileID, reg, W, H) -> x, y, w,
+-- h in file pixels and live (true when this client's own atlas lies on the
+-- same file, which wins; false = the generated Retail coordinates), or nil
+-- while the size is unknown. Cached per file and size: a sheet asks for
+-- every region on each pointer move.
+function K.NewRegionRects()
+    local cache = {}   -- [file id] = { W, H, [name] = { x, y, w, h, live } or false }
+    return function(fileID, reg, W, H)
+        if not (W and H) then return nil end
+        local c = cache[fileID]
+        if not (c and c.W == W and c.H == H) then
+            c = { W = W, H = H }
+            cache[fileID] = c
+        end
+        local r = c[reg[1]]
+        if r == nil then
+            r = false
+            local id, info = K.ResolveAtlas(reg[1])
+            if id == fileID and info then
+                local x, y, w, h = K.CropFromTexCoords(info.leftTexCoord, info.rightTexCoord,
+                    info.topTexCoord, info.bottomTexCoord, W, H)
+                if x then r = { x, y, w, h, true } end
+            end
+            if not r and reg[4] then
+                local x, y, w, h = K.CropFromTexCoords(reg[4], reg[5], reg[6], reg[7], W, H)
+                if x then r = { x, y, w, h, false } end
+            end
+            c[reg[1]] = r
+        end
+        if r then return r[1], r[2], r[3], r[4], r[5] end
+    end
+end
+
 -- ── Native size probe ────────────────────────────────────────────────────────
 -- A texture with one anchor and no size of its own takes the file's size once
 -- it has loaded. Polled for up to 3 s. A fresh texture per probe: a reused one

@@ -7,6 +7,8 @@
 --   label  shown name (an L key, resolved here)
 --   cat    picker tab: stone | parchment | scenery | profession | classic
 --   file   game file ID, or an addon path; w / h = its native size
+--   crop   optional { x, y, w, h }; flip optional "h" / "v" / "hv"; bright
+--          optional -1..1, curated in the Lab (all UI/BgLayer.lua)
 -- "none" is always first (plain colour).
 --
 -- The game backgrounds come from the Background Lab (UI/BackgroundLab.lua,
@@ -25,9 +27,9 @@ BNB.StickyBG = SBG
 
 local BGS_ADDON = "BigNoteBox_BGs"
 
-local function E(key, label, cat, file, w, h, mode, anchor, scale, crop)
+local function E(key, label, cat, file, w, h, mode, anchor, scale, crop, flip, bright)
     return { key = key, label = label, cat = cat, file = file, w = w, h = h,
-             mode = mode, anchor = anchor, scale = scale or 1, crop = crop }
+             mode = mode, anchor = anchor, scale = scale or 1, crop = crop, flip = flip, bright = bright }
 end
 
 -- The profession art fills only the top left 677 x 550 of its 1024 file; the

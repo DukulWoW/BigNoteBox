@@ -154,9 +154,15 @@ local function MakeTile()
 end
 
 -- Draws the tile's entry the way UI/StickyNote.lua draws the note: base =
--- note colour, art tinted by Colorize %, backdrop centre clear under art
+-- note colour, backdrop centre clear under the art.
+-- The tiles show the plain art: Colorize and Texture brightness are left
+-- out (the background's own curated brightness still applies), so the
+-- picker is for choosing art and the tint shows on the sticky beside it.
+-- At the note's own Colorize a dark note made every tile near black
+-- (Dukul 2026-10-02). The note colour stays as the base under the art.
 local function Paint(t, st)
     local K, c, e = Kit(), st.cfg, t.entry
+    c = setmetatable({ bgColorOpacity = 0, bgBrightness = 0 }, { __index = c })
     local s = math.min(CELL_W / st.w, CELL_H / st.h)
     t.mini:SetScale(s)
     t.mini:SetSize(st.w, st.h)
