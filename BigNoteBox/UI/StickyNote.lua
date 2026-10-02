@@ -2044,16 +2044,17 @@ local function CreateStickyFrame(noteID)
     bodyEb:SetScript("OnCursorChanged", nil)
     bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
     -- Esc or Ctrl+Enter ends an inline edit, saved like a click outside
-    -- (Dukul, 2026-10-02). Plain Enter stays a new line. The newline a
-    -- multi-line box types for Ctrl+Enter is taken back out first.
+    -- (Dukul, 2026-10-02). Plain Enter stays a new line: a multi-line EditBox
+    -- types the newline itself only while it has no OnEnterPressed, so with
+    -- this handler the newline is inserted here. Ctrl+Enter types nothing.
     bodyEb:HookScript("OnEscapePressed", function() EndInlineEdit(f) end)
     bodyEb:HookScript("OnEnterPressed", function(self)
-        if not (f._inlineEditing and IsControlKeyDown()) then return end
-        local pos, t = self:GetCursorPosition(), self:GetText() or ""
-        if pos > 0 and t:sub(pos, pos) == "\n" then
-            self:SetText(t:sub(1, pos - 1) .. t:sub(pos + 1))
+        if not f._inlineEditing then return end
+        if IsControlKeyDown() then
+            EndInlineEdit(f)
+        else
+            self:Insert("\n")
         end
-        EndInlineEdit(f)
     end)
     -- Minimize, close, task view and HideAll all hide the body: end the edit
     sf2:HookScript("OnHide", function() EndInlineEdit(f) end)
