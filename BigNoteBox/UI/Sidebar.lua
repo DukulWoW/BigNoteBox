@@ -589,6 +589,8 @@ local function ShowSlotContextMenu(key, btn)
             rec.slotHidden = true
             if _activeKey == key then SB.SetActive("all") end
             SB.Refresh()
+            -- Settings > Modules > Character sidebar's list, if built (ALL-211)
+            if BNB.RefreshHiddenCharList then BNB.RefreshHiddenCharList() end
         end)
 
         -- Change icon

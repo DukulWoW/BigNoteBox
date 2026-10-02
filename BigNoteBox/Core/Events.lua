@@ -286,48 +286,65 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
 end)
 
 --------------------------------------------------------------------------------
+-- Situation checks (contextual surfacing). Every event below asks for one
+-- check through ScheduleContextCheck, which keeps a single pending check
+-- (PERF-05): a zone change fires two or three of these events, and each ran
+-- its own full check. A request never makes a pending check run sooner, so the
+-- zone events keep their settle time when a target change lands in between.
+--------------------------------------------------------------------------------
+local CONTEXT_CHECK_KEY = "contextCheck"
+local _contextCheckAt   = nil   -- GetTime() of the pending check
+local function RunContextCheck()
+    _contextCheckAt = nil
+    if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
+end
+local function ScheduleContextCheck(delay)
+    if not BNB.CheckContextualNotes then return end
+    local at = GetTime() + delay
+    if _contextCheckAt and _contextCheckAt > at then at = _contextCheckAt end
+    _contextCheckAt = at
+    BNB.Debounce(CONTEXT_CHECK_KEY, at - GetTime(), RunContextCheck)
+end
+
+-- Target and group changes only matter to player situations
+local function PlayerContextsInUse()
+    return not BNB.HasPlayerContexts or BNB.HasPlayerContexts()
+end
+
+--------------------------------------------------------------------------------
 -- PLAYER_ENTERING_WORLD — zone change detection (contextual surfacing)
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_ENTERING_WORLD", function()
-    if BNB.CheckContextualNotes then
-        C_Timer.After(1, BNB.CheckContextualNotes)
-    end
+    ScheduleContextCheck(1)
 end)
 
 --------------------------------------------------------------------------------
 -- ZONE_CHANGED_NEW_AREA — major zone transitions
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("ZONE_CHANGED_NEW_AREA", function()
-    if BNB.CheckContextualNotes then
-        C_Timer.After(0.5, BNB.CheckContextualNotes)
-    end
+    ScheduleContextCheck(0.5)
 end)
 
 --------------------------------------------------------------------------------
 -- ZONE_CHANGED — sub-zone transitions within the same zone
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("ZONE_CHANGED", function()
-    if BNB.CheckContextualNotes then
-        C_Timer.After(0.5, BNB.CheckContextualNotes)
-    end
+    ScheduleContextCheck(0.5)
 end)
 
 --------------------------------------------------------------------------------
 -- ZONE_CHANGED_INDOORS — entering/leaving buildings (can change sub-zone)
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("ZONE_CHANGED_INDOORS", function()
-    if BNB.CheckContextualNotes then
-        C_Timer.After(0.5, BNB.CheckContextualNotes)
-    end
+    ScheduleContextCheck(0.5)
 end)
 
 --------------------------------------------------------------------------------
--- PLAYER_TARGET_CHANGED — target changed (player-context notes)
+-- PLAYER_TARGET_CHANGED — target changed (player-context notes). Tab-targeting
+-- keeps moving the check out, so it runs once the target settles.
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
-    if BNB.CheckContextualNotes then
-        C_Timer.After(0.1, BNB.CheckContextualNotes)
-    end
+    if PlayerContextsInUse() then ScheduleContextCheck(0.1) end
 end)
 
 --------------------------------------------------------------------------------
@@ -337,10 +354,11 @@ end)
 local _rosterCheckPending = false
 BNB.RegisterEvent("GROUP_ROSTER_UPDATE", function()
     if _rosterCheckPending or not BNB.CheckContextualNotes then return end
+    if not PlayerContextsInUse() then return end
     _rosterCheckPending = true
     C_Timer.After(1, function()
         _rosterCheckPending = false
-        BNB.CheckContextualNotes()
+        ScheduleContextCheck(0)
     end)
 end)
 

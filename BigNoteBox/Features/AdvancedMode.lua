@@ -178,10 +178,15 @@ end
 
 --------------------------------------------------------------------------------
 -- FONT OBJECTS
--- Named per frame so multiple render frames don't share the same font object.
+-- Shared by every render frame (PERF-03): an object is fully set by its key
+-- (tag, font file, pixel size, flags), so frames that want the same font get
+-- the same object, and no frame ever changes one another frame uses. They were
+-- named per frame, which made four new global font objects (more with an
+-- outline) for every sticky ever opened.
 -- Must be deferred: called after PLAYER_LOGIN via AM.ApplyFontsToRenderFrame.
 --------------------------------------------------------------------------------
-local _fontObjs = {}  -- cache: key = "BNBRich_frameName_tag_flags"
+local _fontObjs = {}  -- cache: key = "tag|path|px|flags"
+local _fontCount = 0
 
 -- Resolve note.fontOutline to a SetFont flag string.
 -- Handles SLUG, SLUG Outline, and SLUG Thick Outline as first-class options.
@@ -218,24 +223,24 @@ function AM.OutlineLabel(fontOutline)
     return (key and BNB.L and BNB.L[key]) or o
 end
 
-local function GetOrCreateFontObj(key, path, size, flags)
-    -- Include flags in cache key so outline changes don't reuse a stale object.
-    local cacheKey = key .. (flags ~= "" and ("_" .. flags) or "")
-    if not _fontObjs[cacheKey] then
-        -- Named global font for the no-flag variant; anonymous for flagged ones.
-        local fo
-        if flags == "" then
-            fo = _G[key]
-            if not fo then fo = CreateFont(key) end
-        else
-            fo = CreateFont(nil)
-        end
-        _fontObjs[cacheKey] = fo
-    end
-    local fo = _fontObjs[cacheKey]
+local function GetOrCreateFontObj(tag, path, size, flags)
+    local px
     if path and path ~= "" then
         size = BNB.FontPx and BNB.FontPx(path, size) or size   -- per-font factor (ALL-60)
-        pcall(function() fo:SetFont(path, math.max(math.floor(size + 0.5), 6), flags) end)
+        px = math.max(math.floor(size + 0.5), 6)
+    end
+    local cacheKey = tag .. "|" .. (path or "") .. "|" .. (px or "") .. "|" .. flags
+    local fo = _fontObjs[cacheKey]
+    if not fo then
+        -- Numbered names: one global per distinct font, never per frame
+        _fontCount = _fontCount + 1
+        fo = CreateFont("BNBRichFont" .. _fontCount)
+        _fontObjs[cacheKey] = fo
+    end
+    -- Set on every call, not only on creation: a bundled TTF that was not
+    -- loaded yet on a cold login draws blank until it is set again (ALL-16)
+    if px then
+        pcall(fo.SetFont, fo, path, px, flags)
     end
     return fo
 end
@@ -249,8 +254,6 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
 
     local bodyPath = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) or nil
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont() or bodyPath
-
-    local fname = f:GetName() or tostring(f)
 
     -- Independent size mode: user has set explicit pixel sizes for each heading level.
     -- Multiplier mode (default): sizes derived from bodySize using fixed ratios.
@@ -268,10 +271,10 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
         psz  = bodySize
     end
 
-    f:SetFontObject("h1", GetOrCreateFontObj("BNBRich_"..fname.."_h1", boldPath, h1sz, flagStr))
-    f:SetFontObject("h2", GetOrCreateFontObj("BNBRich_"..fname.."_h2", boldPath, h2sz, flagStr))
-    f:SetFontObject("h3", GetOrCreateFontObj("BNBRich_"..fname.."_h3", boldPath, h3sz, flagStr))
-    f:SetFontObject("p",  GetOrCreateFontObj("BNBRich_"..fname.."_p",  bodyPath, psz,  flagStr))
+    f:SetFontObject("h1", GetOrCreateFontObj("h1", boldPath, h1sz, flagStr))
+    f:SetFontObject("h2", GetOrCreateFontObj("h2", boldPath, h2sz, flagStr))
+    f:SetFontObject("h3", GetOrCreateFontObj("h3", boldPath, h3sz, flagStr))
+    f:SetFontObject("p",  GetOrCreateFontObj("p",  bodyPath, psz,  flagStr))
 
     -- White text for headings/body; colour tags in markup override per-span.
     -- Note: SimpleHTML does not support SetFontObject/SetTextColor for "a" tags —

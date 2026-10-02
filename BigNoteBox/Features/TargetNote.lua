@@ -766,6 +766,12 @@ local function OnUnitMenuOpen(owner, rootDescription, contextData)
         rootDescription:CreateButton(L["TGT_MENU_OPEN"], function()
             UN.OpenNote(existingID)
         end)
+        -- The same note as a sticky (ALL-204, Dukul 2026-10-02)
+        if BNB.Sticky and BNB.Sticky.OpenWorld then
+            rootDescription:CreateButton(L["TGT_MENU_OPEN_STICKY"], function()
+                BNB.Sticky.OpenWorld(existingID)
+            end)
+        end
     end
     -- Offered even when a note exists: the flow then shows the "note exists"
     -- window, whose Create Duplicate is the menu's only way to a second note

@@ -41,6 +41,9 @@ local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local MODEL_SPLIT_DEFAULT = 0.30   -- items get 30%, model gets 70% of scroll area
 local MODEL_SPLIT_MIN_PX  = 60     -- minimum item area height in px
 local MODEL_MIN_H         = 150    -- minimum model frame height in px
+local MODEL_SPIN_KEY      = "refboxModelSpin"   -- BNB.Debounce key: item view spin resumes (ALL-206)
+local MAX_PITCH           = 1.4    -- model viewer tilt limit, radians (about 80 degrees)
+local MAX_DEPTH           = 6      -- Shift+wheel nearer / further limit, model units
 
 -- ── Skin-mode title height (shared with UI/ReferenceBoxTasks.lua via the kit) ─
 local SK_RB_TITLE_H         = 28
@@ -67,6 +70,10 @@ local _pendingQuests = {}   -- questID → true
 -- player's data). The row shows it as unavailable; the X removes it.
 local _unavailable   = { item = {}, spell = {} }
 local _modelHidden   = {}   -- noteID  → true (session-only, resets on /reload)
+-- The entry shown in the model viewer from the list (ALL-206), or nil:
+-- { noteID, att = { type, id }, spec = ModelSpec(att) }. For the open note
+-- only: cleared when the Reference Box moves to another note.
+local _shown         = nil
 local _gearViewTmog  = {}   -- noteID  → true = showing transmog, false/nil = regular
 -- Set true while SendAttachmentToChat is inserting, read by TryAddLink (shift-click hook).
 -- Declared up here because SendAttachmentToChat comes first in the file.
@@ -131,6 +138,100 @@ local function IsInspectNote(id)
     if note.source == "target" and note.targetNpcID ~= nil and not note.targetIsPet then return true end
     return false
 end
+-- The entry shown from the list (ALL-206), when it belongs to this note
+local function ShownFor(id)
+    return _shown and id and _shown.noteID == id and RBOn() and _shown or nil
+end
+
+-- Has a model view: an inspect / NPC note, or an entry shown on demand
+-- ("Show model", ALL-206). Everything that decides whether the Model tab and
+-- the viewer exist asks this; IsInspectNote is the note's own model only.
+local function HasModel(id)
+    return IsInspectNote(id) or ShownFor(id) ~= nil
+end
+
+-- How a Reference Box entry is drawn in the model viewer (ALL-206), or nil
+-- when it has none (quests, most spells, reagents and other plain items):
+--   { kind = "gear",     id = itemID }      tried on a character
+--   { kind = "weapon",   id = itemID }      on its own (weapons, shields, off-hands)
+--   { kind = "creature", id = creatureID }  battle pet
+--   { kind = "display",  id = displayID }   mount (item or spell), pet fallback
+local function MountSpec(mountID)
+    if not (mountID and C_MountJournal and C_MountJournal.GetMountInfoExtraByID) then return nil end
+    local ok, displayID = pcall(C_MountJournal.GetMountInfoExtraByID, mountID)
+    if ok and displayID and displayID ~= 0 then return { kind = "display", id = displayID } end
+    return nil
+end
+-- An item's transmog appearance (ALL-213): appearanceID (the visual a model
+-- can show on its own), sourceID. nil when it has none.
+local function ItemAppearance(itemID)
+    local TC = C_TransmogCollection
+    if not (TC and TC.GetItemInfo) then return nil end
+    local ok, appearanceID, sourceID = pcall(TC.GetItemInfo, itemID)
+    if ok and sourceID then return appearanceID, sourceID end
+    return nil
+end
+
+-- The camera Blizzard's Appearances tab uses for a gear piece's slot
+-- (ALL-213), or nil: item -> appearance source -> UI camera. A weapon's
+-- camera is made for the weapon shown on its own (SetItemAppearance), not
+-- held by a character: on a character it tipped the model on its side.
+local function GearCameraID(itemID, sourceID)
+    local TC = C_TransmogCollection
+    if not (TC and TC.GetAppearanceCameraIDBySource) then return nil end
+    if not sourceID then sourceID = select(2, ItemAppearance(itemID)) end
+    if not sourceID then return nil end
+    local ok, cameraID = pcall(TC.GetAppearanceCameraIDBySource, sourceID)
+    if ok and cameraID and cameraID ~= 0 then return cameraID end
+    return nil
+end
+
+-- Shown on their own in the viewer, as in the Appearances tab
+local WEAPON_LOCS = {
+    INVTYPE_WEAPON = true, INVTYPE_2HWEAPON = true, INVTYPE_WEAPONMAINHAND = true,
+    INVTYPE_WEAPONOFFHAND = true, INVTYPE_SHIELD = true, INVTYPE_HOLDABLE = true,
+    INVTYPE_RANGED = true, INVTYPE_RANGEDRIGHT = true, INVTYPE_THROWN = true,
+}
+-- Armour slots seen on a character. IsDressableItemByID can answer false for
+-- an item whose data has not loaded yet; the equip slot is known at once.
+local WORN_LOCS = {
+    INVTYPE_HEAD = true, INVTYPE_SHOULDER = true, INVTYPE_BODY = true,
+    INVTYPE_CHEST = true, INVTYPE_ROBE = true, INVTYPE_WAIST = true,
+    INVTYPE_LEGS = true, INVTYPE_FEET = true, INVTYPE_WRIST = true,
+    INVTYPE_HAND = true, INVTYPE_CLOAK = true, INVTYPE_TABARD = true,
+}
+
+local function ModelSpec(att)
+    if not (att and att.id) then return nil end
+    if att.type == "item" then
+        local id = att.id
+        if C_MountJournal and C_MountJournal.GetMountFromItem then
+            local ok, mountID = pcall(C_MountJournal.GetMountFromItem, id)
+            local spec = ok and MountSpec(mountID)
+            if spec then return spec end
+        end
+        if C_PetJournal and C_PetJournal.GetPetInfoByItemID then
+            -- returns name, icon, petType, creatureID, ..., creatureDisplayID (12th)
+            local ok, _, _, _, creatureID, _, _, _, _, _, _, _, displayID =
+                pcall(C_PetJournal.GetPetInfoByItemID, id)
+            if ok and creatureID and creatureID ~= 0 then return { kind = "creature", id = creatureID } end
+            if ok and displayID and displayID ~= 0 then return { kind = "display", id = displayID } end
+        end
+        -- att.sourceID: a transmog gear card's appearance (inspect notes),
+        -- drawn as that exact appearance, variant included
+        local equipLoc = C_Item.GetItemInfoInstant and select(4, C_Item.GetItemInfoInstant(id))
+        local dressable = (C_Item.IsDressableItemByID and C_Item.IsDressableItemByID(id))
+            or WEAPON_LOCS[equipLoc] or WORN_LOCS[equipLoc] or att.sourceID
+        if dressable then
+            return { kind = WEAPON_LOCS[equipLoc] and "weapon" or "gear", id = id, sourceID = att.sourceID }
+        end
+    elseif att.type == "spell" and C_MountJournal and C_MountJournal.GetMountFromSpell then
+        local ok, mountID = pcall(C_MountJournal.GetMountFromSpell, att.id)
+        return ok and MountSpec(mountID) or nil
+    end
+    return nil
+end
+
 local function IsLocked(id)
     local note = id and NDB() and NDB().notes and NDB().notes[id]
     if not note then return false end
@@ -514,6 +615,83 @@ local function SendAttachmentToChat(att)
     end
 end
 
+-- Debug mode only: one chat line per step of showing an entry (ALL-206,
+-- transmog cards that drew nothing, 2026-10-02)
+local function ViewerTrace(fmt, ...)
+    local db = BigNoteBoxDB
+    if db and db.debugMode then
+        BNB:Print("|cff88bbff[viewer]|r " .. string.format(fmt, ...))
+    end
+end
+K.ViewerTrace = ViewerTrace
+
+-- Dressing room for an entry: a transmog card's exact appearance (its saved
+-- source) through DressUpVisual, anything else through its item link
+local function DressUpEntry(att)
+    if att.sourceID and DressUpVisual then
+        local ok, shown = pcall(DressUpVisual, att.sourceID)
+        ViewerTrace("dressing room source %s: ok=%s result=%s", tostring(att.sourceID), tostring(ok), tostring(shown))
+        if ok then return end
+    end
+    local _, link = C_Item.GetItemInfo(att.id)
+    ViewerTrace("dressing room item %s: link=%s", tostring(att.id), tostring(link ~= nil))
+    if link then DressUpItemLink(link) end
+end
+
+-- ── Show an entry in the model viewer (ALL-206) ──────────────────────────────
+-- Any note gets the Model tab while an entry is shown; on an inspect or NPC
+-- note the entry takes the place of the player / NPC until the viewer's X.
+-- Returns false when the entry has no model.
+local function ShowInViewer(att)
+    local spec = ModelSpec(att)
+    ViewerTrace("show %s %s source=%s -> %s", tostring(att.type), tostring(att.id), tostring(att.sourceID),
+        spec and (spec.kind .. " " .. tostring(spec.id) .. " source=" .. tostring(spec.sourceID)) or "no model")
+    if not (spec and _noteID and rbFrame) then return false end
+    _shown = { noteID = _noteID, att = { type = att.type, id = att.id, sourceID = att.sourceID }, spec = spec }
+    _modelHidden[_noteID] = nil
+    _rbMode = "model"
+    if rbFrame._modelFrame then rbFrame._modelFrame._shownKey = nil end   -- load it again
+    UpdateModeStrip()
+    RenderList()
+    UpdateModelViewer()
+    return true
+end
+
+-- The viewer's X: back to the note's own model, or no Model tab on other notes
+local function ClearShownModel()
+    _shown = nil
+    local mdl = rbFrame and rbFrame._modelFrame
+    if mdl then
+        mdl._shownKey = nil
+        if mdl._stopSpin then mdl._stopSpin() end
+    end
+    if not IsInspectNote(_noteID) then _rbMode = "attachments" end
+    UpdateModeStrip()
+    RenderList()
+    UpdateModelViewer()
+end
+
+-- Open an entry's link the way a click on a chat link does (the item, spell or
+-- quest window), for entries the viewer cannot show.
+local function OpenEntryLink(att)
+    local link = BuildAttachmentLink(att)
+    local data = link and link:match("|H(.-)|h")
+    if data and SetItemRef then pcall(SetItemRef, data, link, "LeftButton") end
+end
+
+-- Left-click on a list entry, as on a link in chat (ALL-206, Dukul
+-- 2026-10-02): Shift = into the chat box, Ctrl = dressing room (items),
+-- plain = shown in the model viewer, or its link window when it has no model.
+local function OnEntryClick(att)
+    if IsShiftKeyDown() then
+        SendAttachmentToChat(att)
+    elseif IsControlKeyDown() and att.type == "item" then
+        DressUpEntry(att)
+    elseif not ShowInViewer(att) then
+        OpenEntryLink(att)
+    end
+end
+
 -- ── Move/Copy picker window ───────────────────────────────────────────────────
 local _pickerFrame  = nil
 local _pickerNoteID = nil
@@ -772,6 +950,15 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
                 if link then DressUpItemLink(link) end
             end)
         end
+        -- Show model, beside the dressing room (ALL-206): only for entries
+        -- the viewer can draw
+        if attCheck and ModelSpec(attCheck) then
+            root:CreateButton(L["REFBOX_CTX_SHOW_MODEL"], function()
+                local note2 = NDB() and NDB().notes and NDB().notes[noteID]
+                local att2  = note2 and note2.attachments and note2.attachments[attIndex]
+                if att2 then ShowInViewer(att2) end
+            end)
+        end
         root:CreateButton(L["REFBOX_CTX_MOVE_COPY"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
@@ -817,11 +1004,19 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
             if url then BNB.ShowClipboardHint(url) end
         end)
 
+        -- Show model (ALL-206) and the dressing room; a transmog card's own
+        -- appearance (appearanceID there is the transmog source)
+        local gearAtt = { type = "item", id = gearEntry.id, sourceID = gearEntry.appearanceID }
+
         -- Try in dressing room
         root:CreateButton(L["REFBOX_CTX_DRESSUP"], function()
-            local _, link = C_Item.GetItemInfo(gearEntry.id)
-            if link then DressUpItemLink(link) end
+            DressUpEntry(gearAtt)
         end)
+        if ModelSpec(gearAtt) then
+            root:CreateButton(L["REFBOX_CTX_SHOW_MODEL"], function()
+                ShowInViewer(gearAtt)
+            end)
+        end
 
         root:CreateDivider()
 
@@ -1210,7 +1405,7 @@ RenderList = function()
     local attachments = GetAttachments(_noteID) or {}
     local count       = #attachments
     local maxItems    = GetMaxItems()
-    local modelVisible = IsInspectNote(_noteID) and not (_noteID and _modelHidden[_noteID])
+    local modelVisible = HasModel(_noteID) and not (_noteID and _modelHidden[_noteID])
     local compact     = IsCompact() or modelVisible  -- compact when model viewer is shown
     local locked      = IsLocked(_noteID)
 
@@ -1243,18 +1438,11 @@ RenderList = function()
         -- Subject cards (npc/player pseudo-attachments) are not interactive
         local isSubject = data and data.isSubject
 
-        -- Left-click: send item/spell link to the active chat editbox
-        -- Ctrl+left-click on items: open WoW dressing room
+        -- Left-click: model viewer or link window, Shift = chat, Ctrl = dressing
+        -- room (OnEntryClick, ALL-206)
         if not isSubject then
             row:SetScript("OnClick", function(self, btn)
-                if btn == "LeftButton" then
-                    if IsControlKeyDown() and att2.type == "item" then
-                        local _, link = C_Item.GetItemInfo(att2.id)
-                        if link then DressUpItemLink(link) end
-                    else
-                        SendAttachmentToChat(att2)
-                    end
-                end
+                if btn == "LeftButton" then OnEntryClick(att2) end
             end)
         else
             row:SetScript("OnClick", nil)
@@ -1319,7 +1507,8 @@ RenderList = function()
 
         -- Helper: renders one gear card row. isTmog controls watermark + type label.
         local function RenderGearRow(gearEntry, listRef, listIdx, isTmog)
-            local att = { type = "item", id = gearEntry.id }
+            -- sourceID: transmog cards show their exact appearance in the viewer
+            local att = { type = "item", id = gearEntry.id, sourceID = isTmog and gearEntry.appearanceID or nil }
             local data = ResolveAttachment(att)
             local row = AcquireRow(sc)
             row:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PAD, y)
@@ -1335,16 +1524,9 @@ RenderList = function()
             local capList = listRef
             local capIdx  = listIdx
 
+            -- Same clicks as an attachment (ALL-206): plain = this piece in the viewer
             row:SetScript("OnClick", function(self, btn)
-                if btn == "LeftButton" then
-                    if IsControlKeyDown() then
-                        -- Ctrl+click: open WoW dressing room with this item.
-                        local link = C_Item.GetItemInfo(gearEntry.id) and select(2, C_Item.GetItemInfo(gearEntry.id))
-                        if link then DressUpItemLink(link) end
-                    else
-                        SendAttachmentToChat(att)
-                    end
-                end
+                if btn == "LeftButton" then OnEntryClick(att) end
             end)
             row:SetScript("OnMouseUp", function(self, btn)
                 if btn == "RightButton" then
@@ -1481,6 +1663,12 @@ end
 local function ModelTabIcon()
     local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
     if not note then return TAB_FALLBACK end
+    -- A note whose tab is only there for a shown entry: that entry's icon
+    local shown = ShownFor(_noteID)
+    if shown and not IsInspectNote(_noteID) then
+        local data = ResolveAttachment(shown.att)
+        return (data and data.icon) or TAB_FALLBACK
+    end
     if note.source == "inspect" and BNB.GetInspectRaceIcon then
         local ok, path = pcall(BNB.GetInspectRaceIcon, note.inspectRaceID, note.inspectSexID)
         if ok and path then return path end
@@ -1629,7 +1817,9 @@ local function UpdateSideTabs()
     local icon  = strip._modelBtn._icon
     icon:SetTexture(ModelTabIcon())
     -- Live portrait while targeted, else the NPC's saved portrait (ALL-46)
-    if TargetMatchesNpcNote() or TargetMatchesInspectNote() then
+    if ShownFor(_noteID) and not IsInspectNote(_noteID) then
+        -- shown entry's icon, set above
+    elseif TargetMatchesNpcNote() or TargetMatchesInspectNote() then
         pcall(SetPortraitTexture, icon, "target")
     elseif BNB.SetNpcNotePortrait then
         local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
@@ -1703,7 +1893,7 @@ function UpdateModeStrip()
     if not _modeStrip then return end
     -- The tabs switch between the model and the tasks view, so with Tasks off
     -- both go and the note stays on its model (ALL-102)
-    local hasModel = IsInspectNote(_noteID) and BNB.TasksEnabled()
+    local hasModel = HasModel(_noteID) and BNB.TasksEnabled()
     _modeStrip:SetShown(hasModel)
     if not hasModel then return end
     if _modeStrip._sideTabs then UpdateSideTabs(); return end
@@ -2099,37 +2289,124 @@ BuildModelViewer = function(f)
     model:HookScript("OnSizeChanged", SizeCrest)
     model._sizeCrest = SizeCrest
 
-    -- Mouse drag: left = rotate, right = pan X/Y
+    -- Mouse drag: left = turn (sideways) and tilt (up / down), right = pan;
+    -- wheel = zoom, Shift+wheel = nearer / further (ALL-213, Dukul
+    -- 2026-10-02: "move the model freely, not just on a 2D plane"). The OnUpdate that follows
+    -- the pointer runs only while a button is held (PERF-08: it ran every
+    -- frame the model was shown).
     local rotating = false
     local panning  = false
     local lastX, lastY = 0, 0
+    local DragUpdate   -- set below
+
+    -- Item view (ALL-206, Dukul 2026-10-02): an entry shown from the list
+    -- turns gently by itself. A drag or a zoom stops it; SPIN_IDLE seconds
+    -- after the last one the view resets and it turns again. model._spin is
+    -- on while an entry is shown; the player / NPC view never turns.
+    local SPIN_SPEED = 0.5   -- radians per second, a full turn in about 12 s
+    local SPIN_IDLE  = 3     -- Dukul 2026-10-02: 5 s was a little long
+    local function SpinUpdate(self, elapsed)
+        self:SetFacing((self:GetFacing() or 0) + SPIN_SPEED * elapsed)
+    end
+
+    -- Start view of a shown entry: default position, then for a gear piece
+    -- the camera the Appearances tab uses for its slot (ALL-213: the head
+    -- for a helm, the shoulders for shoulders), set in model._cameraID
+    model._resetView = function()
+        model:SetPosition(0, 0, 0)
+        model:SetModelScale(1)
+        model:SetFacing(0)
+        pcall(model.SetPitch, model, 0)
+        if model._cameraID and Model_ApplyUICamera then
+            pcall(Model_ApplyUICamera, model, model._cameraID)
+        end
+    end
+    -- Back to the model's own camera (player / NPC view, mounts, pets):
+    -- Model_ApplyUICamera leaves a custom camera, pitch, roll and a frozen pose
+    model._clearCamera = function()
+        if not model._cameraID then return end
+        model._cameraID = nil
+        pcall(model.SetPitch, model, 0)
+        pcall(model.SetRoll, model, 0)
+        pcall(model.UseModelCenterToTransform, model, false)
+        pcall(model.RefreshCamera, model)
+        pcall(model.SetAnimation, model, 0)
+    end
+    -- A race model that loads after the camera was set: set it again
+    pcall(model.HookScript, model, "OnModelLoaded", function(self)
+        if self._cameraID and self._spin and not (rotating or panning) then self._resetView() end
+    end)
+
+    -- model._spinOff: the camera bar's animation button turned the turning
+    -- off (session only); the view still resets after a touch
+    local function ResumeSpin()
+        if not (model._spin and model:IsVisible()) or rotating or panning then return end
+        model._resetView()
+        if not model._spinOff then model:SetScript("OnUpdate", SpinUpdate) end
+    end
+    -- The user moved or zoomed: the spin waits, then the view resets
+    local function SpinTouched()
+        if model._spin then BNB.Debounce(MODEL_SPIN_KEY, SPIN_IDLE, ResumeSpin) end
+    end
+    model._startSpin = function()
+        model._spin = true
+        BNB.CancelDebounce(MODEL_SPIN_KEY)
+        if not (rotating or panning or model._spinOff) then model:SetScript("OnUpdate", SpinUpdate) end
+    end
+    model._stopSpin = function()
+        model._spin = false
+        BNB.CancelDebounce(MODEL_SPIN_KEY)
+        if not (rotating or panning) then model:SetScript("OnUpdate", nil) end
+    end
+
     model:SetScript("OnMouseDown", function(self, btn)
         local cx, cy = GetCursorPosition()
         local scale = self:GetEffectiveScale()
         cx, cy = cx / scale, cy / scale
         if btn == "LeftButton" then
             rotating = true
-            lastX = cx
+            lastX, lastY = cx, cy
         elseif btn == "RightButton" then
             panning = true
             lastX, lastY = cx, cy
+        end
+        if rotating or panning then
+            BNB.CancelDebounce(MODEL_SPIN_KEY)   -- no reset in the middle of a drag
+            self:SetScript("OnUpdate", DragUpdate)
         end
     end)
     model:SetScript("OnMouseUp", function(self, btn)
         if btn == "LeftButton" then rotating = false end
         if btn == "RightButton" then panning = false end
+        if not (rotating or panning) then
+            self:SetScript("OnUpdate", nil)
+            SpinTouched()
+        end
+    end)
+    -- A hide mid-drag gets no OnMouseUp: end the drag so the next show is idle.
+    -- A shown entry loads again on the next show (UpdateModelViewer).
+    model:HookScript("OnHide", function(self)
+        rotating, panning = false, false
+        self:SetScript("OnUpdate", nil)
+        BNB.CancelDebounce(MODEL_SPIN_KEY)
+        self._shownKey = nil
     end)
     -- ALL-95: open hand over the model, holding hand while rotating / panning
     BNB.SetHoverCursor(model, "open", "hold")
-    model:SetScript("OnUpdate", function(self)
+    DragUpdate = function(self)
         local cx, cy = GetCursorPosition()
         local scale = self:GetEffectiveScale()
         cx, cy = cx / scale, cy / scale
         if rotating then
             local dx = (cx - lastX) * 0.01
-            lastX = cx
+            local dy = (cy - lastY) * 0.01
+            lastX, lastY = cx, cy
             local facing = self:GetFacing() or 0
             self:SetFacing(facing + dx)
+            -- Tilt, kept short of straight up / down
+            local ok, pitch = pcall(self.GetPitch, self)
+            pitch = ok and pitch or 0
+            pcall(self.SetPitch, self, math.max(-MAX_PITCH, math.min(MAX_PITCH, pitch - dy)))
         end
         if panning then
             local dx = (cx - lastX) * 0.01
@@ -2138,10 +2415,18 @@ BuildModelViewer = function(f)
             local px, py, pz = self:GetPosition()
             self:SetPosition(px, py + dx, pz + dy)
         end
-    end)
+    end
 
-    -- Scroll wheel to zoom
+    -- Scroll wheel to zoom (stops an item view's spin, SpinTouched)
     model:SetScript("OnMouseWheel", function(self, delta)
+        if self._spin and not (rotating or panning) then self:SetScript("OnUpdate", nil) end
+        if IsShiftKeyDown() then
+            -- Nearer / further: the model's depth, the axis the drags leave out
+            local px, py, pz = self:GetPosition()
+            self:SetPosition(math.max(-MAX_DEPTH, math.min(MAX_DEPTH, px + delta * 0.25)), py, pz)
+            SpinTouched()
+            return
+        end
         local scale = self:GetModelScale() or 1
         if delta > 0 then
             scale = math.min(scale * 1.1, 4.0)
@@ -2149,6 +2434,7 @@ BuildModelViewer = function(f)
             scale = math.max(scale * 0.9, 0.3)
         end
         self:SetModelScale(scale)
+        SpinTouched()
     end)
 
     -- Placeholder label for when target is out of range
@@ -2197,6 +2483,33 @@ BuildModelViewer = function(f)
         if rbFrame then RenderList() end
     end)
     hideBtn:Hide()  -- shown by UpdateModelViewer when model is visible
+
+    -- X in the hide button's place while an entry from the list is shown
+    -- (ALL-206): back to the note's own model, or no model on other notes
+    local closeBtn = CreateFrame("Button", nil, model)
+    closeBtn:SetSize(BTN_SZ, BTN_SZ)
+    closeBtn:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4)
+    closeBtn:SetFrameLevel(model:GetFrameLevel() + 4)
+    local cbN = closeBtn:CreateTexture(nil, "ARTWORK"); cbN:SetAllPoints()
+    cbN:SetTexture(ASSETS .. "Buttons\\bt-close-normal")
+    local cbH = closeBtn:CreateTexture(nil, "ARTWORK"); cbH:SetAllPoints()
+    cbH:SetTexture(ASSETS .. "Buttons\\bt-close-hover"); cbH:Hide()
+    local cbP = closeBtn:CreateTexture(nil, "ARTWORK"); cbP:SetAllPoints()
+    cbP:SetTexture(ASSETS .. "Buttons\\bt-close-press"); cbP:Hide()
+    closeBtn:SetScript("OnMouseDown", function() cbP:Show(); cbN:Hide(); cbH:Hide() end)
+    closeBtn:SetScript("OnMouseUp",   function() cbP:Hide(); cbH:Show() end)
+    closeBtn:SetScript("OnEnter", function(self)
+        cbN:Hide(); cbH:Show()
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:AddLine(L["REFBOX_MV_ITEM_CLOSE_TIP"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    closeBtn:SetScript("OnLeave", function() cbP:Hide(); cbH:Hide(); cbN:Show(); GameTooltip:Hide() end)
+    closeBtn:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        if K.ClearShownModel then K.ClearShownModel() end
+    end)
+    closeBtn:Hide()
 
     -- "Show model" button (bt-up) — bottom-right corner of the refbox scroll area.
     -- Only visible when model data exists but the user has hidden the viewer.
@@ -2275,6 +2588,138 @@ BuildModelViewer = function(f)
     gearBtn:Hide()
     f._modelGearBtn = gearBtn
 
+    -- ── Camera bar (ALL-213, Dukul 2026-10-02) ───────────────────────────────
+    -- Blizzard's shop camera buttons (atlas shop-icon-camera-*, file
+    -- interface/shop/catalogshopcameracontrolicons2x), shown while the pointer
+    -- is anywhere over the viewer (Dukul 2026-10-02; it was the bottom band
+    -- only): turn left / right (held), reset
+    -- view, and in the item view the animation button = turning on / off.
+    -- Not built where the atlas is missing (it may not exist on Forever).
+    local CAM_ATLAS = "shop-icon-camera-"
+    local hasCamAtlas = C_Texture and C_Texture.GetAtlasInfo
+        and C_Texture.GetAtlasInfo(CAM_ATLAS .. "rotateleft-default") ~= nil
+    if hasCamAtlas then
+        local CAM_BTN, CAM_GAP = 26, 4   -- button size, gap
+        local TURN_SPEED = 2.0                          -- radians per second while held
+        local bar = CreateFrame("Frame", nil, model)
+        bar:SetHeight(CAM_BTN)
+        bar:SetPoint("BOTTOM", model, "BOTTOM", 0, 6)
+        bar:SetFrameLevel(model:GetFrameLevel() + 6)
+        bar:SetAlpha(0)
+        bar:Hide()
+
+        local function CamButton(name, tipKey)
+            local b = CreateFrame("Button", nil, bar)
+            b:SetSize(CAM_BTN, CAM_BTN)
+            b:SetNormalAtlas(CAM_ATLAS .. name .. "-default")
+            b:SetHighlightAtlas(CAM_ATLAS .. name .. "-hover")
+            b:SetPushedAtlas(CAM_ATLAS .. name .. "-pressed")
+            b._camName = name
+            b:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(L[self._tipKey or tipKey], 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            return b
+        end
+
+        -- Held turn buttons: the item's own turning pauses, as for a drag
+        local function HoldTurn(b, dir)
+            local function Turn(_, elapsed)
+                model:SetFacing((model:GetFacing() or 0) + dir * TURN_SPEED * elapsed)
+            end
+            b:SetScript("OnMouseDown", function(self)
+                BNB.CancelDebounce(MODEL_SPIN_KEY)
+                if not (rotating or panning) then model:SetScript("OnUpdate", nil) end
+                self:SetScript("OnUpdate", Turn)
+            end)
+            b:SetScript("OnMouseUp", function(self)
+                self:SetScript("OnUpdate", nil)
+                SpinTouched()
+            end)
+            b:HookScript("OnHide", function(self) self:SetScript("OnUpdate", nil) end)
+        end
+
+        local animBtn  = CamButton("animation",   "REFBOX_MV_SPIN_STOP")
+        local leftBtn  = CamButton("rotateleft",  "REFBOX_MV_TURN_LEFT")
+        local rightBtn = CamButton("rotateright", "REFBOX_MV_TURN_RIGHT")
+        local resetBtn = CamButton("undo",        "REFBOX_MV_RESET_VIEW")
+        HoldTurn(leftBtn,  1)
+        HoldTurn(rightBtn, -1)
+
+        resetBtn:SetScript("OnClick", function()
+            BNB.CancelDebounce(MODEL_SPIN_KEY)
+            if model._spin then
+                model._resetView()
+                if not (rotating or panning or model._spinOff) then
+                    model:SetScript("OnUpdate", SpinUpdate)
+                end
+            else
+                model:SetPosition(0, 0, 0)
+                model:SetModelScale(1)
+                model:SetFacing(0)
+                pcall(model.SetPitch, model, 0)
+            end
+        end)
+
+        -- Animation: the item view's turning on / off; lit while it turns
+        local function ShowAnimState()
+            local on = not model._spinOff
+            animBtn:SetNormalAtlas(CAM_ATLAS .. "animation-" .. (on and "pressed" or "default"))
+            animBtn._tipKey = on and "REFBOX_MV_SPIN_STOP" or "REFBOX_MV_SPIN_START"
+        end
+        animBtn:SetScript("OnClick", function(self)
+            model._spinOff = not model._spinOff or nil
+            BNB.CancelDebounce(MODEL_SPIN_KEY)
+            if not (rotating or panning) then
+                model:SetScript("OnUpdate", (model._spin and not model._spinOff) and SpinUpdate or nil)
+            end
+            ShowAnimState()
+            if GameTooltip:IsOwned(self) then self:GetScript("OnEnter")(self) end
+        end)
+
+        -- Left to right: [animation] turn left, turn right, reset; the
+        -- animation button only while an entry from the list is shown
+        local function Layout()
+            local btns = model._spin and { animBtn, leftBtn, rightBtn, resetBtn }
+                or { leftBtn, rightBtn, resetBtn }
+            animBtn:SetShown(model._spin == true)
+            for i, b in ipairs(btns) do
+                b:ClearAllPoints()
+                b:SetPoint("LEFT", bar, "LEFT", (i - 1) * (CAM_BTN + CAM_GAP), 0)
+            end
+            bar:SetWidth(#btns * CAM_BTN + (#btns - 1) * CAM_GAP)
+            ShowAnimState()
+        end
+
+        -- Shown while the pointer is over the viewer (a short fade). The poll
+        -- runs only from the model's OnEnter until the pointer leaves it.
+        local FADE = 0.15
+        local function Watch(self, elapsed)
+            local overModel = model:IsVisible() and model:IsMouseOver()
+            local a = bar:GetAlpha()
+            if overModel then
+                if not bar:IsShown() then Layout(); bar:Show() end
+                bar:SetAlpha(math.min(1, a + elapsed / FADE))
+            else
+                a = math.max(0, a - elapsed / FADE)
+                bar:SetAlpha(a)
+                if a == 0 then
+                    bar:Hide()
+                    if not overModel then self:SetScript("OnUpdate", nil) end
+                end
+            end
+        end
+        local watcher = CreateFrame("Frame", nil, model)
+        model:HookScript("OnEnter", function() watcher:SetScript("OnUpdate", Watch) end)
+        model:HookScript("OnHide", function()
+            watcher:SetScript("OnUpdate", nil)
+            bar:SetAlpha(0); bar:Hide()
+        end)
+        f._modelCamBar = bar
+    end
+
     -- Secondary label: "Transmog gear" / "Regular gear" — shown below the LIVE/RECONSTRUCTED label.
     local gearLabel = model:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     gearLabel:SetPoint("TOPLEFT", liveLabel, "BOTTOMLEFT", 0, -2)
@@ -2286,6 +2731,7 @@ BuildModelViewer = function(f)
     f._modelPlaceholder  = placeholder
     f._modelLiveLabel    = liveLabel
     f._modelHideBtn      = hideBtn
+    f._modelCloseBtn     = closeBtn
     f._modelShowBtn      = showBtn
     f._modelGearBtn      = gearBtn
     f._modelGearLabel    = gearLabel
@@ -2331,7 +2777,8 @@ end
 -- Show/hide model viewer based on current note; load model if needed
 UpdateModelViewer = function()
     if not rbFrame then return end
-    local isInspect = IsInspectNote(_noteID)
+    local isInspect = HasModel(_noteID)   -- own model or a shown entry (ALL-206)
+    local shown     = ShownFor(_noteID)
 
     local mdl      = rbFrame._modelFrame
     local ph       = rbFrame._modelPlaceholder
@@ -2340,8 +2787,18 @@ UpdateModelViewer = function()
     local showBtn  = rbFrame._modelShowBtn
     local gearBtn  = rbFrame._modelGearBtn
     local gearLbl  = rbFrame._modelGearLabel
+    local closeBtn = rbFrame._modelCloseBtn
 
     if not mdl then return end
+    -- Only a shown entry spins and has the X; set again below when one is shown
+    if closeBtn then closeBtn:Hide() end
+    if not shown then
+        if mdl._spin and mdl._stopSpin then mdl._stopSpin() end
+        mdl._shownKey = nil
+        mdl._clearCamera()
+        -- The player / NPC view resets position and facing below; tilt too
+        pcall(mdl.SetPitch, mdl, 0)
+    end
 
     -- Suppress model whenever we're in tasks/attachments mode on an inspect note
     if isInspect and _rbMode == "attachments" then
@@ -2409,6 +2866,74 @@ UpdateModelViewer = function()
         else
             crest:Hide()
         end
+    end
+
+    -- An entry from the list (ALL-206): drawn once per show, then left alone,
+    -- so a re-layout does not reset a model the user is turning
+    if shown then
+        if hideBtn then hideBtn:Hide() end
+        if closeBtn then closeBtn:Show() end
+        if gearBtn then gearBtn:Hide() end
+        if gearLbl then gearLbl:Hide() end
+        local key = shown.spec.kind .. ":" .. shown.spec.id .. ":" .. tostring(shown.spec.sourceID)
+        if mdl._shownKey ~= key then
+            mdl._shownKey = key
+            local spec = shown.spec
+            mdl._clearCamera()
+            -- Weapons, shields and off-hands on their own with their slot
+            -- camera, as the Appearances tab shows them. When that cannot be
+            -- done they go on a character like armour, without the camera.
+            local alone = false
+            if spec.kind == "weapon" and mdl.SetItemAppearance then
+                local appearanceID
+                if spec.sourceID and C_TransmogCollection and C_TransmogCollection.GetSourceInfo then
+                    local ok, info = pcall(C_TransmogCollection.GetSourceInfo, spec.sourceID)
+                    appearanceID = ok and info and info.visualID or nil
+                end
+                appearanceID = appearanceID or ItemAppearance(spec.id)
+                if appearanceID then
+                    pcall(mdl.ClearModel, mdl)
+                    alone = pcall(mdl.SetItemAppearance, mdl, appearanceID)
+                    if alone then mdl._cameraID = GearCameraID(spec.id, spec.sourceID) end
+                end
+                ViewerTrace("alone: visual=%s ok=%s camera=%s", tostring(appearanceID), tostring(alone), tostring(mdl._cameraID))
+            end
+            if alone then
+                -- shown above; nothing else to load
+            elseif spec.kind == "gear" or spec.kind == "weapon" then
+                -- On the note's player (race + sex) when it has one, else on
+                -- your own character; undressed, so the piece stands out
+                local raceLoaded = false
+                if note and note.inspectRaceID and note.inspectSexID ~= nil then
+                    pcall(function()
+                        mdl:SetUnit("none")
+                        mdl:SetCustomRace(note.inspectRaceID, note.inspectSexID)
+                        local fileID = mdl:GetModelFileID()
+                        raceLoaded = fileID ~= nil and fileID ~= 0
+                    end)
+                end
+                if not raceLoaded then pcall(mdl.SetUnit, mdl, "player") end
+                pcall(mdl.Undress, mdl)
+                local okTry, tryResult = pcall(mdl.TryOn, mdl, spec.sourceID or ("item:" .. spec.id))
+                if spec.kind == "gear" then mdl._cameraID = GearCameraID(spec.id, spec.sourceID) end
+                ViewerTrace("worn: race=%s tryOn ok=%s result=%s camera=%s model=%s", tostring(raceLoaded),
+                    tostring(okTry), tostring(tryResult), tostring(mdl._cameraID), tostring(mdl:GetModelFileID()))
+            elseif spec.kind == "creature" then
+                pcall(mdl.SetCreature, mdl, spec.id)
+            else
+                pcall(mdl.SetDisplayInfo, mdl, spec.id)
+            end
+            mdl._resetView()
+            mdl._startSpin()
+        end
+        if ph then ph:Hide() end
+        if ll then
+            local data = ResolveAttachment(shown.att)
+            ll:SetText(data and data.name or "")
+            if data then ll:SetTextColor(data.qr, data.qg, data.qb, 0.9) end
+            ll:Show()
+        end
+        return
     end
     local inspName  = note and note.inspectName
     local tgtName = (BNB.UnitNameRealm("target"))
@@ -2592,7 +3117,7 @@ UpdateDynamicTitle = function()
     if not rbFrame then return end
     local parts = {}
     if RBOn() then parts[#parts + 1] = L["REFBOX_PART_REF"] end
-    if IsInspectNote(_noteID) then parts[#parts + 1] = L["REFBOX_PART_MODEL"] end
+    if HasModel(_noteID) then parts[#parts + 1] = L["REFBOX_PART_MODEL"] end
     if TasksOnly() or (BNB.Task and BNB.Task.Shows(_noteID)) then
         parts[#parts + 1] = L["REFBOX_TITLE_TASKS"]
     end
@@ -2656,8 +3181,10 @@ function BNB.OpenReferenceBox(noteID)
         end)
     end
     _noteID = noteID or BNB._currentNoteID
+    -- A shown entry (ALL-206) belongs to its note: ShownFor drops it elsewhere
+    if _shown and _shown.noteID ~= _noteID then _shown = nil end
     -- Reset to model mode on every note switch for inspect notes
-    _rbMode = IsInspectNote(_noteID) and "model" or "attachments"
+    _rbMode = HasModel(_noteID) and "model" or "attachments"
     SetTitle(_noteID)
     PositionFrame()
     BuildExternalModeStrip()
@@ -2727,6 +3254,7 @@ function BNB.SyncReferenceBox(noteID)
     -- Reset gear view to transmog (default) whenever the note changes.
     if _noteID ~= noteID then
         _gearViewTmog[noteID] = nil
+        _shown = nil   -- the entry shown in the viewer belonged to the last note (ALL-206)
     end
     _noteID = noteID
 
@@ -2739,7 +3267,7 @@ function BNB.SyncReferenceBox(noteID)
         if hasContent then
             EnsureFrame()
             if not rbFrame:IsShown() then
-                _rbMode = IsInspectNote(noteID) and "model" or "attachments"
+                _rbMode = HasModel(noteID) and "model" or "attachments"
                 SetTitle(noteID)
                 PositionFrame()
                 rbFrame:Show()
@@ -2756,7 +3284,7 @@ function BNB.SyncReferenceBox(noteID)
             return
         end
         -- Reset mode for new note
-        _rbMode = IsInspectNote(noteID) and "model" or "attachments"
+        _rbMode = HasModel(noteID) and "model" or "attachments"
         UpdateModeStrip()
         SetTitle(noteID)
         RenderList()
@@ -2772,7 +3300,8 @@ end
 BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
     if not rbFrame or not rbFrame:IsShown() then return end
     if IsInspectNote(_noteID) then
-        C_Timer.After(0.1, UpdateModelViewer)
+        -- A shown entry stays in the viewer (ALL-206); only the tab follows
+        if not ShownFor(_noteID) then C_Timer.After(0.1, UpdateModelViewer) end
         UpdateModeStrip()   -- Model tab: NPC portrait follows the target
     end
 end)
@@ -2785,7 +3314,8 @@ BNB.CloseCompanionWindows = function()
 end
 
 -- ── Kit helpers for UI/ReferenceBoxTasks.lua (see the kit above) ──────────────
-K.IsInspectNote, K.OnModeClick = IsInspectNote, OnModeClick
+K.HasModel, K.OnModeClick = HasModel, OnModeClick
+K.ClearShownModel = ClearShownModel   -- the model viewer's X (built before it is defined)
 K.UpdateModeStrip, K.UpdateModelViewer, K.UpdateDynamicTitle =
     UpdateModeStrip, UpdateModelViewer, UpdateDynamicTitle
 

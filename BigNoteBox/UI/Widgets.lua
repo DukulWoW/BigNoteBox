@@ -416,9 +416,10 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     function btn:GetText() return lbl:GetText() end
     function btn:GetFontString() return lbl end
 
-    -- Re-skin when preset changes (triggered by ApplyMainWindowSkin).
+    -- Re-skin when preset changes (triggered by ApplyMainWindowSkin), and on
+    -- every show, which is why the registry may skip it while hidden.
     btn:HookScript("OnShow", ApplyPreset)
-    BNB.RegisterSkinButton(ApplyPreset)
+    BNB.RegisterSkinButton(ApplyPreset, btn)
 
     return btn
 end

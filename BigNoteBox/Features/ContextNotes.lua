@@ -84,8 +84,44 @@ local function GroupNames()
 end
 
 -- ── Match a single note against current context ────────────────────────────────
+-- Where the player is, read once per check (PERF-05: it was read again for
+-- every note): zone kind and name, sub-zone and target name, lower case.
+-- Group names come from GroupNames(), only when a player situation is tested.
+local function CurrentEnv()
+    local kind, val = GetCurrentZone()
+    local tgt = GetCurrentPlayer()
+    return {
+        zoneKind = kind,
+        zone     = (val or ""):lower(),
+        subzone  = (GetSubZoneText and GetSubZoneText() or ""):lower(),
+        target   = tgt and tgt:lower(),
+    }
+end
+
+-- Does one situation string ("zone:Elwynn Forest", "player:Thrall", ...) match?
+local function ContextMatches(ctx, env)
+    local kind, value = ctx:match("^(%w+):(.+)$")
+    if not kind or not value then return false end
+
+    value = value:lower()
+
+    if kind == "zone" or kind == "instance" then
+        return env.zoneKind == kind and env.zone == value
+    elseif kind == "subzone" then
+        return env.subzone == value
+    elseif kind == "player" then
+        -- Match against full value or just the name portion (before realm hyphen)
+        local valName = value:match("^([^-]+)") or value
+        local tgt = env.target
+        if tgt and (tgt == value or tgt == valName) then return true end
+        local group = GroupNames()
+        return (group[value] or group[valName]) and true or false
+    end
+    return false
+end
+
 -- Returns true if the note should surface.
-local function NoteMatches(note)
+local function NoteMatches(note, env)
     -- Scope guard: character-scoped notes only surface for their owner.
     local sc = note.scope
     if sc and sc ~= "global" then
@@ -95,29 +131,18 @@ local function NoteMatches(note)
 
     local ctx = note.context
     if not ctx or ctx == "" then return false end
+    return ContextMatches(ctx, env)
+end
 
-    local kind, value = ctx:match("^(%w+):(.+)$")
-    if not kind or not value then return false end
-
-    value = value:lower()
-
-    if kind == "zone" or kind == "instance" then
-        local curKind, curVal = GetCurrentZone()
-        return curKind == kind and curVal:lower() == value
-    elseif kind == "subzone" then
-        local curSub = GetSubZoneText and GetSubZoneText() or ""
-        return curSub:lower() == value
-    elseif kind == "player" then
-        local tgt = GetCurrentPlayer()
-        if tgt then
-            tgt = tgt:lower()
-            -- Match against full value or just the name portion (before realm hyphen)
-            local valName = value:match("^([^-]+)") or value
-            if tgt == value or tgt == valName then return true end
-        end
-        local group   = GroupNames()
-        local valName = value:match("^([^-]+)") or value
-        return (group[value] or group[valName]) and true or false
+-- Target and group changes only matter to notes with a player situation
+-- (PERF-05): Core/Events.lua skips those checks when no note has one. A plain
+-- scan, no API calls, so a newly set situation counts at once.
+function BNB.HasPlayerContexts()
+    local ndb = BNB.NotesDB()
+    if not (ndb and ndb.notes) then return false end
+    for _, note in pairs(ndb.notes) do
+        local c = note.context
+        if c and c:find("^player:") then return true end
     end
     return false
 end
@@ -495,13 +520,14 @@ function BNB.CheckContextualNotes()
     if not ndb or not ndb.notes then return end
 
     _groupNames = nil   -- group may have changed since the last check
+    local env = CurrentEnv()
     local matches   = {}
     local matchSet  = {}
     local stickyIDs = {}
     local popupIDs  = {}
     for _, note in pairs(ndb.notes) do
         if note and note.context and note.context ~= "" then
-            if NoteMatches(note) then
+            if NoteMatches(note, env) then
                 matches[#matches + 1]  = note.id
                 matchSet[note.id]      = true
                 if note.contextDisplay == "sticky" then
@@ -656,37 +682,17 @@ function BNB.CheckContextualNotes()
             end
         end
     end)
-
-    -- Notify TaskManager so per-task situations are evaluated in the same pass.
-    if BNB.Task and BNB.Task.OnContextChanged then
-        BNB.Task.OnContextChanged()
-    end
 end
 
--- Expose the context matching function so TaskManager can evaluate per-task
--- situations using the same logic as note contexts.
--- ctx is a context string e.g. "zone:stormwind city", "player:Arthas".
+-- Match one situation string against where the player is now, as note
+-- situations are matched. ctx e.g. "zone:stormwind city", "player:Arthas".
+-- Unused since the per-task situation scan was removed (PERF-05, Dukul
+-- 2026-10-02: it ran on every target change and its toast never existed);
+-- kept for per-task situation toasts (ALL-202).
 BNB._taskContextMatch = function(ctx)
     if not ctx or ctx == "" then return false end
-    local kind, value = ctx:match("^(%w+):(.+)$")
-    if not kind or not value then return false end
-    value = value:lower()
-    if kind == "zone" or kind == "instance" then
-        local curKind, curVal = GetCurrentZone()
-        return curKind == kind and curVal:lower() == value
-    elseif kind == "subzone" then
-        local curSub = GetSubZoneText and GetSubZoneText() or ""
-        return curSub:lower() == value
-    elseif kind == "player" then
-        local tgt = GetCurrentPlayer()
-        if tgt then
-            tgt = tgt:lower()
-            local valName = value:match("^([^-]+)") or value
-            if tgt == value or tgt == valName then return true end
-        end
-        return false
-    end
-    return false
+    _groupNames = nil
+    return ContextMatches(ctx, CurrentEnv())
 end
 
 -- ── Decode context string for display ─────────────────────────────────────────

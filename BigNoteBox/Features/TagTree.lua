@@ -61,9 +61,7 @@ local function BuildTagBuckets()
         end
         -- Sort notes within bucket A-Z by title
         table.sort(notes, function(a, b)
-            local at = (a.title and a.title ~= "") and a.title:lower() or "\255"
-            local bt = (b.title and b.title ~= "") and b.title:lower() or "\255"
-            return at < bt
+            return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
         end)
         if #notes > 0 then
             buckets[#buckets + 1] = { tag = tag, notes = notes }
@@ -77,9 +75,7 @@ local function BuildTagBuckets()
         end
     end
     table.sort(untagged, function(a, b)
-        local at = (a.title and a.title ~= "") and a.title:lower() or "\255"
-        local bt = (b.title and b.title ~= "") and b.title:lower() or "\255"
-        return at < bt
+        return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
     end)
 
     return buckets, untagged

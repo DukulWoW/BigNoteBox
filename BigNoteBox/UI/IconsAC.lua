@@ -193,13 +193,25 @@ local function BuildIconAC()
         self:UpdateSel()
     end
 
-    local function Strip(s)
-        return (s:lower():gsub("[_%-]", ""))
+    -- Lower case, no _ or -, one entry per name in the list. Built once per
+    -- list on the first search (PERF-06): stripping ~32,000 names on every
+    -- search made two new strings per name per keystroke.
+    local _stripped, _strippedFor
+    local function StrippedNames(list)
+        if _strippedFor ~= list then
+            _stripped = {}
+            for i, name in ipairs(list) do
+                _stripped[i] = (name:lower():gsub("[_%-]", ""))
+            end
+            _strippedFor = list
+        end
+        return _stripped
     end
 
     function popup:Search(raw)
         local list = BNB.BlizzardIconList
         if not list then self:Hide(); return end
+        local strippedNames = StrippedNames(list)
 
         -- Split query on spaces; each word must match somewhere in the stripped name
         local words = {}
@@ -212,8 +224,8 @@ local function BuildIconAC()
         if #words == 0 or (#words == 1 and #words[1] < 2) then self:Hide(); return end
 
         local found = {}
-        for _, name in ipairs(list) do
-            local stripped = Strip(name)
+        for i, name in ipairs(list) do
+            local stripped = strippedNames[i]
             local allMatch = true
             for _, w in ipairs(words) do
                 if not stripped:find(w, 1, true) then

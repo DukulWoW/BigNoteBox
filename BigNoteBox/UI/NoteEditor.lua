@@ -56,15 +56,16 @@ local function RefreshFocusButton()
     local ok = BNB._currentNoteID ~= nil and not BNB._editorLocked
     btn:SetEnabled(ok)
     btn:SetAlpha(ok and 1.0 or 0.35)
-    pcall(function() btn._n:SetDesaturated(not ok) end)
+    if btn._n then btn._n:SetDesaturated(not ok) end
 end
 
 function BNB.UpdateSaveButtonState()
     if not saveBtn then return end
     local enabled = BNB._dirty == true
+    saveBtn._showsDirty = enabled   -- MarkDirty skips the update while true
     saveBtn:SetEnabled(enabled)
     saveBtn:SetAlpha(enabled and 1.0 or 0.4)
-    pcall(function() saveBtn._tx:SetDesaturated(not enabled) end)
+    if saveBtn._tx then saveBtn._tx:SetDesaturated(not enabled) end
     -- Keep focus button in sync: disabled with no note or a locked note
     local hasNote = BNB._currentNoteID ~= nil
     RefreshFocusButton()
@@ -76,7 +77,9 @@ end
 
 BNB.MarkDirty = function()
     BNB._dirty = true
-    BNB.UpdateSaveButtonState()
+    -- Runs on every keystroke: the buttons only change when the Save button
+    -- does not show the note as changed yet (PERF-04)
+    if not (saveBtn and saveBtn._showsDirty) then BNB.UpdateSaveButtonState() end
     if BNB.ScheduleAutoSave then BNB.ScheduleAutoSave() end   -- ALL-52
 end
 
@@ -445,17 +448,16 @@ local function UpdateStatsStrip(text)
     local chars = #text
     local words = 0
     for _ in text:gmatch("%S+") do words = words + 1 end
-    local function fmt(n)
-        local s      = tostring(n)
-        local result = ""
-        local len    = #s
-        for i = 1, len do
-            if i > 1 and (len - i + 1) % 3 == 0 then result = result .. "," end
-            result = result .. s:sub(i, i)
-        end
-        return result
-    end
+    local fmt = BreakUpLargeNumbers or tostring
     strip:SetText(string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words)))
+end
+
+-- Typing updates the strip once the keys pause (PERF-04): the word count
+-- walks the whole body, too much per keystroke in a long note.
+local STATS_DELAY = 0.15
+local function UpdateStatsFromEditor()
+    local eb = BNB._editorBody
+    if eb then UpdateStatsStrip(eb.GetRealText and eb:GetRealText() or eb:GetText()) end
 end
 
 --------------------------------------------------------------------------------
@@ -488,10 +490,10 @@ local function BuildBodyField(parent, topAnchor)
     eb:SetScript("OnTextChanged", function(self, userInput)
         if not self._showingPlaceholder then
             if userInput then
+                -- MarkDirty also schedules the live preview: RichPreview.lua
+                -- hooks it (loads after this file, so the hook wraps this
+                -- override). Calling ScheduleRender here too ran it twice.
                 BNB.MarkDirty()
-                -- Notify live preview directly (hooksecurefunc on MarkDirty is
-                -- unreliable for plain Lua closures — call directly instead)
-                if BNB.RichPreview then BNB.RichPreview.ScheduleRender() end
                 if BNB._editorBodyScroll and BNB._editorBodyScroll.UpdateScrollbar then
                     BNB._editorBodyScroll:UpdateScrollbar()
                 end
@@ -543,7 +545,7 @@ local function BuildBodyField(parent, topAnchor)
                     end
                 end
             end
-            UpdateStatsStrip(self:GetText())
+            BNB.Debounce("editorStats", STATS_DELAY, UpdateStatsFromEditor)
         end
     end)
 
@@ -1315,6 +1317,7 @@ local function SetEditorLocked(locked)
 
         -- Only save and delete are greyed when locked
         if toolbar._saveBtn then
+            saveBtn._showsDirty = (not locked and BNB._dirty == true)
             saveBtn:SetEnabled(not locked and BNB._dirty == true)
             saveBtn:SetAlpha((not locked and BNB._dirty == true) and 1.0 or 0.4)
             pcall(function() saveBtn._tx:SetDesaturated(locked or not BNB._dirty) end)

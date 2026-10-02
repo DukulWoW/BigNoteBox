@@ -63,8 +63,20 @@ end
 --------------------------------------------------------------------------------
 local ef = CreateFrame("Frame")
 ef:RegisterEvent("PLAYER_REGEN_DISABLED")
-ef:RegisterEvent("PLAYER_STARTED_MOVING")
-ef:RegisterEvent("PLAYER_STOPPED_MOVING")
+
+-- The movement events only matter while Focus mode is open or the setup
+-- orbit runs, so they are registered only then (PERF-08: they came in for the
+-- whole session, on every step the player took).
+local _focusOpen, _setupOrbit = false, false
+local function UpdateMoveEvents()
+    if _focusOpen or _setupOrbit then
+        ef:RegisterEvent("PLAYER_STARTED_MOVING")
+        ef:RegisterEvent("PLAYER_STOPPED_MOVING")
+    else
+        ef:UnregisterEvent("PLAYER_STARTED_MOVING")
+        ef:UnregisterEvent("PLAYER_STOPPED_MOVING")
+    end
+end
 ef:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_DISABLED" then
         -- Combat: stop and never auto-resume for this combat
@@ -93,8 +105,16 @@ function FO.Stop()
     _stop()
 end
 
+-- Focus mode opened or closed (UI/FocusEditor.lua): movement events on or off
+function FO.SetFocusOpen(open)
+    _focusOpen = open and true or false
+    UpdateMoveEvents()
+end
+
 -- Setup wizard variants — bypass the IsFocusModeOpen guard.
 function FO.StartForSetup()
+    _setupOrbit = true
+    UpdateMoveEvents()
     if _running then return end
     if InCombatLockdown() then return end
     local db = BigNoteBoxDB
@@ -105,6 +125,8 @@ end
 
 function FO.StopForSetup()
     _stop()
+    _setupOrbit = false
+    UpdateMoveEvents()
 end
 
 function FO.Toggle()

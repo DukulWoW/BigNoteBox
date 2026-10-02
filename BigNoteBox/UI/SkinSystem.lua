@@ -121,8 +121,12 @@ end
 
 -- Public: called by CreateSkinButton for each skin button that should update
 -- on preset change. applyFn is a zero-arg function that re-applies the preset.
-function BNB.RegisterSkinButton(applyFn)
-    _skinButtons[#_skinButtons + 1] = applyFn
+-- owner (optional): the button, when it re-applies the preset itself on
+-- OnShow. Such a button is skipped while hidden, and dropped once it has no
+-- parent (a rebuilt row), so a window show does not walk every skin button
+-- ever made (PERF-09).
+function BNB.RegisterSkinButton(applyFn, owner)
+    _skinButtons[#_skinButtons + 1] = { fn = applyFn, owner = owner }
 end
 
 -- Public: called by CreateSkinTabs so tabs recolour on preset change.
@@ -181,10 +185,18 @@ function BNB.ApplyMainWindowSkin()
     applyList(_mainTargets)
     applyList(_extTargets)
 
-    -- Recolour all registered skin buttons
-    for _, applyFn in ipairs(_skinButtons) do
-        pcall(applyFn)
+    -- Recolour all registered skin buttons; prune the orphaned ones
+    local n = 0
+    for i = 1, #_skinButtons do
+        local e = _skinButtons[i]
+        local owner = e.owner
+        if not owner or owner:GetParent() then
+            n = n + 1
+            _skinButtons[n] = e
+            if not owner or owner:IsVisible() then pcall(e.fn) end
+        end
     end
+    for i = #_skinButtons, n + 1, -1 do _skinButtons[i] = nil end
 
     -- Recolour all registered skin tabs
     for _, refreshFn in ipairs(_skinTabs) do

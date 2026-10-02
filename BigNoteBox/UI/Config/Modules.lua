@@ -917,22 +917,42 @@ local function BuildSidebarPage(sf, ct, y, page)
     hiddenHdr:SetText(L["CFG_SIDEBAR_HIDDEN_HEADER"])
     subY = subY - (ROW_H + 2)
 
-    -- Hidden characters dynamic list.
-    -- Rows are Frames; old ones are orphaned (SetParent nil) on each rebuild
-    -- so their CreateTexture/CreateFontString children don't accumulate.
+    -- Hidden characters dynamic list. Rows are built once and reused
+    -- (PERF-10): it is rebuilt on every show of this page, and each rebuild
+    -- used to orphan its rows and make new ones, skin buttons included.
+    -- A row's Show button reads the character from row._charKey.
     local hiddenListY = subY
     local _hiddenRowPool = {}
-    local _hiddenRowCount = 0
+    local _hiddenNoneRow
+    local RebuildHiddenList   -- the Show buttons call it
 
-    local function RebuildHiddenList()
-        for i = 1, _hiddenRowCount do
-            if _hiddenRowPool[i] then
-                _hiddenRowPool[i]:Hide()
-                _hiddenRowPool[i]:SetParent(nil)
-                _hiddenRowPool[i] = nil
+    local function HiddenRow(i)
+        local row = _hiddenRowPool[i]
+        if row then return row end
+        row = CreateFrame("Frame", nil, sidebarSub)
+        row:SetHeight(26)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("LEFT",  row, "LEFT",  0,   0)
+        lbl:SetPoint("RIGHT", row, "RIGHT", -90, 0)
+        lbl:SetJustifyH("LEFT"); lbl:SetHeight(26)
+        row._lbl = lbl
+        local showBtn = BNB.CreateButton(nil, row, L["CFG_SIDEBAR_SHOW_BTN"], 80, 22)
+        showBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        showBtn:SetScript("OnClick", function()
+            local key = row._charKey
+            if key and db.knownChars[key] then
+                db.knownChars[key].slotHidden = false
             end
-        end
-        _hiddenRowCount = 0
+            if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
+            RebuildHiddenList()
+        end)
+        _hiddenRowPool[i] = row
+        return row
+    end
+
+    RebuildHiddenList = function()
+        for _, row in ipairs(_hiddenRowPool) do row:Hide() end
+        if _hiddenNoneRow then _hiddenNoneRow:Hide() end
 
         local chars = db.knownChars or {}
         local hidden = {}
@@ -946,41 +966,29 @@ local function BuildSidebarPage(sf, ct, y, page)
         end)
 
         local rowY = hiddenListY
-        for _, h in ipairs(hidden) do
-            _hiddenRowCount = _hiddenRowCount + 1
-            local row = CreateFrame("Frame", nil, sidebarSub)
-            row:SetHeight(26)
+        for i, h in ipairs(hidden) do
+            local row = HiddenRow(i)
+            row._charKey = h.key
+            row:ClearAllPoints()
             row:SetPoint("TOPLEFT",  sidebarSub, "TOPLEFT",  0, rowY)
             row:SetPoint("TOPRIGHT", sidebarSub, "TOPRIGHT", 0, rowY)
-            local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            lbl:SetPoint("LEFT",  row, "LEFT",  0,   0)
-            lbl:SetPoint("RIGHT", row, "RIGHT", -90, 0)
-            lbl:SetJustifyH("LEFT"); lbl:SetHeight(26)
-            lbl:SetText((h.rec.name or h.key)
+            row._lbl:SetText((h.rec.name or h.key)
                 .. "  |cff888888(" .. (h.rec.realm or "") .. ")|r")
-            local showBtn = BNB.CreateButton(nil, row, L["CFG_SIDEBAR_SHOW_BTN"], 80, 22)
-            showBtn:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-            local capturedKey = h.key
-            showBtn:SetScript("OnClick", function()
-                if db.knownChars[capturedKey] then
-                    db.knownChars[capturedKey].slotHidden = false
-                end
-                if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
-                RebuildHiddenList()
-            end)
-            _hiddenRowPool[_hiddenRowCount] = row
+            row:Show()
             rowY = rowY - 30
         end
 
         if #hidden == 0 then
-            _hiddenRowCount = 1
-            local row = CreateFrame("Frame", nil, sidebarSub)
-            row:SetHeight(20)
-            row:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, hiddenListY)
-            local nl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            nl:SetAllPoints(row); nl:SetJustifyH("LEFT")
-            nl:SetTextColor(0.45, 0.45, 0.45); nl:SetText(L["CFG_SIDEBAR_HIDDEN_NONE"])
-            _hiddenRowPool[1] = row
+            if not _hiddenNoneRow then
+                local row = CreateFrame("Frame", nil, sidebarSub)
+                row:SetHeight(20)
+                row:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, hiddenListY)
+                local nl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                nl:SetAllPoints(row); nl:SetJustifyH("LEFT")
+                nl:SetTextColor(0.45, 0.45, 0.45); nl:SetText(L["CFG_SIDEBAR_HIDDEN_NONE"])
+                _hiddenNoneRow = row
+            end
+            _hiddenNoneRow:Show()
             rowY = hiddenListY - 24
         end
 
@@ -991,6 +999,8 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     sf:HookScript("OnShow", RebuildHiddenList)
     RebuildHiddenList()
+    -- The sidebar's "Hide from sidebar" calls this, so an open page follows (ALL-211)
+    BNB.RefreshHiddenCharList = RebuildHiddenList
 
     -- y must advance past the sub-frame; GetHeight() is now set by RebuildHiddenList
     y = y - sidebarSub:GetHeight()

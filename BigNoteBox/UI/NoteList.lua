@@ -1524,8 +1524,60 @@ end
 
 BNB._createListEntry = function(parent) return CreateListEntry(parent) end
 
+-- Row icon border (PERF-01): the backdrop is set only when its file or size
+-- changed, since every list refresh re-populates every row.
+local ROW_BORDER_INSETS = { left = 0, right = 0, top = 0, bottom = 0 }
+local function SetRowBorder(bf, edgeFile, edgeSize, r, g, b, a)
+    local sig = edgeFile .. "|" .. edgeSize
+    if bf._sig ~= sig then
+        local ok = pcall(bf.SetBackdrop, bf, {
+            edgeFile = edgeFile, edgeSize = edgeSize, insets = ROW_BORDER_INSETS,
+        })
+        bf._sig = ok and sig or nil
+        if not ok then return end
+        bf:SetBackdropColor(0, 0, 0, 0)
+    end
+    bf:SetBackdropBorderColor(r, g, b, a)
+end
+
+-- Preview text per note (PERF-01), kept until the body, rich mode or source
+-- changes. Lua strings are interned, so comparing the body is one pointer
+-- compare. Only the start of the body is cleaned: two or three lines show.
+local PREVIEW_CHARS = 1000
+local _previewCache = setmetatable({}, { __mode = "k" })
+local function PreviewText(note)
+    local c = _previewCache[note]
+    local raw = note.body or ""
+    if c and c.body == raw and c.rich == note.richMode and c.src == note.source then
+        return c.text
+    end
+    local body = raw:sub(1, PREVIEW_CHARS):match("^%s*(.-)%s*$")
+    -- Strip rich note markup tags so preview shows plain text only
+    if note.richMode then
+        -- For inspect/target notes, skip the first {h1} block (player/target
+        -- name) since it duplicates the note title shown above the preview.
+        if note.source == "inspect" or note.source == "target" then
+            body = body:gsub("^%s*{h1[^}]*}.-{/h1}%s*", "", 1)
+        end
+        body = body:gsub("{/?h%d+:?[cr]?}", "")
+        body = body:gsub("{/?p:?[cr]?}", "")
+        body = body:gsub("{img:[^}]+}", "")
+        body = body:gsub("{icon:[^}]+}", "")
+        body = body:gsub("{col:%x%x%x%x%x%x}", "")
+        body = body:gsub("{/col}", "")
+        body = body:gsub("{br}", "")
+        body = body:gsub("{link%*[^*}]+%*([^}]*)}", "%1")
+        -- Collapse runs of blank lines so they don't eat the line budget
+        body = body:gsub("\n%s*\n+", "\n")
+        body = body:match("^%s*(.-)%s*$") or body
+    end
+    _previewCache[note] = { body = raw, rich = note.richMode, src = note.source, text = body }
+    return body
+end
+
 local function PopulateEntry(btn, note, selected, collapsed)
     btn._noteID = note.id
+    btn._title  = note.title   -- RefreshNoteListEntry: did a save change it?
     local noteIcon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     local iconPath = (noteIcon and noteIcon ~= "") and noteIcon or DEFAULT_ICON
     btn._icon:SetTexture(iconPath)
@@ -1597,18 +1649,11 @@ local function PopulateEntry(btn, note, selected, collapsed)
             bf:ClearAllPoints()
             bf:SetPoint("TOPLEFT",     btn._icon, "TOPLEFT",     -bordOffset,  bordOffset)
             bf:SetPoint("BOTTOMRIGHT", btn._icon, "BOTTOMRIGHT",  bordOffset, -bordOffset)
-            pcall(function()
-                bf:SetBackdrop({
-                    edgeFile = path, edgeSize = es,
-                    insets = { left = 0, right = 0, top = 0, bottom = 0 },
-                })
-                bf:SetBackdropColor(0, 0, 0, 0)
-                bf:SetBackdropBorderColor(
-                    math.min(1, 0.70 * bordBright),
-                    math.min(1, 0.70 * bordBright),
-                    math.min(1, 0.75 * bordBright),
-                    0.85)
-            end)
+            SetRowBorder(bf, path, es,
+                math.min(1, 0.70 * bordBright),
+                math.min(1, 0.70 * bordBright),
+                math.min(1, 0.75 * bordBright),
+                0.85)
             bf:Show()
         end
     else
@@ -1623,15 +1668,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
         bf:ClearAllPoints()
         bf:SetPoint("TOPLEFT",     btn._icon, "TOPLEFT",     -2,  2)
         bf:SetPoint("BOTTOMRIGHT", btn._icon, "BOTTOMRIGHT",  2, -2)
-        pcall(function()
-            bf:SetBackdrop({
-                edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                edgeSize = 12,
-                insets = { left = 0, right = 0, top = 0, bottom = 0 },
-            })
-            bf:SetBackdropColor(0, 0, 0, 0)
-            bf:SetBackdropBorderColor(0.35, 0.35, 0.38, 0.75)
-        end)
+        SetRowBorder(bf, "Interface\\Tooltips\\UI-Tooltip-Border", 12, 0.35, 0.35, 0.38, 0.75)
         bf:Show()
     end
 
@@ -1778,27 +1815,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
         if collapsed or compact then
             btn._previewLbl:Hide()
         else
-            local body = (note.body or ""):match("^%s*(.-)%s*$")
-            -- Strip rich note markup tags so preview shows plain text only
-            if note.richMode then
-                -- For inspect/target notes, skip the first {h1} block (player/target
-                -- name) since it duplicates the note title shown above the preview.
-                if note.source == "inspect" or note.source == "target" then
-                    body = body:gsub("^%s*{h1[^}]*}.-{/h1}%s*", "", 1)
-                end
-                body = body:gsub("{/?h%d+:?[cr]?}", "")
-                body = body:gsub("{/?p:?[cr]?}", "")
-                body = body:gsub("{img:[^}]+}", "")
-                body = body:gsub("{icon:[^}]+}", "")
-                body = body:gsub("{col:%x%x%x%x%x%x}", "")
-                body = body:gsub("{/col}", "")
-                body = body:gsub("{br}", "")
-                body = body:gsub("{link%*[^*}]+%*([^}]*)}", "%1")
-                -- Collapse runs of blank lines so they don't eat the line budget
-                body = body:gsub("\n%s*\n+", "\n")
-                body = body:match("^%s*(.-)%s*$") or body
-            end
-            btn._previewLbl:SetText(body)
+            btn._previewLbl:SetText(PreviewText(note))
             btn._previewLbl:SetMaxLines(spacious and 3 or 2)
             btn._previewLbl:Show()
         end
@@ -1869,21 +1886,12 @@ function BNB.RefreshNoteList()
 
     -- Always split pinned vs regular. In non-custom modes pinned notes are
     -- sorted A-Z among themselves; regular notes follow the active sort.
-    local isCustom = (BigNoteBoxDB and BigNoteBoxDB.sortBy == "custom")
+    -- GetOrderedNotes already sorts the pinned notes A-Z by title (PERF-07:
+    -- they were sorted a second time here).
     local pinned, regular = {}, {}
     for _, note in ipairs(notes) do
         if note.pinned then pinned[#pinned + 1] = note
         else                regular[#regular + 1] = note end
-    end
-    -- Pinned notes always A-Z by title regardless of sort mode
-    if not isCustom and #pinned > 1 then
-        local LAST = "\255"
-        table.sort(pinned, function(a, b)
-            local at = (a.title and a.title ~= "") and a.title:lower() or LAST
-            local bt = (b.title and b.title ~= "") and b.title:lower() or LAST
-            if at ~= bt then return at < bt end
-            return (a.id or "") < (b.id or "")
-        end)
     end
 
     for _, btn in ipairs(listEntries) do btn:Hide(); btn:ClearAllPoints() end
@@ -1998,6 +2006,51 @@ function BNB.RefreshNoteList()
     local sfH = _sf and _sf:GetHeight() or 100
     child:SetHeight(math.max(totalH, sfH))
     if _sf and _sf.UpdateScrollbar then _sf:UpdateScrollbar() end
+end
+
+-- The shown flat-list row for a note, or nil.
+local function ShownRow(id)
+    for _, btn in ipairs(listEntries) do
+        if btn:IsShown() and btn._noteID == id then return btn end
+    end
+end
+
+-- Is btn the first (newest first) or last (oldest first) unpinned row?
+-- In the "edited" sort that is where a saved note goes, so it does not move.
+local function AtEditedEdge(btn, asc)
+    local edge
+    for _, b in ipairs(listEntries) do
+        if b:IsShown() then
+            local n = BNB.GetNote(b._noteID)
+            if n and not n.pinned then
+                if not asc then return b == btn end
+                edge = b
+            end
+        end
+    end
+    return edge == btn
+end
+
+-- Redraw one note's row (PERF-01). For a change that cannot alter which notes
+-- the list shows or their order: autosave of title/body, task changes, target
+-- portraits. Anything that might falls back to the full RefreshNoteList, so
+-- callers never need to know. opts.tasks: the note's tasks changed.
+function BNB.RefreshNoteListEntry(id, opts)
+    local note = id and BNB.GetNote(id)
+    local db   = BigNoteBoxDB
+    local btn  = note and not (db and db.tagTreeMode) and ShownRow(id)
+    if not btn or currentFilter ~= "" or currentTagFilter
+        or (opts and opts.tasks and BNB._taskFilterActive) then
+        return BNB.RefreshNoteList()
+    end
+    local sortBy = db and db.sortBy or "creation"
+    if btn._title ~= note.title and (sortBy == "alpha" or note.pinned) then
+        return BNB.RefreshNoteList()
+    end
+    if sortBy == "edited" and not note.pinned and not AtEditedEdge(btn, db and db.sortAsc) then
+        return BNB.RefreshNoteList()
+    end
+    PopulateEntry(btn, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
 end
 
 --------------------------------------------------------------------------------
@@ -2280,9 +2333,19 @@ end
 
 -- Refresh note list icons when target changes so target note portraits update live.
 -- Only fires RefreshNoteList if the main window is visible — no-op otherwise.
+-- Only target and inspect notes show the live portrait, so only their rows are
+-- redrawn (PERF-01: tab-targeting rebuilt the whole list on every target).
 BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
-    if BNB.mainFrame and BNB.mainFrame:IsShown() then
+    if not (BNB.mainFrame and BNB.mainFrame:IsShown()) then return end
+    if BigNoteBoxDB and BigNoteBoxDB.tagTreeMode then
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+        return
+    end
+    for _, btn in ipairs(listEntries) do
+        local note = btn:IsShown() and BNB.GetNote(btn._noteID)
+        if note and (note.source == "target" or note.source == "inspect") then
+            PopulateEntry(btn, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
+        end
     end
 end)
 
@@ -2290,9 +2353,9 @@ end)
 -- note list row appears/disappears as tasks are added or removed.
 C_Timer.After(0, function()
     if BNB.Task and BNB.Task.RegisterCallback then
-        BNB.Task.RegisterCallback("TasksChanged", function()
+        BNB.Task.RegisterCallback("TasksChanged", function(noteID)
             if BNB.mainFrame and BNB.mainFrame:IsShown() then
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                BNB.RefreshNoteListEntry(noteID, { tasks = true })
             end
         end)
     end

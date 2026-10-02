@@ -84,6 +84,48 @@ function BNB.Time(t)
     return time(t) - BNB.ServerTimeOffset()
 end
 
+-- One pending call per key (SUG-03, PERF-04): a later Debounce for the same key
+-- moves the deadline instead of cancelling and making a new C_Timer, so a call
+-- per keystroke allocates nothing. Pass a function built once, not a new closure
+-- per call. Driven by a frame with no parent, so it keeps running while
+-- UIParent is hidden (Focus mode, Alt+Z). Errors go to the error handler.
+local _debounce, _due = {}, {}
+local _debounceDriver = CreateFrame("Frame")
+_debounceDriver:Hide()
+_debounceDriver:SetScript("OnUpdate", function(self)
+    -- Collect first, run after: a call may Debounce a new key, and adding a
+    -- key to a table during pairs() is not allowed
+    local now, n = GetTime(), 0
+    for _, d in pairs(_debounce) do
+        if d.at and now >= d.at then
+            n = n + 1
+            _due[n] = d.fn
+            d.at, d.fn = nil, nil
+        end
+    end
+    for i = 1, n do
+        local fn = _due[i]
+        _due[i] = nil
+        xpcall(fn, geterrorhandler())
+    end
+    for _, d in pairs(_debounce) do if d.at then return end end
+    self:Hide()
+end)
+function BNB.Debounce(key, delay, fn)
+    local d = _debounce[key]
+    if not d then d = {}; _debounce[key] = d end
+    d.at, d.fn = GetTime() + (delay or 0), fn
+    _debounceDriver:Show()
+end
+function BNB.CancelDebounce(key)
+    local d = _debounce[key]
+    if d then d.at, d.fn = nil, nil end
+end
+function BNB.DebouncePending(key)
+    local d = _debounce[key]
+    return d ~= nil and d.at ~= nil
+end
+
 -- Forced display language (ALL-14). BigNoteBoxLocale is its own SavedVariable so it is
 -- already loaded here, before the Locales/ files run. nil/"" /"client" = follow the WoW
 -- client locale; any other value is a forced locale code (e.g. "zhCN").

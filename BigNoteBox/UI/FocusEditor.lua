@@ -1176,6 +1176,7 @@ function BNB.OpenFocusMode()
             BuildFocusFrame()
         end
     end
+    if BNB.FocusOrbit and BNB.FocusOrbit.SetFocusOpen then BNB.FocusOrbit.SetFocusOpen(true) end
 
     -- Snapshot which companion windows are open, then close them all.
     -- CloseFocusMode will reopen exactly what was open.
@@ -1273,7 +1274,10 @@ function BNB.CloseFocusMode()
     if not focusFrame or not focusFrame:IsShown() then return end
     if focusDirty then SaveFocusNote() end
 
-    if BNB.FocusOrbit then BNB.FocusOrbit.Stop() end
+    if BNB.FocusOrbit then
+        BNB.FocusOrbit.Stop()
+        if BNB.FocusOrbit.SetFocusOpen then BNB.FocusOrbit.SetFocusOpen(false) end
+    end
     HideAfkOverlay()
     BNB.FadeOutFocusOverlay(0.5)
     -- Close focus preview window

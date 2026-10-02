@@ -12,7 +12,6 @@
 --   BNB.Task.ClearCompleted(noteID)
 --   BNB.Task.HasTasks(noteID)                 -> bool
 --   BNB.Task.CheckResets()                    -> called on login + daily ticker
---   BNB.Task.OnContextChanged()               -> called by ContextNotes on zone/target change
 --
 -- Callbacks (register via BNB.Task.RegisterCallback):
 --   "TasksChanged" (noteID)  -- fired after any mutation to a note's task list
@@ -546,47 +545,10 @@ end
 --------------------------------------------------------------------------------
 -- Per-task situation uses the same context string format as note.context:
 --   "zone:stormwind city", "instance:mythic", "player:Arthas", "subzone:..."
---
--- Evaluation reuses ContextNotes' internal helpers via BNB._taskContextMatch
--- (set up below). If ContextNotes isn't loaded yet we fall back gracefully.
-
--- Called by ContextNotes after it finishes its own evaluation pass, or directly
--- when zone/target changes. Checks all tasks across all notes for situation hits.
-function T.OnContextChanged()
-    local ndb = BNB.NotesDB()
-    if not ndb or not ndb.notes then return end
-
-    -- Use ContextNotes' NoteMatches-equivalent if exposed, else a simple stub.
-    local matchFn = BNB._taskContextMatch  -- set by ContextNotes on load
-    if not matchFn then return end
-
-    local hits = {}  -- { text, noteID }
-    for noteID, note in pairs(ndb.notes) do
-        if note.tasks then
-            -- Note-level situation fallback context
-            local noteCtx = note.context
-
-            for _, task in ipairs(note.tasks) do
-                if not task.completed then
-                    local ctx = task.situation or noteCtx
-                    if ctx and ctx ~= "" then
-                        if matchFn(ctx) then
-                            hits[#hits + 1] = { text = task.text, noteID = noteID }
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    if #hits == 0 then return end
-
-    -- Show toast for each hit (deduplicated per note -- show at most one toast
-    -- row per note to avoid flooding).
-    if BNB.ShowTaskToast then
-        BNB.ShowTaskToast(hits)
-    end
-end
+-- Nothing acts on it yet. A scan of every task on every situation check used
+-- to run here and call a toast function that never existed; removed (PERF-05,
+-- Dukul 2026-10-02). Per-task situation toasts, for newly matched tasks only,
+-- are ALL-202; BNB._taskContextMatch (Features/ContextNotes.lua) matches one.
 
 --------------------------------------------------------------------------------
 -- DAILY TICKER

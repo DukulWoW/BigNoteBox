@@ -212,7 +212,9 @@ end
 local _mainFrame     = nil
 local _mainRSF       = nil
 local _mainRF        = nil
-local _debounceTimer = nil
+-- Live renders wait for typing to pause: BNB.Debounce keys (SUG-03, PERF-04)
+local MAIN_RENDER_KEY  = "richPreviewMain"
+local FOCUS_RENDER_KEY = "richPreviewFocus"
 local _mainGen       = { n = 0 }
 local _heightHooked  = false
 
@@ -280,7 +282,6 @@ local function GetCursorRatio(eb)
 end
 
 local function DoRender()
-    _debounceTimer = nil
     if not _mainFrame or not _mainFrame:IsShown() then return end
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
     local eb = BNB._editorBody
@@ -289,12 +290,11 @@ end
 
 function RP.ScheduleRender()
     if not _mainFrame then return end
-    if _debounceTimer then _debounceTimer:Cancel(); _debounceTimer = nil end
-    _debounceTimer = C_Timer.NewTimer(GetDebounceDelay(), DoRender)
+    BNB.Debounce(MAIN_RENDER_KEY, GetDebounceDelay(), DoRender)
 end
 
 function RP.RenderNote(note)
-    if _debounceTimer then _debounceTimer:Cancel(); _debounceTimer = nil end
+    BNB.CancelDebounce(MAIN_RENDER_KEY)
     if not _mainFrame or not _mainFrame:IsShown() then return end
     RenderNote(note, _mainRSF, _mainRF, _mainGen)
 end
@@ -319,7 +319,7 @@ function RP.Open()
 end
 
 function RP.Close()
-    if _debounceTimer then _debounceTimer:Cancel(); _debounceTimer = nil end
+    BNB.CancelDebounce(MAIN_RENDER_KEY)
     if _mainFrame then _mainFrame:Hide() end
     RP.UpdateToggleBtn()
 end
@@ -384,7 +384,6 @@ local _focusFrame = nil
 local _focusRSF   = nil
 local _focusRF    = nil
 local _focusGen   = { n = 0 }
-local _focusDebounceTimer = nil   -- pending live render; RPF.Close cancels it
 
 local function BuildFocusPreviewFrame(w, h)
     if not _focusFrame then
@@ -456,7 +455,7 @@ end
 
 function RPF.Close()
     _focusGen.n = _focusGen.n + 1
-    if _focusDebounceTimer then _focusDebounceTimer:Cancel(); _focusDebounceTimer = nil end
+    BNB.CancelDebounce(FOCUS_RENDER_KEY)   -- pending live render
     if _focusFrame then _focusFrame:Hide() end
     if BNB._focusMarkupPreviewBtn then
         BNB._focusMarkupPreviewBtn:SetAlpha(0.45)
@@ -478,7 +477,6 @@ local function GetFocusLiveBody()
 end
 
 local function DoFocusRender()
-    _focusDebounceTimer = nil
     if not _focusFrame or not _focusFrame:IsShown() then return end
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
     local eb = BNB._focusEditorBody
@@ -487,8 +485,7 @@ end
 
 function RPF.ScheduleRefresh()
     if not _focusFrame then return end
-    if _focusDebounceTimer then _focusDebounceTimer:Cancel(); _focusDebounceTimer = nil end
-    _focusDebounceTimer = C_Timer.NewTimer(GetDebounceDelay(), DoFocusRender)
+    BNB.Debounce(FOCUS_RENDER_KEY, GetDebounceDelay(), DoFocusRender)
 end
 
 function RPF.Refresh()

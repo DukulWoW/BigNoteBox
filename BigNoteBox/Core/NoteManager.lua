@@ -85,6 +85,27 @@ function BNB.TagIndexRebuild()
     end
 end
 
+-- A note field in lower case (PERF-07), nil for a missing or empty field.
+-- Kept per note until the field changes: strings are interned, so that check
+-- is one compare. Search and the sorts call this once per note or comparison,
+-- where they used to lower-case the title and the whole body every time.
+local _lowerCache = setmetatable({}, { __mode = "k" })
+local function LowerOf(note, field)
+    local s = note[field]
+    if not s or s == "" then return nil end
+    local c = _lowerCache[note]
+    if not c then c = {}; _lowerCache[note] = c end
+    local e = c[field]
+    if not e or e[1] ~= s then e = { s, s:lower() }; c[field] = e end
+    return e[2]
+end
+BNB.NoteLower = LowerOf
+
+-- Sort key for "A-Z by title": untitled notes sort last.
+function BNB.NoteTitleKey(note)
+    return LowerOf(note, "title") or "\255"
+end
+
 -- Returns a sorted list of { tag, count } for all known tags.
 -- count = number of live notes carrying that tag.
 function BNB.GetAllTags()
@@ -94,11 +115,11 @@ function BNB.GetAllTags()
         local count = 0
         for _ in pairs(ids) do count = count + 1 end
         if count > 0 then
-            out[#out + 1] = { tag = tag, count = count }
+            out[#out + 1] = { tag = tag, count = count, _key = tag:lower() }
         end
     end
     table.sort(out, function(a, b)
-        return a.tag:lower() < b.tag:lower()
+        return a._key < b._key
     end)
     return out
 end
@@ -531,8 +552,9 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
                     passTask = BNB.Task and BNB.Task.HasTasks(id) or false
                 end
                 if lower then
-                    local titleMatch = note.title and note.title:lower():find(lower, 1, true)
-                    local bodyMatch  = note.body  and note.body:lower():find( lower, 1, true)
+                    local lt, lb = LowerOf(note, "title"), LowerOf(note, "body")
+                    local titleMatch = lt and lt:find(lower, 1, true)
+                    local bodyMatch  = lb and lb:find(lower, 1, true)
                     passText = titleMatch or bodyMatch
                 end
                 if lowerTag then
@@ -593,9 +615,8 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
             if ap ~= bp then return ap > bp end
             -- Both pinned: always A-Z by title, independent of active sort mode
             if a.pinned and b.pinned then
-                local LAST = "\255"
-                local at = (a.title and a.title ~= "") and a.title:lower() or LAST
-                local bt = (b.title and b.title ~= "") and b.title:lower() or LAST
+                local at = LowerOf(a, "title") or "\255"
+                local bt = LowerOf(b, "title") or "\255"
                 if at ~= bt then return at < bt end
                 return (a.id or "") < (b.id or "")
             end
@@ -620,13 +641,12 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
         elseif sortBy == "alpha" then
             -- Alpha: A-Z is ascending (asc=true), Z-A is descending (asc=false).
             -- Untitled notes sort to the end regardless of direction.
-            local LAST = "\255"
-            av = (a.title and a.title ~= "") and a.title:lower() or LAST
-            bv = (b.title and b.title ~= "") and b.title:lower() or LAST
+            av = LowerOf(a, "title") or "\255"
+            bv = LowerOf(b, "title") or "\255"
         elseif sortBy == "location" then
             -- Notes with no context sort to the end regardless of direction.
-            av = (a.context and a.context ~= "") and a.context:lower() or "\255"
-            bv = (b.context and b.context ~= "") and b.context:lower() or "\255"
+            av = LowerOf(a, "context") or "\255"
+            bv = LowerOf(b, "context") or "\255"
         else
             av, bv = a.created or 0, b.created or 0
         end
@@ -722,16 +742,19 @@ function BNB.SaveCurrentNoteQuiet()
     BNB.UpdateNote(id, fields)
     BNB._dirty = (title == "")
     if BNB.UpdateSaveButtonState then BNB.UpdateSaveButtonState() end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    -- Only the edited row, unless the save can move it (PERF-01)
+    if BNB.RefreshNoteListEntry then BNB.RefreshNoteListEntry(id) end
     if BNB._syncNoteConfigTitle then BNB._syncNoteConfigTitle() end
     -- Live update: keeps the sticky's scroll, unlike RefreshNote
     if BNB.Sticky and BNB.Sticky.RefreshBodyLive then BNB.Sticky.RefreshBodyLive(id) end
 end
 
-local _autoIdle, _autoForced
+-- Two BNB.Debounce keys (SUG-03, PERF-04): the idle one moves on every
+-- keystroke, the forced one is set once and saves during non-stop typing.
+local AUTO_IDLE, AUTO_FORCED = "autoSaveIdle", "autoSaveForced"
 local function RunAutoSave()
-    if _autoIdle   then _autoIdle:Cancel();   _autoIdle   = nil end
-    if _autoForced then _autoForced:Cancel(); _autoForced = nil end
+    BNB.CancelDebounce(AUTO_IDLE)
+    BNB.CancelDebounce(AUTO_FORCED)
     -- xpcall, not pcall: a failed save must still reach BugSack / scriptErrors,
     -- or the lost text goes unnoticed (SV-02)
     if BNB.IsAutoSave() then xpcall(BNB.SaveCurrentNoteQuiet, geterrorhandler()) end
@@ -743,9 +766,8 @@ function BNB.ScheduleAutoSave()
     local db     = BigNoteBoxDB
     local idle   = (db and db.undoIdleDelay)      or 0.8
     local forced = (db and db.undoForcedInterval) or 3.0
-    if _autoIdle then _autoIdle:Cancel() end
-    _autoIdle = C_Timer.NewTimer(idle, RunAutoSave)
-    if not _autoForced then _autoForced = C_Timer.NewTimer(forced, RunAutoSave) end
+    BNB.Debounce(AUTO_IDLE, idle, RunAutoSave)
+    if not BNB.DebouncePending(AUTO_FORCED) then BNB.Debounce(AUTO_FORCED, forced, RunAutoSave) end
 end
 
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
