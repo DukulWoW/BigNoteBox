@@ -22,9 +22,6 @@ local BNB = BigNoteBox
 -- ── Constants ────────────────────────────────────────────────────────────────
 
 local ASSETS          = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local QUEST_ICON      = ASSETS .. "Buttons\\bt-createnote-normal"        -- normal state for Blizzard frame buttons
-local QUEST_ICON_HOVER= ASSETS .. "Buttons\\bt-createnote-hover"  -- hover state for Blizzard frame buttons
-local QUEST_ICON_PRESS= ASSETS .. "Buttons\\bt-createnote-press"  -- pressed state for Blizzard frame buttons
 
 -- ── Button position on Blizzard frames ───────────────────────────────────────
 -- POSITION: top-left corner of the host frame, next to the native X button.
@@ -216,57 +213,20 @@ local function ItemIcon(itemID)
     return nil
 end
 
--- ── Pressed state (FOR-20) ────────────────────────────────────────────────────
--- Swaps the icon to bt-createnote-press while the left button is held. The
--- hover texture sits on the HIGHLIGHT layer above it, so it is hidden for the
--- press. OnHide resets it in case the frame closes mid-press. Also used by the
--- inspect-frame button (Features/InspectNote.lua), hence the BNB export.
-local function AddPressState(btn, tex, hi)
-    local function Release()
-        tex:SetTexture(QUEST_ICON)
-        hi:SetAlpha(1)
-    end
-    btn:SetScript("OnMouseDown", function(self, mouseBtn)
-        if mouseBtn ~= "LeftButton" or not self:IsEnabled() then return end
-        tex:SetTexture(QUEST_ICON_PRESS)
-        hi:SetAlpha(0)
-    end)
-    btn:SetScript("OnMouseUp", Release)
-    btn:HookScript("OnHide", Release)
-end
-BNB.AddQuickNotePressState = AddPressState
-
 -- ── Button builder helper ─────────────────────────────────────────────────────
 -- Creates a button anchored at TOPLEFT of `parent` with QN_X / QN_Y offset.
--- Uses note-copy.tga (normal) and note-copy-hover.tga (hover) — no tinted overlay.
+-- The "createnote" icon button, always the normal look: it sits on Blizzard
+-- frames, which have no skin mode. Hover, press (FOR-20) and the reset on hide
+-- come from BNB.CreateIconButton (UI/IconButton.lua).
 -- onClickFn receives no arguments; it should call CreateQuickNote itself.
 local function MakeButton(name, parent, onClickFn)
-    local btn = CreateFrame("Button", name, parent)
-    btn:SetSize(QN_SZ, QN_SZ)
+    local btn = BNB.CreateIconButton(parent, QN_SZ, "createnote", { name = name, skin = false,
+        tip = BNB.L["QN_BTN_TIP1"], tipSub = BNB.L["QN_BTN_TIP2"], tipAnchor = "ANCHOR_BOTTOMRIGHT",
+        onClick = function() onClickFn() end })
     -- POSITION: adjust QN_X / QN_Y at the top of this file if needed
     btn:SetPoint("TOPLEFT", parent, "TOPLEFT", QN_X, QN_Y)
     btn:SetFrameStrata("HIGH")
     btn:SetFrameLevel((parent:GetFrameLevel() or 0) + 10)
-
-    local tex = btn:CreateTexture(nil, "ARTWORK")
-    tex:SetAllPoints()
-    tex:SetTexture(QUEST_ICON)
-    btn._tex = tex
-
-    -- Hover: swap to the dedicated hover texture instead of a colour overlay
-    local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-    hi:SetAllPoints()
-    hi:SetTexture(QUEST_ICON_HOVER)
-    AddPressState(btn, tex, hi)
-
-    btn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
-        GameTooltip:AddLine(BNB.L["QN_BTN_TIP1"], 1, 1, 1)
-        GameTooltip:AddLine(BNB.L["QN_BTN_TIP2"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    btn:SetScript("OnClick", onClickFn)
     return btn
 end
 
@@ -937,28 +897,12 @@ end
 local function InjectQuestLogFrame()
     -- Create one button, parented initially to UIParent (hidden).
     -- PositionQuestLogBtn() reparents it on each hook call.
-    local btn = CreateFrame("Button", "BNBQuickNoteQuestLogBtn", UIParent)
-    btn:SetSize(QN_SZ, QN_SZ)
+    local btn = BNB.CreateIconButton(UIParent, QN_SZ, "createnote", {
+        name = "BNBQuickNoteQuestLogBtn", skin = false,
+        tip = BNB.L["QN_BTN_TIP1"], tipSub = BNB.L["QN_BTN_TIP2_QUEST"], tipAnchor = "ANCHOR_BOTTOMRIGHT" })
     btn:SetFrameStrata("HIGH")
     btn:SetFrameLevel(100)
     btn:Hide()
-
-    local tex = btn:CreateTexture(nil, "ARTWORK")
-    tex:SetAllPoints()
-    tex:SetTexture(QUEST_ICON)
-
-    local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-    hi:SetAllPoints()
-    hi:SetTexture(QUEST_ICON_HOVER)
-    AddPressState(btn, tex, hi)
-
-    btn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
-        GameTooltip:AddLine(BNB.L["QN_BTN_TIP1"], 1, 1, 1)
-        GameTooltip:AddLine(BNB.L["QN_BTN_TIP2_QUEST"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     btn:SetScript("OnClick", function()
         if not IsEnabled() then return end

@@ -291,35 +291,17 @@ end
 -- SKIN CLOSE BUTTON
 -- BNB.CreateSkinCloseButton(parent, onClick)
 --
--- Shared 22x22 textured close button used by every skinned window's title bar.
--- Matches the bt-close-normal/hover/press asset set used by MainWindow.lua's
--- MakeTexBtn. Callers are responsible for anchoring; the convention is:
+-- Shared 22x22 close button used by every skinned window's title bar: the
+-- "close" icon button in its skin look (UI/IconButton.lua, ALL-210).
+-- Callers are responsible for anchoring; the convention is:
 --     btn:SetPoint("RIGHT", titleBar, "RIGHT", -2, 0)
 -- The -2 inset keeps the button slightly clear of the window border while
 -- still overlapping it enough to match Blizzard's native close-button style.
 --------------------------------------------------------------------------------
-local BNB_BTNS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-
 function BNB.CreateSkinCloseButton(parent, onClick)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(22, 22)
-    btn:SetHighlightTexture("")
-    btn:SetPushedTexture("")
-
-    local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
-    n:SetTexture(BNB_BTNS .. "bt-close-normal")
-    local h = btn:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
-    h:SetTexture(BNB_BTNS .. "bt-close-hover"); h:Hide()
-    local p = btn:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
-    p:SetTexture(BNB_BTNS .. "bt-close-press"); p:Hide()
-
-    btn:SetScript("OnClick",     function() if onClick then onClick() end end)
-    btn:SetScript("OnMouseDown", function(self) if self:IsEnabled() then p:Show(); n:Hide(); h:Hide() end end)
-    btn:SetScript("OnMouseUp",   function(self) p:Hide(); if self:IsEnabled() then h:Show() else n:Show() end end)
-    btn:SetScript("OnEnter",     function(self) if self:IsEnabled() then n:Hide(); h:Show() end end)
-    btn:SetScript("OnLeave",     function() p:Hide(); h:Hide(); n:Show() end)
-
-    btn._n, btn._h, btn._p = n, h, p
+    -- onClick is called with no arguments: callers pass functions like onClose
+    local btn = BNB.CreateIconButton(parent, 22, "close", { skin = true,
+        onClick = function() if onClick then onClick() end end })
     return btn
 end
 

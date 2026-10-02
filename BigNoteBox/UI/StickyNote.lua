@@ -1103,7 +1103,6 @@ end
 -- Task rows are built once per sticky and reused (PERF-02): WoW never frees a
 -- frame, and every TasksChanged used to orphan a new set. The scripts read
 -- what a row shows now from row._noteID / row._task / row._taskID.
-local SN_TASK_BTN_A = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
 local SN_TASK_UI_A  = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
 local RenderStickyTasks   -- forward declaration: rows re-render on collapse
 
@@ -1150,7 +1149,8 @@ local function CreateStickyTaskRow(ct, f)
         end
     end)
 
-    -- Toggle button: bt-right (collapsed) / bt-down (expanded), matches RefBox.
+    -- Toggle button: "right" (collapsed) / "down" (expanded), matches RefBox.
+    -- Icon button: skin look in skin mode, like the Reference Box toggle (Dukul 2026-10-03).
     -- Hidden entirely for leaf tasks (no sub-tasks) — not functional in sticky.
     local function DoCollapse()
         local collapsed = _stickyCollapsed[row._noteID]
@@ -1159,26 +1159,21 @@ local function CreateStickyTaskRow(ct, f)
         else collapsed[row._taskID] = true end
         RenderStickyTasks(row._noteID)
     end
-    local togBtn = CreateFrame("Button", nil, row)
-    togBtn:SetSize(TOG_SZ, TOG_SZ)
+    local togBtn = BNB.CreateIconButton(row, TOG_SZ, "down", { tipAnchor = "ANCHOR_TOP",
+        onClick = DoCollapse,
+        tip = function()
+            local collapsed = _stickyCollapsed[row._noteID]
+            return (collapsed and collapsed[row._taskID]) and L["STICKY_EXPAND_SUBTASKS"] or L["STICKY_COLLAPSE_SUBTASKS"]
+        end })
     togBtn:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     togBtn:SetFrameLevel(row:GetFrameLevel() + 3)
-    local togTex = togBtn:CreateTexture(nil, "ARTWORK"); togTex:SetAllPoints()
-    togBtn:SetScript("OnClick", DoCollapse)
-    togBtn:SetScript("OnEnter", function(self)
-        local collapsed = _stickyCollapsed[row._noteID]
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine((collapsed and collapsed[row._taskID]) and L["STICKY_EXPAND_SUBTASKS"] or L["STICKY_COLLAPSE_SUBTASKS"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    togBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- Invisible hit area covering the row (except checkbox) for tap-to-collapse
     local hitBtn = CreateFrame("Button", nil, row)
     hitBtn:SetPoint("TOPLEFT",     row, "TOPLEFT",     CB_SZ + 2, 0)
     hitBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0,         0)
     hitBtn:SetFrameLevel(row:GetFrameLevel() + 2)  -- below togBtn (+3)
     hitBtn:SetScript("OnClick", DoCollapse)
-    row._togBtn, row._togTex, row._hitBtn = togBtn, togTex, hitBtn
+    row._togBtn, row._hitBtn = togBtn, hitBtn
 
     -- Reset and situation icons, chained left to right after togBtn by the fill
     row._rstIco = MakeStickyTaskIcon(row, SN_TASK_UI_A .. "ui-repeat", function(task)
@@ -1224,7 +1219,7 @@ local function FillStickyTaskRow(row, noteID, task, depth, y, rowH, collapsed)
     local hasSubs     = subs and #subs > 0
     local isCollapsed = collapsed[task.id]
     if hasSubs then
-        row._togTex:SetTexture(SN_TASK_BTN_A .. (isCollapsed and "bt-right-normal" or "bt-down-normal"))
+        row._togBtn:SetSymbol(isCollapsed and "right" or "down")
         row._togBtn:SetAlpha(1.0)
         row._togBtn:Show()
         row._hitBtn:Show()
@@ -1373,14 +1368,9 @@ end
 
 -- Switch the sticky between task view and note view.
 -- view = "tasks" or "note". Saves preference to DB.
--- Swap the texture set on a header button built by HdrBtn.
--- Relies on _n/_h/_p refs stored at build time.
-local SN_BTN_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-local function SetHdrBtnTex(btn, texName)
-    if not (btn and btn._n) then return end
-    btn._n:SetTexture(SN_BTN_PATH .. texName .. "-normal")
-    btn._h:SetTexture(SN_BTN_PATH .. texName .. "-hover")
-    btn._p:SetTexture(SN_BTN_PATH .. texName .. "-press")
+-- Swap the symbol on a header button built by HdrBtn (an icon button).
+local function SetHdrBtnTex(btn, symbol)
+    if btn and btn.SetSymbol then btn:SetSymbol(symbol) end
 end
 
 local function SN_SetTaskView(noteID, view)
@@ -1409,7 +1399,7 @@ local function SN_SetTaskView(noteID, view)
     --   showing tasks  -> bt-note  (click will return to note)
     --   showing note   -> bt-tasks (click will go to tasks)
     if f._tasksHdrBtn then
-        SetHdrBtnTex(f._tasksHdrBtn, showTasks and "bt-note" or "bt-tasks")
+        SetHdrBtnTex(f._tasksHdrBtn, showTasks and "note" or "tasks")
     end
 end
 
@@ -1705,7 +1695,6 @@ local function CreateStickyFrame(noteID)
     -- A container frame that holds all header icon buttons, parented to the header
     -- at OVERLAY frame level so it renders above the title text.
     -- Starts hidden (alpha 0); fades in/out over 0.1 s when the root is hovered.
-    local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
     local BTN_SZ = 25   -- smaller than HEADER_H (28) for a less chunky look
 
     local btnOverlay = CreateFrame("Frame", nil, header)
@@ -1736,10 +1725,17 @@ local function CreateStickyFrame(noteID)
     local BTN_GAP  = 1
     local BTN_RIGHT_PAD = 1
 
-    -- Icon button factory (right-to-left slot numbering, slot 1 = rightmost)
-    local function HdrBtn(slot, texName, tip, onClick)
-        local btn = CreateFrame("Button", nil, btnOverlay)
-        btn:SetSize(BTN_SZ, BTN_SZ)
+    -- Icon button factory (right-to-left slot numbering, slot 1 = rightmost).
+    -- Icon buttons (UI/IconButton.lua), skin look in skin mode (Dukul 2026-10-03).
+    local function HdrBtn(slot, symbol, tip, onClick)
+        local btn = BNB.CreateIconButton(btnOverlay, BTN_SZ, symbol, { onClick = onClick,
+            tip = function(self)
+                if self == f._alarmHdrBtn then
+                    local n = BNB.GetNote and BNB.GetNote(noteID)
+                    return (n and n.alarm) and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
+                end
+                return tip
+            end })
         -- Position: right-aligned with gap, centred vertically in header.
         -- Single anchor so SetSize is respected (two anchors stretch the button).
         local xOff = -BTN_RIGHT_PAD - (slot - 1) * (BTN_SZ + BTN_GAP)
@@ -1747,65 +1743,24 @@ local function CreateStickyFrame(noteID)
         btn:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", xOff, yOff)
         btn:SetFrameLevel(btnOverlay:GetFrameLevel() + 1)
 
-        -- Suppress WoW's default button flash so our press texture shows cleanly
-        btn:SetHighlightTexture("")
-        btn:SetPushedTexture("")
-
-        local normalTx = btn:CreateTexture(nil, "ARTWORK")
-        normalTx:SetAllPoints()
-        normalTx:SetTexture(ASSETS .. texName .. "-normal")
-
-        local hoverTx = btn:CreateTexture(nil, "ARTWORK")
-        hoverTx:SetAllPoints()
-        hoverTx:SetTexture(ASSETS .. texName .. "-hover")
-        hoverTx:Hide()
-
-        local pressTx = btn:CreateTexture(nil, "ARTWORK")
-        pressTx:SetAllPoints()
-        pressTx:SetTexture(ASSETS .. texName .. "-press")
-        pressTx:Hide()
-
-        -- Store refs so textures can be swapped without rebuilding the button
-        btn._n = normalTx; btn._h = hoverTx; btn._p = pressTx
-
         -- Start hidden; will be shown by FadeBtns when root is hovered
         btn:SetAlpha(0)
         table.insert(_hdrBtns, btn)
 
-        btn:SetScript("OnClick", onClick)
-        btn:SetScript("OnMouseDown", function()
-            pressTx:Show(); normalTx:Hide(); hoverTx:Hide()
-        end)
-        btn:SetScript("OnMouseUp", function()
-            pressTx:Hide(); hoverTx:Show()
-        end)
-        btn:SetScript("OnEnter", function()
-            normalTx:Hide(); hoverTx:Show()
-            FadeBtns(1)   -- keep all buttons visible while any button is hovered
-            GameTooltip:SetOwner(btn, "ANCHOR_BOTTOM")
-            local dynTip = tip
-            if btn == f._alarmHdrBtn then
-                local n = BNB.GetNote and BNB.GetNote(noteID)
-                dynTip = (n and n.alarm) and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
-            end
-            GameTooltip:AddLine(dynTip, 1, 1, 1); GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function()
-            pressTx:Hide(); hoverTx:Hide(); normalTx:Show()
-            GameTooltip:Hide()
-        end)
+        -- keep all buttons visible while any button is hovered
+        btn:HookScript("OnEnter", function() FadeBtns(1) end)
         return btn
     end
 
     -- slot 1 = close, slot 2 = minimize, slot 3 = settings, slot 4 = edit
-    HdrBtn(1, "bt-close", L["STICKY_UNPIN_TIP"], function() SN.Close(noteID) end)
+    HdrBtn(1, "close", L["STICKY_UNPIN_TIP"], function() SN.Close(noteID) end)
 
-    local minBtn = HdrBtn(2, "bt-minimize", L["STICKY_MINIMIZE_TO_ICON_TIP"], function()
+    local minBtn = HdrBtn(2, "minimize", L["STICKY_MINIMIZE_TO_ICON_TIP"], function()
         SN.SetMinimized(noteID, not f._minimized)
     end)
     f._minBtn = minBtn
 
-    HdrBtn(3, "bt-settings", L["STICKY_NOTE_SETTINGS_TIP"], function()
+    HdrBtn(3, "settings", L["STICKY_NOTE_SETTINGS_TIP"], function()
         -- Do NOT close the ESC menu here — settings open alongside the sticky
         -- so the user can see their changes live (OpenStickySettings raises
         -- the settings panel strata above GameMenuFrame automatically).
@@ -1817,7 +1772,7 @@ local function CreateStickyFrame(noteID)
         end
     end)
 
-    HdrBtn(4, "bt-edit", L["STICKY_OPEN_TO_EDIT_TIP"], function()
+    HdrBtn(4, "edit", L["STICKY_OPEN_TO_EDIT_TIP"], function()
         -- Ends (and saves) an inline edit first, so BNB opens on the new text
         EndInlineEdit(f)
         OpenInMainEditor(noteID)
@@ -1825,7 +1780,7 @@ local function CreateStickyFrame(noteID)
 
     -- slot 5 = alarm: opens alarm setter window anchored to this button
     -- Assets: Assets/UI/sn-alarm-normal.tga + sn-alarm-hover.tga
-    local alarmHdrBtn = HdrBtn(5, "bt-alarm", L["STICKY_SET_ALARM_TIP"], function()
+    local alarmHdrBtn = HdrBtn(5, "alarm", L["STICKY_SET_ALARM_TIP"], function()
         local note = BNB.GetNote and BNB.GetNote(noteID)
         local alarm = note and note.alarm
         -- If alarm glow is actively running, clicking the button dismisses it.
@@ -1844,7 +1799,7 @@ local function CreateStickyFrame(noteID)
     f._alarmHdrBtn = alarmHdrBtn
 
     -- slot 6 = tasks: toggle task view / create first task
-    local tasksHdrBtn = HdrBtn(6, "bt-tasks", L["STICKY_CREATE_TASK_TIP"], function()
+    local tasksHdrBtn = HdrBtn(6, "tasks", L["STICKY_CREATE_TASK_TIP"], function()
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         if not hasTasks then
             -- No tasks: close ESC menu, open main window, select note, open RefBox, add task
@@ -2450,7 +2405,7 @@ local function ReopenStickyFrame(f, noteID)
     f._taskViewActive = false
     f._taskScroll:Hide()
     f._taskFooter:Hide()
-    if f._tasksHdrBtn then SetHdrBtnTex(f._tasksHdrBtn, "bt-tasks") end
+    if f._tasksHdrBtn then SetHdrBtnTex(f._tasksHdrBtn, "tasks") end
 
     -- One tick later, as for a new frame (geometry resolved): the note view
     -- (title, icon badge and body as they are now), then tasks if preferred.

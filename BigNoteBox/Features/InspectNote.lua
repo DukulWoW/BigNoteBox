@@ -13,7 +13,6 @@
 local BNB    = BigNoteBox
 local L      = BNB.L
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local BTNS   = ASSETS .. "Buttons\\"
 local UN     = BNB.UnitNotes   -- shared with TargetNote (Features/UnitNotes.lua)
 
 -- ── Button placement (adjust these to fine-tune position) ─────────────────────
@@ -706,22 +705,15 @@ local function CreateInspectButton()
     if _inspectBtn then return end
     if not InspectFrame then return end
 
-    local btn = CreateFrame("Button", "BNBInspectNoteBtn", InspectFrame)
-    btn:SetSize(INS_SZ, INS_SZ)
+    -- The "createnote" icon button, normal look (a Blizzard frame has no skin mode)
+    local btn = BNB.CreateIconButton(InspectFrame, INS_SZ, "createnote",
+        { name = "BNBInspectNoteBtn", skin = false })
     btn:SetPoint("TOPRIGHT", InspectFrame, "TOPRIGHT", INS_X, INS_Y)
     btn:SetFrameStrata("HIGH")
     btn:SetFrameLevel((InspectFrame:GetFrameLevel() or 0) + 10)
 
-    local tex = btn:CreateTexture(nil, "ARTWORK"); tex:SetAllPoints()
-    tex:SetTexture(BTNS .. "bt-createnote-normal")
-    btn._tex = tex
-
-    local hi = btn:CreateTexture(nil, "HIGHLIGHT"); hi:SetAllPoints()
-    hi:SetTexture(BTNS .. "bt-createnote-hover")
-    -- Pressed texture while held, same as the quest/gossip buttons (FOR-20)
-    if BNB.AddQuickNotePressState then BNB.AddQuickNotePressState(btn, tex, hi) end
-
-    btn:SetScript("OnEnter", function(self)
+    -- The tooltip depends on the inspect state, so it is built here
+    btn:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         if not _inspectReady then
             GameTooltip:AddLine(L["QN_BTN_TIP1"], 1, 1, 1)
@@ -741,15 +733,12 @@ local function CreateInspectButton()
         end
         GameTooltip:Show()
     end)
-    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     btn:SetScript("OnClick", function()
         if not _inspectReady then return end
         StartInspectNoteFlow(false)
     end)
 
     btn:SetEnabled(false)
-    btn:SetAlpha(0.35)
-    pcall(function() tex:SetDesaturated(true) end)
 
     _inspectBtn = btn
 end
@@ -758,16 +747,12 @@ local function EnableInspectBtn()
     if not _inspectBtn then return end
     _inspectReady = true
     _inspectBtn:SetEnabled(true)
-    _inspectBtn:SetAlpha(1.0)
-    pcall(function() _inspectBtn._tex:SetDesaturated(false) end)
 end
 
 local function DisableInspectBtn()
     if not _inspectBtn then return end
     _inspectReady = false
     _inspectBtn:SetEnabled(false)
-    _inspectBtn:SetAlpha(0.35)
-    pcall(function() _inspectBtn._tex:SetDesaturated(true) end)
 end
 
 --------------------------------------------------------------------------------

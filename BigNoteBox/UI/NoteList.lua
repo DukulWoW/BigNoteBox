@@ -32,6 +32,10 @@ local COL_GOLD   = { 1,    0.82, 0,    1 }
 local COL_WHITE  = { 1,    1,    1,    1 }
 local COL_GREY   = { 0.58, 0.58, 0.58, 1 }
 local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G/B (ALL-98)
+-- Normal mode row art, a test (Dukul 2026-10-03): stretched over the whole row.
+-- Skin mode keeps the colour fills above and below.
+local ROW_SEL_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-selection"
+local ROW_HOVER_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-hover"
 
 local listEntries   = {}
 BNB._listEntries    = listEntries   -- shared with TagTree.lua
@@ -1234,9 +1238,16 @@ local function CreateListEntry(parent)
     local _lastClick, _lastClickID  -- double-click detection state
     local _deselectTimer            -- pending deselect timer handle
 
-    -- Selection highlight: ARTWORK layer so OVERLAY text draws on top of it
-    local selBg = btn:CreateTexture(nil, "ARTWORK", nil, 1)
-    selBg:SetAllPoints(); selBg:SetColorTexture(unpack(COL_SEL_BG)); selBg:Hide()
+    -- Normal mode draws the row art; skin mode the flat colour fills
+    local rowArt = not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
+
+    -- Selection highlight: ARTWORK layer so OVERLAY text draws on top of it.
+    -- The normal-mode art goes on BACKGROUND, under the icon (ARTWORK) too
+    -- (Dukul 2026-10-03); skin mode's faint fill stays where it was.
+    local selBg = btn:CreateTexture(nil, rowArt and "BACKGROUND" or "ARTWORK", nil, 1)
+    selBg:SetAllPoints()
+    if rowArt then selBg:SetTexture(ROW_SEL_TEX) else selBg:SetColorTexture(unpack(COL_SEL_BG)) end
+    selBg:Hide()
     btn._selBg = selBg
 
     -- Multi-select highlight (blue tint)
@@ -1246,8 +1257,22 @@ local function CreateListEntry(parent)
     multiSelBg:Hide()
     btn._multiSelBg = multiSelBg
 
-    local hiBg = btn:CreateTexture(nil, "HIGHLIGHT")
-    hiBg:SetAllPoints(); hiBg:SetColorTexture(1, 1, 1, 0.05)
+    -- Hover. Skin mode: the HIGHLIGHT layer, which draws over everything.
+    -- Normal mode: the row art under the icon and text like the selection,
+    -- so it is a BACKGROUND texture shown while the row is hovered (Dukul 2026-10-03)
+    if rowArt then
+        local hiBg = btn:CreateTexture(nil, "BACKGROUND", nil, 2)
+        hiBg:SetAllPoints()
+        hiBg:SetTexture(ROW_HOVER_TEX)
+        hiBg:Hide()
+        btn:HookScript("OnEnter", function() hiBg:Show() end)
+        btn:HookScript("OnLeave", function() hiBg:Hide() end)
+        btn:HookScript("OnHide",  function() hiBg:Hide() end)   -- a row reused under the pointer
+    else
+        local hiBg = btn:CreateTexture(nil, "HIGHLIGHT")
+        hiBg:SetAllPoints()
+        hiBg:SetColorTexture(1, 1, 1, 0.05)
+    end
 
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SIZE, ICON_SIZE)

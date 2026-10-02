@@ -54,9 +54,7 @@ local function RefreshFocusButton()
     local btn = BNB._focusModeBtn
     if not btn then return end
     local ok = BNB._currentNoteID ~= nil and not BNB._editorLocked
-    btn:SetEnabled(ok)
-    btn:SetAlpha(ok and 1.0 or 0.35)
-    if btn._n then btn._n:SetDesaturated(not ok) end
+    btn:SetEnabled(ok)   -- the icon button draws its own disabled look
 end
 
 function BNB.UpdateSaveButtonState()
@@ -1841,45 +1839,11 @@ local function BuildRichTabStrip()
     ReAnchor()
     mf:HookScript("OnSizeChanged", function() ReAnchor() end)
 
-    -- Tab buttons
-    local BTN_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-
-    -- Creates a textured icon button for the Editor/View toggle.
-    -- normal/hover/press are bare asset names (no path prefix needed).
-    -- active = true  -> full alpha (this is the current mode)
-    -- active = false -> dimmed alpha (the other mode)
-    local function MakeRichBtn(assetBase, tip, xOff)
-        local btn = CreateFrame("Button", nil, strip)
-        btn:SetSize(32, 32)
+    -- Tab buttons: icon buttons for the Editor/View toggle (UI/IconButton.lua).
+    -- The current mode is drawn at full alpha, the other dimmed (AM_RefreshTabs).
+    local function MakeRichBtn(symbol, tip, xOff)
+        local btn = BNB.CreateIconButton(strip, 32, symbol, { tip = tip, tipAnchor = "ANCHOR_TOP" })
         btn:SetPoint("TOPLEFT", strip, "TOPLEFT", xOff, -(TAB_H - 32) / 2)
-        btn:SetHighlightTexture("")
-        btn:SetPushedTexture("")
-
-        local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
-        n:SetTexture(BTN_PATH .. assetBase .. "-normal")
-        local h = btn:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
-        h:SetTexture(BTN_PATH .. assetBase .. "-hover"); h:Hide()
-        local p = btn:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
-        p:SetTexture(BTN_PATH .. assetBase .. "-press"); p:Hide()
-
-        btn._n, btn._h, btn._p = n, h, p
-
-        btn:SetScript("OnMouseDown", function(self)
-            p:Show(); n:Hide(); h:Hide()
-        end)
-        btn:SetScript("OnMouseUp", function(self)
-            p:Hide(); h:Show(); n:Hide()
-        end)
-        btn:SetScript("OnEnter", function(self)
-            n:Hide(); h:Show()
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function()
-            p:Hide(); h:Hide(); n:Show()
-            GameTooltip:Hide()
-        end)
         return btn
     end
 
@@ -1892,8 +1856,8 @@ local function BuildRichTabStrip()
         editorTab:SetPoint("TOPLEFT", strip, "TOPLEFT", FTAB_X, FTAB_Y)
         viewTab:SetPoint("LEFT", editorTab, "RIGHT", FTAB_GAP, 0)
     else
-        editorTab = MakeRichBtn("bt-editor", L["NE_RICH_EDITOR_MODE_TIP"], 0)
-        viewTab   = MakeRichBtn("bt-view",   L["NE_RICH_VIEW_MODE_TIP"],        36)
+        editorTab = MakeRichBtn("editor", L["NE_RICH_EDITOR_MODE_TIP"], 0)
+        viewTab   = MakeRichBtn("view",   L["NE_RICH_VIEW_MODE_TIP"],   36)
     end
 
     strip._editorTab = editorTab

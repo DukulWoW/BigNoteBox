@@ -580,26 +580,12 @@ end
 -- Add task (+) and [GR][GS] icons, parented to the panel so they don't scroll.
 local function TaskHeaderButtons(taskPnl)
     if taskPnl._hdrBtns then return taskPnl._hdrBtns end
-    local addBtn = CreateFrame("Button", nil, taskPnl)
-    addBtn:SetSize(18, 18)
+    -- Task + and the row X / + / toggle are icon buttons (UI/IconButton.lua),
+    -- skin look in skin mode (ALL-210)
+    local addBtn = BNB.CreateIconButton(taskPnl, 18, "plus", { tipAnchor = "ANCHOR_TOP",
+        tip = L["REFBOX_TASK_ADD_TIP"], tipSub = L["REFBOX_TASK_ADD_TIP_SUB"], tipWrap = true })
     -- Offset by SCROLL_PAD so the button sits left of the scrollbar track.
     addBtn:SetPoint("TOPRIGHT", taskPnl, "TOPRIGHT", -(4 + SCROLL_PAD), -3)
-    local addN = addBtn:CreateTexture(nil, "ARTWORK"); addN:SetAllPoints()
-    addN:SetTexture(ASSETS .. "Buttons\\bt-plus-normal")
-    local addH = addBtn:CreateTexture(nil, "ARTWORK"); addH:SetAllPoints()
-    addH:SetTexture(ASSETS .. "Buttons\\bt-plus-hover"); addH:Hide()
-    local addP = addBtn:CreateTexture(nil, "ARTWORK"); addP:SetAllPoints()
-    addP:SetTexture(ASSETS .. "Buttons\\bt-plus-press"); addP:Hide()
-    addBtn:SetScript("OnEnter", function(self)
-        addH:Show(); addN:Hide()
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["REFBOX_TASK_ADD_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["REFBOX_TASK_ADD_TIP_SUB"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    addBtn:SetScript("OnLeave", function() addH:Hide(); addN:Show(); GameTooltip:Hide() end)
-    addBtn:SetScript("OnMouseDown", function() addP:Show(); addN:Hide(); addH:Hide() end)
-    addBtn:SetScript("OnMouseUp",   function() addP:Hide(); addN:Show() end)
     addBtn:SetScript("OnClick", function()
         if not NoteID() then return end
         local taskID = BNB.Task.AddTask(NoteID(), "")
@@ -773,22 +759,9 @@ local function CreateTaskRow(tsc)
 
     -- Delete X left of the toggle slot, on every row, shown on hover. Deletes the
     -- task (and its sub-tasks) without a confirm, like the context menu.
-    local delBtn = CreateFrame("Button", nil, row)
-    delBtn:SetSize(14, 14)
+    local delBtn = BNB.CreateIconButton(row, 14, "close",
+        { tip = L["REFBOX_TASK_ROW_DELETE_TIP"], tipAnchor = "ANCHOR_TOP" })
     delBtn:SetPoint("RIGHT", row, "RIGHT", -20, 0)   -- one column on every row, left of the toggle slot
-    local delN = delBtn:CreateTexture(nil, "ARTWORK"); delN:SetAllPoints()
-    delN:SetTexture(ASSETS .. "Buttons\\bt-close-normal")
-    local delH = delBtn:CreateTexture(nil, "ARTWORK"); delH:SetAllPoints()
-    delH:SetTexture(ASSETS .. "Buttons\\bt-close-hover"); delH:Hide()
-    delBtn:SetScript("OnEnter", function(self)
-        delH:Show(); delN:Hide()
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["REFBOX_TASK_ROW_DELETE_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    delBtn:SetScript("OnLeave", function()
-        delH:Hide(); delN:Show(); GameTooltip:Hide()
-    end)
     delBtn:SetScript("OnClick", function()
         GameTooltip:Hide()
         BNB.Task.DeleteTask(NoteID(), row._taskID)
@@ -802,10 +775,8 @@ local function CreateTaskRow(tsc)
     -- Expanded : v  → click collapses.   Collapsed : >  → click expands.
     -- Without sub-tasks the toggle stays hidden but keeps its slot, so the
     -- hover + sits where the + of a task with sub-tasks sits (ALL-109).
-    local togBtn = CreateFrame("Button", nil, row)
-    togBtn:SetSize(14, 14)
+    local togBtn = BNB.CreateIconButton(row, 14, "down")
     togBtn:SetPoint("RIGHT", row, "RIGHT", -4, 0)   -- furthest right (Dukul 2026-09-27)
-    local togN = togBtn:CreateTexture(nil, "ARTWORK"); togN:SetAllPoints()
     togBtn:SetScript("OnClick", function()
         -- Toggle collapse/expand, persist state
         row._expanded = not row._expanded
@@ -817,29 +788,16 @@ local function CreateTaskRow(tsc)
         RenderTaskPanel()
         ApplyTaskLayout(RBFrame())
     end)
-    togBtn:SetScript("OnMouseUp", function(_, btn)
+    togBtn:HookScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" then ShowRowMenu(row) end
     end)
-    row._togBtn, row._togTex = togBtn, togN
+    row._togBtn = togBtn
 
     -- + sub-task button: top-level rows only, hover only, with or without
     -- sub-tasks (ALL-109, Dukul 2026-09-27).
-    local subAddBtn = CreateFrame("Button", nil, row)
-    subAddBtn:SetSize(14, 14)
+    local subAddBtn = BNB.CreateIconButton(row, 14, "plus",
+        { tip = L["REFBOX_TASK_ADD_SUB_TIP"], tipAnchor = "ANCHOR_TOP" })
     subAddBtn:SetPoint("RIGHT", delBtn, "LEFT", -2, 0)
-    local saN = subAddBtn:CreateTexture(nil, "ARTWORK"); saN:SetAllPoints()
-    saN:SetTexture(ASSETS .. "Buttons\\bt-plus-normal")
-    local saH = subAddBtn:CreateTexture(nil, "ARTWORK"); saH:SetAllPoints()
-    saH:SetTexture(ASSETS .. "Buttons\\bt-plus-hover"); saH:Hide()
-    subAddBtn:SetScript("OnEnter", function(self)
-        saH:Show(); saN:Hide()
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["REFBOX_TASK_ADD_SUB_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    subAddBtn:SetScript("OnLeave", function()
-        saH:Hide(); saN:Show(); GameTooltip:Hide()
-    end)
     subAddBtn:SetScript("OnClick", function()
         local parentID = row._taskID
         local subID = BNB.Task.AddTask(NoteID(), "", parentID)
@@ -850,7 +808,7 @@ local function CreateTaskRow(tsc)
             BNB.FocusTaskEditBox(subID)
         end
     end)
-    subAddBtn:SetScript("OnMouseUp", function(_, btn)
+    subAddBtn:HookScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" then ShowRowMenu(row) end
     end)
     subAddBtn:Hide()
@@ -946,8 +904,7 @@ local function FillTaskRow(row, task, isSubTask, y)
         -- Default: expanded when sub-tasks exist, irrelevant when none.
         local hasSubTasks = #subTasks > 0
         row._expanded = hasSubTasks and not _collapsedTasks[task.id]
-        row._togTex:SetTexture(ASSETS .. "Buttons\\" ..
-            (row._expanded and "bt-down-normal" or "bt-right-normal"))
+        row._togBtn:SetSymbol(row._expanded and "down" or "right")
         row._togBtn:SetShown(hasSubTasks)
         hover[2] = row._subAddBtn
         rightAnchor = row._subAddBtn

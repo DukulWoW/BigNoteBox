@@ -508,8 +508,69 @@ EnsureQuestDataListener = function()
     end)
 end
 
+-- Item tooltip beside the whole window, level with the hovered row, on the
+-- main window's side, over the main window where there is room (Dukul
+-- 2026-10-03: anchored to the row it was clamped over the Reference Box and hid
+-- the list). Main window closed: the right side. The other side when the
+-- screen edge is in the way. Offsets are worked out in screen pixels, so any scale works.
+-- Which side PlaceItemTip put the item tooltip on, and for which row. Kept
+-- here, not on GameTooltip, so nothing is written onto a Blizzard frame.
+local _tipSide, _tipOwner
+
+-- Comparison tooltips ("Equipped") go on the far side of the item tooltip,
+-- away from the Reference Box. Blizzard puts them on the side with more screen
+-- room, which put them over the list (Dukul 2026-10-03, I29). Runs after
+-- Blizzard's anchoring (hook below) and after PlaceItemTip moves the tooltip.
+local function PlaceCompareTips()
+    local tt = GameTooltip
+    if not (_tipSide and tt:IsShown() and tt:GetOwner() == _tipOwner) then return end
+    local prev = tt
+    for _, st in ipairs(tt.shoppingTooltips or {}) do
+        if st:IsShown() then
+            local y = 0
+            if prev == tt then y = select(5, st:GetPoint(1)) or 0 end   -- keep Blizzard's drop
+            st:ClearAllPoints()
+            if _tipSide == "left" then
+                st:SetPoint("TOPRIGHT", prev, "TOPLEFT", 0, y)
+            else
+                st:SetPoint("TOPLEFT", prev, "TOPRIGHT", 0, y)
+            end
+            prev = st
+        end
+    end
+end
+if TooltipComparisonManager and TooltipComparisonManager.AnchorShoppingTooltips then
+    hooksecurefunc(TooltipComparisonManager, "AnchorShoppingTooltips", function()
+        pcall(PlaceCompareTips)
+    end)
+end
+
+local function PlaceItemTip(anchor)
+    local rb = rbFrame
+    if not (rb and rb:IsShown() and rb:GetLeft() and anchor:GetTop()) then return end
+    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or BNB.DEFAULTS.refboxSide
+    local mainShown = BNB.mainFrame and BNB.mainFrame:IsShown()
+    local goLeft = mainShown and side == "right"   -- Reference Box right of the main window
+    local ts, rs, as = GameTooltip:GetEffectiveScale(), rb:GetEffectiveScale(), anchor:GetEffectiveScale()
+    local tipW = GameTooltip:GetWidth() * ts
+    local screenW = UIParent:GetRight() * UIParent:GetEffectiveScale()
+    local GAP = 4 * rs
+    if goLeft and rb:GetLeft() * rs - GAP - tipW < 0 then goLeft = false
+    elseif not goLeft and rb:GetRight() * rs + GAP + tipW > screenW then goLeft = true end
+    local y = (anchor:GetTop() * as - rb:GetTop() * rs) / ts
+    GameTooltip:ClearAllPoints()
+    if goLeft then
+        GameTooltip:SetPoint("TOPRIGHT", rb, "TOPLEFT", -GAP / ts, y)
+    else
+        GameTooltip:SetPoint("TOPLEFT", rb, "TOPRIGHT", GAP / ts, y)
+    end
+    _tipSide, _tipOwner = goLeft and "left" or "right", anchor
+    pcall(PlaceCompareTips)   -- they may already be up, anchored for the old position
+end
+
 local function ShowTooltip(anchor, att)
-    GameTooltip:SetOwner(anchor, "ANCHOR_LEFT")
+    GameTooltip:SetOwner(anchor, "ANCHOR_NONE")
+    GameTooltip:SetPoint("TOPRIGHT", anchor, "TOPLEFT")   -- until PlaceItemTip moves it
     if att.type == "item" then
         GameTooltip:SetHyperlink("item:" .. att.id)
     elseif att.type == "spell" then
@@ -528,6 +589,7 @@ local function ShowTooltip(anchor, att)
         end
     end
     GameTooltip:Show()
+    PlaceItemTip(anchor)   -- after Show: the width is known only then
 end
 
 -- ── Send attachment link to chat ──────────────────────────────────────────────
@@ -755,9 +817,16 @@ local function BuildPickerWindow()
     sep:SetPoint("TOPLEFT",  f, "TOPLEFT",  1, -TITLE_HP)
     sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -TITLE_HP)
 
-    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetSize(18, 18)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, -4)
+    -- Skin mode: the skin close icon button (Dukul 2026-10-03); normal: Blizzard's X
+    local closeBtn
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        closeBtn = BNB.CreateIconButton(f, 18, "close", { skin = true })
+        closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -3)
+    else
+        closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+        closeBtn:SetSize(18, 18)
+        closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, -4)
+    end
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
@@ -1206,15 +1275,23 @@ local function AcquireRow(parent)
     wmTex:Hide()
     row._wmTex = wmTex
 
-    -- X close button: UIPanelCloseButton style, no background at rest
-    local xBtn = CreateFrame("Button", nil, row, "UIPanelCloseButton")
-    xBtn:SetSize(16, 16)
+    -- X remove button, shown while the row is hovered. Normal mode: the
+    -- UIPanelCloseButton X; skin mode: the skin close icon button, like every
+    -- skin window's X (Dukul 2026-10-03). The icon button owns its OnEnter /
+    -- OnLeave, so the alpha goes on with HookScript.
+    local xBtn
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        xBtn = BNB.CreateIconButton(row, 16, "close", { skin = true })
+    else
+        xBtn = CreateFrame("Button", nil, row, "UIPanelCloseButton")
+        xBtn:SetSize(16, 16)
+    end
     xBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -2)
     xBtn:SetFrameLevel(row:GetFrameLevel() + 5)
     xBtn:SetAlpha(0)
     xBtn:EnableMouse(true)
-    xBtn:SetScript("OnEnter", function(self) self:SetAlpha(1) end)
-    xBtn:SetScript("OnLeave", function(self)
+    xBtn:HookScript("OnEnter", function(self) self:SetAlpha(1) end)
+    xBtn:HookScript("OnLeave", function(self)
         if not row:IsMouseOver() then self:SetAlpha(0) end
     end)
     row._xBtn = xBtn
@@ -1640,6 +1717,9 @@ local TAB_GAP    = 1                           -- sidebar GAP
 -- (Sidebar.lua SIDE_OFFSET, FOR-15 on Forever; its 2 / -2 default on Retail),
 -- scaled. On Forever the right side draws below the frame, as the sidebar does.
 local TAB_OFF    = BNB.IsForever and { left = 5, right = -2 } or { left = 8, right = -4 }
+-- Skin mode: the tabs sit this much further out from the frame, their inner end
+-- under the window edge (Dukul 2026-10-03: "a tiny bit to the left"). Tune here.
+local TAB_SKIN_OUT = 2
 local TAB_BORDER = ASSETS .. (BNB.IsForever and "Sidebar\\sb-border-forever" or "Sidebar\\sb-border")
 local TAB_BOTTOM = BOTTOM_PAD + 4
 local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
@@ -1764,24 +1844,40 @@ local function BuildSideTabs(f)
     return strip
 end
 
+-- Skin mode: always under the frame, so its edge covers the tab's inner end
+-- (Dukul, 2026-09-27: they drew on top of the window). Normal mode: under the
+-- frame on Forever's right side (its border overlaps the tab), above otherwise.
+-- "Under" is one strata lower: a child's frame level below its parent's did not
+-- hold (raising the window lifts its children back over it, Dukul 2026-10-03).
+-- A child keeps its own strata and still hides with the window.
+local STRATA_BELOW = { MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH",
+                       FULLSCREEN = "DIALOG", FULLSCREEN_DIALOG = "FULLSCREEN" }
+local function ApplySideTabLevel()
+    local strip = _modeStrip
+    if not (strip and strip._sideTabs and rbFrame) then return end
+    local skin   = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local under  = skin or (BNB.IsForever and SideTabSide() ~= "left")
+    local strata = rbFrame:GetFrameStrata()
+    if under then
+        strip:SetFrameStrata(STRATA_BELOW[strata] or "LOW")
+    else
+        strip:SetFrameStrata(strata)
+        strip:SetFrameLevel(rbFrame:GetFrameLevel() + 1)
+    end
+end
+
 local function PositionSideTabs()
     local strip = _modeStrip
     local side  = SideTabSide()
-    local below = math.max(0, rbFrame:GetFrameLevel() - 1)
-    local above = rbFrame:GetFrameLevel() + 1
-    -- Skin mode: always below the frame, so its edge covers the tab's inner
-    -- end (Dukul, 2026-09-27: they drew on top of the window)
     local skin  = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local out   = skin and TAB_SKIN_OUT or 0
     strip:ClearAllPoints()
     if side == "left" then
-        strip:SetPoint("BOTTOMRIGHT", rbFrame, "BOTTOMLEFT", TAB_OFF.left, TAB_BOTTOM)
-        strip:SetFrameLevel(skin and below or above)
+        strip:SetPoint("BOTTOMRIGHT", rbFrame, "BOTTOMLEFT", TAB_OFF.left - out, TAB_BOTTOM)
     else
-        strip:SetPoint("BOTTOMLEFT", rbFrame, "BOTTOMRIGHT", TAB_OFF.right, TAB_BOTTOM)
-        -- Normal mode: below the frame on Forever (its border overlaps the tab),
-        -- above on Retail
-        strip:SetFrameLevel((skin or BNB.IsForever) and below or above)
+        strip:SetPoint("BOTTOMLEFT", rbFrame, "BOTTOMRIGHT", TAB_OFF.right + out, TAB_BOTTOM)
     end
+    ApplySideTabLevel()
     local c1,c2,c3,c4,c5,c6,c7,c8 = SideTabTexCoord(side)
     for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
         btn._border:SetTexCoord(c1,c2,c3,c4,c5,c6,c7,c8)
@@ -2460,30 +2556,15 @@ BuildModelViewer = function(f)
     liveLabel:Hide()
 
     -- ── Model hide/show toggle buttons ───────────────────────────────────────
-    -- "Hide model" button (bt-down) — top-right corner of the model viewer frame.
+    -- "Hide model" button ("down") — top-right corner of the model viewer frame.
     -- Clicking hides the model, restores scroll area to full height.
+    -- All four model buttons are icon buttons (UI/IconButton.lua), skin look in
+    -- skin mode (ALL-210).
     local BTN_SZ = 24
-    local hideBtn = CreateFrame("Button", nil, model)
-    hideBtn:SetSize(BTN_SZ, BTN_SZ)
+    local hideBtn = BNB.CreateIconButton(model, BTN_SZ, "down",
+        { tip = L["REFBOX_MV_HIDE_TIP"], tipSub = L["REFBOX_MV_HIDE_TIP_SUB"] })
     hideBtn:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4)
     hideBtn:SetFrameLevel(model:GetFrameLevel() + 4)
-    hideBtn:SetHighlightTexture(""); hideBtn:SetPushedTexture("")
-    local hbN = hideBtn:CreateTexture(nil, "ARTWORK"); hbN:SetAllPoints()
-    hbN:SetTexture(ASSETS .. "Buttons\\bt-down-normal")
-    local hbH = hideBtn:CreateTexture(nil, "ARTWORK"); hbH:SetAllPoints()
-    hbH:SetTexture(ASSETS .. "Buttons\\bt-down-hover"); hbH:Hide()
-    local hbP = hideBtn:CreateTexture(nil, "ARTWORK"); hbP:SetAllPoints()
-    hbP:SetTexture(ASSETS .. "Buttons\\bt-down-press"); hbP:Hide()
-    hideBtn:SetScript("OnMouseDown", function(self) if self:IsEnabled() then hbP:Show(); hbN:Hide(); hbH:Hide() end end)
-    hideBtn:SetScript("OnMouseUp",   function(self) hbP:Hide(); if self:IsEnabled() then hbH:Show() else hbN:Show() end end)
-    hideBtn:SetScript("OnEnter", function(self)
-        if self:IsEnabled() then hbN:Hide(); hbH:Show() end
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["REFBOX_MV_HIDE_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["REFBOX_MV_HIDE_TIP_SUB"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    hideBtn:SetScript("OnLeave", function() hbP:Hide(); hbH:Hide(); hbN:Show(); GameTooltip:Hide() end)
     hideBtn:SetScript("OnClick", function()
         if _noteID then _modelHidden[_noteID] = true end
         if rbFrame then RenderList() end
@@ -2492,98 +2573,43 @@ BuildModelViewer = function(f)
 
     -- X in the hide button's place while an entry from the list is shown
     -- (ALL-206): back to the note's own model, or no model on other notes
-    local closeBtn = CreateFrame("Button", nil, model)
-    closeBtn:SetSize(BTN_SZ, BTN_SZ)
+    local closeBtn = BNB.CreateIconButton(model, BTN_SZ, "close",
+        { tip = L["REFBOX_MV_ITEM_CLOSE_TIP"] })
     closeBtn:SetPoint("TOPRIGHT", model, "TOPRIGHT", -4, -4)
     closeBtn:SetFrameLevel(model:GetFrameLevel() + 4)
-    local cbN = closeBtn:CreateTexture(nil, "ARTWORK"); cbN:SetAllPoints()
-    cbN:SetTexture(ASSETS .. "Buttons\\bt-close-normal")
-    local cbH = closeBtn:CreateTexture(nil, "ARTWORK"); cbH:SetAllPoints()
-    cbH:SetTexture(ASSETS .. "Buttons\\bt-close-hover"); cbH:Hide()
-    local cbP = closeBtn:CreateTexture(nil, "ARTWORK"); cbP:SetAllPoints()
-    cbP:SetTexture(ASSETS .. "Buttons\\bt-close-press"); cbP:Hide()
-    closeBtn:SetScript("OnMouseDown", function() cbP:Show(); cbN:Hide(); cbH:Hide() end)
-    closeBtn:SetScript("OnMouseUp",   function() cbP:Hide(); cbH:Show() end)
-    closeBtn:SetScript("OnEnter", function(self)
-        cbN:Hide(); cbH:Show()
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["REFBOX_MV_ITEM_CLOSE_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    closeBtn:SetScript("OnLeave", function() cbP:Hide(); cbH:Hide(); cbN:Show(); GameTooltip:Hide() end)
     closeBtn:SetScript("OnClick", function()
         GameTooltip:Hide()
         if K.ClearShownModel then K.ClearShownModel() end
     end)
     closeBtn:Hide()
 
-    -- "Show model" button (bt-up) — bottom-right corner of the refbox scroll area.
+    -- "Show model" button ("up") — bottom-right corner of the refbox scroll area.
     -- Only visible when model data exists but the user has hidden the viewer.
     -- Same distance from the right edge as the hide button: the model's right
     -- inset (ApplyModelLayout insetR: 4 normal, 2 skin) plus the hide button's 4
-    local showBtn = CreateFrame("Button", nil, f)
-    showBtn:SetSize(BTN_SZ, BTN_SZ)
+    local showBtn = BNB.CreateIconButton(f, BTN_SZ, "up",
+        { tip = L["REFBOX_MV_SHOW_TIP"], tipSub = L["REFBOX_MV_SHOW_TIP_SUB"] })
     local showR = ((BigNoteBoxDB and BigNoteBoxDB.skinMode) and 2 or 4) + 4
     showBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -showR, BOTTOM_PAD + 4)
     showBtn:SetFrameLevel(f:GetFrameLevel() + 20)
-    showBtn:SetHighlightTexture(""); showBtn:SetPushedTexture("")
-    local sbN = showBtn:CreateTexture(nil, "ARTWORK"); sbN:SetAllPoints()
-    sbN:SetTexture(ASSETS .. "Buttons\\bt-up-normal")
-    local sbH = showBtn:CreateTexture(nil, "ARTWORK"); sbH:SetAllPoints()
-    sbH:SetTexture(ASSETS .. "Buttons\\bt-up-hover"); sbH:Hide()
-    local sbP = showBtn:CreateTexture(nil, "ARTWORK"); sbP:SetAllPoints()
-    sbP:SetTexture(ASSETS .. "Buttons\\bt-up-press"); sbP:Hide()
-    showBtn:SetScript("OnMouseDown", function(self) if self:IsEnabled() then sbP:Show(); sbN:Hide(); sbH:Hide() end end)
-    showBtn:SetScript("OnMouseUp",   function(self) sbP:Hide(); if self:IsEnabled() then sbH:Show() else sbN:Show() end end)
-    showBtn:SetScript("OnEnter", function(self)
-        if self:IsEnabled() then sbN:Hide(); sbH:Show() end
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["REFBOX_MV_SHOW_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["REFBOX_MV_SHOW_TIP_SUB"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    showBtn:SetScript("OnLeave", function() sbP:Hide(); sbH:Hide(); sbN:Show(); GameTooltip:Hide() end)
     showBtn:SetScript("OnClick", function()
         if _noteID then _modelHidden[_noteID] = nil end
         if rbFrame then RenderList() end
     end)
     showBtn:Hide()  -- shown by UpdateModelViewer when model is hidden but available
 
-    -- ── Gear view toggle button (bt-gearview) ────────────────────────────────
+    -- ── Gear view toggle button ("gearview") ─────────────────────────────────
     -- Visible in reconstructed mode: toggles dress-up between transmog and
     -- base gear. Visible but disabled in live mode (live already shows transmog).
-    local gearBtn = CreateFrame("Button", nil, model)
-    gearBtn:SetSize(BTN_SZ, BTN_SZ)
+    local gearBtn = BNB.CreateIconButton(model, BTN_SZ, "gearview", { tipAnchor = "ANCHOR_TOP",
+        tip = function(self)
+            if not self:IsEnabled() then return L["REFBOX_MV_GEAR_TMOG"], L["REFBOX_MV_LIVE_GEAR_TIP"] end
+            local isTmog = _noteID and (_gearViewTmog[_noteID] ~= false)
+            return isTmog and L["REFBOX_MV_GEAR_TMOG"] or L["REFBOX_MV_GEAR_REG"],
+                string.format(L["REFBOX_MV_SWITCH_TO_FMT"], isTmog and L["REFBOX_MV_GEAR_REG"] or L["REFBOX_MV_GEAR_TMOG"])
+        end })
     gearBtn:SetPoint("BOTTOMLEFT", model, "BOTTOMLEFT", 4, 4)
     gearBtn:SetFrameLevel(model:GetFrameLevel() + 4)
-    gearBtn:SetHighlightTexture(""); gearBtn:SetPushedTexture("")
-    local gbN = gearBtn:CreateTexture(nil, "ARTWORK"); gbN:SetAllPoints()
-    gbN:SetTexture(ASSETS .. "Buttons\\bt-gearview-normal")
-    local gbH = gearBtn:CreateTexture(nil, "ARTWORK"); gbH:SetAllPoints()
-    gbH:SetTexture(ASSETS .. "Buttons\\bt-gearview-hover"); gbH:Hide()
-    local gbP = gearBtn:CreateTexture(nil, "ARTWORK"); gbP:SetAllPoints()
-    gbP:SetTexture(ASSETS .. "Buttons\\bt-gearview-press"); gbP:Hide()
-    gearBtn:SetScript("OnMouseDown", function(self)
-        if self:IsEnabled() then gbP:Show(); gbN:Hide(); gbH:Hide() end
-    end)
-    gearBtn:SetScript("OnMouseUp", function(self)
-        gbP:Hide()
-        if self:IsEnabled() then gbH:Show() else gbN:Show() end
-    end)
-    gearBtn:SetScript("OnEnter", function(self)
-        if self:IsEnabled() then gbN:Hide(); gbH:Show() end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        local isTmog = _noteID and (_gearViewTmog[_noteID] ~= false)
-        if self:IsEnabled() then
-            GameTooltip:AddLine(isTmog and L["REFBOX_MV_GEAR_TMOG"] or L["REFBOX_MV_GEAR_REG"], 1, 1, 1)
-            GameTooltip:AddLine(string.format(L["REFBOX_MV_SWITCH_TO_FMT"], isTmog and L["REFBOX_MV_GEAR_REG"] or L["REFBOX_MV_GEAR_TMOG"]), 0.78, 0.78, 0.78)
-        else
-            GameTooltip:AddLine(L["REFBOX_MV_GEAR_TMOG"], 1, 1, 1)
-            GameTooltip:AddLine(L["REFBOX_MV_LIVE_GEAR_TIP"], 0.78, 0.78, 0.78)
-        end
-        GameTooltip:Show()
-    end)
-    gearBtn:SetScript("OnLeave", function() gbP:Hide(); gbH:Hide(); gbN:Show(); GameTooltip:Hide() end)
     gearBtn:SetScript("OnClick", function()
         if not _noteID then return end
         -- Toggle: nil/true = transmog, false = regular.
@@ -2966,7 +2992,6 @@ UpdateModelViewer = function()
         end
         if gearBtn then
             gearBtn:SetEnabled(false)
-            gearBtn:SetAlpha(0.35)
             gearBtn:Show()
         end
         if gearLbl then
@@ -3044,7 +3069,7 @@ UpdateModelViewer = function()
         if gearBtn then
             local hasTmog = tmog and next(tmog)
             gearBtn:SetEnabled(hasTmog ~= nil)
-            gearBtn:SetAlpha(hasTmog and 1.0 or 0.35)
+            gearBtn:SetDim(not hasTmog)   -- no transmog: clickable, drawn disabled
             gearBtn:Show()
         end
         if gearLbl then

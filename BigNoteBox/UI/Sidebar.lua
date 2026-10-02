@@ -37,11 +37,13 @@ local ASSETS        = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ICON_PATH     = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Classes\\"
 local BTN_SZ        = 64     -- button frame size (matches sidebar-border.tga)
 
--- FOR-15: strip offset against the main window, per client/mode. Only Forever
--- normal mode is tuned so far; other combinations default to no offset until
--- their own values are measured (retail normal, retail skin, Forever skin).
+-- FOR-15: strip offset against the main window, per client/mode. Forever and
+-- Retail normal mode are tuned (Retail left from Dukul's screenshots
+-- 2026-10-03: the strip sat 5 units clear of the window border); skin mode
+-- uses the defaults in Refresh (left 2, right -2), which look right.
 local SIDE_OFFSET = {
     forever_normal = { left = 7, right = -2 },
+    retail_normal  = { left = 7, right = -2 },
 }
 
 -- Icon folders available in the sidebar icon picker (Classes, Races, Factions only).
@@ -372,7 +374,10 @@ local function ApplyBtnLayout(w, sz, isz, ix, iy)
     w.iconTex:SetSize(isz, isz)
     w.iconTex:ClearAllPoints()
     local db = BigNoteBoxDB
-    local xOff = (db and db.sidebarSide == "left") and (ix + 5) or ix
+    -- Left side: the border is mirrored, so the icon moves right by 5, or by
+    -- half that (2) for small icons (Dukul 2026-10-03: 5 put it too far right)
+    local xOff = ix
+    if db and db.sidebarSide == "left" then xOff = ix + (sz < BTN_SZ and 2 or 5) end
     w.iconTex:SetPoint("TOPLEFT", w.btn, "TOPLEFT", xOff, iy)
     local ulx,uly,urx,ury,llx,lly,lrx,lry = SidebarTexCoord()
     w.borderTex:SetTexCoord(ulx,uly,urx,ury,llx,lly,lrx,lry)
@@ -654,8 +659,9 @@ function SB.Refresh()
 
     -- FOR-15: Forever normal mode gets its own measured offsets and draws
     -- below the main window so its border overlaps the strip cleanly.
-    local forNormal = BNB.IsForever and not (db and db.skinMode)
-    local off = forNormal and SIDE_OFFSET.forever_normal
+    local normal = not (db and db.skinMode)
+    local off = normal and (BNB.IsForever and SIDE_OFFSET.forever_normal or SIDE_OFFSET.retail_normal)
+    local forNormal = normal and BNB.IsForever
     local leftOff, rightOff = 2, -2
     if off then
         leftOff, rightOff = off.left, off.right
@@ -671,7 +677,7 @@ function SB.Refresh()
         _strip:SetPoint("BOTTOMLEFT", parent, "BOTTOMRIGHT", rightOff,  0)
     end
 
-    if off and side ~= "left" then
+    if forNormal and side ~= "left" then
         -- Right side draws below the main window so its border overlaps the strip.
         _strip:SetFrameLevel(math.max(0, parent:GetFrameLevel() - 1))
     else

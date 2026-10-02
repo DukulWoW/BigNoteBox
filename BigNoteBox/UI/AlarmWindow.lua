@@ -237,39 +237,12 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     calTitle:SetPoint("TOP",realSection,"TOP",0,-1)
     calTitle:SetWidth(AW_CW-44); calTitle:SetJustifyH("CENTER")
 
-    -- Left arrow (previous month) — icon button matching MainWindow titlebar style
+    -- Previous / next month arrows: icon buttons, skin look in skin mode (ALL-210)
     local CAL_BTN_SZ = 18
-    local CAL_BTN_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-    local pBtn = CreateFrame("Button", nil, realSection)
-    pBtn:SetSize(CAL_BTN_SZ, CAL_BTN_SZ)
+    local pBtn = BNB.CreateIconButton(realSection, CAL_BTN_SZ, "left")
     pBtn:SetPoint("TOPLEFT", realSection, "TOPLEFT", 0, 0)
-    pBtn:SetHighlightTexture(""); pBtn:SetPushedTexture("")
-    local pNorm  = pBtn:CreateTexture(nil,"ARTWORK"); pNorm:SetAllPoints()
-    pNorm:SetTexture(CAL_BTN_ASSETS .. "bt-left-normal")
-    local pHover = pBtn:CreateTexture(nil,"ARTWORK"); pHover:SetAllPoints()
-    pHover:SetTexture(CAL_BTN_ASSETS .. "bt-left-hover"); pHover:Hide()
-    local pPress = pBtn:CreateTexture(nil,"ARTWORK"); pPress:SetAllPoints()
-    pPress:SetTexture(CAL_BTN_ASSETS .. "bt-left-press"); pPress:Hide()
-    pBtn:SetScript("OnEnter",    function() pNorm:Hide(); pHover:Show() end)
-    pBtn:SetScript("OnLeave",    function() pHover:Hide(); pPress:Hide(); pNorm:Show() end)
-    pBtn:SetScript("OnMouseDown",function() pPress:Show(); pNorm:Hide(); pHover:Hide() end)
-    pBtn:SetScript("OnMouseUp",  function() pPress:Hide(); pHover:Show() end)
-
-    -- Right arrow (next month)
-    local nBtn = CreateFrame("Button", nil, realSection)
-    nBtn:SetSize(CAL_BTN_SZ, CAL_BTN_SZ)
+    local nBtn = BNB.CreateIconButton(realSection, CAL_BTN_SZ, "right")
     nBtn:SetPoint("TOPRIGHT", realSection, "TOPRIGHT", 0, 0)
-    nBtn:SetHighlightTexture(""); nBtn:SetPushedTexture("")
-    local nNorm  = nBtn:CreateTexture(nil,"ARTWORK"); nNorm:SetAllPoints()
-    nNorm:SetTexture(CAL_BTN_ASSETS .. "bt-right-normal")
-    local nHover = nBtn:CreateTexture(nil,"ARTWORK"); nHover:SetAllPoints()
-    nHover:SetTexture(CAL_BTN_ASSETS .. "bt-right-hover"); nHover:Hide()
-    local nPress = nBtn:CreateTexture(nil,"ARTWORK"); nPress:SetAllPoints()
-    nPress:SetTexture(CAL_BTN_ASSETS .. "bt-right-press"); nPress:Hide()
-    nBtn:SetScript("OnEnter",    function() nNorm:Hide(); nHover:Show() end)
-    nBtn:SetScript("OnLeave",    function() nHover:Hide(); nPress:Hide(); nNorm:Show() end)
-    nBtn:SetScript("OnMouseDown",function() nPress:Show(); nNorm:Hide(); nHover:Hide() end)
-    nBtn:SetScript("OnMouseUp",  function() nPress:Hide(); nHover:Show() end)
 
     for i,dnKey in ipairs(DAY_NAME_KEYS) do
         local dn = L[dnKey]

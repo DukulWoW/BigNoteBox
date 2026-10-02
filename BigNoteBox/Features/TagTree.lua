@@ -17,7 +17,6 @@ local HEADER_H   = 24
 local ENTRY_INDENT = 8      -- px left indent for notes under a tag header
 local PAD_L      = 8
 local BTN_SZ     = 18   -- arrow button size, matches AlarmWindow calendar nav buttons
-local BTN_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
 
 --------------------------------------------------------------------------------
 -- Helpers
@@ -94,28 +93,12 @@ local function GetOrCreateTagHeader(child, idx)
     local hiBg = btn:CreateTexture(nil, "HIGHLIGHT")
     hiBg:SetAllPoints(); hiBg:SetColorTexture(1, 1, 1, 0.05)
 
-    -- Arrow: texture button (bt-right = collapsed, bt-down = expanded)
-    -- Same 18x18 size and script pattern as AlarmWindow calendar nav buttons.
-    local arrowBtn = CreateFrame("Button", nil, btn)
-    arrowBtn:SetSize(BTN_SZ, BTN_SZ)
+    -- Arrow: icon button ("right" = collapsed, "down" = expanded), 18x18 like
+    -- the AlarmWindow calendar arrows. Clicks go to the parent header button.
+    local arrowBtn = BNB.CreateIconButton(btn, BTN_SZ, "right",
+        { onClick = function() btn:Click() end })
     arrowBtn:SetPoint("LEFT", btn, "LEFT", PAD_L, 0)
-    arrowBtn:SetHighlightTexture(""); arrowBtn:SetPushedTexture("")
-    local arNorm  = arrowBtn:CreateTexture(nil, "ARTWORK"); arNorm:SetAllPoints()
-    arNorm:SetTexture(BTN_ASSETS .. "bt-right-normal")
-    local arHover = arrowBtn:CreateTexture(nil, "ARTWORK"); arHover:SetAllPoints()
-    arHover:SetTexture(BTN_ASSETS .. "bt-right-hover"); arHover:Hide()
-    local arPress = arrowBtn:CreateTexture(nil, "ARTWORK"); arPress:SetAllPoints()
-    arPress:SetTexture(BTN_ASSETS .. "bt-right-press"); arPress:Hide()
-    arrowBtn:SetScript("OnEnter",     function() arNorm:Hide(); arHover:Show() end)
-    arrowBtn:SetScript("OnLeave",     function() arHover:Hide(); arPress:Hide(); arNorm:Show() end)
-    arrowBtn:SetScript("OnMouseDown", function() arPress:Show(); arNorm:Hide(); arHover:Hide() end)
-    arrowBtn:SetScript("OnMouseUp",   function() arPress:Hide(); arHover:Show() end)
-    -- Forward clicks on the arrow button to the parent header button
-    arrowBtn:SetScript("OnClick", function() btn:Click() end)
     btn._arrowBtn  = arrowBtn
-    btn._arNorm    = arNorm
-    btn._arHover   = arHover
-    btn._arPress   = arPress
 
     local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbl:SetPoint("LEFT", arrowBtn, "RIGHT", 4, 0)
@@ -235,17 +218,8 @@ function BNB.RefreshTagTree()
         local hdr = GetOrCreateTagHeader(child, hdrIdx)
         hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  0, -totalH)
         hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -totalH)
-        -- Swap arrow textures: bt-down when expanded, bt-right when collapsed
-        if hdr._arrowBtn then
-            local norm  = expanded and BTN_ASSETS .. "bt-down-normal"  or BTN_ASSETS .. "bt-right-normal"
-            local hover = expanded and BTN_ASSETS .. "bt-down-hover"   or BTN_ASSETS .. "bt-right-hover"
-            local press = expanded and BTN_ASSETS .. "bt-down-press"   or BTN_ASSETS .. "bt-right-press"
-            hdr._arNorm:SetTexture(norm)
-            hdr._arHover:SetTexture(hover)
-            hdr._arPress:SetTexture(press)
-            -- Reset to normal state (hide hover/press in case mouse was over during refresh)
-            hdr._arHover:Hide(); hdr._arPress:Hide(); hdr._arNorm:Show()
-        end
+        -- Arrow symbol: down when expanded, right when collapsed
+        if hdr._arrowBtn then hdr._arrowBtn:SetSymbol(expanded and "down" or "right") end
         hdr._lbl:SetText(isUntagged and ("|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r") or tag)
         hdr._count:SetText("(" .. #notes .. ")")
         hdr:SetScript("OnClick", function()

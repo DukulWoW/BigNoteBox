@@ -368,11 +368,24 @@ end
 --------------------------------------------------------------------------------
 function BNB.UpdateFocusSpinBtn(enabled)
     if not focusSpinBtn then return end
-    local BTNS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-    local base = enabled and "bt-spinon" or "bt-spinoff"
-    focusSpinBtn._n:SetTexture(BTNS .. base .. "-normal")
-    focusSpinBtn._h:SetTexture(BTNS .. base .. "-hover")
-    focusSpinBtn._p:SetTexture(BTNS .. base .. "-press")
+    focusSpinBtn:SetSymbol(enabled and "spinon" or "spinoff")
+end
+
+-- Spin (orbit) toggle, an icon button left of Restore in both builders.
+-- skin: true in the skin builder, false in the normal one.
+local function MakeFocusSpinBtn(parent, restoreBtn, skin)
+    local db   = BigNoteBoxDB
+    local isOn = db and db.focusOrbitEnabled ~= false
+    local sb = BNB.CreateIconButton(parent, 18, isOn and "spinon" or "spinoff", { skin = skin,
+        tip = function()
+            local d = BigNoteBoxDB
+            return (d and d.focusOrbitEnabled ~= false)
+                and L["CFG_FOCUS_ORBIT_TIP_OFF"] or L["CFG_FOCUS_ORBIT_TIP_ON"]
+        end,
+        onClick = function() if BNB.FocusOrbit then BNB.FocusOrbit.Toggle() end end })
+    sb:SetPoint("RIGHT", restoreBtn, "LEFT", -4, 0)
+    focusSpinBtn = sb
+    return sb
 end
 
 --------------------------------------------------------------------------------
@@ -552,38 +565,8 @@ local function BuildFocusFrame()
 
     -- Spin (orbit) toggle button — left of Restore
     do
-        local BTNS  = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-        local db    = BigNoteBoxDB
-        local isOn  = db and db.focusOrbitEnabled ~= false
-        local spinBase = isOn and "bt-spinon" or "bt-spinoff"
-        local sb = CreateFrame("Button", nil, f)
-        sb:SetSize(18, 18)
-        sb:SetPoint("RIGHT", restoreBtn, "LEFT", -4, 0)
+        local sb = MakeFocusSpinBtn(f, restoreBtn, false)
         sb:SetFrameLevel(restoreBtn:GetFrameLevel())
-        sb:SetHighlightTexture(""); sb:SetPushedTexture("")
-        local sn = sb:CreateTexture(nil, "ARTWORK"); sn:SetAllPoints()
-        sn:SetTexture(BTNS .. spinBase .. "-normal")
-        local sh = sb:CreateTexture(nil, "ARTWORK"); sh:SetAllPoints()
-        sh:SetTexture(BTNS .. spinBase .. "-hover"); sh:Hide()
-        local sp = sb:CreateTexture(nil, "ARTWORK"); sp:SetAllPoints()
-        sp:SetTexture(BTNS .. spinBase .. "-press"); sp:Hide()
-        sb:SetScript("OnMouseDown", function(self) if self:IsEnabled() then sp:Show(); sn:Hide(); sh:Hide() end end)
-        sb:SetScript("OnMouseUp",   function(self) sp:Hide(); sn:Show(); sh:Hide() end)
-        sb:SetScript("OnEnter", function(self)
-            sn:Hide(); sh:Show()
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            local db = BigNoteBoxDB
-            local tip = (db and db.focusOrbitEnabled ~= false)
-                and L["CFG_FOCUS_ORBIT_TIP_OFF"] or L["CFG_FOCUS_ORBIT_TIP_ON"]
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        sb:SetScript("OnLeave", function() sp:Hide(); sh:Hide(); sn:Show(); GameTooltip:Hide() end)
-        sb:SetScript("OnClick", function()
-            if BNB.FocusOrbit then BNB.FocusOrbit.Toggle() end
-        end)
-        sb._n, sb._h, sb._p = sn, sh, sp
-        focusSpinBtn = sb
     end
 
     local content = CreateFrame("Frame", nil, f)
@@ -886,37 +869,7 @@ local function BuildFocusFrameSkin()
 
     -- Spin (orbit) toggle button — left of Restore
     do
-        local BTNS  = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
-        local db    = BigNoteBoxDB
-        local isOn  = db and db.focusOrbitEnabled ~= false
-        local spinBase = isOn and "bt-spinon" or "bt-spinoff"
-        local sb = CreateFrame("Button", nil, titleBar)
-        sb:SetSize(18, 18)
-        sb:SetPoint("RIGHT", restoreBtn, "LEFT", -4, 0)
-        sb:SetHighlightTexture(""); sb:SetPushedTexture("")
-        local sn = sb:CreateTexture(nil, "ARTWORK"); sn:SetAllPoints()
-        sn:SetTexture(BTNS .. spinBase .. "-normal")
-        local sh = sb:CreateTexture(nil, "ARTWORK"); sh:SetAllPoints()
-        sh:SetTexture(BTNS .. spinBase .. "-hover"); sh:Hide()
-        local sp = sb:CreateTexture(nil, "ARTWORK"); sp:SetAllPoints()
-        sp:SetTexture(BTNS .. spinBase .. "-press"); sp:Hide()
-        sb:SetScript("OnMouseDown", function(self) if self:IsEnabled() then sp:Show(); sn:Hide(); sh:Hide() end end)
-        sb:SetScript("OnMouseUp",   function(self) sp:Hide(); sn:Show(); sh:Hide() end)
-        sb:SetScript("OnEnter", function(self)
-            sn:Hide(); sh:Show()
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            local db = BigNoteBoxDB
-            local tip = (db and db.focusOrbitEnabled ~= false)
-                and L["CFG_FOCUS_ORBIT_TIP_OFF"] or L["CFG_FOCUS_ORBIT_TIP_ON"]
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        sb:SetScript("OnLeave", function() sp:Hide(); sh:Hide(); sn:Show(); GameTooltip:Hide() end)
-        sb:SetScript("OnClick", function()
-            if BNB.FocusOrbit then BNB.FocusOrbit.Toggle() end
-        end)
-        sb._n, sb._h, sb._p = sn, sh, sp
-        focusSpinBtn = sb
+        MakeFocusSpinBtn(titleBar, restoreBtn, true)
     end
 
     -- ── Content area ──────────────────────────────────────────────────────────

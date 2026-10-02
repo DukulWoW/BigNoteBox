@@ -323,44 +323,8 @@ local function BuildWindow()
 end
 
 -- ── Populate sections into scroll content ─────────────────────────────────────
--- ── Button asset constants ────────────────────────────────────────────────────
-local BTN_ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
 local BTN_SZ     = 18   -- arrow button size (matches TagTree and AlarmWindow)
 local HEADER_H   = 24   -- height of each accordion header row
-
--- ── Arrow button factory ──────────────────────────────────────────────────────
--- Creates a texture-based arrow button (bt-right/bt-down) on `parent`.
--- Returns the button and the three texture references for later swapping.
-local function MakeArrowBtn(parent)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(BTN_SZ, BTN_SZ)
-    btn:SetHighlightTexture("")
-    btn:SetPushedTexture("")
-
-    local norm  = btn:CreateTexture(nil, "ARTWORK"); norm:SetAllPoints()
-    local hover = btn:CreateTexture(nil, "ARTWORK"); hover:SetAllPoints()
-    local press = btn:CreateTexture(nil, "ARTWORK"); press:SetAllPoints()
-
-    norm:SetTexture(BTN_ASSETS  .. "bt-right-normal")
-    hover:SetTexture(BTN_ASSETS .. "bt-right-hover");  hover:Hide()
-    press:SetTexture(BTN_ASSETS .. "bt-right-press");  press:Hide()
-
-    btn:SetScript("OnEnter",     function() norm:Hide();  hover:Show() end)
-    btn:SetScript("OnLeave",     function() hover:Hide(); press:Hide(); norm:Show() end)
-    btn:SetScript("OnMouseDown", function() press:Show(); norm:Hide();  hover:Hide() end)
-    btn:SetScript("OnMouseUp",   function() press:Hide(); hover:Show() end)
-
-    return btn, norm, hover, press
-end
-
--- Swap all three textures on an arrow button to collapsed or expanded state.
-local function SetArrow(norm, hover, press, expanded)
-    local n = expanded and BTN_ASSETS .. "bt-down-normal"  or BTN_ASSETS .. "bt-right-normal"
-    local h = expanded and BTN_ASSETS .. "bt-down-hover"   or BTN_ASSETS .. "bt-right-hover"
-    local p = expanded and BTN_ASSETS .. "bt-down-press"   or BTN_ASSETS .. "bt-right-press"
-    norm:SetTexture(n); hover:SetTexture(h); press:SetTexture(p)
-    hover:Hide(); press:Hide(); norm:Show()
-end
 
 -- ── Populate with accordion ───────────────────────────────────────────────────
 local function PopulateContent(ct, sf)
@@ -481,10 +445,10 @@ local function PopulateContent(ct, sf)
         hlTex:SetColorTexture(1, 1, 1, 0.05)
 
         -- Arrow button (forwards clicks to hdrBtn)
-        local arBtn, arNorm, arHover, arPress = MakeArrowBtn(hdrBtn)
+        local arBtn = BNB.CreateIconButton(hdrBtn, BTN_SZ, "right",
+            { onClick = function() hdrBtn:Click() end })
         arBtn:SetPoint("LEFT", hdrBtn, "LEFT", 0, 0)
-        arBtn:SetScript("OnClick", function() hdrBtn:Click() end)
-        sec.arNorm = arNorm; sec.arHover = arHover; sec.arPress = arPress
+        sec.arBtn = arBtn
 
         -- Section header label
         local lbl = hdrBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -540,10 +504,10 @@ local function PopulateContent(ct, sf)
             local wasOpen = sec.isOpen
             for _, s in ipairs(secs) do
                 s.isOpen = false
-                SetArrow(s.arNorm, s.arHover, s.arPress, false)
+                s.arBtn:SetSymbol("right")
             end
             sec.isOpen = not wasOpen
-            SetArrow(sec.arNorm, sec.arHover, sec.arPress, sec.isOpen)
+            sec.arBtn:SetSymbol(sec.isOpen and "down" or "right")
             RefreshLayout()
         end)
     end

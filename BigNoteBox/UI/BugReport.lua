@@ -14,7 +14,6 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
-local BTN_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
 
 BNB.BUG_LINKS = {
     github     = "https://github.com/DukulWoW/BigNoteBox/issues/new/choose",
@@ -152,32 +151,11 @@ local BUG_BTN_ON_SETTINGS = not BNB.IsForever
 local function MakeBugButton(host, glow)
     if not host or host._bugBtn then return end
 
-    local btn = CreateFrame("Button", nil, host)
-    btn:SetSize(BUG_BTN_SZ, BUG_BTN_SZ)
+    local btn = BNB.CreateIconButton(host, BUG_BTN_SZ, "bugs", {
+        onClick = function() BNB.ShowBugReport() end,
+        tip = L["BUG_BTN_TIP"], tipAnchor = "ANCHOR_RIGHT" })
     local d = BNB.IsForever and BNB.CHROME_DELTA or nil
     btn:SetPoint("TOPLEFT", host, "TOPRIGHT", BUG_BTN_X + (d and d.r or 0), BUG_BTN_Y)
-
-    local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
-    n:SetTexture(BTN_PATH .. "bt-bugs-normal")
-    local h = btn:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
-    h:SetTexture(BTN_PATH .. "bt-bugs-hover"); h:Hide()
-    local p = btn:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
-    p:SetTexture(BTN_PATH .. "bt-bugs-press"); p:Hide()
-    btn._n, btn._h, btn._p = n, h, p
-
-    btn:SetScript("OnMouseDown", function() p:Show(); n:Hide(); h:Hide() end)
-    btn:SetScript("OnMouseUp",   function() p:Hide(); h:Show(); n:Hide() end)
-    btn:SetScript("OnEnter", function(self)
-        n:Hide(); h:Show()
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["BUG_BTN_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    btn:SetScript("OnLeave", function()
-        p:Hide(); h:Hide(); n:Show()
-        GameTooltip:Hide()
-    end)
-    btn:SetScript("OnClick", function() BNB.ShowBugReport() end)
     host._bugBtn = btn
 
     -- Pixel glow so the button is noticed during the beta (Dukul, 2026-09-25):

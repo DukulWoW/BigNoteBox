@@ -26,7 +26,6 @@ local COLLAPSED_W    = 82   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + PAD_L(8) + sc
 local SORT_BTN_H = 22   -- height to match WowStyle1 button
 local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4)
 
-local BTNS   = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\"
 local TOPBAR = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
 local BCB_PROMO_ICON = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
 
@@ -51,7 +50,7 @@ BNB._listPaneW = DEFAULT_LIST_W
 --   selY         TOP of the Select button, from the window's TOP
 --   iconX, iconY TOPRIGHT of the right-most toolbar icon (sidebar toggle)
 -- Optional hooks:
---   AddTitleButtons(lockBtn, MakeTexBtn)  extra title-bar buttons left of lock
+--   AddTitleButtons(lockBtn)              extra title-bar buttons left of lock
 --   StyleIcons(icons)                     once, with the toolbar icon buttons
 --   DotColour()                           splitter grip colour at rest (r,g,b)
 --   StylePanes(listPane, editorPane)      once, after the panes exist
@@ -101,42 +100,7 @@ end
 --------------------------------------------------------------------------------
 -- BUTTON HELPERS
 --------------------------------------------------------------------------------
--- Texture button with a normal / hover / press TGA set (Assets\Buttons\).
--- Textures are exposed as _n / _h / _p for callers that desaturate or swap them.
-local function MakeTexBtn(parent, baseName, size, onClick, tipTitle, tipSub)
-    local btn = CreateFrame("Button", nil, parent)
-    btn:SetSize(size, size)
-    -- Suppress WoW's default button flash so our press texture shows cleanly
-    btn:SetHighlightTexture("")
-    btn:SetPushedTexture("")
-
-    local n = btn:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
-    n:SetTexture(BTNS .. baseName .. "-normal")
-    local h = btn:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
-    h:SetTexture(BTNS .. baseName .. "-hover"); h:Hide()
-    local p = btn:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
-    p:SetTexture(BTNS .. baseName .. "-press"); p:Hide()
-
-    btn:SetScript("OnClick",     function() if onClick then onClick() end end)
-    btn:SetScript("OnMouseDown", function(self) if self:IsEnabled() then p:Show(); n:Hide(); h:Hide() end end)
-    btn:SetScript("OnMouseUp",   function(self) p:Hide(); if self:IsEnabled() then h:Show() else n:Show() end end)
-    btn:SetScript("OnEnter", function(self)
-        if self:IsEnabled() then n:Hide(); h:Show() end
-        if tipTitle then
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(tipTitle, 1, 1, 1)
-            if tipSub then GameTooltip:AddLine(tipSub, 0.78, 0.78, 0.78) end
-            GameTooltip:Show()
-        end
-    end)
-    btn:SetScript("OnLeave", function()
-        p:Hide(); h:Hide(); n:Show()
-        GameTooltip:Hide()
-    end)
-
-    btn._n, btn._h, btn._p = n, h, p
-    return btn
-end
+-- Title-bar icon buttons are BNB.CreateIconButton (UI/IconButton.lua, ALL-214).
 
 -- Toolbar icon: plain Button, no template, fixed TOPRIGHT anchor on the window.
 local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick)
@@ -188,37 +152,21 @@ end
 
 --------------------------------------------------------------------------------
 -- SCALE-LOCK BUTTON
--- Locked → bt-lock textures, unlocked → bt-unlock. State persists via
+-- Locked → "lock" symbol, unlocked → "unlock". State persists via
 -- BigNoteBoxDB.scaleLocked. Right-click resets the window size and position.
 --------------------------------------------------------------------------------
 local function IsLocked() return BigNoteBoxDB and BigNoteBoxDB.scaleLocked end
 
 local function MakeLockBtn(f, parent, size)
-    local lockBtn = CreateFrame("Button", nil, parent)
-    lockBtn:SetSize(size, size)
-    lockBtn:SetHighlightTexture("")
-    lockBtn:SetPushedTexture("")
-
-    local lockTex     = lockBtn:CreateTexture(nil, "ARTWORK"); lockTex:SetAllPoints()
-    local unlockTex   = lockBtn:CreateTexture(nil, "ARTWORK"); unlockTex:SetAllPoints()
-    local lockHov     = lockBtn:CreateTexture(nil, "ARTWORK"); lockHov:SetAllPoints();     lockHov:Hide()
-    local unlockHov   = lockBtn:CreateTexture(nil, "ARTWORK"); unlockHov:SetAllPoints();   unlockHov:Hide()
-    local lockPress   = lockBtn:CreateTexture(nil, "ARTWORK"); lockPress:SetAllPoints();   lockPress:Hide()
-    local unlockPress = lockBtn:CreateTexture(nil, "ARTWORK"); unlockPress:SetAllPoints(); unlockPress:Hide()
-
-    lockTex:SetTexture(BTNS .. "bt-lock-normal")
-    unlockTex:SetTexture(BTNS .. "bt-unlock-normal")
-    lockHov:SetTexture(BTNS .. "bt-lock-hover")
-    unlockHov:SetTexture(BTNS .. "bt-unlock-hover")
-    lockPress:SetTexture(BTNS .. "bt-lock-press")
-    unlockPress:SetTexture(BTNS .. "bt-unlock-press")
+    local lockBtn = BNB.CreateIconButton(parent, size, IsLocked() and "lock" or "unlock", {
+        tip = function()
+            if IsLocked() then return L["MW_LOCK_TIP"], L["MW_LOCK_TIP_SUB"], L["MW_LOCK_RESET_TIP"] end
+            return L["MW_UNLOCK_TIP"], L["MW_UNLOCK_TIP_SUB"], L["MW_LOCK_RESET_TIP"]
+        end })
 
     local function RefreshLockBtn()
-        local locked = IsLocked()
-        lockTex:SetShown(locked);   unlockTex:SetShown(not locked)
-        lockHov:Hide(); unlockHov:Hide(); lockPress:Hide(); unlockPress:Hide()
+        lockBtn:SetSymbol(IsLocked() and "lock" or "unlock")
     end
-    RefreshLockBtn()
 
     lockBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     lockBtn:SetScript("OnClick", function(_, btn)
@@ -234,34 +182,9 @@ local function MakeLockBtn(f, parent, size)
         db.scaleLocked = not db.scaleLocked
         RefreshLockBtn()
         if BNB._applyScaleLock then BNB._applyScaleLock() end
-        -- Still hovered: redraw the hover art and the Locked/Unlocked tooltip (ALL-59)
-        if lockBtn:IsMouseOver() then lockBtn:GetScript("OnEnter")(lockBtn) end
+        -- Still hovered: redraw the Locked/Unlocked tooltip (ALL-59)
+        lockBtn:RefreshTip()
     end)
-    lockBtn:SetScript("OnMouseDown", function()
-        local locked = IsLocked()
-        lockTex:Hide(); unlockTex:Hide(); lockHov:Hide(); unlockHov:Hide()
-        if locked then lockPress:Show() else unlockPress:Show() end
-    end)
-    lockBtn:SetScript("OnMouseUp", function()
-        lockPress:Hide(); unlockPress:Hide()
-        if IsLocked() then lockHov:Show() else unlockHov:Show() end
-    end)
-    lockBtn:SetScript("OnEnter", function(self)
-        local locked = IsLocked()
-        if locked then lockTex:Hide();   lockHov:Show()
-        else           unlockTex:Hide(); unlockHov:Show() end
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        if locked then
-            GameTooltip:AddLine(L["MW_LOCK_TIP"], 1, 1, 1)
-            GameTooltip:AddLine(L["MW_LOCK_TIP_SUB"], 0.78, 0.78, 0.78)
-        else
-            GameTooltip:AddLine(L["MW_UNLOCK_TIP"], 1, 1, 1)
-            GameTooltip:AddLine(L["MW_UNLOCK_TIP_SUB"], 0.78, 0.78, 0.78)
-        end
-        GameTooltip:AddLine(L["MW_LOCK_RESET_TIP"], 0.55, 0.55, 0.55)
-        GameTooltip:Show()
-    end)
-    lockBtn:SetScript("OnLeave", function() RefreshLockBtn(); GameTooltip:Hide() end)
     BNB._refreshLockBtn = RefreshLockBtn
     return lockBtn
 end
@@ -471,25 +394,23 @@ function BNB.CreateMainWindow()
 
     -- ── Title-bar buttons: focus mode, sticky eye, scale lock (right to left) ─
     if chrome.closeBtn then
-        local focusBtn = MakeTexBtn(chrome.btnParent, "bt-focus", chrome.btnSize,
-            function() if BNB.OpenFocusMode then BNB.OpenFocusMode() end end,
-            L["FOCUS_MODE_TIP"], L["FOCUS_MODE_TIP_SUB"])
+        local focusBtn = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "focus", {
+            onClick = function() if BNB.OpenFocusMode then BNB.OpenFocusMode() end end,
+            tip = L["FOCUS_MODE_TIP"], tipSub = L["FOCUS_MODE_TIP_SUB"] })
         focusBtn:SetPoint("RIGHT", chrome.closeBtn, "LEFT", -chrome.btnGap, 0)
         BNB._focusModeBtn = focusBtn
         -- Start disabled — no note selected yet; UpdateSaveButtonState re-enables on note load
         focusBtn:SetEnabled(false)
-        focusBtn:SetAlpha(0.35)
-        pcall(function() focusBtn._n:SetDesaturated(true) end)
 
         -- Sticky eye (ALL-101): open = stickies shown (click hides them all),
         -- closed = hidden by Hide all / its keybind. Two buttons, one shown.
         local function ToggleStickies()
             if BNB.Sticky and BNB.Sticky.ToggleHidden then BNB.Sticky.ToggleHidden() end
         end
-        local eyeOpen = MakeTexBtn(chrome.btnParent, "bt-eye-open", chrome.btnSize,
-            ToggleStickies, L["MW_EYE_HIDE_TIP"], L["MW_EYE_HIDE_SUB"])
-        local eyeClosed = MakeTexBtn(chrome.btnParent, "bt-eye-closed", chrome.btnSize,
-            ToggleStickies, L["MW_EYE_SHOW_TIP"])
+        local eyeOpen = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "eye-open", {
+            onClick = ToggleStickies, tip = L["MW_EYE_HIDE_TIP"], tipSub = L["MW_EYE_HIDE_SUB"] })
+        local eyeClosed = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "eye-closed", {
+            onClick = ToggleStickies, tip = L["MW_EYE_SHOW_TIP"] })
         for _, eb in ipairs({ eyeOpen, eyeClosed }) do
             eb:SetPoint("RIGHT", focusBtn, "LEFT", -chrome.btnGap, 0)
             eb:HookScript("OnEnter", function(self)
@@ -512,7 +433,7 @@ function BNB.CreateMainWindow()
         local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
         lockBtn:SetPoint("RIGHT", eyeOpen, "LEFT", -chrome.btnGap, 0)
 
-        if chrome.AddTitleButtons then chrome.AddTitleButtons(lockBtn, MakeTexBtn) end
+        if chrome.AddTitleButtons then chrome.AddTitleButtons(lockBtn) end
     end
 
     -- ── Toolbar icons (right side of the toolbar strip) ──────────────────────

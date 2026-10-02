@@ -208,29 +208,12 @@ local function NewSubPage(title, build, key)
     function page.Open() OpenSubPage(page) end
     if key then subPages[key] = page end
 
-    -- Textured back arrow, same build as BNB.CreateSkinCloseButton; used in
-    -- both chromes (the art is not skin-tinted).
-    local back = CreateFrame("Button", nil, ct)
-    back:SetSize(22, 22)
+    -- Back arrow: an icon button, skin look in skin mode (ALL-210). The click
+    -- hides the page under the pointer; the button resets itself on hide.
+    local back = BNB.CreateIconButton(ct, 22, "left", {
+        onClick = function() ReselectTab(page.idx) end,
+        tip = L["CFG_SUBPAGE_BACK"], tipAnchor = "ANCHOR_RIGHT" })
     back:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, -8)
-    local n = back:CreateTexture(nil, "ARTWORK"); n:SetAllPoints()
-    n:SetTexture(ASSET .. "Buttons\\bt-left-normal")
-    local h = back:CreateTexture(nil, "ARTWORK"); h:SetAllPoints()
-    h:SetTexture(ASSET .. "Buttons\\bt-left-hover"); h:Hide()
-    local p = back:CreateTexture(nil, "ARTWORK"); p:SetAllPoints()
-    p:SetTexture(ASSET .. "Buttons\\bt-left-press"); p:Hide()
-    back:SetScript("OnClick",     function() ReselectTab(page.idx) end)
-    back:SetScript("OnMouseDown", function() p:Show(); n:Hide(); h:Hide() end)
-    back:SetScript("OnMouseUp",   function() p:Hide(); h:Show() end)
-    back:SetScript("OnEnter", function(self)
-        n:Hide(); h:Show()
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_SUBPAGE_BACK"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    back:SetScript("OnLeave", function() p:Hide(); h:Hide(); n:Show(); GameTooltip:Hide() end)
-    -- The click hides the page under the pointer, so OnLeave may never come.
-    sf:HookScript("OnShow", function() p:Hide(); h:Hide(); n:Show() end)
 
     local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     lbl:SetPoint("LEFT", back, "RIGHT", 8, 0)

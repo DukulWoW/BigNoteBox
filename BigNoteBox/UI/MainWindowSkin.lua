@@ -13,9 +13,10 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 -- ── Layout constants ──────────────────────────────────────────────────────────
-local SK_TITLE_H     = 20    -- top row: window title + X / lock / focus buttons
+-- Title bar 28 like every other skin window (Dukul 2026-10-03; it was 20)
+local SK_TITLE_H     = 28    -- top row: window title + X / lock / focus buttons
 local SK_TOOLBAR_H   = 35    -- sort dropdowns + topbar icons strip
-local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 55
+local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 63
 local SORT_BTN_H     = 22
 
 --------------------------------------------------------------------------------
@@ -61,11 +62,12 @@ function BNB.BuildMainWindowSkinChrome()
         iconY     = -(SK_CHROME_H - 8 - 20),   -- icon bottom 8px above the panes
 
         -- Skin randomise button, left of the lock
-        AddTitleButtons = function(lockBtn, MakeTexBtn)
+        AddTitleButtons = function(lockBtn)
             local PRESET_KEYS = {}
             for k in pairs(BNB.SKIN_PRESETS) do PRESET_KEYS[#PRESET_KEYS + 1] = k end
-            local skinChangeBtn = MakeTexBtn(titleBar, "bt-skinchange", 18,
-                function()
+            local skinChangeBtn = BNB.CreateIconButton(titleBar, 18, "skinchange", {
+                tip = L["MWS_RANDOM_SKIN_TIP"], tipSub = L["MWS_RANDOM_SKIN_TIP_SUB"],
+                onClick = function()
                     local db = BigNoteBoxDB; if not db then return end
                     local cur = db.skinPreset or "obsidian"
                     -- Pick a random preset that isn't the current one
@@ -80,8 +82,7 @@ function BNB.BuildMainWindowSkinChrome()
                     db.skinBrightness = 0.5 + steps * 0.05
                     if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
                     if BNB._refreshSkinConfig then BNB._refreshSkinConfig() end
-                end,
-                L["MWS_RANDOM_SKIN_TIP"], L["MWS_RANDOM_SKIN_TIP_SUB"])
+                end })
             skinChangeBtn:SetPoint("RIGHT", lockBtn, "LEFT", -4, 0)
         end,
 

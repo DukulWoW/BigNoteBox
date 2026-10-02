@@ -43,6 +43,7 @@ UI\GlowOverlay.lua
 UI\IconsAC.lua
 UI\Fonts.lua
 UI\SkinSystem.lua
+UI\IconButton.lua
 UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
