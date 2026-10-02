@@ -28,7 +28,7 @@ local function DB()  return BigNoteBoxDB          end
 -- "notes" is the filtered set for that tag (respects text + fav filter).
 -- Also returns a separate list of untagged notes.
 local function BuildTagBuckets()
-    local tagIndex = DB() and DB().tagIndex or {}
+    local tagIndex = BNB.TagIndex()
 
     -- Get filtered notes using NoteList current filter state
     local textFilter = BNB.GetCurrentFilter and BNB.GetCurrentFilter() or ""

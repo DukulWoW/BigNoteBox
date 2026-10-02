@@ -368,7 +368,7 @@ end)
 BNB.RegisterEvent("PLAYER_REGEN_DISABLED", function()
     local db = BigNoteBoxDB
     if not db then return end
-    local action = db.combatAction or "nothing"
+    local action = db.combatAction or BNB.DEFAULTS.combatAction
 
     -- If focus mode is open, exit it first so UIParent is restored before
     -- we apply any combat visibility changes.

@@ -78,23 +78,22 @@ local function GetNote(id)
     return BNB.GetNote and BNB.GetNote(id)
 end
 
-local function SaveAlarm(noteID, alarmData)
+-- state = true: the alarm only moved on (dismissed, snoozed, re-armed), which
+-- is not an edit of the note, so `updated` stays (SV-08). Setting or clearing
+-- an alarm is an edit.
+local function SaveAlarm(noteID, alarmData, state)
+    local opts = state and { noTouch = true } or nil
     -- alarmData == nil means clear the alarm field entirely
     if alarmData == nil then
-        BNB.UpdateNote(noteID, { _clear = { "alarm" } })
+        BNB.UpdateNote(noteID, { _clear = { "alarm" } }, opts)
     else
-        BNB.UpdateNote(noteID, { alarm = alarmData })
+        BNB.UpdateNote(noteID, { alarm = alarmData }, opts)
     end
 end
 
 -- Returns alarmDefaults table from DB, with fallback so we never crash
 local function Defaults()
-    return (BigNoteBoxDB and BigNoteBoxDB.alarmDefaults) or {
-        snoozeDefault = 5,
-        glowType      = 2,
-        glowColor     = { 0.400, 0.733, 0.416, 1.0 },
-        glowMode      = "continuous",
-    }
+    return (BigNoteBoxDB and BigNoteBoxDB.alarmDefaults) or BNB.DEFAULTS.alarmDefaults
 end
 
 -- The alarm window's own sounds (its Sound list). These were only known to
@@ -261,7 +260,7 @@ end
 -- Resolve effective glow type (alarm override or global default)
 function AM.GetGlowType(alarm)
     local def = Defaults()
-    return (alarm and alarm.glowType) or def.glowType or 2
+    return (alarm and alarm.glowType) or def.glowType or BNB.DEFAULTS.alarmDefaults.glowType
 end
 
 -- Internal: start LCG glow on a single frame using alarm's glow settings + advanced params
@@ -269,7 +268,7 @@ function AM._LCGStart(frame, alarm)
     if not LCG or not frame then return end
     local def    = Defaults()
     local gType  = AM.GetGlowType(alarm)
-    local gColor = (alarm and alarm.glowColor) or def.glowColor or { 0.400, 0.733, 0.416, 1.0 }
+    local gColor = (alarm and alarm.glowColor) or def.glowColor or BNB.DEFAULTS.alarmDefaults.glowColor
 
     -- Per-type advanced params (nil = LCG default)
     local lines     = alarm and alarm.glowLines
@@ -378,7 +377,7 @@ function AM.GlowStart(noteID)
     if not alarm then return end
 
     local def      = Defaults()
-    local mode     = alarm.glowMode or def.glowMode or "continuous"
+    local mode     = alarm.glowMode or def.glowMode or BNB.DEFAULTS.alarmDefaults.glowMode
     local targets  = _glowTargets[noteID] or {}
 
     -- Cancel any existing glow timers
@@ -631,11 +630,11 @@ function AM.Dismiss(noteID)
         alarm.time        = next
         alarm.fired       = false
         alarm.snoozedUntil = nil
-        SaveAlarm(noteID, alarm)
+        SaveAlarm(noteID, alarm, true)
     else
         alarm.fired        = true
         alarm.snoozedUntil = nil
-        SaveAlarm(noteID, alarm)
+        SaveAlarm(noteID, alarm, true)
     end
 
     -- Refresh note list row and overview
@@ -655,10 +654,10 @@ function AM.Snooze(noteID, minutes)
         return
     end
 
-    minutes = minutes or alarm.snoozeDefault or Defaults().snoozeDefault or 5
+    minutes = minutes or alarm.snoozeDefault or Defaults().snoozeDefault or BNB.DEFAULTS.alarmDefaults.snoozeDefault
     alarm.snoozedUntil = time() + minutes * 60
     alarm.fired        = false
-    SaveAlarm(noteID, alarm)
+    SaveAlarm(noteID, alarm, true)
 
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
@@ -675,7 +674,7 @@ function AM.ResetFired(noteID)
     if alarm.timeType == "ingame" and (alarm.time or 0) <= time() then
         alarm.time = AM.NextInGameTime(alarm.igTime)
     end
-    SaveAlarm(noteID, alarm)
+    SaveAlarm(noteID, alarm, true)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end

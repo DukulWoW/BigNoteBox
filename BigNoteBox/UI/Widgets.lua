@@ -1403,8 +1403,7 @@ local function BuildTagAutocomplete()
     function popup:ShowFor(eb, partial)
         self._eb = eb
         -- Gather matches: tagIndex keys that start with partial (case-insensitive)
-        local db = BigNoteBoxDB
-        local idx = db and db.tagIndex
+        local idx = BNB.TagIndex()
         if not idx then self:Hide(); return end
         local lpartial = partial:lower()
         -- Build set of tags already on the current note so we can exclude them

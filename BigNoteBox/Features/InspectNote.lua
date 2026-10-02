@@ -159,12 +159,12 @@ end
 -- ── Config helpers ────────────────────────────────────────────────────────────
 local function GetMode()
     local db = BigNoteBoxDB
-    return db and db.inspectNoteMode or "manual"
+    return db and db.inspectNoteMode or BNB.DEFAULTS.inspectNoteMode
 end
 
 local function GetType()
     local db = BigNoteBoxDB
-    return db and db.inspectNoteType or "choose"
+    return db and db.inspectNoteType or BNB.DEFAULTS.inspectNoteType
 end
 
 --------------------------------------------------------------------------------

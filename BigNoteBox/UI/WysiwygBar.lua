@@ -283,7 +283,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         -- Apply to editor body live
         local eb = BNB._editorBody; if not eb then return end
         local note = BNB.GetNote(id); if not note then return end
-        local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local def = fontID and BNB.ResolveFontDef and BNB.ResolveFontDef(fontID)
         if def then
             pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
@@ -414,7 +414,7 @@ local function BuildWysiwygBar(parent, tsStrip)
 
     local function GetCurrentFontSize()
         local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-        return (note and note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        return (note and note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     end
 
     local function RefreshSizeLbl()

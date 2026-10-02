@@ -483,9 +483,9 @@ local function BuildAppearanceTab(sf, ct)
     y = y - 4
 
     y = AddSlider(ct, y, L["CONFIG_FONT_SIZE"], 9, 22,
-        function() return db.fontSize or 13 end,
+        function() return db.fontSize or BNB.DEFAULTS.fontSize end,
         function(v) BNB.ApplyFont(nil, v) end,
-        L["CFG_FONTSIZE_TIP"], 13)
+        L["CFG_FONTSIZE_TIP"], BNB.DEFAULTS.fontSize)
 
     y = AddRule(ct, y) - 4
 
@@ -502,7 +502,7 @@ local function BuildAppearanceTab(sf, ct)
         and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
     if useNativeDrop2 then
-        local curMode = db.listEntryHeight or "normal"
+        local curMode = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
         local modeDD2 = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         modeDD2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         modeDD2:SetWidth(CONTENT_W)
@@ -532,14 +532,14 @@ local function BuildAppearanceTab(sf, ct)
     else
         -- Fallback: cycling button
         local function GetModeLabel()
-            local v = db.listEntryHeight or "normal"
+            local v = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
             for _, m in ipairs(MODE_ITEMS) do if m.key == v then return m.label end end
             return MODE_ITEMS[1].label
         end
         local modeBtn = BNB.CreateButton(nil, ct, GetModeLabel(), CONTENT_W, 24)
         modeBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         modeBtn:SetScript("OnClick", function(self)
-            local cur = db.listEntryHeight or "normal"
+            local cur = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
             local idx = 1
             for i, m in ipairs(MODE_ITEMS) do if m.key == cur then idx = i; break end end
             idx = (idx % #MODE_ITEMS) + 1
@@ -563,7 +563,7 @@ local function BuildAppearanceTab(sf, ct)
         { key = "MM-DD-YYYY", label = L["CFG_DATEFMT_MDY"] },
     }
     local function GetFmtLabel()
-        local cur = db.dateFormat or "relative"
+        local cur = db.dateFormat or BNB.DEFAULTS.dateFormat
         for _, f in ipairs(DATE_FORMATS) do
             if f.key == cur then return f.label end
         end
@@ -578,7 +578,7 @@ local function BuildAppearanceTab(sf, ct)
         local dd = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         dd:SetWidth(CONTENT_W)
-        local curFmt = db.dateFormat or "relative"
+        local curFmt = db.dateFormat or BNB.DEFAULTS.dateFormat
         dd:SetupMenu(function(_, root)
             for _, fmtEntry in ipairs(DATE_FORMATS) do
                 root:CreateRadio(fmtEntry.label,
@@ -599,7 +599,7 @@ local function BuildAppearanceTab(sf, ct)
         local fmtBtn = BNB.CreateButton(nil, ct, GetFmtLabel(), CONTENT_W, 24)
         fmtBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         fmtBtn:SetScript("OnClick", function(self)
-            local cur = db.dateFormat or "relative"
+            local cur = db.dateFormat or BNB.DEFAULTS.dateFormat
             local idx = 1
             for i, f in ipairs(DATE_FORMATS) do if f.key == cur then idx = i; break end end
             idx = (idx % #DATE_FORMATS) + 1

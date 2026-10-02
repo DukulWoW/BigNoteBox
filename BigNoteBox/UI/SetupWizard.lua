@@ -780,7 +780,7 @@ local function BuildPage4(content)
                 HighlightCards()
                 -- Update preview to selected font
                 if _p4PreviewLbl then
-                    local sz = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+                    local sz = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                     local p = (d.bold and d.bold ~= "") and d.bold or d.regular
                     BNB.SetFontSafe(_p4PreviewLbl, p, sz, "GameFontNormal")
                 end
@@ -829,7 +829,7 @@ local function BuildPage4(content)
             BNB.ApplyFont(self:GetChecked() and "wow" or "notoserif", nil)
             HighlightCards()
             if _p4PreviewLbl then
-                local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+                local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
                 if boldPath and boldPath ~= "" then
                     BNB.SetFontSafe(_p4PreviewLbl, boldPath, sz, "GameFontNormal")
@@ -846,7 +846,7 @@ local function BuildPage4(content)
     -- Font size slider
     local fssl = BNB.CreateStackedSlider(ct, CW - 36, {
         label = L["SW_FONT_SIZE_SLIDER"], min = 9, max = 22,
-        value = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13, default = 13,
+        value = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize, default = BNB.DEFAULTS.fontSize,
         fmt = function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end,
         onChange = function(v)
             BNB.ApplyFont(nil, math.floor(v))
@@ -877,7 +877,7 @@ local function BuildPage4(content)
     previewLbl:SetText(L["NND_PREVIEW_SAMPLE"])
     -- Initialise font once BNB fonts are ready
     C_Timer.After(0.05, function()
-        local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+        local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
         BNB.SetFontSafe(previewLbl, boldPath, sz, "GameFontNormal")
     end)
@@ -902,7 +902,7 @@ local function BuildPage4(content)
     local _modeBtns  = {}
 
     local function HighlightModes()
-        local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or "normal"
+        local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or BNB.DEFAULTS.listEntryHeight
         for _, e in ipairs(_modeBtns) do
             if e.key == cur then
                 e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
@@ -949,7 +949,7 @@ local function BuildPage4(content)
 
         local mk = m.key
         btn:SetScript("OnEnter", function(self)
-            local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or "normal"
+            local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or BNB.DEFAULTS.listEntryHeight
             if cur ~= mk then self:SetBackdropBorderColor(0.45, 0.65, 0.45, 1) end
         end)
         btn:SetScript("OnLeave", HighlightModes)
@@ -971,7 +971,7 @@ local function BuildPage4(content)
 
     local sideDD, sideY
     sideDD, sideY = MakeDropdown(ct, y, CW - 16, function(_, root)
-        local cur = (BigNoteBoxDB and BigNoteBoxDB.sidebarSide) or "right"
+        local cur = (BigNoteBoxDB and BigNoteBoxDB.sidebarSide) or BNB.DEFAULTS.sidebarSide
         local items = {
             { key="right", label=L["SW_SIDEBAR_RIGHT"] },
             { key="left",  label=L["SW_SIDEBAR_LEFT"] },
@@ -996,7 +996,7 @@ local function BuildPage4(content)
 
     local combatDD, combatY
     combatDD, combatY = MakeDropdown(ct, y, CW - 16, function(_, root)
-        local cur = (BigNoteBoxDB and BigNoteBoxDB.combatAction) or "nothing"
+        local cur = (BigNoteBoxDB and BigNoteBoxDB.combatAction) or BNB.DEFAULTS.combatAction
         local items = {
             { key="nothing",          label=L["SW_COMBAT_NOTHING"] },
             { key="hide_no_stickies", label=L["SW_COMBAT_HIDE_NO_STICKIES"] },

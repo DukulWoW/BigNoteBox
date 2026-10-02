@@ -24,7 +24,6 @@ BNB.Sticky = BNB.Sticky or {}
 local SN = BNB.Sticky
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
-local MAX_NOTES  = 10
 local DEF_W      = 260
 local DEF_H      = 220
 local MIN_W      = 160
@@ -683,7 +682,7 @@ local function ApplyConfig(frame, noteID)
         pcall(function() frame._bodyEb:SetTextColor(r, g, b) end)
         pcall(function() frame._bodyEb:SetAlpha(cfg.textAlpha or 1.0) end)
         pcall(function() frame._bodyEb:SetJustifyH(cfg.textAlign or "LEFT") end)
-        local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+        local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local fid = cfg.fontID
         local path
         if fid and BNB.ResolveFontDef then path = BNB.ResolveFontDef(fid).regular
@@ -1070,7 +1069,7 @@ local function GetStickyViewPref(noteID)
     local rec = noteID and StickyDB()[noteID]
     local saved = rec and rec.view
     if saved == "tasks" or saved == "note" then return saved end
-    local def = BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or "tasks"
+    local def = BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or BNB.DEFAULTS.taskStickyDefault
     return def
 end
 
@@ -1293,7 +1292,7 @@ RenderStickyTasks = function(noteID)
     if _cfg and _cfg.focusMode then
         _sp = "compact"
     else
-        _sp = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+        _sp = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
     end
     local ROW_H, SUB_ROW_H, ROW_GAP
     if _sp == "compact"  then ROW_H, SUB_ROW_H, ROW_GAP = 18, 16, 1
@@ -2095,7 +2094,7 @@ local function CreateStickyFrame(noteID)
     -- ── Body scroll ───────────────────────────────────────────────────────────
     local sf2, bodyEb = BNB.CreateScrolledEditBox(
         "BigNoteBoxSN_" .. noteID:gsub("-", ""):sub(1, 10),
-        front, (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13)
+        front, (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize)
     sf2:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     sf2:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22),  PAD)
     f._bodyScroll = sf2
@@ -2195,7 +2194,7 @@ local function CreateStickyFrame(noteID)
         if f._richNoteID and richScroll:IsShown() then
             local rn = BNB.GetNote(f._richNoteID)
             if rn then
-                local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+                local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(richRender, bs, fs)
                 local rawST = getmetatable(richRender).__index.SetText
@@ -2567,8 +2566,8 @@ function SN.Open(noteID, noESCOpen)
         end
         SaveGeometry(noteID, f); return
     end
-    if CountOpen() >= (BigNoteBoxDB and BigNoteBoxDB.stickyMaxCount or MAX_NOTES) then
-        BNB:Print(string.format(L["STICKY_MAX"], BigNoteBoxDB and BigNoteBoxDB.stickyMaxCount or MAX_NOTES)); return
+    if CountOpen() >= (BigNoteBoxDB and BigNoteBoxDB.stickyMaxCount or BNB.DEFAULTS.stickyMaxCount) then
+        BNB:Print(string.format(L["STICKY_MAX"], BigNoteBoxDB and BigNoteBoxDB.stickyMaxCount or BNB.DEFAULTS.stickyMaxCount)); return
     end
     local f = closedFrames[noteID]
     closedFrames[noteID] = nil
@@ -2629,7 +2628,7 @@ function SN.OpenQuick(noteID)
     if (BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)) or StickyNoteIsLocked(note) then
         return false
     end
-    local max = db and db.stickyMaxCount or MAX_NOTES
+    local max = db and db.stickyMaxCount or BNB.DEFAULTS.stickyMaxCount
     if CountOpen() >= max then return false, "max" end
 
     -- Each quick sticky steps 26 px down-right from the last one still open;
@@ -2909,7 +2908,7 @@ function SN.RefreshBodyLive(noteID)
     if f._richNoteID == noteID and f._richScroll:IsShown() then
         local rf, rs = f._richRender, f._richScroll
         local y  = rs:GetVerticalScroll()
-        local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, BNB.AdvancedMode.OutlineFlagStr(note.fontOutline))
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, BNB.AdvancedMode.ToHTML(note.body or "", bs))
@@ -3028,7 +3027,7 @@ function SN.RefreshNote(noteID)
                 local rf  = f._richRender
                 local rn  = BNB.GetNote(noteID)
                 if not rn then return end
-                local bs  = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+                local bs  = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 rf:SetWidth(w)
                 local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)

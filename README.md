@@ -104,7 +104,7 @@ Floating always-visible notes.
 - Transparency controls
 - Rich rendering support
 - Persistent across sessions
-- Up to 50 stickies supported
+- Up to 50 stickies open at once (20 by default, set in Settings)
 - Focus Mode that hides border & icon
 - Task View to show the tasks attached to a note
 

@@ -26,12 +26,11 @@ local PAD            = 8
 local CONTENT_PAD    = 14    -- extra horizontal padding for rendered content
 local TITLE_H_NORMAL = 28     -- ButtonFrameTemplate title bar
 local TITLE_H_SKIN   = 26     -- skin title bar height
-local DEBOUNCE_DEFAULT = 0.3
 local FRAME_NAME       = "BigNoteBoxRichPreviewFrame"
 local FOCUS_FRAME_NAME = "BigNoteBoxRichPreviewFocusFrame"
 
 local function GetDebounceDelay()
-    return BigNoteBoxDB and BigNoteBoxDB.previewDebounce or DEBOUNCE_DEFAULT
+    return BigNoteBoxDB and BigNoteBoxDB.previewDebounce or BNB.DEFAULTS.previewDebounce
 end
 
 local RP  = {}   -- main preview module
@@ -101,7 +100,7 @@ local function RenderNote(note, rsf, rf, gen, liveBody, cursorRatio)
         local w = rsf:GetWidth()
         if w and w > 0 then rf:SetWidth(w) end
 
-        local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local fs = BNB.AdvancedMode.OutlineFlagStr(note.fontOutline)
         AM.ApplyFontsToRenderFrame(rf, sz, fs)
 

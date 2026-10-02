@@ -92,12 +92,14 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yOff)
     row:EnableMouse(true)
 
-    -- Note icon from the snapshot
+    -- Note icon from the snapshot; snapshots since SV-11 carry no icon, so the
+    -- note's current one
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SZ, ICON_SZ)
     icon:SetPoint("LEFT", row, "LEFT", 0, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    local iconTex = snap.icon or DEFAULT_ICON
+    local live    = BNB.GetNote and BNB.GetNote(noteID)
+    local iconTex = snap.icon or (live and live.icon) or DEFAULT_ICON
     if type(iconTex) == "number" or iconTex:find("^Interface") or iconTex:find("^%d+$") then
         icon:SetTexture(iconTex)
     else

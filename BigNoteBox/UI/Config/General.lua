@@ -346,7 +346,7 @@ local function BuildGeneralTab(sf, ct)
             { key = "hide_minimize",      label = L["CFG_COMBAT_ITEM_HIDE_MINIMIZE"] },
             { key = "hide_all",           label = L["CFG_COMBAT_ITEM_HIDE_ALL"] },
         }
-        local curCombat = db.combatAction or "nothing"
+        local curCombat = db.combatAction or BNB.DEFAULTS.combatAction
         local combatDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         combatDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         combatDD:SetWidth(CONTENT_W)

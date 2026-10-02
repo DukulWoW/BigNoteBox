@@ -153,7 +153,7 @@ local function BuildNotesTab(sf, ct)
     -- ── Retention slider ───────────────────────────────────────────────────────
     local retainSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_TRASH_RETAIN_SLIDER"], min = 0, max = 90,
-        value = db.trashRetainDays ~= nil and db.trashRetainDays or 30, default = 30,
+        value = db.trashRetainDays or BNB.DEFAULTS.trashRetainDays, default = BNB.DEFAULTS.trashRetainDays,
         onChange = function(v) db.trashRetainDays = v end,
         tip = L["CFG_TRASH_RETAIN_TIP"],
     })
@@ -265,7 +265,7 @@ local function BuildNotesTab(sf, ct)
 
     -- Helper: what each size would be in multiplier mode (used for greyed display).
     local function MultiplierSize(mult)
-        local base = (db and db.fontSize) or 13
+        local base = (db and db.fontSize) or BNB.DEFAULTS.fontSize
         return math.floor(base * mult + 0.5)
     end
 
@@ -318,10 +318,10 @@ local function BuildNotesTab(sf, ct)
         return sl
     end
 
-    h1sl = MakeSizeSlider(L["CFG_RICH_SIZE_H1"], "richH1Size",   25, 2.0); y = y - (SLIDER_H + ROW_GAP)
-    h2sl = MakeSizeSlider(L["CFG_RICH_SIZE_H2"], "richH2Size",   20, 1.6); y = y - (SLIDER_H + ROW_GAP)
-    h3sl = MakeSizeSlider(L["CFG_RICH_SIZE_H3"], "richH3Size",   16, 1.3); y = y - (SLIDER_H + ROW_GAP)
-    psl  = MakeSizeSlider(L["CFG_RICH_SIZE_P"],  "richBodySize", 12, 1.0); y = y - (SLIDER_H + ROW_GAP)
+    h1sl = MakeSizeSlider(L["CFG_RICH_SIZE_H1"], "richH1Size",   BNB.DEFAULTS.richH1Size,   2.0); y = y - (SLIDER_H + ROW_GAP)
+    h2sl = MakeSizeSlider(L["CFG_RICH_SIZE_H2"], "richH2Size",   BNB.DEFAULTS.richH2Size,   1.6); y = y - (SLIDER_H + ROW_GAP)
+    h3sl = MakeSizeSlider(L["CFG_RICH_SIZE_H3"], "richH3Size",   BNB.DEFAULTS.richH3Size,   1.3); y = y - (SLIDER_H + ROW_GAP)
+    psl  = MakeSizeSlider(L["CFG_RICH_SIZE_P"],  "richBodySize", BNB.DEFAULTS.richBodySize, 1.0); y = y - (SLIDER_H + ROW_GAP)
 
     -- Wire checkbox OnClick now that all slider locals are defined.
     indepCb:SetScript("OnClick", function(self)
@@ -333,7 +333,7 @@ local function BuildNotesTab(sf, ct)
             h1sl:SetValue(db and db.richH1Size   or 25)
             h2sl:SetValue(db and db.richH2Size   or 20)
             h3sl:SetValue(db and db.richH3Size   or 16)
-            psl:SetValue( db and db.richBodySize or 12)
+            psl:SetValue( db and db.richBodySize or BNB.DEFAULTS.richBodySize)
         else
             -- Show multiplier ghost values when switching off
             h1sl:SetValue(MultiplierSize(2.0), true)
@@ -383,10 +383,10 @@ local function BuildNotesTab(sf, ct)
         dlDesc:SetHeight(h); y = y - h - 2
     end
 
-    local curDebounce = db and db.previewDebounce or 0.3
+    local curDebounce = db and db.previewDebounce or BNB.DEFAULTS.previewDebounce
     local debounceSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_PREVIEW_DELAY_SLIDER"], min = 1, max = 10,
-        value = math.floor(curDebounce * 10 + 0.5), default = 3,
+        value = math.floor(curDebounce * 10 + 0.5), default = math.floor(BNB.DEFAULTS.previewDebounce * 10 + 0.5),
         fmt = function(v) return string.format("%.1f", v / 10) end,
         onChange = function(v)
             local val = v / 10
@@ -418,12 +418,12 @@ local function BuildNotesTab(sf, ct)
     warnLbl:SetWordWrap(true); warnLbl:SetHeight(28)
     warnLbl:SetTextColor(0.90, 0.30, 0.30)
     warnLbl:SetText(L["CFG_UNDO_DEPTH_WARN"])
-    local curDepth = db and db.undoDepth or 50
+    local curDepth = db and db.undoDepth or BNB.DEFAULTS.undoDepth
     warnLbl:SetShown(curDepth > 50)
 
     local depthSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_UNDO_DEPTH_SLIDER"], min = 10, max = 200,
-        value = curDepth, default = 50,
+        value = curDepth, default = BNB.DEFAULTS.undoDepth,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.undoDepth = v end
             warnLbl:SetShown(v > 50)
@@ -447,10 +447,10 @@ local function BuildNotesTab(sf, ct)
         local h = lbl:GetStringHeight() + 4
         lbl:SetHeight(h); y = y - h - 2
     end
-    local curIdle = db and db.undoIdleDelay or 0.8
+    local curIdle = db and db.undoIdleDelay or BNB.DEFAULTS.undoIdleDelay
     local idleSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_AUTOSAVE_IDLE_SLIDER"], min = 3, max = 30,
-        value = math.floor(curIdle * 10 + 0.5), default = 8,
+        value = math.floor(curIdle * 10 + 0.5), default = math.floor(BNB.DEFAULTS.undoIdleDelay * 10 + 0.5),
         fmt = function(v) return string.format("%.1f", v / 10) end,
         onChange = function(v)
             local val = v / 10
@@ -473,10 +473,10 @@ local function BuildNotesTab(sf, ct)
         local h = lbl:GetStringHeight() + 4
         lbl:SetHeight(h); y = y - h - 2
     end
-    local curForced = db and db.undoForcedInterval or 3
+    local curForced = db and db.undoForcedInterval or BNB.DEFAULTS.undoForcedInterval
     local forcedSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 1, max = 10,
-        value = curForced, default = 3,
+        value = curForced, default = BNB.DEFAULTS.undoForcedInterval,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = v end
         end,
@@ -499,10 +499,10 @@ local function BuildNotesTab(sf, ct)
     y = y - 32
 
     -- History slots slider
-    local curSlots = BigNoteBoxDB and BigNoteBoxDB.historyMaxSlots or 5
+    local curSlots = BigNoteBoxDB and BigNoteBoxDB.historyMaxSlots or BNB.DEFAULTS.historyMaxSlots
     local slotsSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_AUTOSAVE_SLOTS_TIP_TITLE"], min = 1, max = 20,
-        value = curSlots, default = 5,
+        value = curSlots, default = BNB.DEFAULTS.historyMaxSlots,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.historyMaxSlots = v end
         end,

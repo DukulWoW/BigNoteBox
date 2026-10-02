@@ -683,7 +683,7 @@ local function PopulateStickySettings(noteID)
     HLStickyFonts()
 
     -- Reset clears the note's own size, so it follows the global one again
-    local globalFontSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+    local globalFontSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     local function ApplyStickyFontSize(v)
         if stickyFrame and stickyFrame._bodyEb then
             local path = select(1, stickyFrame._bodyEb:GetFont())

@@ -649,7 +649,7 @@ function SB.Refresh()
 
     -- Re-anchor the strip based on current side setting
     local db   = BigNoteBoxDB
-    local side = (db and db.sidebarSide) or "right"
+    local side = (db and db.sidebarSide) or BNB.DEFAULTS.sidebarSide
     local parent = _strip:GetParent()
 
     -- FOR-15: Forever normal mode gets its own measured offsets and draws

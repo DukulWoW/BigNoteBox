@@ -329,7 +329,7 @@ PopulateTagManager = function()
 
         -- Note sub-rows (accordion body)
         if isOpen then
-            local tidx = BigNoteBoxDB and BigNoteBoxDB.tagIndex
+            local tidx = BNB.TagIndex()
             local noteIDs = {}
             if tidx and tidx[tag] then
                 for id in pairs(tidx[tag]) do noteIDs[#noteIDs + 1] = id end

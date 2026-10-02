@@ -25,6 +25,7 @@
 --   every import read it.
 --
 -- NOTES DB ROOT: notes, noteOrder, trash, dbVersion, migrationDone (v7)
+-- History snapshots hold content fields only since v8 (SV-11).
 --
 -- TRASH DB  (BigNoteBoxNotesDB.trash):
 --   Full note copy + deletedAt (unix timestamp). Purged after trashRetainDays days.
@@ -41,22 +42,209 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 7   -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 16  -- bump + add block to MigrateSettingsDB()
+local NOTES_SCHEMA_VERSION    = 8   -- bump + add block to MigrateNotesDB()
+local SETTINGS_SCHEMA_VERSION = 17  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
--- DEFAULTS
+-- DEFAULTS (SV-03, ALL-136.8)
+-- The one list of settings defaults. InitSettingsDB fills every key that is
+-- nil in BigNoteBoxDB from here (tables are merged key by key, a saved value
+-- is never replaced). Code that needs a fallback reads BNB.DEFAULTS.<key>,
+-- never its own literal, and slider Reset values come from here too.
+-- Read-only: copy a table before changing it.
+-- Keys whose nil means something (saveMode, oracleTheme, quickNoteKeyMode,
+-- lastSeenWhatsNewVersion, ...) are left out on purpose: nil is their default.
 --------------------------------------------------------------------------------
-BNB.defaults = {
+BNB.DEFAULTS = {
+    -- Window position / size, main window and Focus mode
     windowPos = { x = 0, y = 0, w = 820, h = 640 },
-    fontSize  = 13,
-    splitX    = 240,
-    settings  = {
-        contextSurface   = true,
-        bcbIntegration   = true,
-        sendKeybind      = nil,
-        captureKeybind   = nil,
-        hideLoginMessage = false,
+    focusPos  = { x = 0, y = 0, w = 620, h = 540 },
+
+    -- Splitter and collapse state
+    splitX        = 240,
+    listCollapsed = false,
+
+    -- Font / display (fontChoice depends on the client language: InitSettingsDB)
+    fontSize   = 13,
+    lineHeight = "1.0",
+
+    -- Feature flags
+    contextSurface   = true,
+    bcbIntegration   = true,
+    hideLoginMessage = false,
+
+    -- Minimap icon (LibDBIcon state)
+    minimapIcon = { hide = false, minimapPos = 220 },
+
+    -- Sticky note positions and config { [noteID] = {x,y,w,h,shown,...} }
+    postits = {},
+
+    -- Appearance prefs
+    listEntryHeight = "normal",
+
+    -- Advanced
+    confirmClose = false,
+
+    -- Trash
+    trashFeature     = true,
+    warnBeforeDelete = true,
+    trashRetainDays  = 30,
+
+    -- Features
+    lockNotes     = false,
+    openOnLogin   = false,
+    setupComplete = false,
+    -- setupPage is transient (set before reload, consumed on next login); nil is correct
+
+    -- Target Note
+    targetNoteType              = "choose",
+    targetNoteTagCreatureType   = true,
+    targetNoteTagFamily         = false,
+    targetNoteTagClassification = true,
+    targetNoteTagFaction        = true,
+    targetNoteTagZone           = true,
+    targetNoteTagBoss           = true,
+
+    -- Inspect Note
+    inspectNoteMode         = "manual",
+    inspectNoteType         = "choose",
+    inspectNoteAddSituation = false,
+    inspectNoteGearShow     = "both",
+
+    -- Tag Tree view
+    tagTreeMode          = false,
+    tagTreeStartExpanded = false,
+    tagTreeStayOpen      = true,
+
+    -- Reference Box and Tasks (ALL-102)
+    referenceBoxEnabled = true,
+    tasksEnabled        = true,
+    refboxDisplayStyle  = "normal",
+    refboxMaxItems      = 50,
+    refboxAutoOpen      = true,
+    refboxSide          = "left",
+    -- Reference Box: show ItemID / SpellID in the game's tooltip for any item or spell
+    refboxShowIDs       = false,
+
+    -- Tasks
+    taskRemoveOnComplete  = false,     -- false = keep completed tasks, dimmed
+    taskStickyDefault     = "tasks",   -- default sticky view for notes with tasks
+    taskCompletedPosition = "bottom",  -- where completed tasks go in the list
+    taskSpacing           = "normal",  -- "compact" | "normal" | "spacious"
+    taskPanelExpanded     = true,      -- task panel expanded in the Reference Box
+    -- Per-note task/attachment split ratio: { [noteID] = 0.0..1.0 }
+    -- 0.5 = equal split; 1.0 = tasks take all; 0.0 = attachments take all
+    taskSplitRatio        = {},
+
+    -- Timestamp display
+    dateFormat = "relative",
+    use24Hour  = true,
+
+    -- Note list sort
+    sortBy  = "creation",
+    sortAsc = false,
+
+    -- Context popup anchor position (CENTER-relative) and hold time
+    -- (seconds; 0 = stay until manually closed)
+    popupAnchorX  = 0,
+    popupAnchorY  = 200,
+    popupHoldTime = 5,
+
+    -- Known characters registry, built on each login.
+    -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.
+    knownChars = {},
+
+    -- Maximum number of sticky notes open at once (slider 1-50, BUG-28)
+    stickyMaxCount        = 20,
+    -- true: Ctrl+H "hide all stickies" persists across reloads and relogins
+    stickiesHiddenPersist = false,
+
+    -- Undo/redo history depth per note (runtime only, never in the notes DB).
+    -- Range 10-200; above 50 shows a memory warning in Settings.
+    undoDepth          = 50,
+    -- Seconds after the last keystroke before an undo snapshot (0.3-3.0)
+    undoIdleDelay      = 0.8,
+    -- Max seconds of continuous typing before a snapshot is forced (1-10)
+    undoForcedInterval = 3,
+
+    -- Session history: max auto slots per note (1-20)
+    historyMaxSlots = 5,
+
+    -- WYSIWYG formatting toolbar between timestamp and body
+    wysiwygBarVisible = true,
+
+    -- When entering combat: "nothing" | "hide_all" (main window, companions,
+    -- stickies) | "hide_no_stickies"
+    combatAction = "nothing",
+
+    -- Quick Note button in quest/gossip/book frames.
+    -- quickNoteAction: "silent" = create in the background, "open" = create
+    -- and open BNB on it, "confirm" = small popup to edit the title first.
+    -- quickNoteImmersionX/Y have no default: nil = the built-in position.
+    quickNoteEnabled      = true,
+    quickNoteAction       = "silent",
+    -- DialogueUI: a note whenever the user clicks DUI's copy text button
+    duiAutoNote           = true,
+    -- Immersion: the floating Quick Note button during Immersion dialogues
+    quickNoteImmersionBtn = true,
+    saveQuestRewards      = true,
+
+    -- Window scale lock: hides the resize handle
+    scaleLocked = false,
+
+    -- Focus mode: hide the whole WoW UI while it is open
+    focusHideUI = true,
+
+    -- Focus Mode Orbit
+    focusOrbitEnabled        = true,
+    focusOrbitSpeed          = 0.004,  -- very slow/cinematic
+    focusOrbitResumeDelay    = 3.0,    -- seconds; 0 = never resume
+    focusOverlayAlpha        = 0.6,    -- dark overlay behind the focus window
+    focusOverlayUseSkinColor = false,  -- tint the overlay with the skin colour
+
+    -- Rich Notes
+    newNotesRichByDefault   = false,
+    richOpenInEditor        = false,
+    skinRandomize           = false,
+    skinRandomizeBrightness = false,
+
+    -- Rich note live preview: open it when a rich note is selected / always in
+    -- Focus mode; seconds after the last keystroke before it re-renders
+    richPreviewAutoShow    = true,
+    focusPreviewAlwaysShow = true,
+    previewDebounce        = 0.3,
+    -- LibSharedMedia fonts in the font picker (opt-in, needs a reload)
+    lsmFonts               = false,
+    -- Rich Notes independent heading/body sizes
+    richIndependentSizes   = false,
+    richH1Size             = 25,
+    richH2Size             = 20,
+    richH3Size             = 16,
+    richBodySize           = 12,
+
+    -- Blizzard icon autocomplete (opt-in, Advanced tab)
+    blizzardIconComplete = false,
+
+    -- Direct Send
+    directSend = { autoReject = false },
+
+    -- Character sidebar.
+    -- sidebarEnabled:    master toggle
+    -- sidebarAutoSwitch: switch to the logged-in character's slot on login
+    -- sidebarActiveKey:  active filter ("all", "global", "char:Name-Realm")
+    sidebarEnabled    = false,
+    sidebarAutoSwitch = false,
+    sidebarActiveKey  = "all",
+    sidebarSide       = "right",
+    sidebarAtBottom   = false,
+    sidebarSmallIcons = false,
+
+    -- Alarm system defaults for new alarms
+    alarmDefaults = {
+        snoozeDefault = 5,
+        glowType      = 2,   -- 1=Pixel 2=AutoCast 3=Border 4=Proc
+        glowColor     = { 0.400, 0.733, 0.416, 1.0 },
+        glowMode      = "continuous",  -- "continuous"|"pulse"|"once"
     },
 }
 
@@ -263,6 +451,32 @@ function BNB.MigrateNotesDB()
         v = 7
     end
 
+    -- ++ v7 -> v8: history snapshots keep only content fields (SV-11), the
+    -- dummy updatedAt field goes (SV-08), ALL-136.8 ++++++++++++++++++++++++++++
+    -- Snapshots copied every content field of the note, up to 21 per note.
+    -- Trimmed to the list in Features/NoteHistory.lua (SNAP_FIELDS + timestamp),
+    -- written out here because that file loads after this one.
+    if v < 8 then
+        local keep = { timestamp = true, title = true, body = true, richMode = true,
+                       tags = true, tasks = true, taskList = true }
+        local function Trim(snap)
+            if type(snap) ~= "table" then return end
+            for k in pairs(snap) do
+                if not keep[k] then snap[k] = nil end
+            end
+        end
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                if type(note.history) == "table" then
+                    for _, snap in ipairs(note.history) do Trim(snap) end
+                end
+                Trim(note.manualSnapshot)
+                note.updatedAt = nil
+            end
+        end
+        v = 8
+    end
+
     -- Never lower the stored version: running an older build must not make the
     -- next upgrade run the migrations again (SV-10)
     ndb.dbVersion = math.max(ndb.dbVersion or 1, NOTES_SCHEMA_VERSION)
@@ -281,40 +495,26 @@ local function MigrateSettingsDB()
     local db = BigNoteBoxDB
     local v  = db.dbVersion or 1
 
-    -- ── v1 → v2: introduce tagIndex ──────────────────────────────────────────
-    if v < 2 then
-        -- Rebuild from scratch — TagIndexRebuild is defined in NoteManager.lua
-        -- which loads after Database.lua. Defer via a flag; Initialize.lua will
-        -- call BNB.TagIndexRebuild() explicitly after all modules are loaded.
-        db.tagIndex = {}
-        db._needsTagRebuild = true
-        v = 2
-    end
+    -- Blocks that only filled a default for a new key (v2, v3's second half,
+    -- v4, v6-v14) are empty now: InitSettingsDB runs first and fills every
+    -- default from BNB.DEFAULTS (SV-03, ALL-136.8). The steps stay so the
+    -- version numbers keep their meaning. Blocks that change saved data stay.
 
-    -- ── v2 → v3: remove "favorites" sort mode; add stickiesHiddenPersist ─────
+    -- v1 -> v2: introduced tagIndex (runtime-only since v17, SV-05)
+    if v < 2 then v = 2 end
+
+    -- ++ v2 -> v3: remove "favorites" sort mode ++++++++++++++++++++++++++++++++++
     if v < 3 then
         -- "favorites" was removed from the sort dropdown. Reset to "creation"
         -- so the UI doesn't show a blank/unknown sort label for existing users.
         if db.sortBy == "favorites" then
             db.sortBy = "creation"
         end
-        -- New sticky hide-all persist flag — off by default (hide resets on reload).
-        if db.stickiesHiddenPersist == nil then db.stickiesHiddenPersist = false end
         v = 3
     end
 
-    -- ++ v3 -> v4: introduce alarmDefaults +++++++++++++++++++++++++++++++++++++++
-    if v < 4 then
-        if db.alarmDefaults == nil then
-            db.alarmDefaults = {
-                snoozeDefault = 5,
-                glowType      = 2,   -- AutoCast
-                glowColor     = { 0.400, 0.733, 0.416, 1.0 },
-                glowMode      = "pulse",
-            }
-        end
-        v = 4
-    end
+    -- v3 -> v4: introduced alarmDefaults (now a default)
+    if v < 4 then v = 4 end
 
     -- ++ v4 -> v5: reset alarmDefaults.glowColor to BNB green (was gold) ++++++++++
     if v < 5 then
@@ -324,84 +524,12 @@ local function MigrateSettingsDB()
         v = 5
     end
 
-    -- ++ v5 -> v6: introduce sidebar layout settings ++++++++++++++++++++++++++++++
-    if v < 6 then
-        if db.sidebarSide     == nil then db.sidebarSide     = "right" end
-        if db.sidebarAtBottom == nil then db.sidebarAtBottom = false   end
-        if db.sidebarSmallIcons == nil then db.sidebarSmallIcons = false end
-        v = 6
-    end
-
-    -- ++ v6 -> v7: rich preview auto-show + directSend defaults +++++++++++++++++++
-    if v < 7 then
-        if db.richPreviewAutoShow == nil then db.richPreviewAutoShow = true end
-        if db.directSend == nil then db.directSend = {} end
-        if db.directSend.autoReject == nil then db.directSend.autoReject = false end
-        v = 7
-    end
-
-    -- ++ v7 -> v8: refbox left-side default + focus preview always-show +++++++++++
-    if v < 8 then
-        if db.refboxSide             == nil then db.refboxSide             = "left" end
-        if db.focusPreviewAlwaysShow == nil then db.focusPreviewAlwaysShow = true   end
-        v = 8
-    end
-
-    -- ++ v8 -> v9: live preview debounce delay ++++++++++++++++++++++++++++++++++++
-    if v < 9 then
-        if db.previewDebounce == nil then db.previewDebounce = 0.3 end
-        v = 9
-    end
-
-    -- ++ v9 -> v10: What's New version tracking +++++++++++++++++++++++++++++++++++
-    if v < 10 then
-        -- lastSeenWhatsNewVersion: the version string last acknowledged by the user.
-        -- Nil on first run or after a version bump causes the window to appear.
-        -- Never set a default here; nil is intentional so the popup fires on first install.
-        v = 10
-    end
-
-    -- ++ v10 -> v11: LibSharedMedia font opt-in ++++++++++++++++++++++++++++++++++++
-    if v < 11 then
-        -- lsmFonts: intentionally defaults to false — user must opt in via Advanced tab.
-        if db.lsmFonts == nil then db.lsmFonts = false end
-        v = 11
-    end
-
-    -- ++ v11 -> v12: Rich Notes independent heading sizes +++++++++++++++++++++++++
-    if v < 12 then
-        if db.richIndependentSizes == nil then db.richIndependentSizes = false end
-        if db.richH1Size          == nil then db.richH1Size          = 25    end
-        if db.richH2Size          == nil then db.richH2Size          = 20    end
-        if db.richH3Size          == nil then db.richH3Size          = 16    end
-        if db.richBodySize        == nil then db.richBodySize        = 12    end
-        v = 12
-    end
-
-    -- ++ v12 -> v13: task system settings ++++++++++++++++++++++++++++++++++++++
-    if v < 13 then
-        -- "Remove on complete" vs keep dimmed. Default: keep (false = keep).
-        if db.taskRemoveOnComplete   == nil then db.taskRemoveOnComplete   = false end
-        -- Default sticky view for notes that have tasks. "tasks" = show tasks.
-        if db.taskStickyDefault      == nil then db.taskStickyDefault      = "tasks" end
-        -- Where completed tasks appear in the list. "bottom" = push to bottom.
-        if db.taskCompletedPosition  == nil then db.taskCompletedPosition  = "bottom" end
-        -- Row spacing in task lists. "normal" = default, "compact", "spacious".
-        if db.taskSpacing            == nil then db.taskSpacing            = "normal" end
-        -- Whether the task panel is expanded by default in RefBox.
-        if db.taskPanelExpanded      == nil then db.taskPanelExpanded      = true  end
-        -- Per-note task/attachment split ratio: { [noteID] = 0.0..1.0 }
-        -- 0.5 = equal split; 1.0 = tasks take all; 0.0 = attachments take all.
-        if db.taskSplitRatio         == nil then db.taskSplitRatio         = {}    end
-        v = 13
-    end
-
-    -- ++ v13 -> v14: Blizzard icon autocomplete toggle ++++++++++++++++++++++++
-    if v < 14 then
-        -- Off by default — user must opt in via Advanced tab.
-        if db.blizzardIconComplete == nil then db.blizzardIconComplete = false end
-        v = 14
-    end
+    -- v5 -> v14 introduced: sidebar layout (v6), rich preview auto-show and
+    -- directSend (v7), refboxSide and focus preview (v8), preview debounce (v9),
+    -- What's New tracking (v10, nil on purpose), lsmFonts (v11), rich heading
+    -- sizes (v12), task settings (v13), Blizzard icon autocomplete (v14).
+    -- All of them are defaults now.
+    if v < 14 then v = 14 end
 
     -- ++ v14 -> v15: drop the dead autosave key (ALL-52) ++++++++++++++++++++++
     if v < 15 then
@@ -422,44 +550,43 @@ local function MigrateSettingsDB()
         v = 16
     end
 
+    if v < 17 then
+        -- The tag index is runtime-only now (SV-05, ALL-136.8): it is derived
+        -- from the notes, and a saved copy went stale (and stayed the other
+        -- notes set's after a dev-mode switch).
+        db.tagIndex = nil
+        db._needsTagRebuild = nil
+        v = 17
+    end
+
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)
     db.dbVersion = math.max(db.dbVersion or 1, SETTINGS_SCHEMA_VERSION)
 end
 
 --------------------------------------------------------------------------------
 -- INITIALIZE SETTINGS DB  (BigNoteBoxDB)
--- Safe to wipe on reset — contains no user-created content.
+-- Safe to wipe on reset: contains no user-created content.
 --------------------------------------------------------------------------------
+-- Fills every nil key of db from def. A nested table is merged key by key, so
+-- a saved table keeps its own values and only gains the keys it lacks; a
+-- saved value is never replaced, whatever its type.
+local function ApplyDefaults(db, def)
+    for k, v in pairs(def) do
+        if db[k] == nil then
+            db[k] = DeepCopy(v)
+        elseif type(v) == "table" and type(db[k]) == "table" then
+            ApplyDefaults(db[k], v)
+        end
+    end
+end
+
 local function InitSettingsDB()
     BigNoteBoxDB = BigNoteBoxDB or {}
-    local db       = BigNoteBoxDB
-    local defaults = BNB.defaults
+    local db = BigNoteBoxDB
 
-    -- Window position / size
-    if db.windowPos == nil then
-        db.windowPos = {
-            x = defaults.windowPos.x,
-            y = defaults.windowPos.y,
-            w = defaults.windowPos.w,
-            h = defaults.windowPos.h,
-        }
-    end
+    ApplyDefaults(db, BNB.DEFAULTS)
 
-    -- Focus mode window position / size
-    if db.focusPos == nil then
-        db.focusPos = { x = 0, y = 0, w = 620, h = 540 }
-    end
-
-    -- Splitter and collapse state
-    if db.splitX        == nil then db.splitX        = defaults.splitX    end
-    if db.listCollapsed == nil then db.listCollapsed  = false              end
-
-    -- Currently selected note (UI state, not data)
-    if db.selectedNoteID == nil then db.selectedNoteID = nil end
-
-    -- Font / display
-    if db.fontSize    == nil then db.fontSize   = defaults.fontSize end
-    if db.fontChoice  == nil then
+    if db.fontChoice == nil then
         -- On first install, default to WoW's locale font for CJK clients so
         -- Chinese/Korean/Japanese text is immediately readable without manual setup.
         -- Uses the active (forced-or-client) language so a forced CJK language also defaults here.
@@ -476,205 +603,10 @@ local function InitSettingsDB()
             db.fontChoice = "notoserif"
         end
     end
-    if db.lineHeight  == nil then db.lineHeight = "1.0"             end
-
-    -- Feature flags
-    if db.contextSurface  == nil then db.contextSurface  = defaults.settings.contextSurface  end
-    if db.bcbIntegration  == nil then db.bcbIntegration  = defaults.settings.bcbIntegration  end
-    if db.sendKeybind     == nil then db.sendKeybind     = defaults.settings.sendKeybind      end
-    if db.captureKeybind  == nil then db.captureKeybind  = defaults.settings.captureKeybind   end
-    if db.hideLoginMessage== nil then db.hideLoginMessage= defaults.settings.hideLoginMessage end
-
-    -- Minimap icon (LibDBIcon state)
-    if db.minimapIcon == nil then
-        db.minimapIcon = { hide = false, minimapPos = 220 }
-    end
-
-    -- Sticky note positions { [noteID] = {x,y,w,h,shown} }
-    if db.postits == nil then db.postits = {} end
-
-    -- Appearance prefs
-    if db.listEntryHeight == nil then db.listEntryHeight = "normal"  end
-
-    -- Advanced
-    if db.confirmClose    == nil then db.confirmClose    = false     end
-
-    -- Trash
-    if db.trashFeature     == nil then db.trashFeature     = true      end
-    if db.warnBeforeDelete == nil then db.warnBeforeDelete = true      end
-    if db.trashRetainDays  == nil then db.trashRetainDays  = 30       end
-
-    -- Features
-    if db.lockNotes    == nil then db.lockNotes    = false end
-    if db.openOnLogin   == nil then db.openOnLogin   = false end
-    if db.setupComplete == nil then db.setupComplete = false end
-    -- setupPage is transient (set before reload, consumed on next login); nil is correct default
-
-    -- Target Note
-    if db.targetNoteType              == nil then db.targetNoteType              = "choose" end
-    if db.targetNoteTagCreatureType   == nil then db.targetNoteTagCreatureType   = true     end
-    if db.targetNoteTagFamily         == nil then db.targetNoteTagFamily         = false    end
-    if db.targetNoteTagClassification == nil then db.targetNoteTagClassification = true     end
-    if db.targetNoteTagFaction        == nil then db.targetNoteTagFaction        = true     end
-    if db.targetNoteTagZone           == nil then db.targetNoteTagZone           = true     end
-    if db.targetNoteTagBoss           == nil then db.targetNoteTagBoss           = true     end
-
-    -- Inspect Note
-    if db.inspectNoteMode         == nil then db.inspectNoteMode         = "manual" end
-    if db.inspectNoteType         == nil then db.inspectNoteType         = "choose" end
-    if db.inspectNoteAddSituation == nil then db.inspectNoteAddSituation = false    end
-    if db.inspectNoteGearShow     == nil then db.inspectNoteGearShow     = "both"   end
-
-    -- Tag Tree view
-    if db.tagTreeMode          == nil then db.tagTreeMode          = false end
-    if db.tagTreeStartExpanded == nil then db.tagTreeStartExpanded = false end
-    if db.tagTreeStayOpen      == nil then db.tagTreeStayOpen      = true  end
-
-    -- Reference Box
-    if db.referenceBoxEnabled  == nil then db.referenceBoxEnabled  = true     end
-    if db.tasksEnabled         == nil then db.tasksEnabled         = true     end   -- ALL-102
-    if db.refboxDisplayStyle   == nil then db.refboxDisplayStyle   = "normal" end
-    if db.refboxMaxItems       == nil then db.refboxMaxItems       = 50       end
-    if db.refboxAutoOpen       == nil then db.refboxAutoOpen       = true     end
-    if db.refboxSide           == nil then db.refboxSide           = "left"   end
-
-    -- Timestamp display
-    if db.dateFormat      == nil then db.dateFormat      = "relative"    end
-    if db.use24Hour       == nil then db.use24Hour       = true         end
-
-    -- Note list sort
-    if db.sortBy          == nil then db.sortBy          = "creation"   end
-    if db.sortAsc         == nil then db.sortAsc         = false        end
-
-    -- Context popup anchor position (CENTER-relative)
-    if db.popupAnchorX == nil then db.popupAnchorX = 0   end
-    if db.popupAnchorY == nil then db.popupAnchorY = 200 end
-
-    -- Context popup hold time (seconds; 0 = stay until manually closed)
-    if db.popupHoldTime == nil then db.popupHoldTime = 5 end
-
-    -- Known characters registry — built automatically on each login.
-    -- { ["Name-Realm"] = { name, realm, class, lastSeen } }
-    -- Non-precious: safe to wipe. Rebuilds as each character logs in.
-    if db.knownChars == nil then db.knownChars = {} end
-
-    -- Tag index — maps tag name → set of note IDs { [id] = true }.
-    -- Rebuilt from scratch by MigrateSettingsDB if absent.
-    -- Non-precious: fully derivable from notes.
-    if db.tagIndex == nil then db.tagIndex = {} end
-
-    -- Maximum number of sticky notes that can be open at once (1–20, default 10)
-    if db.stickyMaxCount        == nil then db.stickyMaxCount        = 10    end
-    -- When true, Ctrl+H "hide all stickies" persists across reloads and relogins.
-    -- When false (default), stickies reappear automatically after a reload/relog.
-    if db.stickiesHiddenPersist == nil then db.stickiesHiddenPersist = false end
-
-    -- Undo/redo history depth per note (runtime only — never persisted to NotesDB).
-    -- Range: 10-200. Values above 50 show a memory warning in Config.
-    if db.undoDepth          == nil then db.undoDepth          = 50  end
-
-    -- Undo snapshot idle delay: seconds after last keystroke before a snapshot fires.
-    -- Range 0.3-3.0, default 0.8.
-    if db.undoIdleDelay      == nil then db.undoIdleDelay      = 0.8 end
-
-    -- Undo forced interval: max seconds of continuous typing before a snapshot is
-    -- forced regardless of speed. Range 1-10, default 3.
-    if db.undoForcedInterval == nil then db.undoForcedInterval = 3   end
-
-    -- Session history: max auto-save slots per note (1-20, default 5).
-    -- Each slot stores a full note snapshot from the previous logout/reload.
-    if db.historyMaxSlots    == nil then db.historyMaxSlots    = 5   end
-
-    -- Whether the WYSIWYG formatting toolbar is visible between timestamp and body.
-    if db.wysiwygBarVisible == nil then db.wysiwygBarVisible = true end
-
-    -- What to hide when entering combat.
-    -- "nothing"        = do nothing (default)
-    -- "hide_all"       = hide main window + companions + sticky notes
-    -- "hide_no_stickies" = hide main window + companions, keep sticky notes visible
-    if db.combatAction == nil then db.combatAction = "nothing" end
-
-    -- QuickNote: inject button into quest/gossip/book frames to create notes from game UI
-    -- quickNoteAction: what happens when the button is clicked
-    --   "silent"  = create note silently in background (default)
-    --   "open"    = create note and open BNB on it
-    --   "confirm" = show a small popup to confirm/edit title before creating
-    if db.quickNoteEnabled  == nil then db.quickNoteEnabled  = true     end
-    if db.quickNoteAction   == nil then db.quickNoteAction   = "silent" end
-    -- Persisted position for the Immersion floating button (nil = use built-in default)
-    -- quickNoteImmersionX / quickNoteImmersionY: intentionally no default — nil means
-    -- "use the built-in constant". Set by drag-stop in QuickNote.lua.
-    -- DialogueUI: auto-create a note whenever the user clicks DUI's copy text button.
-    -- Default true — the hook is installed unconditionally; this setting gates note creation.
-    if db.duiAutoNote == nil then db.duiAutoNote = true end
-    -- Immersion: show the floating Quick Note button during Immersion dialogues
-    if db.quickNoteImmersionBtn == nil then db.quickNoteImmersionBtn = true end
-    if db.saveQuestRewards      == nil then db.saveQuestRewards      = true end
-
-    -- Window scale lock: when true the resize handle is hidden and the window cannot be scaled.
-    if db.scaleLocked  == nil then db.scaleLocked  = false end
-
-    -- Focus mode: hide the entire WoW UI (UIParent) when focus mode is active.
-    if db.focusHideUI  == nil then db.focusHideUI  = true  end
-
-    -- Focus Mode Orbit
-    if db.focusOrbitEnabled     == nil then db.focusOrbitEnabled     = true   end
-    if db.focusOrbitSpeed       == nil then db.focusOrbitSpeed       = 0.004  end  -- very slow/cinematic
-    if db.focusOrbitResumeDelay == nil then db.focusOrbitResumeDelay = 3.0    end  -- seconds; 0 = never resume
-    if db.focusOverlayAlpha     == nil then db.focusOverlayAlpha     = 0.6    end  -- dark overlay behind focus window
-    if db.focusOverlayUseSkinColor == nil then db.focusOverlayUseSkinColor = false end  -- tint overlay with skin color
-
-    -- Rich Notes
-    if db.newNotesRichByDefault == nil then db.newNotesRichByDefault = false end
-    if db.richOpenInEditor     == nil then db.richOpenInEditor     = false end
-    if db.skinRandomize        == nil then db.skinRandomize        = false end
-    if db.skinRandomizeBrightness == nil then db.skinRandomizeBrightness = false end
-
-    -- Rich note live preview window
-    -- richPreviewAutoShow: open the preview automatically when a rich note is selected
-    if db.richPreviewAutoShow    == nil then db.richPreviewAutoShow    = true  end
-    -- focusPreviewAlwaysShow: always open preview when entering focus mode (for rich notes)
-    if db.focusPreviewAlwaysShow == nil then db.focusPreviewAlwaysShow = true  end
-    -- previewDebounce: seconds after last keystroke before live preview re-renders
-    if db.previewDebounce        == nil then db.previewDebounce        = 0.3   end
-    -- lsmFonts: load LibSharedMedia fonts into the font picker (requires reload)
-    if db.lsmFonts               == nil then db.lsmFonts               = false end
-    -- Rich Notes independent heading/body sizes
-    if db.richIndependentSizes   == nil then db.richIndependentSizes   = false end
-    if db.richH1Size             == nil then db.richH1Size             = 25    end
-    if db.richH2Size             == nil then db.richH2Size             = 20    end
-    if db.richH3Size             == nil then db.richH3Size             = 16    end
-    if db.richBodySize           == nil then db.richBodySize           = 12    end
-
-    -- Direct Send
-    if db.directSend           == nil then db.directSend           = {}    end
-    if db.directSend.autoReject == nil then db.directSend.autoReject = false end
-
-    -- Reference Box: show ItemID / SpellID in the game's native tooltip for any item or spell
-    if db.refboxShowIDs == nil then db.refboxShowIDs = false end
-
-    -- Character sidebar feature.
-    -- sidebarEnabled:    master toggle (off by default until user enables it)
-    -- sidebarAutoSwitch: automatically switch to the logged-in character's slot on login
-    -- sidebarActiveKey:  persisted active filter key ("all", "global", "char:Name-Realm")
-    if db.sidebarEnabled    == nil then db.sidebarEnabled    = false end
-    if db.sidebarAutoSwitch == nil then db.sidebarAutoSwitch = false end
-    if db.sidebarActiveKey  == nil then db.sidebarActiveKey  = "all" end
-
-    -- Alarm system global defaults.
-    if db.alarmDefaults == nil then
-        db.alarmDefaults = {
-            snoozeDefault = 5,
-            glowType      = 2,   -- 1=Pixel 2=AutoCast 3=Border 4=Proc
-            glowColor     = { 0.400, 0.733, 0.416, 1.0 },
-            glowMode      = "continuous",  -- "continuous"|"pulse"|"once"
-        }
-    end
 
     -- What's New window: last version string acknowledged by the user.
-    -- Intentionally NOT defaulted to any value — nil means "never seen",
+    -- Intentionally NOT defaulted to any value: nil means "never seen",
     -- which causes the window to show on first install or after a version bump.
-    -- (The migration block in MigrateSettingsDB also leaves it nil on upgrade.)
     -- db.lastSeenWhatsNewVersion is written on close by UI/WhatsNew.lua.
 
     -- Debug mode must never persist through a reload or relog.

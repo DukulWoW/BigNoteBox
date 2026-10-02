@@ -71,7 +71,7 @@ local function GetFocusOverlay()
             if ov:IsShown() then
                 local r, g, b = _overlayColor()
                 local db = BigNoteBoxDB
-                local alpha = (db and db.focusOverlayAlpha) or 0.6
+                local alpha = (db and db.focusOverlayAlpha) or BNB.DEFAULTS.focusOverlayAlpha
                 ov._tex:SetColorTexture(r, g, b, alpha)
             end
         end)
@@ -82,7 +82,7 @@ end
 
 local function ShowFocusOverlay()
     local db    = BigNoteBoxDB
-    local alpha = (db and db.focusOverlayAlpha) or 0.6
+    local alpha = (db and db.focusOverlayAlpha) or BNB.DEFAULTS.focusOverlayAlpha
     if alpha <= 0 then return end
     local ov  = GetFocusOverlay()
     local r, g, b = _overlayColor()
@@ -184,7 +184,7 @@ end
 -- Public: gradual fade-in (called by FocusOrbit resume timer)
 function BNB.FadeInFocusOverlay(duration)
     local db    = BigNoteBoxDB
-    local alpha = (db and db.focusOverlayAlpha) or 0.6
+    local alpha = (db and db.focusOverlayAlpha) or BNB.DEFAULTS.focusOverlayAlpha
     if alpha <= 0 then return end
     local ov  = GetFocusOverlay()
     local r, g, b = _overlayColor()
@@ -296,7 +296,7 @@ local function LoadNoteInFocus(id)
     local fo = note.fontOverride
     if fo and BNB.ResolveFontDef then
         local def = BNB.ResolveFontDef(fo)
-        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
+        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
         if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
         if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
     else
@@ -348,7 +348,7 @@ function BNB.RefreshFocusFont()
     local fo = note.fontOverride
     if fo and BNB.ResolveFontDef then
         local def = BNB.ResolveFontDef(fo)
-        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
+        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
         if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
         if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
     else
@@ -668,7 +668,7 @@ local function BuildFocusFrame()
 
     local bodyPath, bodySize
     if BNB.GetBodyFont then bodyPath, bodySize = BNB.GetBodyFont() end
-    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxFocusBodyScroll", content, bodySize)
     if bodyPath then pcall(function() eb:SetFont(bodyPath, BNB.FontPx(bodyPath, bodySize), "") end) end
@@ -692,7 +692,7 @@ local function BuildFocusFrame()
             local id = BNB._currentNoteID
             if id and not BNB._undoActive then
                 local idleDelay = (BigNoteBoxDB and BigNoteBoxDB.undoIdleDelay)     or 0.8
-                local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or 3.0
+                local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval
                 if not BNB._focusUndoTimers  then BNB._focusUndoTimers  = {} end
                 if not BNB._focusUndoForced  then BNB._focusUndoForced  = {} end
                 local ft = BNB._focusUndoTimers
@@ -1004,7 +1004,7 @@ local function BuildFocusFrameSkin()
     -- Body scroll (identical to normal version)
     local bodyPath, bodySize
     if BNB.GetBodyFont then bodyPath, bodySize = BNB.GetBodyFont() end
-    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxFocusBodyScroll", content, bodySize)
     if bodyPath then pcall(function() eb:SetFont(bodyPath, BNB.FontPx(bodyPath, bodySize), "") end) end
@@ -1028,7 +1028,7 @@ local function BuildFocusFrameSkin()
             local id = BNB._currentNoteID
             if id and not BNB._undoActive then
                 local idleDelay = (BigNoteBoxDB and BigNoteBoxDB.undoIdleDelay)     or 0.8
-                local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or 3.0
+                local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval
                 if not BNB._focusUndoTimers then BNB._focusUndoTimers = {} end
                 if not BNB._focusUndoForced then BNB._focusUndoForced = {} end
                 local ft = BNB._focusUndoTimers

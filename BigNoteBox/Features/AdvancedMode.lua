@@ -249,7 +249,7 @@ end
 -- Defaults to "" when omitted (callers without a note reference, or no outline set).
 function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
     if not f then return end
-    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     flagStr  = flagStr or ""
 
     local bodyPath = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) or nil
@@ -263,7 +263,7 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
         h1sz = db.richH1Size   or 25
         h2sz = db.richH2Size   or 20
         h3sz = db.richH3Size   or 16
-        psz  = db.richBodySize or 12
+        psz  = db.richBodySize or BNB.DEFAULTS.richBodySize
     else
         h1sz = bodySize * 2.0
         h2sz = bodySize * 1.6

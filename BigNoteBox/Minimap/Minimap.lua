@@ -55,10 +55,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.InitMinimapButton()
     if not BigNoteBoxDB.minimapIcon then
-        BigNoteBoxDB.minimapIcon = {
-            hide = false,
-            minimapPos = 220,
-        }
+        BigNoteBoxDB.minimapIcon = CopyTable(BNB.DEFAULTS.minimapIcon)
     end
 
     if DBIcon and ldbObject then

@@ -41,16 +41,39 @@ end
 
 --------------------------------------------------------------------------------
 -- TAG INDEX HELPERS
--- BigNoteBoxDB.tagIndex maps tag → { [noteID] = true }.
+-- BNB.TagIndex() maps tag → { [noteID] = true }.
 -- All mutations go through these helpers so the index stays consistent.
 -- Keys are stored in original case (as typed); lookups are case-insensitive
 -- at the call site where needed (e.g. autocomplete prefix match).
+-- Runtime-only (SV-05, ALL-136.8): built from the active notes set the first
+-- time it is asked for, never saved. It used to live in BigNoteBoxDB, where
+-- any write that skipped these helpers left it wrong across sessions and a
+-- dev-mode switch kept the other notes set's index.
 --------------------------------------------------------------------------------
+local _tagIndex
+
+-- The tag index, built on first use. Read-only for callers: change tags
+-- through UpdateNote / RenameTag / DeleteTag / RemoveNoteTag.
+function BNB.TagIndex()
+    if _tagIndex then return _tagIndex end
+    local ndb = BNB.NotesDB()
+    -- No notes set yet (or the BigNoteBoxDB addon is missing): nothing to
+    -- index, and nothing cached, so a later call still builds the real one
+    if not (ndb and ndb.notes) then return {} end
+    _tagIndex = {}
+    for id, note in pairs(ndb.notes) do
+        for _, tag in ipairs(note.tags or {}) do
+            if tag ~= "" then
+                if not _tagIndex[tag] then _tagIndex[tag] = {} end
+                _tagIndex[tag][id] = true
+            end
+        end
+    end
+    return _tagIndex
+end
+
 local function TagDB()
-    local db = BigNoteBoxDB
-    if not db then return nil end
-    if not db.tagIndex then db.tagIndex = {} end
-    return db.tagIndex
+    return BNB.TagIndex()
 end
 
 function BNB.TagIndexAdd(id, tag)
@@ -72,17 +95,11 @@ function BNB.TagIndexRemove(id, tag)
     end
 end
 
--- Rebuild the entire index from live notes. Called once on migration and
--- available as a slash-command recovery tool.
+-- Rebuild the entire index from live notes (after a bulk change such as
+-- Delete All Notes, or as a recovery tool).
 function BNB.TagIndexRebuild()
-    local db = BigNoteBoxDB; if not db then return end
-    db.tagIndex = {}
-    local ndb = BNB.NotesDB(); if not ndb or not ndb.notes then return end
-    for id, note in pairs(ndb.notes) do
-        for _, tag in ipairs(note.tags or {}) do
-            BNB.TagIndexAdd(id, tag)
-        end
-    end
+    _tagIndex = nil
+    BNB.TagIndex()
 end
 
 -- A note field in lower case (PERF-07), nil for a missing or empty field.
@@ -270,8 +287,8 @@ local COPY_SKIP = {}
 for _, def in ipairs(BNB.NOTE_FIELDS) do
     if def.nocopy then COPY_SKIP[def.key] = true end
 end
--- Shared with NoteHistory.lua (ALL-65.6), so a snapshot/restore skips the same
--- identity/meta fields as a copy instead of keeping its own hand-written list.
+-- (NoteHistory.lua used this set until SV-11; snapshots now keep their own
+-- short list of content fields, SNAP_FIELDS there.)
 BNB.NOTE_COPY_SKIP = COPY_SKIP
 
 -- Full recursive copy, so the new note shares no table with the source
@@ -316,8 +333,13 @@ end
 
 --------------------------------------------------------------------------------
 -- UPDATE
+-- Every change to a note goes through here: tags are deduped and indexed, and
+-- `updated` is stamped. Pass opts.noTouch for runtime state that is not an
+-- edit (an alarm dismissed or snoozed, a task ticked or reset; SV-08): the
+-- fields are written but `updated` stays, so "Edited" sort and the Oracle's
+-- recently-edited weight do not move.
 --------------------------------------------------------------------------------
-function BNB.UpdateNote(id, fields)
+function BNB.UpdateNote(id, fields, opts)
     local note = NDB().notes[id]
     if not note then return end
     -- Capture old tags before mutation if tags are changing
@@ -337,7 +359,7 @@ function BNB.UpdateNote(id, fields)
     if fields._clear then
         for _, k in ipairs(fields._clear) do note[k] = nil end
     end
-    note.updated = time()
+    if not (opts and opts.noTouch) then note.updated = time() end
     -- Update tag index when tags changed
     if oldTags then
         -- Remove all old tag entries for this note
@@ -585,8 +607,8 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
     end
 
     local db     = BigNoteBoxDB
-    local sortBy = db and db.sortBy or "creation"
-    local asc    = db and db.sortAsc or false
+    local sortBy = db and db.sortBy or BNB.DEFAULTS.sortBy
+    local asc    = db and db.sortAsc or BNB.DEFAULTS.sortAsc
 
     -- Custom mode: results are already in noteOrder sequence from the ipairs above.
     -- Skip sort entirely — table.sort is not stable, so even a no-op cmp can shuffle
@@ -765,7 +787,7 @@ function BNB.ScheduleAutoSave()
     if not BNB.IsAutoSave() then return end
     local db     = BigNoteBoxDB
     local idle   = (db and db.undoIdleDelay)      or 0.8
-    local forced = (db and db.undoForcedInterval) or 3.0
+    local forced = (db and db.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval
     BNB.Debounce(AUTO_IDLE, idle, RunAutoSave)
     if not BNB.DebouncePending(AUTO_FORCED) then BNB.Debounce(AUTO_FORCED, forced, RunAutoSave) end
 end

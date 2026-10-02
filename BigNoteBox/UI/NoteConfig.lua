@@ -413,7 +413,7 @@ local function BuildGeneralTab(sf, ct)
         btn:SetScript("OnLeave", HLFonts)
         btn:SetScript("OnClick", function()
             Save({fontOverride = def.id})
-            local sz = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
+            local sz = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
             if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
             if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
             HLFonts()
@@ -470,7 +470,7 @@ local function BuildGeneralTab(sf, ct)
             -- Apply live to the open editor if this note is loaded
             local note = GetNote()
             local sz = (note and note.fontSize)
-                or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+                or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
             local eb = BNB._editorBody
             if eb and BNB._currentNoteID == _noteID then
                 local ov = note and note.fontOverride
@@ -516,7 +516,7 @@ local function BuildGeneralTab(sf, ct)
                 -- Apply live to the open editor if this note is loaded
                 local note = GetNote()
                 local sz = (note and note.fontSize)
-                    or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 13
+                    or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 local eb = BNB._editorBody
                 if eb and BNB._currentNoteID == _noteID then
                     local def = path and BNB.GetFontDef and BNB.GetFontDef(path)
@@ -551,7 +551,7 @@ local function BuildGeneralTab(sf, ct)
 
     local function GetNoteFontSize()
         local n = GetNote()
-        return (n and n.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        return (n and n.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     end
 
     -- Stacked slider (ALL-121). Reset clears the note's own size, so it
@@ -565,7 +565,7 @@ local function BuildGeneralTab(sf, ct)
     end
     local fsSl = BNB.CreateStackedSlider(panel, CW_SCROLL, {
         label = "", min = 8, max = 32, value = GetNoteFontSize(),
-        default = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12,
+        default = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize,
         fmt = function(v) return v .. "pt" end,
         onChange = function(sz)
             Save({fontSize = sz})
@@ -574,7 +574,7 @@ local function BuildGeneralTab(sf, ct)
         onReset = function()
             if not _noteID then return end
             BNB.UpdateNote(_noteID, {_clear = {"fontSize"}})
-            ApplyEditorSize((BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12)
+            ApplyEditorSize((BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize)
             if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         end,
     })

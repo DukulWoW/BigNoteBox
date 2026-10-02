@@ -62,7 +62,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
             { key = "open",    label = L["CFG_QN_ITEM_OPEN"] },
             { key = "confirm", label = L["CFG_QN_ITEM_CONFIRM"] },
         }
-        local curQN = db.quickNoteAction or "silent"
+        local curQN = db.quickNoteAction or BNB.DEFAULTS.quickNoteAction
         local qnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         qnDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         qnDD:SetWidth(CONTENT_W)
@@ -215,7 +215,7 @@ local function BuildPlayerNpcPage(sf, ct, y)
             { key = "auto_rich",   label = L["CFG_ITEM_AUTO_RICH"] },
             { key = "auto_normal", label = L["CFG_ITEM_AUTO_NORMAL"] },
         }
-        local curInsMode = db.inspectNoteMode or "manual"
+        local curInsMode = db.inspectNoteMode or BNB.DEFAULTS.inspectNoteMode
         local insModeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         insModeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         insModeDD:SetWidth(CONTENT_W)
@@ -268,7 +268,7 @@ local function BuildPlayerNpcPage(sf, ct, y)
             { key = "always_rich",   label = L["CFG_ITEM_ALWAYS_RICH"] },
             { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
-        local curInsType = db.inspectNoteType or "choose"
+        local curInsType = db.inspectNoteType or BNB.DEFAULTS.inspectNoteType
         insTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         insTypeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         insTypeDD:SetWidth(CONTENT_W)
@@ -317,7 +317,7 @@ local function BuildPlayerNpcPage(sf, ct, y)
             { key = "regular",  label = L["CFG_INS_GEAR_REGULAR"] },
             { key = "transmog", label = L["CFG_INS_GEAR_TRANSMOG"]},
         }
-        local curGearShow = db.inspectNoteGearShow or "both"
+        local curGearShow = db.inspectNoteGearShow or BNB.DEFAULTS.inspectNoteGearShow
         local gearShowDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         gearShowDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         gearShowDD:SetWidth(CONTENT_W)
@@ -360,7 +360,7 @@ local function BuildPlayerNpcPage(sf, ct, y)
             { key = "always_rich",   label = L["CFG_ITEM_ALWAYS_RICH"] },
             { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
-        local curTNType = db.targetNoteType or "choose"
+        local curTNType = db.targetNoteType or BNB.DEFAULTS.targetNoteType
         local tnTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
         tnTypeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         tnTypeDD:SetWidth(CONTENT_W)
@@ -491,7 +491,7 @@ local function BuildTasksPage(sf, ct, y, page)
                     local iv = item.key
                     root:CreateRadio(item.label,
                         function()
-                            return (BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom") == iv
+                            return (BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition) == iv
                         end,
                         function()
                             if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = iv end
@@ -512,14 +512,14 @@ local function BuildTasksPage(sf, ct, y, page)
         else
             -- Fallback: cycling button
             local function GetCpLabel()
-                local v = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom"
+                local v = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition
                 for _, item in ipairs(CP_ITEMS) do if item.key == v then return item.label end end
                 return CP_ITEMS[1].label
             end
             local cpBtn = BNB.CreateButton(nil, ct, GetCpLabel(), CONTENT_W, 24)
             cpBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
             cpBtn:SetScript("OnClick", function(self)
-                local cur = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or "bottom"
+                local cur = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition
                 local next = cur == "bottom" and "inline" or "bottom"
                 if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = next end
                 local lbl = next == "bottom" and L["CFG_TASK_POS_BOTTOM_SHORT"] or L["CFG_TASK_POS_KEEP_SHORT"]
@@ -569,7 +569,7 @@ local function BuildTasksPage(sf, ct, y, page)
                     local iv = item.key
                     root:CreateRadio(item.label,
                         function()
-                            return (BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal") == iv
+                            return (BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing) == iv
                         end,
                         function()
                             if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = iv end
@@ -590,14 +590,14 @@ local function BuildTasksPage(sf, ct, y, page)
             y = y - 32
         else
             local function GetSpLabel()
-                local v = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+                local v = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
                 for _, item in ipairs(SP_ITEMS) do if item.key == v then return item.label end end
                 return L["CFG_SPACING_LABEL_NORMAL"]
             end
             local spBtn = BNB.CreateButton(nil, ct, GetSpLabel(), CONTENT_W, 24)
             spBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
             spBtn:SetScript("OnClick", function(self)
-                local cur = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+                local cur = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
                 local idx = 1
                 for i, item in ipairs(SP_ITEMS) do if item.key == cur then idx = i; break end end
                 idx = (idx % #SP_ITEMS) + 1
@@ -611,7 +611,7 @@ local function BuildTasksPage(sf, ct, y, page)
 
     -- Default sticky view for notes with tasks
     y = AddCheck(ct, y, L["CFG_CHK_STICKY_TASKVIEW_LABEL"],
-        function() return (BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or "tasks") == "tasks" end,
+        function() return (BigNoteBoxDB and BigNoteBoxDB.taskStickyDefault or BNB.DEFAULTS.taskStickyDefault) == "tasks" end,
         function(v)
             if BigNoteBoxDB then
                 BigNoteBoxDB.taskStickyDefault = v and "tasks" or "note"
@@ -662,7 +662,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
                 for _, opt in ipairs(SIDE_OPTIONS) do
                     local key = opt.key
                     root:CreateRadio(opt.label,
-                        function() return (db.refboxSide or "left") == key end,
+                        function() return (db.refboxSide or BNB.DEFAULTS.refboxSide) == key end,
                         function()
                             db.refboxSide = key
                             sideDD:GenerateMenu()
@@ -695,7 +695,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
                 for _, opt in ipairs(STYLE_OPTIONS) do
                     local key = opt.key
                     root:CreateRadio(opt.label,
-                        function() return (db.refboxDisplayStyle or "normal") == key end,
+                        function() return (db.refboxDisplayStyle or BNB.DEFAULTS.refboxDisplayStyle) == key end,
                         function()
                             db.refboxDisplayStyle = key
                             styleDD:GenerateMenu()
@@ -710,7 +710,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
         -- Max attachments slider
         local rbMaxSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
             label = L["CFG_REFBOX_MAX_SLIDER"], min = 1, max = 100,
-            value = db.refboxMaxItems or 50, default = 50,
+            value = db.refboxMaxItems or BNB.DEFAULTS.refboxMaxItems, default = BNB.DEFAULTS.refboxMaxItems,
             onChange = function(v) db.refboxMaxItems = v end,
             tip = L["CFG_REFBOX_MAX_TIP"],
         })
@@ -813,7 +813,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             { key = "right", label = L["CFG_SIDEBAR_SIDE_RIGHT"] },
             { key = "left",  label = L["CFG_SIDEBAR_SIDE_LEFT"] },
         }
-        local curSide = db.sidebarSide or "right"
+        local curSide = db.sidebarSide or BNB.DEFAULTS.sidebarSide
         local sideDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
         sideDD:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         sideDD:SetWidth(CONTENT_W)
@@ -1043,9 +1043,9 @@ local function BuildStickyPage(sf, ct, y)
     end
 
     y = AddSlider(ct, y, L["CFG_SLIDER_MAX_STICKIES"], 1, 50,
-        function() return db.stickyMaxCount or 20 end,
+        function() return db.stickyMaxCount or BNB.DEFAULTS.stickyMaxCount end,
         function(v) db.stickyMaxCount = v end,
-        L["CFG_SLIDER_MAX_STICKIES_TIP"], 20)
+        L["CFG_SLIDER_MAX_STICKIES_TIP"], BNB.DEFAULTS.stickyMaxCount)
 
     -- nil = off: stickies act like windows, the one clicked last comes to the
     -- front (Ctrl+J brings them all forward); on = always over the main window
@@ -1113,7 +1113,7 @@ local function BuildFocusPage(sf, ct, y)
     -- Speed slider (greyed when orbit off)
     local speedSl = BNB.CreateStackedSlider(ct, CONTENT_W - 14, {
         label = L["CFG_FOCUS_ORBIT_SPEED"], min = 0.001, max = 0.020, step = 0.001,
-        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or 0.004, default = 0.004,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitSpeed) or BNB.DEFAULTS.focusOrbitSpeed, default = BNB.DEFAULTS.focusOrbitSpeed,
         fmt = function(v) return string.format("%.3f", v) end,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.focusOrbitSpeed = v end
@@ -1125,7 +1125,7 @@ local function BuildFocusPage(sf, ct, y)
     -- Resume-after-movement slider (greyed when orbit off)
     local resumeSl = BNB.CreateStackedSlider(ct, CONTENT_W - 14, {
         label = L["CFG_FOCUS_ORBIT_RESUME"], min = 0, max = 10, step = 0.5,
-        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or 3.0, default = 3.0,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOrbitResumeDelay) or BNB.DEFAULTS.focusOrbitResumeDelay, default = BNB.DEFAULTS.focusOrbitResumeDelay,
         fmt = function(v)
             if v <= 0 then return L["CFG_FOCUS_ORBIT_OFF"] end
             return string.format("%.1f s", v)
@@ -1141,7 +1141,7 @@ local function BuildFocusPage(sf, ct, y)
     y = y - 4
     local overlaySl = BNB.CreateStackedSlider(ct, CONTENT_W, {
         label = L["CFG_FOCUS_OVERLAY_ALPHA"], min = 0.0, max = 1.0, step = 0.05,
-        value = (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or 0.6, default = 0.6,
+        value = (BigNoteBoxDB and BigNoteBoxDB.focusOverlayAlpha) or BNB.DEFAULTS.focusOverlayAlpha, default = BNB.DEFAULTS.focusOverlayAlpha,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.focusOverlayAlpha = v end
         end,
@@ -1207,9 +1207,9 @@ local function BuildContextPopupPage(sf, ct, y, page)
 
     -- Popup hold time slider
     y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
-        function() return db.popupHoldTime or 5 end,
+        function() return db.popupHoldTime or BNB.DEFAULTS.popupHoldTime end,
         function(v) db.popupHoldTime = v end,
-        L["CFG_SLIDER_ALERT_SECONDS_TIP"], 5)
+        L["CFG_SLIDER_ALERT_SECONDS_TIP"], BNB.DEFAULTS.popupHoldTime)
     page.enableCb = cb   -- twin on the Features overview row
     sf:FinaliseHeight(math.abs(y) + 12)
 end

@@ -86,13 +86,13 @@ local function GetOrCreateTaskList(noteID)
     return note.taskList
 end
 
--- Persist after any direct mutation to note.tasks / note.taskList.
--- BNB.UpdateNote with the full field is the safe way; direct mutation on the
--- live reference also works because BNB stores by reference in BigNoteBoxNotesDB,
--- but we call UpdateNote with a dummy field to trigger the save/autosave path.
-local function Persist(noteID)
-    -- Touching updatedAt keeps history consistent.
-    BNB.UpdateNote(noteID, { updatedAt = time() })
+-- Persist after any direct mutation to note.tasks / note.taskList. The tables
+-- are changed in place (BNB stores by reference in the notes DB), so this
+-- only stamps the edit. state = true for a tick, untick or reset: that is not
+-- an edit of the note, so `updated` stays (SV-08). The old dummy `updatedAt`
+-- field is gone (dropped from saved notes by NOTES v8).
+local function Persist(noteID, state)
+    BNB.UpdateNote(noteID, {}, state and { noTouch = true } or nil)
 end
 
 --------------------------------------------------------------------------------
@@ -338,7 +338,7 @@ function T.ToggleTask(noteID, taskID)
         Uncomplete(noteID, task)
     end
 
-    Persist(noteID)
+    Persist(noteID, true)
     Fire("TasksChanged", noteID)
 end
 
@@ -392,7 +392,7 @@ function T.ClearCompleted(noteID)
         end
     end
 
-    Persist(noteID)
+    Persist(noteID, true)
     Fire("TasksChanged", noteID)
 end
 
@@ -528,9 +528,8 @@ function T.CheckResets()
                 end
             end
             if dirty then
+                -- A reset is state, not an edit: `updated` stays (SV-08)
                 changed[#changed + 1] = noteID
-                -- Touch updatedAt so history / autosave picks it up.
-                note.updatedAt = now
             end
         end
     end

@@ -40,7 +40,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local BASE        = "Interface\\AddOns\\BigNoteBox\\Assets\\Fonts\\"
-local DEFAULT_SIZE = 13
+local DEFAULT_SIZE = BNB.DEFAULTS.fontSize
 
 -- Language -> font set. A language not listed here uses the Latin set. Add a line
 -- when a new CJK language ships (plus a SET_DEFAULT entry and its cards).
@@ -401,7 +401,7 @@ end
 function BNB.GetBodyFont()
     local db  = BigNoteBoxDB
     local def = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
-    local sz  = (db and db.fontSize) or DEFAULT_SIZE
+    local sz  = (db and db.fontSize) or BNB.DEFAULTS.fontSize
     return def.regular, sz
 end
 
@@ -540,7 +540,7 @@ function BNB.ApplyFont(id, size)
     if size then db.fontSize   = size end
 
     local def      = _byID[BNB.GetEffectiveFontID()] or _byID["notoserif"]
-    local sz       = db.fontSize or DEFAULT_SIZE
+    local sz       = db.fontSize or BNB.DEFAULTS.fontSize
     local bodyPath = def.regular
     local boldPath = def.bold
 

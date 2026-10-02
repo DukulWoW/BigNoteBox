@@ -10,9 +10,9 @@
 --
 -- A "snap" table contains:
 --   timestamp  — unix time of snapshot
---   + all content fields from the note (title, body, tags, context, icon, ...)
---   NOT: whatever BNB.NOTE_COPY_SKIP lists (id, created, updated, updatedAt,
---        coordX/Y/mapID/zone, history, manualSnapshot, alarm)
+--   + the SNAP_FIELDS below (title, body, richMode, tags, tasks, taskList).
+--   Look and metadata (icon, colours, font, context, attachments, gear, ...)
+--   are not versioned: a restore leaves them as they are (SV-11).
 --
 -- AUTO SLOTS:
 --   Controlled by BigNoteBoxDB.historyMaxSlots (default 5, range 1-20).
@@ -42,14 +42,15 @@
 local BNB = BigNoteBox
 
 --------------------------------------------------------------------------------
--- FIELDS a snapshot never captures: identity, timestamps, the creation
--- position, the note's own history/alarm (recursion / one reminder ringing
--- twice). Everything else is content and gets snapshotted, so a restore
--- brings back every field NoteManager knows about (richMode, tasks,
--- taskList, ...) without a hand-written list going stale (ALL-65.6: the old
--- allow-list missed richMode and tasks). Shared with BNB.CopyNote (ALL-58).
+-- FIELDS a snapshot captures and a restore puts back (SV-11, ALL-136.8,
+-- Dukul's pick). Snapshots used to copy every content field (ALL-65.6), so up
+-- to 21 full copies of each note's attachments, gear and look sat in the notes
+-- file, which loads at login. The text, its mode, its tags and its tasks
+-- (with the list's reset settings) are what a restore needs. NOTES v8
+-- (Core/Database.lua) trims older snapshots to the same list.
 --------------------------------------------------------------------------------
-local SNAP_SKIP = BNB.NOTE_COPY_SKIP
+local SNAP_FIELDS = { "title", "body", "richMode", "tags", "tasks", "taskList" }
+BNB.HISTORY_SNAP_FIELDS = SNAP_FIELDS
 
 --------------------------------------------------------------------------------
 -- INTERNAL: deep-copy a value (handles tables, arrays, primitives)
@@ -69,25 +70,32 @@ end
 --------------------------------------------------------------------------------
 local function MakeSnap(note)
     local snap = { timestamp = time() }
-    for field, v in pairs(note) do
-        if not SNAP_SKIP[field] then
-            snap[field] = DeepCopy(v)
-        end
+    for _, field in ipairs(SNAP_FIELDS) do
+        snap[field] = DeepCopy(note[field])
     end
     return snap
 end
 
 --------------------------------------------------------------------------------
--- INTERNAL: approximate byte size of a snapshot (title + body + overhead)
+-- INTERNAL: approximate byte size of a snapshot. Walks every field, tables
+-- included (it used to count title and body only, so tasks or an untrimmed
+-- old snapshot did not show). Strings count their length, anything else a
+-- few bytes, plus a little per key for the saved-file syntax.
 --------------------------------------------------------------------------------
+local function ValueSize(v)
+    local t = type(v)
+    if t == "string" then return #v + 2 end
+    if t ~= "table" then return 8 end
+    local n = 2
+    for k, x in pairs(v) do
+        n = n + ValueSize(k) + ValueSize(x) + 4
+    end
+    return n
+end
+
 local function SnapSize(snap)
     if not snap then return 0 end
-    local n = 0
-    if snap.title then n = n + #snap.title end
-    if snap.body  then n = n + #snap.body  end
-    -- rough overhead for other fields
-    n = n + 64
-    return n
+    return ValueSize(snap)
 end
 
 --------------------------------------------------------------------------------
@@ -99,7 +107,7 @@ end
 
 local function MaxSlots()
     local db = BigNoteBoxDB
-    local n  = db and db.historyMaxSlots or 5
+    local n  = db and db.historyMaxSlots or BNB.DEFAULTS.historyMaxSlots
     if n < 1  then n = 1  end
     if n > 20 then n = 20 end
     return n
@@ -314,20 +322,18 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
         while #note.history > max do table.remove(note.history) end
     end
 
-    -- Apply snapshot fields to live note. Clear any content field the note
-    -- currently has that the snapshot doesn't (a field added after the
-    -- snapshot was taken), then copy every field the snapshot does carry.
-    -- Through UpdateNote, so the tag index follows the restored tags (BUG-22);
-    -- tags is always passed for that, as {} when the snapshot has none.
+    -- Apply the snapshot's fields to the live note: each SNAP_FIELDS entry is
+    -- set from the snapshot, or cleared when the snapshot has none (tasks
+    -- added after it was taken). Nothing else is touched, also when an old
+    -- snapshot still carries more (SV-11). Through UpdateNote, so the tag
+    -- index follows the restored tags (BUG-22); tags is always passed for
+    -- that, as {} when the snapshot has none.
     local fields, clear = {}, {}
-    for field in pairs(note) do
-        if not SNAP_SKIP[field] and snap[field] == nil and field ~= "tags" then
+    for _, field in ipairs(SNAP_FIELDS) do
+        if snap[field] ~= nil then
+            fields[field] = DeepCopy(snap[field])
+        elseif field ~= "tags" and note[field] ~= nil then
             clear[#clear + 1] = field
-        end
-    end
-    for field, v in pairs(snap) do
-        if field ~= "timestamp" then
-            fields[field] = DeepCopy(v)
         end
     end
     if fields.tags == nil then fields.tags = {} end

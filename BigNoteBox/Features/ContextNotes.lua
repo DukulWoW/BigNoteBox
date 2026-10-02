@@ -189,7 +189,7 @@ local TOAST_BAR_H   = 2
 
 local function GetHoldTime()
     local db = BigNoteBoxDB
-    return (db and db.popupHoldTime) or 5
+    return (db and db.popupHoldTime) or BNB.DEFAULTS.popupHoldTime
 end
 
 -- Countdown state (managed via OnUpdate, not C_Timer — gives us the bar)

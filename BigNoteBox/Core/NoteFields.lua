@@ -11,7 +11,8 @@
 --   [2] types an import accepts: s string, n number, b boolean, t table
 --   share    = Share window group (BNB.SHARE_GROUPS); "text" is always sent;
 --              nil = never shared (this player's own: scope, pin, alarm...)
---   nocopy   = a copy and a history snapshot leave it out
+--   nocopy   = a copy leaves it out (history snapshots keep only the few
+--              fields in SNAP_FIELDS, Features/NoteHistory.lua, SV-11)
 --   internal = never backed up or shared either (implies nocopy)
 --
 -- Loads before Core/NoteManager.lua, with no dependencies, so the luajit tools
@@ -96,7 +97,7 @@ local FIELDS = {
     { "history",        "t", internal = true },
     { "manualSnapshot", "t", internal = true },
     { "lastOpened",     "n", internal = true },
-    { "updatedAt",      "n", internal = true },
+    { "updatedAt",      "n", internal = true },   -- dropped by NOTES v8 (SV-08); old backups may carry it
     { "deletedAt",      "n", internal = true },
 }
 

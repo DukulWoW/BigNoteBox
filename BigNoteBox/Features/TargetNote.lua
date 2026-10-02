@@ -36,7 +36,7 @@ local TN = BNB.TargetNote
 --------------------------------------------------------------------------------
 local function GetType()
     local db = BigNoteBoxDB
-    return db and db.targetNoteType or "choose"
+    return db and db.targetNoteType or BNB.DEFAULTS.targetNoteType
 end
 
 -- Returns true if a tag config key is enabled (all default to true except Family).

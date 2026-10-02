@@ -143,7 +143,7 @@ end
 local function FmtTime(ts)
     if not ts or ts == 0 then return "" end
     local db       = BigNoteBoxDB
-    local fmt      = db and db.dateFormat or "YYYY-MM-DD"
+    local fmt      = db and db.dateFormat or BNB.DEFAULTS.dateFormat
     local use24    = db == nil or db.use24Hour ~= false
 
     if fmt == "relative" then
@@ -471,7 +471,7 @@ local function BuildBodyField(parent, topAnchor)
     if BNB.GetBodyFont then
         bodyPath, bodySize = BNB.GetBodyFont()
     end
-    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+    bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
 
     local sf, eb = BNB.CreateScrolledEditBox("BigNoteBoxBodyScroll", parent, bodySize)
     if bodyPath then
@@ -502,7 +502,7 @@ local function BuildBodyField(parent, topAnchor)
                 local id = BNB._currentNoteID
                 if id and not BNB._undoActive then
                     local idleDelay = (BigNoteBoxDB and BigNoteBoxDB.undoIdleDelay)    or 0.8
-                    local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or 3.0
+                    local forcedInt = (BigNoteBoxDB and BigNoteBoxDB.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval
                     -- First snapshot for this note: push immediately so Undo
                     -- always has a "before" state to return to.
                     if not BNB._undoSnap[id] or BNB._undoStack[id] == nil then
@@ -1427,7 +1427,7 @@ function BNB.LoadNoteInEditor(id)
     -- Timestamps + creation coordinates
     if tsStrip then
         local db  = BigNoteBoxDB
-        local fmt = db and db.dateFormat or "YYYY-MM-DD"
+        local fmt = db and db.dateFormat or BNB.DEFAULTS.dateFormat
         local isRelative = (fmt == "relative")
 
         local createdStr, updatedStr
@@ -1460,7 +1460,7 @@ function BNB.LoadNoteInEditor(id)
     if fontOverride and BNB.ResolveFontDef then
         local def = BNB.ResolveFontDef(fontOverride)
         if def then
-            local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+            local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
             if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
             if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
             appliedOverride = true
@@ -1975,7 +1975,7 @@ function BNB.AM_EnterViewMode(id)
             if BNB._editorInViewMode and BNB._currentNoteID then
                 local rn = BNB.GetNote(BNB._currentNoteID)
                 if rn then
-                    local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+                    local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                     local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                     BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
                     local rawST = getmetatable(rf).__index.SetText
@@ -2039,7 +2039,7 @@ function BNB.AM_EnterViewMode(id)
         local freshNote = id and BNB.GetNote(id)
         if not freshNote then return end
 
-        local bodySize = freshNote.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+        local bodySize = freshNote.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local flagStr  = BNB.AdvancedMode.OutlineFlagStr(freshNote.fontOutline)
         BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bodySize, flagStr)
 

@@ -289,7 +289,7 @@ local function BuildPanel(f, isLeft)
         end
     end
 
-    local bodySize = BigNoteBoxDB and BigNoteBoxDB.fontSize or 13
+    local bodySize = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
     local sf, eb  = BNB.CreateScrolledEditBox(nil, pane, bodySize)
     sf:SetPoint("TOPLEFT",     pane, "TOPLEFT",     0,   0)
     sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -22, BTN_H + 8)

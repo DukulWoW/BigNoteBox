@@ -589,7 +589,7 @@ local function BuildDialog()
     sizeHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
-    local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+    local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     -- Stacked slider with Reset (ALL-121); the header above is its label
     local szWidget = BNB.CreateStackedSlider(f, COL_R_W, {
         label = "", min = 8, max = 32, value = defaultSize, default = defaultSize,
@@ -732,7 +732,7 @@ function NND.Open()
     _selIcon  = RandomNoteIcon()
     _selFont  = nil
     _selColor = nil
-    _selSize  = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+    _selSize  = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     _selRich  = (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
     if _richCheck then _richCheck:SetChecked(_selRich) end
     if _wowCheck  then _wowCheck:SetChecked(false) end
@@ -824,7 +824,7 @@ function NND.Confirm()
     local updates = { icon = _selIcon }
     if _selFont  then updates.fontOverride = _selFont  end
     if _selColor then updates.titleColor   = _selColor end
-    local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or 12
+    local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     if _selSize ~= defaultSize then updates.fontSize = _selSize end
     if _selRich then updates.richMode = true end
     BNB.UpdateNote(id, updates)

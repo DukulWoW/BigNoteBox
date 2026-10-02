@@ -22,7 +22,7 @@ local function _start()
     if not BNB.IsFocusModeOpen or not BNB.IsFocusModeOpen() then return end
     local db = BigNoteBoxDB
     if not db or db.focusOrbitEnabled == false then return end
-    local speed = db.focusOrbitSpeed or 0.004
+    local speed = db.focusOrbitSpeed or BNB.DEFAULTS.focusOrbitSpeed
     MoveViewRightStart(speed)
     _running = true
 end
@@ -47,7 +47,7 @@ end
 local function _scheduleResume()
     _cancelResume()
     local db = BigNoteBoxDB
-    local delay = (db and db.focusOrbitResumeDelay) or 3.0
+    local delay = (db and db.focusOrbitResumeDelay) or BNB.DEFAULTS.focusOrbitResumeDelay
     if delay <= 0 then return end   -- 0 = never resume after movement
     -- Fade overlay back in over a duration tied to the resume delay (capped 1.5–3s)
     local fadeDur = math.max(1.5, math.min(delay, 3.0))
@@ -118,7 +118,7 @@ function FO.StartForSetup()
     if _running then return end
     if InCombatLockdown() then return end
     local db = BigNoteBoxDB
-    local speed = (db and db.focusOrbitSpeed) or 0.004
+    local speed = (db and db.focusOrbitSpeed) or BNB.DEFAULTS.focusOrbitSpeed
     MoveViewRightStart(speed)
     _running = true
 end

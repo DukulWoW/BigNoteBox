@@ -33,7 +33,7 @@ local TASK_FOOTER_H         = 26     -- height of Clear/Delete footer strip
 
 -- Returns { rowH, subRowH, gap } based on BigNoteBoxDB.taskSpacing.
 local function GetTaskSpacing()
-    local s = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or "normal"
+    local s = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
     if s == "compact"  then return 18, 16, 1 end
     if s == "spacious" then return 30, 28, 4 end
     return 24, 22, 2   -- normal (original values)
@@ -1014,7 +1014,7 @@ local function DoRenderTaskPanel()
     _taskRowsNoteID = NoteID()
 
     local db           = BigNoteBoxDB
-    local completedPos = (db and db.taskCompletedPosition) or "bottom"
+    local completedPos = (db and db.taskCompletedPosition) or BNB.DEFAULTS.taskCompletedPosition
     local T            = BNB.Task
     local done, total  = T.GetCompletionCount(NoteID())
 

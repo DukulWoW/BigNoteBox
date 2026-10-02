@@ -28,6 +28,9 @@ local function MergeBareNameRecord(db, name, realm, classToken)
     if not (old and cur) or oldKey == BNB.currentChar or old.class ~= classToken then return end
     if old.slotPinned then cur.slotPinned = true end
     local oldScope, newScope = "char:" .. oldKey, "char:" .. BNB.currentChar
+    -- Written straight onto the notes, not through UpdateNote: this runs at
+    -- login before any search cache exists, and a moved scope is not an edit
+    -- (SV-07 checked, ALL-136.8)
     local ndb = BNB.NotesDB()
     local moved = 0
     for _, list in ipairs({ ndb and ndb.notes, ndb and ndb.trash }) do
@@ -69,10 +72,28 @@ function BNB.Initialize()
         end
     end
 
-    -- 1c. Rebuild tag index if migration flagged it as needed
-    if BigNoteBoxDB and BigNoteBoxDB._needsTagRebuild then
-        if BNB.TagIndexRebuild then BNB.TagIndexRebuild() end
-        BigNoteBoxDB._needsTagRebuild = nil
+    -- 1c. (The tag index is runtime-only since SV-05: BNB.TagIndex() builds it
+    --     on first use, so there is no rebuild flag to honour here.)
+
+    -- 1c-post. Drop per-note settings whose note is gone (SV-09): a sticky's
+    --     postits record and the Reference Box task split ratio outlived the
+    --     note and its trash copy. Not in dev mode: settings are shared, and
+    --     the other notes set's ids are not visible from here. Not with an
+    --     empty notes set either (a notes file that failed to load would take
+    --     every sticky's position with it).
+    do
+        local ndb, db = BNB.NotesDB(), BigNoteBoxDB
+        if db and not BNB.IsDevMode() and ndb and ndb.notes and next(ndb.notes) then
+            local trash = ndb.trash or {}
+            for _, key in ipairs({ "postits", "taskSplitRatio" }) do
+                local t = db[key]
+                if type(t) == "table" then
+                    for id in pairs(t) do
+                        if not ndb.notes[id] and not trash[id] then t[id] = nil end
+                    end
+                end
+            end
+        end
     end
 
     -- 1d. Register this character in the known-characters registry.
@@ -163,7 +184,7 @@ function BNB.Initialize()
         SafeCall("Sidebar", BNB.Sidebar.Build, BNB.mainFrame)
         -- Restore persisted active key
         local db = BigNoteBoxDB
-        local savedKey = db and db.sidebarActiveKey or "all"
+        local savedKey = db and db.sidebarActiveKey or BNB.DEFAULTS.sidebarActiveKey
         BNB.Sidebar.SetActive(savedKey)
         -- Auto-switch to this character's slot if option is enabled
         if db and db.sidebarEnabled and db.sidebarAutoSwitch then
@@ -402,7 +423,7 @@ function BNB_KeybindQuickNote()
             return
         end
         if why == "max" then
-            local msg = string.format(L["QN_KEY_STICKY_MAX"], db.stickyMaxCount or 10)
+            local msg = string.format(L["QN_KEY_STICKY_MAX"], db.stickyMaxCount or BNB.DEFAULTS.stickyMaxCount)
             if UIErrorsFrame then UIErrorsFrame:AddMessage(msg, 1.0, 0.82, 0.0, 1.0) end
             BNB:Print(msg)
         end

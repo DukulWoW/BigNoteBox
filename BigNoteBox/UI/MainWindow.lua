@@ -18,7 +18,7 @@ local DEFAULT_H  = 640
 -- Saved in BigNoteBoxDB.splitX between sessions.
 local MIN_LIST_W     = 160
 local MAX_LIST_W     = 460
-local DEFAULT_LIST_W = 240
+local DEFAULT_LIST_W = BNB.DEFAULTS.splitX
 -- Icon-only collapsed width: 8px left pad + 32px icon + 8px right pad + 22px scrollbar + 2px buffer = 72px
 -- Must match COLLAPSED_W in NoteList.lua
 local COLLAPSED_W    = 82   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + PAD_L(8) + scrollbar(22) + 2
@@ -440,7 +440,7 @@ function BNB.CreateMainWindow()
 
     -- Restore saved split width
     BNB._listPaneW = math.max(MIN_LIST_W,
-        math.min(MAX_LIST_W, BigNoteBoxDB.splitX or DEFAULT_LIST_W))
+        math.min(MAX_LIST_W, BigNoteBoxDB.splitX or BNB.DEFAULTS.splitX))
 
     local skin = BigNoteBoxDB.skinMode and BNB.BuildMainWindowSkinChrome
     local chrome = skin and BNB.BuildMainWindowSkinChrome() or BuildClassicChrome()
@@ -641,7 +641,7 @@ function BNB.CreateMainWindow()
     }
     local function CurrentSortLabel()
         for _, m in ipairs(SORT_MODES) do
-            if m.key == (BigNoteBoxDB.sortBy or "creation") then return m.label end
+            if m.key == (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) then return m.label end
         end
         return L["SORT_MODE_CREATION"]
     end
@@ -680,7 +680,7 @@ function BNB.CreateMainWindow()
             for _, m in ipairs(SORT_MODES) do
                 local key = m.key
                 root:CreateRadio(m.label,
-                    function() return (BigNoteBoxDB.sortBy or "creation") == key end,
+                    function() return (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) == key end,
                     function() BigNoteBoxDB.sortBy = key; sortDD:GenerateMenu(); ApplySort() end)
             end
         end)
@@ -700,7 +700,7 @@ function BNB.CreateMainWindow()
         sortCycleBtn = BNB.CreateButton(nil, f, CurrentSortLabel(), DD_W, SORT_BTN_H)
         sortCycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
         sortCycleBtn:SetScript("OnClick", function(self)
-            local cur = BigNoteBoxDB.sortBy or "creation"
+            local cur = BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy
             local idx = 1
             for i, m in ipairs(SORT_MODES) do if m.key == cur then idx = i; break end end
             idx = (idx % #SORT_MODES) + 1
@@ -954,7 +954,7 @@ function BNB.CreateMainWindow()
             splitter:EnableMouse(false)
         else
             BNB._listPaneW = math.max(MIN_LIST_W,
-                math.min(MAX_LIST_W, BigNoteBoxDB.splitX or DEFAULT_LIST_W))
+                math.min(MAX_LIST_W, BigNoteBoxDB.splitX or BNB.DEFAULTS.splitX))
             splitter:EnableMouse(true)
         end
         ApplySplit(f)
@@ -1052,7 +1052,7 @@ function BNB.CreateMainWindow()
             splitter:EnableMouse(false)
         else
             BNB._listPaneW = math.max(
-                BigNoteBoxDB.splitX or DEFAULT_LIST_W,
+                BigNoteBoxDB.splitX or BNB.DEFAULTS.splitX,
                 collapsedW + 40)
             splitter:EnableMouse(true)
         end

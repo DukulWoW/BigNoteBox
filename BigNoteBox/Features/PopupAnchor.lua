@@ -86,8 +86,8 @@ function BNB.TogglePopupAnchor()
     end
     -- Position at saved location or screen centre
     local db = BigNoteBoxDB
-    local x  = db and db.popupAnchorX or 0
-    local y  = db and db.popupAnchorY or 200
+    local x  = db and db.popupAnchorX or BNB.DEFAULTS.popupAnchorX
+    local y  = db and db.popupAnchorY or BNB.DEFAULTS.popupAnchorY
     _anchor:ClearAllPoints()
     _anchor:SetPoint("CENTER", UIParent, "CENTER", x, y)
     _anchor:Show()
@@ -116,7 +116,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.GetPopupAnchorPoint()
     local db = BigNoteBoxDB
-    local x  = db and db.popupAnchorX or 0
-    local y  = db and db.popupAnchorY or 200
+    local x  = db and db.popupAnchorX or BNB.DEFAULTS.popupAnchorX
+    local y  = db and db.popupAnchorY or BNB.DEFAULTS.popupAnchorY
     return "CENTER", UIParent, "CENTER", x, y
 end

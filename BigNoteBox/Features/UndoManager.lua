@@ -48,7 +48,7 @@ BNB._undoActive = false
 --------------------------------------------------------------------------------
 local function MaxDepth()
     local db = BigNoteBoxDB
-    local d  = db and db.undoDepth or 50
+    local d  = db and db.undoDepth or BNB.DEFAULTS.undoDepth
     if d < 10  then d = 10  end
     if d > 200 then d = 200 end
     return d

@@ -92,7 +92,7 @@ end
 -- Three modes: normal (32px icon), compact (16px, no preview), spacious (42px, 3 preview lines)
 local function GetListMode()
     local db = BigNoteBoxDB
-    local v  = db and db.listEntryHeight or "normal"
+    local v  = db and db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
     if v == "compact"  then return "compact"
     elseif v == "spacious" then return "spacious"
     else return "normal" end
@@ -360,7 +360,7 @@ local function BuildSearchBar(parent)
     treeTx:SetAllPoints()
     treeTx:SetTexture(ASSETS .. "UI\\ui-treeview")
     treeBtn._tx = treeTx
-    local _treeActive = BigNoteBoxDB and BigNoteBoxDB.tagTreeMode or false
+    local _treeActive = BigNoteBoxDB and BigNoteBoxDB.tagTreeMode or BNB.DEFAULTS.tagTreeMode
     local function ApplyTreeBtnState()
         treeBtn:SetAlpha(_treeActive and 1.0 or 0.35)
         pcall(function() treeTx:SetDesaturated(not _treeActive) end)
@@ -2043,7 +2043,7 @@ function BNB.RefreshNoteListEntry(id, opts)
         or (opts and opts.tasks and BNB._taskFilterActive) then
         return BNB.RefreshNoteList()
     end
-    local sortBy = db and db.sortBy or "creation"
+    local sortBy = db and db.sortBy or BNB.DEFAULTS.sortBy
     if btn._title ~= note.title and (sortBy == "alpha" or note.pinned) then
         return BNB.RefreshNoteList()
     end
@@ -2178,7 +2178,7 @@ function BNB.BuildNoteList()
     if not pane then return end
 
     -- Restore collapse and display mode from DB
-    BNB._listCollapsed = BigNoteBoxDB.listCollapsed or false
+    BNB._listCollapsed = BigNoteBoxDB.listCollapsed or BNB.DEFAULTS.listCollapsed
     ApplyListMode()
 
     local searchBar = BuildSearchBar(pane)

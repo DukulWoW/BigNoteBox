@@ -118,7 +118,7 @@ local function GetAttachments(id)
     local note = id and NDB() and NDB().notes and NDB().notes[id]
     return note and note.attachments or nil
 end
-local function GetMaxItems() return DB().refboxMaxItems or 20 end
+local function GetMaxItems() return DB().refboxMaxItems or BNB.DEFAULTS.refboxMaxItems end
 local function IsCompact()   return DB().refboxDisplayStyle == "compact" end
 
 -- The Reference Box and Tasks switch off independently (ALL-102). With the
@@ -241,6 +241,8 @@ local function IsLocked(id)
 end
 
 -- ── Attachment persistence ────────────────────────────────────────────────────
+-- The attachment list is changed in place; UpdateNote(id, {}) then stamps the
+-- edit (`updated`), as any other change to a note does (SV-07).
 local function AddAttachment(noteID, att)
     if not noteID then return end
     if IsLocked(noteID) then
@@ -258,6 +260,7 @@ local function AddAttachment(noteID, att)
         if ex.type == att.type and ex.id == att.id then return end
     end
     table.insert(note.attachments, att)
+    BNB.UpdateNote(noteID, {})
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end   -- update badge
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
@@ -267,6 +270,7 @@ local function RemoveAttachment(noteID, index)
     local note = NDB().notes[noteID]
     if not note or not note.attachments then return end
     table.remove(note.attachments, index)
+    BNB.UpdateNote(noteID, {})
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
@@ -299,6 +303,8 @@ local function MoveAttachment(fromNoteID, attIndex, toNoteID)
     table.remove(fromNote.attachments, attIndex)
     local copy = {}; for k, v in pairs(att) do copy[k] = v end
     table.insert(toNote.attachments, copy)
+    BNB.UpdateNote(fromNoteID, {})
+    BNB.UpdateNote(toNoteID, {})
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
@@ -1479,7 +1485,7 @@ RenderList = function()
     if count == 0 then y = y - 48 end
     local note = _noteID and BNB.GetNote(_noteID)
     if note and note.source == "inspect" and _rbMode == "model" then
-        local gearShow    = (BigNoteBoxDB and BigNoteBoxDB.inspectNoteGearShow) or "both"
+        local gearShow    = (BigNoteBoxDB and BigNoteBoxDB.inspectNoteGearShow) or BNB.DEFAULTS.inspectNoteGearShow
         local tmogItems   = note.inspectTransmogItems
         local regItems    = note.inspectGearItems
         local showTmog    = (gearShow == "both" or gearShow == "transmog") and tmogItems and #tmogItems > 0
@@ -1647,7 +1653,7 @@ end
 
 -- Outer edge: away from the main window, so the tabs never cover it
 local function SideTabSide()
-    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or "left"
+    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or BNB.DEFAULTS.refboxSide
     if not (BNB.mainFrame and BNB.mainFrame:IsShown()) then side = "left" end
     return side
 end
@@ -3082,7 +3088,7 @@ end
 local function PositionFrame()
     if not rbFrame then return end
     rbFrame:ClearAllPoints()
-    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or "left"
+    local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or BNB.DEFAULTS.refboxSide
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         if side == "right" then
             rbFrame:SetPoint("TOPLEFT", BNB.mainFrame, "TOPRIGHT", 8, 0)
