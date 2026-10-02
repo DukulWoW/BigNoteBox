@@ -124,6 +124,10 @@ local function InitDevMode()
     if type(BigNoteBoxDevDB) ~= "table" then BigNoteBoxDevDB = {} end
     local dev = BigNoteBoxDevDB
     BNB._devMode = true
+    -- Debug mode starts on in dev mode (Dukul, 2026-10-02). InitSettingsDB clears it
+    -- on every load, so this re-arms it each reload; turning it off holds until then.
+    BigNoteBoxDB.debugMode = true
+    BNB._debugMode = true
     if dev.notesDB == nil then
         local src = BigNoteBoxNotesDB_Loaded and BigNoteBoxNotesDB
         dev.notesDB = type(src) == "table" and DeepCopy(src) or {}

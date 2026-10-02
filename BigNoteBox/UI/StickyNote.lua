@@ -70,6 +70,24 @@ local DEFAULT_CFG = {
 
 -- ── State ──────────────────────────────────────────────────────────────────────
 local openFrames = {}
+
+-- Settings > Modules > Sticky notes "Keep sticky notes above BigNoteBox
+-- windows" (nil = off, Dukul 2026-10-02: off by default now that Ctrl+J
+-- brings them forward). On: HIGH, over the main window (MEDIUM). Off: MEDIUM
+-- as well, where SetToplevel brings whichever window was clicked last to the
+-- front. ESC-screen stickies keep FULLSCREEN_DIALOG.
+function SN.Strata()
+    return (BigNoteBoxDB and BigNoteBoxDB.stickiesOnTop == true) and "HIGH" or "MEDIUM"
+end
+
+-- Re-strata every open sticky and mini tile after the setting changes
+function SN.ApplyStrata()
+    local s = SN.Strata()
+    for _, f in pairs(openFrames) do
+        if not f._escOnly then f:SetFrameStrata(s) end
+        if f._miniTile then f._miniTile:SetFrameStrata(s) end
+    end
+end
 BNB._stickyFrames = openFrames
 
 -- Per-note collapse state for sticky task rows: _stickyCollapsed[noteID][taskID] = true
@@ -816,7 +834,7 @@ local function CreateMiniTile(frame, noteID, note)
 
     local tile = BNB.CreateBackdropFrame("Frame", nil, UIParent)
     tile:SetSize(MINI_SIZE, MINI_SIZE)
-    tile:SetFrameStrata("HIGH")
+    tile:SetFrameStrata(SN.Strata())
     tile:SetToplevel(true)
     tile:SetMovable(true)
     tile:SetClampedToScreen(true)
@@ -1544,7 +1562,7 @@ local function CreateStickyFrame(noteID)
     if not note then return nil end
 
     local f = BNB.CreateBackdropFrame("Frame", nil, UIParent)
-    f:SetFrameStrata("HIGH")
+    f:SetFrameStrata(SN.Strata())
     f:SetToplevel(true)
     f:SetMovable(true)
     f:SetResizable(true)
@@ -2025,6 +2043,18 @@ local function CreateStickyFrame(noteID)
     f._cursorFollow = bodyEb:GetScript("OnCursorChanged")
     bodyEb:SetScript("OnCursorChanged", nil)
     bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
+    -- Esc or Ctrl+Enter ends an inline edit, saved like a click outside
+    -- (Dukul, 2026-10-02). Plain Enter stays a new line. The newline a
+    -- multi-line box types for Ctrl+Enter is taken back out first.
+    bodyEb:HookScript("OnEscapePressed", function() EndInlineEdit(f) end)
+    bodyEb:HookScript("OnEnterPressed", function(self)
+        if not (f._inlineEditing and IsControlKeyDown()) then return end
+        local pos, t = self:GetCursorPosition(), self:GetText() or ""
+        if pos > 0 and t:sub(pos, pos) == "\n" then
+            self:SetText(t:sub(1, pos - 1) .. t:sub(pos + 1))
+        end
+        EndInlineEdit(f)
+    end)
     -- Minimize, close, task view and HideAll all hide the body: end the edit
     sf2:HookScript("OnHide", function() EndInlineEdit(f) end)
     ForwardHover(sf2, f)
@@ -2452,6 +2482,10 @@ function SN.Open(noteID, noESCOpen)
     else
         f._escOnly = false
         f:SetAlpha(0); f:Show()
+        -- A new sticky starts at the same frame level as the open ones, so
+        -- their child frames interleaved: it could draw behind an older one
+        -- and a click could land on the one underneath (ALL-198)
+        f:Raise()
         FadeFrame(f, 0, 1.0, FLIP_TIME)
     end
 
@@ -2465,7 +2499,7 @@ function SN.Open(noteID, noESCOpen)
     if rec and rec.minimized then SN.SetMinimized(noteID, true) end
 end
 
--- Quick-note key in sticky mode (BigNoteBoxDB.quickNoteKeyMode == "sticky"):
+-- Quick-note key in sticky mode (the default: BigNoteBoxDB.quickNoteKeyMode ~= "main"):
 -- opens a new note as a sticky at screen centre, each further open sticky
 -- offset down-right, and starts an inline edit. Returns false, with nothing
 -- opened, when the sticky cannot be typed in (inline edit off, rich or locked
@@ -2482,15 +2516,30 @@ function SN.OpenQuick(noteID)
     local max = db and db.stickyMaxCount or MAX_NOTES
     if CountOpen() >= max then return false, "max" end
 
-    local off = CountOpen() * 26
+    -- Each quick sticky steps 26 px down-right from the last one still open;
+    -- the first (or the next after those are closed) sits at screen centre.
+    -- Counting every open sticky, as before, jumped when unrelated stickies
+    -- were open elsewhere (ALL-198).
+    local prev = SN._lastQuickID and openFrames[SN._lastQuickID]
+    local px, py
+    if prev and prev:IsShown() and not prev._minimized then
+        local cx, cy = prev:GetCenter()
+        local ux, uy = UIParent:GetCenter()
+        local s = prev:GetEffectiveScale() / UIParent:GetEffectiveScale()
+        if cx and ux then px, py = cx * s - ux + 26, cy * s - uy - 26 end
+    end
     local cfg = GetCfg(noteID)
     cfg.escOnly = false   -- a note to type in now, never an ESC-screen sticky
     SaveCfg(noteID, cfg)
     SN.Open(noteID)
     local f = openFrames[noteID]
     if not f then return false end
+    -- px/py are UIParent units; SetPoint offsets are in the frame's own
+    local fs = f:GetEffectiveScale() / UIParent:GetEffectiveScale()
     f:ClearAllPoints()
-    f:SetPoint("CENTER", UIParent, "CENTER", off, -off)
+    f:SetPoint("CENTER", UIParent, "CENTER", (px or 0) / fs, (py or 0) / fs)
+    f:Raise()
+    SN._lastQuickID = noteID
     SaveGeometry(noteID, f)
     f._quickNew = true
     StartInlineEdit(f)
@@ -2608,6 +2657,17 @@ function SN.PrintHiddenNotice(atLogin)
 end
 
 -- Toggle between HideAll and ShowAll based on current stickiesHidden flag.
+-- Ctrl+J (ALL-200): raise every open sticky and minimized tile above other
+-- windows of their strata. ESC-screen stickies are left where they are.
+function SN.BringAllToFront()
+    for _, f in pairs(openFrames) do
+        if not f._escOnly then
+            if f:IsShown() then f:Raise() end
+            if f._miniTile and f._miniTile:IsShown() then f._miniTile:Raise() end
+        end
+    end
+end
+
 function SN.ToggleHidden()
     local db = BigNoteBoxDB
     if db and db.stickiesHidden then

@@ -804,8 +804,9 @@ local function LoginScan()
     end
 
     if #_missedOnLogin > 0 then
-        -- Show all missed alarms in overview window; also open individual popups
-        if BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
+        -- Two or more missed: the overview lists them (and says so in chat);
+        -- a single one gets just its popup (ALL-190, Dukul 2026-10-02)
+        if #_missedOnLogin > 1 and BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
             BNB.AlarmOverview.ShowMissed(_missedOnLogin)
         end
         for _, id in ipairs(_missedOnLogin) do

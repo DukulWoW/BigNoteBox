@@ -7,17 +7,22 @@ BigNoteBox = BigNoteBox or {}
 local BNB = BigNoteBox
 
 BNB.ADDON_NAME = ADDON_NAME
-BNB.ADDON_VERSION = "1.14.0"
+BNB.ADDON_VERSION = "1.15.0"
 
 -- Version shorthand
 BNB.version = BNB.ADDON_VERSION
 
--- WoW: Forever runs the Mainline client (WOW_PROJECT_MAINLINE) but reports a 1.x
--- interface number (16001), so both checks are needed to tell it apart from Retail
--- and from Classic Era. Checked at runtime rather than by which TOC loaded, so it
--- also holds when a player loads the retail TOC as "out of date" on Forever.
+-- WoW: Forever reports a 1.x interface number (16001, client 1.60.x). It used to be
+-- told apart by WOW_PROJECT_ID == WOW_PROJECT_MAINLINE as well, but build 70170
+-- (2026-10-01) gave Forever its own project id (18; MAINLINE is 1), and every
+-- Forever check went false (FOR-27).
+-- The interface range alone is enough: Classic Era is 11xxx, the other Classic
+-- clients 2xxxx-5xxxx, Retail 1xxxxx, so 16xxx-19xxx is Forever's alone. Checked at
+-- runtime rather than by which TOC loaded, so it also holds when a player loads
+-- the retail TOC as "out of date" on Forever.
 local _, _, _, _tocVersion = GetBuildInfo()
-BNB.IsForever = (WOW_PROJECT_ID == WOW_PROJECT_MAINLINE) and (_tocVersion or 0) < 100000
+_tocVersion = _tocVersion or 0
+BNB.IsForever = _tocVersion >= 16000 and _tocVersion < 20000
 
 -- Action bar icon path relative to Assets\ ("Actionbar\\ab-lock"). On Forever, icons
 -- that have an ab-forever-<name> variant use it; the rest keep the shared art.

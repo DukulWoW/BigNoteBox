@@ -247,9 +247,9 @@ function BNB.SetListCollapsed(collapsed)
     if BNB._searchOuterClear then
         if collapsed then BNB._searchOuterClear:Hide() else BNB._searchOuterClear:Show() end
     end
-    if _newBtn then
-        if collapsed then _newBtn:Hide() else _newBtn:Show() end
-    end
+    -- New Note stays in both modes: collapsed it is a narrow "NN" left of the arrow
+    -- (Dukul, 2026-10-02); its width and label come from UpdateButtonLabels
+    if _newBtn then _newBtn:Show() end
     if _qBtn then
         if collapsed then _qBtn:Hide() else _qBtn:Show() end
     end
@@ -300,8 +300,8 @@ function BNB.SetListCollapsed(collapsed)
         BNB._applyListCollapse(collapsed, COLLAPSED_W)
     end
 
-    -- Refresh button labels after collapse state change
-    if not collapsed and BNB._updateButtonLabels then
+    -- Refresh button labels after collapse state change (both ways: collapsed = "NN")
+    if BNB._updateButtonLabels then
         C_Timer.After(0.1, BNB._updateButtonLabels)
     end
 
@@ -520,6 +520,7 @@ local function BuildSearchBar(parent)
     -- Active (lit) only when something is actually filtering; grey otherwise.
     local function ApplyOuterClearState()
         local active = _favFilterActive or _taskFilterActive or (currentFilter ~= "")
+            or (currentTagFilter ~= nil)
         outerClear:SetAlpha(active and 1.0 or 0.40)
         pcall(function() oTex:SetDesaturated(not active) end)
     end
@@ -527,6 +528,7 @@ local function BuildSearchBar(parent)
 
     outerClear:SetScript("OnEnter", function(self)
         local active = _favFilterActive or _taskFilterActive or (currentFilter ~= "")
+            or (currentTagFilter ~= nil)
         if active then self:SetAlpha(1.0) end
         pcall(function() oTex:SetDesaturated(false) end)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -1847,6 +1849,9 @@ end
 
 function BNB.RefreshNoteList()
     if not BNB._listScrollChild then return end
+    -- Every filter change ends here, typing included (ALL-194: the reset
+    -- icon only lit up for the favourite and task buttons)
+    if BNB._applyOuterClearState then BNB._applyOuterClearState() end
     -- Delegate to tag tree when that mode is active
     if BigNoteBoxDB and BigNoteBoxDB.tagTreeMode and BNB.RefreshTagTree then
         BNB.RefreshTagTree()
@@ -2015,7 +2020,38 @@ end
 --------------------------------------------------------------------------------
 -- SELECT NOTE
 --------------------------------------------------------------------------------
+-- Quick notes made in the main window follow the sticky rule (ALL-199, Dukul
+-- 2026-10-02): the first time you move off one (another note, closing the
+-- window, logout) with its body still empty, it is removed outright, no
+-- trash. Typed in once, it stays like any note. Mark AFTER SelectNote(id).
+function BNB.MarkQuickNew(id) BNB._quickNewID = id end
+
+function BNB.DropEmptyQuickNote(nextID)
+    local id = BNB._quickNewID
+    if not id or id == nextID then return end
+    -- Focus mode writes the note from its own box; the main editor may not
+    -- have that text yet, so never judge "empty" while it is open
+    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then return end
+    BNB._quickNewID = nil
+    local note = BNB.GetNote(id)
+    if not note then return end
+    local body = note.body or ""
+    if BNB._currentNoteID == id and BNB._editorBody then
+        local eb = BNB._editorBody
+        body = eb._showingPlaceholder and "" or (eb:GetText() or "")
+    end
+    if not body:match("^%s*$") then return end
+    BNB.PurgeNote(id)
+    if BNB._currentNoteID == id then BNB._currentNoteID = nil end
+    if BigNoteBoxDB and BigNoteBoxDB.selectedNoteID == id then BigNoteBoxDB.selectedNoteID = nil end
+    C_Timer.After(0, function()
+        if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    end)
+end
+BNB.RegisterEvent("PLAYER_LOGOUT", function() BNB.DropEmptyQuickNote(nil) end)
+
 function BNB.SelectNote(id)
+    BNB.DropEmptyQuickNote(id)
     -- If switching away from a pending new note (no title yet), clear the flag.
     -- The discard popup handles the actual deletion if needed.
     if BNB._pendingNewNoteID and BNB._currentNoteID ~= id then
@@ -2194,6 +2230,7 @@ function BNB.BuildNoteList()
         if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SelectNote      then BNB.SelectNote(id)   end
+        BNB.MarkQuickNew(id)
         C_Timer.After(0.05, function()
             if BNB._editorBody then BNB._editorBody:SetFocus() end
         end)
@@ -2206,6 +2243,12 @@ function BNB.BuildNoteList()
     local function UpdateButtonLabels()
         if not _newBtn or not _qBtn or not pane:GetWidth() then return end
         local paneW     = pane:GetWidth()
+        if BNB._listCollapsed then
+            -- Icons only: one button fills the space left of the arrow (2 px edge + 4 px gap)
+            _newBtn:SetWidth(math.max(20, paneW - PAD_L - collapseW - 6))
+            _newBtn:SetText("NN")
+            return
+        end
         local available = paneW - PAD_L - collapseW - 12  -- gaps between buttons
         local halfW     = math.max(20, math.floor(available / 2))
         _newBtn:SetWidth(halfW)
@@ -2228,7 +2271,6 @@ function BNB.BuildNoteList()
     -- Apply initial collapse state (hides search/buttons, reanchors sf if collapsed)
     if BNB._listCollapsed then
         searchBar:Hide()
-        _newBtn:Hide()
         _qBtn:Hide()
         sf:ClearAllPoints()
         sf:SetPoint("TOPLEFT",     pane, "TOPLEFT",     PAD_L, -4)

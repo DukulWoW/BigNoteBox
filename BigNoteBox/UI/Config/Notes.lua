@@ -98,6 +98,12 @@ local function BuildNotesTab(sf, ct)
     y = MakeKeybindRow(ct, y, L["CFG_KB_NEW_NOTE"],
         "BIGNOTEBOXNEWNOTE",   "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F8") .. ")", L["CFG_KB_DESC_NEW_NOTE"])
 
+    -- nil = on (the old behaviour); read by BNB.OpenConfigOnNew (UI/MainWindow.lua)
+    y = AddCheck(ct, y, L["CFG_CHK_OPEN_CONFIG_NEW_LABEL"],
+        function() return db.openConfigOnNew ~= false end,
+        function(v) if v then db.openConfigOnNew = nil else db.openConfigOnNew = false end end,
+        L["CFG_CHK_OPEN_CONFIG_NEW_TIP"])
+
     y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
         function() return db.lockNotes == true end,
         function(v)

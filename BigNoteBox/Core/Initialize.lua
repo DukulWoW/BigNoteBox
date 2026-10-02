@@ -291,12 +291,53 @@ end
 -- free; the player's own bindings are never touched. SetBinding is blocked
 -- in combat, so a combat login waits for combat to end.
 --------------------------------------------------------------------------------
-local DEFAULT_KEYS_VERSION = 1
+-- Third value = the version a key arrived in: a bump applies only the newer
+-- ones, so a default the player unbound on purpose is not handed back.
+local DEFAULT_KEYS_VERSION = 2
 local DEFAULT_KEYS = {
-    { "BIGNOTEBOXNOTEONTARGET", "F6" },
+    { "BIGNOTEBOXNOTEONTARGET",   "F6",     1 },
+    { "BIGNOTEBOXQUICKNOTE",      "F7",     1 },
+    { "BIGNOTEBOXNEWNOTE",        "F8",     1 },
+    { "BIGNOTEBOXSTICKIESFRONT",  "CTRL-J", 2 },   -- ALL-200
+}
+
+-- Every BigNoteBox binding and its default key, the same as Bindings.xml:
+-- keep the two in step. No second value = no default key.
+BNB.BINDING_DEFAULTS = {
+    { "BIGNOTEBOXOPEN",         "CTRL-N" },
     { "BIGNOTEBOXQUICKNOTE",    "F7" },
     { "BIGNOTEBOXNEWNOTE",      "F8" },
+    { "BIGNOTEBOXHIDESTICKIES", "CTRL-H" },
+    { "BIGNOTEBOXTOGGLERV" },
+    { "BIGNOTEBOXNOTEONTARGET", "F6" },
+    { "BIGNOTEBOXORACLE",       "CTRL-SPACE" },
+    { "BIGNOTEBOXSTICKIESFRONT", "CTRL-J" },
 }
+
+-- Danger Zone "Reset key bindings" (Dukul, 2026-10-02): every BigNoteBox
+-- action loses its keys and gets its default back. A default key that the
+-- game or another addon uses is left alone and comes back in `skipped`
+-- ("F7 (Action name)"). Returns false in combat, where SetBinding is blocked.
+function BNB.ResetKeyBindings()
+    if InCombatLockdown() then return false end
+    for _, d in ipairs(BNB.BINDING_DEFAULTS) do
+        for _, key in ipairs({ GetBindingKey(d[1]) }) do SetBinding(key) end
+    end
+    local skipped = {}
+    for _, d in ipairs(BNB.BINDING_DEFAULTS) do
+        local action, key = d[1], d[2]
+        if key then
+            local cur = GetBindingAction(key)
+            if cur == nil or cur == "" then
+                SetBinding(key, action)
+            else
+                skipped[#skipped + 1] = key .. " (" .. (_G["BINDING_NAME_" .. cur] or cur) .. ")"
+            end
+        end
+    end
+    SaveBindings(GetCurrentBindingSet())
+    return true, skipped
+end
 
 function BNB.ApplyDefaultKeys()
     local db = BigNoteBoxDB
@@ -311,10 +352,11 @@ function BNB.ApplyDefaultKeys()
         return
     end
     local changed = false
+    local have = db.defaultKeysVersion or 0
     for _, d in ipairs(DEFAULT_KEYS) do
         local action, key = d[1], d[2]
         local cur = GetBindingAction(key)
-        if not GetBindingKey(action) and (cur == nil or cur == "") then
+        if d[3] > have and not GetBindingKey(action) and (cur == nil or cur == "") then
             if SetBinding(key, action) then changed = true end
         end
     end
@@ -353,7 +395,7 @@ function BNB_KeybindQuickNote()
     -- Sticky mode: the note opens as a sticky to type in. When that cannot
     -- happen it opens in the main window as before; a full sticky set says so.
     local db = BigNoteBoxDB
-    if db and db.quickNoteKeyMode == "sticky" and BNB.Sticky and BNB.Sticky.OpenQuick then
+    if db and db.quickNoteKeyMode ~= "main" and BNB.Sticky and BNB.Sticky.OpenQuick then
         local ok, why = BNB.Sticky.OpenQuick(id)
         if ok then
             if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then BNB.RefreshNoteList() end
@@ -369,6 +411,7 @@ function BNB_KeybindQuickNote()
     if BNB.mainFrame and not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote      then BNB.SelectNote(id)   end
+    if BNB.MarkQuickNew    then BNB.MarkQuickNew(id) end   -- empty = removed (ALL-199)
     C_Timer.After(0.05, function()
         if BNB._editorBody then BNB._editorBody:SetFocus() end
     end)
@@ -377,6 +420,11 @@ end
 function BNB_KeybindNewNote()
     if InCombatLockdown() then return end
     if BNB.CreateNewNote then BNB.CreateNewNote() end
+end
+
+-- Every open sticky and minimized tile to the front (ALL-200, Ctrl+J)
+function BNB_KeybindStickiesFront()
+    if BNB.Sticky and BNB.Sticky.BringAllToFront then BNB.Sticky.BringAllToFront() end
 end
 
 function BNB_KeybindHideStickies()

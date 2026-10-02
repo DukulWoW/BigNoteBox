@@ -1104,14 +1104,13 @@ local function SetupRow(row, att, data, index, compact, locked)
         row._pendingLabel:SetPoint("TOPRIGHT", row, "TOPRIGHT", -20, -22)
     end
 
-    -- Locked: desaturate icon and darken
-    local desat = locked or false
-    pcall(function() row._icon:SetDesaturated(desat) end)
-    local alpha = locked and 0.55 or 1.0
-    row._icon:SetAlpha(alpha)
-    row._iconBorder:SetAlpha(alpha)
-    row._nameLabel:SetAlpha(alpha)
-    row._typeLabel:SetAlpha(alpha)
+    -- Locked rows keep their colour: the lock icon in the X's place says it
+    -- all (ALL-195, Dukul 2026-10-02). Reset, since rows are pooled.
+    pcall(function() row._icon:SetDesaturated(false) end)
+    row._icon:SetAlpha(1.0)
+    row._iconBorder:SetAlpha(1.0)
+    row._nameLabel:SetAlpha(1.0)
+    row._typeLabel:SetAlpha(1.0)
     -- Locked rows: no X (can't remove), the lock icon in its place
     row._xBtn:SetAlpha(0)
     row._xBtn:EnableMouse(not locked)

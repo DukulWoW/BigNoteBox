@@ -467,7 +467,17 @@ function ZP.Open(anchorFrame, onSelect, filterType)
     _onSelect   = onSelect
     _activeKind = filterType == "instance" and "instance" or "zone"
 
-    local ncFrame = _G["BigNoteBoxNoteConfigFrame"]
+    -- The window the browse button sits in: Note Settings or Sticky settings.
+    -- It used to be Note Settings always, so from Sticky settings the picker
+    -- lined up with a hidden Note Settings window (Dukul, 2026-10-02).
+    local ncFrame = anchorFrame
+    while ncFrame and ncFrame:GetParent() and ncFrame:GetParent() ~= UIParent do
+        ncFrame = ncFrame:GetParent()
+    end
+    if ncFrame == anchorFrame or not ncFrame:IsShown() then ncFrame = nil end
+    -- Both hosts are DIALOG and raise themselves on click (SetToplevel), so
+    -- the picker sits one strata up to stay over whichever one opened it.
+    _picker:SetFrameStrata("FULLSCREEN_DIALOG")
 
     -- Height: from bottom of anchorFrame down to bottom of ncFrame
     local anchorBottom = anchorFrame:GetBottom() or 0

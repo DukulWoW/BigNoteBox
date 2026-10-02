@@ -179,8 +179,9 @@ local function BuildQuickNotePage(sf, ct, y, page)
             { label = L["CFG_QN_KEY_MODE_MAIN"],   value = "main" },
             { label = L["CFG_QN_KEY_MODE_STICKY"], value = "sticky" },
         }
-        local dd = BNB.CreateValueDropdown(ct, entries, db.quickNoteKeyMode or "main",
-            function(v) db.quickNoteKeyMode = (v == "sticky") and v or nil end,
+        -- nil = sticky, the default since 2026-10-02 (Dukul); "main" is saved
+        local dd = BNB.CreateValueDropdown(ct, entries, db.quickNoteKeyMode or "sticky",
+            function(v) db.quickNoteKeyMode = (v == "main") and v or nil end,
             CONTENT_W, 26)
         dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         local tipOwner = dd._dd or dd
@@ -1035,6 +1036,17 @@ local function BuildStickyPage(sf, ct, y)
         function() return db.stickyMaxCount or 20 end,
         function(v) db.stickyMaxCount = v end,
         L["CFG_SLIDER_MAX_STICKIES_TIP"], 20)
+
+    -- nil = off: stickies act like windows, the one clicked last comes to the
+    -- front (Ctrl+J brings them all forward); on = always over the main window
+    -- (UI/StickyNote.lua SN.Strata)
+    y = AddCheck(ct, y, L["CFG_STICKY_ON_TOP"],
+        function() return db.stickiesOnTop == true end,
+        function(v)
+            if v then db.stickiesOnTop = true else db.stickiesOnTop = nil end
+            if BNB.Sticky and BNB.Sticky.ApplyStrata then BNB.Sticky.ApplyStrata() end
+        end,
+        L["CFG_STICKY_ON_TOP_TIP"])
 
     y = AddCheck(ct, y, L["CFG_STICKY_HIDE_PERSIST"],
         function() return db.stickiesHiddenPersist == true end,

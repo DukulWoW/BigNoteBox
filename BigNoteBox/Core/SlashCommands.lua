@@ -293,7 +293,9 @@ local function BuildPopups()
             BNB._pendingImport = nil
             BNB._pendingImportForeign = nil
         end,
-        OnCancel = function(_, reason)
+        -- OnCancel(self, data, reason): reason is the THIRD argument. It read
+        -- the second (data, nil), so "Keep original" imported nothing (D9, 2026-10-02)
+        OnCancel = function(_, _, reason)
             if reason == "clicked" then
                 -- button2: keep original scope
                 local p = BNB._pendingImport

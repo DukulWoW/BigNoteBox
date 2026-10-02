@@ -347,6 +347,38 @@ local function OnEscapeKey()
 end
 
 --------------------------------------------------------------------------------
+-- DEV MODE MARKING  (ALL-129: the dev notes set must never pass for the real one)
+--------------------------------------------------------------------------------
+-- Lives in the dev addon (never packaged), so the shipped zip does not carry it
+local DEV_BG = "Interface\\AddOns\\BigNoteBox_Dev\\Assets\\ui-bg-devmode"
+
+-- Main window title, both chromes: "BigNoteBox (Development Mode Enabled)" in dev mode
+function BNB.MainWindowTitle()
+    if BNB.IsDevMode and BNB.IsDevMode() then
+        return string.format(L["CFG_DEV_WINDOW_TITLE_FMT"], L["WINDOW_TITLE"])
+    end
+    return L["WINDOW_TITLE"]
+end
+
+-- Tiled overlay over the window background (Dukul's ui-bg-devmode, faint by its
+-- own alpha). Top of BACKGROUND: over the template Bg / skin backdrop, under
+-- the borders and every child frame.
+local function AddDevModeOverlay(f)
+    if not (BNB.IsDevMode and BNB.IsDevMode()) then return end
+    local ov = f:CreateTexture(nil, "BACKGROUND", nil, 7)
+    if f.Bg then
+        ov:SetAllPoints(f.Bg)
+    else
+        ov:SetPoint("TOPLEFT", 3, -3)
+        ov:SetPoint("BOTTOMRIGHT", -3, 3)
+    end
+    ov:SetTexture(DEV_BG, "REPEAT", "REPEAT")
+    ov:SetHorizTile(true)
+    ov:SetVertTile(true)
+    f._devOverlay = ov
+end
+
+--------------------------------------------------------------------------------
 -- CLASSIC CHROME  (ButtonFrameTemplate, matches BCB)
 --------------------------------------------------------------------------------
 local function BuildClassicChrome()
@@ -361,7 +393,7 @@ local function BuildClassicChrome()
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetAlpha(0.95)
-    f:SetTitle(L["WINDOW_TITLE"])
+    f:SetTitle(BNB.MainWindowTitle())
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function()
@@ -414,6 +446,7 @@ function BNB.CreateMainWindow()
     local chrome = skin and BNB.BuildMainWindowSkinChrome() or BuildClassicChrome()
     local f = chrome.frame
     f._headerH = chrome.headerH
+    AddDevModeOverlay(f)
 
     f:SetSize(DEFAULT_W, DEFAULT_H)
     f:SetPoint("CENTER")
@@ -974,6 +1007,9 @@ function BNB.CreateMainWindow()
             return
         end
         BNB.SaveCurrentNote()
+        -- An untouched quick note goes with the window (ALL-199). Only on a
+        -- real close: Focus mode returns above, so a note being written there stays
+        if BNB.DropEmptyQuickNote then BNB.DropEmptyQuickNote(nil) end
         SaveWindowPos(self)
         BigNoteBoxDB.selectedNoteID = BNB._currentNoteID
         BigNoteBoxDB.splitX = BNB._listPaneW
@@ -1344,6 +1380,12 @@ function BNB.ShowBCBPromo()
         _bcbPromoFrame:Raise()
     end
 end
+-- Settings > Notes "Open Note Settings for new notes" (nil = on). Both ways of
+-- making a new note ask this: CreateNewNote below and UI/NewNoteDialog.lua.
+function BNB.OpenConfigOnNew()
+    return not (BigNoteBoxDB and BigNoteBoxDB.openConfigOnNew == false)
+end
+
 function BNB.CreateNewNote()
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
 
@@ -1393,7 +1435,7 @@ function BNB.CreateNewNote()
 
     C_Timer.After(0.05, function()
         if BNB._editorTitle then BNB._editorTitle:SetFocus() end
-        if BNB.OpenNoteConfig then BNB.OpenNoteConfig(id) end
+        if BNB.OpenConfigOnNew() and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id) end
     end)
     -- Mark this note as pending (no title yet) so the discard guard knows
     -- to prompt before silently deleting it.

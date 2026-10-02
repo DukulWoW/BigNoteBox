@@ -11,6 +11,9 @@
     <Binding name="BIGNOTEBOXHIDESTICKIES" category="BigNoteBox" default="CTRL-H" runOnUp="false">
         BNB_KeybindHideStickies()
     </Binding>
+    <Binding name="BIGNOTEBOXSTICKIESFRONT" category="BigNoteBox" default="CTRL-J" runOnUp="false">
+        BNB_KeybindStickiesFront()
+    </Binding>
     <Binding name="BIGNOTEBOXTOGGLERV" category="BigNoteBox" default="" runOnUp="false">
         BNB_KeybindToggleRichView()
     </Binding>

@@ -37,7 +37,7 @@ function BNB.BuildMainWindowSkinChrome()
     -- Offset left by ~40px so it centres in the space left of the buttons
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -40, 0)
     titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["WINDOW_TITLE"])
+    titleLbl:SetText(BNB.MainWindowTitle())
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar,
         function() BNB.RequestCloseMainWindow() end)

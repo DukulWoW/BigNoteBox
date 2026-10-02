@@ -253,10 +253,11 @@ local function BuildContent(f, ct, saveBtn)
     browseBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     browseBtn:SetScript("OnClick", function()
         if BNB.ZonePicker and BNB.ZonePicker.Open then
-            BNB.ZonePicker.Open(function(name)
+            -- Anchor first, callback second (they were swapped, so Browse threw)
+            BNB.ZonePicker.Open(browseBtn, function(name)
                 valueEb:SetText(name or "")
                 MarkDirty()
-            end, browseBtn)
+            end)
         end
     end)
     _sitBrowseBtn = browseBtn

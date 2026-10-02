@@ -24,6 +24,15 @@ local L   = BNB.L
 BNB._contextMatches = BNB._contextMatches or {}
 BNB._autoWaypoints  = BNB._autoWaypoints  or {}  -- noteID → TomTom uid (or true for retail)
 
+-- Developer tools > "Trace situation checks" (ALL-192): one chat line per check,
+-- per sticky open and per toast, plus the state 3 s later. Needs debug mode too.
+local function Trace(fmt, ...)
+    local db = BigNoteBoxDB
+    if db and db.debugMode and db.debugContextTrace then
+        BNB:Print("|cff88bbff[ctx " .. string.format("%.1f", GetTime()) .. "]|r " .. string.format(fmt, ...))
+    end
+end
+
 -- ── Get current environment strings ───────────────────────────────────────────
 local function GetCurrentZone()
     -- GetZoneText() = current zone (e.g. "Elwynn Forest")
@@ -545,18 +554,33 @@ function BNB.CheckContextualNotes()
         if not prevSet[id] then newStickyIDs[#newStickyIDs + 1] = id end
     end
 
+    Trace("check: zone=%s matches=%d prev=%d newPopup=%d newSticky=%d",
+        tostring((select(2, GetCurrentZone()))), #matches, #prev, #newPopupIDs, #newStickyIDs)
+
     -- Only fire enter-alerts for notes that are genuinely new to this context
     if #newPopupIDs > 0 or #newStickyIDs > 0 then
         local _, locName = GetCurrentZone()
         C_Timer.After(0.5, function()
             if BNB.Sticky and BNB.Sticky.Open then
                 for _, noteID in ipairs(newStickyIDs) do
-                    pcall(function() BNB.Sticky.Open(noteID) end)
+                    local ok, err = pcall(function() BNB.Sticky.Open(noteID) end)
+                    Trace("sticky open %s: ok=%s err=%s isOpen=%s", tostring(noteID), tostring(ok),
+                        tostring(err), tostring(BNB.Sticky.IsOpen and BNB.Sticky.IsOpen(noteID)))
                 end
             end
             if #newPopupIDs > 0 then
                 ShowToast(newPopupIDs, locName)
+                Trace("toast shown: visible=%s uiParentShown=%s", tostring(_toast and _toast:IsVisible()),
+                    tostring(UIParent:IsShown()))
             end
+            C_Timer.After(3, function()
+                local open = 0
+                for _, noteID in ipairs(newStickyIDs) do
+                    if BNB.Sticky.IsOpen and BNB.Sticky.IsOpen(noteID) then open = open + 1 end
+                end
+                Trace("3 s later: toast visible=%s, stickies open=%d of %d",
+                    tostring(_toast and _toast:IsVisible()), open, #newStickyIDs)
+            end)
         end)
     end
 

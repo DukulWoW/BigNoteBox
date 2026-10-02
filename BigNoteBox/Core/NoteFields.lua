@@ -192,6 +192,11 @@ function BNB.CleanNoteFields(src, want)
            and not def.internal and (not want or want(def)) then
             v = CopyData(v, 1)
             if type(v) == "table" and SHAPES[def.key] then v = SHAPES[def.key](v) end
+            -- WoW fonts have no tab glyph (drawn as a box, ALL-196) and the
+            -- editor cannot type one, so a tab from outside becomes 4 spaces
+            if (def.key == "body" or def.key == "title") and type(v) == "string" then
+                v = v:gsub("\t", "    ")
+            end
             out[def.key] = v
         end
     end

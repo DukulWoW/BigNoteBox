@@ -280,6 +280,23 @@ local function PopulateContent(ct, sf)
         end)
     y = y - SEC_GAP
 
+    -- ── 1b. Reset Key Bindings (BigNoteBox's own actions only) ──────────────
+    y = MakeRule(ct, y); y = y - 8
+    y = MakeHeader(ct, y, L["DZ_KEYS_HDR"])
+    y = MakeDesc(ct, y, L["DZ_KEYS_DESC"])
+    y = MakeActionRow(ct, y,
+        L["DZ_KEYS_BTN"], 160,
+        L["DZ_CONFIRM_RESET"], 160,
+        function()
+            local ok, skipped = BNB.ResetKeyBindings()
+            if not ok then BNB:Print(L["DZ_MSG_KEYS_COMBAT"]); return end
+            BNB:Print(L["DZ_MSG_KEYS_RESET"])
+            if #skipped > 0 then
+                BNB:Print(string.format(L["DZ_MSG_KEYS_SKIPPED_FMT"], table.concat(skipped, ", ")))
+            end
+        end)
+    y = y - SEC_GAP
+
     -- ── 2. Empty Trash ───────────────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_EMPTYTRASH_HDR"])

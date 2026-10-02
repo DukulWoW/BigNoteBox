@@ -26,7 +26,7 @@ BNB.DebugWindow = BNB.DebugWindow or {}
 local DW = BNB.DebugWindow
 
 local SK_TITLE_H   = 28   -- skin title strip height
-local WIN_W, WIN_H = 400, 482
+local WIN_W, WIN_H = 400, 508
 local PAD          = 20
 local ROW_H        = 26
 local SUB_INDENT   = 20
@@ -44,7 +44,7 @@ local function Commit()
     BNB._debugMode = db.debugMode
     if not db.debugMode then
         -- Sub-options are meaningless with the master off (same as the old inline section)
-        staged.wp, staged.pseudo, staged.imm = false, false, false
+        staged.wp, staged.pseudo, staged.imm, staged.ctxTrace = false, false, false, false
         db.debugWaypoint = nil; BNB._debugWaypoint = nil
     else
         db.debugWaypoint = staged.wp and true or nil
@@ -52,6 +52,7 @@ local function Commit()
     end
     db.debugPseudoLocale = staged.pseudo and true or nil
     BNB._debugImmersionPos = staged.imm and true or nil
+    db.debugContextTrace = staged.ctxTrace and true or nil
     BNB:Print("|cff88bbff" .. (db.debugMode and "Debug mode enabled." or "Debug mode disabled.") .. "|r")
 end
 
@@ -204,6 +205,11 @@ local function BuildWindow()
     local pseudoCb = Sub(L["CFG_DEV_PSEUDOLOC_LABEL"], "pseudo",
         L["CFG_DEV_PSEUDOLOC_TIP_TITLE"], L["CFG_DEV_PSEUDOLOC_TIP_BODY"])
     local immCb = Sub(L["CFG_DEV_IMM_LABEL"], "imm", L["CFG_DEV_IMM_LABEL"], L["CFG_DEV_IMM_TIP"])
+    -- Situation check trace (ALL-192, Features/ContextNotes.lua). Saved, so it
+    -- survives the reload it is meant to watch; in dev mode debug mode is
+    -- re-armed every load (Core/Database.lua InitDevMode), so it keeps running.
+    local ctxCb = Sub(L["CFG_DEV_CTX_TRACE_LABEL"], "ctxTrace",
+        L["CFG_DEV_CTX_TRACE_LABEL"], L["CFG_DEV_CTX_TRACE_TIP"])
 
     y = y - 4
 
@@ -294,6 +300,8 @@ local function BuildWindow()
         wpCb:SetChecked(staged.wp)
         pseudoCb:SetChecked(staged.pseudo)
         immCb:SetChecked(staged.imm)
+        staged.ctxTrace = db.debugContextTrace == true
+        ctxCb:SetChecked(staged.ctxTrace)
         Refresh()
     end)
 

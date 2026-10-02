@@ -428,7 +428,7 @@ local function PopulateStickySettings(noteID)
                     end
                 else
                     -- Switching back to normal: restore strata and show in world.
-                    f:SetFrameStrata("HIGH")
+                    f:SetFrameStrata(BNB.Sticky.Strata())
                     if not f._minimized then
                         f:Show(); f:Raise()
                     end
