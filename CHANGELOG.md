@@ -1,39 +1,30 @@
-# BigNoteBox v1.16.0
+# BigNoteBox v1.17.0
 
 ## All versions
 
 ### New
-- Right-clicking the portrait of a player or NPC you have a note on now also offers "Open BNB Sticky Note".
-- Reference Box: "Show model" shows gear, mounts and battle pets in the model viewer on any note, turning slowly; grab it to turn, move or zoom, and it starts turning again 3 seconds after you let go. Gear is framed on its slot: a helm on the head, shoulders on the shoulders; weapons, shields and off-hands are shown on their own. Drag up and down to tilt, Shift+wheel to move it nearer, and hover the bottom of the viewer for turn, reset and animation buttons.
-- Reference Box: clicking an entry now works like a link in chat: click to view it (model viewer, or its item window), Shift+click to put it in chat, Ctrl+click for the dressing room.
+- The note list's right-click menu is rebuilt: a shorter menu with icons and sub-menus that open on hover (Open, Create, Actions, History), with the note's icon and title colour at the top. The Tag Manager's note rows use it too.
+- A situation note can show when you arrive, when you leave, or both (Situation tab > Trigger), and as often as you choose: every time, once per session, once per day, once per daily or weekly reset, or only once. Counted for each character.
+- Right-click in Select mode for a menu that works on every selected note: open as sticky notes, pin, favorite or lock all, duplicate, move, convert, export as JSON, Markdown or HTML, create restore points, clear history, clear alarms, remove tasks or situations, move to trash or delete.
+- Create or edit a note's situation straight from its right-click menu (Create > Create situation).
+- History in the right-click menu: create or replace the restore point, clear the auto snapshots, and Restore previous lists the restore point and the latest snapshots to compare and restore.
+- Settings > Modules > Right-click menu: choose what a click on Open note, Create, Actions and History does, and how fast the sub-menus open, with a Try it button.
+- Right-click an Oracle search result for the same note menu.
+- Remove all tasks from a note with its right-click menu (Create > Remove all tasks).
 
 ### Change
-- Send to Chat sends party, raid, guild, officer and whisper lines a moment apart, so the server no longer drops lines of long notes, and shows a live count. Closing the window stops it.
-- Send to Chat to Say or Yell sends one message per click on Send, since the game only allows those from a click.
-- Direct Send paces itself to the server's limit, shows its progress, and tells you in chat when the note went out or why it could not be sent (player offline, blocked in an instance).
-- Typing in long notes is lighter: the word count, live preview and autosave wait for a pause in your typing instead of running on every key.
-- The note list redraws only the note you are typing in, and only target notes when you change target, instead of the whole list.
-- Note history now keeps the text, rich mode, tags and tasks of each version instead of a full copy of the note, so saved history takes far less space. Restoring a version leaves the note's icon, colours and font as they are now.
-- Ticking a task or snoozing and dismissing an alarm no longer counts as editing the note, so it keeps its place in the "Edited" sort.
-- Redrawn icon buttons (title bars, sticky headers, tasks, Reference Box, calendar), with a bronze edge on WoW Forever. In skin mode they now take the skin's colours, like every other skin button, instead of the stone look.
-- Skin mode: the main window's title bar is now as tall as every other window's.
-- Reference Box: item tooltips now open beside the window on the main window's side, with the "Equipped" comparison next to them, so they no longer cover the list.
+- Every right-click menu (Tag Manager, alarms, history, sidebar, stickies, Reference Box, tasks, Insert Info) now uses the new menu, and entries that cannot be undone are shown in red.
+- Shift+click a note to start Select mode, and click anywhere outside the note list to leave it.
+- Selected notes in Select mode have their own highlight.
+- Rich notes switch between Markup and Note with labelled tabs under the editor, each with its icon beside the name.
 
 ### Fixed
-- Direct Send with auto-reject on printed one chat line for every piece of an incoming note; now one per note.
-- Situation waypoints were set again on every target change, taking the map tracking away from your quest.
-- Player situations now match members of a 5-player party, not only a raid, and are checked when someone joins.
-- Inspect notes for a party member you had not targeted were built from your target instead.
-- The book button stayed greyed out for the rest of the session if the book was closed while it was reading the pages.
-- Opening and closing sticky notes, ticking tasks and opening Settings used a little more memory every time, for the whole session.
-- A zone change checked your note situations two or three times over.
-- Hovering a sticky with high opacity snapped to full instead of fading; every hover fade now takes the same short time.
-- Hiding a character from the sidebar now shows in Settings > Modules > Character sidebar's Hidden characters list at once.
-- A sticky showing its tasks went blank when the last task was cleared or deleted; it now goes back to the note.
-- The maximum number of open sticky notes now starts at 20, the same value its Reset button gives.
-- Character sidebar on the left: small icons sat off-centre, and in normal mode the bar stood away from the main window.
-- Skin mode: the Reference Box's Model and Tasks tabs could draw over the window's edge.
-- The main window could jump toward the top of the screen as soon as you started dragging it.
-- The main window sometimes opened in the middle of the screen at its default size instead of where you left it.
-- Focus mode: the dark AFK screen now goes away when you move the mouse, as it was meant to.
-- A situation alert that fired again while the previous one was fading out vanished straight away.
+- The Settings tabs no longer run over the edges of the window.
+- The note list menu now says "Close note settings" while Note Settings is open for that note.
+- Override and Compare in the "restore point already exists" popup did nothing.
+- Opening a note from outside the note list (Oracle search, menus) now scrolls the list to it, opening the main window and clearing a list search that hides it.
+- "When you leave the area: Minimize" chosen in a sticky's settings did nothing. Notes already set that way are repaired.
+- Factory Reset and Clear migration flags in the Danger Zone were blocked from reloading the UI and left an error instead.
+- The Reference Box opened from Oracle search (Alt+Enter) did not close on ESC after the main window had opened it once.
+- The Tag Manager showed above the Danger Zone's red overlay.
+- Clicking a situation popup now opens its note, also when several notes popped up at once, when the main window had not been opened yet, or when the note list was filtered to another character.
