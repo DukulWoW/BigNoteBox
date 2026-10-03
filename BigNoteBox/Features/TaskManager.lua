@@ -363,6 +363,17 @@ function T.DeleteTask(noteID, taskID)
     Fire("TasksChanged", noteID)
 end
 
+-- Deletes every task of the note (right-click menu > Create > Remove all
+-- tasks). The array is emptied in place, never replaced; the list settings
+-- (note.taskList) stay for the next task.
+function T.DeleteAll(noteID)
+    local tasks = GetOrCreateTasksTable(noteID)
+    if not tasks or #tasks == 0 then return end
+    for i = #tasks, 1, -1 do tasks[i] = nil end
+    Persist(noteID)
+    Fire("TasksChanged", noteID)
+end
+
 -- Clear completed tasks. Behaviour depends on db.taskRemoveOnComplete:
 --   false (default) -> uncheck all completed tasks
 --   true            -> delete all completed tasks

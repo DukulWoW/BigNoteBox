@@ -36,6 +36,12 @@ local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G
 -- Skin mode keeps the colour fills above and below.
 local ROW_SEL_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-selection"
 local ROW_HOVER_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-hover"
+local ROW_MULTI_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-multi-selection"
+-- The three row pictures are greyscale and take the BNB green here (Dukul,
+-- 2026-10-03): one colour for all, the art keeps its shading and alpha
+local function TintRowArt(tex)
+    tex:SetVertexColor(COL_SEL_BG[1], COL_SEL_BG[2], COL_SEL_BG[3])
+end
 
 local listEntries   = {}
 BNB._listEntries    = listEntries   -- shared with TagTree.lua
@@ -740,6 +746,9 @@ NOTE_ACTIONS.open      = function(noteID)
     if BNB.RevealNoteInList then BNB.RevealNoteInList(noteID) end
     BNB.SelectNote(noteID)
 end
+-- The one way to open a note in the main window from outside the list
+-- (situation toasts): opens the window, shows the note if a filter hides it
+BNB.OpenNoteInMain = NOTE_ACTIONS.open
 NOTE_ACTIONS.settings  = function(noteID)
     if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
 end
@@ -816,6 +825,7 @@ BNB._NoteListKit = {
     NoteIsLocked   = NoteIsLocked,
     StickyOpenKind = StickyOpenKind,
     DuplicateNote  = DuplicateNote,
+    OpenAsSticky   = OpenAsSticky,   -- a toggle: callers check StickyOpenKind first
 }
 
 --------------------------------------------------------------------------------
@@ -934,9 +944,41 @@ local function ToggleMultiSelect(noteID)
     UpdateMultiActionBtns(n)
 end
 
+-- Select mode ends on a press anywhere but the note list, the Select mode
+-- buttons, the right-click menu or a confirm popup (Dukul, 2026-10-03).
+-- GLOBAL_MOUSE_DOWN is listened to only while Select mode is on.
+local _multiWatch
+local function MouseOnPopup()
+    for i = 1, (STATICPOPUP_NUMDIALOGS or 4) do
+        local p = _G["StaticPopup" .. i]
+        if p and p:IsShown() and p:IsMouseOver() then return true end
+    end
+    return false
+end
+local function MouseInMultiArea()
+    if BNB.listPane and BNB.listPane:IsVisible() and BNB.listPane:IsMouseOver() then return true end
+    for _, b in ipairs({ BNB._multiSelBtn, BNB._multiSelectAllBtn, BNB._multiDeleteBtn,
+                         BNB._multiCopyMoveBtn, BNB._multiExportBtn }) do
+        if b and b:IsVisible() and b:IsMouseOver() then return true end
+    end
+    if BNB.ContextMenu and BNB.ContextMenu.IsMouseOver() then return true end
+    return MouseOnPopup()
+end
+local function WatchMultiClicks(on)
+    if not _multiWatch then
+        _multiWatch = CreateFrame("Frame")
+        _multiWatch:SetScript("OnEvent", function()
+            if _multiMode and not MouseInMultiArea() then BNB.SetMultiMode(false) end
+        end)
+    end
+    if on then pcall(_multiWatch.RegisterEvent, _multiWatch, "GLOBAL_MOUSE_DOWN")
+    else _multiWatch:UnregisterEvent("GLOBAL_MOUSE_DOWN") end
+end
+
 function BNB.SetMultiMode(enabled)
     _multiMode = enabled
     _multiSel  = {}
+    WatchMultiClicks(enabled)
     local function ShowBtn(btn)
         if btn then btn:SetShown(enabled); btn:SetEnabled(false); end
     end
@@ -994,22 +1036,29 @@ local function MultiDeleteSummary(ids)
     return table.concat(lines, "\n")
 end
 
-function BNB.DeleteMultiSelected()
-    -- Selected ids in note order (so the confirm lists them as the list does),
-    -- live notes only
+-- The selected notes in list order, live notes only
+function BNB.GetMultiSelectedOrdered()
     local ids = {}
     for _, id in ipairs(BNB.NotesDB().noteOrder) do
         if _multiSel[id] and BNB.GetNote(id) then ids[#ids + 1] = id end
     end
+    return ids
+end
+
+-- permanent = true skips the trash even while it is on (the Select mode
+-- right-click menu's "Delete permanently", ALL-234)
+function BNB.DeleteMultiSelected(permanent)
+    -- Selected ids in note order (so the confirm lists them as the list does)
+    local ids = BNB.GetMultiSelectedOrdered()
     if #ids == 0 then return end
     local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
     -- A single note follows "Warn before delete"; two or more always confirm
     if #ids == 1 and not warn then
-        if BNB.DeleteNotes then BNB.DeleteNotes(ids) end
+        if BNB.DeleteNotes then BNB.DeleteNotes(ids, permanent) end
         if BNB.SetMultiMode then BNB.SetMultiMode(false) end
         return
     end
-    local which = (BNB.TrashEnabled and BNB.TrashEnabled())
+    local which = (not permanent and BNB.TrashEnabled and BNB.TrashEnabled())
         and "BNB_DELETE_MULTI_TRASH" or "BNB_DELETE_MULTI"
     local popup = StaticPopup_Show(which, tostring(#ids), MultiDeleteSummary(ids), ids)
     if popup then popup.data = ids end
@@ -1068,14 +1117,17 @@ local function CreateListEntry(parent)
     -- (Dukul 2026-10-03); skin mode's faint fill stays where it was.
     local selBg = btn:CreateTexture(nil, rowArt and "BACKGROUND" or "ARTWORK", nil, 1)
     selBg:SetAllPoints()
-    if rowArt then selBg:SetTexture(ROW_SEL_TEX) else selBg:SetColorTexture(unpack(COL_SEL_BG)) end
+    if rowArt then selBg:SetTexture(ROW_SEL_TEX); TintRowArt(selBg)
+    else selBg:SetColorTexture(unpack(COL_SEL_BG)) end
     selBg:Hide()
     btn._selBg = selBg
 
-    -- Multi-select highlight (blue tint)
-    local multiSelBg = btn:CreateTexture(nil, "ARTWORK", nil, 2)
+    -- Multi-select highlight. Normal mode: Dukul's row art (2026-10-03), on
+    -- BACKGROUND over the selection and under the hover; skin mode: blue tint
+    local multiSelBg = btn:CreateTexture(nil, rowArt and "BACKGROUND" or "ARTWORK", nil, 2)
     multiSelBg:SetAllPoints()
-    multiSelBg:SetColorTexture(0.20, 0.45, 0.90, 0.18)
+    if rowArt then multiSelBg:SetTexture(ROW_MULTI_TEX); TintRowArt(multiSelBg)
+    else multiSelBg:SetColorTexture(0.20, 0.45, 0.90, 0.18) end
     multiSelBg:Hide()
     btn._multiSelBg = multiSelBg
 
@@ -1083,9 +1135,9 @@ local function CreateListEntry(parent)
     -- Normal mode: the row art under the icon and text like the selection,
     -- so it is a BACKGROUND texture shown while the row is hovered (Dukul 2026-10-03)
     if rowArt then
-        local hiBg = btn:CreateTexture(nil, "BACKGROUND", nil, 2)
+        local hiBg = btn:CreateTexture(nil, "BACKGROUND", nil, 3)   -- over the multi-select art
         hiBg:SetAllPoints()
-        hiBg:SetTexture(ROW_HOVER_TEX)
+        hiBg:SetTexture(ROW_HOVER_TEX); TintRowArt(hiBg)
         hiBg:Hide()
         btn:HookScript("OnEnter", function() hiBg:Show() end)
         btn:HookScript("OnLeave", function() hiBg:Hide() end)
@@ -1233,7 +1285,30 @@ local function CreateListEntry(parent)
     -- Double-click -> the action picked in Settings > Notes (ALL-100)
     btn:SetScript("OnClick", function(self, mouseBtn)
         if mouseBtn == "RightButton" then
+            -- Select mode: the menu for the whole selection (ALL-234); a row
+            -- not yet picked is added first, so the menu covers what you clicked
+            if _multiMode and BNB.ShowMultiNoteContextMenu then
+                if not _multiSel[self._noteID] then ToggleMultiSelect(self._noteID) end
+                BNB.ShowMultiNoteContextMenu(self, BNB.GetMultiSelectedOrdered())
+                return
+            end
             BNB.ShowNoteContextMenu(self, self._noteID)
+            return
+        end
+
+        -- Shift+click starts Select mode (Dukul, 2026-10-04): the clicked note
+        -- is picked, and the note open in the editor too while the list shows
+        -- it; from then on clicks pick as in Select mode
+        if not _multiMode and IsShiftKeyDown() then
+            local openID = BNB._currentNoteID
+            BNB.SetMultiMode(true)
+            if openID and openID ~= self._noteID then
+                for _, n in ipairs(BNB.GetOrderedNotes(currentFilter, currentTagFilter)) do
+                    if n.id == openID then _multiSel[openID] = true; break end
+                end
+            end
+            ToggleMultiSelect(self._noteID)   -- picks it, redraws, counts the buttons
+            BNB.SaveCurrentNote(); BNB.SelectNote(self._noteID)
             return
         end
 
@@ -1932,7 +2007,7 @@ for _, k in ipairs({ "title", "body", "richMode", "icon", "iconSource", "iconFra
     "titleColor", "borderOverride", "borderScale", "borderOffset", "borderBrightness",
     "locked", "alarm", "attachments", "fontOverride", "fontSize", "fontOutline",
     "lineHeight", "textAlign", "waypoint", "wpClearOnLeave", "contextDisplay",
-    "contextLeave", "lastOpened" }) do ROW_ONLY[k] = true end
+    "contextLeave", "contextTrigger", "contextFreq", "lastOpened" }) do ROW_ONLY[k] = true end
 
 local function RowOnly(fields)
     if not fields then return false end

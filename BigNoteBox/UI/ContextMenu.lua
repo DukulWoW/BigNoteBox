@@ -62,6 +62,9 @@ local ICON     = 18     -- row icon size
 local TITLE_IC = 20     -- header icon size
 local ARROW_W  = 12
 local MIN_W, MAX_W = 140, 320   -- row width limits (text truncates past MAX)
+-- A long title (a note's name) widens the menu this far at most and is cut
+-- with "..." past it; the entries still size the menu (Dukul, 2026-10-03)
+local TITLE_MAX_W = 220
 -- Hover on a parent before its sub-menu opens: BigNoteBoxDB.contextMenuDelay,
 -- default 0.10 (L3: 0.15 felt long), set on the Modules page
 local function OpenDelay()
@@ -439,7 +442,7 @@ local function Fill(f, d)
             end
             r._text:SetPoint("LEFT", x, 0)
             r._text:SetPoint("RIGHT", -8, 0)
-            w = math.max(w, x + TextWidth(r._text) + 8)
+            w = math.max(w, math.min(TITLE_MAX_W, x + TextWidth(r._text) + 8))
         else
             r:SetHeight(ROW_H); r:EnableMouse(true)
             r._disabled = it.opts.disabled and true or false

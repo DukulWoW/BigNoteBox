@@ -61,6 +61,10 @@ local FIELDS = {
     { "situations",     "t", share = "situation" },
     { "contextDisplay", "s", share = "situation" },
     { "contextLeave",   "s", share = "situation" },
+    -- When it shows (nil = on arriving, "leave", "both") and how often (nil =
+    -- every time, "session", "day", "daily", "weekly", "once"), ALL-232 S2
+    { "contextTrigger", "s", share = "situation" },
+    { "contextFreq",    "s", share = "situation" },
     { "waypoint",       "t", share = "situation" },
     { "wpClearOnLeave", "b", share = "situation" },
     -- Unit: who a target or inspect note is about (model viewer, Oracle
@@ -100,6 +104,9 @@ local FIELDS = {
     { "history",        "t", internal = true },
     { "manualSnapshot", "t", internal = true },
     { "lastOpened",     "n", internal = true },
+    -- When the note last showed for its situation, per character and per
+    -- arrive / leave: { ["Name-Realm"] = { a = ts, l = ts } } (contextFreq)
+    { "contextSeen",    "t", internal = true },
     { "updatedAt",      "n", internal = true },   -- dropped by NOTES v8 (SV-08); old backups may carry it
     { "deletedAt",      "n", internal = true },
 }

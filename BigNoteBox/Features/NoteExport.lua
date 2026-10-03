@@ -83,7 +83,9 @@ local function MdEncodeNote(note)
     end
     if note.contextDisplay then lines[#lines + 1] = "contextDisplay: " .. note.contextDisplay end
     if note.contextLeave   then lines[#lines + 1] = "contextLeave: "   .. note.contextLeave   end
-    if note.pinned         then lines[#lines + 1] = "pinned: true"                            end
+    if note.contextTrigger then lines[#lines + 1] = "contextTrigger: " .. note.contextTrigger end
+    if note.contextFreq    then lines[#lines + 1] = "contextFreq: "    .. note.contextFreq    end
+    if note.pinned        then lines[#lines + 1] = "pinned: true"                            end
     if note.favorited      then lines[#lines + 1] = "favorited: true"                         end
     if note.richMode       then lines[#lines + 1] = "richMode: true"                          end
     if note.locked ~= nil  then lines[#lines + 1] = "locked: " .. (note.locked and "true" or "false") end
@@ -1008,6 +1010,8 @@ local function ParseMarkdownNotes(text)
                         else note.situations[#note.situations + 1] = val end
                     elseif key == "contextDisplay" then note.contextDisplay = val
                     elseif key == "contextLeave"   then note.contextLeave   = val
+                    elseif key == "contextTrigger" then note.contextTrigger = val
+                    elseif key == "contextFreq"    then note.contextFreq    = val
                     elseif key == "fontOverride"   then note.fontOverride   = val
                     elseif key == "textAlign"      then note.textAlign      = val
                     elseif key == "fontOutline"    then note.fontOutline    = val
@@ -1152,11 +1156,10 @@ function BNB.ForeignScopeChar(noteList)
     end
 end
 
--- Multi-select "Export (N)" (BUG-12): the selected notes as one JSON export,
--- in list order, in the same export window as Settings > Backup.
-function BNB.ExportMultiJSON(ids)
+-- The notes of ids in list order (any not in the order last)
+local function NotesInOrder(ids)
     local ndb = BNB.NotesDB()
-    if not ndb or not ids or #ids == 0 then return end
+    if not ndb or not ids or #ids == 0 then return {} end
     local want = {}
     for _, id in ipairs(ids) do want[id] = true end
     local list = {}
@@ -1169,9 +1172,44 @@ function BNB.ExportMultiJSON(ids)
     for id in pairs(want) do
         if ndb.notes[id] then list[#list + 1] = ndb.notes[id] end
     end
+    return list
+end
+
+-- Multi-select "Export (N)" (BUG-12): the selected notes as one JSON export,
+-- in list order, in the same export window as Settings > Backup.
+function BNB.ExportMultiJSON(ids)
+    local list = NotesInOrder(ids)
     if #list > 0 and BNB.OpenExportWindow then
         BNB.OpenExportWindow(JsonEncodeNotes(list))
     end
+end
+
+-- Several notes as Markdown, in the Settings > Backup "all notes" layout (a
+-- header line, "===" before each note), so it imports back the same way
+-- (ALL-234)
+function BNB.ExportMultiMD(ids)
+    local list = NotesInOrder(ids)
+    if #list == 0 or not BNB.OpenExportWindow then return end
+    local chunks = { string.format("# BigNoteBox Export v%d | %s | %d note(s)\n",
+        EXPORT_VERSION, BNB.Date("%Y-%m-%d %H:%M"), #list) }
+    for _, note in ipairs(list) do chunks[#chunks + 1] = "===\n" .. MdEncodeNote(note) end
+    BNB.OpenExportWindow(table.concat(chunks, "\n"))
+end
+
+-- Several notes as HTML: the "Note only" fragment of each, a rule between
+-- them, to paste into a page (a full page per note cannot be joined). The
+-- export window's HTML style dropdown is for one note, so it stays hidden
+-- (ALL-234)
+function BNB.ExportMultiHTML(ids)
+    local list = NotesInOrder(ids)
+    if #list == 0 or not BNB.OpenExportWindow then return end
+    local parts, anyImages = {}, false
+    for _, note in ipairs(list) do
+        local html, hasImages = HtmlExportNoteOnly(note)
+        parts[#parts + 1] = html
+        anyImages = anyImages or hasImages
+    end
+    BNB.OpenExportWindow(table.concat(parts, "\n<hr>\n"), anyImages and L["CFG_EXPORT_IMG_WARN"] or nil)
 end
 
 -- Public wrapper so the BNB_IMPORT_SCOPE_REMAP popup callback (defined in

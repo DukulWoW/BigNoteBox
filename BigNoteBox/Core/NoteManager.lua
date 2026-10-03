@@ -353,6 +353,8 @@ function BNB.CreateNote(title, body)
         -- context fields: set via NoteConfig Situation tab
         -- contextDisplay: nil/"popup" = toast, "sticky" = open as sticky
         -- contextLeave:   nil/"keep" = do nothing, "minimize", "hide"
+        -- contextTrigger: nil = on arriving, "leave", "both"
+        -- contextFreq:    nil = every time, "session", "day", "daily", "weekly", "once"
         coordX       = coordX,    -- map X coord at creation time (0-100 scale), or nil
         coordY       = coordY,    -- map Y coord at creation time (0-100 scale), or nil
         coordMapID   = coordMapID, -- map ID at creation time, or nil

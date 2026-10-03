@@ -3163,29 +3163,29 @@ local function EnsureFrame()
     end
     HookMainWindowResize()
     K.RegisterTaskCallback()
+    -- ESC normally reaches this box through the main window's key handler
+    -- (MainWindow.lua OnEscapeKey), which stops the key there. Opened on
+    -- its own (Oracle search, Alt) the main window is closed, so that
+    -- cascade never runs. UISpecialFrames covers this on Retail, but not
+    -- reliably on Forever (confirmed 2026-09-26, ALL-69.2: closes fine
+    -- with X, not with ESC, on Forever only) -- so the fallback is our
+    -- own key handler, which only takes over while the main window is
+    -- closed (it steps aside otherwise, so MainWindow's cascade order,
+    -- e.g. Task Edit Window before Reference Box, is untouched).
+    -- Here, not in OpenReferenceBox: the note-switch auto-open builds the
+    -- frame too, and a box built there never closed on ESC (2026-10-03)
+    tinsert(UISpecialFrames, "BigNoteBoxReferenceBoxFrame")
+    BNB.AttachEscClose(rbFrame, function() BNB.CloseReferenceBox() end,
+        BNB.MainWindowShown)
+    rbFrame:HookScript("OnHide", function()
+        if _modeStrip then _modeStrip:Hide() end
+    end)
 end
 
 function BNB.OpenReferenceBox(noteID)
     if not BoxUsable() then return end
     BNB.StampOpened(noteID)
-    if not rbFrame then
-        EnsureFrame()
-        -- ESC normally reaches this box through the main window's key handler
-        -- (MainWindow.lua OnEscapeKey), which stops the key there. Opened on
-        -- its own (Oracle search, Alt) the main window is closed, so that
-        -- cascade never runs. UISpecialFrames covers this on Retail, but not
-        -- reliably on Forever (confirmed 2026-09-26, ALL-69.2: closes fine
-        -- with X, not with ESC, on Forever only) -- so the fallback is our
-        -- own key handler, which only takes over while the main window is
-        -- closed (it steps aside otherwise, so MainWindow's cascade order,
-        -- e.g. Task Edit Window before Reference Box, is untouched).
-        tinsert(UISpecialFrames, "BigNoteBoxReferenceBoxFrame")
-        BNB.AttachEscClose(rbFrame, function() BNB.CloseReferenceBox() end,
-            BNB.MainWindowShown)
-        rbFrame:HookScript("OnHide", function()
-            if _modeStrip then _modeStrip:Hide() end
-        end)
-    end
+    EnsureFrame()
     _noteID = noteID or BNB._currentNoteID
     -- A shown entry (ALL-206) belongs to its note: ShownFor drops it elsewhere
     if _shown and _shown.noteID ~= _noteID then _shown = nil end

@@ -2453,6 +2453,9 @@ function SN.SetMinimized(noteID, minimized)
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
+-- How many stickies are open, against stickyMaxCount (ALL-234 opens several)
+function SN.CountOpen() return CountOpen() end
+
 function SN.IsOpen(noteID)
     local f = openFrames[noteID]
     if not f then return false end

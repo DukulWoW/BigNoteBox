@@ -65,11 +65,17 @@ local function StopGlow(f)
 end
 
 -- ── Overlay ───────────────────────────────────────────────────────────────────
+-- The overlay and the window sit one strata above every other window
+-- (DIALOG): a frame level cannot do it, since another window's children (the
+-- Tag Manager's template parts, scroll rows) sit at higher levels than the
+-- window itself and drew over the overlay (2026-10-03)
+local STRATA = "FULLSCREEN_DIALOG"
+
 local function GetOverlay()
     if _overlay then return _overlay end
     local ov = CreateFrame("Frame", nil, UIParent)
     ov:SetAllPoints()
-    ov:SetFrameStrata("DIALOG")
+    ov:SetFrameStrata(STRATA)
     ov:SetFrameLevel(1)
     ov:EnableMouse(false)
     local tex = ov:CreateTexture(nil, "BACKGROUND")
@@ -255,6 +261,15 @@ local function PopulateContent(ct, sf)
             button1 = L["DZ_POPUP_RELOAD"],
             button2 = L["DZ_POPUP_LATER"],
             timeout = 0, whileDead = true, hideOnEscape = true,
+            -- A Blizzard popup is DIALOG strata, under the overlay: lifted
+            -- while it shows, put back for the next popup that uses the frame
+            OnShow = function(self)
+                self._bnbStrata = self:GetFrameStrata()
+                self:SetFrameStrata(STRATA)
+            end,
+            OnHide = function(self)
+                if self._bnbStrata then self:SetFrameStrata(self._bnbStrata); self._bnbStrata = nil end
+            end,
             OnAccept = function()
                 local db = BigNoteBoxDB
                 if db then
@@ -399,9 +414,9 @@ local function PopulateContent(ct, sf)
             local ndb = BNB.NotesDB()
             if ndb then ndb.migrationDone = {} end
             BNB:Print(L["DZ_MSG_MIGRATION_CLEARED"])
-            C_Timer.After(0.5, function()
-                C_UI.Reload()
-            end)
+            -- Reload is protected: it needs the click's hardware event, so
+            -- never from a timer (ADDON_ACTION_BLOCKED, 2026-10-03)
+            C_UI.Reload()
         end)
     y = y - SEC_GAP
 
@@ -469,9 +484,7 @@ local function PopulateContent(ct, sf)
             BNB.SetNotesDB({})
             BigNoteBoxDB      = {}
             BNB:Print(L["DZ_MSG_FACTORY_DONE"])
-            C_Timer.After(0.5, function()
-                C_UI.Reload()
-            end)
+            C_UI.Reload()   -- in the click itself, see Clear migration flags
         end)
     y = y - PAD
 
@@ -498,7 +511,7 @@ local function BuildWindow()
     BNB.SetBackdrop(f,
         RED_BG_R, RED_BG_G, RED_BG_B, RED_BG_A,
         RED_BD_R, RED_BD_G, RED_BD_B, RED_BD_A)
-    f:SetFrameStrata("DIALOG")
+    f:SetFrameStrata(STRATA)
     f:SetToplevel(true)
     f:SetSize(WIN_W, WIN_H)
     f:SetPoint("CENTER")

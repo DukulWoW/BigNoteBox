@@ -9,7 +9,8 @@
 --
 -- Stored as: note.situations = { "zone:Elwynn Forest" / "subzone:..." /
 -- "instance:Molten Core" / "player:Thrall", ... } or nil (ALL-232), plus
--- contextDisplay, contextLeave, waypoint, wpClearOnLeave. The editor shows and
+-- contextDisplay, contextLeave, contextTrigger, contextFreq (ALL-232 S2),
+-- waypoint, wpClearOnLeave. The editor shows and
 -- edits the first situation; any further ones are kept as they are.
 --
 -- Public API:
@@ -38,6 +39,9 @@ local BIND_DEF_SZ, BIND_MIN_SZ = 20, 11   -- GameFontNormalHuge3 default, smalle
 local TYPES        = { "none", "zone", "subzone", "instance", "player" }
 local DISPLAY_KEYS = { "popup", "sticky", "both" }
 local LEAVE_KEYS   = { "keep", "minimize", "hide" }
+-- contextTrigger / contextFreq; the first key of each is saved as nil
+local TRIGGER_KEYS = { "arrive", "leave", "both" }
+local FREQ_KEYS    = { "always", "session", "day", "daily", "weekly", "once" }
 
 local _editors = {}   -- every editor built, for the cross-window reload
 local _popup          -- the waypoint info popup, shared
@@ -75,18 +79,19 @@ local function Tip(btn, title, body, wrap)
 end
 
 -- A value picker: WowStyle1 dropdown, or a cycling button where the template
--- is missing. onPick(key) runs on a player's choice; c:Set(key) only shows it.
+-- is missing. onPick(key) runs on a player's choice; c:Set(key) only shows it;
+-- c:SetLabels(labels) swaps the wording (player situations, ALL-232).
 local function NewChoice(panel, keys, labels, width, onPick)
-    local c = { value = keys[1] }
+    local c = { value = keys[1], labels = labels }
     local function LabelOf(k)
-        for i, kk in ipairs(keys) do if kk == k then return labels[i] end end
-        return labels[1]
+        for i, kk in ipairs(keys) do if kk == k then return c.labels[i] end end
+        return c.labels[1]
     end
     if HAS_DD then
         local dd = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
         dd:SetHeight(24)
         dd:SetupMenu(function(_, root)
-            for i, label in ipairs(labels) do
+            for i, label in ipairs(c.labels) do
                 local key = keys[i]
                 root:CreateRadio(label,
                     function() return c.value == key end,
@@ -110,12 +115,13 @@ local function NewChoice(panel, keys, labels, width, onPick)
             for i, k in ipairs(keys) do if k == c.value then idx = i; break end end
             idx = (idx % #keys) + 1
             c.value = keys[idx]
-            self:SetText(labels[idx])
+            self:SetText(c.labels[idx])
             onPick(c.value)
         end)
         c.frame = b
         function c:Set(k) self.value = k; b:SetText(LabelOf(k)) end
     end
+    function c:SetLabels(l) self.labels = l; self:Set(self.value) end
     return c
 end
 
@@ -435,18 +441,35 @@ function BNB.CreateSituationEditor(panel, opts)
     curBindHeader:SetMaxLines(1)
     curBindHeader:SetTextColor(0.55, 0.55, 0.55)
 
-    -- ── Display mode + leave action ──────────────────────────────────────────
+    -- ── Show as / Trigger / How often / On leaving ───────────────────────────
+    -- Label above a full-width dropdown, as everywhere else (Dukul,
+    -- 2026-10-03; label-left rows ran past the window's right edge). The gaps
+    -- are tighter than the old two blocks so four fit above the "Bound to"
+    -- display
     local dispDiv = Divider(panel)
-    dispDiv:SetPoint("TOPLEFT",  useCurrentBtn, "BOTTOMLEFT", 0, -26)
+    dispDiv:SetPoint("TOPLEFT",  useCurrentBtn, "BOTTOMLEFT", 0, -14)
     dispDiv:SetPoint("TOPRIGHT", panel,         "TOPRIGHT",  -padR, 0)
 
-    local dispLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    dispLabel:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, -6)
-    dispLabel:SetText(L["STICKY_SIT_DISPLAY_LABEL"])
-    dispLabel:SetTextColor(0.78, 0.78, 0.78)
+    local OPT_PITCH = 44   -- label 12 + 3 + dropdown 24 + gap
+    local optW = width
+    -- Places row n (1-based) of the option block: its label and, under it,
+    -- its picker from the left edge to the right inset of the type dropdown
+    local function OptionRow(n, labelKey, c)
+        local y = -6 - (n - 1) * OPT_PITCH
+        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, y)
+        lbl:SetText(L[labelKey])
+        lbl:SetTextColor(0.78, 0.78, 0.78)
+        c.frame:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, y - 15)
+        if HAS_DD then
+            -- dispDiv ends padR from the panel edge; the dropdowns end ddR from it
+            c.frame:SetPoint("TOPRIGHT", dispDiv, "BOTTOMRIGHT", padR - ddR, y - 15)
+        end
+        return lbl
+    end
 
     local disp = NewChoice(panel, DISPLAY_KEYS,
-        { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] }, width,
+        { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] }, optW,
         function(mode)
             local id = NoteID(); if not id then return end
             if mode == "sticky" or mode == "both" then
@@ -456,21 +479,15 @@ function BNB.CreateSituationEditor(panel, opts)
             end
             Sync(id)
         end)
-    disp.frame:SetPoint("TOPLEFT", dispLabel, "BOTTOMLEFT", 0, -4)
-    if HAS_DD then disp.frame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -ddR, 0) end
+    local dispLabel = OptionRow(1, "SIT_ROW_SHOW_AS", disp)
 
-    -- What happens to the open sticky when you leave the bound area
-    local leaveDiv = Divider(panel)
-    leaveDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -52)
-    leaveDiv:SetPoint("TOPRIGHT", panel,   "TOPRIGHT", -padR, 0)
+    local trig   -- the trigger picker, built below; RefreshLeaveRow reads it
 
-    local leaveLabel = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    leaveLabel:SetPoint("TOPLEFT", leaveDiv, "BOTTOMLEFT", 0, -6)
-    leaveLabel:SetText(L["STICKY_SIT_LEAVE_LABEL"])
-    leaveLabel:SetTextColor(0.78, 0.78, 0.78)
-
+    -- What happens to the open sticky when you leave the bound area: only for
+    -- a note that shows on arriving alone. One that shows on leaving has just
+    -- been shown then, so the row hides (ALL-232, "Agreed")
     local leave = NewChoice(panel, LEAVE_KEYS,
-        { L["STICKY_LEAVE_KEEP"], L["STICKY_LEAVE_MINIMIZE"], L["STICKY_LEAVE_HIDE"] }, width,
+        { L["STICKY_LEAVE_KEEP"], L["STICKY_LEAVE_MINIMIZE"], L["STICKY_LEAVE_HIDE"] }, optW,
         function(mode)
             local id = NoteID(); if not id then return end
             if mode == "keep" then
@@ -480,14 +497,86 @@ function BNB.CreateSituationEditor(panel, opts)
             end
             Sync(id)
         end)
-    leave.frame:SetPoint("TOPLEFT", leaveLabel, "BOTTOMLEFT", 0, -4)
-    if HAS_DD then leave.frame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -ddR, 0) end
+    local leaveLabel = OptionRow(4, "SIT_ROW_LEAVE", leave)
+
+    local function RefreshLeaveRow(show)
+        if show == nil then show = dispDiv:IsShown() end
+        if show and trig.value ~= "arrive" then show = false end
+        if show then leaveLabel:Show(); leave.frame:Show()
+        else         leaveLabel:Hide(); leave.frame:Hide() end
+    end
+
+    -- A changed trigger or how-often starts counting afresh: a note set to
+    -- "Only once" and back again shows again
+    local function ResetSeen(id)
+        local note = BNB.GetNote(id)
+        if note then note.contextSeen = nil end
+    end
+
+    -- When it shows: arriving (nil), leaving, or both. A player situation is
+    -- no place: it matches while that player is your target or in your
+    -- group, so its words are "meet" and "gone" (Dukul, 2026-10-03)
+    local PLACE_TRIG  = { L["SIT_TRIGGER_ARRIVE"], L["SIT_TRIGGER_LEAVE"], L["SIT_TRIGGER_BOTH"] }
+    local PLAYER_TRIG = { L["SIT_TRIGGER_MEET"], L["SIT_TRIGGER_GONE"], L["SIT_TRIGGER_BOTH_PLAYER"] }
+    trig = NewChoice(panel, TRIGGER_KEYS, PLACE_TRIG, optW,
+        function(mode)
+            local id = NoteID(); if not id then return end
+            if mode == "arrive" then
+                BNB.UpdateNote(id, { _clear = { "contextTrigger" } })
+            else
+                BNB.UpdateNote(id, { contextTrigger = mode })
+            end
+            ResetSeen(id)
+            RefreshLeaveRow()
+            Sync(id)
+        end)
+    local trigLabel = OptionRow(2, "SIT_ROW_TRIGGER", trig)
+    local isPlayer = false   -- the type dropdown shows "Player"
+    trig.frame:HookScript("OnEnter", function(self)
+        if not isPlayer then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["SIT_ROW_TRIGGER"], 1, 1, 1)
+        GameTooltip:AddLine(L["SIT_TRIGGER_PLAYER_TIP"], 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    trig.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Called by SelectType: the trigger and leave rows speak of places or of
+    -- a player, after the type dropdown
+    local function ApplyKindWords(kind)
+        isPlayer = (kind == "player")
+        trig:SetLabels(isPlayer and PLAYER_TRIG or PLACE_TRIG)
+        leaveLabel:SetText(L[isPlayer and "SIT_ROW_GONE" or "SIT_ROW_LEAVE"])
+    end
+
+    -- How often, per character
+    local freq = NewChoice(panel, FREQ_KEYS,
+        { L["SIT_FREQ_ALWAYS"], L["SIT_FREQ_SESSION"], L["SIT_FREQ_DAY"],
+          L["SIT_FREQ_DAILY"], L["SIT_FREQ_WEEKLY"], L["SIT_FREQ_ONCE"] }, optW,
+        function(mode)
+            local id = NoteID(); if not id then return end
+            if mode == "always" then
+                BNB.UpdateNote(id, { _clear = { "contextFreq" } })
+            else
+                BNB.UpdateNote(id, { contextFreq = mode })
+            end
+            ResetSeen(id)
+            Sync(id)
+        end)
+    local freqLabel = OptionRow(3, "SIT_ROW_FREQ", freq)
+    freq.frame:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["SIT_ROW_FREQ"], 1, 1, 1)
+        GameTooltip:AddLine(L["SIT_FREQ_TIP"], 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    freq.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- ── Waypoint ─────────────────────────────────────────────────────────────
     -- note.waypoint = { mapID, x, y, label, title }. TomTom (TomTom:AddWaypoint)
     -- and the built-in map pin (C_Map.SetUserWaypoint) are both used if present.
     local wpDiv = Divider(panel)
-    wpDiv:SetPoint("TOPLEFT",  leaveDiv, "TOPLEFT",  0, -90)
+    wpDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -(6 + 4 * OPT_PITCH + 4))
     wpDiv:SetPoint("TOPRIGHT", panel,    "TOPRIGHT", -padR, 0)
 
     local wpHdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -538,21 +627,24 @@ function BNB.CreateSituationEditor(panel, opts)
     wpDesc:SetPoint("TOPRIGHT", panel, "TOPRIGHT",  -padR, 0)
     wpDesc:SetJustifyH("LEFT"); wpDesc:SetWordWrap(true)
 
-    -- 2x2 grid: [Pin here] [Navigate] / [Clear] [Manual]
+    -- [Pin here] [Navigate] [Clear WP] / [Manual] [x] Remove waypoint on zone
+    -- leave (Dukul, 2026-10-03: one row less than the old 2x2 grid with the
+    -- checkbox under it; the room went to the Situation options above)
     local BTN_W, BTN_H, BTN_GAP = 72, 22, 6
     local wpPinBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_PIN_HERE"], BTN_W, BTN_H)
     wpPinBtn:SetPoint("TOPLEFT", wpDesc, "BOTTOMLEFT", 0, -6)
     local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
     wpNavBtn:SetPoint("LEFT", wpPinBtn, "RIGHT", BTN_GAP, 0)
     local wpClearBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_CLEAR"], BTN_W, BTN_H)
-    wpClearBtn:SetPoint("TOPLEFT", wpPinBtn, "BOTTOMLEFT", 0, -BTN_GAP)
+    wpClearBtn:SetPoint("LEFT", wpNavBtn, "RIGHT", BTN_GAP, 0)
     local wpManualBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_MANUAL"], BTN_W, BTN_H)
-    wpManualBtn:SetPoint("LEFT", wpClearBtn, "RIGHT", BTN_GAP, 0)
+    wpManualBtn:SetPoint("TOPLEFT", wpPinBtn, "BOTTOMLEFT", 0, -BTN_GAP)
 
-    -- Manual coordinates row (hidden until Manual is clicked)
+    -- Manual coordinates row (hidden until Manual is clicked), under the
+    -- Manual row; nothing else lives there, so nothing has to move (ALL-233)
     local wpManualRow = CreateFrame("Frame", nil, panel)
     wpManualRow:SetHeight(22)
-    wpManualRow:SetPoint("TOPLEFT",  wpClearBtn, "BOTTOMLEFT", 0, -6)
+    wpManualRow:SetPoint("TOPLEFT",  wpManualBtn, "BOTTOMLEFT", 0, -6)
     wpManualRow:SetPoint("TOPRIGHT", panel,      "TOPRIGHT",  -padR, 0)
     wpManualRow:Hide()
 
@@ -578,22 +670,19 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpSetBtn = BNB.CreateButton(nil, wpManualRow, L["STICKY_WP_BTN_SET"], 38, 20)
     wpSetBtn:SetPoint("LEFT", wpYEb, "RIGHT", 4, 0)
 
-    -- "Remove waypoint on zone leave"
+    -- "Remove waypoint on zone leave", beside Manual; the label wraps to two
+    -- lines
     local wpLeaveChk = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
     wpLeaveChk:SetSize(24, 24)
-    wpLeaveChk:SetPoint("TOPLEFT", wpClearBtn, "BOTTOMLEFT", -4, -8)
-    -- The manual row opens in the same place: the checkbox moves below it while
-    -- it shows, by whichever path it opens or closes (ALL-233)
-    wpManualRow:SetScript("OnShow", function()
-        wpLeaveChk:ClearAllPoints()
-        wpLeaveChk:SetPoint("TOPLEFT", wpManualRow, "BOTTOMLEFT", -4, -6)
-    end)
-    wpManualRow:SetScript("OnHide", function()
-        wpLeaveChk:ClearAllPoints()
-        wpLeaveChk:SetPoint("TOPLEFT", wpClearBtn, "BOTTOMLEFT", -4, -8)
-    end)
+    wpLeaveChk:SetPoint("LEFT", wpManualBtn, "RIGHT", BTN_GAP - 2, 0)
     local wpLeaveChkLbl = wpLeaveChk:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpLeaveChkLbl:SetPoint("LEFT", wpLeaveChk, "RIGHT", 2, 0)
+    -- Ends under Clear WP's right edge; the -(BTN_H + BTN_GAP) keeps both
+    -- anchors at the same height (the checkbox is centred on the Manual row)
+    wpLeaveChkLbl:SetPoint("RIGHT", wpClearBtn, "RIGHT", 0, -(BTN_H + BTN_GAP))
+    wpLeaveChkLbl:SetJustifyH("LEFT")
+    wpLeaveChkLbl:SetWordWrap(true)
+    wpLeaveChkLbl:SetMaxLines(2)
     wpLeaveChkLbl:SetText(L["STICKY_WP_LEAVE_REMOVE_LABEL"])
     wpLeaveChkLbl:SetTextColor(0.78, 0.78, 0.78)
     wpLeaveChk:SetScript("OnClick", function(self)
@@ -621,7 +710,7 @@ function BNB.CreateSituationEditor(panel, opts)
     wpStatusLbl:Hide()
 
     -- Everything below the value row shows only while a type is chosen
-    local typedOnly = { dispDiv, dispLabel, disp.frame, leaveDiv, leaveLabel, leave.frame,
+    local typedOnly = { dispDiv, dispLabel, disp.frame, trigLabel, trig.frame, freqLabel, freq.frame,
                         wpDiv, wpHdr, wpDesc, wpStatusTag, wpInfoLbl, wpInfoHit,
                         wpPinBtn, wpNavBtn, wpClearBtn, wpManualBtn, wpLeaveChk }
 
@@ -674,6 +763,7 @@ function BNB.CreateSituationEditor(panel, opts)
         for _, w in ipairs(typedOnly) do   -- FontStrings among them: Show/Hide, never SetShown
             if show then w:Show() else w:Hide() end
         end
+        RefreshLeaveRow(show)
         if not show then wpManualRow:Hide(); return end
         RefreshWPStatusTag()
         local note = NoteID() and BNB.GetNote(NoteID())
@@ -708,6 +798,7 @@ function BNB.CreateSituationEditor(panel, opts)
         HideAC()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
         if VALUE_LABELS[t] then valueLbl:SetText(L[VALUE_LABELS[t]]) end
+        ApplyKindWords(t)
     end
 
     -- ── Button handlers ──────────────────────────────────────────────────────
@@ -748,10 +839,13 @@ function BNB.CreateSituationEditor(panel, opts)
 
     clearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
-        BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave" } })
+        BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave",
+                                        "contextTrigger", "contextFreq" } })
+        ResetSeen(id)
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
         valueEb:SetText("")
         typ:Set("none"); disp:Set("popup"); leave:Set("keep")
+        trig:Set("arrive"); freq:Set("always")
         SelectType("none")
         clearBtn:Hide()
         RefreshCurBind()
@@ -885,6 +979,12 @@ function BNB.CreateSituationEditor(panel, opts)
         disp:Set((cd == "sticky" or cd == "both") and cd or "popup")
         local lv = note and note.contextLeave
         leave:Set((lv == "minimize" or lv == "hide") and lv or "keep")
+        local tr = note and note.contextTrigger
+        trig:Set((tr == "leave" or tr == "both") and tr or "arrive")
+        local fq = note and note.contextFreq
+        local known = false
+        for _, k in ipairs(FREQ_KEYS) do if k == fq then known = true end end
+        freq:Set(known and fq or "always")
 
         local kind, value
         local ctx = BNB.FirstSituation(note)

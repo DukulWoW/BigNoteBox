@@ -14,6 +14,9 @@
 --   "player:Thrall"
 --   "subzone:The Canals"
 --
+-- A note shows when it starts matching (arriving), when it stops (leaving) or
+-- both (note.contextTrigger), as often as note.contextFreq allows (ALL-232 S2).
+--
 -- Public API (called from Events.lua):
 --   BNB.CheckContextualNotes()   — call on zone change / login
 --
@@ -375,7 +378,25 @@ local function GetToastRow(parent, index)
     return row
 end
 
-local function ShowToast(matchIDs, locationName)
+-- A click on the toast opens the note in the main window: through the note
+-- list's own Open (creates the window if needed, clears a sidebar or search
+-- filter that hides the note). A bare mainFrame:Show() + SelectNote did
+-- nothing before the window existed and left a filtered note unselected
+local function OpenNote(id)
+    if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id) end
+end
+
+-- leftBy: noteID -> the situation string it was left by, for notes shown on
+-- leaving (ALL-232); the line under the title / the row tag says so
+local function ShowToast(matchIDs, locationName, leftBy)
+    leftBy = leftBy or {}
+    local function LeftText(id)
+        local k, v = (leftBy[id] or ""):match("^(%w+):(.+)$")
+        if not v then return nil end
+        -- A player is not left but gone: "Thrall is gone", name without realm
+        if k == "player" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
+        return string.format(L["CONTEXT_LEFT"], v)
+    end
     if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then return end
     local count = #matchIDs
     if count == 0 then return end
@@ -408,17 +429,14 @@ local function ShowToast(matchIDs, locationName)
         local tc = note and note.titleColor
         if tc then f._lbl:SetTextColor(tc.r, tc.g, tc.b, 1)
         else       f._lbl:SetTextColor(1, 0.82, 0, 1) end
-        f._sub:SetText(locationName or "")
+        f._sub:SetText(LeftText(matchIDs[1]) or locationName or "")
 
         f:SetScript("OnMouseDown", function(_, btn)
             if btn == "RightButton" then
                 _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
                 return
             end
-            if BNB.mainFrame then
-                BNB.mainFrame:Show()
-                if BNB.SelectNote then BNB.SelectNote(matchIDs[1]) end
-            end
+            OpenNote(matchIDs[1])
             _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
         end)
 
@@ -434,10 +452,7 @@ local function ShowToast(matchIDs, locationName)
                 _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
                 return
             end
-            if BNB.mainFrame then
-                BNB.mainFrame:Show()
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            end
+            OpenNote(matchIDs[1])   -- the first one listed (the rows open each)
             _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
         end)
 
@@ -460,10 +475,15 @@ local function ShowToast(matchIDs, locationName)
                 row._lbl:SetTextColor(0.85, 0.85, 0.85)
             end
 
-            -- Show sub-zone tag if this note matched by a sub-zone
+            -- Show sub-zone tag if this note matched by a sub-zone, or
+            -- "(Left X)" for a note shown on leaving
             local ctx = BNB._contextMatchedBy[matchIDs[i]] or ""
             local ctxKind, ctxVal = ctx:match("^(%w+):(.+)$")
-            if ctxKind == "subzone" and ctxVal and ctxVal ~= "" then
+            local left = LeftText(matchIDs[i])
+            if left then
+                row._ctx:SetText("(" .. left .. ")")
+                row._ctx:Show()
+            elseif ctxKind == "subzone" and ctxVal and ctxVal ~= "" then
                 row._ctx:SetText("(" .. ctxVal .. ")")
                 row._ctx:Show()
             else
@@ -477,10 +497,7 @@ local function ShowToast(matchIDs, locationName)
                     _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
                     return
                 end
-                if BNB.mainFrame then
-                    BNB.mainFrame:Show()
-                    if BNB.SelectNote then BNB.SelectNote(noteID) end
-                end
+                OpenNote(noteID)
                 _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
             end)
             row:SetScript("OnEnter", function()
@@ -516,6 +533,74 @@ local function ShowToast(matchIDs, locationName)
     end)
 end
 
+-- ── When and how often (ALL-232 S2) ──────────────────────────────────────────
+-- note.contextTrigger: nil = the note shows on arriving, "leave" = on leaving,
+-- "both". note.contextFreq: nil = every time, or once per "session" / "day" /
+-- "daily" reset / "weekly" reset / "once" ever, counted per character and
+-- separately for arriving ("a") and leaving ("l") in note.contextSeen.
+local function ShowsOn(note, which)
+    local t = note.contextTrigger
+    if which == "a" then return t == nil or t == "both" end
+    return t == "leave" or t == "both"
+end
+
+-- When this character's play session began. Kept in its knownChars record so
+-- a /reload is not a new session: "once per session" would show again after
+-- every reload otherwise.
+local _sessionStart = time()
+BNB.RegisterEvent("PLAYER_ENTERING_WORLD", function(_, isLogin)
+    local kc  = BigNoteBoxDB and BigNoteBoxDB.knownChars
+    local rec = kc and BNB.currentChar and kc[BNB.currentChar]
+    if not rec then return end
+    if isLogin or not rec.sessionStart then rec.sessionStart = time() end
+    _sessionStart = rec.sessionStart
+end)
+
+-- The most recent daily / weekly reset (as TaskManager's LastDailyReset)
+local function LastReset(kind, now)
+    local api  = C_DateAndTime
+    local fn   = api and (kind == "daily" and api.GetSecondsUntilDailyReset
+                          or api.GetSecondsUntilWeeklyReset)
+    local secs = fn and fn()
+    if not secs then return nil end
+    return now + secs - (kind == "daily" and 86400 or 7 * 86400)
+end
+
+local function Due(note, which)
+    local freq = note.contextFreq
+    if not freq then return true end
+    local rec  = note.contextSeen and note.contextSeen[BNB.currentChar]
+    local last = rec and rec[which]
+    if not last then return true end
+    if freq == "once" then return false end
+    if freq == "session" then return last < _sessionStart end
+    local now = time()
+    if freq == "day" then return BNB.Date("%Y-%m-%d", last) ~= BNB.Date("%Y-%m-%d", now) end
+    if freq == "daily" or freq == "weekly" then
+        local reset = LastReset(freq, now)
+        return not reset or last < reset
+    end
+    return true   -- a value from a newer build: every time
+end
+
+-- Written straight onto the note, not through UpdateNote: showing is not an
+-- edit (no "Edited" bump, no NoteChanged)
+local function Stamp(note, which)
+    if not note.contextFreq or not BNB.currentChar then return end
+    note.contextSeen = note.contextSeen or {}
+    local rec = note.contextSeen[BNB.currentChar] or {}
+    note.contextSeen[BNB.currentChar] = rec
+    rec[which] = time()
+end
+
+-- Sorts a note that is due to show into the sticky / popup lists by its
+-- display mode
+local function AddByDisplay(note, stickyIDs, popupIDs)
+    local d = note.contextDisplay
+    if d == "sticky" or d == "both" then stickyIDs[#stickyIDs + 1] = note.id end
+    if d ~= "sticky" then popupIDs[#popupIDs + 1] = note.id end
+end
+
 -- ── Main check ────────────────────────────────────────────────────────────────
 function BNB.CheckContextualNotes()
     if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then
@@ -530,8 +615,6 @@ function BNB.CheckContextualNotes()
     local matches   = {}
     local matchSet  = {}
     local matchedBy = {}
-    local stickyIDs = {}
-    local popupIDs  = {}
     for _, note in pairs(ndb.notes) do
         if note and BNB.HasSituation(note) then
             local by = NoteMatches(note, env)
@@ -539,24 +622,43 @@ function BNB.CheckContextualNotes()
                 matches[#matches + 1]  = note.id
                 matchSet[note.id]      = true
                 matchedBy[note.id]     = by
-                if note.contextDisplay == "sticky" then
-                    stickyIDs[#stickyIDs + 1] = note.id
-                elseif note.contextDisplay == "both" then
-                    stickyIDs[#stickyIDs + 1] = note.id
-                    popupIDs[#popupIDs + 1]  = note.id
-                else
-                    popupIDs[#popupIDs + 1]  = note.id
-                end
             end
         end
     end
 
     local prev    = BNB._contextMatches or {}
+    local prevBy  = BNB._contextMatchedBy or {}
     local prevSet = {}
     for _, id in ipairs(prev) do prevSet[id] = true end
 
     BNB._contextMatches = matches
     BNB._contextMatchedBy = matchedBy
+
+    -- Notes to show: newly matching ones that show on arriving, and notes
+    -- left that show on leaving; each only when its how-often allows
+    local newStickyIDs, newPopupIDs, leftBy = {}, {}, {}
+    local arrived, left = 0, 0
+    for _, id in ipairs(matches) do
+        local note = BNB.GetNote(id)
+        if not prevSet[id] and note and ShowsOn(note, "a") and Due(note, "a") then
+            Stamp(note, "a")
+            AddByDisplay(note, newStickyIDs, newPopupIDs)
+            arrived = arrived + 1
+        end
+    end
+    for _, id in ipairs(prev) do
+        local note = not matchSet[id] and BNB.GetNote(id)
+        local by   = prevBy[id]
+        -- Only a real departure: a note whose situation was just removed or
+        -- changed in the editor also stops matching, and must not pop up
+        if note and ShowsOn(note, "l") and by and BNB.NoteHasSituation(note, by)
+           and Due(note, "l") then
+            Stamp(note, "l")
+            AddByDisplay(note, newStickyIDs, newPopupIDs)
+            leftBy[id] = by
+            left = left + 1
+        end
+    end
 
     -- ── Zone-leave: notes that were matching but no longer are ─────────────────
     local hasKeepWP = false  -- track if any departing note wants to keep its WP
@@ -564,7 +666,9 @@ function BNB.CheckContextualNotes()
         if not matchSet[id] then
             _wpSent[id] = nil   -- set it again on the next entry
             local note = BNB.GetNote(id)
-            local action = note and note.contextLeave  -- nil/"keep", "minimize", "hide"
+            -- nil/"keep", "minimize", "hide". Only for a note that shows on
+            -- arriving alone: one that shows on leaving has just been shown
+            local action = note and not ShowsOn(note, "l") and note.contextLeave
             if action and action ~= "keep" and BNB.Sticky and BNB.Sticky.IsOpen(id) then
                 if action == "hide" then
                     pcall(function() BNB.Sticky.Close(id) end)
@@ -607,20 +711,12 @@ function BNB.CheckContextualNotes()
     -- Badge always reflects current count
     UpdateMinimapBadge(#matches)
 
-    -- Determine which notes are newly entering context (weren't matching before)
-    local newPopupIDs  = {}
-    local newStickyIDs = {}
-    for _, id in ipairs(popupIDs) do
-        if not prevSet[id] then newPopupIDs[#newPopupIDs + 1] = id end
-    end
-    for _, id in ipairs(stickyIDs) do
-        if not prevSet[id] then newStickyIDs[#newStickyIDs + 1] = id end
-    end
+    Trace("check: zone=%s matches=%d prev=%d arrived=%d left=%d newPopup=%d newSticky=%d",
+        tostring((select(2, GetCurrentZone()))), #matches, #prev, arrived, left,
+        #newPopupIDs, #newStickyIDs)
 
-    Trace("check: zone=%s matches=%d prev=%d newPopup=%d newSticky=%d",
-        tostring((select(2, GetCurrentZone()))), #matches, #prev, #newPopupIDs, #newStickyIDs)
-
-    -- Only fire enter-alerts for notes that are genuinely new to this context
+    -- Only fire alerts for notes that are genuinely new to this context, or
+    -- just left
     if #newPopupIDs > 0 or #newStickyIDs > 0 then
         local _, locName = GetCurrentZone()
         C_Timer.After(0.5, function()
@@ -632,7 +728,7 @@ function BNB.CheckContextualNotes()
                 end
             end
             if #newPopupIDs > 0 then
-                ShowToast(newPopupIDs, locName)
+                ShowToast(newPopupIDs, locName, leftBy)
                 Trace("toast shown: visible=%s uiParentShown=%s", tostring(_toast and _toast:IsVisible()),
                     tostring(UIParent:IsShown()))
             end

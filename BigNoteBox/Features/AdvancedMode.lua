@@ -364,6 +364,23 @@ local function StripMarkup(text)
 end
 AM.StripMarkup = StripMarkup  -- exposed for sticky note plain-text rendering
 
+-- The conversion itself, no confirm: the popup below and the Select mode
+-- menu (ALL-234, which confirms once for all its notes) both call it
+function AM.StripToPlain(noteID)
+    local note = BNB.GetNote(noteID)
+    if not note then return end
+    -- Create a history snapshot before stripping so user can revert
+    if BNB.HistorySnapshotNote then BNB.HistorySnapshotNote(noteID) end
+    local stripped = StripMarkup(note.body or "")
+    BNB.UpdateNote(noteID, { body = stripped, richMode = false })
+    if BNB._currentNoteID == noteID and BNB.LoadNoteInEditor then
+        BNB.LoadNoteInEditor(noteID)
+    end
+    if BNB.Sticky and BNB.Sticky.RefreshNote then
+        BNB.Sticky.RefreshNote(noteID)
+    end
+end
+
 function AM.ConvertToPlain(id, onDone)
     if not id then
         if onDone then onDone(false) end
@@ -378,20 +395,7 @@ function AM.ConvertToPlain(id, onDone)
             button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
             button2  = BNB.L["CANCEL"],
             OnAccept = function(self, data)
-                local noteID = data.id
-                local note   = BNB.GetNote(noteID)
-                if note then
-                    -- Create a history snapshot before stripping so user can revert
-                    if BNB.HistorySnapshotNote then BNB.HistorySnapshotNote(noteID) end
-                    local stripped = StripMarkup(note.body or "")
-                    BNB.UpdateNote(noteID, { body = stripped, richMode = false })
-                    if BNB._currentNoteID == noteID and BNB.LoadNoteInEditor then
-                        BNB.LoadNoteInEditor(noteID)
-                    end
-                    if BNB.Sticky and BNB.Sticky.RefreshNote then
-                        BNB.Sticky.RefreshNote(noteID)
-                    end
-                end
+                AM.StripToPlain(data.id)
                 if data.onDone then data.onDone(true) end
             end,
             OnCancel = function(self, data)
