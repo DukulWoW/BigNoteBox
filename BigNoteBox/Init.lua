@@ -7,7 +7,7 @@ BigNoteBox = BigNoteBox or {}
 local BNB = BigNoteBox
 
 BNB.ADDON_NAME = ADDON_NAME
-BNB.ADDON_VERSION = "1.15.2"
+BNB.ADDON_VERSION = "1.16.0"
 
 -- Version shorthand
 BNB.version = BNB.ADDON_VERSION
