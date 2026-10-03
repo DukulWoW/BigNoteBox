@@ -9,11 +9,14 @@
 -- waits SWITCH_DELAY and is cancelled when the pointer reaches the sub-menu.
 --
 -- Public API:
---   BNB.ContextMenu.Open(owner, build)
+--   BNB.ContextMenu.Open(owner, build, after)
 --     owner : the frame right-clicked (the menu closes when it hides)
 --     build : function(root), fills the menu through the methods below
+--     after : optional function, runs after any item's click (the Oracle
+--             bar closes itself with it)
 --   BNB.ContextMenu.Close()
 --   BNB.ContextMenu.IsOpen()
+--   BNB.ContextMenu.IsMouseOver()   pointer over any open level
 --
 -- Building (names follow Blizzard's MenuUtil, so a menu moves over with few
 -- changes, e.g. the Tag Manager's extraTop):
@@ -55,7 +58,12 @@ local ICON     = 18     -- row icon size
 local TITLE_IC = 20     -- header icon size
 local ARROW_W  = 12
 local MIN_W, MAX_W = 140, 320   -- row width limits (text truncates past MAX)
-local OPEN_DELAY   = 0.10       -- hover on a parent before its sub-menu opens (L3: 0.15 felt long)
+-- Hover on a parent before its sub-menu opens: BigNoteBoxDB.contextMenuDelay,
+-- default 0.10 (L3: 0.15 felt long), set on the Modules page
+local function OpenDelay()
+    local v = BigNoteBoxDB and BigNoteBoxDB.contextMenuDelay
+    return v or BNB.DEFAULTS.contextMenuDelay
+end
 local SWITCH_DELAY = 0.30       -- grace while crossing a sibling diagonally
 local OVERLAP  = 2              -- a sub-menu overlaps its parent by this
 local STRATA   = "FULLSCREEN_DIALOG"
@@ -119,6 +127,7 @@ local _owner        -- frame the menu belongs to
 local _skin   = false
 local _timer        -- pending open/switch
 local _watch        -- GLOBAL_MOUSE_DOWN listener
+local _after        -- runs after an item's click (CM.Open's third argument)
 
 local function Cancel()
     if _timer then _timer:Cancel(); _timer = nil end
@@ -239,7 +248,7 @@ local function RowEnter(row)
     SetRowActive(row, true)
     if _open > i and RowParentOf(i + 1) == row then Cancel(); return end   -- its own sub-menu
     if row._hasSub then
-        Schedule(_open > i and SWITCH_DELAY or OPEN_DELAY, function()
+        Schedule(_open > i and SWITCH_DELAY or OpenDelay(), function()
             if row:IsMouseOver() then ShowLevel(i + 1, row._desc, row) end
         end)
     elseif _open > i then
@@ -259,8 +268,10 @@ local function RowClick(row)
     local d = row._desc
     if row._disabled or not d then return end
     if d.fn then
+        local after = _after
         CM.Close()
         xpcall(d.fn, geterrorhandler())
+        if after then xpcall(after, geterrorhandler()) end
     elseif row._hasSub then
         local i = row:GetParent()._level
         if RowParentOf(i + 1) ~= row then Cancel(); ShowLevel(i + 1, d, row) end
@@ -516,10 +527,22 @@ function CM.IsOpen()
     return _open > 0
 end
 
+-- Pointer over the menu (header badge included): a click there is ours, so
+-- a host that closes on outside clicks (the Oracle bar) leaves it alone
+function CM.IsMouseOver()
+    for k = 1, _open do
+        local f = _levels[k]
+        if f:IsMouseOver() or (f._badge and f._badge:IsShown() and f._badge:IsMouseOver()) then
+            return true
+        end
+    end
+    return false
+end
+
 function CM.Close()
     Cancel()
     CloseFrom(1)
-    _owner = nil
+    _owner, _after = nil, nil
     if _watch then _watch:UnregisterEvent("GLOBAL_MOUSE_DOWN") end
 end
 
@@ -527,13 +550,7 @@ local function Watch()
     if not _watch then
         _watch = CreateFrame("Frame")
         _watch:SetScript("OnEvent", function()
-            for k = 1, _open do
-                local f = _levels[k]
-                if f:IsMouseOver() or (f._badge and f._badge:IsShown() and f._badge:IsMouseOver()) then
-                    return
-                end
-            end
-            CM.Close()
+            if not CM.IsMouseOver() then CM.Close() end
         end)
     end
     -- Next frame, so the click that opened the menu cannot close it
@@ -542,13 +559,13 @@ local function Watch()
     end)
 end
 
-function CM.Open(owner, build)
+function CM.Open(owner, build, after)
     CM.Close()
     local root = NewDesc("root")
     build(root)
     if not HasSub(root) then return end
     _skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false
-    _owner = owner
+    _owner, _after = owner, after
     if owner and owner.HookScript and not owner._cmHideHooked then
         owner._cmHideHooked = true
         owner:HookScript("OnHide", function(self)

@@ -71,6 +71,7 @@ UI\Config\Notes.lua
 UI\Config\Backup.lua
 UI\Config\Advanced.lua
 UI\Config\OracleSettings.lua
+UI\Config\ContextMenuSettings.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua

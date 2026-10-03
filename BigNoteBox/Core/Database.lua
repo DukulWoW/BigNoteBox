@@ -239,6 +239,13 @@ BNB.DEFAULTS = {
     sidebarAtBottom   = false,
     sidebarSmallIcons = false,
 
+    -- Note right-click menu (ALL-148, UI/NoteContextMenu.lua), Modules page.
+    -- contextMenuClick: what a click on each main item does, the key of one
+    -- of its sub-menu entries or "menu" (the click only opens the sub-menu).
+    -- contextMenuDelay: seconds of hover before a sub-menu opens.
+    contextMenuClick = { open = "sticky", create = "menu", actions = "menu", history = "menu" },
+    contextMenuDelay = 0.10,
+
     -- Alarm system defaults for new alarms
     alarmDefaults = {
         snoozeDefault = 5,

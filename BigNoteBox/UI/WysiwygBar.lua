@@ -713,7 +713,8 @@ local function BuildWysiwygBar(parent, tsStrip)
         if BNB._dirty and BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
         local slots = BNB.HistoryGetSlots(id)
         if slots.manual then
-            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", id)
+            -- The id is the popup's data (arg 4), as OnAccept / OnCancel read it
+            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", nil, nil, id)
         else
             BNB.HistoryCreateManual(id)
             BNB:Print(L["HISTORY_MANUAL_SAVED"])

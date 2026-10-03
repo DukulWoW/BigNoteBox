@@ -599,7 +599,9 @@ local function RowText(row, r, textRight, m)
                 end)
                 badge:SetScript("OnLeave", function() GameTooltip:Hide() end)
                 badge:SetScript("OnMouseUp", function(self, button)
-                    if button == "LeftButton" and self:IsMouseOver() then row:Click() end
+                    if (button == "LeftButton" or button == "RightButton") and self:IsMouseOver() then
+                        row:Click(button)
+                    end
                 end)
                 row.badges[b] = badge
             end
@@ -668,7 +670,7 @@ end
 -- by RowLayout on every layout.
 local function BuildRow(parent, onEnter, onClick)
     local row = CreateFrame("Button", nil, parent)
-    row:RegisterForClicks("LeftButtonUp")
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     local selTex = row:CreateTexture(nil, "BACKGROUND", nil, 1)
     selTex:SetAllPoints()
@@ -704,9 +706,21 @@ local function BuildRow(parent, onEnter, onClick)
     return row
 end
 
+-- Right-click on a result: the note list's menu (ALL-148). Any entry
+-- clicked closes the bar, as opening a result does. Not for trash results:
+-- the menu is for live notes.
+local function ResultMenu(row, i)
+    local r = results[i]
+    if not (r and BNB.ShowNoteContextMenu) or Oracle._openAs == "trash" then return end
+    SetSelection(i)
+    BNB.ShowNoteContextMenu(row, r.note.id, nil, Oracle.Close)
+end
+
 -- The real list's row i.
 local function MainRow(i)
-    rows[i] = BuildRow(panel, function() SetSelection(i) end, function() OpenResult(i) end)
+    rows[i] = BuildRow(panel, function() SetSelection(i) end, function(self, button)
+        if button == "RightButton" then ResultMenu(self, i) else OpenResult(i) end
+    end)
     return rows[i]
 end
 
@@ -1052,10 +1066,12 @@ local function Build()
         end
     end)
 
-    -- A click anywhere outside the bar and the results closes it.
+    -- A click anywhere outside the bar and the results closes it. A result's
+    -- right-click menu sits outside both and counts as inside (ALL-148).
     bar:SetScript("OnEvent", function(_, event)
         if event == "GLOBAL_MOUSE_DOWN" and bar:IsShown() and not previewing
-            and not bar:IsMouseOver() and not panel:IsMouseOver() then
+            and not bar:IsMouseOver() and not panel:IsMouseOver()
+            and not (BNB.ContextMenu and BNB.ContextMenu.IsMouseOver()) then
             Oracle.Close()
         end
     end)

@@ -10,7 +10,7 @@
 --   ----
 --   Pin, Favorite, Lock
 --   Actions >        duplicate, copy/move, clipboard, convert, share, export
---   History >        restore point, history
+--   History >        restore point, history, clear, restore previous >
 --   ----
 --   Move to trash, Delete permanently
 --
@@ -29,10 +29,58 @@ end
 -- What a click on each main item does: the key of one of its sub-menu
 -- entries, nil = the click only opens the sub-menu. The item then carries
 -- that entry's label ("Open as sticky note", not "Open note"), Dukul
--- 2026-10-03. Session 3 makes these Modules page settings.
-local DEFAULT_CLICK = { open = "sticky", create = nil, actions = nil, history = nil }
+-- 2026-10-03. Saved as BigNoteBoxDB.contextMenuClick, "menu" = nil here;
+-- set on Settings > Modules > Right-click menu (UI/Config/ContextMenuSettings.lua).
+local function ClickKey(item)
+    local c = BigNoteBoxDB and BigNoteBoxDB.contextMenuClick
+    local v = c and c[item]
+    if v == nil then v = BNB.DEFAULTS.contextMenuClick[item] end
+    if v == "menu" then return nil end
+    return v
+end
+
+-- The entries a main item's click can run, for the settings page and the
+-- sample menu: { item, label key, icon, { { entry key, label key }, ... } }.
+-- Keys match the entries built below; a choice missing on a note (Copy /
+-- Move with the sidebar off) falls back to a sub-menu-only click there.
+BNB.NOTE_MENU_CLICKS = {
+    { "open", "NL_CTX_OPEN", "note", {
+        { "editor", "NL_CM_OPEN_EDITOR" }, { "settings", "NL_CTX_OPEN_SETTINGS" },
+        { "focus", "CFG_DBL_FOCUS" }, { "sticky", "NL_CTX_OPEN_STICKY" },
+        { "escSticky", "NL_CTX_OPEN_ESC_STICKY" } } },
+    { "create", "NL_CM_CREATE", "create", {
+        { "alarm", "NL_CTX_CREATE_ALARM" }, { "task", "NL_CTX_CREATE_TASK" },
+        { "situation", "NL_CM_CREATE_SITUATION" } } },
+    { "actions", "NL_CM_ACTIONS", "action", {
+        { "duplicate", "NL_CTX_DUPLICATE" }, { "copyMove", "NL_CTX_COPY_MOVE" },
+        { "clipboard", "NL_CM_COPY_CLIPBOARD" }, { "convert", "NL_CM_CONVERT" },
+        { "share", "NL_CTX_SHARE" }, { "exportJson", "NL_CM_EXPORT_JSON" },
+        { "exportMd", "NL_CM_EXPORT_MD" }, { "exportHtml", "NL_CM_EXPORT_HTML" } } },
+    -- Clear note history is left out: never a one-click action
+    { "history", "NL_CM_HISTORY", "history", {
+        { "restorePoint", "HISTORY_CTX_CREATE" }, { "view", "HISTORY_CTX_VIEW" } } },
+}
 
 local DIV = { divider = true }
+local RECENT_SNAPS = 3   -- auto snapshots listed under Restore previous
+
+-- History > Clear note history: auto snapshots only, the manual restore point
+-- stays (Dukul's scope). The note id arrives as data (StaticPopup_Show arg 4).
+StaticPopupDialogs["BNB_CM_CLEAR_HISTORY"] = {
+    text           = L["NL_CM_CLEAR_HISTORY_CONFIRM"],
+    button1        = L["DELETE"],
+    button2        = L["CANCEL"],
+    OnAccept       = function(_, noteID)
+        if not noteID then return end
+        BNB.HistoryDeleteAuto(noteID)
+        if BNB.RefreshHistoryWindow then BNB.RefreshHistoryWindow() end
+        if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
+    end,
+    timeout        = 0,
+    whileDead      = true,
+    hideOnEscape   = true,
+    preferredIndex = 3,
+}
 
 -- A main item with its sub-menu. entries: { key, label, fn, opts } or DIV;
 -- false (an entry left out on this note) is skipped. A disabled default
@@ -52,7 +100,8 @@ end
 
 -- extraTop(root), optional: lets a caller elsewhere (Tag Manager note rows)
 -- put its own entries right under the header, before "Open note".
-function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
+-- after, optional: runs after any entry's click (Oracle results close the bar).
+function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
     local note = BNB.GetNote(noteID)
     if not note then return end
     local K = BNB._NoteListKit
@@ -90,11 +139,24 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
             BNB.SaveCurrentNote()
         end
         if BNB.HistoryGetSlots(noteID).manual then
-            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", noteID)
+            -- The id is the popup's data (arg 4): as text arg 1 it reached
+            -- neither Override nor Compare
+            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", nil, nil, noteID)
         else
             BNB.HistoryCreateManual(noteID)
             BNB:Print(L["HISTORY_MANUAL_SAVED"])
         end
+    end
+    local function Compare(snap)
+        return function()
+            if BNB._currentNoteID == noteID and BNB._dirty and BNB.SaveCurrentNote then
+                BNB.SaveCurrentNote()
+            end
+            if BNB.OpenHistoryCompare then BNB.OpenHistoryCompare(noteID, snap) end
+        end
+    end
+    local function ViewHistory()
+        if BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(noteID) end
     end
 
     BNB.ContextMenu.Open(owner, function(root)
@@ -113,7 +175,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
 
         -- Open note: the click opens (or closes) the sticky (Dukul)
         local stickyLabel = kind == "world" and L["NL_CTX_CLOSE_STICKY"] or L["NL_CTX_OPEN_STICKY"]
-        Parent(root, L["NL_CTX_OPEN"], "note", DEFAULT_CLICK.open, {
+        Parent(root, L["NL_CTX_OPEN"], "note", ClickKey("open"), {
             { key = "editor",   label = L["NL_CM_OPEN_EDITOR"], fn = function() A.open(noteID) end },
             { key = "settings", label = BNB.NoteConfigOpenFor(noteID) and L["NL_CM_CLOSE_SETTINGS"]
                 or L["NL_CTX_OPEN_SETTINGS"], fn = function() A.settings(noteID) end },
@@ -128,7 +190,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
         local hasAlarm = note.alarm ~= nil
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         local hasSituation = note.context and note.context ~= ""
-        Parent(root, L["NL_CM_CREATE"], "create", DEFAULT_CLICK.create, {
+        Parent(root, L["NL_CM_CREATE"], "create", ClickKey("create"), {
             { key = "alarm", label = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"],
               fn = function() A.alarm(noteID) end },
             hasAlarm and { label = Plain(L["NL_CTX_REMOVE_ALARM"]), opts = { danger = true }, fn = function()
@@ -152,7 +214,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
             function() A.lock(noteID) end, { icon = "locked" })
 
         local rich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
-        Parent(root, L["NL_CM_ACTIONS"], "action", DEFAULT_CLICK.actions, {
+        Parent(root, L["NL_CM_ACTIONS"], "action", ClickKey("actions"), {
             { key = "duplicate", label = L["NL_CTX_DUPLICATE"], fn = function() K.DuplicateNote(noteID) end },
             (BNB.Sidebar and BNB.Sidebar.IsEnabled()) and {   -- Copy/Move to character
               key = "copyMove", label = L["NL_CTX_COPY_MOVE"], fn = function()
@@ -179,17 +241,70 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop)
             end },
         })
 
-        Parent(root, L["NL_CM_HISTORY"], "history", DEFAULT_CLICK.history, {
-            { key = "restorePoint", label = L["HISTORY_CTX_CREATE"], fn = CreateRestorePoint },
-            { key = "view", label = L["HISTORY_CTX_VIEW"], fn = function()
-                if BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(noteID) end
+        -- History: Dukul's sketch plus the restore point on top, which reads
+        -- Replace once one exists (2026-10-03)
+        local slots = BNB.HistoryGetSlots and BNB.HistoryGetSlots(noteID) or { auto = {} }
+        local hasAuto = #slots.auto > 0
+        local hasAny  = hasAuto or slots.manual ~= nil
+        local hist = Parent(root, L["NL_CM_HISTORY"], "history", ClickKey("history"), {
+            { key = "restorePoint", label = slots.manual and L["NL_CM_REPLACE_RESTORE"]
+                or L["HISTORY_CTX_CREATE"], fn = CreateRestorePoint },
+            { key = "view", label = L["HISTORY_CTX_VIEW"], fn = ViewHistory,
+              opts = { disabled = not hasAny } },
+            { label = L["NL_CM_CLEAR_HISTORY"], opts = { danger = true, disabled = not hasAuto },
+              fn = function()
+                StaticPopup_Show("BNB_CM_CLEAR_HISTORY", title, nil, noteID)
             end },
+            DIV,
         })
+        -- Restore previous: the manual restore point, the newest auto
+        -- snapshots, View all. Rows are date and time; each opens the
+        -- compare window, which does the restoring
+        local prev = hist:CreateButton(L["NL_CM_RESTORE_PREVIOUS"], nil, { disabled = not hasAny })
+        if slots.manual then
+            prev:CreateButton(BNB.FmtTs(slots.manual.timestamp), Compare(slots.manual),
+                { tip = L["HISTORY_SECTION_MANUAL"], tipSub = L["HISTORY_COMPARE_TIP"] })
+            if hasAuto then prev:CreateDivider() end
+        end
+        for n = 1, math.min(RECENT_SNAPS, #slots.auto) do
+            local snap = slots.auto[n]
+            prev:CreateButton(BNB.FmtTs(snap.timestamp), Compare(snap), { tip = L["HISTORY_COMPARE_TIP"] })
+        end
+        if hasAny then
+            prev:CreateDivider()
+            prev:CreateButton(L["NL_CM_VIEW_ALL"], ViewHistory)
+        end
 
         root:CreateDivider()
         if BNB.TrashEnabled and BNB.TrashEnabled() then
             root:CreateButton(L["NL_CTX_TRASH"], DoTrash, { icon = "trash" })
         end
         root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), DoDeletePerm, { icon = "danger" })
+    end, after)
+end
+
+-- The settings page's "Try it": the menu's main items with the saved click
+-- choices and hover delay, on no note. Every entry only closes the menu.
+function BNB.ShowSampleNoteMenu(owner)
+    local function Nop() end
+    BNB.ContextMenu.Open(owner, function(root)
+        root:CreateTitle(L["CFG_CM_SAMPLE_TITLE"], { badge = true, icon = "Interface\\Icons\\INV_Misc_Note_01" })
+        root:CreateDivider()
+        for n, m in ipairs(BNB.NOTE_MENU_CLICKS) do
+            local entries = {}
+            for _, e in ipairs(m[4]) do
+                entries[#entries + 1] = { key = e[1], label = Plain(L[e[2]]), fn = Nop }
+            end
+            local p = Parent(root, L[m[2]], m[3], ClickKey(m[1]), entries)
+            if m[1] == "history" then
+                p:CreateDivider()
+                local prev = p:CreateButton(L["NL_CM_RESTORE_PREVIOUS"])
+                for d = 1, RECENT_SNAPS do prev:CreateButton(BNB.FmtTs(time() - d * 86400), Nop) end
+            end
+            if n == 2 then root:CreateDivider() end
+        end
+        root:CreateDivider()
+        root:CreateButton(L["NL_CTX_TRASH"], Nop, { icon = "trash" })
+        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), Nop, { icon = "danger" })
     end)
 end

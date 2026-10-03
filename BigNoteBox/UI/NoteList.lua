@@ -735,7 +735,17 @@ local function OpenAsSticky(noteID, escOnly)
 end
 
 local NOTE_ACTIONS = {}
-NOTE_ACTIONS.open      = function(noteID) BNB.SaveCurrentNote(); BNB.SelectNote(noteID) end
+NOTE_ACTIONS.open      = function(noteID)
+    -- From the Oracle's menu the main window may be closed (as OpenInMain, UI/Oracle.lua)
+    if not (BNB.mainFrame and BNB.mainFrame:IsShown()) then
+        if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
+        BNB.OpenMainWindow()
+    end
+    BNB.SaveCurrentNote()
+    -- From outside the list (Oracle results) the note may be filtered out
+    if BNB.RevealNoteInList then BNB.RevealNoteInList(noteID) end
+    BNB.SelectNote(noteID)
+end
 NOTE_ACTIONS.settings  = function(noteID)
     if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
 end
@@ -2026,6 +2036,34 @@ function BNB.SelectNote(id)
     if nhp and nhp:IsShown() and BNB.OpenNoteHistoryPanel then
         BNB.OpenNoteHistoryPanel(id)
     end
+    BNB.ScrollNoteListTo(id)
+end
+
+-- Scrolls the note list just far enough to show the note's row (a note
+-- opened from a menu, the Oracle or elsewhere stayed out of view). Next
+-- frame, so a list refreshed or a window shown in the same call has its
+-- layout and scroll range. Flat list and tag tree alike: both use
+-- listEntries; a note with no shown row (filtered, folded tag) is left be.
+function BNB.ScrollNoteListTo(id)
+    C_Timer.After(0, function()
+        local sf, child = _sf, BNB._listScrollChild
+        if not (id and sf and child and sf:IsVisible()) then return end
+        local row
+        for _, btn in ipairs(listEntries) do
+            if btn:IsShown() and btn._noteID == id then row = btn; break end
+        end
+        local cTop, rTop = child:GetTop(), row and row:GetTop()
+        if not (cTop and rTop) then return end
+        local top    = cTop - rTop
+        local bottom = top + row:GetHeight()
+        local cur, view = sf:GetVerticalScroll(), sf:GetHeight()
+        local to
+        if top < cur then to = top
+        elseif bottom > cur + view then to = bottom - view end
+        if to then
+            sf:SetVerticalScroll(math.max(0, math.min(sf:GetVerticalScrollRange(), to)))
+        end
+    end)
 end
 
 --------------------------------------------------------------------------------
