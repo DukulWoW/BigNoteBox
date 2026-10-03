@@ -557,7 +557,7 @@ function FL.Open()
     if f._okBtn then f._okBtn:SetText(BNB.RandomOkPhrase()) end
 
     -- Cancel any in-flight close fade so the frame starts clean
-    f:SetScript("OnUpdate", nil)
+    BNB.StopFade(f)
     f:SetAlpha(BNB.WindowAlpha(f))
 
     -- Snapshot and hide all BNB windows
@@ -575,7 +575,7 @@ function FL.Open()
 
     -- Overlay: cancel any in-flight hide fade, show fresh
     local ov = GetOverlay()
-    ov:SetScript("OnUpdate", nil)
+    BNB.StopFade(ov)
     ShowOverlay()
     ov:SetFrameLevel(math.max(1, f:GetFrameLevel() - 1))
 
@@ -599,14 +599,14 @@ function FL.Close()
 
     -- Cancel any overlay fade and hide immediately
     if _overlay then
-        _overlay:SetScript("OnUpdate", nil)
+        BNB.StopFade(_overlay)
         _overlay:Hide()
     end
 
     -- Cancel any frame fade and hide immediately
     if _frame then
         StopGlow(_frame)
-        _frame:SetScript("OnUpdate", nil)
+        BNB.StopFade(_frame)
         _frame:Hide()
         _frame:SetAlpha(BNB.WindowAlpha(_frame))  -- reset alpha for next open
     end

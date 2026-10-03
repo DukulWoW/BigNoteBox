@@ -398,21 +398,10 @@ end
 
 function BNB_KeybindQuickNote()
     if InCombatLockdown() then return end
-    -- Replicate Quick Note button logic: next gap-filling number
+    -- Same note as the list's Quick Note button (BNB.CreateQuickNote)
     if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
-    local base   = L["NL_QUICK_NOTE_BTN"]   -- same title as the list's Quick Note button
-    local taken  = {}
-    for _, note in pairs((BNB.NotesDB() or {}).notes or {}) do
-        local t = note.title or ""
-        if t == base then taken[1] = true
-        else local n = t:match("^" .. base .. " (%d+)$"); if n then taken[tonumber(n)] = true end end
-    end
-    local title = (not taken[1]) and base or (function()
-        local i = 2; while taken[i] do i = i + 1 end; return base .. " " .. i
-    end)()
-    local id = BNB.CreateNote and BNB.CreateNote(title)
+    local id = BNB.CreateQuickNote()
     if not id then return end
-    BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04" })
     -- Sticky mode: the note opens as a sticky to type in. When that cannot
     -- happen it opens in the main window as before; a full sticky set says so.
     local db = BigNoteBoxDB
@@ -428,14 +417,7 @@ function BNB_KeybindQuickNote()
             BNB:Print(msg)
         end
     end
-    if not BNB.mainFrame then if BNB.OpenMainWindow then BNB.OpenMainWindow() elseif BNB.CreateMainWindow then BNB.CreateMainWindow() end end
-    if BNB.mainFrame and not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    if BNB.SelectNote      then BNB.SelectNote(id)   end
-    if BNB.MarkQuickNew    then BNB.MarkQuickNew(id) end   -- empty = removed (ALL-199)
-    C_Timer.After(0.05, function()
-        if BNB._editorBody then BNB._editorBody:SetFocus() end
-    end)
+    BNB.ShowQuickNote(id)
 end
 
 function BNB_KeybindNewNote()

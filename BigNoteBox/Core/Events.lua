@@ -182,7 +182,13 @@ end
 --------------------------------------------------------------------------------
 -- EVENT BUS
 -- Modules register callbacks via BNB.RegisterEvent(event, callback).
--- All events funnel through a single frame.
+-- Shared events funnel through this one frame. Some modules still keep their
+-- own event frame for events only they use (Focus mode, setup wizard,
+-- Reference Box, Direct Send...); that is fine, the bus is not exclusive.
+-- Each handler runs through securecallfunction: an error is reported
+-- (BugSack / scriptErrors) and the remaining handlers still run. At
+-- PLAYER_LOGOUT that chain is note save, sticky inline-edit save, then history
+-- snapshots, so one failure must not cost the rest (ARCH-01).
 --------------------------------------------------------------------------------
 local eventFrame = CreateFrame("Frame")
 local handlers = {}
@@ -193,13 +199,29 @@ function BNB.RegisterEvent(event, callback)
     table.insert(handlers[event], callback)
 end
 
-function BNB.UnregisterEvent(event)
-    eventFrame:UnregisterEvent(event)
+-- Removes one handler; the frame event is unregistered only when none are
+-- left. The list is replaced, not edited in place, so an OnEvent loop that is
+-- running over the old list is not disturbed.
+function BNB.UnregisterEvent(event, callback)
+    local list = handlers[event]
+    if not list then return end
+    local kept = {}
+    for _, h in ipairs(list) do
+        if h ~= callback then kept[#kept + 1] = h end
+    end
+    if #kept == 0 then
+        handlers[event] = nil
+        eventFrame:UnregisterEvent(event)
+    else
+        handlers[event] = kept
+    end
 end
 
 eventFrame:SetScript("OnEvent", function(self, event, ...)
-    for _, handler in ipairs(handlers[event] or {}) do
-        handler(event, ...)
+    local list = handlers[event]
+    if not list then return end
+    for i = 1, #list do
+        securecallfunction(list[i], event, ...)
     end
 end)
 

@@ -188,21 +188,11 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (ROW_H + ROW_GAP)
 
     -- Preset dropdown (only active when skin mode is enabled)
-    local SKIN_PRESETS = {
-        { key = "obsidian",   label = L["CFG_SKIN_PRESET_OBSIDIAN"]  },
-        { key = "void",       label = L["CFG_SKIN_PRESET_VOID"]            },
-        { key = "dragonfire", label = L["CFG_SKIN_PRESET_DRAGONFIRE"]         },
-        { key = "arcane",     label = L["CFG_SKIN_PRESET_ARCANE"]            },
-        { key = "fel",        label = L["CFG_SKIN_PRESET_FEL"]              },
-        { key = "titan",      label = L["CFG_SKIN_PRESET_TITAN"]             },
-        { key = "icecrown",   label = L["CFG_SKIN_PRESET_ICECROWN"]          },
-        { key = "holy",       label = L["CFG_SKIN_PRESET_HOLY"]             },
-        { key = "azshara",    label = L["CFG_SKIN_PRESET_AZSHARA"]          },
-        { key = "ragnaros",   label = L["CFG_SKIN_PRESET_RAGNAROS"]         },
-        { key = "earthen",    label = L["CFG_SKIN_PRESET_EARTHEN"]          },
-        { key = "argent",     label = L["CFG_SKIN_PRESET_ARGENT"]           },
-        { key = "oled",       label = L["CFG_SKIN_PRESET_OLED"]             },
-    }
+    -- Order and labels from BNB.SKIN_PRESET_ORDER (UI/SkinSystem.lua)
+    local SKIN_PRESETS = {}
+    for _, key in ipairs(BNB.SKIN_PRESET_ORDER) do
+        SKIN_PRESETS[#SKIN_PRESETS + 1] = { key = key, label = BNB.SkinPresetLabel(key) }
+    end
 
     local function CurrentPresetLabel()
         local cur = db.skinPreset or "obsidian"

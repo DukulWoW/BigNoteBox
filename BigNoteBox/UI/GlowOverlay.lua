@@ -17,19 +17,57 @@ function BNB.GetLCG()
 end
 
 -- ── Fade ──────────────────────────────────────────────────────────────────────
+-- The one frame fade (CMP-05; was the sticky's FadeFrame, which replaced
+-- LibAnimate in ALL-64). Alpha fade on a native AnimationGroup, so it never
+-- touches the frame's OnUpdate script: the old BNB.FadeTo used SetScript
+-- ("OnUpdate"), which wiped any OnUpdate the frame had (the AFK overlay's
+-- mouse-move dismiss never survived its own fade-in).
+-- Starting a fade stops the one already running on that frame and drops its
+-- onDone: a sticky reopened while it is still fading out is not hidden by the
+-- old fade's Hide. Same contract LibAnimate had (it stopped the running
+-- animation on the frame first).
 function BNB.FadeTo(target, fromAlpha, toAlpha, duration, onDone)
-    target:SetScript("OnUpdate", nil)   -- cancel any in-flight fade first
-    local elapsed = 0
-    target:SetAlpha(fromAlpha)
-    target:SetScript("OnUpdate", function(self, dt)
-        elapsed = elapsed + dt
-        local t = math.min(elapsed / duration, 1)
-        self:SetAlpha(fromAlpha + (toAlpha - fromAlpha) * t)
-        if t >= 1 then
-            self:SetScript("OnUpdate", nil)
-            if onDone then onDone() end
+    local ag = target._bnbFadeAG
+    if not ag then
+        ag = target:CreateAnimationGroup()
+        ag:SetToFinalAlpha(true)
+        ag._alpha = ag:CreateAnimation("Alpha")
+        local function Complete(self)
+            self:GetParent():SetAlpha(self._toAlpha)
+            local cb = self._onDone
+            self._onDone = nil
+            if cb then cb() end
         end
-    end)
+        ag:SetScript("OnFinished", Complete)
+        -- Stopped by anything but a new fade (e.g. the frame hidden mid-fade):
+        -- land on the final alpha and run onDone, so a frame is never left
+        -- half transparent
+        ag:SetScript("OnStop", function(self)
+            if not self._restarting then Complete(self) end
+        end)
+        target._bnbFadeAG = ag
+    end
+    -- A new fade replaces the running one: the old onDone never runs
+    ag._restarting = true
+    ag:Stop()
+    ag._restarting = false
+    ag._toAlpha, ag._onDone = toAlpha, onDone
+    ag._alpha:SetFromAlpha(fromAlpha)
+    ag._alpha:SetToAlpha(toAlpha)
+    ag._alpha:SetDuration(duration)
+    target:SetAlpha(fromAlpha)
+    ag:Play()
+end
+
+-- Cancels a running fade without its onDone; the caller sets the alpha it
+-- wants. Replaces the old SetScript("OnUpdate", nil) cancel.
+function BNB.StopFade(target)
+    local ag = target and target._bnbFadeAG
+    if not ag then return end
+    ag._onDone = nil
+    ag._restarting = true
+    ag:Stop()
+    ag._restarting = false
 end
 
 -- ── Skin-tinted overlay colour ────────────────────────────────────────────────

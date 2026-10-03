@@ -144,40 +144,26 @@ function BNB.WireDropTarget(eb)
     if not eb or eb._bnbDropWired then return end
     eb._bnbDropWired = true
 
+    -- HookScript throughout, never SetScript: SetScript would drop any hooks
+    -- already on the box, so this only worked while it was wired first (CMP-06).
+    -- The box has no OnMouseDown / OnEnter of its own today; if one is added,
+    -- it runs first and the drag checks below still act on GetCursorInfo().
+
     -- OnReceiveDrag fires when the player releases a cursor object over the frame
-    local prev = eb:GetScript("OnReceiveDrag")
-    eb:SetScript("OnReceiveDrag", function(self)
-        HandleDrop(self)
-        if prev then pcall(prev, self) end
-    end)
+    eb:HookScript("OnReceiveDrag", HandleDrop)
 
     -- OnMouseDown with LeftButton also fires for drag releases in some clients;
     -- guard with GetCursorInfo so we only intercept actual drag operations.
-    local prevMD = eb:GetScript("OnMouseDown")
-    eb:SetScript("OnMouseDown", function(self, btn)
-        if btn == "LeftButton" and GetCursorInfo() then
-            HandleDrop(self)
-        elseif prevMD then
-            prevMD(self, btn)
-        end
+    eb:HookScript("OnMouseDown", function(self, btn)
+        if btn == "LeftButton" and GetCursorInfo() then HandleDrop(self) end
     end)
 
-    -- OnEnter/OnLeave: show tooltip hint while dragging over the box
-    local prevEnter = eb:GetScript("OnEnter")
-    local prevLeave = eb:GetScript("OnLeave")
-
-    eb:SetScript("OnEnter", function(self)
-        if GetCursorInfo() then
-            UpdateDragTooltip(self)
-        elseif prevEnter then
-            prevEnter(self)
-        end
+    -- OnEnter/OnLeave: show tooltip hint while dragging over the box. A hook
+    -- runs after the box's own OnEnter, so the drag hint wins the tooltip.
+    eb:HookScript("OnEnter", function(self)
+        if GetCursorInfo() then UpdateDragTooltip(self) end
     end)
-
-    eb:SetScript("OnLeave", function(self)
-        GameTooltip:Hide()
-        if prevLeave then prevLeave(self) end
-    end)
+    eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
 -- ── Setup: wire the already-created editor body boxes ────────────────────────

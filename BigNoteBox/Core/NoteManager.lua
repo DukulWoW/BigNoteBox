@@ -21,6 +21,39 @@ function BNB.NormalizeTag(s)
 end
 
 --------------------------------------------------------------------------------
+-- NOTE ID GENERATOR
+--------------------------------------------------------------------------------
+-- Seconds plus 32 random bits, drawn again until the id is free in both notes
+-- and trash. A bulk import or migration creates many notes within one second,
+-- and the old 16-bit suffix could hand out the same id twice (BUG-01). Ids are
+-- only ever compared as strings, so the longer form mixes fine with old ones.
+-- Moved from Database.lua (ARCH-06).
+function BNB.GenerateID()
+    local ndb   = BNB.NotesDB()
+    local notes = ndb and ndb.notes or {}
+    local trash = ndb and ndb.trash or {}
+    local id
+    repeat
+        id = string.format("bnb-%08x%04x%04x", time(), math.random(0, 0xFFFF), math.random(0, 0xFFFF))
+    until not notes[id] and not trash[id]
+    return id
+end
+
+--------------------------------------------------------------------------------
+-- TRASH ENABLED
+--------------------------------------------------------------------------------
+-- True when trash is active (the Trash checkbox on and trashRetainDays > 0).
+-- Used by delete call sites to skip the confirmation popup — moving to trash
+-- is non-destructive, so there is nothing to confirm. Moved from
+-- SlashCommands.lua (ARCH-06).
+function BNB.TrashEnabled()
+    if not (BigNoteBoxDB and BigNoteBoxDB.trashFeature ~= false) then return false end
+    local days = BigNoteBoxDB.trashRetainDays
+    if days == nil then days = BNB.DEFAULTS.trashRetainDays end
+    return days > 0
+end
+
+--------------------------------------------------------------------------------
 -- TRASH BUTTON SYNC
 -- Reads trash directly so it works whether or not TrashWindow is open.
 -- Called by every function that mutates the trash (Delete, Restore, Empty)
@@ -211,6 +244,45 @@ function BNB.RemoveNoteTag(id, tag)
 end
 
 --------------------------------------------------------------------------------
+-- QUICK NOTE — lowest available gap in the sequence
+-- If "Quick Note", "Quick Note 2", "Quick Note 3" exist but "Quick Note 4"
+-- was deleted, the next one is "Quick Note 4" — not "Quick Note 5".
+-- Rule: base title = "Quick Note" (no number), then 2, 3, 4, ...
+-- (WoW convention: first is unnumbered, subsequent get a number from 2 up.)
+-- One builder for the list's Quick Note button and the quick note key (CMP-05).
+-- The localized base is escaped before it goes into a pattern: a translation
+-- with "-" or "(" in it never matched, and every quick note came out unnumbered.
+--------------------------------------------------------------------------------
+function BNB.NextQuickNoteTitle()
+    local base  = L["NL_QUICK_NOTE_BTN"]
+    local pat   = "^" .. base:gsub("%p", "%%%0") .. " (%d+)$"
+    local taken = {}
+    for _, note in pairs((NDB() or {}).notes or {}) do
+        local t = note.title or ""
+        if t == base then
+            taken[1] = true
+        else
+            local n = t:match(pat)
+            if n then taken[tonumber(n)] = true end
+        end
+    end
+    if not taken[1] then return base end
+    local i = 2
+    while taken[i] do i = i + 1 end
+    return base .. " " .. i
+end
+
+-- Creates the next quick note (title + note icon) and returns its id, or nil.
+-- Opening it is the caller's job: BNB.ShowQuickNote (main window) or
+-- BNB.Sticky.OpenQuick.
+function BNB.CreateQuickNote()
+    local id = BNB.CreateNote(BNB.NextQuickNoteTitle())
+    if not id then return nil end
+    BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04" })
+    return id
+end
+
+--------------------------------------------------------------------------------
 -- CREATE
 --------------------------------------------------------------------------------
 function BNB.CreateNote(title, body)
@@ -293,12 +365,7 @@ BNB.NOTE_COPY_SKIP = COPY_SKIP
 
 -- Full recursive copy, so the new note shares no table with the source
 -- (the old copies shared the tags table: editing one note's tags changed both)
-local function DeepCopy(v)
-    if type(v) ~= "table" then return v end
-    local t = {}
-    for k, val in pairs(v) do t[k] = DeepCopy(val) end
-    return t
-end
+local DeepCopy = BNB.DeepCopy
 
 -- Copies note srcID into a new note and returns the new id. The copy keeps the
 -- source's scope unless overrides says otherwise; overrides (optional) replaces

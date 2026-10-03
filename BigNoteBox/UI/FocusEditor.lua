@@ -63,7 +63,7 @@ local function GetFocusOverlay()
     local ef = CreateFrame("Frame")
     ef:RegisterEvent("PLAYER_REGEN_DISABLED")
     ef:SetScript("OnEvent", function()
-        if ov:IsShown() then ov:SetScript("OnUpdate", nil); ov:Hide() end
+        if ov:IsShown() then BNB.StopFade(ov); ov:Hide() end
     end)
     -- Register for skin color refresh
     if BNB.RegisterSkinBackdrop then
@@ -200,10 +200,6 @@ end
 -- TIMESTAMP FORMATTER
 --------------------------------------------------------------------------------
 -- One implementation, in UI/NoteEditor.lua (was a hardcoded duplicate, ALL-28)
-local function FmtTime(ts)
-    return BNB.FmtTime and BNB.FmtTime(ts) or ""
-end
-
 --------------------------------------------------------------------------------
 -- HELPERS
 --------------------------------------------------------------------------------
@@ -312,8 +308,8 @@ local function LoadNoteInFocus(id)
 
     -- Timestamps can be set immediately
     if focusTsStrip then
-        local cr = note.created and string.format(L["NE_CREATED_FMT"], FmtTime(note.created)) or ""
-        local up = note.updated and string.format(L["NE_TS_SEP_EDITED_FMT"], FmtTime(note.updated)) or ""
+        local cr = note.created and string.format(L["NE_CREATED_FMT"], BNB.FmtTime(note.created)) or ""
+        local up = note.updated and string.format(L["NE_TS_SEP_EDITED_FMT"], BNB.FmtTime(note.updated)) or ""
         focusTsStrip:SetText(cr .. up)
     end
 
@@ -1133,17 +1129,10 @@ function BNB.OpenFocusMode()
 
     -- Snapshot which companion windows are open, then close them all.
     -- CloseFocusMode will reopen exactly what was open.
+    -- The windows come from the registry in UI/MainWindow.lua (`focus` entries).
     local noteID = BNB._currentNoteID
     local snap = {}
-    local function shown(name) local f = _G[name]; return f and f:IsShown() end
-    snap.noteConfig   = shown("BigNoteBoxNoteConfigFrame")
-    snap.config       = shown("BigNoteBoxConfigFrame")
-    snap.trash        = shown("BigNoteBoxTrashFrame")
-    snap.tagManager   = shown("BigNoteBoxTagManagerFrame")
-    snap.historyWin   = shown("BigNoteBoxHistoryFrame")
-    snap.historyPanel = shown("BigNoteBoxNoteHistoryFrame")
-    snap.refBox       = shown("BigNoteBoxReferenceBoxFrame")
-    snap.sendToChat   = shown("BigNoteBoxSendDialog")
+    snap.windows      = BNB.SnapshotWindows()
     snap.noteID       = noteID  -- needed to reopen note-specific windows
     -- Snapshot rich preview state before companion windows are closed
     snap.richPreview  = BNB.RichPreview and BNB.RichPreview.IsOpen()
@@ -1272,20 +1261,7 @@ function BNB.CloseFocusMode()
             BNB.Sticky.ShowAll()
         end
         C_Timer.After(FADE_TIME + 0.05, function()
-            if snap.noteConfig  and BNB.OpenNoteConfig       then BNB.OpenNoteConfig(id)       end
-            if snap.config      then
-                local cf = _G["BigNoteBoxConfigFrame"]
-                if cf then cf:Show() end
-            end
-            if snap.trash       then
-                local tw = _G["BigNoteBoxTrashFrame"]
-                if tw then tw:Show() end
-            end
-            if snap.tagManager  and BNB.ToggleTagManager     then BNB.ToggleTagManager()       end
-            if snap.historyWin  and BNB.OpenHistoryWindow    then BNB.OpenHistoryWindow()      end
-            if snap.historyPanel and BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(id) end
-            if snap.refBox      and BNB.OpenReferenceBox     then BNB.OpenReferenceBox(id)     end
-            if snap.sendToChat  and BNB.OpenSendToChat       then BNB.OpenSendToChat(id)       end
+            BNB.ReopenWindows(snap.windows, id)
             if snap.richPreview and BNB.RichPreview          then BNB.RichPreview.Open()       end
         end)
     end

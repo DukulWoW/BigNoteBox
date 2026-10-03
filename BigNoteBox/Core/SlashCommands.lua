@@ -152,26 +152,8 @@ function BNB.RegisterSlashCommands()
 end
 
 --------------------------------------------------------------------------------
--- PRINT HELPER
--- Prefixes messages with the addon name in color.
---------------------------------------------------------------------------------
-function BNB:Print(msg)
-    print("|cff66bb6aBigNoteBox|r: " .. tostring(msg))
-end
-
---------------------------------------------------------------------------------
 -- STATIC POPUP DIALOGS
 --------------------------------------------------------------------------------
--- Helper: returns true when trash is active (trashRetainDays > 0).
--- Used by delete call sites to skip the confirmation popup — moving to trash
--- is non-destructive, so there is nothing to confirm.
-function BNB.TrashEnabled()
-    if not (BigNoteBoxDB and BigNoteBoxDB.trashFeature ~= false) then return false end
-    local days = BigNoteBoxDB.trashRetainDays
-    if days == nil then days = 30 end
-    return days > 0
-end
-
 -- Built at PLAYER_LOGIN, not file load: L[...] must resolve after the language is
 -- known, or the popups stay in the load-time language (and the pseudo-locale misses them).
 local function BuildPopups()

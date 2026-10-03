@@ -207,23 +207,16 @@ function BNB.CloseInsertInfoMenu()
 end
 
 -- ── Wire a single EditBox ─────────────────────────────────────────────────────
--- Hooks right-click to show the Insert Info menu. Chains any existing
--- OnMouseUp handler (e.g. the standard WoW right-click link handler).
+-- Hooks right-click to show the Insert Info menu. HookScript, so any OnMouseUp
+-- the box already has (and any hooks on it) keep running (CMP-06).
 function BNB.WireInsertInfoTarget(eb)
     if not eb or eb._bnbInsertInfoWired then return end
     eb._bnbInsertInfoWired = true
 
-    local prev = eb:GetScript("OnMouseUp")
-    eb:SetScript("OnMouseUp", function(self, btn, ...)
-        if btn == "RightButton" then
-            -- Only show our menu when the editor is not locked / disabled
-            if self:IsEnabled() then
-                ShowInsertInfoMenu(self)
-            end
-            -- Still let any prior handler run (e.g. link tooltip on retail)
-            if prev then pcall(prev, self, btn, ...) end
-        else
-            if prev then prev(self, btn, ...) end
+    eb:HookScript("OnMouseUp", function(self, btn)
+        -- Only show our menu when the editor is not locked / disabled
+        if btn == "RightButton" and self:IsEnabled() then
+            ShowInsertInfoMenu(self)
         end
     end)
 end

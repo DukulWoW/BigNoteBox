@@ -12,6 +12,22 @@ BNB.ADDON_VERSION = "1.15.2"
 -- Version shorthand
 BNB.version = BNB.ADDON_VERSION
 
+-- Chat line prefixed with the addon name in colour. Lives here, in the first
+-- file, so every later file can print (moved from SlashCommands.lua, ARCH-06).
+function BNB:Print(msg)
+    print("|cff66bb6aBigNoteBox|r: " .. tostring(msg))
+end
+
+-- Full recursive copy of a value; non-tables come back as they are. The one
+-- copy helper (CMP-05): Database, NoteManager and NoteHistory each had their
+-- own, and NoteHistory's stopped at two levels (BUG-22).
+function BNB.DeepCopy(v)
+    if type(v) ~= "table" then return v end
+    local out = {}
+    for k, x in pairs(v) do out[k] = BNB.DeepCopy(x) end
+    return out
+end
+
 -- WoW: Forever reports a 1.x interface number (16001, client 1.60.x). It used to be
 -- told apart by WOW_PROJECT_ID == WOW_PROJECT_MAINLINE as well, but build 70170
 -- (2026-10-01) gave Forever its own project id (18; MAINLINE is 1), and every

@@ -153,19 +153,11 @@ function BNB.SetupChatCapture()
     if not eb then return end
 
     -- Hook right-click on the BCB editbox to append our menu item.
-    -- BCB may have its own OnMouseUp handler — we chain, not replace.
-    local prevOnMouseUp = eb:GetScript("OnMouseUp")
-    eb:SetScript("OnMouseUp", function(self, button, ...)
-        if button == "RightButton" then
-            -- Let BCB's own handler run first (if any), then show ours.
-            if prevOnMouseUp then
-                pcall(prevOnMouseUp, self, button, ...)
-            end
-            ShowBCBCaptureMenu(self)
-        else
-            if prevOnMouseUp then
-                prevOnMouseUp(self, button, ...)
-            end
-        end
+    -- HookScript, not SetScript: BCB's own OnMouseUp runs first and any hooks
+    -- other addons put on BCB's box survive (CMP-06).
+    if eb._bnbCaptureHooked then return end
+    eb._bnbCaptureHooked = true
+    eb:HookScript("OnMouseUp", function(self, button)
+        if button == "RightButton" then ShowBCBCaptureMenu(self) end
     end)
 end

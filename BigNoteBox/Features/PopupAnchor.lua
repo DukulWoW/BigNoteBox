@@ -15,6 +15,25 @@ local ANCHOR_H = 28
 --------------------------------------------------------------------------------
 -- CREATE
 --------------------------------------------------------------------------------
+-- Saves the frame's centre as an offset from the screen centre (whole
+-- pixels); with reanchor, also pins the frame there. One copy for drag stop
+-- and Lock (CMP-05).
+local function SaveAnchorPos(f, reanchor)
+    local cx, cy = f:GetCenter()
+    local scx, scy = UIParent:GetCenter()
+    if not (cx and scx) then return end
+    local x = math.floor(cx - scx + 0.5)
+    local y = math.floor(cy - scy + 0.5)
+    if reanchor then
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "CENTER", x, y)
+    end
+    if BigNoteBoxDB then
+        BigNoteBoxDB.popupAnchorX = x
+        BigNoteBoxDB.popupAnchorY = y
+    end
+end
+
 local function CreateAnchorEditor()
     if _anchor then return end
 
@@ -46,19 +65,7 @@ local function CreateAnchorEditor()
     f:SetScript("OnDragStart", function(self) self:StartMoving() end)
     f:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
-        -- Save CENTER-relative position
-        local cx, cy = self:GetCenter()
-        local scx, scy = UIParent:GetCenter()
-        if cx and scx then
-            local x = math.floor(cx - scx + 0.5)
-            local y = math.floor(cy - scy + 0.5)
-            self:ClearAllPoints()
-            self:SetPoint("CENTER", UIParent, "CENTER", x, y)
-            if BigNoteBoxDB then
-                BigNoteBoxDB.popupAnchorX = x
-                BigNoteBoxDB.popupAnchorY = y
-            end
-        end
+        SaveAnchorPos(self, true)
     end)
     BNB.SetMoveCursor(f)   -- ALL-95
 
@@ -95,17 +102,7 @@ end
 
 function BNB.LockPopupAnchor()
     if not _anchor then return end
-    -- Save final position
-    local cx, cy = _anchor:GetCenter()
-    local scx, scy = UIParent:GetCenter()
-    if cx and scx then
-        local x = math.floor(cx - scx + 0.5)
-        local y = math.floor(cy - scy + 0.5)
-        if BigNoteBoxDB then
-            BigNoteBoxDB.popupAnchorX = x
-            BigNoteBoxDB.popupAnchorY = y
-        end
-    end
+    SaveAnchorPos(_anchor)   -- final position
     _anchor:Hide()
     BNB:Print(L["POPANCHOR_SAVED"])
 end

@@ -32,39 +32,32 @@ local function MigrationState()
     return BNB.NotesDB()
 end
 
-local ADDON_KEYS  = { "NoteworthyII", "TakeANote", "YetAnotherNotepad", "Notepad", "NotepadChar", "Notes", "TinyPad", "PurpleNotes", "SimpleNote", "QuickNotes", "OneWoWNotes", "MyNotepad", "AmmeNotepad" }
-local ADDON_NAMES = {
-    NoteworthyII      = "Noteworthy II",
-    TakeANote         = "TakeANote",
-    YetAnotherNotepad = "Yet Another Notepad",
-    Notepad           = "Notepad",
-    NotepadChar       = "Notepad (character)",
-    Notes             = "Notes",
-    TinyPad           = "TinyPad",
-    PurpleNotes       = "PurpleNotes",
-    SimpleNote        = "SimpleNote",
-    QuickNotes        = "QuickNotes",
-    OneWoWNotes       = "OneWoW Notes",
-    MyNotepad         = "MyNotepad",
-    AmmeNotepad       = "AmmeNotepad",
+-- The addons we can migrate from, in the order they are listed:
+-- { key, display name, AddOn folder for IsAddOnLoaded }. One list (CMP-05);
+-- the three tables below are built from it for the code that reads them.
+-- NotepadChar shares the Notepad folder.
+local SOURCES = {
+    { "NoteworthyII",      "Noteworthy II",       "NoteworthyII" },
+    { "TakeANote",         "TakeANote",           "TakeANote" },
+    { "YetAnotherNotepad", "Yet Another Notepad", "YetAnotherNotepad" },
+    { "Notepad",           "Notepad",             "Notepad" },
+    { "NotepadChar",       "Notepad (character)", "Notepad" },
+    { "Notes",             "Notes",               "Notes" },
+    { "TinyPad",           "TinyPad",             "TinyPad" },
+    { "PurpleNotes",       "PurpleNotes",         "PurpleNotes" },
+    { "SimpleNote",        "SimpleNote",          "SimpleNote" },
+    { "QuickNotes",        "QuickNotes",          "QuickNotes" },
+    { "OneWoWNotes",       "OneWoW Notes",        "OneWoW_Notes" },
+    { "MyNotepad",         "MyNotepad",           "MyNotepad" },
+    { "AmmeNotepad",       "AmmeNotepad",         "AmmeNotepad" },
 }
--- Maps addon keys to the actual WoW addon folder name for IsAddOnLoaded.
--- NotepadChar shares the same addon folder as Notepad.
-local ADDON_LOAD_NAME = {
-    NoteworthyII      = "NoteworthyII",
-    TakeANote         = "TakeANote",
-    YetAnotherNotepad = "YetAnotherNotepad",
-    Notepad           = "Notepad",
-    NotepadChar       = "Notepad",
-    Notes             = "Notes",
-    TinyPad           = "TinyPad",
-    PurpleNotes       = "PurpleNotes",
-    SimpleNote        = "SimpleNote",
-    QuickNotes        = "QuickNotes",
-    OneWoWNotes       = "OneWoW_Notes",
-    MyNotepad         = "MyNotepad",
-    AmmeNotepad       = "AmmeNotepad",
-}
+local ADDON_KEYS, ADDON_NAMES, ADDON_LOAD_NAME = {}, {}, {}
+for i, src in ipairs(SOURCES) do
+    local key = src[1]
+    ADDON_KEYS[i]        = key
+    ADDON_NAMES[key]     = src[2]
+    ADDON_LOAD_NAME[key] = src[3]
+end
 
 -- Expose for use by ConfigWindow and other modules
 M.ADDON_KEYS      = ADDON_KEYS

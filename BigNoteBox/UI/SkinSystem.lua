@@ -40,6 +40,21 @@ BNB.SKIN_PRESETS = {
     oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18 },
 }
 
+-- Display order of the presets: the one list Settings > Appearance and the
+-- setup wizard read (CMP-05; each kept its own copy). Labels come from the key:
+-- CFG_SKIN_PRESET_<KEY> ("Void  (purple)") for Settings, SW_PRESET_<KEY>
+-- ("Void") for the wizard. A new preset = one SKIN_PRESETS line, one entry
+-- here and the two locale keys.
+BNB.SKIN_PRESET_ORDER = {
+    "obsidian", "void", "dragonfire", "arcane", "fel",
+    "titan", "icecrown", "holy", "azshara", "ragnaros",
+    "earthen", "argent", "oled",
+}
+
+function BNB.SkinPresetLabel(key, short)
+    return L[(short and "SW_PRESET_" or "CFG_SKIN_PRESET_") .. key:upper()] or key
+end
+
 -- Returns the active preset table, falling back to obsidian.
 function BNB.GetSkinPreset()
     local key = BigNoteBoxDB and BigNoteBoxDB.skinPreset or "obsidian"
@@ -446,12 +461,3 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
     return ctrl
 end
 
---------------------------------------------------------------------------------
--- OPEN MAIN WINDOW ROUTER
--- Builds the frame on first call, then shows it. CreateMainWindow picks the
--- classic or skin chrome from BigNoteBoxDB.skinMode.
---------------------------------------------------------------------------------
-function BNB.OpenMainWindow()
-    if not BNB.mainFrame and BNB.CreateMainWindow then BNB.CreateMainWindow() end
-    if BNB.mainFrame then BNB.mainFrame:Show() end
-end

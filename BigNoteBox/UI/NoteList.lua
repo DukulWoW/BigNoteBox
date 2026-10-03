@@ -195,31 +195,6 @@ BNB.ApplyListMode = ApplyListMode
 
 
 --------------------------------------------------------------------------------
--- QUICK NOTE — lowest available gap in the sequence
--- If "Quick Note", "Quick Note 2", "Quick Note 3" exist but "Quick Note 4"
--- was deleted, the next one is "Quick Note 4" — not "Quick Note 5".
--- Rule: base title = "Quick Note" (no number), then 2, 3, 4, …
--- (WoW convention: first is unnumbered, subsequent get a number from 2 up.)
---------------------------------------------------------------------------------
-local function GetNextQuickNoteTitle()
-    local base = L["NL_QUICK_NOTE_BTN"]
-    local taken = {}
-    for _, note in pairs(BNB.NotesDB().notes or {}) do
-        local t = note.title or ""
-        if t == base then
-            taken[1] = true
-        else
-            local n = t:match("^" .. base .. " (%d+)$")
-            if n then taken[tonumber(n)] = true end
-        end
-    end
-    if not taken[1] then return base end
-    local i = 2
-    while taken[i] do i = i + 1 end
-    return base .. " " .. i
-end
-
---------------------------------------------------------------------------------
 -- COLLAPSE / EXPAND LIST PANE
 -- Stores state in BNB._listCollapsed and BigNoteBoxDB.listCollapsed.
 -- Notifies MainWindow to adjust the split position.
@@ -2104,6 +2079,18 @@ end
 -- trash. Typed in once, it stays like any note. Mark AFTER SelectNote(id).
 function BNB.MarkQuickNew(id) BNB._quickNewID = id end
 
+-- Opens a just-created quick note in the main window, marked quick-new, with
+-- the cursor in the body. Used by the Quick Note button and the quick note key.
+function BNB.ShowQuickNote(id)
+    BNB.OpenMainWindow()
+    BNB.RefreshNoteList()
+    BNB.SelectNote(id)
+    BNB.MarkQuickNew(id)   -- empty = removed (ALL-199)
+    C_Timer.After(0.05, function()
+        if BNB._editorBody then BNB._editorBody:SetFocus() end
+    end)
+end
+
 function BNB.DropEmptyQuickNote(nextID)
     local id = BNB._quickNewID
     if not id or id == nextID then return end
@@ -2301,17 +2288,8 @@ function BNB.BuildNoteList()
     qBtn:SetScript("OnClick", function()
         if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
         BNB.SaveCurrentNote()
-        local title = GetNextQuickNoteTitle()
-        local id    = BNB.CreateNote(title)
-        BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04" })
-        if not BNB.mainFrame then BNB.CreateMainWindow() end
-        if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-        if BNB.SelectNote      then BNB.SelectNote(id)   end
-        BNB.MarkQuickNew(id)
-        C_Timer.After(0.05, function()
-            if BNB._editorBody then BNB._editorBody:SetFocus() end
-        end)
+        local id = BNB.CreateQuickNote()
+        if id then BNB.ShowQuickNote(id) end
     end)
     _qBtn = qBtn
 

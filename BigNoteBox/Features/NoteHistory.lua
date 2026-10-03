@@ -58,12 +58,7 @@ BNB.HISTORY_SNAP_FIELDS = SNAP_FIELDS
 -- task, attachment and gear table with the live note: ticking a task changed
 -- the snapshot too (BUG-22).
 --------------------------------------------------------------------------------
-local function DeepCopy(v)
-    if type(v) ~= "table" then return v end
-    local copy = {}
-    for k, val in pairs(v) do copy[k] = DeepCopy(val) end
-    return copy
-end
+local DeepCopy = BNB.DeepCopy
 
 --------------------------------------------------------------------------------
 -- INTERNAL: build a snapshot table from a live note

@@ -716,44 +716,10 @@ local function ForwardHover(child, root)
 end
 
 -- ── Frame fade (replaces LibAnimate, ALL-64) ──────────────────────────────────
--- Alpha fade on a native AnimationGroup, so it never touches the frame's
--- OnUpdate script (see the note on buttons further down).
--- Starting a fade stops the one already running on that frame and drops its
--- onDone: a sticky reopened while it is still fading out is not hidden by the
--- old fade's Hide. Same contract LibAnimate had (it stopped the running
--- animation on the frame first).
-local function FadeFrame(target, fromAlpha, toAlpha, duration, onDone)
-    local ag = target._bnbFadeAG
-    if not ag then
-        ag = target:CreateAnimationGroup()
-        ag:SetToFinalAlpha(true)
-        ag._alpha = ag:CreateAnimation("Alpha")
-        local function Complete(self)
-            self:GetParent():SetAlpha(self._toAlpha)
-            local cb = self._onDone
-            self._onDone = nil
-            if cb then cb() end
-        end
-        ag:SetScript("OnFinished", Complete)
-        -- Stopped by anything but a new fade (e.g. the frame hidden mid-fade):
-        -- land on the final alpha and run onDone, so a note is never left
-        -- half transparent
-        ag:SetScript("OnStop", function(self)
-            if not self._restarting then Complete(self) end
-        end)
-        target._bnbFadeAG = ag
-    end
-    -- A new fade replaces the running one: the old onDone never runs
-    ag._restarting = true
-    ag:Stop()
-    ag._restarting = false
-    ag._toAlpha, ag._onDone = toAlpha, onDone
-    ag._alpha:SetFromAlpha(fromAlpha)
-    ag._alpha:SetToAlpha(toAlpha)
-    ag._alpha:SetDuration(duration)
-    target:SetAlpha(fromAlpha)
-    ag:Play()
-end
+-- BNB.FadeTo (UI/GlowOverlay.lua): AnimationGroup alpha fade that never
+-- touches the frame's OnUpdate script (see the note on buttons further down).
+-- It started here as FadeFrame and became the shared helper in CMP-05.
+local FadeFrame = BNB.FadeTo
 
 -- Background Lab "Try on stickies" (ALL-110, developer tool): def shows on
 -- every open sticky until it is called with nil, a sticky texture is picked

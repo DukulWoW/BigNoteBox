@@ -636,24 +636,14 @@ local function BuildPage3(content)
     y = ny
 
     -- Preset dropdown
-    local PRESET_ORDER = {
-        "obsidian", "void", "dragonfire", "arcane", "fel",
-        "titan", "icecrown", "holy", "azshara", "ragnaros",
-        "earthen", "argent", "oled",
-    }
-    local PRESET_LABELS = {
-        obsidian   = L["SW_PRESET_OBSIDIAN"],   void     = L["SW_PRESET_VOID"],       dragonfire = L["SW_PRESET_DRAGONFIRE"],
-        arcane     = L["SW_PRESET_ARCANE"],     fel      = L["SW_PRESET_FEL"],         titan      = L["SW_PRESET_TITAN"],
-        icecrown   = L["SW_PRESET_ICECROWN"],   holy     = L["SW_PRESET_HOLY"],        azshara    = L["SW_PRESET_AZSHARA"],
-        ragnaros   = L["SW_PRESET_RAGNAROS"],   earthen  = L["SW_PRESET_EARTHEN"],    argent     = L["SW_PRESET_ARGENT"],
-        oled       = L["SW_PRESET_OLED"],
-    }
+    -- Order and short labels from BNB.SKIN_PRESET_ORDER (UI/SkinSystem.lua)
+    local PRESET_ORDER = BNB.SKIN_PRESET_ORDER
     local dd, ddy   -- declared first: the menu callback below regenerates dd
     dd, ddy = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.skinPreset) or "obsidian"
         for _, key in ipairs(PRESET_ORDER) do
             local k = key
-            root:CreateRadio(PRESET_LABELS[k] or k,
+            root:CreateRadio(BNB.SkinPresetLabel(k, true),
                 function() return cur == k end,
                 function()
                     cur = k

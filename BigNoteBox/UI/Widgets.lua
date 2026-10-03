@@ -256,24 +256,6 @@ function BNB.GetDeflate()
     return LibStub and LibStub("LibDeflate", true)
 end
 
--- BNB.FmtTs — short "YYYY-MM-DD  H:MM am/pm" timestamp (distinct from BNB.FmtTime's relative/date-format logic)
-function BNB.FmtTs(ts)
-    if not ts or ts == 0 then return L["TS_UNKNOWN"] end
-    local db    = BigNoteBoxDB
-    local use24 = db and db.use24Hour ~= false
-    local d     = BNB.Date("%Y-%m-%d", ts)
-    local t
-    if use24 then
-        t = BNB.Date("%H:%M", ts)
-    else
-        local h    = tonumber(BNB.Date("%H", ts))
-        local ampm = h >= 12 and "pm" or "am"
-        h = h % 12; if h == 0 then h = 12 end
-        t = h .. ":" .. BNB.Date("%M", ts) .. " " .. ampm
-    end
-    return d .. "  " .. t
-end
-
 --------------------------------------------------------------------------------
 -- ENSURE BACKDROP MIXIN
 --------------------------------------------------------------------------------
@@ -1786,6 +1768,47 @@ end
 
 function BNB.StopGripSizing(f)
     if f._gripDriver then f._gripDriver:SetScript("OnUpdate", nil) end
+end
+
+-- Window drag without StartMoving (ALL-97, drag half). On Retail with a UI
+-- scale of 0.8 the client's StartMoving threw the main window 100-190 px up on
+-- every drag (probed 2026-10-03: one CENTER anchor on UIParent, height well
+-- inside the screen, and the jump stayed with the screen clamp off and with
+-- IsUserPlaced cleared). Same idea as StartGripSizing: pin TOPLEFT, follow the
+-- pointer's movement, keep the window on screen when it is clamped.
+-- Call StartDragMoving from OnDragStart and StopDragMoving from OnDragStop.
+function BNB.StartDragMoving(f)
+    local left, top = f:GetLeft(), f:GetTop()
+    if not (left and top) then return end
+    f:ClearAllPoints()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left, top)
+
+    local s       = f:GetEffectiveScale()
+    local cx, cy  = GetCursorPosition()
+    local w, h    = f:GetSize()
+    -- The screen in the frame's own units
+    local us      = UIParent:GetEffectiveScale()
+    local screenW = UIParent:GetWidth()  * us / s
+    local screenH = UIParent:GetHeight() * us / s
+    local clamp   = f:IsClampedToScreen()
+
+    local drv = f._dragDriver or CreateFrame("Frame")
+    f._dragDriver = drv
+    drv:SetScript("OnUpdate", function(self)
+        if not f:IsShown() then self:SetScript("OnUpdate", nil); return end
+        local x, y = GetCursorPosition()
+        local l = left + (x - cx) / s
+        local t = top  + (y - cy) / s
+        if clamp then
+            l = math.min(math.max(l, 0), math.max(0, screenW - w))
+            t = math.max(math.min(t, screenH), math.min(h, screenH))
+        end
+        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
+    end)
+end
+
+function BNB.StopDragMoving(f)
+    if f._dragDriver then f._dragDriver:SetScript("OnUpdate", nil) end
 end
 
 --------------------------------------------------------------------------------

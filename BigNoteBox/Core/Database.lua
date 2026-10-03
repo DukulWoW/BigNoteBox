@@ -249,24 +249,6 @@ BNB.DEFAULTS = {
 }
 
 --------------------------------------------------------------------------------
--- UUID GENERATOR
---------------------------------------------------------------------------------
--- Seconds plus 32 random bits, drawn again until the id is free in both notes
--- and trash. A bulk import or migration creates many notes within one second,
--- and the old 16-bit suffix could hand out the same id twice (BUG-01). Ids are
--- only ever compared as strings, so the longer form mixes fine with old ones.
-function BNB.GenerateID()
-    local ndb   = BNB.NotesDB()
-    local notes = ndb and ndb.notes or {}
-    local trash = ndb and ndb.trash or {}
-    local id
-    repeat
-        id = string.format("bnb-%08x%04x%04x", time(), math.random(0, 0xFFFF), math.random(0, 0xFFFF))
-    until not notes[id] and not trash[id]
-    return id
-end
-
---------------------------------------------------------------------------------
 -- DEV MODE (ALL-129)
 -- The BigNoteBox_Dev addon (never packaged) is dev mode: while it is enabled,
 -- notes come from its own SavedVariable BigNoteBoxDevDB.notesDB (same shape as
@@ -295,12 +277,7 @@ function BNB.LabDB()
     return BigNoteBoxDB
 end
 
-local function DeepCopy(v)
-    if type(v) ~= "table" then return v end
-    local out = {}
-    for k, x in pairs(v) do out[k] = DeepCopy(x) end
-    return out
-end
+local DeepCopy = BNB.DeepCopy
 
 local LAB_KEYS = { "devBgLab", "devIconLab", "devSearch" }
 

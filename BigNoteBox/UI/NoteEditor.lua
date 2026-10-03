@@ -171,6 +171,15 @@ function BNB.FmtClock(ts)
     return FmtClockPart(ts or time(), db == nil or db.use24Hour ~= false)
 end
 
+-- Fixed "YYYY-MM-DD  H:MM" stamp for history rows, whatever the date setting
+-- (a list of versions reads best in one sortable form). Moved here from
+-- Widgets.lua so all four formatters share the date and clock parts (CMP-05).
+function BNB.FmtTs(ts)
+    if not ts or ts == 0 then return L["TS_UNKNOWN"] end
+    local db = BigNoteBoxDB
+    return FmtDatePart(ts) .. "  " .. FmtClockPart(ts, db == nil or db.use24Hour ~= false)
+end
+
 --------------------------------------------------------------------------------
 -- TITLE FIELD
 -- AddPlaceholder called ONCE at build time.

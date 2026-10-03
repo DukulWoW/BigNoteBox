@@ -208,14 +208,99 @@ end
 -- the same ESC press. Instead we catch ESC via OnKeyDown and close the
 -- top-most BNB window first, the main window last.
 --------------------------------------------------------------------------------
--- Hides a shown window through its close function (plain Hide without one).
-local function TryHide(name, closeFn)
-    local w = _G[name]
-    if w and w:IsShown() then
-        if closeFn then closeFn() else w:Hide() end
-        return true
-    end
-end
+--------------------------------------------------------------------------------
+-- WINDOW REGISTRY (ARCH-03)
+-- Every BNB window the main window manages, in ESC order: the one ESC closes
+-- first is first. It replaces four lists kept by hand (the ESC cascade,
+-- CloseCompanionWindows, the raise list and Focus mode's snapshot). A new
+-- window = one entry here. Fields:
+--   name       global frame name (nil for an ESC step that is not a window)
+--   esc        true = Hide on ESC while shown; a function = how ESC closes it
+--              (called only while shown; a nameless step returns true when
+--              it handled the key)
+--   companion  closes with the main window: true = Hide if shown, a function
+--              = called every time (the close functions check for themselves)
+--   raise      raised together with the main window when it is clicked
+--   focus      Focus mode closes it and reopens it afterwards; the number is
+--              the reopen order, `reopen(noteID)` how
+-- Close and open functions live in files that load later, so every entry
+-- looks them up when it runs, never at load time.
+--------------------------------------------------------------------------------
+local function Call(t, k, ...) local fn = t and t[k]; if fn then return fn(...) end end
+local function ShowNamed(name) local w = _G[name]; if w then w:Show() end end
+
+local WINDOWS = {
+    { name = "BigNoteBoxSendConfirm", raise = true },
+    { name = "BigNoteBoxSendDialog",  raise = true,
+      companion = function() Call(BNB, "CloseSendToChat") end,
+      focus = 8, reopen = function(id) Call(BNB, "OpenSendToChat", id) end },
+    -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
+    -- (sidebar right-click > Change icon), Insert Info menu
+    { name = "BNBNewNoteDialogFrame",
+      esc       = function() Call(BNB.NewNoteDialog, "Close") end,
+      companion = function() Call(BNB.NewNoteDialog, "Close") end },
+    { name = "BNBClipboardHintFrame",
+      esc = function() Call(BNB._clipboardHint, "_dismiss") end },
+    { name = "BNBSidebarIconPickerFrame", esc = true, raise = true },
+    { esc = function() return Call(BNB, "CloseInsertInfoMenu") end },
+    { name = "BigNoteBoxExportFrame",   esc = true, companion = true, raise = true },
+    { name = "BigNoteBoxCopyMoveFrame", esc = true, companion = true, raise = true },
+    { name = "BigNoteBoxHistoryCompareFrame", raise = true,
+      esc       = function() Call(BNB, "CloseHistoryCompare") end,
+      companion = function() Call(BNB, "CloseHistoryCompare") end },
+    -- Alarm setter window closes before sticky settings
+    { name = "BNBAlarmWindow", raise = true,
+      esc       = function() Call(BNB.AlarmWindow, "Close") end,
+      companion = function() Call(BNB.AlarmWindow, "Close") end },
+    { name = "BNBAlarmOverviewFrame", esc = true, companion = true, raise = true },
+    { name = "BigNoteBoxStickySettingsFrame", raise = true,
+      esc = function() Call(BNB.Sticky, "CloseSettings") end },
+    { name = "BigNoteBoxTagManagerFrame", esc = true, companion = true, raise = true,
+      focus = 4, reopen = function() Call(BNB, "ToggleTagManager") end },
+    -- Per-note history panel, then the main history window (also closes panel)
+    { name = "BigNoteBoxNoteHistoryFrame", raise = true,
+      esc       = function() Call(BNB, "CloseNoteHistoryPanel") end,
+      companion = function() Call(BNB, "CloseNoteHistoryPanel") end,
+      focus = 6, reopen = function(id) Call(BNB, "OpenNoteHistoryPanel", id) end },
+    { name = "BigNoteBoxHistoryFrame", raise = true,
+      esc       = function() Call(BNB, "CloseHistoryWindow") end,
+      companion = function() Call(BNB, "CloseHistoryWindow") end,
+      focus = 5, reopen = function() Call(BNB, "OpenHistoryWindow") end },
+    -- Trash view popup before the trash window itself
+    { name = "BNBTrashViewPopup", esc = true },
+    { name = "BigNoteBoxTrashFrame", esc = true, companion = true, raise = true,
+      focus = 3, reopen = function() ShowNamed("BigNoteBoxTrashFrame") end },
+    -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
+    { name = "BigNoteBoxIconFramePicker",
+      esc = function() Call(BNB.IconFramePicker, "Close") end },
+    { name = "BigNoteBoxNoteConfigFrame", esc = true, companion = true, raise = true,
+      focus = 1, reopen = function(id) Call(BNB, "OpenNoteConfig", id) end },
+    -- Task Edit Window before the Reference Box
+    { name = "BNBTaskEditWindow", raise = true,
+      esc = function() Call(BNB.TaskEditWindow, "Close") end },
+    { name = "BigNoteBoxReferenceBoxFrame", esc = true, raise = true,
+      companion = function() Call(BNB, "CloseReferenceBox") end,
+      focus = 7, reopen = function(id) Call(BNB, "OpenReferenceBox", id) end },
+    -- Share preview, then share, then import, all before the main window
+    { name = "BNBSharePreviewFrame", raise = true,
+      esc = function() Call(BNB, "CloseSharePreview") end },
+    { name = "BNBShareFrame", raise = true,   -- closing it also closes the preview
+      esc       = function() Call(BNB, "CloseShareWindow") end,
+      companion = function() Call(BNB, "CloseShareWindow") end },
+    { name = "BNBImportFrame", raise = true,
+      esc       = function() Call(BNB, "CloseImportWindow") end,
+      companion = function() Call(BNB, "CloseImportWindow") end },
+    -- Addon settings window: a sub-page goes back to its tab first
+    { esc = function() return Call(BNB, "ConfigSubPageBack") end },
+    { name = "BigNoteBoxConfigFrame", esc = true, raise = true,
+      companion = function(w)
+          if w and w:IsShown() and not BNB._keepSettingsOpen then w:Hide() end
+      end,
+      focus = 2, reopen = function() ShowNamed("BigNoteBoxConfigFrame") end },
+    -- Rich preview has no fixed frame name; it only closes with the main window
+    { companion = function() Call(BNB, "CloseRichPreview") end },
+}
+BNB.WINDOWS = WINDOWS
 
 -- The game's ESC menu (an ESC sticky opens it) sits on top of our windows:
 -- let the game close it first. Sticky settings opened over it still close
@@ -225,46 +310,23 @@ local function EscToGameMenu()
     return GameMenuFrame and GameMenuFrame:IsShown() and not (ss and ss:IsShown())
 end
 
--- ESC on the main window (BNB.AttachEscClose; in combat the game has ESC)
+-- ESC on the main window (BNB.AttachEscClose; in combat the game has ESC):
+-- the first shown window in WINDOWS closes, the main window last
 local function OnEscapeKey()
-    -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
-    -- (sidebar right-click → Change icon), Insert Info menu
-    if TryHide("BNBNewNoteDialogFrame",
-        BNB.NewNoteDialog and BNB.NewNoteDialog.Close) then return end
-    if TryHide("BNBClipboardHintFrame",
-        BNB._clipboardHint and BNB._clipboardHint._dismiss) then return end
-    if TryHide("BNBSidebarIconPickerFrame") then return end
-    if BNB.CloseInsertInfoMenu and BNB.CloseInsertInfoMenu() then return end
-    if TryHide("BigNoteBoxExportFrame")   then return end
-    if TryHide("BigNoteBoxCopyMoveFrame") then return end
-    if TryHide("BigNoteBoxHistoryCompareFrame", BNB.CloseHistoryCompare) then return end
-    -- Alarm setter window closes before sticky settings
-    if TryHide("BNBAlarmWindow", BNB.AlarmWindow and BNB.AlarmWindow.Close) then return end
-    if TryHide("BNBAlarmOverviewFrame") then return end
-    if TryHide("BigNoteBoxStickySettingsFrame",
-        BNB.Sticky and BNB.Sticky.CloseSettings) then return end
-    if TryHide("BigNoteBoxTagManagerFrame") then return end
-    -- Per-note history panel, then the main history window (also closes panel)
-    if TryHide("BigNoteBoxNoteHistoryFrame", BNB.CloseNoteHistoryPanel) then return end
-    if TryHide("BigNoteBoxHistoryFrame",     BNB.CloseHistoryWindow)    then return end
-    -- Trash view popup before the trash window itself
-    if TryHide("BNBTrashViewPopup")    then return end
-    if TryHide("BigNoteBoxTrashFrame") then return end
-    -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
-    if TryHide("BigNoteBoxIconFramePicker",
-        BNB.IconFramePicker and BNB.IconFramePicker.Close) then return end
-    if TryHide("BigNoteBoxNoteConfigFrame") then return end
-    -- Task Edit Window before the Reference Box
-    if TryHide("BNBTaskEditWindow",
-        BNB.TaskEditWindow and BNB.TaskEditWindow.Close) then return end
-    if TryHide("BigNoteBoxReferenceBoxFrame") then return end
-    -- Share preview, then share, then import, all before the main window
-    if TryHide("BNBSharePreviewFrame", BNB.CloseSharePreview) then return end
-    if TryHide("BNBShareFrame",        BNB.CloseShareWindow)  then return end
-    if TryHide("BNBImportFrame",       BNB.CloseImportWindow) then return end
-    -- Addon settings window: a sub-page goes back to its tab first
-    if BNB.ConfigSubPageBack and BNB.ConfigSubPageBack() then return end
-    if TryHide("BigNoteBoxConfigFrame") then return end
+    for _, e in ipairs(WINDOWS) do
+        local esc = e.esc
+        if esc then
+            if not e.name then
+                if esc() then return end
+            else
+                local w = _G[e.name]
+                if w and w:IsShown() then
+                    if esc == true then w:Hide() else esc(w) end
+                    return
+                end
+            end
+        end
+    end
     -- Otherwise close main window (with confirm if enabled)
     BNB.RequestCloseMainWindow()
 end
@@ -356,6 +418,17 @@ local function BuildClassicChrome()
 end
 
 --------------------------------------------------------------------------------
+-- OPEN MAIN WINDOW ROUTER
+-- Builds the frame on first call, then shows it. CreateMainWindow picks the
+-- classic or skin chrome from BigNoteBoxDB.skinMode. Moved from SkinSystem.lua
+-- (ARCH-06).
+--------------------------------------------------------------------------------
+function BNB.OpenMainWindow()
+    if not BNB.mainFrame and BNB.CreateMainWindow then BNB.CreateMainWindow() end
+    if BNB.mainFrame then BNB.mainFrame:Show() end
+end
+
+--------------------------------------------------------------------------------
 -- CREATE MAIN WINDOW
 --------------------------------------------------------------------------------
 function BNB.CreateMainWindow()
@@ -378,11 +451,13 @@ function BNB.CreateMainWindow()
     f:SetMovable(true)
     f:SetResizable(true)   -- REQUIRED — ButtonFrameTemplate does not set this
     f:SetClampedToScreen(true)
+    -- BNB.StartDragMoving, not f:StartMoving(): the client's mover threw this
+    -- window toward the top of the screen on every drag (ALL-97, UI/Widgets.lua)
     for _, handle in ipairs({ f, chrome.dragBar }) do
         handle:RegisterForDrag("LeftButton")
-        handle:SetScript("OnDragStart", function() f:StartMoving() end)
+        handle:SetScript("OnDragStart", function() BNB.StartDragMoving(f) end)
         handle:SetScript("OnDragStop",  function()
-            f:StopMovingOrSizing()
+            BNB.StopDragMoving(f)
             SaveWindowPos(f)
         end)
     end
@@ -908,6 +983,11 @@ function BNB.CreateMainWindow()
     end)
 
     f:SetScript("OnHide", function(self)
+        -- The Hide that ends this build (below) is not a close: the frame is
+        -- still at its default size in the centre, and saving here wrote that
+        -- over the saved position whenever the UI was already visible while the
+        -- window was built (ALL-97 J4, 2026-10-03: "moves back to the center")
+        if not self._built then return end
         -- Focus mode hides the main window silently — skip confirm/save.
         if self._focusHide then
             -- Focus mode also leaves multi-select, same as a close
@@ -948,6 +1028,7 @@ function BNB.CreateMainWindow()
     end)
 
     f:Hide()
+    f._built = true
     BNB.mainFrame = f
 
     -- Re-check BCB presence each time the window opens (BCB may load after BNB)
@@ -1048,68 +1129,57 @@ function BNB.HideMainWindowKeepSettings()
     return true
 end
 
--- Close all companion windows (NoteConfig, Config, SendToChat).
+-- Close all companion windows (the `companion` entries in WINDOWS).
 -- Called from OnHide and from RequestCloseMainWindow so all close paths are covered.
 function BNB.CloseCompanionWindows()
-    local nc  = _G["BigNoteBoxNoteConfigFrame"]
-    local cfg = _G["BigNoteBoxConfigFrame"]
-    local tw  = _G["BigNoteBoxTrashFrame"]
-    local tm  = _G["BigNoteBoxTagManagerFrame"]
-    local cm  = _G["BigNoteBoxCopyMoveFrame"]
-    local ex  = _G["BigNoteBoxExportFrame"]
-    if nc  and nc:IsShown()  then nc:Hide()  end
-    if cfg and cfg:IsShown() and not BNB._keepSettingsOpen then cfg:Hide() end
-    if tw  and tw:IsShown()  then tw:Hide()  end
-    if tm  and tm:IsShown()  then tm:Hide()  end
-    if cm  and cm:IsShown()  then cm:Hide()  end
-    if ex  and ex:IsShown()  then ex:Hide()  end
-    if BNB.CloseRichPreview      then BNB.CloseRichPreview()      end
-    if BNB.CloseHistoryCompare   then BNB.CloseHistoryCompare()   end
-    if BNB.CloseNoteHistoryPanel then BNB.CloseNoteHistoryPanel() end
-    if BNB.CloseHistoryWindow    then BNB.CloseHistoryWindow()    end
-    if BNB.CloseSendToChat       then BNB.CloseSendToChat()       end
-    if BNB.CloseShareWindow      then BNB.CloseShareWindow()      end  -- also closes preview
-    if BNB.CloseImportWindow     then BNB.CloseImportWindow()     end
-    if BNB.CloseReferenceBox     then BNB.CloseReferenceBox()     end
-    if BNB.AlarmWindow and BNB.AlarmWindow.Close then BNB.AlarmWindow.Close() end
-    local ao = _G["BNBAlarmOverviewFrame"]
-    if ao and ao:IsShown() then ao:Hide() end
-    if BNB.NewNoteDialog and BNB.NewNoteDialog.Close then BNB.NewNoteDialog.Close() end
+    for _, e in ipairs(WINDOWS) do
+        local c = e.companion
+        if c then
+            local w = e.name and _G[e.name]
+            if c == true then
+                if w and w:IsShown() then w:Hide() end
+            else
+                c(w)
+            end
+        end
+    end
 end
 
 -- Raise all currently-visible BNB frames together so clicking the main window
--- never leaves companion windows stranded behind other addon frames.
-local BNB_RAISE_FRAMES = {
-    "BigNoteBoxFrame",
-    "BigNoteBoxReferenceBoxFrame",
-    "BigNoteBoxNoteConfigFrame",
-    "BigNoteBoxConfigFrame",
-    "BigNoteBoxTrashFrame",
-    "BigNoteBoxTagManagerFrame",
-    "BigNoteBoxCopyMoveFrame",
-    "BigNoteBoxExportFrame",
-    "BigNoteBoxHistoryFrame",
-    "BigNoteBoxHistoryCompareFrame",
-    "BigNoteBoxNoteHistoryFrame",
-    "BigNoteBoxStickySettingsFrame",
-    "BNBAlarmWindow",
-    "BNBAlarmOverviewFrame",
-    "BNBShareFrame",
-    "BNBSharePreviewFrame",
-    "BNBImportFrame",
-    "BNBTaskEditWindow",
-    "BNBSidebarIconPickerFrame",
-    "BigNoteBoxTagManagerFrame",
-    "BigNoteBoxSendDialog",
-    "BigNoteBoxSendConfirm",
-}
+-- never leaves companion windows stranded behind other addon frames. The main
+-- window first, then WINDOWS from the bottom up, so the window ESC would close
+-- first ends on top.
+local function RaiseShown(name)
+    local fr = _G[name]
+    if fr and fr:IsShown() then pcall(fr.Raise, fr) end
+end
 function BNB.RaiseBNBWindows()
-    for _, name in ipairs(BNB_RAISE_FRAMES) do
-        local fr = _G[name]
-        if fr and fr:IsShown() then
-            pcall(function() fr:Raise() end)
-        end
+    RaiseShown("BigNoteBoxFrame")
+    for i = #WINDOWS, 1, -1 do
+        local e = WINDOWS[i]
+        if e.raise then RaiseShown(e.name) end
     end
+end
+
+-- Focus mode (UI/FocusEditor.lua): which `focus` windows are open now, and
+-- reopening them afterwards in their `focus` order.
+function BNB.SnapshotWindows()
+    local open = {}
+    for _, e in ipairs(WINDOWS) do
+        local w = e.focus and _G[e.name]
+        if w and w:IsShown() then open[e.name] = true end
+    end
+    return open
+end
+
+function BNB.ReopenWindows(open, noteID)
+    if not open then return end
+    local list = {}
+    for _, e in ipairs(WINDOWS) do
+        if e.focus and open[e.name] then list[#list + 1] = e end
+    end
+    table.sort(list, function(a, b) return a.focus < b.focus end)
+    for _, e in ipairs(list) do e.reopen(noteID) end
 end
 
 --------------------------------------------------------------------------------

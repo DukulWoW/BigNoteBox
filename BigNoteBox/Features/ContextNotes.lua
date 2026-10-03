@@ -204,8 +204,9 @@ local function DismissToast()
     local f = _toast; if not f then return end
     _countdown.running = false
     f:SetScript("OnUpdate", nil)
-    UIFrameFadeOut(f, TOAST_FADE, f:GetAlpha(), 0)
-    C_Timer.After(TOAST_FADE + 0.05, function() f:Hide() end)
+    -- BNB.FadeTo, not UIFrameFadeOut + a timed Hide (CMP-05): a toast shown
+    -- again inside the fade-out starts a new fade, which drops this Hide
+    BNB.FadeTo(f, f:GetAlpha(), 0, TOAST_FADE, function() f:Hide() end)
 end
 
 local function IsMouseOverToast()
@@ -501,8 +502,7 @@ local function ShowToast(matchIDs, locationName)
     end
 
     f:Show()
-    f:SetAlpha(0)
-    UIFrameFadeIn(f, TOAST_FADE, 0, 1)
+    BNB.FadeTo(f, 0, 1, TOAST_FADE)
 
     -- Start countdown after fade-in completes
     C_Timer.After(TOAST_FADE, function()
