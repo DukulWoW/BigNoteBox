@@ -272,7 +272,6 @@ local OV_PAD  = 10
 local OV_ROW  = 36
 
 local _ovFrame    = nil
-local _ovCtxDD    = nil  -- reusable right-click dropdown
 local _ovMultiMode = false
 local _ovMultiSel  = {}  -- { [noteID] = true }
 -- Footer button refs (set during BuildOverview, used by SetOvMultiMode)
@@ -786,15 +785,9 @@ function AO.Refresh()
                 return
             end
             if btn == "RightButton" then
-                -- Right-click context menu
-                if not _ovCtxDD then
-                    _ovCtxDD = CreateFrame("DropdownButton", "BNBAlarmOvCtxDD",
-                        UIParent, "WowStyle1DropdownTemplate")
-                    _ovCtxDD:SetSize(1,1); _ovCtxDD:SetAlpha(0)
-                end
-                BNB.PlaceContextMenu(_ovCtxDD, self)
+                -- Right-click context menu (ALL-148)
                 local nid = noteID  -- capture for closures
-                _ovCtxDD:SetupMenu(function(_, root)
+                BNB.ContextMenu.Open(self, function(root)
                     root:CreateTitle(t)
                     root:CreateButton(L["AO_CTX_OPEN_ALARM"], function()
                         if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then
@@ -815,9 +808,8 @@ function AO.Refresh()
                     root:CreateButton(L["AO_CTX_DELETE_ALARM"], function()
                         local popup = StaticPopup_Show("BNB_DELETE_ALARM_CONFIRM")
                         if popup then popup.data = nid end
-                    end)
+                    end, { danger = true })   -- irreversible = red (Dukul)
                 end)
-                _ovCtxDD:OpenMenu()
             else
                 -- Left-click: open alarm config
                 if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then

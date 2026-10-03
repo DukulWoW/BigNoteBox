@@ -85,28 +85,14 @@ end
 
 -- ── Right-click menu hook ──────────────────────────────────────────────────────
 
--- Reused WowStyle1 dropdown frame
-local _bcbCtxDropdown = nil
-
--- Show a small context menu anchored to the BCB editbox
+-- Show a small context menu at the pointer over the BCB editbox (ALL-148)
 local function ShowBCBCaptureMenu(eb)
-    local menuTitle = "BigNoteBox"
-
-    if not _bcbCtxDropdown then
-        _bcbCtxDropdown = CreateFrame("DropdownButton", "BNBBCBCaptureDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _bcbCtxDropdown:SetSize(1, 1)
-        _bcbCtxDropdown:SetAlpha(0)
-    end
-    BNB.PlaceContextMenu(_bcbCtxDropdown, eb)
-
-    _bcbCtxDropdown:SetupMenu(function(_, root)
-        root:CreateTitle(menuTitle)
+    BNB.ContextMenu.Open(eb, function(root)
+        root:CreateTitle("BigNoteBox")
         root:CreateButton(L["CAPTURE_MENU"], function()
             DoCaptureFromBCB()
         end)
     end)
-    _bcbCtxDropdown:OpenMenu()
 end
 
 -- ── Setup ──────────────────────────────────────────────────────────────────────

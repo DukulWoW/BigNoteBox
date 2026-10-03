@@ -984,18 +984,9 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
     _pickerFrame:Raise()
 end
 
--- ── Context menu ─────────────────────────────────────────────────────────────
-local _ctxDropdown     = nil
-local _gearCtxDropdown = nil
-
+-- ── Context menu (BNB.ContextMenu, ALL-148) ──────────────────────────────────
 local function OpenContextMenu(anchorRow, noteID, attIndex)
-    if not _ctxDropdown then
-        _ctxDropdown = CreateFrame("DropdownButton", "BNBRefBoxCtxDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _ctxDropdown:SetSize(1, 1); _ctxDropdown:SetAlpha(0)
-    end
-    BNB.PlaceContextMenu(_ctxDropdown, anchorRow)
-    _ctxDropdown:SetupMenu(function(_, root)
+    BNB.ContextMenu.Open(anchorRow, function(root)
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
@@ -1042,19 +1033,12 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
         root:CreateDivider()
         root:CreateButton(L["REFBOX_CTX_REMOVE"], function()
             RemoveAttachment(noteID, attIndex)
-        end)
+        end, { danger = true })   -- irreversible = red (Dukul)
     end)
-    _ctxDropdown:OpenMenu()
 end
 
 local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listIdx)
-    if not _gearCtxDropdown then
-        _gearCtxDropdown = CreateFrame("DropdownButton", "BNBRefBoxGearCtxDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _gearCtxDropdown:SetSize(1, 1); _gearCtxDropdown:SetAlpha(0)
-    end
-    BNB.PlaceContextMenu(_gearCtxDropdown, anchorRow)
-    _gearCtxDropdown:SetupMenu(function(_, root)
+    BNB.ContextMenu.Open(anchorRow, function(root)
         -- Send to chat
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local att = {type = "item", id = gearEntry.id}
@@ -1062,15 +1046,10 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
         end)
 
         -- Insert at text cursor — greyed out in rich note view mode
-        local inViewMode = BNB._editorInViewMode == true
-        local insertLabel = inViewMode
-            and ("|cff888888" .. L["REFBOX_CTX_INSERT"] .. "|r")
-            or  L["REFBOX_CTX_INSERT"]
-        root:CreateButton(insertLabel, function()
-            if inViewMode then return end
+        root:CreateButton(L["REFBOX_CTX_INSERT"], function()
             local att = {type = "item", id = gearEntry.id}
             InsertAttachmentIntoNote(att, noteID)
-        end)
+        end, { disabled = BNB._editorInViewMode == true })
 
         -- Copy Wowhead URL
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
@@ -1102,9 +1081,8 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
                 BNB.UpdateNote(noteID, {})
                 RenderList()
             end
-        end)
+        end, { danger = true })
     end)
-    _gearCtxDropdown:OpenMenu()
 end
 
 -- ── Shift-click hook (Baganator-safe) ────────────────────────────────────────

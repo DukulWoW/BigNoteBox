@@ -235,14 +235,18 @@ local WINDOWS = {
       companion = function() Call(BNB, "CloseSendToChat") end,
       focus = 8, reopen = function(id) Call(BNB, "OpenSendToChat", id) end },
     -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
-    -- (sidebar right-click > Change icon), Insert Info menu
+    -- (sidebar right-click > Change icon), any open right-click menu (it
+    -- takes ESC itself while it has the keyboard; this catches the rest)
     { name = "BNBNewNoteDialogFrame",
       esc       = function() Call(BNB.NewNoteDialog, "Close") end,
       companion = function() Call(BNB.NewNoteDialog, "Close") end },
     { name = "BNBClipboardHintFrame",
       esc = function() Call(BNB._clipboardHint, "_dismiss") end },
     { name = "BNBSidebarIconPickerFrame", esc = true, raise = true },
-    { esc = function() return Call(BNB, "CloseInsertInfoMenu") end },
+    { esc = function()
+          local cm = BNB.ContextMenu
+          if cm and cm.IsOpen() then cm.Close(); return true end
+      end },
     { name = "BigNoteBoxExportFrame",   esc = true, companion = true, raise = true },
     { name = "BigNoteBoxCopyMoveFrame", esc = true, companion = true, raise = true },
     { name = "BigNoteBoxHistoryCompareFrame", raise = true,

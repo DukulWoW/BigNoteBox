@@ -1107,8 +1107,7 @@ function BNB.FocusTaskEditBox(taskID)
     if task and task.text == "" then T.DeleteTask(NoteID(), taskID) end
 end
 
--- ── Task context menu (WowStyle1DropdownTemplate — matches attachment rows) ──
-local _taskCtxDropdown
+-- ── Task context menu (BNB.ContextMenu, ALL-148, as the attachment rows) ─────
 function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
     if not noteID or not taskID then return end
     local T = BNB.Task
@@ -1116,17 +1115,10 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
     local task = T.FindTask(noteID, taskID)
     if not task then return end
 
-    if not _taskCtxDropdown then
-        _taskCtxDropdown = CreateFrame("DropdownButton", "BNBTaskCtxDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _taskCtxDropdown:SetSize(1, 1); _taskCtxDropdown:SetAlpha(0)
-    end
-    BNB.PlaceContextMenu(_taskCtxDropdown, anchor)
-
     local isTopLevel = not task.parentID
     local L = BNB.L or {}
 
-    _taskCtxDropdown:SetupMenu(function(_, root)
+    BNB.ContextMenu.Open(anchor, function(root)
         -- Edit task...
         root:CreateButton(L["TASK_CTX_EDIT"] or "Edit task...", function()
             if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
@@ -1232,16 +1224,14 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         root:CreateDivider()
 
         -- Delete
-        local delLabel = "|cffFF6666" .. (L["TASK_CTX_DELETE"] or "Delete") .. "|r"
-        root:CreateButton(delLabel, function()
+        root:CreateButton(L["TASK_CTX_DELETE"] or "Delete", function()
             T.DeleteTask(noteID, taskID)
             if RenderTaskPanel then
                 RenderTaskPanel()
                 ApplyTaskLayout(RBFrame())
             end
-        end)
+        end, { danger = true })
     end)
-    _taskCtxDropdown:OpenMenu()
 end
 
 -- RenderList's second delayed pass (ReferenceBox.lua) hides and re-shows the

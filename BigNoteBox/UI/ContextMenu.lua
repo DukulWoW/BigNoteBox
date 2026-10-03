@@ -33,6 +33,9 @@
 --     opts.disabled  greyed, no click, no sub-menu
 --     opts.tip, opts.tipSub   tooltip
 --   item:CreateButton(...) / item:CreateDivider()   makes item a sub-menu
+--   root:CreateRadio(text, isSelected, onSelect, opts) -> item
+--     a choice with a round mark, filled while isSelected() returns true;
+--     a click runs onSelect and closes the menu (the task Reset / Situation)
 --   root:CreateDivider()
 --
 -- Closes on: a click on an item, a click outside every open level, ESC
@@ -49,6 +52,7 @@ local ART     = "Interface\\AddOns\\BigNoteBox\\Assets\\ContextMenu\\"
 local LAYERS  = ART .. "Layers\\"    -- cm-background-inactive/-active/-warning, -highlight
 local SYMBOLS = ART .. "Symbols\\"   -- cm-<icon>, 64x64 on the plate's canvas
 local ARROW   = "Interface\\ChatFrame\\ChatFrameExpandArrow"
+local RADIO   = "Interface\\Common\\UI-DropDownRadioChecks"   -- top half: on 0-.5, off .5-1
 local WARNING  = { danger = true }   -- red plate on hover (Delete permanently)
 local UNTINTED = { danger = true }   -- skin look keeps the red
 
@@ -104,6 +108,13 @@ function Desc:CreateTitle(text, opts)
     return d
 end
 
+function Desc:CreateRadio(text, isSelected, onSelect, opts)
+    local d = NewDesc("radio", text, onSelect, opts)
+    d.isSelected = isSelected
+    self.items[#self.items + 1] = d
+    return d
+end
+
 function Desc:CreateDivider()
     local d = NewDesc("divider")
     self.items[#self.items + 1] = d
@@ -128,6 +139,9 @@ local _skin   = false
 local _timer        -- pending open/switch
 local _watch        -- GLOBAL_MOUSE_DOWN listener
 local _after        -- runs after an item's click (CM.Open's third argument)
+-- Owners that have our OnHide hook. A table, not a field on the owner: one of
+-- them is BigChatBox's edit box (ChatCapture), another addon's frame
+local _hideHooked = setmetatable({}, { __mode = "k" })
 
 local function Cancel()
     if _timer then _timer:Cancel(); _timer = nil end
@@ -289,6 +303,10 @@ local function NewRow(f)
     r._plate:SetSize(ICON, ICON)
     r._plate:SetPoint("LEFT", 4, 0)
     r._icon = r:CreateTexture(nil, "ARTWORK", nil, 1)
+    r._mark = r:CreateTexture(nil, "ARTWORK", nil, 1)   -- radio mark
+    r._mark:SetTexture(RADIO)
+    r._mark:SetSize(16, 16)
+    r._mark:SetPoint("LEFT", 5, 0)
     r._text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     r._text:SetJustifyH("LEFT")
     r._text:SetWordWrap(false)
@@ -360,7 +378,7 @@ end
 local function Fill(f, d)
     local hasIcons = false
     for _, it in ipairs(d.items) do
-        if it.kind == "button" and it.opts.icon then hasIcons = true; break end
+        if (it.kind == "button" and it.opts.icon) or it.kind == "radio" then hasIcons = true; break end
     end
     local textX = hasIcons and (4 + ICON + 6) or 10
     if f._badge then f._badge:Hide() end
@@ -373,7 +391,7 @@ local function Fill(f, d)
         r._desc, r._active, r._iconKey = it, nil, nil
         r._disabled, r._hasSub = false, false
         r._hl:Hide()
-        r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide()
+        r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide(); r._mark:Hide()
         r._icon:SetDesaturated(false); r._icon:SetVertexColor(1, 1, 1); r._icon:SetTexCoord(0, 1, 0, 1)
         r._text:ClearAllPoints()
         ApplyRowLook(r)
@@ -436,7 +454,17 @@ local function Fill(f, d)
             end
             r._text:SetText(it.text or "")
             r._text:Show()
-            if it.opts.icon then
+            if it.kind == "radio" then
+                local on = it.isSelected and it.isSelected() and true or false
+                r._mark:SetTexCoord(on and 0 or 0.5, on and 0.5 or 1, 0, 0.5)
+                if _skin then   -- tinted like the dividers
+                    local _, _, _, br, bg_, bb = SkinColours()
+                    r._mark:SetDesaturated(true); r._mark:SetVertexColor(br, bg_, bb)
+                else
+                    r._mark:SetDesaturated(false); r._mark:SetVertexColor(1, 1, 1)
+                end
+                r._mark:Show()
+            elseif it.opts.icon then
                 r._iconKey = it.opts.icon
                 r._icon:SetSize(ICON, ICON)
                 r._icon:ClearAllPoints()
@@ -566,8 +594,8 @@ function CM.Open(owner, build, after)
     if not HasSub(root) then return end
     _skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false
     _owner, _after = owner, after
-    if owner and owner.HookScript and not owner._cmHideHooked then
-        owner._cmHideHooked = true
+    if owner and owner.HookScript and not _hideHooked[owner] then
+        _hideHooked[owner] = true
         owner:HookScript("OnHide", function(self)
             if _owner == self then CM.Close() end
         end)

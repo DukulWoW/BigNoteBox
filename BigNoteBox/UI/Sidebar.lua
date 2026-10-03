@@ -550,19 +550,7 @@ local function ShowSlotContextMenu(key, btn)
     local rec = db.knownChars and db.knownChars[charKey]
     if not rec then return end
 
-    -- Reuse a single DropdownButton parented to UIParent (invisible, 1x1)
-    if not SB._ctxDD then
-        local dd = CreateFrame("DropdownButton", "BNBSidebarContextDD", UIParent,
-            "WowStyle1DropdownTemplate")
-        dd:SetSize(1, 1)
-        dd:SetAlpha(0)
-        dd:SetToplevel(true)
-        SB._ctxDD = dd
-    end
-    local dd = SB._ctxDD
-    BNB.PlaceContextMenu(dd, btn)
-
-    dd:SetupMenu(function(_, root)
+    BNB.ContextMenu.Open(btn, function(root)   -- ALL-148
         -- Pin / Unpin
         root:CreateButton(
             rec.slotPinned and L["SB_UNPIN"] or L["SB_PIN_TO_TOP"],
@@ -612,8 +600,6 @@ local function ShowSlotContextMenu(key, btn)
             end)
         end
     end)
-
-    dd:OpenMenu()
 end
 
 --------------------------------------------------------------------------------

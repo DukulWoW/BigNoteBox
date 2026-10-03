@@ -672,13 +672,8 @@ end
 
 --------------------------------------------------------------------------------
 -- RIGHT-CLICK CONTEXT MENU
--- Uses WowStyle1DropdownTemplate (retail Midnight only).
---
--- Menu items:
---   Open / Select       — left-click equivalent
---   Duplicate           — clones title+body+tags into a new note
---   ── divider ──
---   Delete              — shows BNB_DELETE_NOTE popup
+-- The menu itself is UI/NoteContextMenu.lua (ALL-148); the helpers it uses
+-- from here go over through BNB._NoteListKit.
 --------------------------------------------------------------------------------
 
 local function DuplicateNote(id)

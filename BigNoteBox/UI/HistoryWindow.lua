@@ -50,7 +50,6 @@ end
 --------------------------------------------------------------------------------
 -- INTERNAL: build one row frame for a note entry
 --------------------------------------------------------------------------------
-local _hwCtxDD = nil   -- reused WowStyle1DropdownTemplate button
 
 local function BuildRow(parent, note, id, yOff)
     local row = CreateFrame("Button", nil, parent)
@@ -116,13 +115,7 @@ local function BuildRow(parent, note, id, yOff)
 
     row:SetScript("OnClick", function(self, mouseBtn)
         if mouseBtn == "RightButton" then
-            if not _hwCtxDD then
-                _hwCtxDD = CreateFrame("DropdownButton", "BNBHistoryRowContextDropdown",
-                    UIParent, "WowStyle1DropdownTemplate")
-                _hwCtxDD:SetSize(1, 1); _hwCtxDD:SetAlpha(0)
-            end
-            BNB.PlaceContextMenu(_hwCtxDD, row)
-            _hwCtxDD:SetupMenu(function(_, root)
+            BNB.ContextMenu.Open(row, function(root)   -- ALL-148
                 root:CreateButton(L["HISTORY_CTX_VIEW"], function()
                     if BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(id) end
                 end)
@@ -151,9 +144,8 @@ local function BuildRow(parent, note, id, yOff)
                         preferredIndex = 3,
                     }
                     StaticPopup_Show("BNB_HISTORY_CLEAR_NOTE")
-                end)
+                end, { danger = true })   -- irreversible = red (Dukul)
             end)
-            _hwCtxDD:OpenMenu()
         else
             if BNB.OpenNoteHistoryPanel then
                 BNB.OpenNoteHistoryPanel(id)

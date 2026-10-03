@@ -59,6 +59,7 @@ UI\IconFrameLayer.lua
 UI\IconFrames.lua
 UI\StickyBackgrounds.lua
 UI\StickyNote.lua
+UI\SituationEditor.lua
 UI\StickySettings.lua
 UI\StickyBgPicker.lua
 UI\IconFramePicker.lua

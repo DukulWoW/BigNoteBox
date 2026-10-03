@@ -82,7 +82,6 @@ end
 --------------------------------------------------------------------------------
 -- BuildSnapRow — one snapshot entry
 --------------------------------------------------------------------------------
-local _snapCtxDD = nil   -- reused WowStyle1DropdownTemplate button
 
 local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     -- slotType = "manual" or "auto"; slotIndex = 1-based for auto
@@ -177,13 +176,7 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     -- row's own confirm step rather than a second popup).
     row:SetScript("OnMouseUp", function(self, button)
         if button ~= "RightButton" then return end
-        if not _snapCtxDD then
-            _snapCtxDD = CreateFrame("DropdownButton", "BNBSnapContextDropdown",
-                UIParent, "WowStyle1DropdownTemplate")
-            _snapCtxDD:SetSize(1, 1); _snapCtxDD:SetAlpha(0)
-        end
-        BNB.PlaceContextMenu(_snapCtxDD, row)
-        _snapCtxDD:SetupMenu(function(_, root)
+        BNB.ContextMenu.Open(row, function(root)   -- ALL-148
             root:CreateButton(L["HISTORY_OVERRIDE_COMPARE"], function()
                 if BNB.OpenHistoryCompare then BNB.OpenHistoryCompare(noteID, snap) end
             end)
@@ -195,9 +188,8 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
             root:CreateButton(L["BTN_DELETE_NOTE"], function()
                 local onClick = delBtn:GetScript("OnClick")
                 if onClick then onClick(delBtn) end
-            end)
+            end, { danger = true })   -- irreversible = red (Dukul)
         end)
-        _snapCtxDD:OpenMenu()
     end)
 
     -- Bottom separator

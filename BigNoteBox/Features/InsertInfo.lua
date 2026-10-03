@@ -114,20 +114,10 @@ local function InsertIntoEditBox(eb, text)
     BNB.MarkDirty()
 end
 
--- ── Menu (WowStyle1DropdownTemplate) ─────────────────────────────────────────
+-- ── Menu (BNB.ContextMenu, ALL-148) ──────────────────────────────────────────
 
-local _infoDropdown = nil
-
-local function ShowInsertInfoMenuModern(eb)
-    if not _infoDropdown then
-        _infoDropdown = CreateFrame("DropdownButton", "BNBInsertInfoDropdown",
-            UIParent, "WowStyle1DropdownTemplate")
-        _infoDropdown:SetSize(1, 1)
-        _infoDropdown:SetAlpha(0)
-    end
-    BNB.PlaceContextMenu(_infoDropdown, eb)
-
-    _infoDropdown:SetupMenu(function(_, root)
+local function ShowInsertInfoMenu(eb)
+    BNB.ContextMenu.Open(eb, function(root)
         root:CreateTitle(L["INSERT_INFO_TITLE"] or "Insert Info")
 
         -- Location
@@ -187,23 +177,6 @@ local function ShowInsertInfoMenuModern(eb)
                 function() InsertIntoEditBox(eb, value) end)
         end
     end)
-
-    _infoDropdown:OpenMenu()
-end
-
--- ── Dispatch ──────────────────────────────────────────────────────────────────
-
-local function ShowInsertInfoMenu(eb)
-    ShowInsertInfoMenuModern(eb)
-end
-
--- Called by MainWindow ESC handler to close the menu before anything else.
-function BNB.CloseInsertInfoMenu()
-    if _infoDropdown and _infoDropdown:IsMenuOpen() then
-        _infoDropdown:CloseMenu()
-        return true
-    end
-    return false
 end
 
 -- ── Wire a single EditBox ─────────────────────────────────────────────────────

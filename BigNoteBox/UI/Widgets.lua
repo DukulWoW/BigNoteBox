@@ -1812,28 +1812,8 @@ function BNB.StopDragMoving(f)
 end
 
 --------------------------------------------------------------------------------
--- RIGHT-CLICK MENUS (ALL-81)
--- Every context menu opens from a hidden 1x1 DropdownButton parented to
--- UIParent. Anchored to the clicked row, the menu opened away from the mouse
--- (past a window's right edge), and since nothing ties it to the window it
--- stayed open when that window closed (Esc, X, a toggle).
--- PlaceContextMenu(dd, owner) puts dd at the mouse pointer and closes its menu
--- when `owner` (the row or box that was right-clicked) hides; a hidden window
--- hides its children too. Call it before dd:OpenMenu(). The OnHide hook goes on
--- once per owner and only acts while dd was last opened from that owner.
+-- RIGHT-CLICK MENUS: every one goes through BNB.ContextMenu.Open(owner, build)
+-- (UI/ContextMenu.lua, ALL-148). It opens at the pointer and closes when
+-- `owner` (the row or box right-clicked) hides. PlaceContextMenu, the old
+-- helper for Blizzard's hidden-DropdownButton menus (ALL-81), is gone.
 --------------------------------------------------------------------------------
-function BNB.PlaceContextMenu(dd, owner)
-    local cx, cy = GetCursorPosition()
-    local sc = UIParent:GetEffectiveScale()
-    dd:ClearAllPoints()
-    dd:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / sc, cy / sc)
-    dd._ctxOwner = owner
-    if not (owner and owner.HookScript) then return end
-    owner._ctxMenuDD = dd
-    if owner._ctxMenuHideHooked then return end
-    owner._ctxMenuHideHooked = true
-    owner:HookScript("OnHide", function(self)
-        local d = self._ctxMenuDD
-        if d and d._ctxOwner == self and d:IsMenuOpen() then d:CloseMenu() end
-    end)
-end

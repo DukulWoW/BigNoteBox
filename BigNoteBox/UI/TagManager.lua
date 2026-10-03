@@ -28,8 +28,6 @@ local _openTag     = nil
 local _tagPool  = {}
 local _notePool = {}
 
-local _tagCtxDD = nil   -- reused WowStyle1DropdownTemplate button (tag header rows)
-
 -- Multi-select state
 local _multiMode   = false
 local _multiSel    = {}   -- { [tag] = true }
@@ -242,21 +240,15 @@ PopulateTagManager = function()
         -- Expand / collapse (normal) or toggle selection (multi-select)
         row.hitBtn:SetScript("OnClick", function(_, mouseBtn)
             if mouseBtn == "RightButton" then
-                if not _tagCtxDD then
-                    _tagCtxDD = CreateFrame("DropdownButton", "BNBTagContextDropdown",
-                        UIParent, "WowStyle1DropdownTemplate")
-                    _tagCtxDD:SetSize(1, 1); _tagCtxDD:SetAlpha(0)
-                end
-                BNB.PlaceContextMenu(_tagCtxDD, row.hitBtn)
-                _tagCtxDD:SetupMenu(function(_, root)
+                BNB.ContextMenu.Open(row.hitBtn, function(root)   -- ALL-148
                     root:CreateButton(L["TAG_MGR_RENAME"], function() row.renBtn:GetScript("OnClick")(row.renBtn) end)
-                    root:CreateButton(L["TAG_MGR_DELETE"], function() row.delBtn:GetScript("OnClick")(row.delBtn) end)
+                    root:CreateButton(L["TAG_MGR_DELETE"], function() row.delBtn:GetScript("OnClick")(row.delBtn) end,
+                        { danger = true })   -- irreversible = red (Dukul)
                     root:CreateButton(L["TAG_MGR_SHOW_NOTES"], function()
                         _openTag = capturedTag
                         PopulateTagManager()
                     end)
                 end)
-                _tagCtxDD:OpenMenu()
                 return
             end
             if _multiMode then

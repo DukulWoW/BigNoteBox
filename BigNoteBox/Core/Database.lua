@@ -42,7 +42,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 8   -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 9   -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 17  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -459,6 +459,18 @@ function BNB.MigrateNotesDB()
             end
         end
         v = 8
+    end
+
+    -- Sticky settings saved "When you leave: Minimize" as contextLeave
+    -- "bt-minimize" (v1.13.0 to v1.16.0), which nothing reads; the shared
+    -- Situation editor (CMP-03) saves "minimize"
+    if v < 9 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                if note.contextLeave == "bt-minimize" then note.contextLeave = "minimize" end
+            end
+        end
+        v = 9
     end
 
     -- Never lower the stored version: running an older build must not make the

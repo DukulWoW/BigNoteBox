@@ -1823,18 +1823,8 @@ local function CreateStickyFrame(noteID)
     -- ── Right-click context menu (ALL-83) ─────────────────────────────────────
     -- Same entries as the header buttons: Open in editor, Settings, Set/Edit
     -- alarm, Show tasks/note, then a divider, Minimize, Close.
-    local _stickyCtxDD = nil
     local function ShowStickyContextMenu(anchor)
-        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-                and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")) then
-            return
-        end
-        if not _stickyCtxDD then
-            _stickyCtxDD = CreateFrame("DropdownButton", nil, UIParent, "WowStyle1DropdownTemplate")
-            _stickyCtxDD:SetSize(1, 1); _stickyCtxDD:SetAlpha(0)
-        end
-        BNB.PlaceContextMenu(_stickyCtxDD, anchor)
-        _stickyCtxDD:SetupMenu(function(_, root)
+        BNB.ContextMenu.Open(anchor, function(root)   -- ALL-148
             root:CreateButton(L["STICKY_OPEN_TO_EDIT_TIP"], function()
                 EndInlineEdit(f)
                 OpenInMainEditor(noteID)
@@ -1906,7 +1896,6 @@ local function CreateStickyFrame(noteID)
                 SN.Close(noteID)
             end)
         end)
-        _stickyCtxDD:OpenMenu()
     end
     f._showStickyCtxMenu = ShowStickyContextMenu
 
