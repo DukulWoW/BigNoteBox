@@ -77,13 +77,14 @@ local function GetLocationNotes(max)
 
     local results = {}
     for id, note in pairs(ndb.notes) do
-        if note.context then
-            local kind, value = note.context:match("^(%w+):(.+)$")
+        for _, ctx in ipairs(BNB.NoteSituations(note)) do
+            local kind, value = ctx:match("^(%w+):(.+)$")
             if kind and value and kind == curKind and value:lower() == curVal then
                 results[#results + 1] = { id = id, note = note }
-                if #results >= max then break end
+                break
             end
         end
+        if #results >= max then break end
     end
     return results
 end

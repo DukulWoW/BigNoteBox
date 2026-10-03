@@ -53,8 +53,8 @@ function BNB.RegisterSlashCommands()
                 BNB:Print(string.format("|cff88bbffWaypoint data:|r mapID=%s  x=%s  y=%s  title=%s  label=%s",
                     tostring(wp.mapID), tostring(wp.x), tostring(wp.y),
                     tostring(wp.title), tostring(wp.label)))
-                BNB:Print(string.format("|cff88bbffFlags:|r wpClearOnLeave=%s  context=%s",
-                    tostring(note.wpClearOnLeave), tostring(note.context)))
+                BNB:Print(string.format("|cff88bbffFlags:|r wpClearOnLeave=%s  situations=%s",
+                    tostring(note.wpClearOnLeave), table.concat(BNB.NoteSituations(note), ", ")))
             elseif sub == "fire" then
                 BNB:Print("|cff88bbffSimulating zone-enter (calling CheckContextualNotes)...|r")
                 if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end

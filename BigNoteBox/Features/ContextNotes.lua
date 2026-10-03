@@ -1,12 +1,14 @@
 -- BigNoteBox Features/ContextNotes.lua — Contextual note surfacing
 --
--- Matches note.context against the player's current environment and surfaces
--- matching notes via:
+-- Matches a note's situations against the player's current environment and
+-- surfaces matching notes via:
 --   1. Minimap badge (a count overlay on the minimap button)
 --   2. Toast notification (a small slide-in frame, auto-dismissed after 6s)
 --
--- note.context schema (stored in BigNoteBoxNotesDB.notes[id].context):
---   nil / ""         → note is "global" (matches everywhere)
+-- note.situations: a list of situation strings, read through
+-- BNB.NoteSituations (Core/NoteFields.lua); the note matches while any one
+-- does (ALL-232, NOTES v10; it was the one string note.context). nil = no
+-- situation, the note never surfaces by itself.
 --   "zone:Elwynn Forest"
 --   "instance:Molten Core"
 --   "player:Thrall"
@@ -22,6 +24,8 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 BNB._contextMatches = BNB._contextMatches or {}
+-- noteID -> the situation string it matched by in the last check
+BNB._contextMatchedBy = BNB._contextMatchedBy or {}
 BNB._autoWaypoints  = BNB._autoWaypoints  or {}  -- noteID → TomTom uid (or true for retail)
 -- noteID -> "mapID:x:y" of the waypoint last set for it while it matched. A
 -- waypoint is set again only when the note newly matches or its waypoint changed,
@@ -120,7 +124,7 @@ local function ContextMatches(ctx, env)
     return false
 end
 
--- Returns true if the note should surface.
+-- Returns the first situation of the note that matches, or nil.
 local function NoteMatches(note, env)
     -- Scope guard: character-scoped notes only surface for their owner.
     local sc = note.scope
@@ -129,9 +133,10 @@ local function NoteMatches(note, env)
         if charKey and charKey ~= BNB.currentChar then return false end
     end
 
-    local ctx = note.context
-    if not ctx or ctx == "" then return false end
-    return ContextMatches(ctx, env)
+    for _, ctx in ipairs(BNB.NoteSituations(note)) do
+        if ContextMatches(ctx, env) then return ctx end
+    end
+    return nil
 end
 
 -- Target and group changes only matter to notes with a player situation
@@ -141,8 +146,9 @@ function BNB.HasPlayerContexts()
     local ndb = BNB.NotesDB()
     if not (ndb and ndb.notes) then return false end
     for _, note in pairs(ndb.notes) do
-        local c = note.context
-        if c and c:find("^player:") then return true end
+        for _, c in ipairs(BNB.NoteSituations(note)) do
+            if c:find("^player:") then return true end
+        end
     end
     return false
 end
@@ -454,8 +460,8 @@ local function ShowToast(matchIDs, locationName)
                 row._lbl:SetTextColor(0.85, 0.85, 0.85)
             end
 
-            -- Show sub-zone tag if this note is bound to a sub-zone
-            local ctx = note and note.context or ""
+            -- Show sub-zone tag if this note matched by a sub-zone
+            local ctx = BNB._contextMatchedBy[matchIDs[i]] or ""
             local ctxKind, ctxVal = ctx:match("^(%w+):(.+)$")
             if ctxKind == "subzone" and ctxVal and ctxVal ~= "" then
                 row._ctx:SetText("(" .. ctxVal .. ")")
@@ -523,13 +529,16 @@ function BNB.CheckContextualNotes()
     local env = CurrentEnv()
     local matches   = {}
     local matchSet  = {}
+    local matchedBy = {}
     local stickyIDs = {}
     local popupIDs  = {}
     for _, note in pairs(ndb.notes) do
-        if note and note.context and note.context ~= "" then
-            if NoteMatches(note, env) then
+        if note and BNB.HasSituation(note) then
+            local by = NoteMatches(note, env)
+            if by then
                 matches[#matches + 1]  = note.id
                 matchSet[note.id]      = true
+                matchedBy[note.id]     = by
                 if note.contextDisplay == "sticky" then
                     stickyIDs[#stickyIDs + 1] = note.id
                 elseif note.contextDisplay == "both" then
@@ -547,6 +556,7 @@ function BNB.CheckContextualNotes()
     for _, id in ipairs(prev) do prevSet[id] = true end
 
     BNB._contextMatches = matches
+    BNB._contextMatchedBy = matchedBy
 
     -- ── Zone-leave: notes that were matching but no longer are ─────────────────
     local hasKeepWP = false  -- track if any departing note wants to keep its WP

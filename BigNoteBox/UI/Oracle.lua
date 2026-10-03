@@ -95,7 +95,7 @@ local BADGES = {
       show = function(note) return note.richMode == true end },
     -- A situation (the note settings Situation tab: zone, instance, player...)
     { file = "s-icon-situation", tip = "ORACLE_BADGE_SITUATION", show = function(note)
-        return type(note.context) == "string" and note.context ~= "" end },
+        return BNB.HasSituation(note) end },
     { file = "s-icon-alarm",    tip = "ORACLE_BADGE_ALARM",
       show = function(note) return note.alarm ~= nil end },
     -- Only while the Tasks module is on (ALL-102)

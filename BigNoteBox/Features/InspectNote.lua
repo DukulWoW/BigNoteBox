@@ -538,7 +538,7 @@ local function CreateInspectNote(richMode, silent)
         fields.inspectTransmogItems = data.transmogItems
     end
     if context then
-        fields.context = context
+        fields.situations = { context }
     end
 
     local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[data.classFile]

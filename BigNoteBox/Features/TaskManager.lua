@@ -533,7 +533,7 @@ end
 --------------------------------------------------------------------------------
 -- SITUATION AWARENESS
 --------------------------------------------------------------------------------
--- Per-task situation uses the same context string format as note.context:
+-- Per-task situation uses the same situation string format as a note's situations:
 --   "zone:stormwind city", "instance:mythic", "player:Arthas", "subzone:..."
 -- Nothing acts on it yet. A scan of every task on every situation check used
 -- to run here and call a toast function that never existed; removed (PERF-05,

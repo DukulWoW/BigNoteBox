@@ -167,7 +167,7 @@ function UN.FindPlayerNote(playerName, realm)
     local ctx = "player:" .. playerName
     if realm and realm ~= "" then ctx = ctx .. "-" .. realm end
     for id, note in pairs(ndb.notes) do
-        if note.context == ctx then return id end
+        if BNB.NoteHasSituation(note, ctx) then return id end
         if note.source == "inspect" and note.inspectName == playerName
            and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == realm) then
             return id

@@ -31,9 +31,11 @@
 --   Full note copy + deletedAt (unix timestamp). Purged after trashRetainDays days.
 --   trashRetainDays = 0 → trash disabled, deletes are permanent.
 --
--- CONTEXT STRING FORMAT (v1):  "<kind>:<value>"
+-- SITUATION STRING FORMAT (v1):  "<kind>:<value>"
 --   kind  = "zone" | "instance" | "subzone" | "player"
 --   value = plain display name as returned by WoW APIs
+--   Held in the list note.situations since NOTES v10 (was the one string
+--   note.context, ALL-232); read through BNB.NoteSituations (NoteFields.lua).
 --   Parsed by: DecodeContext(), NoteMatches() in Features/ContextNotes.lua
 --   If this format ever changes, bump NOTES_SCHEMA_VERSION and add a migration.
 
@@ -42,7 +44,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 9   -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 10  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 17  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -471,6 +473,21 @@ function BNB.MigrateNotesDB()
             end
         end
         v = 9
+    end
+
+    -- A note can have several situations (ALL-232): the single string
+    -- note.context becomes the list note.situations = { context }
+    if v < 10 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                local ctx = note.context
+                if type(ctx) == "string" and ctx ~= "" and note.situations == nil then
+                    note.situations = { ctx }
+                end
+                note.context = nil
+            end
+        end
+        v = 10
     end
 
     -- Never lower the stored version: running an older build must not make the

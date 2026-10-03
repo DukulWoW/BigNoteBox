@@ -35,6 +35,9 @@ local function JsonEncodeNote(note)
             parts[#parts + 1] = JsonEscapeStr(def.key) .. ":" .. Json.Encode(v)
         end
     end
+    -- The first situation as "context" too, for a build from before ALL-232
+    local first = BNB.FirstSituation(note)
+    if first then parts[#parts + 1] = JsonEscapeStr("context") .. ":" .. Json.Encode(first) end
     return "  {" .. table.concat(parts, ",") .. "}"
 end
 
@@ -73,7 +76,11 @@ local function MdEncodeNote(note)
     if note.tags and #note.tags > 0 then
         lines[#lines + 1] = "tags: " .. table.concat(note.tags, ", ")
     end
-    if note.context       then lines[#lines + 1] = "context: "        .. note.context        end
+    -- First situation as "context" (what a build from before ALL-232 reads),
+    -- any further ones as "situation" lines
+    for i, s in ipairs(BNB.NoteSituations(note)) do
+        lines[#lines + 1] = (i == 1 and "context: " or "situation: ") .. s
+    end
     if note.contextDisplay then lines[#lines + 1] = "contextDisplay: " .. note.contextDisplay end
     if note.contextLeave   then lines[#lines + 1] = "contextLeave: "   .. note.contextLeave   end
     if note.pinned         then lines[#lines + 1] = "pinned: true"                            end
@@ -359,8 +366,9 @@ local function BuildMetaHtml(note)
     if note.tags and #note.tags > 0 then
         parts[#parts + 1] = "<strong>Tags:</strong> " .. HtmlEsc(table.concat(note.tags, ", "))
     end
-    if note.context and note.context ~= "" then
-        parts[#parts + 1] = "<strong>Context:</strong> " .. HtmlEsc(note.context)
+    if BNB.HasSituation(note) then
+        parts[#parts + 1] = "<strong>Context:</strong> "
+            .. HtmlEsc(table.concat(BNB.NoteSituations(note), ", "))
     end
     if note.created then
         parts[#parts + 1] = "<strong>Created:</strong> " .. BNB.Date("%Y-%m-%d %H:%M", note.created)
@@ -994,7 +1002,10 @@ local function ParseMarkdownNotes(text)
                 local key, val = lines[i]:match("^([%w]+):%s*(.-)%s*$")
                 if key and val then
                     if     key == "title"          then note.title          = val
-                    elseif key == "context"        then note.context        = val
+                    elseif key == "context" or key == "situation" then
+                        note.situations = note.situations or {}
+                        if key == "context" then table.insert(note.situations, 1, val)
+                        else note.situations[#note.situations + 1] = val end
                     elseif key == "contextDisplay" then note.contextDisplay = val
                     elseif key == "contextLeave"   then note.contextLeave   = val
                     elseif key == "fontOverride"   then note.fontOverride   = val

@@ -151,6 +151,18 @@ local function LowerOf(note, field)
 end
 BNB.NoteLower = LowerOf
 
+-- The first situation in lower case, cached the same way ("by location" sort;
+-- situations are a list since ALL-232)
+local function SituationLower(note)
+    local s = BNB.FirstSituation(note)
+    if not s then return nil end
+    local c = _lowerCache[note]
+    if not c then c = {}; _lowerCache[note] = c end
+    local e = c._situation
+    if not e or e[1] ~= s then e = { s, s:lower() }; c._situation = e end
+    return e[2]
+end
+
 -- Sort key for "A-Z by title": untitled notes sort last.
 function BNB.NoteTitleKey(note)
     return LowerOf(note, "title") or "\255"
@@ -329,7 +341,7 @@ function BNB.CreateNote(title, body)
         title        = title or "",
         body         = body  or "",
         tags         = {},
-        context      = nil,
+        situations   = nil,   -- { "zone:Orgrimmar", ... } (ALL-232)
         scope        = newScope,
         icon         = nil,
         titleColor   = nil,   -- { r, g, b } or nil for default
@@ -761,9 +773,9 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
             av = LowerOf(a, "title") or "\255"
             bv = LowerOf(b, "title") or "\255"
         elseif sortBy == "location" then
-            -- Notes with no context sort to the end regardless of direction.
-            av = LowerOf(a, "context") or "\255"
-            bv = LowerOf(b, "context") or "\255"
+            -- Notes with no situation sort to the end regardless of direction.
+            av = SituationLower(a) or "\255"
+            bv = SituationLower(b) or "\255"
         else
             av, bv = a.created or 0, b.created or 0
         end

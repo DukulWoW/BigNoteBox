@@ -189,7 +189,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
 
         local hasAlarm = note.alarm ~= nil
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
-        local hasSituation = note.context and note.context ~= ""
+        local hasSituation = BNB.HasSituation(note)
         Parent(root, L["NL_CM_CREATE"], "create", ClickKey("create"), {
             { key = "alarm", label = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"],
               fn = function() A.alarm(noteID) end },

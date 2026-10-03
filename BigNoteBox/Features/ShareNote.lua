@@ -71,7 +71,7 @@ function BNB.ShareBuildPayload(noteID, groups)
     local data = BNB.CleanNoteFields(note, function(def)
         return def.share == "text" or (def.share ~= nil and groups[def.share] == true)
     end)
-    return { v = 2, note = data }
+    return { v = 2, note = BNB.AddLegacyContext(data) }
 end
 
 -- A received payload (share string or Direct Send) back to note fields, or

@@ -54,8 +54,11 @@ local FIELDS = {
     { "borderOffset",     "n", share = "look" },
     { "borderBrightness", "n", share = "look" },
     { "lineHeight",       "sn", share = "look" },
-    -- Situation: where the note pops up, and its waypoint
-    { "context",        "s", share = "situation" },
+    -- Situation: where the note pops up, and its waypoint. situations is a
+    -- list of "kind:value" strings (ALL-232, NOTES v10); the single string
+    -- `context` it replaced is still written next to it on the way out and
+    -- read on the way in (CleanNoteFields), for older builds
+    { "situations",     "t", share = "situation" },
     { "contextDisplay", "s", share = "situation" },
     { "contextLeave",   "s", share = "situation" },
     { "waypoint",       "t", share = "situation" },
@@ -178,7 +181,44 @@ local SHAPES = {
     waypoint = function(v)
         if type(v.mapID) == "number" and type(v.x) == "number" and type(v.y) == "number" then return v end
     end,
+    situations = function(v)
+        local out = {}
+        for _, s in ipairs(v) do
+            if type(s) == "string" and s:find("^%w+:.+$") then out[#out + 1] = s end
+        end
+        return #out > 0 and out or nil
+    end,
 }
+
+--------------------------------------------------------------------------------
+-- SITUATIONS (ALL-232)
+-- note.situations = { "zone:Orgrimmar", "player:Thrall", ... }; the note
+-- matches while any one of them does. Read it only through these.
+--------------------------------------------------------------------------------
+local NO_SITUATIONS = {}   -- shared, never written to
+
+-- The note's situation strings, an empty list when it has none
+function BNB.NoteSituations(note)
+    local s = note and note.situations
+    return type(s) == "table" and s or NO_SITUATIONS
+end
+
+function BNB.HasSituation(note)
+    return BNB.NoteSituations(note)[1] ~= nil
+end
+
+-- The first situation, what older builds read as note.context
+function BNB.FirstSituation(note)
+    return BNB.NoteSituations(note)[1]
+end
+
+-- Does the note have this exact situation string?
+function BNB.NoteHasSituation(note, ctx)
+    for _, s in ipairs(BNB.NoteSituations(note)) do
+        if s == ctx then return true end
+    end
+    return false
+end
 
 -- Returns a new table with the fields of src that are in the schema, have an
 -- accepted type and shape, and pass want(def) (nil = every non-internal
@@ -201,5 +241,21 @@ function BNB.CleanNoteFields(src, want)
             out[def.key] = v
         end
     end
+    -- An older build sends one situation as `context` (ALL-232): taken only
+    -- when there is no list, and only if the situation group is wanted
+    local ctx = src.context
+    if out.situations == nil and type(ctx) == "string" and ctx:find("^%w+:.+$")
+       and (not want or want(BNB.NOTE_FIELD.situations)) then
+        out.situations = { ctx }
+    end
     return out
+end
+
+-- For anything written for another build to read (JSON backup, share
+-- string, Direct Send): the first situation as `context` too, so a build
+-- from before ALL-232 still gets one
+function BNB.AddLegacyContext(fields)
+    local s = fields.situations
+    if type(s) == "table" and type(s[1]) == "string" then fields.context = s[1] end
+    return fields
 end

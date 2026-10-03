@@ -7,9 +7,10 @@
 -- its own copy, and the copies had drifted (sticky saved contextLeave
 -- "bt-minimize", which nothing reads).
 --
--- Stored as: note.context = "zone:Elwynn Forest" / "subzone:..." /
--- "instance:Molten Core" / "player:Thrall" / nil, plus contextDisplay,
--- contextLeave, waypoint, wpClearOnLeave.
+-- Stored as: note.situations = { "zone:Elwynn Forest" / "subzone:..." /
+-- "instance:Molten Core" / "player:Thrall", ... } or nil (ALL-232), plus
+-- contextDisplay, contextLeave, waypoint, wpClearOnLeave. The editor shows and
+-- edits the first situation; any further ones are kept as they are.
 --
 -- Public API:
 --   BNB.CreateSituationEditor(panel, opts) -> ed   build once per window
@@ -631,7 +632,7 @@ function BNB.CreateSituationEditor(panel, opts)
 
     local function RefreshCurBind()
         local note = NoteID() and BNB.GetNote(NoteID())
-        local ctx  = note and note.context
+        local ctx  = BNB.FirstSituation(note)
         local path = curBindValue:GetFont()
         if ctx and ctx ~= "" then
             local kind, value
@@ -727,10 +728,16 @@ function BNB.CreateSituationEditor(panel, opts)
     saveBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
         local val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
-        if typ.value == "none" or val == "" then
-            BNB.UpdateNote(id, { _clear = { "context" } })
+        -- The first situation is replaced or removed; the rest stay
+        local list = {}
+        for i, sit in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
+            if i > 1 then list[#list + 1] = sit end
+        end
+        if typ.value ~= "none" and val ~= "" then table.insert(list, 1, typ.value .. ":" .. val) end
+        if #list > 0 then
+            BNB.UpdateNote(id, { situations = list })
         else
-            BNB.UpdateNote(id, { context = typ.value .. ":" .. val })
+            BNB.UpdateNote(id, { _clear = { "situations" } })
         end
         RefreshCurBind()
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
@@ -741,7 +748,7 @@ function BNB.CreateSituationEditor(panel, opts)
 
     clearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
-        BNB.UpdateNote(id, { _clear = { "context", "contextDisplay", "contextLeave" } })
+        BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave" } })
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
         valueEb:SetText("")
         typ:Set("none"); disp:Set("popup"); leave:Set("keep")
@@ -880,8 +887,8 @@ function BNB.CreateSituationEditor(panel, opts)
         leave:Set((lv == "minimize" or lv == "hide") and lv or "keep")
 
         local kind, value
-        local ctx = note and note.context
-        if ctx and ctx ~= "" and BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
+        local ctx = BNB.FirstSituation(note)
+        if ctx and BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
         if kind then
             typ:Set(kind)
             SelectType(kind)

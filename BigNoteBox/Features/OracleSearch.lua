@@ -118,8 +118,8 @@ local function Fields(note)
     local tags = {}
     for i, t in ipairs(note.tags or {}) do tags[i] = tostring(t):lower() end
     local who = {}
-    local ctx = note.context
-    if type(ctx) == "string" and ctx ~= "" then
+    local sits = BNB.NoteSituations(note)
+    for _, ctx in ipairs(sits) do
         who[#who + 1] = (ctx:match("^%w+:(.+)$") or ctx):lower()
     end
     if note.inspectName then who[#who + 1] = tostring(note.inspectName):lower() end
@@ -127,7 +127,7 @@ local function Fields(note)
     -- player, or the NPC of a target note (whose name is only in its title).
     -- A zone context counts for plain words (who above), not for @.
     local about = {}
-    if type(ctx) == "string" then
+    for _, ctx in ipairs(sits) do
         local name = ctx:match("^player:(.+)$")
         if name then about[#about + 1] = name:lower() end
     end
@@ -222,8 +222,11 @@ end
 -- The `z` filter: a note that surfaces for a zone, instance or sub-zone
 -- (Features/ContextNotes.lua), as opposed to a player/NPC note (p/n).
 local function IsZoneContext(note)
-    local kind = type(note.context) == "string" and note.context:match("^(%a+):")
-    return kind == "zone" or kind == "instance" or kind == "subzone"
+    for _, ctx in ipairs(BNB.NoteSituations(note)) do
+        local kind = ctx:match("^(%a+):")
+        if kind == "zone" or kind == "instance" or kind == "subzone" then return true end
+    end
+    return false
 end
 
 -- Start of the local day containing t (hour/min/sec zeroed).
@@ -474,12 +477,19 @@ end
 -- A note that surfaces where the player is now. zone = { kind = "zone" or
 -- "instance", name = ..., sub = ... }, lower case (UI/Oracle.lua).
 function OS.IsHereNote(note, zone)
-    if type(note.context) ~= "string" or not zone then return false end
-    local kind, value = note.context:match("^(%a+):(.+)$")
-    if not kind then return false end
-    value = value:lower()
-    if kind == "subzone" then return zone.sub ~= nil and zone.sub ~= "" and value == zone.sub end
-    return kind == zone.kind and value == zone.name
+    if not zone then return false end
+    for _, ctx in ipairs(BNB.NoteSituations(note)) do
+        local kind, value = ctx:match("^(%a+):(.+)$")
+        if kind then
+            value = value:lower()
+            if kind == "subzone" then
+                if zone.sub ~= nil and zone.sub ~= "" and value == zone.sub then return true end
+            elseif kind == zone.kind and value == zone.name then
+                return true
+            end
+        end
+    end
+    return false
 end
 
 -- A note about the current target, found the way Features/TargetNote.lua
@@ -490,7 +500,8 @@ function OS.IsTargetNote(note, target)
     if target.isPlayer then
         local key = "player:" .. target.name
         local full = (target.realm and target.realm ~= "") and (key .. "-" .. target.realm) or key
-        if note.targetPlayerKey == full or note.context == full or note.context == key then return true end
+        if note.targetPlayerKey == full or BNB.NoteHasSituation(note, full)
+           or BNB.NoteHasSituation(note, key) then return true end
         return note.source == "inspect" and note.inspectName == target.name
             and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == target.realm)
     end
