@@ -43,9 +43,11 @@ UI\IconsAC.lua
 UI\Fonts.lua
 UI\SkinSystem.lua
 UI\IconButton.lua
+UI\ContextMenu.lua
 UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
+UI\NoteContextMenu.lua
 UI\NoteEditor.lua
 UI\WelcomePanel.lua
 UI\WysiwygBar.lua

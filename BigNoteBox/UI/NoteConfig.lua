@@ -2815,12 +2815,24 @@ function BNB._NoteConfigSelectTab(idx)
 end
 
 -- ── Public API ────────────────────────────────────────────────────────────────
-function BNB.OpenNoteConfig(noteID)
+-- tab, optional: "situation" opens on that tab, and only switches to it when
+-- the window is already open for this note (no toggle). Context menu, ALL-148.
+local TAB_KEYS = { situation = TAB_SIT }
+
+function BNB.NoteConfigOpenFor(noteID)
+    return ncFrame and ncFrame:IsShown() and _noteID == noteID or false
+end
+
+function BNB.OpenNoteConfig(noteID, tab)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local note=noteID and BNB.GetNote(noteID)
     if not note then BNB:Print(L["NC_NO_NOTE_SELECTED"]); return end
+    local tabIdx = tab and TAB_KEYS[tab]
 
-    if ncFrame and ncFrame:IsShown() and _noteID==noteID then ncFrame:Hide(); return end
+    if ncFrame and ncFrame:IsShown() and _noteID==noteID then
+        if tabIdx then BNB._NoteConfigSelectTab(tabIdx) else ncFrame:Hide() end
+        return
+    end
     _noteID=noteID
 
     if not ncFrame then ncFrame=CreateNoteConfigWindow() end
@@ -2848,7 +2860,7 @@ function BNB.OpenNoteConfig(noteID)
     local sPanel = tabPanels[TAB_SIT]
     if sPanel and sPanel._loadCtx then sPanel._loadCtx() end
 
-    BNB._NoteConfigSelectTab(ncFrame._activeTab or TAB_GEN)
+    BNB._NoteConfigSelectTab(tabIdx or ncFrame._activeTab or TAB_GEN)
 
     ncFrame:ClearAllPoints()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then

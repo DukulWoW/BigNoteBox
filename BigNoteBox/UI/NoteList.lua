@@ -680,7 +680,6 @@ end
 --   ── divider ──
 --   Delete              — shows BNB_DELETE_NOTE popup
 --------------------------------------------------------------------------------
-local _ctxDropdown = nil   -- reused WowStyle1DropdownTemplate button
 
 local function DuplicateNote(id)
     local src = BNB.GetNote(id)
@@ -694,8 +693,6 @@ local function DuplicateNote(id)
     if BNB.SelectNote      then BNB.SelectNote(newID) end
 end
 
--- extraTop(root) — optional, lets a caller elsewhere (e.g. Tag Manager note
--- rows) inject its own entries right after the title, before "Open".
 --------------------------------------------------------------------------------
 -- NOTE ACTIONS
 -- One body per action, shared by the right-click menu and the list's
@@ -811,165 +808,14 @@ BNB.LIST_DOUBLE_CLICK_ACTIONS = {
     { value = "pin",       key = "CFG_DBL_PIN" },
 }
 
-function BNB.ShowNoteContextMenu(btn, noteID, extraTop)
-    local note = BNB.GetNote(noteID)
-    if not note then return end
-    local title = (note.title ~= "") and note.title or L["UNTITLED"]
-
-    -- Shared helpers
-    local function DoTrash()
-        if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title, nil, noteID)
-            if popup then popup.data = noteID end
-        else
-            if BNB.DeleteNote then BNB.DeleteNote(noteID) end
-        end
-    end
-    local function DoDeletePerm()
-        if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE", title, nil, noteID)
-            if popup then popup.data = noteID end
-        else
-            -- Skips the trash even while it is on (ALL-58 follow-up)
-            if BNB.DeleteNote then BNB.DeleteNote(noteID, true) end
-        end
-    end
-    local function CopyBody()
-        local n = BNB.GetNote(noteID)
-        if not n then return end
-        local content = (n.title and n.title ~= "" and (n.title .. "\n") or "")
-                     .. (n.body or "")
-        BNB:Print(L["BTN_COPY_NOTE_CLASSIC"])
-        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(content) end
-    end
-
-    if not _ctxDropdown then
-            _ctxDropdown = CreateFrame("DropdownButton", "BNBNoteContextDropdown",
-                UIParent, "WowStyle1DropdownTemplate")
-            _ctxDropdown:SetSize(1, 1); _ctxDropdown:SetAlpha(0)
-        end
-        BNB.PlaceContextMenu(_ctxDropdown, btn)
-
-        _ctxDropdown:SetupMenu(function(_, root)
-            root:CreateTitle(title)
-
-            if extraTop then extraTop(root) end
-
-            -- Open
-            root:CreateButton(L["NL_CTX_OPEN"], function() NOTE_ACTIONS.open(noteID) end)
-            root:CreateButton(L["NL_CTX_OPEN_SETTINGS"], function() NOTE_ACTIONS.settings(noteID) end)
-            -- Labels say Close when the entry would close (it is a toggle)
-            local kind = StickyOpenKind(noteID)
-            root:CreateButton(kind == "world" and L["NL_CTX_CLOSE_STICKY"] or L["NL_CTX_OPEN_STICKY"],
-                function() NOTE_ACTIONS.sticky(noteID) end)
-            root:CreateButton(kind == "esc" and L["NL_CTX_CLOSE_ESC_STICKY"] or L["NL_CTX_OPEN_ESC_STICKY"],
-                function() NOTE_ACTIONS.escSticky(noteID) end)
-            do
-                local n3 = BNB.GetNote(noteID)
-                local hasAlarm = n3 and n3.alarm ~= nil
-                local alarmLabel = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"]
-                root:CreateButton(alarmLabel, function() NOTE_ACTIONS.alarm(noteID) end)
-                if hasAlarm then
-                    root:CreateButton(L["NL_CTX_REMOVE_ALARM"], function()
-                        if BNB.Alarm and BNB.Alarm.ClearAlarm then
-                            BNB.Alarm.ClearAlarm(noteID)
-                        end
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-                end
-            end
-            if BNB.TasksEnabled() then   -- ALL-102
-                local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
-                local taskLabel = hasTasks and L["NL_CTX_ADD_TASK"] or L["NL_CTX_CREATE_TASK"]
-                root:CreateButton(taskLabel, function() NOTE_ACTIONS.task(noteID) end)
-            end
-
-            root:CreateDivider()
-
-            -- Pin / Unpin, Favorite / Unfavorite, Lock / Unlock
-            local n = BNB.GetNote(noteID)
-            if n then
-                root:CreateButton(n.pinned and L["NL_CTX_UNPIN"] or L["NL_CTX_PIN"],
-                    function() NOTE_ACTIONS.pin(noteID) end)
-                root:CreateButton(n.favorited and L["NL_CTX_UNFAV"] or L["NL_CTX_FAV"],
-                    function() NOTE_ACTIONS.fav(noteID) end)
-                root:CreateButton(NoteIsLocked(n) and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"],
-                    function() NOTE_ACTIONS.lock(noteID) end)
-            end
-
-            root:CreateButton(L["NL_CTX_DUPLICATE"], function() DuplicateNote(noteID) end)
-
-            -- Copy/Move to character (sidebar feature)
-            if BNB.Sidebar and BNB.Sidebar.IsEnabled() then
-                root:CreateButton(L["NL_CTX_COPY_MOVE"], function()
-                    if BNB.OpenCopyMovePopup then
-                        BNB.OpenCopyMovePopup(noteID, "copy")
-                    end
-                end)
-            end
-
-            -- Convert rich <-> regular
-            if BNB.AdvancedMode then
-                local isRich = BNB.AdvancedMode.IsRich(note)
-                if isRich then
-                    root:CreateButton(L["NL_CTX_CONVERT_PLAIN"], function()
-                        BNB.AdvancedMode.ConvertToPlain(noteID)
-                    end)
-                else
-                    root:CreateButton(L["NL_CTX_CONVERT_RICH"], function()
-                        BNB.AdvancedMode.ConvertToRich(noteID)
-                    end)
-                end
-            end
-
-            -- History actions
-            root:CreateButton(L["HISTORY_CTX_CREATE"], function()
-                if not BNB.HistoryGetSlots then return end
-                -- Save unsaved edits first if this is the currently open note
-                if BNB._currentNoteID == noteID and BNB._dirty and BNB.SaveCurrentNote then
-                    BNB.SaveCurrentNote()
-                end
-                local slots = BNB.HistoryGetSlots(noteID)
-                if slots.manual then
-                    StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", noteID)
-                else
-                    BNB.HistoryCreateManual(noteID)
-                    BNB:Print(L["HISTORY_MANUAL_SAVED"])
-                end
-            end)
-            root:CreateButton(L["HISTORY_CTX_VIEW"], function()
-                if BNB.OpenNoteHistoryPanel then
-                    BNB.OpenNoteHistoryPanel(noteID)
-                end
-            end)
-
-            root:CreateDivider()
-
-            -- Share / Export / copy
-            root:CreateButton(L["NL_CTX_SHARE"], function()
-                if BNB.OpenShareWindow then BNB.OpenShareWindow(noteID) end
-            end)
-            root:CreateButton(L["NL_CTX_EXPORT_JSON"], function()
-                if BNB.ExportNoteJSON then BNB.ExportNoteJSON(noteID) end
-            end)
-            root:CreateButton(L["NL_CTX_EXPORT_MD"], function()
-                if BNB.ExportNoteMD then BNB.ExportNoteMD(noteID) end
-            end)
-            root:CreateButton(L["NL_CTX_EXPORT_HTML"], function()
-                if BNB.ExportNoteHTML then BNB.ExportNoteHTML(noteID) end
-            end)
-            root:CreateButton(L["NL_CTX_COPY_CLIPBOARD"], CopyBody)
-
-            root:CreateDivider()
-
-            -- Trash / delete
-            if BNB.TrashEnabled and BNB.TrashEnabled() then
-                root:CreateButton(L["NL_CTX_TRASH"], DoTrash)
-            end
-            root:CreateButton(L["NL_CTX_DELETE_PERM"], DoDeletePerm)
-        end)
-        _ctxDropdown:OpenMenu()
-end
+-- The right-click menu itself is UI/NoteContextMenu.lua (ALL-148); it reaches
+-- these through the kit, so the double-click and the menu share one body.
+BNB._NoteListKit = {
+    NOTE_ACTIONS   = NOTE_ACTIONS,
+    NoteIsLocked   = NoteIsLocked,
+    StickyOpenKind = StickyOpenKind,
+    DuplicateNote  = DuplicateNote,
+}
 
 --------------------------------------------------------------------------------
 -- DRAG-REORDER HELPERS

@@ -265,6 +265,16 @@ local function BuildWindow()
     iconLabBtn:ClearAllPoints()
     iconLabBtn:SetPoint("LEFT", layoutBtn, "RIGHT", 8, 0)
     y = y + ROW_H
+    -- The menu engine on its own (ALL-148, UI/ContextMenu.lua), beside Setup wizard
+    local ctxBtn
+    ctxBtn = MakeButton(L["CFG_DEV_CTXMENU_BTN"], 170,
+        L["CFG_DEV_CTXMENU_BTN"], L["CFG_DEV_CTXMENU_TIP_BODY"], function()
+            BNB.OpenContextMenuTest(ctxBtn)
+        end)
+    ctxBtn:ClearAllPoints()
+    ctxBtn:SetPoint("LEFT", setupBtn, "RIGHT", 8, 0)
+    y = y + ROW_H
+    dependents[#dependents + 1] = { btn = ctxBtn }
     dependents[#dependents + 1] = { btn = iconLabBtn }
     dependents[#dependents + 1] = { btn = bgLabBtn }
     dependents[#dependents + 1] = { btn = toastBtn }
@@ -322,4 +332,41 @@ end
 
 function DW.Toggle()
     if _frame and _frame:IsShown() then DW.Close() else DW.Open() end
+end
+
+-- Context Menu Test (ALL-148): the engine with every kind of row, no notes
+function BNB.OpenContextMenuTest(owner)
+    local function Say(what) return function() BNB:Print("|cff88bbffMenu:|r " .. what) end end
+    BNB.ContextMenu.Open(owner, function(root)
+        root:CreateTitle("Context Menu Test", { icon = "Interface\\Icons\\INV_Misc_Note_01", badge = true,
+            color = { r = 0.45, g = 0.8, b = 1 } })   -- as a note's titleColor arrives
+        root:CreateDivider()
+        local open = root:CreateButton("Open note", Say("Open note (parent click)"), { icon = "note" })
+        open:CreateButton("Open sticky note", Say("Open sticky note"))
+        open:CreateButton("Open ESC sticky note", Say("Open ESC sticky note"))
+        local create = root:CreateButton("Create", nil, { icon = "create" })
+        create:CreateButton("Create alarm", Say("Create alarm"))
+        create:CreateButton("Create task", Say("Create task"))
+        create:CreateButton("Create situation", Say("Create situation"))
+        root:CreateDivider()
+        root:CreateButton("Pin to top", Say("Pin to top"), { icon = "pinned" })
+        root:CreateButton("Add to favorites", Say("Add to favorites"), { icon = "favorite",
+            tip = "Tooltip test", tipSub = "A second, wrapped line under the title." })
+        root:CreateButton("Lock note (disabled)", Say("never"), { icon = "locked", disabled = true })
+        local act = root:CreateButton("Actions", nil, { icon = "action" })
+        act:CreateButton("Duplicate", Say("Duplicate"))
+        act:CreateButton("A rather long label to check that the width follows the longest row", Say("Long label"))
+        act:CreateDivider()
+        act:CreateButton("Disabled sub-menu row", Say("never"), { disabled = true })
+        local hist = root:CreateButton("History", nil, { icon = "history" })
+        hist:CreateButton("View note history", Say("View note history"))
+        local prev = hist:CreateButton("Restore previous")
+        prev:CreateButton("Manual restore point", Say("Manual restore point"))
+        prev:CreateDivider()
+        for n = 1, 3 do prev:CreateButton("Snapshot " .. n, Say("Snapshot " .. n)) end
+        prev:CreateButton("View all...", Say("View all"))
+        root:CreateDivider()
+        root:CreateButton("Move to trash", Say("Move to trash"), { icon = "trash" })
+        root:CreateButton("Delete permanently", Say("Delete permanently"), { icon = "danger" })
+    end)
 end

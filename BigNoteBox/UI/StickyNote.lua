@@ -412,6 +412,7 @@ local function ApplyIconDecoration(target, iconTex, note, borderName, borderScal
     ApplyIconBorder(target, not hasFrame and borderName, borderScale, borderOffset, borderBright)
 end
 
+
 -- ── Font outline helper ───────────────────────────────────────────────────────
 -- Returns flags string and shadow (ox, oy, r, g, b, a) for a given outline name.
 -- Used by ApplyConfig and PopulateStickySettings.
@@ -574,6 +575,15 @@ local function SetStickyNoteIcon(tex, note)
     tex:SetTexture((icon and icon ~= "") and icon or STICKY_DEFAULT_ICON)
     tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     if note and BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+end
+
+-- A note's icon drawn as the sticky's badge draws it: icon or NPC portrait,
+-- then its icon frame or LSM edge border on target. The note list's context
+-- menu header uses it (ALL-148).
+function SN.DrawNoteIcon(target, tex, note)
+    SetStickyNoteIcon(tex, note)
+    ApplyIconDecoration(target, tex, note, note.borderOverride,
+        note.borderScale or 100, note.borderOffset or 2, note.borderBrightness or 100)
 end
 
 local function ApplyConfig(frame, noteID)
