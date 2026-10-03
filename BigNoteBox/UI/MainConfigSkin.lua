@@ -93,8 +93,9 @@ function BNB.CreateConfigWindowSkin()
     for i, tab in ipairs(TABS) do labels[i] = tab.label() end
 
     local tabCtrl = BNB.CreateSkinTabs(f, labels, function(idx) SelectTab(idx) end)
-    tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -SK_CFG_TITLE_H)
-    tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_CFG_TITLE_H)
+    -- ALL-229: in from both edges by the New note button's inset (ConfigWindow's TAB_SIDE)
+    tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  8,  -SK_CFG_TITLE_H)
+    tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -SK_CFG_TITLE_H)
     f._skinTabCtrl = tabCtrl
 
     -- ── Recolour chrome and refresh fonts on show ─────────────────────────────

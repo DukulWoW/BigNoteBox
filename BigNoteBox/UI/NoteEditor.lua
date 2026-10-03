@@ -289,7 +289,7 @@ local function BuildTitleField(parent)
         local created = note.created and AbsTime(note.created)
         local updated = note.updated and AbsTime(note.updated)
         if not created and not updated then return end
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
         if created then GameTooltip:AddLine(string.format(L["NE_CREATED_FMT"], created), 0.7, 0.7, 0.7) end
         if updated then GameTooltip:AddLine(string.format(L["NE_EDITED_FMT"], updated), 0.7, 0.7, 0.7) end
         local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
@@ -1751,7 +1751,7 @@ end
 local TAB_H        = 32   -- height of the Editor/View icon button strip
 local _richTabStrip = nil
 
--- Forever: text tabs cut from the game's own UIFrameTabsPaperdollInfo sheet
+-- Text tabs (both clients) cut from the game's own UIFrameTabsPaperdollInfo sheet
 -- (64x512, file id 4200159; not shipped with the addon). Blue (Source) is the black tab with the blue
 -- overlay on top; yellow (View) is the gold tab. The inactive tab is dimmed with
 -- vertex colour, never alpha (Dukul, 2026-09-27). Pieces are {x0, x1, y0, y1} px.
@@ -1769,6 +1769,12 @@ local FTAB_PIECES = {
     blue   = { l = { 0, 16, 260, 279 }, m = { 16, 48,  74,  93 }, r = { 35, 51, 238, 257 } },
 }
 local FTAB_BLUE_L, FTAB_BLUE_R, FTAB_BLUE_Y = 4, 3, 8
+-- The icon-button symbol beside the label (both clients, Dukul 2026-10-03): the glyph sits
+-- in about 14..54 x 17..48 of the 64 px canvas, so a square around it is cut out.
+local FTAB_SYM     = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\Symbols\\bt-"
+local FTAB_ICON    = 18
+local FTAB_ICON_TC = { 13 / 64, 55 / 64, 12 / 64, 54 / 64 }
+local FTAB_ICON_GAP = 3
 
 -- Three textures (left cap, stretched middle, right cap) for one piece set, filling
 -- `frame` between the given insets. Returns them for vertex colouring.
@@ -1792,9 +1798,85 @@ local function AddForeverTabPieces(frame, set, layer, sub, li, ri, top)
     return out
 end
 
--- A Forever bottom tab: "blue" or "yellow" art, a text label, a tooltip.
--- tab:SetActive(bool) brightens or dims the art and label.
-local function MakeForeverTab(parent, color, label, tip)
+-- The icon-button symbol left of a text label, centred as one group on the tab
+-- (yOff from its centre). Sets the tab's width; returns the icon and label.
+local function AddTabFace(btn, symbol, label, yOff)
+    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    fs:SetText(label)
+    local icon = btn:CreateTexture(nil, "ARTWORK", nil, 2)
+    icon:SetTexture(FTAB_SYM .. symbol .. "-normal")
+    icon:SetTexCoord(unpack(FTAB_ICON_TC))
+    icon:SetSize(FTAB_ICON, FTAB_ICON)
+    local groupW = FTAB_ICON + FTAB_ICON_GAP + math.ceil(fs:GetStringWidth())
+    icon:SetPoint("LEFT", btn, "CENTER", -groupW / 2, yOff)
+    fs:SetPoint("LEFT", icon, "RIGHT", FTAB_ICON_GAP, 0)
+    btn:SetWidth(math.max(FTAB_MIN_W, groupW + 2 * FTAB_CAP))
+    return icon, fs
+end
+
+-- Skin mode: the skin icon buttons' box (preset colours, tooltip border) with no
+-- top border, tucked SKTAB_TUCK px up under the main window, which hides its top
+-- end behind the window's own border (Dukul, 2026-10-03). The strip is put in the
+-- strata below the window by AM_RefreshTabs. The inactive tab is darkened.
+local SKTAB_H, SKTAB_TUCK = 37, 8   -- frame height; visible height = SKTAB_H - SKTAB_TUCK
+local SKTAB_BOX = { bgFile = "Interface\\Buttons\\White8x8",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
+    insets = { left = 3, right = 3, top = 3, bottom = 3 } }
+local STRATA_BELOW = { MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH",
+    FULLSCREEN = "DIALOG", FULLSCREEN_DIALOG = "FULLSCREEN", TOOLTIP = "FULLSCREEN_DIALOG" }
+
+local function MakeSkinTab(parent, symbol, label, tip)
+    local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
+    btn:SetHeight(SKTAB_H)
+    local icon, fs = AddTabFace(btn, symbol, label, -SKTAB_TUCK / 2)   -- centred in the visible part
+    btn:SetBackdrop(SKTAB_BOX)   -- once: Paint only sets colours, a new SetBackdrop rebuilds the pieces
+    -- No top border: drop the top edge and corners, run the side edges up to the top
+    for _, k in ipairs({ "TopEdge", "TopLeftCorner", "TopRightCorner" }) do
+        if btn[k] then btn[k]:Hide() end
+    end
+    if btn.LeftEdge and btn.RightEdge then
+        btn.LeftEdge:SetPoint("TOPLEFT", btn, "TOPLEFT")
+        btn.RightEdge:SetPoint("TOPRIGHT", btn, "TOPRIGHT")
+    end
+    local hl = btn:CreateTexture(nil, "ARTWORK", nil, 1)
+    hl:SetPoint("TOPLEFT", 3, -3); hl:SetPoint("BOTTOMRIGHT", -3, 3)
+    hl:SetColorTexture(1, 1, 1, 0.10)
+    hl:Hide()
+
+    local active, hover = true, false
+    local function Paint()
+        local p = BNB.GetSkinPreset()
+        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local m = active and 1 or 0.6
+        btn:SetBackdropColor(math.min(1, p.r + p.lift * 1.5) * m, math.min(1, p.g + p.lift * 1.5) * m,
+            math.min(1, p.b + p.lift * 1.5) * m, 0.97)
+        btn:SetBackdropBorderColor(br, bg_, bb, 1)
+        hl:SetShown(hover and not active)
+        local s = 2.2 * (active and 1 or 0.45)   -- the skin icon buttons' symbol tint
+        icon:SetDesaturated(true)
+        icon:SetVertexColor(math.min(1, br * s), math.min(1, bg_ * s), math.min(1, bb * s))
+        local v = active and 1 or 0.6
+        fs:SetTextColor(v, v, v)
+    end
+    function btn:SetActive(on) active = on and true or false; Paint() end
+    btn:SetScript("OnEnter", function(self)
+        hover = true; Paint()
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(tip, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function()
+        hover = false; Paint()
+        GameTooltip:Hide()
+    end)
+    BNB.RegisterSkinButton(Paint, btn)
+    Paint()
+    return btn
+end
+
+-- A bottom tab in the Forever look: "blue" or "yellow" art, the icon-button symbol
+-- left of a text label, a tooltip. tab:SetActive(bool) brightens or dims all of it.
+local function MakeForeverTab(parent, color, symbol, label, tip)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetHeight(FTAB_H)
     local texs
@@ -1805,15 +1887,13 @@ local function MakeForeverTab(parent, color, label, tip)
     else
         texs = AddForeverTabPieces(btn, "yellow", "BACKGROUND", 0, 0, 0, 0)
     end
-    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    fs:SetPoint("CENTER", btn, "CENTER", 0, 2)   -- centred on the tab face, above the shadow
-    fs:SetText(label)
-    btn:SetWidth(math.max(FTAB_MIN_W, math.ceil(fs:GetStringWidth()) + 2 * FTAB_CAP))
+    local icon, fs = AddTabFace(btn, symbol, label, 2)   -- above the shadow
 
     local active, hover = true, false
     local function Paint()
         local v = active and 1 or (hover and 0.7 or FTAB_DIM)
         for _, t in ipairs(texs) do t:SetVertexColor(v, v, v) end
+        icon:SetVertexColor(v, v, v)
         fs:SetTextColor(v, v, v)
     end
     function btn:SetActive(on) active = on and true or false; Paint() end
@@ -1848,7 +1928,7 @@ local function BuildRichTabStrip()
     ReAnchor()
     mf:HookScript("OnSizeChanged", function() ReAnchor() end)
 
-    -- Tab buttons: icon buttons for the Editor/View toggle (UI/IconButton.lua).
+    -- Fallback tab buttons: icon buttons for the Editor/View toggle (UI/IconButton.lua).
     -- The current mode is drawn at full alpha, the other dimmed (AM_RefreshTabs).
     local function MakeRichBtn(symbol, tip, xOff)
         local btn = BNB.CreateIconButton(strip, 32, symbol, { tip = tip, tipAnchor = "ANCHOR_TOP" })
@@ -1856,10 +1936,23 @@ local function BuildRichTabStrip()
         return btn
     end
 
+    -- The Forever text tabs on both clients (Dukul, 2026-10-03). The sheet is game art,
+    -- not shipped: should a client ever lack it, fall back to the icon buttons rather
+    -- than draw green squares.
     local editorTab, viewTab
-    if BNB.IsForever then
-        editorTab = MakeForeverTab(strip, "blue",   L["NE_RICH_TAB_MARKUP"], L["NE_RICH_EDITOR_MODE_TIP"])
-        viewTab   = MakeForeverTab(strip, "yellow", L["NE_RICH_TAB_NOTE"],   L["NE_RICH_VIEW_MODE_TIP"])
+    local hasSheet = not (C_UIFileAsset and C_UIFileAsset.IsKnownFile)
+        or C_UIFileAsset.IsKnownFile(FTAB_TEX)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        editorTab = MakeSkinTab(strip, "editor", L["NE_RICH_TAB_MARKUP"], L["NE_RICH_EDITOR_MODE_TIP"])
+        viewTab   = MakeSkinTab(strip, "view",   L["NE_RICH_TAB_NOTE"],   L["NE_RICH_VIEW_MODE_TIP"])
+        local w = math.max(editorTab:GetWidth(), viewTab:GetWidth())
+        editorTab:SetWidth(w); viewTab:SetWidth(w)
+        editorTab:SetPoint("TOPLEFT", strip, "TOPLEFT", FTAB_X, SKTAB_TUCK)
+        viewTab:SetPoint("LEFT", editorTab, "RIGHT", FTAB_GAP, 0)
+        strip._under = true
+    elseif hasSheet then
+        editorTab = MakeForeverTab(strip, "blue",   "editor", L["NE_RICH_TAB_MARKUP"], L["NE_RICH_EDITOR_MODE_TIP"])
+        viewTab   = MakeForeverTab(strip, "yellow", "view",   L["NE_RICH_TAB_NOTE"],   L["NE_RICH_VIEW_MODE_TIP"])
         local w = math.max(editorTab:GetWidth(), viewTab:GetWidth())   -- same width, the wider label's
         editorTab:SetWidth(w); viewTab:SetWidth(w)
         editorTab:SetPoint("TOPLEFT", strip, "TOPLEFT", FTAB_X, FTAB_Y)
@@ -1898,10 +1991,13 @@ function BNB.AM_RefreshTabs()
         strip:Hide()
         return
     end
+    if strip._under and BNB.mainFrame then   -- skin tabs hang under the window (a child's level cannot)
+        strip:SetFrameStrata(STRATA_BELOW[BNB.mainFrame:GetFrameStrata()] or "LOW")
+    end
     strip:Show()
     -- Active button: full alpha. Inactive: dimmed (transparency only, per design).
     local inView = BNB._editorInViewMode == true
-    if strip._editorTab and strip._editorTab.SetActive then   -- Forever text tabs: dim, not fade
+    if strip._editorTab and strip._editorTab.SetActive then   -- text tabs: dim, not fade
         strip._editorTab:SetActive(not inView)
         strip._viewTab:SetActive(inView)
         return

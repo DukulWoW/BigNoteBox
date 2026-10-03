@@ -28,6 +28,8 @@ local CFG_W      = 480
 -- small gap under them (was 60 + 32 = 92, ~35 px of dead space)
 local CONTENT_TOP = 68
 local PAD        = 16
+local TAB_SIDE   = 8    -- tab row inset from each window edge, = the New note button's (ALL-229)
+local TAB_GAP    = 5    -- between top tabs (ALL-105)
 local CONTENT_W  = CFG_W - PAD * 2 - 30   -- leave extra room so slider value clears bar
 local CONTENT_W2 = CFG_W - PAD * 2 - 10   -- bar hidden
 local ROW_H      = 28
@@ -649,12 +651,30 @@ local function CreateConfigWindow()
             end
         end)
         btn:SetID(i)
-        if lastBtn then btn:SetPoint("LEFT", lastBtn, "RIGHT", 5, 0)
-        else             btn:SetPoint("TOPLEFT", f, "TOPLEFT", 7, -25) end
+        if lastBtn then btn:SetPoint("LEFT", lastBtn, "RIGHT", TAB_GAP, 0)
+        else             btn:SetPoint("TOPLEFT", f, "TOPLEFT", TAB_SIDE, -25) end
         btn:SetScript("OnClick", function(self) SelectTab(self:GetID()) end)
         tabBtns[i] = btn
         lastBtn    = btn
     end
+    -- ALL-229: keep the row inside the window, TAB_SIDE in from both edges (the
+    -- New note button's inset). Too wide: take the side padding off every tab a
+    -- pixel at a time, then share the width equally (long labels truncate).
+    pcall(function()
+        local free = CFG_W - 2 * TAB_SIDE - (#tabBtns - 1) * TAB_GAP
+        local function RowW()
+            local w = 0
+            for _, b in ipairs(tabBtns) do w = w + b:GetWidth() end
+            return w
+        end
+        if RowW() <= free then return end
+        for pad = 14, 0, -1 do
+            for _, b in ipairs(tabBtns) do PanelTemplates_TabResize(b, pad) end
+            if RowW() <= free then return end
+        end
+        local share = math.floor(free / #tabBtns)
+        for _, b in ipairs(tabBtns) do PanelTemplates_TabResize(b, 0, share) end
+    end)
 
     -- Build the six scroll panels and their content (shared with skin chrome)
     BNB._BuildConfigTabPanels(f, CONTENT_TOP)
