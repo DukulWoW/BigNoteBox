@@ -831,7 +831,6 @@ function NND.Confirm()
 
     if not BNB.mainFrame then BNB.CreateMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote      then BNB.SelectNote(id)    end
     C_Timer.After(0.05, function()
         if BNB.OpenConfigOnNew() and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id) end

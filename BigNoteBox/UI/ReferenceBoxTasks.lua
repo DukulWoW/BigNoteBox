@@ -488,9 +488,8 @@ end
 -- after building rbFrame.
 RegisterTaskCallback = function()
     if _taskCallbackRegistered then return end
-    if not BNB.Task or not BNB.Task.RegisterCallback then return end
     _taskCallbackRegistered = true
-    BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
+    BNB.RegisterMessage("ReferenceBoxTasks", "TasksChanged", function(_, changedNoteID)
         _taskDataGen = _taskDataGen + 1
         if RBFrame() and RBFrame():IsShown() and changedNoteID == NoteID() then
             if BNB.Task then

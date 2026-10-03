@@ -195,7 +195,6 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
               fn = function() A.alarm(noteID) end },
             hasAlarm and { label = Plain(L["NL_CTX_REMOVE_ALARM"]), opts = { danger = true }, fn = function()
                 if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(noteID) end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end } or false,
             BNB.TasksEnabled() and {   -- ALL-102
               key = "task", label = hasTasks and L["NL_CTX_ADD_TASK"] or L["NL_CTX_CREATE_TASK"],

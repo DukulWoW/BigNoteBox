@@ -339,7 +339,6 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
     if BNB._currentNoteID == id then
         if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
     end
-    if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
     if BNB.Sticky and BNB.Sticky.RefreshNote then
         BNB.Sticky.RefreshNote(id)
     end

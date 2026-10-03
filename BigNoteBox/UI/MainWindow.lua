@@ -976,7 +976,6 @@ function BNB.CreateMainWindow()
                 if BNB.PurgeNote then BNB.PurgeNote(sel) end
                 BigNoteBoxDB.selectedNoteID = nil
                 sel = nil
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end
         end
         if sel and ndb.notes[sel] then
@@ -1425,7 +1424,6 @@ function BNB.CreateNewNote()
     if not BNB.mainFrame then BNB.OpenMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
 
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote      then BNB.SelectNote(id)   end
 
     C_Timer.After(0.05, function()

@@ -208,6 +208,12 @@ function BNB.RenameTag(oldTag, newTag)
     end
     -- Remove old key entirely
     idx[oldTag] = nil
+    -- Written straight onto the notes (not an edit: `updated` stays), so the
+    -- message is sent here (ARCH-02)
+    for id in pairs(ids) do
+        local note = ndb.notes[id]
+        if note then BNB.SendMessage("NoteChanged", id, { tags = note.tags }) end
+    end
     return true
 end
 
@@ -229,6 +235,10 @@ function BNB.DeleteTag(tag)
         end
     end
     idx[tag] = nil
+    for id in pairs(ids) do
+        local note = ndb.notes[id]
+        if note then BNB.SendMessage("NoteChanged", id, { tags = note.tags }) end
+    end
 end
 
 -- Remove one tag from one note only (ALL-83 tag manager context menu).
@@ -241,6 +251,7 @@ function BNB.RemoveNoteTag(id, tag)
     end
     note.tags = newTags
     BNB.TagIndexRemove(id, tag)
+    BNB.SendMessage("NoteChanged", id, { tags = newTags })
 end
 
 --------------------------------------------------------------------------------
@@ -343,6 +354,7 @@ function BNB.CreateNote(title, body)
     for _, tag in ipairs(NDB().notes[id].tags or {}) do
         BNB.TagIndexAdd(id, tag)
     end
+    BNB.SendMessage("NoteCreated", id)
     return id
 end
 
@@ -437,8 +449,8 @@ function BNB.UpdateNote(id, fields, opts)
         for _, tag in ipairs(note.tags or {}) do
             BNB.TagIndexAdd(id, tag)
         end
-        if BNB.RefreshTagManager then BNB.RefreshTagManager() end
     end
+    BNB.SendMessage("NoteChanged", id, fields)
 end
 
 --------------------------------------------------------------------------------
@@ -462,6 +474,7 @@ local function RemoveNote(id, permanent)
         for k, v in pairs(note) do trashed[k] = v end
         trashed.deletedAt = time()
         ndb.trash[id] = trashed
+        BNB.SendMessage("TrashChanged")
     end
 
     -- Remove from live notes and order
@@ -485,21 +498,19 @@ local function RemoveNote(id, permanent)
     return true
 end
 
--- UI half: list, editor selection, trash window, trash button.
+-- UI half: editor selection. The list follows NoteDeleted (UI/NoteList.lua;
+-- SelectNote redraws it first), the Trash window and button TrashChanged.
 local function RefreshAfterDelete()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-        if BNB.SelectNote      then BNB.SelectNote(nil)   end
+        if BNB.SelectNote then BNB.SelectNote(nil) end
     end
-    -- Refresh trash window if open (note may now appear there)
-    if BNB.RefreshTrashWindow then BNB.RefreshTrashWindow() end
-    BNB.SyncTrashBtnState()
 end
 
 -- permanent = true skips the trash even while it is on ("Delete permanently")
 function BNB.DeleteNote(id, permanent)
     if not RemoveNote(id, permanent) then return end
     RefreshAfterDelete()
+    BNB.SendMessage("NoteDeleted", { id }, permanent)
 end
 
 -- Bulk delete: every id goes through the same path as DeleteNote, the UI
@@ -507,11 +518,15 @@ end
 -- number of notes actually deleted.
 function BNB.DeleteNotes(ids, permanent)
     if not ids then return 0 end
-    local n = 0
+    local removed = {}
     for _, id in ipairs(ids) do
-        if RemoveNote(id, permanent) then n = n + 1 end
+        if RemoveNote(id, permanent) then removed[#removed + 1] = id end
     end
-    if n > 0 then RefreshAfterDelete() end
+    local n = #removed
+    if n > 0 then
+        RefreshAfterDelete()
+        BNB.SendMessage("NoteDeleted", removed, permanent)
+    end
     return n
 end
 
@@ -532,6 +547,8 @@ function BNB.PurgeNote(id)
     end
     for _, tag in ipairs(tags) do BNB.TagIndexRemove(id, tag) end
     if BNB.Sticky and BNB.Sticky.Close then BNB.Sticky.Close(id) end
+    -- Still no UI refresh here; the message is data only (permanent = true)
+    BNB.SendMessage("NoteDeleted", { id }, true)
 end
 
 --------------------------------------------------------------------------------
@@ -551,15 +568,12 @@ function BNB.RestoreNote(id)
     ndb.notes[id] = note
     table.insert(ndb.noteOrder, 1, id)
 
-    if BNB.mainFrame and BNB.mainFrame:IsShown() then
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    end
-    if BNB.RefreshTrashWindow then BNB.RefreshTrashWindow() end
     -- Re-index tags for the restored note
     for _, tag in ipairs(note.tags or {}) do
         BNB.TagIndexAdd(id, tag)
     end
-    BNB.SyncTrashBtnState()
+    BNB.SendMessage("TrashChanged")
+    BNB.SendMessage("NoteRestored", id)
 end
 
 --------------------------------------------------------------------------------
@@ -572,11 +586,26 @@ function BNB.PurgeTrash()
     if days == nil then days = 30 end
     if days == 0 then return end  -- trash disabled; nothing to purge
     local cutoff = time() - (days * 86400)
+    local purged = false
     for id, note in pairs(ndb.trash) do
         if (note.deletedAt or 0) < cutoff then
             ndb.trash[id] = nil
+            purged = true
         end
     end
+    if purged then BNB.SendMessage("TrashChanged") end
+end
+
+--------------------------------------------------------------------------------
+-- PURGE TRASHED  (permanently delete these trash entries; the Trash window's
+-- Delete and Delete selected). Every write to the trash lives in this file
+-- and sends TrashChanged (ARCH-02).
+--------------------------------------------------------------------------------
+function BNB.PurgeTrashed(ids)
+    local trash = NDB() and NDB().trash
+    if not (trash and ids) then return end
+    for _, id in ipairs(ids) do trash[id] = nil end
+    BNB.SendMessage("TrashChanged")
 end
 
 --------------------------------------------------------------------------------
@@ -585,8 +614,7 @@ end
 function BNB.EmptyTrash()
     local ndb = NDB()
     ndb.trash = {}
-    if BNB.RefreshTrashWindow then BNB.RefreshTrashWindow() end
-    BNB.SyncTrashBtnState()
+    BNB.SendMessage("TrashChanged")
 end
 
 --------------------------------------------------------------------------------
@@ -765,9 +793,9 @@ end
 function BNB.SaveCurrentNote()
     if not BNB._dirty then return end
     local id = BNB._currentNoteID
-    if not id then BNB._dirty = false; return end
+    if not id then BNB.Editor.SetDirty(false); return end
     local note = BNB.GetNote(id)
-    if not note then BNB._dirty = false; return end
+    if not note then BNB.Editor.SetDirty(false); return end
 
     local title = BNB._editorTitle and BNB._editorTitle:GetText() or note.title
     local body  = BNB._editorBody  and BNB._editorBody:GetText()  or note.body
@@ -785,10 +813,9 @@ function BNB.SaveCurrentNote()
     end
 
     BNB.UpdateNote(id, { title = title, body = body })
-    BNB._dirty = false
+    BNB.Editor.SetDirty(false)
     if BNB.UpdateSaveButtonState then BNB.UpdateSaveButtonState() end
 
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     -- Keep NoteConfig title in sync if open
     if BNB._syncNoteConfigTitle then BNB._syncNoteConfigTitle() end
     -- Refresh any open post-it for this note
@@ -817,7 +844,7 @@ function BNB.SaveCurrentNoteQuiet()
     if not BNB._dirty then return end
     local id   = BNB._currentNoteID
     local note = id and BNB.GetNote(id)
-    if not note then BNB._dirty = false; return end
+    if not note then BNB.Editor.SetDirty(false); return end
 
     local title = BNB._editorTitle and BNB._editorTitle:GetText() or note.title
     local body  = BNB._editorBody  and BNB._editorBody:GetText()  or note.body
@@ -829,10 +856,8 @@ function BNB.SaveCurrentNoteQuiet()
     local fields = { body = body }
     if title ~= "" then fields.title = title end
     BNB.UpdateNote(id, fields)
-    BNB._dirty = (title == "")
+    BNB.Editor.SetDirty(title == "")
     if BNB.UpdateSaveButtonState then BNB.UpdateSaveButtonState() end
-    -- Only the edited row, unless the save can move it (PERF-01)
-    if BNB.RefreshNoteListEntry then BNB.RefreshNoteListEntry(id) end
     if BNB._syncNoteConfigTitle then BNB._syncNoteConfigTitle() end
     -- Live update: keeps the sticky's scroll, unlike RefreshNote
     if BNB.Sticky and BNB.Sticky.RefreshBodyLive then BNB.Sticky.RefreshBodyLive(id) end
@@ -864,9 +889,26 @@ BNB.RegisterEvent("PLAYER_LOGOUT", function()
 end)
 
 --------------------------------------------------------------------------------
+-- EDITOR STATE  (ARCH-02)
+-- The note open in the main window and whether it has unsaved edits. Read
+-- them anywhere (BNB._currentNoteID / BNB._dirty, or these getters); change
+-- them only through the setters. SetCurrent does not touch
+-- BigNoteBoxDB.selectedNoteID (what a reload reopens): callers that mean it
+-- set that too. SelectNote sends NoteSelected(id) once the editor has loaded
+-- the note; Note Settings, the Reference Box and the history panel follow it.
+--------------------------------------------------------------------------------
+BNB.Editor = BNB.Editor or {}
+local Editor = BNB.Editor
+
+function Editor.CurrentID() return BNB._currentNoteID end
+function Editor.IsDirty()   return BNB._dirty == true end
+function Editor.SetCurrent(id) BNB._currentNoteID = id end
+function Editor.SetDirty(on)   BNB._dirty = on and true or false end
+
+--------------------------------------------------------------------------------
 -- MARK DIRTY
 --------------------------------------------------------------------------------
 function BNB.MarkDirty()
-    BNB._dirty = true
+    Editor.SetDirty(true)
 end
 

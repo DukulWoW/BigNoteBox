@@ -116,10 +116,7 @@ local function PurgeSelectedConfirm()
             OnAccept = function(self, data)
                 local sel = data or self.data
                 if type(sel) ~= "table" then return end
-                local trash = (BNB.NotesDB() or {}).trash
-                if trash then
-                    for _, id in ipairs(sel) do trash[id] = nil end
-                end
+                BNB.PurgeTrashed(sel)
                 SetTrashMultiMode(false)
             end,
             timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
@@ -216,6 +213,17 @@ function BNB.RefreshTrashWindow()
     if not _twFrame or not _twFrame:IsShown() then return end
     BNB.PopulateTrashWindow()
 end
+
+-- Every change to the trash (delete to trash, restore, purge, empty) sends
+-- TrashChanged (Core/NoteManager.lua): the window and the toolbar button
+-- follow it, once per frame, so a restore of 20 selected notes is one redraw.
+local function FollowTrash()
+    BNB.RefreshTrashWindow()
+    UpdateTrashBtnState()
+end
+BNB.RegisterMessage("TrashWindow", "TrashChanged", function()
+    BNB.Debounce("trashWindow", 0, FollowTrash)
+end)
 
 function BNB.PopulateTrashWindow()
     if not _twFrame then return end
@@ -397,11 +405,7 @@ function BNB.PopulateTrashWindow()
             -- Sure?: permanently delete from trash
             row._sureBtn:SetScript("OnClick", function()
                 if row._sureTimer then row._sureTimer:Cancel(); row._sureTimer = nil end
-                local ndb = BNB.NotesDB()
-                if ndb and ndb.trash then
-                    ndb.trash[id] = nil
-                end
-                BNB.RefreshTrashWindow()
+                BNB.PurgeTrashed({ id })   -- the window follows TrashChanged
             end)
         end
 

@@ -261,7 +261,6 @@ local function AddAttachment(noteID, att)
     end
     table.insert(note.attachments, att)
     BNB.UpdateNote(noteID, {})
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end   -- update badge
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
 
@@ -271,7 +270,6 @@ local function RemoveAttachment(noteID, index)
     if not note or not note.attachments then return end
     table.remove(note.attachments, index)
     BNB.UpdateNote(noteID, {})
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
 
@@ -305,7 +303,6 @@ local function MoveAttachment(fromNoteID, attIndex, toNoteID)
     table.insert(toNote.attachments, copy)
     BNB.UpdateNote(fromNoteID, {})
     BNB.UpdateNote(toNoteID, {})
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
 
@@ -3255,6 +3252,8 @@ end
 
 -- Called by SelectNote on every note switch.
 -- Auto-opens if configured and note has attachments. Never auto-closes.
+BNB.RegisterMessage("ReferenceBox", "NoteSelected", function(_, id) BNB.SyncReferenceBox(id) end)
+
 function BNB.SyncReferenceBox(noteID)
     if not noteID then
         if rbFrame and rbFrame:IsShown() then rbFrame:Hide() end
@@ -3314,13 +3313,6 @@ BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
         UpdateModeStrip()   -- Model tab: NPC portrait follows the target
     end
 end)
-
--- Wrap CloseCompanionWindows
-local _origClose = BNB.CloseCompanionWindows
-BNB.CloseCompanionWindows = function()
-    if rbFrame and rbFrame:IsShown() then rbFrame:Hide() end
-    if _origClose then _origClose() end
-end
 
 -- ── Kit helpers for UI/ReferenceBoxTasks.lua (see the kit above) ──────────────
 K.HasModel, K.OnModeClick = HasModel, OnModeClick

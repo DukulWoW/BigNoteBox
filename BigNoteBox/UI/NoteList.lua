@@ -684,7 +684,6 @@ local function DuplicateNote(id)
     local newID = BNB.CopyNote(id, {
         title = src.title ~= "" and (src.title .. " (copy)") or "" })
     if not newID then return end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote      then BNB.SelectNote(newID) end
 end
 
@@ -779,7 +778,6 @@ end
 NOTE_ACTIONS.pin       = function(noteID)
     local n = BNB.GetNote(noteID); if not n then return end
     BNB.UpdateNote(noteID, { pinned = not n.pinned })
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 end
 NOTE_ACTIONS.fav       = function(noteID)
     local n = BNB.GetNote(noteID); if not n then return end
@@ -788,13 +786,11 @@ NOTE_ACTIONS.fav       = function(noteID)
     else
         BNB.UpdateNote(noteID, { favorited = true })
     end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 end
 NOTE_ACTIONS.lock      = function(noteID)
     local n = BNB.GetNote(noteID); if not n then return end
     BNB.UpdateNote(noteID, { locked = not NoteIsLocked(n) })
     if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(noteID) end
-    if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
     if BNB.LoadNoteInEditor   then BNB.LoadNoteInEditor(BNB._currentNoteID) end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
@@ -1274,7 +1270,7 @@ local function CreateListEntry(parent)
                 -- Guard: note may have changed by the time the timer fires
                 if BNB._currentNoteID ~= clickedID then return end
                 BNB.SaveCurrentNote()
-                BNB._currentNoteID = nil
+                BNB.Editor.SetCurrent(nil)
                 if BigNoteBoxDB then BigNoteBoxDB.selectedNoteID = nil end
                 if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
                 if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
@@ -1715,7 +1711,7 @@ function BNB.PopulateListEntry(btn, note, selected, collapsed)
     PopulateEntry(btn, note, selected, collapsed)
 end
 
-function BNB.RefreshNoteList()
+local function RefreshNoteList()
     if not BNB._listScrollChild then return end
     -- Every filter change ends here, typing included (ALL-194: the reset
     -- icon only lit up for the favourite and task buttons)
@@ -1859,6 +1855,28 @@ function BNB.RefreshNoteList()
     if _sf and _sf.UpdateScrollbar then _sf:UpdateScrollbar() end
 end
 
+-- ── Following the note data (ARCH-02) ────────────────────────────────────────
+-- The list redraws itself from NoteCreated / NoteChanged / NoteDeleted /
+-- NoteRestored (Core/NoteManager.lua), so code that changes a note does not
+-- call RefreshNoteList. Messages are collected and handled once, on the next
+-- frame: an import of 150 notes is one redraw, not 300. Every message and
+-- every redraw takes a number from _seq; a message is skipped when a redraw
+-- after it already covered it (a full redraw, or that note's row), so a
+-- refresh still called by hand costs nothing extra.
+local _seq, _lastFull = 0, 0
+local _rowAt          = {}    -- note id -> _seq of its last row redraw
+local _pendingRows    = {}    -- note id -> _seq of its newest NoteChanged
+local _pendingFull          -- _seq of the newest create / delete / restore
+local FLUSH_KEY       = "noteListMessages"
+
+-- Sends NoteListRefreshed after every redraw, flat list or tag tree (the
+-- Welcome panel's icon rows follow it; a hooksecurefunc until ARCH-02)
+function BNB.RefreshNoteList()
+    _seq = _seq + 1; _lastFull = _seq
+    RefreshNoteList()
+    BNB.SendMessage("NoteListRefreshed")
+end
+
 -- The shown flat-list row for a note, or nil.
 local function ShownRow(id)
     for _, btn in ipairs(listEntries) do
@@ -1901,8 +1919,68 @@ function BNB.RefreshNoteListEntry(id, opts)
     if sortBy == "edited" and not note.pinned and not AtEditedEdge(btn, db and db.sortAsc) then
         return BNB.RefreshNoteList()
     end
+    _seq = _seq + 1; _rowAt[id] = _seq
     PopulateEntry(btn, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
 end
+
+-- Fields that only change how a note's own row looks. A change to anything
+-- else (pinned, favourite, scope, tags, situation, a field added later) can
+-- move the note in or out of the list or change its place: full redraw.
+-- An in-place change (UpdateNote(id, {}): Reference Box items) is row-only.
+local ROW_ONLY = {}
+for _, k in ipairs({ "title", "body", "richMode", "icon", "iconSource", "iconFrame",
+    "titleColor", "borderOverride", "borderScale", "borderOffset", "borderBrightness",
+    "locked", "alarm", "attachments", "fontOverride", "fontSize", "fontOutline",
+    "lineHeight", "textAlign", "waypoint", "wpClearOnLeave", "contextDisplay",
+    "contextLeave", "lastOpened" }) do ROW_ONLY[k] = true end
+
+local function RowOnly(fields)
+    if not fields then return false end
+    for k in pairs(fields) do
+        if k == "_clear" then
+            for _, c in ipairs(fields._clear) do
+                if not ROW_ONLY[c] then return false end
+            end
+        elseif not ROW_ONLY[k] then
+            return false
+        end
+    end
+    return true
+end
+
+-- Handles the collected messages now. SelectNote and ScrollNoteListTo call it
+-- first, so a note created or changed just before is already in the list.
+-- While the main window is closed the work is dropped: its OnShow redraws.
+local function FlushListWork()
+    BNB.CancelDebounce(FLUSH_KEY)
+    local full, rows = _pendingFull, _pendingRows
+    if not full and not next(rows) then return end
+    _pendingFull, _pendingRows = nil, {}
+    if not (BNB.mainFrame and BNB.mainFrame:IsShown()) then return end
+    if full and full > _lastFull then return BNB.RefreshNoteList() end
+    for id, at in pairs(rows) do
+        -- RefreshNoteListEntry may fall back to a full redraw, which raises
+        -- _lastFull and so covers the rest
+        if at > _lastFull and (_rowAt[id] or 0) < at then
+            BNB.RefreshNoteListEntry(id)
+        end
+    end
+end
+BNB.FlushNoteList = FlushListWork
+
+local function QueueFull()
+    _seq = _seq + 1; _pendingFull = _seq
+    BNB.Debounce(FLUSH_KEY, 0, FlushListWork)
+end
+
+BNB.RegisterMessage("NoteList", "NoteCreated",  QueueFull)
+BNB.RegisterMessage("NoteList", "NoteDeleted",  QueueFull)
+BNB.RegisterMessage("NoteList", "NoteRestored", QueueFull)
+BNB.RegisterMessage("NoteList", "NoteChanged", function(_, id, fields)
+    if not RowOnly(fields) then return QueueFull() end
+    _seq = _seq + 1; _pendingRows[id] = _seq
+    BNB.Debounce(FLUSH_KEY, 0, FlushListWork)
+end)
 
 --------------------------------------------------------------------------------
 -- REVEAL NOTE
@@ -1934,7 +2012,6 @@ function BNB.MarkQuickNew(id) BNB._quickNewID = id end
 -- the cursor in the body. Used by the Quick Note button and the quick note key.
 function BNB.ShowQuickNote(id)
     BNB.OpenMainWindow()
-    BNB.RefreshNoteList()
     BNB.SelectNote(id)
     BNB.MarkQuickNew(id)   -- empty = removed (ALL-199)
     C_Timer.After(0.05, function()
@@ -1958,15 +2035,14 @@ function BNB.DropEmptyQuickNote(nextID)
     end
     if not body:match("^%s*$") then return end
     BNB.PurgeNote(id)
-    if BNB._currentNoteID == id then BNB._currentNoteID = nil end
+    if BNB._currentNoteID == id then BNB.Editor.SetCurrent(nil) end
     if BigNoteBoxDB and BigNoteBoxDB.selectedNoteID == id then BigNoteBoxDB.selectedNoteID = nil end
-    C_Timer.After(0, function()
-        if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then BNB.RefreshNoteList() end
-    end)
+    -- The list follows PurgeNote's NoteDeleted on the next frame (ARCH-02)
 end
 BNB.RegisterEvent("PLAYER_LOGOUT", function() BNB.DropEmptyQuickNote(nil) end)
 
 function BNB.SelectNote(id)
+    FlushListWork()   -- a note created just before has its row (ARCH-02)
     BNB.DropEmptyQuickNote(id)
     -- If switching away from a pending new note (no title yet), clear the flag.
     -- The discard popup handles the actual deletion if needed.
@@ -1989,7 +2065,7 @@ function BNB.SelectNote(id)
         end
     end
 
-    BNB._currentNoteID = id; BigNoteBoxDB.selectedNoteID = id
+    BNB.Editor.SetCurrent(id); BigNoteBoxDB.selectedNoteID = id
     BNB.StampOpened(id)
     local collapsed = BNB._listCollapsed
     for _, btn in ipairs(listEntries) do
@@ -2024,13 +2100,8 @@ function BNB.SelectNote(id)
         end
     end
     if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
-    if BNB.SyncNoteConfig   then BNB.SyncNoteConfig(id)  end
-    if BNB.SyncReferenceBox then BNB.SyncReferenceBox(id) end
-    -- If the per-note history panel is open, switch it to the newly selected note
-    local nhp = _G["BigNoteBoxNoteHistoryFrame"]
-    if nhp and nhp:IsShown() and BNB.OpenNoteHistoryPanel then
-        BNB.OpenNoteHistoryPanel(id)
-    end
+    -- Note Settings, the Reference Box and the history panel follow (ARCH-02)
+    BNB.SendMessage("NoteSelected", id)
     BNB.ScrollNoteListTo(id)
 end
 
@@ -2041,6 +2112,7 @@ end
 -- listEntries; a note with no shown row (filtered, folded tag) is left be.
 function BNB.ScrollNoteListTo(id)
     C_Timer.After(0, function()
+        FlushListWork()
         local sf, child = _sf, BNB._listScrollChild
         if not (id and sf and child and sf:IsVisible()) then return end
         local row
@@ -2233,12 +2305,8 @@ end)
 
 -- Refresh the note list when tasks change so the task icon (ui-tasks) in the
 -- note list row appears/disappears as tasks are added or removed.
-C_Timer.After(0, function()
-    if BNB.Task and BNB.Task.RegisterCallback then
-        BNB.Task.RegisterCallback("TasksChanged", function(noteID)
-            if BNB.mainFrame and BNB.mainFrame:IsShown() then
-                BNB.RefreshNoteListEntry(noteID, { tasks = true })
-            end
-        end)
+BNB.RegisterMessage("NoteList", "TasksChanged", function(_, noteID)
+    if BNB.mainFrame and BNB.mainFrame:IsShown() then
+        BNB.RefreshNoteListEntry(noteID, { tasks = true })
     end
 end)

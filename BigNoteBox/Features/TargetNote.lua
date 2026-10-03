@@ -634,7 +634,6 @@ local function CreateTargetNote(richMode, data)
     -- Select the note so SyncReferenceBox fires with the fully populated note
     -- (targetNpcID must be set before SelectNote, which is why we call it
     -- after UpdateNote rather than after CreateNote).
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.SelectNote then
         if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
         BNB.SelectNote(noteID)

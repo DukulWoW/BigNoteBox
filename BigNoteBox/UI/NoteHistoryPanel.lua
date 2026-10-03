@@ -440,6 +440,13 @@ end
 --------------------------------------------------------------------------------
 -- Public API
 --------------------------------------------------------------------------------
+-- While the panel is open it switches to the note selected in the main window
+-- (NoteSelected from SelectNote; a hand call there until ARCH-02)
+BNB.RegisterMessage("NoteHistoryPanel", "NoteSelected", function(_, id)
+    local nhp = _G["BigNoteBoxNoteHistoryFrame"]
+    if nhp and nhp:IsShown() then BNB.OpenNoteHistoryPanel(id) end
+end)
+
 function BNB.OpenNoteHistoryPanel(noteID)
     if InCombatLockdown() then return end
     _currentID = noteID

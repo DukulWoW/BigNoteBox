@@ -577,7 +577,6 @@ local function UpdateInspectGear(noteID, richMode)
     end
     BNB.UpdateNote(noteID, fields)
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-    if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
 end
 
 --------------------------------------------------------------------------------

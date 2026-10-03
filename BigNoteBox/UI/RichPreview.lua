@@ -495,10 +495,11 @@ function RPF.Refresh()
 end
 
 --------------------------------------------------------------------------------
--- HOOKS
+-- MESSAGES  (sent by UI/NoteEditor.lua; these were hooksecurefunc on BNB's own
+-- functions until ARCH-02)
 --------------------------------------------------------------------------------
 
-hooksecurefunc(BNB, "MarkDirty", function()
+BNB.RegisterMessage("RichPreview", "EditorDirty", function()
     RP.ScheduleRender()
     if RPF.IsOpen() then
         RPF.ScheduleRefresh()
@@ -506,13 +507,13 @@ hooksecurefunc(BNB, "MarkDirty", function()
 end)
 
 -- Entering view mode: hide both preview windows
-hooksecurefunc(BNB, "AM_EnterViewMode", function()
+BNB.RegisterMessage("RichPreview", "EditorViewMode", function()
     if RP.IsOpen() then RP.Close() end
     if RPF.IsOpen() then RPF.Close() end
 end)
 
 -- Entering edit mode: re-show preview if appropriate
-hooksecurefunc(BNB, "AM_EnterEditMode", function()
+BNB.RegisterMessage("RichPreview", "EditorEditMode", function()
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
     if not note or not note.richMode then return end
 

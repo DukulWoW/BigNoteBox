@@ -95,7 +95,6 @@ local function GetNote()  return _noteID and BNB.GetNote(_noteID) end
 local function Save(fields)
     if not _noteID then return end
     BNB.UpdateNote(_noteID, fields)
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
 end
 
@@ -279,7 +278,7 @@ local function BuildGeneralTab(sf, ct)
 
     y, _cbPinned = Check(panel, y, L["NC_PIN_TOP_LABEL"],
         function() local n=GetNote(); return n and n.pinned==true end,
-        function(v) Save({pinned=v}); if BNB.RefreshNoteList then BNB.RefreshNoteList() end end,
+        function(v) Save({pinned=v}) end,
         L["NC_PIN_TOP_TIP"])
     y = y - 2
 
@@ -292,7 +291,6 @@ local function BuildGeneralTab(sf, ct)
             else
                 if not _noteID then return end
                 BNB.UpdateNote(_noteID, {_clear = {"favorited"}})
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end
         end,
@@ -353,7 +351,6 @@ local function BuildGeneralTab(sf, ct)
     resetClr:SetScript("OnClick", function()
         if not _noteID then return end
         BNB.UpdateNote(_noteID, {_clear = {"titleColor"}})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
     end)
     y = y - 30
@@ -574,7 +571,6 @@ local function BuildGeneralTab(sf, ct)
             if not _noteID then return end
             BNB.UpdateNote(_noteID, {_clear = {"fontSize"}})
             ApplyEditorSize((BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize)
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         end,
     })
     fsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
@@ -842,7 +838,6 @@ local function BuildGeneralTab(sf, ct)
         if not _noteID then return end
         BNB.UpdateNote(_noteID, { scope = "char:" .. charKey })
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         -- Close NoteConfig — the note is no longer visible to this character
         if ncFrame then ncFrame:Hide() end
     end
@@ -918,7 +913,6 @@ local function BuildGeneralTab(sf, ct)
         if not _noteID then return end
         BNB.UpdateNote(_noteID, { scope = "global" })
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         RefreshScopeBtns()
     end)
     scopeCharBtn:SetScript("OnClick", function()
@@ -926,7 +920,6 @@ local function BuildGeneralTab(sf, ct)
         local cur = BNB.currentChar or "Unknown"
         BNB.UpdateNote(_noteID, { scope = "char:" .. cur })
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         RefreshScopeBtns()
     end)
 
@@ -1088,7 +1081,6 @@ local function BuildAppearanceTab(panel)
                 if key == "none" then BNB.UpdateNote(_noteID, {_clear = {"iconFrame"}})
                 else BNB.UpdateNote(_noteID, {iconFrame = key}) end
                 RefreshIconFrameBtn()
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end,
             getBorder = function() local n = GetNote(); return (n and n.borderOverride) or "None" end,
@@ -1096,7 +1088,6 @@ local function BuildAppearanceTab(panel)
                 if name == "None" then BNB.UpdateNote(_noteID, {_clear = {"borderOverride"}})
                 else BNB.UpdateNote(_noteID, {borderOverride = name}) end
                 RefreshIconFrameBtn()
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end,
             getBright = function()
@@ -1129,7 +1120,6 @@ local function BuildAppearanceTab(panel)
             fmt = function(v) return v .. unit end,
             onChange = function(v)
                 Save({[field] = v})
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end,
         })
@@ -1266,7 +1256,6 @@ local function BuildAppearanceTab(panel)
         if #noteIcons == 0 then return end
         local pick = noteIcons[math.random(#noteIcons)]
         BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
         RefreshIconGrid(true)
     end)
@@ -1279,7 +1268,6 @@ local function BuildAppearanceTab(panel)
         if #icons == 0 then return end
         local pick = icons[math.random(#icons)]
         BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
         RefreshIconGrid()
     end)
@@ -1374,7 +1362,6 @@ local function BuildAppearanceTab(panel)
         if not _noteID or not name or name == "" then return end
         local path = "Interface\\Icons\\" .. name
         BNB.UpdateNote(_noteID, {icon = path, iconSource = "blizzard"})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
     end
 
@@ -1413,7 +1400,6 @@ local function BuildAppearanceTab(panel)
         if #noteIcons == 0 then return end
         local pick = noteIcons[math.random(#noteIcons)]
         BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
         -- SetRealText, never AddPlaceholder again: that SetScripts the focus
         -- handlers and wipes the icon autocomplete's hooks (see CLAUDE.md)
@@ -1707,6 +1693,8 @@ end
 
 -- Refreshes NoteConfig content when the selected note changes, but only if the
 -- window is already open. No toggle, no reposition — called from SelectNote.
+BNB.RegisterMessage("NoteConfig", "NoteSelected", function(_, id) BNB.SyncNoteConfig(id) end)
+
 function BNB.SyncNoteConfig(noteID)
     if not ncFrame or not ncFrame:IsShown() then return end
     if not noteID then ncFrame:Hide(); return end

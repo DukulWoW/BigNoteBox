@@ -278,7 +278,6 @@ local function BuildWysiwygBar(parent, tsStrip)
         else
             BNB.UpdateNote(id, {fontOverride = fontID})
         end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SyncNoteConfig then BNB.SyncNoteConfig(id) end
         -- Apply to editor body live
         local eb = BNB._editorBody; if not eb then return end
@@ -425,7 +424,6 @@ local function BuildWysiwygBar(parent, tsStrip)
         sz = math.max(8, math.min(32, math.floor(sz)))
         local id = BNB._currentNoteID; if not id then return end
         BNB.UpdateNote(id, {fontSize = sz})
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SyncNoteConfig  then BNB.SyncNoteConfig(id) end
         local eb = BNB._editorBody
         if eb then

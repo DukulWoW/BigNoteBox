@@ -288,8 +288,6 @@ PopulateTagManager = function()
             BNB.RenameTag(capturedTag, newTag)
             CancelRename()
             PopulateTagManager()
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
         end
 
         row.okBtn:SetScript("OnClick",          CommitRename)
@@ -308,8 +306,6 @@ PopulateTagManager = function()
                 OnAccept       = function()
                     BNB.DeleteTag(capturedTag)
                     PopulateTagManager()
-                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
                 end,
                 timeout        = 0,
                 whileDead      = true,
@@ -361,7 +357,6 @@ PopulateTagManager = function()
                     local function GoToNote()
                         if BNB.mainFrame then
                             BNB.mainFrame:Show()
-                            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                             if BNB.SelectNote      then BNB.SelectNote(capturedID) end
                         end
                     end
@@ -377,8 +372,6 @@ PopulateTagManager = function()
                                 root:CreateButton(L["TAG_MGR_CTX_REMOVE_TAG"], function()
                                     BNB.RemoveNoteTag(capturedID, capturedTag)
                                     PopulateTagManager()
-                                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                                    if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
                                 end)
                                 root:CreateDivider()
                             end)
@@ -467,8 +460,6 @@ local function BuildTagManager()
                     BNB.DeleteTag(tag)
                 end
                 SetMultiMode(false)
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
             end,
             timeout        = 0,
             whileDead      = true,
@@ -576,8 +567,6 @@ local function BuildTagManagerSkin()
                     BNB.DeleteTag(tag)
                 end
                 SetMultiMode(false)
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                if BNB.RefreshTagStrip then BNB.RefreshTagStrip() end
             end,
             timeout        = 0,
             whileDead      = true,
@@ -660,3 +649,24 @@ function BNB.RefreshTagManager()
         PopulateTagManager()
     end
 end
+
+-- Follows the note data (ARCH-02): a tag added or removed, or a note with tags
+-- deleted / restored / copied, changes the counts. Once per frame.
+local function TagsTouched(fields)
+    if not fields then return false end
+    if fields.tags then return true end
+    for _, k in ipairs(fields._clear or {}) do
+        if k == "tags" then return true end
+    end
+    return false
+end
+local function QueueTagManager()
+    if _tmFrame and _tmFrame:IsShown() then
+        BNB.Debounce("tagManager", 0, BNB.RefreshTagManager)
+    end
+end
+BNB.RegisterMessage("TagManager", "NoteChanged", function(_, _, fields)
+    if TagsTouched(fields) then QueueTagManager() end
+end)
+BNB.RegisterMessage("TagManager", "NoteDeleted",  QueueTagManager)
+BNB.RegisterMessage("TagManager", "NoteRestored", QueueTagManager)

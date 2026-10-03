@@ -137,7 +137,6 @@ local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
         tags   = tags or {},
     })
     if rewardAttacher then rewardAttacher(id) end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     return id
 end
 

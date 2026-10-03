@@ -1059,7 +1059,6 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         if #selected == 0 then return end
         for _, destScope in ipairs(selected) do CopyNoteToScope(destScope) end
         f:Hide(); SB.Refresh()
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     end)
 
     f._moveBtn:SetScript("OnClick", function()
@@ -1068,7 +1067,6 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         BNB.UpdateNote(noteID, { scope = selected[1] })
         for i = 2, #selected do CopyNoteToScope(selected[i]) end
         f:Hide(); SB.Refresh()
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     end)
 
     f:ClearAllPoints()
@@ -1200,7 +1198,6 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         f:Hide()
         SB.Refresh()
         if BNB.SetMultiMode  then BNB.SetMultiMode(false) end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     end)
 
     f._moveBtn:SetScript("OnClick", function()
@@ -1218,7 +1215,6 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         f:Hide()
         SB.Refresh()
         if BNB.SetMultiMode  then BNB.SetMultiMode(false) end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     end)
 
     -- Anchor to mouse

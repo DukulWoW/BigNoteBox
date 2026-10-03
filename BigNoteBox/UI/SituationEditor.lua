@@ -723,7 +723,6 @@ function BNB.CreateSituationEditor(panel, opts)
             BNB.UpdateNote(id, { context = typ.value .. ":" .. val })
         end
         RefreshCurBind()
-        if BNB.RefreshNoteList      then BNB.RefreshNoteList()      end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
         Sync(id)
@@ -749,7 +748,6 @@ function BNB.CreateSituationEditor(panel, opts)
             end
             BNB._autoWaypoints[id] = nil
         end
-        if BNB.RefreshNoteList      then BNB.RefreshNoteList()      end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         Sync(id)
     end)

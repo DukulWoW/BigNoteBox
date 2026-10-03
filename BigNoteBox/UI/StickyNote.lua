@@ -1401,9 +1401,8 @@ end
 -- Register TasksChanged callback once so open stickies re-render on data changes.
 local function EnsureStickyTaskCallback()
     if _stickyTaskCallbackRegistered then return end
-    if not (BNB.Task and BNB.Task.RegisterCallback) then return end
     _stickyTaskCallbackRegistered = true
-    BNB.Task.RegisterCallback("TasksChanged", function(changedNoteID)
+    BNB.RegisterMessage("StickyNote", "TasksChanged", function(_, changedNoteID)
         local f = changedNoteID and openFrames[changedNoteID]
         if not f then return end
         if f._taskViewActive and not LeaveEmptyTaskView(changedNoteID) then
@@ -1471,7 +1470,6 @@ local function OpenInMainEditor(noteID)
         end
         if not BNB.mainFrame then return end
         BNB.mainFrame:Show()
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SelectNote      then BNB.SelectNote(noteID) end
         -- SelectNote refuses the switch when the current note has no title
         if BNB._currentNoteID ~= noteID then return end
@@ -1785,7 +1783,6 @@ local function CreateStickyFrame(noteID)
                 end
                 if BNB.mainFrame then
                     BNB.mainFrame:Show()
-                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     if BNB.SelectNote      then BNB.SelectNote(noteID) end
                 end
                 local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")
@@ -1868,7 +1865,6 @@ local function CreateStickyFrame(noteID)
                             end
                             if BNB.mainFrame then
                                 BNB.mainFrame:Show()
-                                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                                 if BNB.SelectNote      then BNB.SelectNote(noteID) end
                             end
                             local taskID = BNB.Task and BNB.Task.AddTask(noteID, "")

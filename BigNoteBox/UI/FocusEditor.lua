@@ -233,9 +233,8 @@ local function SaveFocusNote()
     BNB.UpdateNote(id, { title = title, body = body })
     if BNB._editorTitle then BNB._editorTitle:SetRealText(title) end
     if BNB._editorBody  then BNB._editorBody:SetRealText(body)   end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     focusDirty = false
-    BNB._dirty = false
+    BNB.Editor.SetDirty(false)
     UpdateFocusSaveBtn()
     if BNB.UpdateSaveButtonState then BNB.UpdateSaveButtonState() end
     if BNB.RichPreviewFocus then BNB.RichPreviewFocus.Refresh() end
@@ -405,7 +404,7 @@ local function FocusInsertTagPair(open, close)
         eb:Insert(open .. close)
         eb:SetCursorPosition(curStart + #open)
     end
-    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
 end
 
 local function FocusInsertTag(tag)
@@ -416,7 +415,7 @@ local function FocusInsertTag(tag)
     local cursor = eb:GetCursorPosition() or 0
     eb:Insert(tag)
     eb:SetCursorPosition(cursor + #tag)
-    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
 end
 
 local function BuildFocusMarkupBar(parent, anchorBelow)
@@ -612,7 +611,7 @@ local function BuildFocusFrame()
     end)
     titleEb:SetScript("OnTextChanged", function(self, userInput)
         if userInput and not self._showingPlaceholder then
-            focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+            focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
         end
     end)
     focusTitleEb = titleEb
@@ -661,7 +660,7 @@ local function BuildFocusFrame()
     end)
     eb:SetScript("OnTextChanged", function(self, userInput)
         if userInput and not self._showingPlaceholder then
-            focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+            focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
             if sf.UpdateScrollbar then sf:UpdateScrollbar() end
             UpdateFocusStats(self:GetText())
             -- Notify focus live preview
@@ -717,7 +716,7 @@ local function BuildFocusFrame()
                 if text then
                     self:SetText(text)
                     C_Timer.After(0, function() self:SetCursorPosition(cursor or 0) end)
-                    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+                    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
             end
@@ -734,7 +733,7 @@ local function BuildFocusFrame()
                 if text then
                     self:SetText(text)
                     C_Timer.After(0, function() self:SetCursorPosition(cursor or 0) end)
-                    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+                    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
             end
@@ -917,7 +916,7 @@ local function BuildFocusFrameSkin()
     end)
     titleEb:SetScript("OnTextChanged", function(self, userInput)
         if userInput and not self._showingPlaceholder then
-            focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+            focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
         end
     end)
     focusTitleEb = titleEb
@@ -967,7 +966,7 @@ local function BuildFocusFrameSkin()
     end)
     eb:SetScript("OnTextChanged", function(self, userInput)
         if userInput and not self._showingPlaceholder then
-            focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+            focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
             if sf.UpdateScrollbar then sf:UpdateScrollbar() end
             UpdateFocusStats(self:GetText())
             -- Notify focus live preview
@@ -1023,7 +1022,7 @@ local function BuildFocusFrameSkin()
                 if text then
                     self:SetText(text)
                     C_Timer.After(0, function() self:SetCursorPosition(cursor or 0) end)
-                    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+                    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
             end
@@ -1040,7 +1039,7 @@ local function BuildFocusFrameSkin()
                 if text then
                     self:SetText(text)
                     C_Timer.After(0, function() self:SetCursorPosition(cursor or 0) end)
-                    focusDirty = true; BNB._dirty = true; UpdateFocusSaveBtn()
+                    focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
             end

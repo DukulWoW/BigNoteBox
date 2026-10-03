@@ -443,16 +443,17 @@ local function PopulateContent(ct, sf)
             local open = {}
             for id in pairs(BNB._stickyFrames or {}) do open[#open + 1] = id end
             for _, id in ipairs(open) do pcall(BNB.Sticky.Close, id) end
+            local gone = {}
+            for id in pairs(BNB.NotesDB().notes) do gone[#gone + 1] = id end
             BNB.NotesDB().notes     = {}
             BNB.NotesDB().noteOrder = {}
             -- Derived state that still pointed at the deleted notes (BUG-23)
             BNB.TagIndexRebuild()
             BNB._contextMatches = {}
-            if BNB.RefreshTagManager then BNB.RefreshTagManager() end
-            BNB._currentNoteID = nil
+            BNB.Editor.SetCurrent(nil)
             if BigNoteBoxDB then BigNoteBoxDB.selectedNoteID = nil end
-            if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
             if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
+            BNB.SendMessage("NoteDeleted", gone, true)   -- the list follows
             BNB:Print(L["DZ_MSG_ALL_NOTES_DELETED"])
         end)
     y = y - SEC_GAP

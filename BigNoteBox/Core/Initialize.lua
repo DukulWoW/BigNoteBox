@@ -408,7 +408,6 @@ function BNB_KeybindQuickNote()
     if db and db.quickNoteKeyMode ~= "main" and BNB.Sticky and BNB.Sticky.OpenQuick then
         local ok, why = BNB.Sticky.OpenQuick(id)
         if ok then
-            if BNB.mainFrame and BNB.mainFrame:IsShown() and BNB.RefreshNoteList then BNB.RefreshNoteList() end
             return
         end
         if why == "max" then

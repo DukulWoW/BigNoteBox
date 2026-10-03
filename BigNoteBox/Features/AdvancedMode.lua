@@ -388,7 +388,6 @@ function AM.ConvertToPlain(id, onDone)
                     if BNB._currentNoteID == noteID and BNB.LoadNoteInEditor then
                         BNB.LoadNoteInEditor(noteID)
                     end
-                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                     if BNB.Sticky and BNB.Sticky.RefreshNote then
                         BNB.Sticky.RefreshNote(noteID)
                     end
@@ -424,7 +423,6 @@ function AM.ConvertToRich(id)
     if BNB._currentNoteID == id and BNB.LoadNoteInEditor then
         BNB.LoadNoteInEditor(id)
     end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 end
 
 --------------------------------------------------------------------------------

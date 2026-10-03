@@ -74,11 +74,12 @@ function BNB.UpdateSaveButtonState()
 end
 
 BNB.MarkDirty = function()
-    BNB._dirty = true
+    BNB.Editor.SetDirty(true)
     -- Runs on every keystroke: the buttons only change when the Save button
     -- does not show the note as changed yet (PERF-04)
     if not (saveBtn and saveBtn._showsDirty) then BNB.UpdateSaveButtonState() end
     if BNB.ScheduleAutoSave then BNB.ScheduleAutoSave() end   -- ALL-52
+    BNB.SendMessage("EditorDirty")   -- the rich preview follows (RichPreview.lua)
 end
 
 -- Automatic save mode hides the Save button and closes its gap: the buttons
@@ -388,9 +389,8 @@ local function BuildTitleField(parent)
                 local id = BNB._pendingNewNoteID
                 BNB._pendingNewNoteID = nil
                 if not id then return end
-                BNB._currentNoteID = nil
+                BNB.Editor.SetCurrent(nil)
                 if BNB.PurgeNote        then BNB.PurgeNote(id) end
-                if BNB.RefreshNoteList  then BNB.RefreshNoteList() end
                 if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
                 -- Close NoteConfig if it was open for this note
                 local nc = _G["BigNoteBoxNoteConfigFrame"]
@@ -781,7 +781,6 @@ local function BuildToolbar(parent)
         local newID = BNB.CopyNote(id, {
             title = src.title ~= "" and (src.title .. " (copy)") or "" })
         if not newID then return end
-        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         if BNB.SelectNote      then BNB.SelectNote(newID) end
     end)
 
@@ -818,7 +817,6 @@ local function BuildToolbar(parent)
             BNB.UpdateNote(id, { locked = true })
         end
         if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(id) end
-        if BNB.RefreshNoteList    then BNB.RefreshNoteList()    end
         BNB.LoadNoteInEditor(id)
     end)
     -- OnEnter/OnLeave include grow (BTN_NORMAL/BTN_HOVER from MakeIconBtn closure)
@@ -989,8 +987,6 @@ local function RebuildTagChips(strip, tags)
                 if t ~= capturedTag then newTags[#newTags + 1] = t end
             end
             BNB.UpdateNote(id, { tags = newTags })
-            if BNB._editorTagStrip then BNB.RefreshTagStrip() end
-            if BNB.RefreshNoteList  then BNB.RefreshNoteList()  end
         end)
 
         -- GetStringWidth() can return 0 before layout — use string length as floor
@@ -1138,8 +1134,6 @@ local function BuildTagStrip(parent, toolbarFrame)
         -- Reset to placeholder without re-calling AddPlaceholder (which would
         -- overwrite the OnEditFocusLost hook set by AttachTagAutocomplete)
         self:SetRealText("")
-        if BNB._editorTagStrip then BNB.RefreshTagStrip() end
-        if BNB.RefreshNoteList  then BNB.RefreshNoteList()  end
         -- Re-open autocomplete showing updated tag list
         if BNB._tagAC then BNB._tagAC:ShowFor(self, "") end
     end)
@@ -1264,6 +1258,17 @@ function BNB.ToggleTagStrip()
     end
 end
 
+-- The open note's chips follow its tag changes, wherever they come from (the
+-- strip itself, the Tag Manager, a history restore; ARCH-02). Once per frame.
+BNB.RegisterMessage("NoteEditor", "NoteChanged", function(_, id, fields)
+    if id ~= BNB._currentNoteID or not fields then return end
+    local touched = fields.tags ~= nil
+    for _, k in ipairs(fields._clear or {}) do
+        if k == "tags" then touched = true end
+    end
+    if touched then BNB.Debounce("editorTagStrip", 0, BNB.RefreshTagStrip) end
+end)
+
 -- Public: rebuild chips for current note
 function BNB.RefreshTagStrip()
     if not tagStripFrame then return end
@@ -1375,8 +1380,8 @@ function BNB.LoadNoteInEditor(id)
         end
         if toolbar    then toolbar:Hide()    end
         if BNB._editorWysiwygBar then BNB._editorWysiwygBar:Hide() end
-        BNB._currentNoteID = nil
-        BNB._dirty = false
+        BNB.Editor.SetCurrent(nil)
+        BNB.Editor.SetDirty(false)
         if BNB._sessionUnlocked and id then BNB._sessionUnlocked[id] = nil end
         BNB.UpdateSaveButtonState()
         if BNB.RichPreview then BNB.RichPreview.OnNoteCleared() end
@@ -1413,7 +1418,7 @@ function BNB.LoadNoteInEditor(id)
         end
     end
 
-    BNB._dirty = false
+    BNB.Editor.SetDirty(false)
 
     -- Cancel any pending snapshot timers for the previous note before resetting.
     local prevID = BNB._currentNoteID  -- still the old ID at this point in LoadNoteInEditor
@@ -1515,7 +1520,7 @@ function BNB.LoadNoteInEditor(id)
 
     if toolbar then BNB.RefreshTagStrip() end
 
-    BNB._dirty = false
+    BNB.Editor.SetDirty(false)
     BNB.UpdateSaveButtonState()
 
     -- Apply lock state (session unlock overrides)
@@ -2011,7 +2016,7 @@ end
 function BNB.AM_EnterViewMode(id)
     BNB._editorInViewMode = true
     local note = id and BNB.GetNote(id)
-    if not note then return end
+    if not note then BNB.SendMessage("EditorViewMode", id); return end
 
     -- Build render scroll frame + render frame lazily
     if not BNB._editorRenderScroll then
@@ -2122,6 +2127,7 @@ function BNB.AM_EnterViewMode(id)
     end)
 
     BNB.AM_RefreshTabs()
+    BNB.SendMessage("EditorViewMode", id)   -- the rich preview closes (RichPreview.lua)
 end
 
 function BNB.AM_EnterEditMode()
@@ -2138,6 +2144,7 @@ function BNB.AM_EnterEditMode()
 
     BNB.UpdateBodyTopAnchor()
     BNB.AM_RefreshTabs()
+    BNB.SendMessage("EditorEditMode")
 end
 
 -- Toggle between view and editor mode for the currently loaded rich note.

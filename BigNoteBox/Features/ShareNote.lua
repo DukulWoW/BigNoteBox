@@ -398,7 +398,6 @@ local function BuildSharePreview()
                     BNB.RBAddAttachment(id, a)
                 end
             end
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             if BNB.SelectNote     then BNB.SelectNote(id)    end
             BNB:Print("|cff66bb6a" .. L["SHARE_IMPORTED"] .. "|r")
         end

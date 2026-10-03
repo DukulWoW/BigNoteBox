@@ -471,10 +471,8 @@ local function BuildEmptyState(parent)
     local configBtn = BNB.CreateButton(nil, f, L["WELCOME_CONFIG_BTN"], 140, 28)
     configBtn:SetPoint("BOTTOM", f, "BOTTOM", 80, 4)
     configBtn:SetScript("OnClick", function()
+        -- The label follows through SettingsShown / SettingsHidden (below)
         if BNB.OpenConfig then BNB.OpenConfig() end
-        -- Refresh label immediately after the toggle so it reflects the new state.
-        -- Also installs the config frame hooks on first open (lazy singleton).
-        C_Timer.After(0, function() configBtn:RefreshLabel() end)
     end)
     configBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -526,7 +524,7 @@ local function BuildEmptyState(parent)
     end
 
     -- Rebuilds only the location/favorite icon sections. Called by both
-    -- RefreshWelcomePanel and the RefreshNoteList hook below.
+    -- RefreshWelcomePanel and the NoteListRefreshed message below.
     RefreshIconRows = function()
         if f._locRowFrame then
             f._locRowFrame:Hide()
@@ -647,33 +645,31 @@ local function BuildEmptyState(parent)
         if _clockTicker then _clockTicker:Cancel(); _clockTicker = nil end
     end)
 
-    -- When config is opened or closed via any path, refresh the label.
-    -- hooksecurefunc covers the toolbar/slash/welcome-button toggle paths.
-    -- The OnHide hook on the config frame covers closing via its own X button.
-    hooksecurefunc(BNB, "OpenConfig", function()
-        if f:IsShown() then
-            C_Timer.After(0, function()
-                if f:IsShown() then configBtn:RefreshLabel() end
-            end)
-        end
-        -- Install the OnHide hook now that the config frame exists (lazy singleton).
-        local cf = _G["BigNoteBoxConfigFrame"]
-        if cf and not cf._bnbWelcomeLabelHooked then
-            cf._bnbWelcomeLabelHooked = true
-            cf:HookScript("OnHide", function()
-                if f:IsShown() then configBtn:RefreshLabel() end
-            end)
-        end
-    end)
+    -- When Settings opens or closes by any path, refresh the label
+    -- (messages from UI/ConfigWindow.lua; a hook on BNB.OpenConfig plus an
+    -- OnHide hook installed on first open until ARCH-02).
+    local function OnSettingsToggled()
+        if f:IsShown() then configBtn:RefreshLabel() end
+    end
+    BNB.RegisterMessage("WelcomePanel", "SettingsShown", OnSettingsToggled)
+    BNB.RegisterMessage("WelcomePanel", "SettingsHidden", OnSettingsToggled)
 
     -- When any note changes (favorite toggle, context set, create, delete),
     -- RefreshNoteList fires. If the welcome panel is visible at that moment,
     -- rebuild the icon rows immediately so the user sees the change without
     -- having to close and reopen the panel.
-    hooksecurefunc(BNB, "RefreshNoteList", function()
+    BNB.RegisterMessage("WelcomePanel", "NoteListRefreshed", function()
         if f:IsShown() and RefreshIconRows then
             RefreshIconRows()
         end
+    end)
+    -- A title or icon change redraws only that note's list row (no
+    -- NoteListRefreshed), so the rows also follow NoteChanged, once per frame
+    local function RedrawRowsIfShown()
+        if f:IsShown() and RefreshIconRows then RefreshIconRows() end
+    end
+    BNB.RegisterMessage("WelcomePanel", "NoteChanged", function()
+        if f:IsShown() then BNB.Debounce("welcomeIconRows", 0, RedrawRowsIfShown) end
     end)
 
     return f

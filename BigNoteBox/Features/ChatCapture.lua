@@ -71,9 +71,6 @@ local function DoCaptureFromBCB()
     -- Create a new note
     local id = BNB.CreateNote(autoTitle, text)
 
-    -- Refresh UI if main window is open
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-
     -- Select the new note in the editor so the user can see it immediately
     if BNB.SelectNote then
         pcall(BNB.SelectNote, id)

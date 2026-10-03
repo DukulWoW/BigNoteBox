@@ -722,6 +722,9 @@ function BNB.OpenConfig()
         BNB.HookConfigHeightTracking()
         -- A sub-page never outlives the window (ALL-84); reopening shows its tab.
         cfgFrame:HookScript("OnHide", CloseSubPage)
+        -- Every way Settings opens or closes (toggle, its X, Esc, a page link)
+        cfgFrame:HookScript("OnShow", function() BNB.SendMessage("SettingsShown") end)
+        cfgFrame:HookScript("OnHide", function() BNB.SendMessage("SettingsHidden") end)
         -- Esc while the main window is closed (the Oracle page hides it, or
         -- Settings opened on its own): back one page, then close. While the
         -- main window is up, its Esc chain owns the key.

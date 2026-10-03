@@ -13,8 +13,8 @@
 --   BNB.Task.HasTasks(noteID)                 -> bool
 --   BNB.Task.CheckResets()                    -> called on login + daily ticker
 --
--- Callbacks (register via BNB.Task.RegisterCallback):
---   "TasksChanged" (noteID)  -- fired after any mutation to a note's task list
+-- Message (BNB.RegisterMessage, Core/Events.lua; ARCH-02):
+--   "TasksChanged" (noteID)  -- sent after any mutation to a note's task list
 
 local BNB = BigNoteBox
 
@@ -35,20 +35,11 @@ local COLOR_ACTIVE = { r = 1.00, g = 1.00, b = 1.00 }  -- normal text
 T.SUBTASK_INDENT = 14
 
 --------------------------------------------------------------------------------
--- CALLBACKS
+-- MESSAGES  (BNB's message bus; this file had its own callback list, which
+-- swallowed errors with pcall, until ARCH-02)
 --------------------------------------------------------------------------------
-local _callbacks = {}
-
-function T.RegisterCallback(event, fn)
-    _callbacks[event] = _callbacks[event] or {}
-    _callbacks[event][#_callbacks[event] + 1] = fn
-end
-
 local function Fire(event, ...)
-    if not _callbacks[event] then return end
-    for _, fn in ipairs(_callbacks[event]) do
-        pcall(fn, ...)
-    end
+    BNB.SendMessage(event, ...)
 end
 
 -- Public: notify TasksChanged listeners (ReferenceBox, StickyNote, NoteList)

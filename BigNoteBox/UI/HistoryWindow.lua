@@ -122,7 +122,6 @@ local function BuildRow(parent, note, id, yOff)
                 root:CreateButton(L["HW_CTX_OPEN_EDITOR"], function()
                     if BNB.mainFrame then
                         BNB.mainFrame:Show()
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
                         if BNB.SelectNote      then BNB.SelectNote(id) end
                     end
                 end)

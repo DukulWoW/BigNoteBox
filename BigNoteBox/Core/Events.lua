@@ -229,6 +229,57 @@ end)
 BNB.eventFrame = eventFrame
 
 --------------------------------------------------------------------------------
+-- MESSAGE BUS  (BNB's own messages, ARCH-02 / LIB-03)
+-- Game events go through RegisterEvent above; things that happen inside BNB go
+-- through CallbackHandler, which the libs already carry:
+--   BNB.RegisterMessage(owner, "NoteChanged", fn)   owner = a string or table
+--   BNB.UnregisterMessage(owner, "NoteChanged")
+--   BNB.UnregisterAllMessages(owner)
+--   BNB.SendMessage("NoteChanged", id, fields)
+-- fn gets the message name first: fn("NoteChanged", id, fields). One owner holds
+-- one handler per message (registering again replaces it), so each subscriber
+-- uses its own owner. Handlers run through securecallfunction: an error is
+-- reported and the other handlers still run.
+-- Use a message where one module would otherwise hook or wrap another's
+-- function (hooksecurefunc on BNB, reassigning BNB.X); a new one is listed here.
+-- Messages:
+--   NoteCreated (id)               Core/NoteManager.lua CreateNote
+--   NoteChanged (id, fields)       UpdateNote, after the write (fields as passed);
+--                                  RenameTag / DeleteTag / RemoveNoteTag ({ tags })
+--   NoteDeleted (ids, permanent)   DeleteNote / DeleteNotes / PurgeNote, after
+--                                  removal; ids = the notes actually removed;
+--                                  Danger Zone "Delete all notes"
+--   NoteRestored (id)              RestoreNote, back from the trash
+--   TrashChanged ()                any write to the trash: delete to trash,
+--                                  RestoreNote, PurgeTrash, PurgeTrashed,
+--                                  EmptyTrash (all in NoteManager)
+--   NoteSelected (id)              UI/NoteList.lua SelectNote, after the editor
+--                                  loaded the note (nil = none); Note Settings,
+--                                  Reference Box, history panel follow it
+--   TasksChanged (id)              Features/TaskManager.lua, any task change
+--   NoteListRefreshed ()           UI/NoteList.lua, end of RefreshNoteList
+--   EditorDirty ()                 UI/NoteEditor.lua MarkDirty, every edit
+--   EditorViewMode (id)            AM_EnterViewMode (rich note view tab)
+--   EditorEditMode ()              AM_EnterEditMode, at its end
+--   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
+-- Every way a note is created, edited or removed sends one of the Note*
+-- messages (audited in ARCH-02 session 2). Writes that send none on purpose:
+-- history snapshots, the target display-ID cache, the login scope merge,
+-- lastOpened (StampOpened). The note list (UI/NoteList.lua), the Tag Manager,
+-- the editor's tag strip and the Trash window + toolbar button redraw from
+-- these messages, so code that changes a note or the trash never calls
+-- RefreshNoteList / RefreshTagManager / RefreshTagStrip / RefreshTrashWindow /
+-- SyncTrashBtnState; a new direct write onto a note must send NoteChanged
+-- itself, and the trash is written only through NoteManager.
+--------------------------------------------------------------------------------
+BNB.callbacks = LibStub("CallbackHandler-1.0"):New(BNB,
+    "RegisterMessage", "UnregisterMessage", "UnregisterAllMessages")
+
+function BNB.SendMessage(msg, ...)
+    BNB.callbacks:Fire(msg, ...)
+end
+
+--------------------------------------------------------------------------------
 -- ADDON_LOADED — early initialization gate
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("ADDON_LOADED", function(event, addonName)

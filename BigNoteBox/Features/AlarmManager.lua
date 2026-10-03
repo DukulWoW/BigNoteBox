@@ -637,8 +637,7 @@ function AM.Dismiss(noteID)
         SaveAlarm(noteID, alarm, true)
     end
 
-    -- Refresh note list row and overview
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    -- The note list follows NoteChanged; the overview is refreshed here
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
@@ -659,7 +658,6 @@ function AM.Snooze(noteID, minutes)
     alarm.fired        = false
     SaveAlarm(noteID, alarm, true)
 
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
@@ -675,7 +673,6 @@ function AM.ResetFired(noteID)
         alarm.time = AM.NextInGameTime(alarm.igTime)
     end
     SaveAlarm(noteID, alarm, true)
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
@@ -683,14 +680,12 @@ function AM.SetAlarm(noteID, alarmData)
     -- A ringing alarm that gets edited starts over from its new settings
     if _ringing[noteID] then StopRinging(noteID) end
     SaveAlarm(noteID, alarmData)
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 
 function AM.ClearAlarm(noteID)
     StopRinging(noteID)
     SaveAlarm(noteID, nil)
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
 

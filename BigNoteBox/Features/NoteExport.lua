@@ -1126,7 +1126,6 @@ local function ImportNotes(noteList, remapScope)
             if src.attachments and #src.attachments > 0 then stats.attachments = stats.attachments + 1 end
         end
     end
-    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     ReportImport(count, #noteList, stats)
     return count
 end
