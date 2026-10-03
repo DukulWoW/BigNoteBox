@@ -541,7 +541,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         end
         rem:CreateButton(L["MULTI_CM_REMOVE_SITUATIONS"], function()
             Confirm("MULTI_CONFIRM_REMOVE_SITUATIONS", c.situations, RemoveSituations)
-        end, { icon = "danger", danger = true, disabled = c.situations == 0 })
+        end, { icon = "remove-situation", danger = true, disabled = c.situations == 0 })
 
         root:CreateDivider()
         if BNB.TrashEnabled and BNB.TrashEnabled() then
