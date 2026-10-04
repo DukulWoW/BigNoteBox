@@ -10,17 +10,17 @@
 -- Stored as: note.situations = { "zone:Elwynn Forest" / "subzone:..." /
 -- "instance:Molten Core" / "player:Thrall", ... } or nil (ALL-232), plus
 -- contextDisplay, contextLeave, contextTrigger, contextFreq (ALL-232 S2),
--- waypoint, wpClearOnLeave. The editor shows and
--- edits the first situation; any further ones are kept as they are.
+-- waypoint, wpClearOnLeave. The editor lists every situation (one row each,
+-- X removes it) above one add row (ALL-232 S3, Dukul's layout A,
+-- 2026-10-04); fixing a typo is X and add again.
 --
 -- Public API:
 --   BNB.CreateSituationEditor(panel, opts) -> ed   build once per window
 --     opts.padL, opts.padR  panel edge to the content
 --     opts.ddR              right inset of the dropdowns
 --     opts.top              y of the header
---     opts.bottom           panel bottom to the "Bound to" value
+--     opts.bottom           panel bottom to the waypoint line
 --     opts.width            content width (fallback cycle buttons)
---     opts.bindW            widest the "Bound to" value may draw before shrinking
 --     opts.host             the window: the waypoint info popup opens beside it
 --                           and closes when it hides
 --   ed:Load(noteID)         show a note's saved situation (open, note switch)
@@ -33,10 +33,14 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local ROW_H  = 28
-local BIND_DEF_SZ, BIND_MIN_SZ = 20, 11   -- GameFontNormalHuge3 default, smallest shrink
+local ROW_H  = 24
+local LIST_ROWS, LIST_ROW_H = 4, 20   -- the list box is always 4 rows; the wheel scrolls past that
+local TYPE_W = 100                    -- the add row's type dropdown
 
-local TYPES        = { "none", "zone", "subzone", "instance", "player" }
+-- "npc" matches exactly like "player" (target or group); its own kind so the
+-- list says what the note is about (Dukul, 2026-10-04). "guild" matches a
+-- target or group member in that guild, never yourself
+local TYPES        = { "zone", "subzone", "instance", "player", "npc", "guild" }
 local DISPLAY_KEYS = { "popup", "sticky", "both" }
 local LEAVE_KEYS   = { "keep", "minimize", "hide" }
 -- contextTrigger / contextFreq; the first key of each is saved as nil
@@ -244,55 +248,118 @@ function BNB.CreateSituationEditor(panel, opts)
     end
     local function NoteID() return ed.noteID end
 
+    local KIND_LABELS = { zone = L["STICKY_KIND_ZONE"], subzone = L["STICKY_KIND_SUBZONE"],
+                          instance = L["STICKY_KIND_INSTANCE"], player = L["STICKY_KIND_PLAYER"],
+                          npc = L["STICKY_KIND_NPC"], guild = L["STICKY_KIND_GUILD"] }
+
     local y = opts.top or -8
     local hdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hdr:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
     hdr:SetTextColor(1, 0.82, 0, 1)
-    hdr:SetText(L["STICKY_CONTEXTUAL_BINDING_HDR"])
-    y = y - 20
+    hdr:SetText(L["SIT_LIST_HDR"])
+    y = y - 18
 
     local desc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     desc:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
     desc:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
     desc:SetTextColor(0.60, 0.60, 0.60)
-    desc:SetText(L["STICKY_SIT_DESC"])
+    desc:SetText(L["SIT_LIST_DESC"])
     desc:SetJustifyH("LEFT")
-    desc:SetWordWrap(true)
-    y = y - 36
+    desc:SetWordWrap(false)
+    y = y - 16
 
-    local div = Divider(panel)
-    div:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
-    div:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
-    y = y - 8
+    local SelectType, RemoveAt, RefreshList   -- below
 
-    local SelectType   -- below
+    -- ── The list: one row per situation, always 4 rows tall ──────────────────
+    -- Nothing below it moves with the count; past 4 the mouse wheel scrolls
+    -- and a thin bar on the right shows where (Dukul, 2026-10-04)
+    local LIST_H = LIST_ROWS * LIST_ROW_H + 4
+    local list = BNB.CreateBackdropFrame("Frame", nil, panel)
+    BNB.SetBackdropDark(list)
+    list:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
+    list:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
+    list:SetHeight(LIST_H)
+    y = y - LIST_H - 6
 
-    -- ── Bind type ─────────────────────────────────────────────────────────────
-    local TYPE_LABELS = { L["TASK_CTX_SIT_NONE"], L["STICKY_KIND_ZONE"], L["STICKY_KIND_SUBZONE"],
-                          L["STICKY_KIND_INSTANCE"], L["STICKY_KIND_PLAYER"] }
-    local typ = NewChoice(panel, TYPES, TYPE_LABELS, width, function(k) SelectType(k) end)
+    local emptyLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    emptyLbl:SetPoint("LEFT",  list, "LEFT",  8, 0)
+    emptyLbl:SetPoint("RIGHT", list, "RIGHT", -8, 0)
+    emptyLbl:SetJustifyH("CENTER")
+    emptyLbl:SetTextColor(0.45, 0.45, 0.45)
+    emptyLbl:SetText(L["SIT_LIST_EMPTY"])
+
+    local thumb = list:CreateTexture(nil, "OVERLAY")
+    thumb:SetWidth(3)
+    thumb:SetColorTexture(0.6, 0.6, 0.6, 0.6)
+    thumb:Hide()
+
+    local listOffset = 0   -- situations scrolled past the top
+    local rows = {}
+    for i = 1, LIST_ROWS do
+        local row = CreateFrame("Frame", nil, list)
+        row:SetHeight(LIST_ROW_H)
+        row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
+        row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
+        row:EnableMouse(true)
+        local hi = row:CreateTexture(nil, "BACKGROUND")
+        hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.06); hi:Hide()
+        row._kind = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row._kind:SetPoint("LEFT", row, "LEFT", 6, 0)
+        row._kind:SetWidth(62)
+        row._kind:SetJustifyH("LEFT"); row._kind:SetWordWrap(false)
+        row._kind:SetTextColor(0.60, 0.60, 0.60)
+        -- No confirm, like a task row's X, and shown only while the pointer
+        -- is over the row (Dukul, 2026-10-04)
+        row._del = BNB.CreateIconButton(row, 16, "close",
+            { tip = L["SIT_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
+        row._del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row._del:SetScript("OnClick", function() GameTooltip:Hide(); RemoveAt(row._index) end)
+        row._del:Hide()
+        local function HoverOff()
+            if row:IsMouseOver() then return end   -- moved between the row and its X
+            hi:Hide(); row._del:Hide()
+        end
+        row._del:HookScript("OnEnter", function() hi:Show() end)
+        row._del:HookScript("OnLeave", HoverOff)
+        row._value = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row._value:SetPoint("LEFT",  row._kind, "RIGHT", 4, 0)
+        row._value:SetPoint("RIGHT", row._del,  "LEFT", -4, 0)
+        row._value:SetJustifyH("LEFT"); row._value:SetWordWrap(false)
+        -- The whole name in a tooltip when it does not fit
+        row:SetScript("OnEnter", function(self)
+            hi:Show(); self._del:Show()
+            if self._value:IsTruncated() then
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:AddLine(self._kind:GetText() or "", 0.78, 0.78, 0.78)
+                GameTooltip:AddLine(self._value:GetText() or "", 1, 1, 1, true)
+                GameTooltip:Show()
+            end
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
+        row:Hide()
+        rows[i] = row
+    end
+    list:SetScript("OnMouseWheel", function(_, delta)
+        listOffset = listOffset - delta
+        RefreshList()
+    end)
+
+    -- ── Add row: [type v] [name] [browse] ────────────────────────────────────
+    local TYPE_LABELS = { L["STICKY_KIND_ZONE"], L["STICKY_KIND_SUBZONE"],
+                          L["STICKY_KIND_INSTANCE"], L["STICKY_KIND_PLAYER"], L["STICKY_KIND_NPC"],
+                          L["STICKY_KIND_GUILD"] }
+    local typ = NewChoice(panel, TYPES, TYPE_LABELS, TYPE_W, function(k) SelectType(k) end)
     typ.frame:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
-    if HAS_DD then typ.frame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -ddR, y) end
-    y = y - 30
+    typ.frame:SetWidth(TYPE_W)
 
-    -- ── Value row (zone / instance / player name) ────────────────────────────
+    -- Spans the whole row: the autocomplete and the zone picker hang from it
     local valueRow = CreateFrame("Frame", nil, panel)
     valueRow:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
     valueRow:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
     valueRow:SetHeight(ROW_H)
-    valueRow:Hide()
-
-    local valueLbl = valueRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    valueLbl:SetPoint("LEFT", valueRow, "LEFT", 0, 0)
-    valueLbl:SetWidth(65)
-    valueLbl:SetJustifyH("LEFT")
-    valueLbl:SetTextColor(0.78, 0.78, 0.78)
-    valueLbl:SetText(L["STICKY_SIT_VALUE_LABEL"])
 
     local valueEb = CreateFrame("EditBox", nil, valueRow, "BackdropTemplate")
     BNB.EnsureBackdrop(valueEb)
-    valueEb:SetPoint("LEFT",  valueLbl, "RIGHT", 6, 0)
-    valueEb:SetPoint("RIGHT", valueRow, "RIGHT", -26, 0)   -- room for the browse button
     valueEb:SetHeight(20)
     valueEb:SetFontObject("GameFontNormal")
     valueEb:SetAutoFocus(false)
@@ -323,7 +390,27 @@ function BNB.CreateSituationEditor(panel, opts)
     browseBtn:SetAlpha(0.7)
     browseBtn:Hide()
 
-    -- ── Autocomplete under the value row (2+ characters typed) ───────────────
+    -- The name box ends at the browse button while it shows
+    local function PlaceValueBox(withBrowse)
+        valueEb:ClearAllPoints()
+        valueEb:SetPoint("LEFT",  valueRow, "LEFT",  TYPE_W + 6, 0)
+        valueEb:SetPoint("RIGHT", valueRow, "RIGHT", withBrowse and -26 or 0, 0)
+    end
+    PlaceValueBox(false)
+
+    -- ── Use current / Add / Clear all ────────────────────────────────────────
+    local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 22)
+    useCurrentBtn:SetPoint("TOPLEFT", valueRow, "BOTTOMLEFT", 0, -4)
+
+    local addBtn = BNB.CreateButton(nil, panel, L["SIT_ADD_BTN"], 60, 22)
+    addBtn:SetPoint("LEFT", useCurrentBtn, "RIGHT", 6, 0)
+    addBtn:SetEnabled(false)
+
+    local clearBtn = BNB.CreateButton(nil, panel, L["SIT_CLEAR_ALL"], 72, 22)
+    clearBtn:SetPoint("TOPRIGHT", valueRow, "BOTTOMRIGHT", 0, -4)
+    clearBtn:SetEnabled(false)
+
+    -- ── Autocomplete under the add row (2+ characters typed) ─────────────────
     local acFrame = BNB.CreateBackdropFrame("Frame", nil, panel)
     BNB.SetBackdrop(acFrame, 0.08, 0.08, 0.10, 0.97, 0.35, 0.35, 0.38, 1)
     acFrame:SetPoint("TOPLEFT",  valueRow, "BOTTOMLEFT",  0, -2)
@@ -379,9 +466,11 @@ function BNB.CreateSituationEditor(panel, opts)
     end
 
     valueEb:SetScript("OnTextChanged", function(self, userInput)
-        if not userInput then return end
         local text = self:GetText() or ""
-        if #text < 2 then HideAC(); return end
+        addBtn:SetEnabled(text:find("%S") ~= nil)
+        if not userInput then return end
+        -- No list of NPC or guild names to offer (GetMatches would answer with zones)
+        if #text < 2 or typ.value == "npc" or typ.value == "guild" then HideAC(); return end
         -- The autocomplete takes over from an open full picker
         if BNB.ZonePicker and BNB.ZonePicker.IsShown and BNB.ZonePicker.IsShown() then
             BNB.ZonePicker.Close()
@@ -411,42 +500,10 @@ function BNB.CreateSituationEditor(panel, opts)
         end
     end)
 
-    -- ── Use current / Apply / Clear ──────────────────────────────────────────
-    local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 20)
-    useCurrentBtn:SetPoint("TOPLEFT", valueRow, "BOTTOMLEFT", 0, -4)
-    useCurrentBtn:Hide()
-
-    local saveBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_APPLY_BTN"], 60, 22)
-    saveBtn:SetPoint("TOPLEFT", useCurrentBtn, "TOPRIGHT", 8, 0)
-    saveBtn:Hide()
-
-    local clearBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_CLEAR_BTN"], 52, 22)
-    clearBtn:SetPoint("TOPLEFT", saveBtn, "TOPRIGHT", 6, 0)
-    clearBtn:Hide()
-
-    -- ── "Bound to" display at the panel bottom ───────────────────────────────
-    local bottom = opts.bottom or 6
-    local curBindValue = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge3")
-    curBindValue:SetPoint("BOTTOMLEFT",  panel, "BOTTOMLEFT",  padL, bottom)
-    curBindValue:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -padR, bottom)
-    curBindValue:SetJustifyH("CENTER")
-    curBindValue:SetWordWrap(false)
-    curBindValue:SetMaxLines(1)
-    curBindValue:SetTextColor(1, 1, 1)
-
-    local curBindHeader = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    curBindHeader:SetPoint("BOTTOMLEFT",  curBindValue, "TOPLEFT",  0, 4)
-    curBindHeader:SetPoint("BOTTOMRIGHT", curBindValue, "TOPRIGHT", 0, 4)
-    curBindHeader:SetJustifyH("CENTER")
-    curBindHeader:SetWordWrap(false)
-    curBindHeader:SetMaxLines(1)
-    curBindHeader:SetTextColor(0.55, 0.55, 0.55)
-
     -- ── Show as / Trigger / How often / On leaving ───────────────────────────
     -- Label above a full-width dropdown, as everywhere else (Dukul,
     -- 2026-10-03; label-left rows ran past the window's right edge). The gaps
-    -- are tighter than the old two blocks so four fit above the "Bound to"
-    -- display
+    -- are tighter than the old two blocks so four fit above the waypoint
     local dispDiv = Divider(panel)
     dispDiv:SetPoint("TOPLEFT",  useCurrentBtn, "BOTTOMLEFT", 0, -14)
     dispDiv:SetPoint("TOPRIGHT", panel,         "TOPRIGHT",  -padR, 0)
@@ -516,9 +573,11 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- When it shows: arriving (nil), leaving, or both. A player situation is
     -- no place: it matches while that player is your target or in your
-    -- group, so its words are "meet" and "gone" (Dukul, 2026-10-03)
-    local PLACE_TRIG  = { L["SIT_TRIGGER_ARRIVE"], L["SIT_TRIGGER_LEAVE"], L["SIT_TRIGGER_BOTH"] }
-    local PLAYER_TRIG = { L["SIT_TRIGGER_MEET"], L["SIT_TRIGGER_GONE"], L["SIT_TRIGGER_BOTH_PLAYER"] }
+    -- group, so its words are "meet" and "gone" (Dukul, 2026-10-03). A note
+    -- with places and players gets neutral words (agreed 2026-10-03)
+    local PLACE_TRIG   = { L["SIT_TRIGGER_ARRIVE"], L["SIT_TRIGGER_LEAVE"], L["SIT_TRIGGER_BOTH"] }
+    local PLAYER_TRIG  = { L["SIT_TRIGGER_MEET"], L["SIT_TRIGGER_GONE"], L["SIT_TRIGGER_BOTH_PLAYER"] }
+    local NEUTRAL_TRIG = { L["SIT_TRIGGER_START"], L["SIT_TRIGGER_END"], L["SIT_TRIGGER_BOTH_ANY"] }
     trig = NewChoice(panel, TRIGGER_KEYS, PLACE_TRIG, optW,
         function(mode)
             local id = NoteID(); if not id then return end
@@ -532,9 +591,9 @@ function BNB.CreateSituationEditor(panel, opts)
             Sync(id)
         end)
     local trigLabel = OptionRow(2, "SIT_ROW_TRIGGER", trig)
-    local isPlayer = false   -- the type dropdown shows "Player"
+    local hasPlayer = false   -- a player is among the note's situations
     trig.frame:HookScript("OnEnter", function(self)
-        if not isPlayer then return end
+        if not hasPlayer then return end
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SIT_ROW_TRIGGER"], 1, 1, 1)
         GameTooltip:AddLine(L["SIT_TRIGGER_PLAYER_TIP"], 0.78, 0.78, 0.78, true)
@@ -542,12 +601,16 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     trig.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Called by SelectType: the trigger and leave rows speak of places or of
-    -- a player, after the type dropdown
-    local function ApplyKindWords(kind)
-        isPlayer = (kind == "player")
-        trig:SetLabels(isPlayer and PLAYER_TRIG or PLACE_TRIG)
-        leaveLabel:SetText(L[isPlayer and "SIT_ROW_GONE" or "SIT_ROW_LEAVE"])
+    -- Called by RefreshList: the trigger and leave rows speak of places, of
+    -- players, or neutrally of both, after the note's situations
+    -- (mode "place" / "player" / "mixed")
+    local function ApplyKindWords(mode)
+        hasPlayer = (mode ~= "place")
+        local words, leaveKey = PLACE_TRIG, "SIT_ROW_LEAVE"
+        if mode == "player" then words, leaveKey = PLAYER_TRIG, "SIT_ROW_GONE"
+        elseif mode == "mixed" then words, leaveKey = NEUTRAL_TRIG, "SIT_ROW_END" end
+        trig:SetLabels(words)
+        leaveLabel:SetText(L[leaveKey])
     end
 
     -- How often, per character
@@ -702,49 +765,21 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     wpLeaveChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Waypoint line above the "Bound to" display
+    -- Waypoint line at the panel bottom
+    local bottom = opts.bottom or 6
     local wpStatusLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    wpStatusLbl:SetPoint("BOTTOMLEFT",  curBindHeader, "TOPLEFT",  0, 6)
-    wpStatusLbl:SetPoint("BOTTOMRIGHT", curBindHeader, "TOPRIGHT", 0, 6)
+    wpStatusLbl:SetPoint("BOTTOMLEFT",  panel, "BOTTOMLEFT",  padL, bottom)
+    wpStatusLbl:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -padR, bottom)
     wpStatusLbl:SetJustifyH("CENTER")
     wpStatusLbl:SetTextColor(0.55, 0.85, 1, 1)
     wpStatusLbl:Hide()
 
-    -- Everything below the value row shows only while a type is chosen
+    -- Everything below the add row shows only while the note has a situation
     local typedOnly = { dispDiv, dispLabel, disp.frame, trigLabel, trig.frame, freqLabel, freq.frame,
                         wpDiv, wpHdr, wpDesc, wpStatusTag, wpInfoLbl, wpInfoHit,
                         wpPinBtn, wpNavBtn, wpClearBtn, wpManualBtn, wpLeaveChk }
 
     -- ── Refreshers ───────────────────────────────────────────────────────────
-    local KIND_LABELS = { zone = L["STICKY_KIND_ZONE"], subzone = L["STICKY_KIND_SUBZONE"],
-                          instance = L["STICKY_KIND_INSTANCE"], player = L["STICKY_KIND_PLAYER"] }
-    local bindW = opts.bindW or width
-
-    local function RefreshCurBind()
-        local note = NoteID() and BNB.GetNote(NoteID())
-        local ctx  = BNB.FirstSituation(note)
-        local path = curBindValue:GetFont()
-        if ctx and ctx ~= "" then
-            local kind, value
-            if BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
-            curBindHeader:SetText(string.format(L["STICKY_SIT_BOUND_TO_FMT"], KIND_LABELS[kind] or kind or "?"))
-            curBindValue:SetText(value or "?")
-            -- Default size, then shrink while too wide
-            if path then
-                pcall(curBindValue.SetFont, curBindValue, path, BIND_DEF_SZ, "")
-                local sw = curBindValue:GetStringWidth() or 0
-                if sw > bindW then
-                    local sz = math.max(BIND_MIN_SZ, math.floor(BIND_DEF_SZ * bindW / sw))
-                    pcall(curBindValue.SetFont, curBindValue, path, sz, "")
-                end
-            end
-        else
-            curBindHeader:SetText("|cff666666" .. L["NC_NO_BINDING"] .. "|r")
-            if path then pcall(curBindValue.SetFont, curBindValue, path, BIND_DEF_SZ, "") end
-            curBindValue:SetText("|cff666666" .. L["NC_NOTE_GLOBAL"] .. "|r")
-        end
-    end
-
     local function RefreshWaypointDisplay()
         local note = NoteID() and BNB.GetNote(NoteID())
         local wp   = note and note.waypoint
@@ -783,23 +818,103 @@ function BNB.CreateSituationEditor(panel, opts)
         end
     end
 
-    local VALUE_LABELS = { zone = "STICKY_SIT_ZONE_LABEL", subzone = "STICKY_SIT_SUBZONE_LABEL",
-                           instance = "STICKY_SIT_INSTANCE_LABEL", player = "STICKY_SIT_PLAYER_LABEL" }
+    -- The list rows, the scroll bar, the trigger words and what shows below
+    RefreshList = function()
+        local sits = BNB.NoteSituations(NoteID() and BNB.GetNote(NoteID()))
+        local n = #sits
+        listOffset = math.max(0, math.min(listOffset, n - LIST_ROWS))
+        for i, row in ipairs(rows) do
+            local idx = listOffset + i
+            local s = sits[idx]
+            if s then
+                local kind, value = BNB.DecodeContext(s)
+                row._index = idx
+                row._kind:SetText(KIND_LABELS[kind] or kind or "?")
+                row._value:SetText(value or s)
+                row:Show()
+                -- A hidden row gets no OnLeave: its X must not come back with it
+                if not row:IsMouseOver() then row._del:Hide() end
+            else
+                row._index = nil
+                row:Hide()
+                row._del:Hide()
+            end
+        end
+        if n == 0 then emptyLbl:Show() else emptyLbl:Hide() end
+        -- "Situations (4)" (Dukul, 2026-10-04); no count while empty
+        hdr:SetText(n > 0 and string.format(L["SIT_LIST_HDR_FMT"], n) or L["SIT_LIST_HDR"])
+        list:EnableMouseWheel(n > LIST_ROWS)   -- otherwise the wheel is the window's
+        if n > LIST_ROWS then
+            local inner = LIST_ROWS * LIST_ROW_H
+            local h = math.max(8, inner * LIST_ROWS / n)
+            thumb:ClearAllPoints()
+            thumb:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2 - (inner - h) * listOffset / (n - LIST_ROWS))
+            thumb:SetHeight(h)
+            thumb:Show()
+        else
+            thumb:Hide()
+        end
+        local place, player = false, false
+        for _, s in ipairs(sits) do
+            local k = BNB.DecodeContext(s)
+            if k == "player" or k == "npc" or k == "guild" then player = true else place = true end
+        end
+        ApplyKindWords((place and player) and "mixed" or player and "player" or "place")
+        ShowTypedControls(n > 0)
+        clearBtn:SetEnabled(n > 0)
+    end
 
     SelectType = function(t)
         typ.value = t
-        local needsValue = (t ~= "none")
-        valueRow:SetShown(needsValue)
-        useCurrentBtn:SetShown(needsValue)
-        saveBtn:SetShown(needsValue)
-        clearBtn:SetShown(true)
-        ShowTypedControls(needsValue)
         -- The zone picker covers zones and instances only
-        browseBtn:SetShown(needsValue and (t == "zone" or t == "instance"))
+        local browse = (t == "zone" or t == "instance")
+        browseBtn:SetShown(browse)
+        PlaceValueBox(browse)
         HideAC()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
-        if VALUE_LABELS[t] then valueLbl:SetText(L[VALUE_LABELS[t]]) end
-        ApplyKindWords(t)
+    end
+
+    -- Saves the note's new situation list and brings everything that shows
+    -- it up to date
+    local function SaveSituations(id, sits)
+        if #sits > 0 then
+            BNB.UpdateNote(id, { situations = sits })
+        else
+            BNB.UpdateNote(id, { _clear = { "situations" } })
+        end
+        RefreshList()
+        if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
+        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
+        Sync(id)
+    end
+
+    RemoveAt = function(idx)
+        local id = NoteID(); if not id or not idx then return end
+        local sits = {}
+        for i, s in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
+            if i ~= idx then sits[#sits + 1] = s end
+        end
+        SaveSituations(id, sits)
+    end
+
+    -- Adds the add row's situation at the end of the list; one the note
+    -- already has (situations match without case) is left out with a line
+    local function AddSituation()
+        local id = NoteID(); if not id then return end
+        local val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
+        if val == "" then return end
+        local s = typ.value .. ":" .. val
+        local sits = {}
+        for i, old in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
+            if old:lower() == s:lower() then BNB:Print(L["SIT_DUPLICATE"]); return end
+            sits[i] = old
+        end
+        sits[#sits + 1] = s
+        valueEb:SetText("")
+        valueEb:ClearFocus()
+        HideAC()
+        listOffset = #sits   -- clamped by RefreshList: the new row shows at the bottom
+        SaveSituations(id, sits)
     end
 
     -- ── Button handlers ──────────────────────────────────────────────────────
@@ -811,45 +926,49 @@ function BNB.CreateSituationEditor(panel, opts)
             val = GetSubZoneText and GetSubZoneText() or ""
         elseif t == "instance" then
             val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
-        elseif t == "player" then
+        elseif t == "player" or t == "npc" then
             val = (BNB.UnitNameRealm("target")) or ""
+        elseif t == "guild" then
+            -- The target's guild, never your own through targeting yourself
+            if UnitIsPlayer("target") and not UnitIsUnit("target", "player") then
+                val = GetGuildInfo("target") or ""
+            end
         end
         valueEb:SetText(val)
     end)
 
-    saveBtn:SetScript("OnClick", function()
-        local id = NoteID(); if not id then return end
-        local val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
-        -- The first situation is replaced or removed; the rest stay
-        local list = {}
-        for i, sit in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
-            if i > 1 then list[#list + 1] = sit end
-        end
-        if typ.value ~= "none" and val ~= "" then table.insert(list, 1, typ.value .. ":" .. val) end
-        if #list > 0 then
-            BNB.UpdateNote(id, { situations = list })
-        else
-            BNB.UpdateNote(id, { _clear = { "situations" } })
-        end
-        RefreshCurBind()
-        if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
-        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
-        Sync(id)
-        BNB:Print(L["STICKY_CONTEXT_BINDING_SAVED"])
-    end)
+    addBtn:SetScript("OnClick", AddSituation)
+    valueEb:SetScript("OnEnterPressed", AddSituation)
 
+    -- With 2+ situations Clear all takes two clicks: the first turns the
+    -- button into "Sure?" for a few seconds (Dukul, 2026-10-04)
+    local CLEAR_ARM_SECS = 3
+    local clearArmed, clearTimer = false, nil
+    local function DisarmClear()
+        clearArmed = false
+        if clearTimer then clearTimer:Cancel(); clearTimer = nil end
+        clearBtn:SetText(L["SIT_CLEAR_ALL"])
+    end
+    clearBtn:HookScript("OnHide", DisarmClear)
+
+    -- Every situation and every option back to the defaults
     clearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
+        if not clearArmed and #BNB.NoteSituations(BNB.GetNote(id)) > 1 then
+            clearArmed = true
+            clearBtn:SetText("|cffff5555" .. L["SIT_CLEAR_SURE"] .. "|r")
+            clearTimer = C_Timer.NewTimer(CLEAR_ARM_SECS, DisarmClear)
+            return
+        end
+        DisarmClear()
         BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave",
                                         "contextTrigger", "contextFreq" } })
         ResetSeen(id)
         if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(id) end
-        valueEb:SetText("")
-        typ:Set("none"); disp:Set("popup"); leave:Set("keep")
+        disp:Set("popup"); leave:Set("keep")
         trig:Set("arrive"); freq:Set("always")
-        SelectType("none")
-        clearBtn:Hide()
-        RefreshCurBind()
+        listOffset = 0
+        RefreshList()
         -- Also remove an active waypoint of this note
         local uid = BNB._autoWaypoints and BNB._autoWaypoints[id]
         if uid then
@@ -974,6 +1093,15 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- ── Load a note ──────────────────────────────────────────────────────────
     function ed:Load(noteID)
+        -- Another note: back to the top of the list, and not the previous
+        -- note's half-typed name. The same note (a save in the other editor)
+        -- keeps both
+        if noteID ~= self.noteID then
+            listOffset = 0
+            valueEb:SetText("")
+            HideAC()
+            DisarmClear()
+        end
         self.noteID = noteID
         local note = noteID and BNB.GetNote(noteID)
         local cd = note and note.contextDisplay
@@ -986,26 +1114,13 @@ function BNB.CreateSituationEditor(panel, opts)
         local known = false
         for _, k in ipairs(FREQ_KEYS) do if k == fq then known = true end end
         freq:Set(known and fq or "always")
-
-        local kind, value
-        local ctx = BNB.FirstSituation(note)
-        if ctx and BNB.DecodeContext then kind, value = BNB.DecodeContext(ctx) end
-        if kind then
-            typ:Set(kind)
-            SelectType(kind)
-            valueEb:SetText(value or "")
-            clearBtn:Show()
-        else
-            typ:Set("none")
-            SelectType("none")
-            valueEb:SetText("")   -- not the previous note's value
-            clearBtn:Hide()
-        end
-        RefreshCurBind()
+        RefreshList()
         RefreshWaypointDisplay()
     end
 
-    -- Start empty: nothing below the type dropdown until a type is chosen
+    -- Start empty: nothing below the add row until the note has a situation
+    typ:Set("zone")
+    SelectType("zone")
     ShowTypedControls(false)
     return ed
 end

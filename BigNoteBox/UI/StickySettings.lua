@@ -254,7 +254,7 @@ local function BuildStickySettingsWindow()
     -- built once; PopulateStickySettings only loads the note into it
     f._sitEditor = BNB.CreateSituationEditor(ct3, {
         padL = 0, padR = 0, ddR = 0, top = -8, bottom = 6,
-        width = SETTINGS_CW, bindW = SETTINGS_CW, host = f,
+        width = SETTINGS_CW, host = f,
     })
 
     f:Hide()

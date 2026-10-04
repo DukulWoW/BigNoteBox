@@ -128,7 +128,7 @@ local function Fields(note)
     -- A zone context counts for plain words (who above), not for @.
     local about = {}
     for _, ctx in ipairs(sits) do
-        local name = ctx:match("^player:(.+)$")
+        local name = ctx:match("^player:(.+)$") or ctx:match("^npc:(.+)$")
         if name then about[#about + 1] = name:lower() end
     end
     if note.inspectName then about[#about + 1] = tostring(note.inspectName):lower() end

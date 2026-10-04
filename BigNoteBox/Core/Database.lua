@@ -32,7 +32,7 @@
 --   trashRetainDays = 0 → trash disabled, deletes are permanent.
 --
 -- SITUATION STRING FORMAT (v1):  "<kind>:<value>"
---   kind  = "zone" | "instance" | "subzone" | "player"
+--   kind  = "zone" | "instance" | "subzone" | "player" | "npc" (npc matches as player) | "guild"
 --   value = plain display name as returned by WoW APIs
 --   Held in the list note.situations since NOTES v10 (was the one string
 --   note.context, ALL-232); read through BNB.NoteSituations (NoteFields.lua).

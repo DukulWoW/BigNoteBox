@@ -1141,7 +1141,7 @@ end
 local function BuildSituationTab(panel)
     local ed = BNB.CreateSituationEditor(panel, {
         padL = PAD, padR = PAD, ddR = 8, top = -PAD, bottom = PAD + 6,
-        width = CW, bindW = NCW - PAD * 2 - 8, host = panel:GetParent(),
+        width = CW, host = panel:GetParent(),
     })
     panel._loadCtx = function() ed:Load(_noteID) end
 end

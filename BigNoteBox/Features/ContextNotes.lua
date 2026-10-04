@@ -67,6 +67,7 @@ end
 -- once per check from unit tokens. GetRaidRosterInfo only answers in a raid, so
 -- party members never matched (BUG-25). Reset by CheckContextualNotes.
 local _groupNames = nil
+local _groupGuilds = nil   -- lower-case guild names of the others in the group, same lifetime
 
 local function GroupNames()
     if _groupNames then return _groupNames end
@@ -90,6 +91,30 @@ local function GroupNames()
     return set
 end
 
+-- A unit's guild, lower case; never your own (Dukul, 2026-10-04: a note on
+-- your own guild would match you all the time)
+local function UnitGuild(unit)
+    if not (UnitExists(unit) and UnitIsPlayer(unit)) or UnitIsUnit(unit, "player") then return nil end
+    local g = GetGuildInfo(unit)
+    return (g and g ~= "") and g:lower() or nil
+end
+
+-- Guilds of the others in the group, for guild situations
+local function GroupGuilds()
+    if _groupGuilds then return _groupGuilds end
+    local set = {}
+    local n = GetNumGroupMembers and GetNumGroupMembers() or 0
+    if n > 0 then
+        local raid = IsInRaid and IsInRaid()
+        for i = 1, raid and n or (n - 1) do
+            local g = UnitGuild((raid and "raid" or "party") .. i)
+            if g then set[g] = true end
+        end
+    end
+    _groupGuilds = set
+    return set
+end
+
 -- ── Match a single note against current context ────────────────────────────────
 -- Where the player is, read once per check (PERF-05: it was read again for
 -- every note): zone kind and name, sub-zone and target name, lower case.
@@ -102,6 +127,7 @@ local function CurrentEnv()
         zone     = (val or ""):lower(),
         subzone  = (GetSubZoneText and GetSubZoneText() or ""):lower(),
         target   = tgt and tgt:lower(),
+        tguild   = UnitGuild("target"),
     }
 end
 
@@ -116,13 +142,19 @@ local function ContextMatches(ctx, env)
         return env.zoneKind == kind and env.zone == value
     elseif kind == "subzone" then
         return env.subzone == value
-    elseif kind == "player" then
+    elseif kind == "player" or kind == "npc" then
+        -- An NPC matches the same way: by target name, or in the group
+        -- (follower dungeons)
         -- Match against full value or just the name portion (before realm hyphen)
         local valName = value:match("^([^-]+)") or value
         local tgt = env.target
         if tgt and (tgt == value or tgt == valName) then return true end
         local group = GroupNames()
         return (group[value] or group[valName]) and true or false
+    elseif kind == "guild" then
+        -- The target's guild or anyone's in the group; typed without a realm,
+        -- so the name matches on any realm (Dukul, 2026-10-04)
+        return env.tguild == value or GroupGuilds()[value] == true
     end
     return false
 end
@@ -150,7 +182,7 @@ function BNB.HasPlayerContexts()
     if not (ndb and ndb.notes) then return false end
     for _, note in pairs(ndb.notes) do
         for _, c in ipairs(BNB.NoteSituations(note)) do
-            if c:find("^player:") then return true end
+            if c:find("^player:") or c:find("^npc:") or c:find("^guild:") then return true end
         end
     end
     return false
@@ -394,7 +426,7 @@ local function ShowToast(matchIDs, locationName, leftBy)
         local k, v = (leftBy[id] or ""):match("^(%w+):(.+)$")
         if not v then return nil end
         -- A player is not left but gone: "Thrall is gone", name without realm
-        if k == "player" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
+        if k == "player" or k == "npc" or k == "guild" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
         return string.format(L["CONTEXT_LEFT"], v)
     end
     if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then return end
@@ -610,7 +642,7 @@ function BNB.CheckContextualNotes()
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
 
-    _groupNames = nil   -- group may have changed since the last check
+    _groupNames, _groupGuilds = nil, nil   -- group may have changed since the last check
     local env = CurrentEnv()
     local matches   = {}
     local matchSet  = {}
@@ -797,7 +829,7 @@ end
 -- kept for per-task situation toasts (ALL-202).
 BNB._taskContextMatch = function(ctx)
     if not ctx or ctx == "" then return false end
-    _groupNames = nil
+    _groupNames, _groupGuilds = nil, nil
     return ContextMatches(ctx, CurrentEnv())
 end
 

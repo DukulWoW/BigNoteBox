@@ -257,6 +257,12 @@ local function BuildMainFrame()
     end
 
     f:SetSize(PREVIEW_W, h)
+    -- One strata above the main window (MEDIUM): the sidebar strip is a child
+    -- of the main window and its icons drew over the preview beside it; a
+    -- raised frame level does not hold against another window's children
+    -- (Dukul, 2026-10-04). Below DIALOG, so Note Settings and the Reference
+    -- Box still open over it
+    f:SetFrameStrata("HIGH")
 
     _mainRSF, _mainRF = BuildRenderPair(FRAME_NAME, f, titleH)
 
