@@ -762,73 +762,19 @@ local _pickerFrame  = nil
 local _pickerNoteID = nil
 local _pickerAttIdx = nil
 
+-- On the shared window shell (UI/ToolWindow.lua, CMP-02 S5). The title (set
+-- in OpenPicker) carries the attachment's icon inline.
 local function BuildPickerWindow()
-    local PW, PH   = 320, 380
-    local TITLE_HP = 28
-    local PAD_P    = 8
-
-    local f = BNB.CreateBackdropFrame("Frame", "BNBRefBoxMovePickerFrame", UIParent)
-    BNB.SetBackdropDark(f)
-    f:SetSize(PW, PH)
-    f:SetFrameStrata("DIALOG")
-    f:SetToplevel(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self)
-        self:StopMovingOrSizing()
-        PositionModeStrip()
-    end)
-    BNB.AttachEscClose(f, f.Hide)
-
-    -- Title bar
-    local titleBar = f:CreateTexture(nil, "ARTWORK")
-    titleBar:SetHeight(TITLE_HP)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  1, -1)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -1)
-    titleBar:SetColorTexture(0.10, 0.10, 0.14, 0.95)
-
-    -- Attachment icon in title bar (set dynamically in OpenPicker)
-    local titleIcon = f:CreateTexture(nil, "OVERLAY")
-    titleIcon:SetSize(18, 18)
-    titleIcon:SetPoint("LEFT", f, "LEFT", PAD_P, 0)
-    titleIcon:SetPoint("TOP",  f, "TOP",  0, -5)
-    titleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    f._titleIcon = titleIcon
-
-    -- Title label (set dynamically in OpenPicker)
-    -- Right anchor keeps clear of the 18px close button at TOPRIGHT +2 offset.
-    local titleLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("LEFT",  titleIcon, "RIGHT", 4, 0)
-    titleLbl:SetPoint("RIGHT", f, "RIGHT", -36, 0)
-    titleLbl:SetPoint("TOP",   f, "TOP",   0, -7)
-    titleLbl:SetJustifyH("LEFT")
-    titleLbl:SetMaxLines(1); titleLbl:SetWordWrap(false)
-    titleLbl:SetText(L["REFBOX_PICKER_TITLE"])
-    f._titleLbl = titleLbl
-
-    local sep = f:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1); sep:SetColorTexture(0.28, 0.28, 0.32, 1)
-    sep:SetPoint("TOPLEFT",  f, "TOPLEFT",  1, -TITLE_HP)
-    sep:SetPoint("TOPRIGHT", f, "TOPRIGHT", -1, -TITLE_HP)
-
-    -- Skin mode: the skin close icon button (Dukul 2026-10-03); normal: Blizzard's X
-    local closeBtn
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        closeBtn = BNB.CreateIconButton(f, 18, "close", { skin = true })
-        closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -3, -3)
-    else
-        closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-        closeBtn:SetSize(18, 18)
-        closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, -4)
-    end
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
+    local f = BNB.CreateToolWindow({
+        name = "BNBRefBoxMovePickerFrame", w = 320, h = 380, pad = 8,
+        title = L["REFBOX_PICKER_TITLE"], toplevel = true, keyEsc = true,
+        onDragStop = function() PositionModeStrip() end,
+    })
+    local top = f._isSkin and SK_RB_TITLE_H or TITLE_H
 
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    1,           -(TITLE_HP + 4))
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,  4)
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    1,           -(top + 4))
+    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
 
     if sf.ScrollBar then
         sf.ScrollBar:SetAlpha(0)
@@ -843,7 +789,6 @@ local function BuildPickerWindow()
     sf:SetScript("OnSizeChanged", function(self) sc:SetWidth(self:GetWidth()) end)
 
     f._sf = sf; f._sc = sc
-    f:Hide()
     return f
 end
 
@@ -856,16 +801,13 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
     local att = (NDB() and NDB().notes and NDB().notes[noteID]
         and NDB().notes[noteID].attachments
         and NDB().notes[noteID].attachments[attIndex])
-    if att and _pickerFrame._titleIcon and _pickerFrame._titleLbl then
+    if att then
+        -- Icon inline in the title, cropped like the old title icon (5..59 of 64)
         local data = ResolveAttachment(att)
-        if data then
-            _pickerFrame._titleIcon:SetTexture(data.icon)
-            _pickerFrame._titleIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            _pickerFrame._titleLbl:SetText(string.format(L["REFBOX_PICKER_PREFIX"], data.name))
-        else
-            _pickerFrame._titleIcon:SetTexture("Interface\\Icons\\INV_Misc_QuestionMark")
-            _pickerFrame._titleLbl:SetText(L["REFBOX_PICKER_TITLE"])
-        end
+        local icon = data and data.icon or "Interface\\Icons\\INV_Misc_QuestionMark"
+        local text = data and string.format(L["REFBOX_PICKER_PREFIX"], data.name)
+            or L["REFBOX_PICKER_TITLE"]
+        _pickerFrame:SetWindowTitle("|T" .. tostring(icon) .. ":16:16:0:0:64:64:5:59:5:59|t " .. text)
     end
 
     local sc = _pickerFrame._sc
@@ -1991,35 +1933,23 @@ function BNB.RefreshReferenceBoxTabs()
     if rbFrame and rbFrame:IsShown() then UpdateModeStrip() end
 end
 
--- ── Build window (ButtonFrameTemplate — matches TrashWindow/NoteConfig) ────────
+-- ── Build window (both modes, shared shell UI/ToolWindow.lua, CMP-02) ─────────
+-- ESC is set up in EnsureFrame (its own handler that steps aside for the main
+-- window), so neither escClose nor keyEsc here.
 local function BuildReferenceBox()
-    local f = CreateFrame("Frame", "BigNoteBoxReferenceBoxFrame", UIParent,
-        "ButtonFrameTemplate")
-    f:SetWidth(RBW)
-    f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self)
-        self:StopMovingOrSizing()
-        PositionModeStrip()
-    end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["REFBOX_TITLE"])
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() BNB.CloseReferenceBox() end)
-    end
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxReferenceBoxFrame", w = RBW, h = 640, pad = PAD,
+        title = L["REFBOX_TITLE"], toplevel = true,
+        onClose = function() BNB.CloseReferenceBox() end,
+        onDragStop = function() PositionModeStrip() end,
+    })
+    f:SetAlpha(1)   -- opaque in both modes, as before CMP-02 (the model viewer)
+    local titleH = f._isSkin and SK_RB_TITLE_H or TITLE_H
 
     -- ── Manual entry strip ───────────────────────────────────────────────────
     local manualStrip = CreateFrame("Frame", nil, f)
-    manualStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(TITLE_H + 4))
-    manualStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(TITLE_H + 4))
+    manualStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(titleH + 4))
+    manualStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(titleH + 4))
     manualStrip:SetHeight(MANUAL_H)
     f._manualStrip = manualStrip   -- hidden in the tasks-only layout (ALL-102)
 
@@ -2074,7 +2004,7 @@ local function BuildReferenceBox()
         self:SetAlpha(0.55); GameTooltip:Hide()
     end)
 
-    local countY = -(TITLE_H + 4 + MANUAL_H + MANUAL_GAP + 2)
+    local countY = -(titleH + 4 + MANUAL_H + MANUAL_GAP + 2)
     local countLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     countLabel:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, countY)
     countLabel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, countY)
@@ -2082,7 +2012,7 @@ local function BuildReferenceBox()
     countLabel:SetText(string.format(L["REFBOX_COUNT"], 0, 0))
     f._countLabel = countLabel
 
-    local scrollTop = -(TITLE_H + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
+    local scrollTop = -(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0,           scrollTop)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
@@ -2117,170 +2047,16 @@ local function BuildReferenceBox()
     K.BuildTaskPanel(f)
     BuildExternalModeStrip()
 
-    f:SetScript("OnShow", function()
+    -- HookScript: the builder hooks OnShow in skin mode (ApplyMainWindowSkin)
+    f:HookScript("OnShow", function()
         EnsureItemInfoListener(); InstallShiftHooks(); RenderList()
     end)
-    f:SetScript("OnHide", function()
+    f:HookScript("OnHide", function()
         ReleaseAllRows()
         if _pickerFrame and _pickerFrame:IsShown() then _pickerFrame:Hide() end
         if f._manualBox then f._manualBox:SetRealText("") end
     end)
 
-    f:Hide()
-    return f
-end
-
--- ── Build window (SKIN VERSION) ───────────────────────────────────────────────
-
-local function BuildReferenceBoxSkin()
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxReferenceBoxFrame", false)
-    _G["BigNoteBoxReferenceBoxFrame"] = f
-    f:SetWidth(RBW)
-    f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self)
-        self:StopMovingOrSizing()
-        PositionModeStrip()
-    end)
-
-    -- Title strip
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_RB_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function()
-        f:StopMovingOrSizing()
-        PositionModeStrip()
-    end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("LEFT",  titleBar, "LEFT",  8, 0)
-    titleLbl:SetPoint("RIGHT", titleBar, "RIGHT", -30, 0)
-    titleLbl:SetJustifyH("LEFT")
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["REFBOX_TITLE"])
-    f._titleLbl = titleLbl  -- used by SetTitle()
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseReferenceBox() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- ── Manual entry strip ───────────────────────────────────────────────────
-    local manualStrip = CreateFrame("Frame", nil, f)
-    manualStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(SK_RB_TITLE_H + 4))
-    manualStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(SK_RB_TITLE_H + 4))
-    manualStrip:SetHeight(MANUAL_H)
-    f._manualStrip = manualStrip   -- hidden in the tasks-only layout (ALL-102)
-
-    local eb = CreateFrame("EditBox", nil, manualStrip, "BackdropTemplate")
-    BNB.EnsureBackdrop(eb)
-    BNB.SetBackdrop(eb, 0.04, 0.04, 0.06, 0.90, 0.18, 0.18, 0.22, 1)
-    eb:SetPoint("TOPLEFT",  manualStrip, "TOPLEFT",  0, 0)
-    eb:SetPoint("TOPRIGHT", manualStrip, "TOPRIGHT", -68, 0)
-    eb:SetHeight(MANUAL_H)
-    eb:SetAutoFocus(false); eb:SetMultiLine(false); eb:SetMaxLetters(256)
-    eb:SetFontObject("GameFontNormalSmall"); eb:SetTextInsets(6, 6, 2, 2)
-    BNB.AddPlaceholder(eb, L["REFBOX_PLACEHOLDER"], 0.4, 0.4, 0.45)
-    eb:SetScript("OnEnterPressed", function(self)
-        CommitManualEntry(self:GetRealText()); self:SetRealText(""); self:ClearFocus()
-    end)
-    eb:SetScript("OnEscapePressed", function(self)
-        self:SetRealText(""); self:ClearFocus()
-    end)
-    f._manualBox = eb
-
-    local addBtn = BNB.CreateButton(nil, manualStrip, L["REFBOX_ADD_BTN"], 40, MANUAL_H)
-    addBtn:SetPoint("TOPRIGHT", manualStrip, "TOPRIGHT", -24, 0)
-    addBtn:SetScript("OnClick", function()
-        if IsLocked(_noteID) then BNB:Print(L["REFBOX_LOCKED"]); return end
-        CommitManualEntry(eb:GetRealText()); eb:SetRealText(""); eb:ClearFocus()
-    end)
-    f._addBtn = addBtn
-
-    local helpBtn = CreateFrame("Button", nil, manualStrip)
-    helpBtn:SetSize(20, MANUAL_H)
-    helpBtn:SetPoint("TOPRIGHT", manualStrip, "TOPRIGHT", 0, 0)
-    local helpTex = helpBtn:CreateTexture(nil, "ARTWORK")
-    helpTex:SetSize(20, 20)
-    helpTex:SetPoint("CENTER", helpBtn, "CENTER", 0, 0)
-    helpTex:SetTexture(ASSETS .. "UI\\ui-info")
-    helpBtn:SetAlpha(0.55)
-    helpBtn:SetScript("OnEnter", function(self)
-        self:SetAlpha(1.0)
-        GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-        GameTooltip:AddLine(L["REFBOX_INFO_TITLE"], 1, 0.82, 0)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["REFBOX_INFO_BARE"],  0.85, 0.85, 0.85)
-        GameTooltip:AddLine(L["REFBOX_INFO_SPELL"], 0.85, 0.85, 0.85)
-        GameTooltip:AddLine(L["REFBOX_INFO_QUEST"], 0.85, 0.85, 0.85)
-        GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(L["REFBOX_INFO_ALSO"],  1, 0.82, 0)
-        GameTooltip:AddLine(L["REFBOX_INFO_DRAG"],  0.78, 0.78, 0.78)
-        GameTooltip:AddLine(L["REFBOX_INFO_SHIFT"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    helpBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(0.55); GameTooltip:Hide()
-    end)
-
-    local countY = -(SK_RB_TITLE_H + 4 + MANUAL_H + MANUAL_GAP + 2)
-    local countLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    countLabel:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, countY)
-    countLabel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, countY)
-    countLabel:SetJustifyH("LEFT"); countLabel:SetTextColor(0.50, 0.50, 0.55)
-    countLabel:SetText(string.format(L["REFBOX_COUNT"], 0, 0))
-    f._countLabel = countLabel
-
-    local scrollTop = -(SK_RB_TITLE_H + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0,           scrollTop)
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
-
-    if sf.ScrollBar then
-        sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, yr)
-            sf.ScrollBar:SetAlpha((yr or 0) > 1 and 1.0 or 0)
-        end)
-    end
-
-    local sc = CreateFrame("Frame", nil, sf)
-    sc:SetWidth(sf:GetWidth()); sc:SetHeight(1)
-    sf:SetScrollChild(sc)
-    sf:SetScript("OnSizeChanged", function(self) sc:SetWidth(self:GetWidth()) end)
-
-    -- Empty label lives inside the scroll child so it scrolls with gear sections.
-    local emptyLabel = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    emptyLabel:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PAD, -8)
-    emptyLabel:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PAD, -8)
-    emptyLabel:SetJustifyH("CENTER")
-    emptyLabel:SetTextColor(0.38, 0.38, 0.42)
-    emptyLabel:SetText(L["REFBOX_EMPTY"])
-    f._emptyLabel = emptyLabel
-
-
-    WireDragDrop(f); WireDragDrop(sc)
-
-    f._scrollFrame = sf; f._scrollChild = sc
-
-    BuildModelViewer(f)
-    K.BuildTaskPanel(f)
-    BuildExternalModeStrip()
-
-    f:SetScript("OnShow", function()
-        EnsureItemInfoListener(); InstallShiftHooks(); RenderList()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-    f:SetScript("OnHide", function()
-        ReleaseAllRows()
-        if _pickerFrame and _pickerFrame:IsShown() then _pickerFrame:Hide() end
-        if f._manualBox then f._manualBox:SetRealText("") end
-    end)
-
-    f:Hide()
     return f
 end
 
@@ -2303,8 +2079,8 @@ end
 BNB._SyncRefBoxHeight = SyncRefBoxHeight  -- exposed for RenderList hook
 
 -- ── Model Viewer (inspect notes only) ─────────────────────────────────────────
--- Creates the model frame. Shared between both BuildReferenceBox and
--- BuildReferenceBoxSkin — called once after the scroll frame is created.
+-- Creates the model frame. Called by BuildReferenceBox (both modes)
+-- once, after the scroll frame is created.
 -- Components are hidden by default and shown by UpdateModelViewer.
 
 -- ── Faction crest (FOR-22) ──────────────────────────────────────────────────
@@ -3129,11 +2905,7 @@ UpdateDynamicTitle = function()
     end
     local title = table.concat(parts, " + ")
 
-    if rbFrame.SetTitle then
-        rbFrame:SetTitle(title)
-    elseif rbFrame._titleLbl then
-        rbFrame._titleLbl:SetText(title)
-    end
+    rbFrame:SetWindowTitle(title)
 end
 
 local function SetTitle(noteID)
@@ -3156,11 +2928,7 @@ end
 
 local function EnsureFrame()
     if rbFrame then return end
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        rbFrame = BuildReferenceBoxSkin()
-    else
-        rbFrame = BuildReferenceBox()
-    end
+    rbFrame = BuildReferenceBox()
     HookMainWindowResize()
     K.RegisterTaskCallback()
     -- ESC normally reaches this box through the main window's key handler

@@ -2349,6 +2349,7 @@ L["MIG_DETECTED_FMT"]               = "You currently have |cff66bb6a%s|r, why no
 L["MIG_EXPLAIN"]                    = "Moving your notes to BigNoteBox keeps everything in one place. Your notes in other addons are not touched as this is a copy, not a move. A UI reload is required after migration. You can safely disable and/or remove the other addons after migration."
 L["MIG_DONT_ASK_AGAIN"]             = "Don't ask again:"
 L["MIG_WARN_WILL_RELOAD"]           = "|cffff9900Warning:|r UI will reload after migration."
+L["MIG_DONE_RELOAD_FMT"]            = "Migration done: %d notes imported.\n\nReload the UI to finish."
 L["MIG_NOT_NOW_BTN"]                = "Not Now"
 
 -- ALL-28: localization audit fixes (relative time, note config, inspect, share)

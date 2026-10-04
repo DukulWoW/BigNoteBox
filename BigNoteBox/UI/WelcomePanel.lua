@@ -188,63 +188,19 @@ local function BuildNoteIconRow(parent, noteItems, yOffset)
 end
 
 -- ── Import popup window ───────────────────────────────────────────────────────
--- Built once, reused. Parented to UIParent at DIALOG strata.
+-- Built once, reused. DIALOG strata, on the shared window shell (UI/ToolWindow.lua,
+-- CMP-02 S5): a ButtonFrameTemplate window in normal mode (it was a plain dark
+-- backdrop), the skin title strip in skin mode.
 local _importFrame
 
 local function GetImportFrame()
     if _importFrame then return _importFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-
-    -- Outer frame: skin-aware or plain dark backdrop
-    local f
-    if skinMode and BNB.CreateSkinFrame then
-        f = BNB.CreateSkinFrame(UIParent, false, "BNBImportNotesFrame", false)
-    else
-        f = BNB.CreateBackdropFrame("Frame", "BNBImportNotesFrame", UIParent)
-        BNB.SetBackdrop(f, 0.08, 0.08, 0.10, 0.97, 0.30, 0.30, 0.32, 1)
-    end
-    f:SetSize(520, 320)
+    local f = BNB.CreateToolWindow({
+        name = "BNBImportNotesFrame", w = 520, h = 320, pad = 16,
+        title = L["IMPORT_POPUP_TITLE"], toplevel = true, escClose = true,
+    })
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-    f:SetToplevel(true)
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetFrameStrata("DIALOG")
-    tinsert(UISpecialFrames, "BNBImportNotesFrame")
-
-    -- Title bar: skin-aware strip or plain dark backdrop
-    local titleBar
-    if skinMode and BNB.CreateSkinStrip then
-        titleBar = BNB.CreateSkinStrip(f, true, false)
-    else
-        titleBar = BNB.CreateBackdropFrame("Frame", nil, f)
-        BNB.SetBackdrop(titleBar, 0.12, 0.12, 0.15, 1, 0.30, 0.30, 0.32, 0)
-    end
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0,  0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0,  0)
-    titleBar:SetHeight(28)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-    BNB.SetMoveCursor(titleBar)   -- ALL-95
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-    titleLbl:SetText(L["IMPORT_POPUP_TITLE"])
-    titleLbl:SetTextColor(1, 0.82, 0)
-
-    -- Close button: bt-close asset set, same style as all other BNB windows
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- Live-update skin colours when preset changes
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
 
     -- Description label
     local desc = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

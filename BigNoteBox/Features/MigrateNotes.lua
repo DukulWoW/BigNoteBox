@@ -9,7 +9,7 @@ local L   = BNB.L
 --   DetectAvailable()       -> array of addon keys that are loaded and not migrationDone
 --   HasAny()                -> true if any of the three addons are loaded at all
 --   CollectPreview(sel)     -> returns array of preview entries from current selections
---   Run(sel)                -> executes migration then C_UI.Reload()
+--   Run(sel)                -> executes migration, then asks to reload (ALL-252)
 --   ShowPopup()             -> shows the login popup
 --   ShowAddonPopup(key)     -> shows the per-addon confirm popup from Advanced tab
 --
@@ -110,6 +110,8 @@ local function MatchCharKey(rawKey)
 end
 
 -- ── Note creation helper ──────────────────────────────────────────────────────
+local _runCount = 0   -- notes made by the M.Run in progress, for the done popup
+
 local function CreateMigratedNote(title, body, tags, charKey)
     if not body or body:match("^%s*$") then return end
     if not title or title == "" then title = L["MIG_IMPORTED_NOTE_TITLE"] end
@@ -117,6 +119,7 @@ local function CreateMigratedNote(title, body, tags, charKey)
     -- which opens the interactive UI dialog and does not return an id.
     local id = BNB.CreateNote(title, body)
     if not id then return end
+    _runCount = _runCount + 1
     -- Scope
     if charKey then
         BNB.UpdateNote(id, { scope = "char:" .. charKey })
@@ -544,8 +547,18 @@ function M.CollectPreview(sel)
 end
 
 -- ── Run migration ─────────────────────────────────────────────────────────────
+-- The reload is the popup's own click: C_UI.Reload() is protected and was
+-- blocked when M.Run called it from the Migrate Now click (ALL-252).
+StaticPopupDialogs["BNB_MIGRATE_DONE"] = {
+    text = L["MIG_DONE_RELOAD_FMT"],
+    button1 = L["CFG_RELOAD_NOW_BTN"],
+    timeout = 0, whileDead = true, hideOnEscape = false, preferredIndex = 3,
+    OnAccept = function() C_UI.Reload() end,
+}
+
 function M.Run(sel)
     local db = MigrationState()
+    _runCount = 0
     db.migrationDone = db.migrationDone or {}
 
     if sel.NoteworthyII and Noteworthy_DB then
@@ -821,7 +834,7 @@ function M.Run(sel)
         db.migrationDone.AmmeNotepad = true
     end
 
-    C_UI.Reload()
+    StaticPopup_Show("BNB_MIGRATE_DONE", _runCount)
 end
 
 -- ── Detection helpers ─────────────────────────────────────────────────────────

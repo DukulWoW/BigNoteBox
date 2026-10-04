@@ -22,50 +22,15 @@ local UN = BNB.UnitNotes
 
 --------------------------------------------------------------------------------
 -- DIALOG FRAME
--- Skin mode decides the chrome once, when the dialog is first built.
+-- The shared window shell (UI/ToolWindow.lua, CMP-02 S5): skin mode decides
+-- the chrome once, when the dialog is first built. Returned hidden.
 --------------------------------------------------------------------------------
 function UN.Dialog(globalName, w, h, title)
-    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.CreateSkinFrame
-    local f
-    if skin then
-        f = BNB.CreateSkinFrame(UIParent, false, globalName, false)
-        _G[globalName] = f
-    else
-        f = CreateFrame("Frame", globalName, UIParent, "BasicFrameTemplateWithInset")
-        f.TitleText:SetText(title)
-        BNB.AddTitleMoveCursor(f)   -- ALL-95
-    end
-    f:SetSize(w, h)
+    local f = BNB.CreateToolWindow({
+        name = globalName, w = w, h = h, title = title, pad = 14,
+        toplevel = true, escClose = true,
+    })
     f:SetPoint("CENTER")
-    f:SetFrameStrata("DIALOG")
-    f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    if skin then
-        local tb = BNB.CreateSkinStrip(f, true, false)
-        tb:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        tb:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        tb:SetHeight(26)
-        tb:EnableMouse(true); tb:RegisterForDrag("LeftButton")
-        tb:SetScript("OnDragStart", function() f:StartMoving() end)
-        tb:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local tl = tb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        tl:SetPoint("CENTER", tb, "CENTER", -12, 0)
-        tl:SetTextColor(1, 0.82, 0); tl:SetText(title)
-
-        BNB.CreateSkinCloseButton(tb, function() f:Hide() end)
-            :SetPoint("RIGHT", tb, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    end
-
-    f:Hide()
-    tinsert(UISpecialFrames, globalName)
     return f
 end
 
@@ -97,7 +62,10 @@ function UN.TypeDialog(globalName, title, glowKey)
     function f:Open(onPick)
         self._onPick = onPick
         self:Show()
-        if BNB.StartWindowGlow then BNB.StartWindowGlow(self, glowKey, BNB.BasicFrameGlowPad()) end
+        -- Seated ButtonFrameTemplate: the default placement; skin frame: flush
+        if BNB.StartWindowGlow then
+            BNB.StartWindowGlow(self, glowKey, self._isSkin and { l = 0, t = 0, r = 0, b = 0 } or nil)
+        end
     end
     return f
 end

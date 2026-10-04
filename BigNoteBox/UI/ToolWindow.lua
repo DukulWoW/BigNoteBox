@@ -103,7 +103,13 @@ local function BuildSkin(o)
     end
 
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
+    -- Centred 15 px left of the strip's centre (the close button's room), and
+    -- held clear of the close button: a long title (Reference Box, Note
+    -- Settings) truncates instead of running under it
+    titleLbl:SetPoint("LEFT",  titleBar, "LEFT",  8, 0)
+    titleLbl:SetPoint("RIGHT", titleBar, "RIGHT", -38, 0)
+    titleLbl:SetJustifyH("CENTER")
+    titleLbl:SetWordWrap(false)
     titleLbl:SetTextColor(1, 0.82, 0)
     titleLbl:SetText(o.title)
     function f:SetWindowTitle(text) titleLbl:SetText(text) end

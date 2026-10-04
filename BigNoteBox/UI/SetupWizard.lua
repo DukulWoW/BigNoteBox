@@ -1281,93 +1281,29 @@ end
 local function BuildWizardFrame()
     if _frame then return _frame end
 
-    local db      = BigNoteBoxDB
-    local skinMode = db and db.skinMode
-
-    local f
-    if skinMode and BNB.CreateSkinFrame then
-        f = BNB.CreateSkinFrame(WorldFrame, false, "BigNoteBoxSetupWizard", false)
-    else
-        -- Normal mode: use ButtonFrameTemplate to match the main window chrome
-        f = CreateFrame("Frame", "BigNoteBoxSetupWizard", UIParent, "ButtonFrameTemplate")
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetAlpha(0.95)
-        -- Wire the template's built-in close button to our quit dialog
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function()
-                StaticPopup_Show("BNB_QUIT_SETUP")
-            end)
-        end
-    end
-
-    f:SetSize(WIN_W, WIN_H)
+    -- Shared shell for both modes (UI/ToolWindow.lua, CMP-02): title, close
+    -- (to our quit dialog), drag, Forever glow. Both modes on UIParent now
+    -- (skin mode was on WorldFrame). Esc reaches OnHide below, which asks too.
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxSetupWizard", w = WIN_W, h = WIN_H, pad = PAD,
+        title = "", toplevel = true, escClose = true,
+        onClose = function() StaticPopup_Show("BNB_QUIT_SETUP") end,
+    })
+    local skinMode = f._isSkin
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-    f:SetFrameStrata("DIALOG")   -- above the DIALOG lvl 1 overlay, below dropdown popups (FOR-03)
+    -- DIALOG (the builder's default): above the DIALOG lvl 1 overlay, below
+    -- dropdown popups (FOR-03)
     f:SetFrameLevel(100)
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    tinsert(UISpecialFrames, "BigNoteBoxSetupWizard")
 
-    -- Title / page counter
-    -- Normal mode: ButtonFrameTemplate provides its own title bar and close button.
-    -- We use f:SetTitle() for the page title and overlay the page counter on the
-    -- template's title region. Skin mode: we build our own strip.
+    -- Page title = the window title; the page counter sits right of it, left
+    -- of the close button
     local contentTopInset   -- how far below the frame top the content starts
-    local contentBotInset   -- how far above the frame bottom the content ends
-
-    if skinMode then
-        local titleStrip = BNB.CreateBackdropFrame("Frame", nil, f)
-        titleStrip:SetHeight(TITLE_H + 6)
-        titleStrip:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleStrip:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleStrip:EnableMouse(true)
-        titleStrip:RegisterForDrag("LeftButton")
-        titleStrip:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleStrip:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        _pageTitle = titleStrip:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        _pageTitle:SetPoint("LEFT",  titleStrip, "LEFT",  12, 0)
-        _pageTitle:SetPoint("RIGHT", titleStrip, "RIGHT", -36, 0)
-        _pageTitle:SetJustifyH("LEFT")
-        _pageTitle:SetTextColor(1, 0.82, 0)
-
-        if BNB.CreateSkinCloseButton then
-            local cb = BNB.CreateSkinCloseButton(titleStrip, function()
-                StaticPopup_Show("BNB_QUIT_SETUP")
-            end)
-            cb:SetPoint("RIGHT", titleStrip, "RIGHT", -4, 0)
-        end
-
-        _pageCounter = titleStrip:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        _pageCounter:SetPoint("BOTTOMRIGHT", titleStrip, "BOTTOMRIGHT", -36, 4)
-        _pageCounter:SetTextColor(0.55, 0.55, 0.55)
-
-        contentTopInset = -(TITLE_H + 14)
-    else
-        -- ButtonFrameTemplate: use SetTitle for the page title text.
-        -- _pageTitle is a shim that proxies SetText to f:SetTitle().
-        _pageTitle = {}
-        setmetatable(_pageTitle, { __index = function(_, k)
-            if k == "SetText" then
-                return function(_, txt) f:SetTitle(txt or "") end
-            end
-        end })
-
-        -- Page counter sits in the top-right of the template title bar area.
-        _pageCounter = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        _pageCounter:SetPoint("TOPRIGHT", f, "TOPRIGHT", -36, -8)
-        _pageCounter:SetTextColor(0.55, 0.55, 0.55)
-
-        contentTopInset = -36   -- ButtonFrameTemplate title bar is ~32px tall
-    end
+    _pageTitle = { SetText = function(_, txt) f:SetWindowTitle(txt or "") end }
+    _pageCounter = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    _pageCounter:SetTextColor(0.55, 0.55, 0.55)
+    _pageCounter:SetPoint("TOPRIGHT", f, "TOPRIGHT", -36, -8)
+    -- ButtonFrameTemplate title bar is ~32px tall; skin mode keeps its old inset
+    contentTopInset = skinMode and -(TITLE_H + 14) or -36
 
     -- Nav area
     local navStrip = BNB.CreateBackdropFrame("Frame", nil, f)

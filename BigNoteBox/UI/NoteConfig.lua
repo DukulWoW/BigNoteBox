@@ -61,11 +61,7 @@ local function RefreshTitle()
         or (L and L["UNTITLED"] or "Untitled")
     -- Truncate long titles so they don't overflow the window titlebar
     if #name > 23 then name = name:sub(1, 20) .. "..." end
-    if ncFrame.SetTitle then
-        ncFrame:SetTitle(name)
-    elseif ncFrame._titleLbl then
-        ncFrame._titleLbl:SetText(name)
-    end
+    ncFrame:SetWindowTitle(name)
 end
 
 -- Register sync callback so editor pushes live title updates
@@ -1147,64 +1143,21 @@ local function BuildSituationTab(panel)
 end
 
 -- ── Build window ──────────────────────────────────────────────────────────────
-local SK_NC_TITLE_H   = 28
-local SK_NC_CONTENT_Y = 58   -- SK_NC_TITLE_H(28) + SK_TAB_H(24) + 6px gap
+local SK_TAB_GAP = 30   -- skin tab strip (24) + 6px gap below the title strip
 
 local function CreateNoteConfigWindow()
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local tabContentY = skinMode and SK_NC_CONTENT_Y or TAB_CONTENT_Y
-    local f
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxNoteConfigFrame", false)
-        _G["BigNoteBoxNoteConfigFrame"] = f
-        f:SetSize(NCW, 640); f:SetPoint("CENTER")
-        f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_NC_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["STICKY_NOTE_SETTINGS_TIP"])
-        f._titleLbl = titleLbl
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxNoteConfigFrame", UIParent, "ButtonFrameTemplate")
-        f:SetSize(NCW, 640); f:SetPoint("CENTER")
-        f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-        f:SetAlpha(0.95)
-        f:SetTitle(L["STICKY_NOTE_SETTINGS_TIP"])
-        if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxNoteConfigFrame")
-    -- Same strata as the Reference Box (DIALOG), which drew over this window
-    -- from MEDIUM whatever was clicked (Dukul, 2026-10-04). Raised on open,
-    -- and BNB.RaiseBNBWindows raises it after the Reference Box (WINDOWS order)
-    f:SetFrameStrata("DIALOG")
+    -- Same strata as the Reference Box (DIALOG, the builder's default), which
+    -- drew over this window from MEDIUM whatever was clicked (Dukul,
+    -- 2026-10-04). Raised on open, and BNB.RaiseBNBWindows raises it after the
+    -- Reference Box (WINDOWS order). Shared shell: UI/ToolWindow.lua (CMP-02)
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxNoteConfigFrame", w = NCW, h = 640, pad = PAD,
+        title = L["STICKY_NOTE_SETTINGS_TIP"], toplevel = true, escClose = true,
+    })
+    f:SetPoint("CENTER")
+    local skinMode = f._isSkin
+    local SK_NC_TITLE_H = BNB.TOOL_SKIN_TITLE_H
+    local tabContentY = skinMode and (SK_NC_TITLE_H + SK_TAB_GAP) or TAB_CONTENT_Y
 
     -- Close ZonePicker whenever NoteConfig hides (any path: close btn, ESC, main
     -- window close); the Situation editor closes its waypoint info popup itself
@@ -1261,7 +1214,6 @@ local function CreateNoteConfigWindow()
         end
     end
 
-    f:Hide()
     return f
 end
 

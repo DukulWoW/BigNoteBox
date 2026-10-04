@@ -602,28 +602,22 @@ function BNB._BuildConfigTabPanels(parent, topOffset)
     return panels, contents
 end
 
-local function CreateConfigWindow()
-    local cfgH = GetTargetHeight()
-
-    local f = CreateFrame("Frame", "BigNoteBoxConfigFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(CFG_W, cfgH)
+-- The window shell for both modes (UI/ToolWindow.lua, CMP-02); w is the
+-- mode's width. DIALOG (the builder's default) like Note Settings and the
+-- Reference Box: it was MEDIUM and drew under the live preview (HIGH, ALL-250).
+-- ESC is handled by the main window's OnKeyDown chain and the AttachEscClose
+-- in BNB.OpenConfig: do not add to UISpecialFrames.
+function BNB._CreateConfigShell(w)
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxConfigFrame", w = w, h = GetTargetHeight(), pad = PAD,
+        title = L["CONFIG_TITLE"], toplevel = true,
+    })
     f:SetPoint("CENTER")
-    f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+    return f
+end
 
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetAlpha(0.95)
-    f:SetTitle(L["CONFIG_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-    end
-    -- ESC is handled by the main window's OnKeyDown chain — do not add to UISpecialFrames
+local function CreateConfigWindow()
+    local f = BNB._CreateConfigShell(CFG_W)
 
     -- ── Tabs ──────────────────────────────────────────────────────────────────
     local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
@@ -674,7 +668,6 @@ local function CreateConfigWindow()
     PanelTemplates_SetNumTabs(f, NUM_TABS)
     f.numTabs = NUM_TABS
 
-    f:Hide()
     return f
 end
 

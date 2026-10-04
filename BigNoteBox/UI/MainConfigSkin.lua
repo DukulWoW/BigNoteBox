@@ -3,7 +3,9 @@
 -- Used when BigNoteBoxDB.skinMode == true. BNB.CreateConfigWindowSkin() is
 -- called from BNB.OpenConfig() (defined in ConfigWindow.lua).
 --
--- Forks the window chrome only — title strip, close button, skin tab row.
+-- Forks the skin tab row only; the window, title strip and close button come
+-- from BNB._CreateConfigShell (ConfigWindow.lua, the shared CreateToolWindow
+-- shell, CMP-02).
 -- The six tab panels and their contents are built by BNB._BuildConfigTabPanels
 -- which lives in ConfigWindow.lua and is shared with the classic chrome path.
 -- This mirrors the MainWindow.lua / MainWindowSkin.lua split.
@@ -20,10 +22,8 @@ local L   = BNB.L
 -- Wider than the classic 480px so the 6 tab labels have comfortable widths.
 -- At 520 each tab is ~85px wide — "Appearance" fits cleanly.
 local SK_CFG_W        = 520
-local SK_CFG_TITLE_H  = 28     -- title strip height (matches NoteConfig skin)
 local SK_CFG_TAB_H    = 24     -- matches SK_TAB_H in SkinSystem.lua
 local SK_CFG_GAP      = 6      -- gap between tab row and content panels
-local SK_CFG_CHROME   = SK_CFG_TITLE_H + SK_CFG_TAB_H + SK_CFG_GAP   -- 58
 
 --------------------------------------------------------------------------------
 -- CREATE CONFIG WINDOW (SKIN VERSION)
@@ -32,42 +32,10 @@ function BNB.CreateConfigWindowSkin()
     local TABS = BNB._configTabs
     if not TABS then return nil end   -- ConfigWindow.lua not loaded yet (shouldn't happen)
 
-    local cfgH = (BNB._GetConfigTargetHeight and BNB._GetConfigTargetHeight()) or 640
-
-    -- ── Outer window frame ────────────────────────────────────────────────────
-    -- Named so existing UISpecialFrames hook can still find it if needed.
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxConfigFrame", false)
-    _G["BigNoteBoxConfigFrame"] = f
-    f:SetSize(SK_CFG_W, cfgH)
-    f:SetPoint("CENTER")
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    -- ── Title strip ───────────────────────────────────────────────────────────
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_CFG_TITLE_H)
-    -- Title strip is also a drag handle
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    -- Offset left a bit so it reads centred once the close button takes space on the right.
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["CONFIG_TITLE"])
-
-    -- Close button — shared skin textured close (bt-close asset set).
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
+    -- ── Outer window frame, title strip and close (shared shell) ─────────────
+    local f = BNB._CreateConfigShell(SK_CFG_W)
+    local SK_CFG_TITLE_H = BNB.TOOL_SKIN_TITLE_H
+    local SK_CFG_CHROME  = SK_CFG_TITLE_H + SK_CFG_TAB_H + SK_CFG_GAP   -- 58
 
     -- ── Tab panels (built by shared helper) ───────────────────────────────────
     -- Must be built BEFORE the skin tab row so the tab onSelect can reference
@@ -98,15 +66,13 @@ function BNB.CreateConfigWindowSkin()
     tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -SK_CFG_TITLE_H)
     f._skinTabCtrl = tabCtrl
 
-    -- ── Recolour chrome and refresh fonts on show ─────────────────────────────
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
+    -- ── Refresh fonts on show (the shell recolours the chrome) ────────────────
+    f:HookScript("OnShow", function()
         if BNB._RefreshConfigFonts then BNB._RefreshConfigFonts() end
     end)
 
     -- Start on first tab (matches classic chrome default)
     SelectTab(1)
 
-    f:Hide()
     return f
 end

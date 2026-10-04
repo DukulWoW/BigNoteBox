@@ -69,8 +69,7 @@ local function CloseStickySettings()
     end)
 end
 
-local SK_SS_TITLE_H   = 28
-local SK_SS_CONTENT_Y = 58   -- SK_SS_TITLE_H(28) + SK_TAB_H(24) + 6px gap
+local SK_SS_TAB_GAP = 30   -- skin tab strip (24) + 6px gap below the title strip
 
 -- Registered here (after CloseStickySettings is declared) so the OnHide hook
 -- in EnsureESCHook can reach it via SN._OnESCHide().
@@ -89,75 +88,18 @@ end
 local function BuildStickySettingsWindow()
     if _stickySettingsFrame then return _stickySettingsFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f
-    local tabContentY  -- used by MakeScrollPanel / MakePlainPanel below
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxStickySettingsFrame", false)
-        _G["BigNoteBoxStickySettingsFrame"] = f
-        f:SetSize(SETTINGS_W, 640)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self)
-            self:StopMovingOrSizing()
-            -- Settings detaches freely when dragged — sticky stays where it is.
-        end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_SS_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function()
-            f:StopMovingOrSizing()
-        end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["STICKY_SETTINGS_TITLE"])
-        f._titleLbl = titleLbl
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() CloseStickySettings() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-        tabContentY = SK_SS_CONTENT_Y
-    else
-        f = CreateFrame("Frame", "BigNoteBoxStickySettingsFrame", UIParent, "ButtonFrameTemplate")
-        f:SetSize(SETTINGS_W, 640)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self)
-            self:StartMoving()
-        end)
-        f:SetScript("OnDragStop", function(self)
-            self:StopMovingOrSizing()
-            -- Settings detaches freely when dragged — sticky stays where it is.
-            -- The anchor to the sticky is broken by StartMoving(); that is intentional.
-        end)
-
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-        f:SetAlpha(0.95)
-        f:SetTitle(L["STICKY_SETTINGS_TITLE"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() CloseStickySettings() end)
-        end
-        tabContentY = SETTINGS_TAB_CONTENT_Y
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxStickySettingsFrame")
+    -- Shared shell (UI/ToolWindow.lua, CMP-02). Settings detaches freely when
+    -- dragged (the drag re-anchors it to UIParent); the sticky stays put.
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxStickySettingsFrame", w = SETTINGS_W, h = 640,
+        pad = SETTINGS_PAD, title = L["STICKY_SETTINGS_TITLE"],
+        toplevel = true, escClose = true,
+        onClose = function() CloseStickySettings() end,
+    })
+    local skinMode = f._isSkin
+    local SK_SS_TITLE_H = BNB.TOOL_SKIN_TITLE_H
+    -- used by MakeScrollPanel / MakePlainPanel below
+    local tabContentY = skinMode and (SK_SS_TITLE_H + SK_SS_TAB_GAP) or SETTINGS_TAB_CONTENT_Y
 
     -- The Situation editor closes its own waypoint info popup
     f:HookScript("OnHide", function()
@@ -257,7 +199,6 @@ local function BuildStickySettingsWindow()
         width = SETTINGS_CW, host = f,
     })
 
-    f:Hide()
     _stickySettingsFrame = f
     return f
 end
@@ -1150,11 +1091,7 @@ local function PopulateStickySettings(noteID)
     f._sitEditor:Load(noteID)
     local note = BNB.GetNote(noteID)
     local noteName = (note and note.title ~= "") and note.title or L["UNTITLED"]
-    if f._titleLbl then
-        f._titleLbl:SetText(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
-    elseif f.SetTitle then
-        f:SetTitle(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
-    end
+    f:SetWindowTitle(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
 end
 
 -- Open the detached settings window for a sticky note

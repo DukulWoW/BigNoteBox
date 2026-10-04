@@ -225,6 +225,36 @@ BNB.RegisterMessage("TrashWindow", "TrashChanged", function()
     BNB.Debounce("trashWindow", 0, FollowTrash)
 end)
 
+-- The View popup: a trashed note's title (as the window title) and body, with
+-- Restore / Close. Built once, on the shared builder (CMP-02 S4); the name and
+-- ESC entry stay, so the main window's WINDOWS registry still finds it.
+local VP_W, VP_H, VP_PAD, VP_FOOT = 340, 340, 12, 38
+local function BuildViewPopup()
+    local vp, restoreBtn, closeBtn = BNB.CreateToolWindow({
+        name = "BNBTrashViewPopup", w = VP_W, h = VP_H, title = "",
+        pad = VP_PAD, cw = VP_W - VP_PAD * 2, footH = VP_FOOT,
+        btn1 = L["TW_ROW_RESTORE_BTN"], btn2 = L["CLOSE"],
+        toplevel = true, escClose = true,
+    })
+    vp:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
+    local top = vp._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
+    local sf = CreateFrame("ScrollFrame", nil, vp, "ScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT",     vp, "TOPLEFT",     VP_PAD, -(top + 6))
+    sf:SetPoint("BOTTOMRIGHT", vp, "BOTTOMRIGHT", -28,    VP_FOOT + 4)
+    if sf.ScrollBar then sf.ScrollBar:SetAlpha(1) end
+    local cw = VP_W - VP_PAD - 28   -- the scroll frame's width
+    local ct = CreateFrame("Frame", nil, sf)
+    ct:SetWidth(cw); sf:SetScrollChild(ct)
+    local bodyFs = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    bodyFs:SetPoint("TOPLEFT"); bodyFs:SetWidth(cw)
+    bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
+    bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
+    vp._bodyFs = bodyFs; vp._bodyCt = ct
+    vp._restoreVpBtn = restoreBtn
+    closeBtn:SetScript("OnClick", function() vp:Hide() end)
+    return vp
+end
+
 function BNB.PopulateTrashWindow()
     if not _twFrame then return end
 
@@ -332,53 +362,14 @@ function BNB.PopulateTrashWindow()
                 if not note then return end
                 local title = (note.title and note.title ~= "") and note.title or L["TW_VIEW_UNTITLED"]
                 local body  = note.body or ""
-                -- Reuse a simple resizable backdrop frame
-                if not _twFrame._viewPopup then
-                    local vp = BNB.CreateBackdropFrame("Frame", "BNBTrashViewPopup", UIParent)
-                    vp:SetSize(340, 340); vp:SetFrameStrata("DIALOG"); vp:SetToplevel(true)
-                    vp:SetMovable(true); vp:EnableMouse(true)
-                    vp:RegisterForDrag("LeftButton")
-                    vp:SetScript("OnDragStart", function(self) self:StartMoving() end)
-                    vp:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-                    BNB.SetBackdrop(vp, 0.07, 0.07, 0.09, 0.97, 0.35, 0.35, 0.38, 1)
-                    local titleFs = vp:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-                    titleFs:SetPoint("TOPLEFT", vp, "TOPLEFT", 12, -12)
-                    titleFs:SetPoint("TOPRIGHT", vp, "TOPRIGHT", -12, -12)
-                    titleFs:SetJustifyH("LEFT"); titleFs:SetWordWrap(true)
-                    titleFs:SetTextColor(1, 0.82, 0.0, 1)
-                    vp._titleFs = titleFs
-                    local div = vp:CreateTexture(nil, "ARTWORK")
-                    div:SetHeight(1)
-                    div:SetPoint("TOPLEFT", vp, "TOPLEFT", 12, -32)
-                    div:SetPoint("TOPRIGHT", vp, "TOPRIGHT", -12, -32)
-                    div:SetColorTexture(0.28, 0.28, 0.30, 1)
-                    local sf = CreateFrame("ScrollFrame", nil, vp, "ScrollFrameTemplate")
-                    sf:SetPoint("TOPLEFT", vp, "TOPLEFT", 12, -38)
-                    sf:SetPoint("BOTTOMRIGHT", vp, "BOTTOMRIGHT", -28, 40)
-                    if sf.ScrollBar then sf.ScrollBar:SetAlpha(1) end
-                    local ct = CreateFrame("Frame", nil, sf)
-                    ct:SetWidth(300); sf:SetScrollChild(ct)
-                    local bodyFs = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                    bodyFs:SetPoint("TOPLEFT"); bodyFs:SetWidth(300)
-                    bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
-                    bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
-                    vp._bodyFs = bodyFs; vp._bodyCt = ct
-                    local restoreVpBtn = BNB.CreateButton(nil, vp, L["TW_ROW_RESTORE_BTN"], 90, 24)
-                    restoreVpBtn:SetPoint("BOTTOM", vp, "BOTTOM", -48, 10)
-                    vp._restoreVpBtn = restoreVpBtn
-                    local closeBtn = BNB.CreateButton(nil, vp, L["CLOSE"], 80, 24)
-                    closeBtn:SetPoint("BOTTOM", vp, "BOTTOM", 50, 10)
-                    closeBtn:SetScript("OnClick", function() vp:Hide() end)
-                    tinsert(UISpecialFrames, "BNBTrashViewPopup")
-                    _twFrame._viewPopup = vp
-                end
+                if not _twFrame._viewPopup then _twFrame._viewPopup = BuildViewPopup() end
                 local vp = _twFrame._viewPopup
                 -- Wire Restore to current item (rewired each open)
                 vp._restoreVpBtn:SetScript("OnClick", function()
                     if BNB.RestoreNote then BNB.RestoreNote(id) end
                     vp:Hide()
                 end)
-                vp._titleFs:SetText(title)
+                vp:SetWindowTitle(title)
                 vp._bodyFs:SetText(body)
                 local textH = vp._bodyFs:GetStringHeight()
                 vp._bodyCt:SetHeight(math.max(textH, 1))
