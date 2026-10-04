@@ -367,127 +367,46 @@ end
 -- User selects all with Ctrl+A and copies manually.
 
 local _exportWin = nil
-local SK_EXP_TITLE_H = 28
 
 function BNB.OpenExportWindow(text, warningText, htmlNoteID)
     local NE = BNB.NoteExport
     if not _exportWin then
-        local f
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxExportFrame", false)
-            _G["BigNoteBoxExportFrame"] = f
-            f:SetSize(520, 440)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+        -- Shared chrome (CMP-02); one body for both modes, the old offsets kept
+        local f = BNB.CreateToolWindow({
+            name = "BigNoteBoxExportFrame", w = 520, h = 440, title = L["CFG_EXPORT_TITLE"],
+            toplevel = true, escClose = true,
+        })
+        f:SetPoint("CENTER")
+        local copyY = f._isSkin and (BNB.TOOL_SKIN_TITLE_H + 8) or 58
 
-            local titleBar = BNB.CreateSkinStrip(f, true, false)
-            titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            titleBar:SetHeight(SK_EXP_TITLE_H)
-            titleBar:EnableMouse(true)
-            titleBar:RegisterForDrag("LeftButton")
-            titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-            titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
+        local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
+        copyBtn:SetPoint("TOP", f, "TOP", 0, -copyY)
+        copyBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(f._eb:GetText()) end)
+        f._copyBtn = copyBtn
 
-            local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-            titleLbl:SetTextColor(1, 0.82, 0)
-            titleLbl:SetText(L["CFG_EXPORT_TITLE"])
-
-            local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-            closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-            local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
-            copyBtn:SetPoint("TOP", f, "TOP", 0, -(SK_EXP_TITLE_H + 8))
-            copyBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(f._eb:GetText()) end)
-            f._copyBtn = copyBtn
-
-            local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -(SK_EXP_TITLE_H + 8 + 24 + 6))
-            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 16)
-            if sf.ScrollBar then
-                sf.ScrollBar:SetAlpha(0)
-                sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-                    sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-                end)
-            end
-
-            local child = CreateFrame("Frame", nil, sf)
-            child:SetSize(460, 1)
-            sf:SetScrollChild(child)
-
-            local eb = CreateFrame("EditBox", nil, child)
-            eb:SetPoint("TOPLEFT",     child, "TOPLEFT",     0, 0)
-            eb:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT", 0, 0)
-            eb:SetFontObject("GameFontNormalSmall")
-            eb:SetMultiLine(true); eb:SetAutoFocus(true)
-            eb:SetMaxLetters(0)
-            eb:SetScript("OnEscapePressed", function() f:Hide() end)
-
-            f._eb = eb; f._child = child; f._sf = sf
-
-            f:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
+        local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+        sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -(f._isSkin and (copyY + 24 + 6) or 90))
+        sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 16)
+        if sf.ScrollBar then
+            sf.ScrollBar:SetAlpha(0)
+            sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
+                sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
             end)
-            f:Hide()
-        else
-            f = CreateFrame("Frame", "BigNoteBoxExportFrame", UIParent, "ButtonFrameTemplate")
-            f:SetSize(520, 440)
-            f:SetPoint("CENTER")
-            f:SetFrameStrata("DIALOG")
-            f:SetToplevel(true); f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-            f:RegisterForDrag("LeftButton")
-            f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-            f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-            ButtonFrameTemplate_HidePortrait(f)
-            ButtonFrameTemplate_HideButtonBar(f)
-            if f.Inset then f.Inset:Hide() end
-            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-            f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-            f:SetTitle(L["CFG_EXPORT_TITLE"])
-            if f.CloseButton then
-                f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-            end
-
-            local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
-            copyBtn:SetPoint("TOP", f, "TOP", 0, -58)
-            copyBtn:SetScript("OnClick", function()
-                BNB.ShowClipboardHint(f._eb:GetText())
-            end)
-            f._copyBtn = copyBtn
-
-            local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-            sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    16, -90)
-            sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",-24,  16)
-            if sf.ScrollBar then
-                sf.ScrollBar:SetAlpha(0)
-                sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-                    sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-                end)
-            end
-
-            local child = CreateFrame("Frame", nil, sf)
-            child:SetSize(460, 1)
-            sf:SetScrollChild(child)
-
-            local eb = CreateFrame("EditBox", nil, child)
-            eb:SetPoint("TOPLEFT",     child, "TOPLEFT",      0,  0)
-            eb:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT",  0,  0)
-            eb:SetFontObject("GameFontNormalSmall")
-            eb:SetMultiLine(true); eb:SetAutoFocus(true)
-            eb:SetMaxLetters(0)
-            eb:SetScript("OnEscapePressed", function() f:Hide() end)
-
-            f._eb    = eb
-            f._child = child
-            f._sf    = sf
-            f:Hide()
         end
-        tinsert(UISpecialFrames, "BigNoteBoxExportFrame")
+
+        local child = CreateFrame("Frame", nil, sf)
+        child:SetSize(460, 1)
+        sf:SetScrollChild(child)
+
+        local eb = CreateFrame("EditBox", nil, child)
+        eb:SetPoint("TOPLEFT",     child, "TOPLEFT",     0, 0)
+        eb:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT", 0, 0)
+        eb:SetFontObject("GameFontNormalSmall")
+        eb:SetMultiLine(true); eb:SetAutoFocus(true)
+        eb:SetMaxLetters(0)
+        eb:SetScript("OnEscapePressed", function() f:Hide() end)
+
+        f._eb = eb; f._child = child; f._sf = sf
         _exportWin = f
     end
 

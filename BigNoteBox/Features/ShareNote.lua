@@ -234,73 +234,16 @@ end
 -- Opens when the user clicks "Preview" after pasting a share string.
 -- Shows decoded title + scrollable body. "Add Note" or "Discard" buttons.
 --------------------------------------------------------------------------------
-local SK_PREV_TITLE_H = 28
-
-local function BuildSharePreviewSkin()
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBSharePreviewFrame", false)
-    _G["BNBSharePreviewFrame"] = f
-    f:SetSize(PREVIEW_W, PREVIEW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_PREV_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["SHARE_PREVIEW_TITLE"])
-    f._titleLbl = titleLbl
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseSharePreview() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    return f, SK_PREV_TITLE_H
-end
-
-local function BuildSharePreviewNormal()
-    local f = CreateFrame("Frame", "BNBSharePreviewFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(PREVIEW_W, PREVIEW_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["SHARE_PREVIEW_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() BNB.CloseSharePreview() end)
-    end
-    return f, 32
-end
-
 local function BuildSharePreview()
     if _previewFrame then return _previewFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-    if skinMode then
-        f, titleH = BuildSharePreviewSkin()
-    else
-        f, titleH = BuildSharePreviewNormal()
-    end
+    -- Shared chrome (CMP-02); the content offsets are the old ones
+    local f = BNB.CreateToolWindow({
+        name = "BNBSharePreviewFrame", w = PREVIEW_W, h = PREVIEW_H, title = L["SHARE_PREVIEW_TITLE"],
+        strata = "DIALOG", toplevel = true,
+        onClose = function() BNB.CloseSharePreview() end,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     local FOOT_H = 44
 
@@ -507,72 +450,16 @@ end
 -- Top half: pick option, generate share string, copy hint.
 -- Bottom half: paste import string, preview button.
 --------------------------------------------------------------------------------
-local SK_SHARE_TITLE_H = 28
-
-local function BuildShareWindowSkin()
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBShareFrame", false)
-    _G["BNBShareFrame"] = f
-    f:SetSize(SHARE_W, 340)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_SHARE_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["SHARE_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseShareWindow() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    return f, SK_SHARE_TITLE_H
-end
-
-local function BuildShareWindowNormal()
-    local f = CreateFrame("Frame", "BNBShareFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(SHARE_W, 340)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["SHARE_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() BNB.CloseShareWindow() end)
-    end
-    return f, 32
-end
-
 local function BuildShareWindow()
     if _shareFrame then return _shareFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-    if skinMode then
-        f, titleH = BuildShareWindowSkin()
-    else
-        f, titleH = BuildShareWindowNormal()
-    end
+    -- Shared chrome (CMP-02); the content offsets are the old ones
+    local f = BNB.CreateToolWindow({
+        name = "BNBShareFrame", w = SHARE_W, h = 340, title = L["SHARE_TITLE"],
+        strata = "HIGH", toplevel = true,
+        onClose = function() BNB.CloseShareWindow() end,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     local y = -(titleH + 10)
     local CW = SHARE_W - PAD * 2
@@ -1043,71 +930,16 @@ end
 -- Reuses OpenSharePreview / CloseSharePreview for the preview flow.
 --------------------------------------------------------------------------------
 local IMPORT_W = 420
-local SK_IMPORT_TITLE_H = 28
-
-local function BuildImportWindowSkin()
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBImportFrame", false)
-    _G["BNBImportFrame"] = f
-    f:SetSize(IMPORT_W, 220)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_IMPORT_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["SHARE_IMPORT_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseImportWindow() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-    return f, SK_IMPORT_TITLE_H
-end
-
-local function BuildImportWindowNormal()
-    local f = CreateFrame("Frame", "BNBImportFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(IMPORT_W, 220)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["SHARE_IMPORT_TITLE"])
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() BNB.CloseImportWindow() end)
-    end
-    return f, 32
-end
-
 local function BuildImportWindow()
     if _importFrame then return _importFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-    if skinMode then
-        f, titleH = BuildImportWindowSkin()
-    else
-        f, titleH = BuildImportWindowNormal()
-    end
+    -- Shared chrome (CMP-02); the content offsets are the old ones
+    local f = BNB.CreateToolWindow({
+        name = "BNBImportFrame", w = IMPORT_W, h = 220, title = L["SHARE_IMPORT_TITLE"],
+        strata = "HIGH", toplevel = true,
+        onClose = function() BNB.CloseImportWindow() end,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
     -- ESC chain: preview closes before import window (handled in MainWindow ESC block)
 
     local y   = -(titleH + 10)

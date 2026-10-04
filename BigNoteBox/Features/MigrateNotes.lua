@@ -968,50 +968,13 @@ local _previewFrame
 local function BuildPreviewWindow()
     if _previewFrame then return _previewFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BNBMigratePreviewFrame", false)
-        f:SetFrameStrata("DIALOG"); f:SetFrameLevel(100); f:SetToplevel(true)
-        f:SetSize(WIN_W, 440)
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(28)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["MIG_PREVIEW_TITLE"])
-        f._titleLbl = titleLbl
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        titleH = 28
-        f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
-    else
-        f = CreateFrame("Frame", "BNBMigratePreviewFrame", UIParent, "ButtonFrameTemplate")
-        f:SetFrameStrata("DIALOG"); f:SetFrameLevel(100); f:SetToplevel(true)
-        f:SetSize(WIN_W, 440)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetTitle(L["MIG_PREVIEW_TITLE"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-        end
-        titleH = 32
-    end
-
-    f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    tinsert(UISpecialFrames, "BNBMigratePreviewFrame")
+    -- Shared chrome (CMP-02)
+    local f = BNB.CreateToolWindow({
+        name = "BNBMigratePreviewFrame", w = WIN_W, h = 440, title = L["MIG_PREVIEW_TITLE"],
+        toplevel = true, escClose = true,
+    })
+    f:SetFrameLevel(100)
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     -- Scroll area
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
@@ -1128,48 +1091,13 @@ local _addonPopup
 function M.ShowAddonPopup(key)
     if _addonPopup then _addonPopup:Hide() end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
     local name = ADDON_NAMES[key] or key
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, nil, false)
-        f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-        f:SetSize(360, 200)
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(28)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-        local tl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        tl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        tl:SetTextColor(1, 0.82, 0)
-        tl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
-        f._titleLbl = tl
-        local cb2 = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        cb2:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        titleH = 28
-        f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
-    else
-        f = CreateFrame("Frame", nil, UIParent, "ButtonFrameTemplate")
-        f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-        f:SetSize(360, 200)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetTitle(string.format(L["MIG_MIGRATE_ADDON_FMT"], name))
-        if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
-        titleH = 32
-    end
-
-    f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+    -- Shared chrome (CMP-02); still a new frame per call, as before
+    local f = BNB.CreateToolWindow({
+        w = 360, h = 200, title = string.format(L["MIG_MIGRATE_ADDON_FMT"], name),
+        toplevel = true,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
     f:SetPoint("CENTER")
 
     local ct = f  -- draw directly on f
@@ -1246,49 +1174,13 @@ function M.ShowPopup()
 
     if _popup then _popup:Hide() end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-
-    -- Window
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BNBMigratePopupFrame", false)
-        f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(28)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-        local tl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        tl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        tl:SetTextColor(1, 0.82, 0)
-        tl:SetText(L["MIG_POPUP_TITLE"])
-        f._titleLbl = tl
-        local xBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        xBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        titleH = 28
-        f:SetScript("OnShow", function() BNB.ApplyMainWindowSkin() end)
-    else
-        f = CreateFrame("Frame", "BNBMigratePopupFrame", UIParent, "ButtonFrameTemplate")
-        f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetTitle(L["MIG_POPUP_TITLE"])
-        if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
-        titleH = 32
-    end
-
-    f:SetSize(WIN_W, 100)  -- height set at end
-    f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+    -- Window: shared chrome (CMP-02); height set at end
+    local f = BNB.CreateToolWindow({
+        name = "BNBMigratePopupFrame", w = WIN_W, h = 100, title = L["MIG_POPUP_TITLE"],
+        toplevel = true, escClose = true,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
     f:SetPoint("CENTER")
-    tinsert(UISpecialFrames, "BNBMigratePopupFrame")
 
     local ct  = f
     local CW  = WIN_W - PAD * 2

@@ -114,72 +114,17 @@ local function SetWindowsLocked(locked)
     end
 end
 
-local SK_EXP_TITLE_H_CMP = 28  -- export popup skin title height
-
 local function OpenExportPopup(noteData, anchorFrame)
     if not _exportFrame then
-        local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-        local ef
-        if skinMode then
-            ef = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxHistoryExportFrame", false)
-            _G["BigNoteBoxHistoryExportFrame"] = ef
-            ef:SetSize(280, 156)
-            ef:SetFrameStrata("TOOLTIP")
-            ef:SetFrameLevel(10)
-            ef:SetToplevel(true)
-            ef:SetMovable(true); ef:SetClampedToScreen(true)
-            ef:EnableMouse(true)
-            ef:RegisterForDrag("LeftButton")
-            ef:SetScript("OnDragStart", function(s) s:StartMoving() end)
-            ef:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-
-            local titleBar = BNB.CreateSkinStrip(ef, true, false)
-            titleBar:SetPoint("TOPLEFT",  ef, "TOPLEFT",  0, 0)
-            titleBar:SetPoint("TOPRIGHT", ef, "TOPRIGHT", 0, 0)
-            titleBar:SetHeight(SK_EXP_TITLE_H_CMP)
-            titleBar:EnableMouse(true)
-            titleBar:RegisterForDrag("LeftButton")
-            titleBar:SetScript("OnDragStart", function() ef:StartMoving() end)
-            titleBar:SetScript("OnDragStop",  function() ef:StopMovingOrSizing() end)
-
-            local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-            titleLbl:SetTextColor(1, 0.82, 0)
-            titleLbl:SetText(L["HISTORY_EXPORT_TITLE"])
-
-            local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() ef:Hide() end)
-            closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-            ef:SetScript("OnShow", function()
-                if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-            end)
-        else
-            -- This branch, EPAD and ey were lost to a bad paste before v1.7.0
-            -- (the function's tail sat here instead), so Export errored on
-            -- every client. Rebuilt 2026-09-24 after the BNB.OpenExportWindow pattern.
-            ef = CreateFrame("Frame", "BigNoteBoxHistoryExportFrame", UIParent, "ButtonFrameTemplate")
-            ef:SetSize(280, 156)
-            ef:SetFrameStrata("TOOLTIP")
-            ef:SetFrameLevel(10)
-            ef:SetToplevel(true)
-            ef:SetMovable(true); ef:SetClampedToScreen(true)
-            ef:EnableMouse(true)
-            ef:RegisterForDrag("LeftButton")
-            ef:SetScript("OnDragStart", function(s) s:StartMoving() end)
-            ef:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-            ButtonFrameTemplate_HidePortrait(ef)
-            ButtonFrameTemplate_HideButtonBar(ef)
-            if ef.Inset then ef.Inset:Hide() end
-            BNB.SeatChrome(ef)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-            ef._forGlow = BNB.AddForeverGlow(ef, ef.Bg)   -- Forever: glow over the wood grain
-            ef:SetTitle(L["HISTORY_EXPORT_TITLE"])
-            if ef.CloseButton then
-                ef.CloseButton:SetScript("OnClick", function() ef:Hide() end)
-            end
-        end
+        -- Shared chrome (CMP-02)
+        local ef = BNB.CreateToolWindow({
+            name = "BigNoteBoxHistoryExportFrame", w = 280, h = 156,
+            title = L["HISTORY_EXPORT_TITLE"], strata = "TOOLTIP", toplevel = true,
+        })
+        ef:SetFrameLevel(10)
 
         local EPAD = PAD
-        local ey   = skinMode and -(SK_EXP_TITLE_H_CMP + 8) or -32
+        local ey   = ef._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -32
 
         local fmtLbl = ef:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fmtLbl:SetPoint("TOPLEFT", ef, "TOPLEFT", EPAD, ey)
@@ -266,8 +211,6 @@ local function OpenExportPopup(noteData, anchorFrame)
     _exportFrame:Raise()
 end
 
-local SK_CMP_TITLE_H = 28
-
 local function BuildPanel(f, isLeft)
     local titleH = f._titleH or TITLE_H
     local panW = math.floor((CMP_W - PAD * 2 - COL_GAP) / 2)
@@ -279,7 +222,7 @@ local function BuildPanel(f, isLeft)
     pane:SetPoint("TOPLEFT", f, "TOPLEFT", xOff, -(titleH + HDR_H + PAD))
 
     -- Forever normal mode: one glow per side, from the column header down to the buttons
-    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then
+    if not f._isSkin then
         local glow = BNB.AddForeverGlow(f)
         if glow then
             glow:ClearAllPoints()
@@ -322,63 +265,15 @@ end
 local function BuildCompareWindow()
     if _cmpFrame then return _cmpFrame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local titleH   = skinMode and SK_CMP_TITLE_H or TITLE_H
-    local f
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxHistoryCompareFrame", false)
-        _G["BigNoteBoxHistoryCompareFrame"] = f
-        f:SetSize(CMP_W, CMP_H)
-        f:SetFrameStrata("FULLSCREEN_DIALOG")
-        f:SetFrameLevel(100)
-        f:SetToplevel(true)
-        f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_CMP_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText("")
-        f._titleLbl = titleLbl
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseHistoryCompare() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxHistoryCompareFrame", UIParent,
-            "ButtonFrameTemplate")
-        f:SetSize(CMP_W, CMP_H)
-        f:SetFrameStrata("FULLSCREEN_DIALOG")
-        f:SetFrameLevel(100)
-        f:SetToplevel(true)
-        f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() BNB.CloseHistoryCompare() end)
-        end
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxHistoryCompareFrame")
+    -- Shared chrome (CMP-02); its Forever glow is one per pane (BuildPanel)
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxHistoryCompareFrame", w = CMP_W, h = CMP_H, title = "",
+        strata = "FULLSCREEN_DIALOG", toplevel = true, escClose = true, noGlow = true,
+        onClose = function() BNB.CloseHistoryCompare() end,
+    })
+    f:SetFrameLevel(100)
+    local skinMode = f._isSkin
+    local titleH   = skinMode and BNB.TOOL_SKIN_TITLE_H or TITLE_H
     f._titleH = titleH
 
     local panW = math.floor((CMP_W - PAD * 2 - COL_GAP) / 2)
@@ -450,11 +345,7 @@ function BNB.OpenHistoryCompare(noteID, snap)
     local f = BuildCompareWindow()
 
     local title = string.format(L["HISTORY_COMPARE_TITLE"], note.title or "(untitled)")
-    if f.SetTitle then
-        f:SetTitle(title)
-    elseif f._titleLbl then
-        f._titleLbl:SetText(title)
-    end
+    f:SetWindowTitle(title)
     if f._rHdr then
         f._rHdr:SetText(L["HISTORY_COMPARE_SNAPSHOT"] ..
             "  |cff888888(" .. FmtTs(snap.timestamp) .. ")|r")
