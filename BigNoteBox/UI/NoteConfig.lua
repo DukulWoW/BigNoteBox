@@ -1046,6 +1046,7 @@ local function BuildAppearanceTab(panel)
         local n0 = GetNote()
         local isNpc = n0 and n0.source == "target" and n0.targetNpcID and not n0.targetIsPet
         return {
+            owner     = "noteConfig",
             get       = function() local n = GetNote(); return n and n.icon end,
             getSource = function() local n = GetNote(); return n and n.iconSource end,
             -- NPC target notes: the picker's "NPC portrait" button (Dukul, 2026-10-04)
@@ -1079,7 +1080,7 @@ local function BuildAppearanceTab(panel)
         BNB.IconFramePicker.Close()
         BNB.IconPicker.Open(_noteID, ncFrame or self, IconPickHandlers())
     end)
-    ifBtn:HookScript("OnClick", function() BNB.IconPicker.Close() end)
+    ifBtn:HookScript("OnClick", function() BNB.IconPicker.Close("noteConfig") end)
     rndLookBtn:SetScript("OnClick", function()
         if not _noteID then return end
         local icons = BNB.ICON_MANIFEST or {}
@@ -1211,7 +1212,7 @@ local function CreateNoteConfigWindow()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
         -- The icon frame picker belongs to this window (ALL-127)
         if BNB.IconFramePicker then BNB.IconFramePicker.Close() end
-        if BNB.IconPicker then BNB.IconPicker.Close() end
+        if BNB.IconPicker then BNB.IconPicker.Close("noteConfig") end
     end)
 
     local tabDefs = {

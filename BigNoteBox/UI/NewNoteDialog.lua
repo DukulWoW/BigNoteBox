@@ -37,8 +37,7 @@ local CARD_GAP = 4
 -- ---------------------------------------------------------------------------
 local _frame       = nil
 local _overlay     = nil   -- black dimmer over mainFrame
-local _iconPickerF = nil
-local _iconBtns    = {}
+local PICKER_KEY   = "newNote"   -- BNB.IconPicker key + owner (ALL-238)
 
 local _selIcon  = nil
 local _selFont  = nil
@@ -93,103 +92,22 @@ local function ShowMainOverlay(show)
 end
 
 -- ---------------------------------------------------------------------------
--- ICON PICKER POPUP
+-- ICON PICKER (BNB.IconPicker beside the dialog, ALL-238)
 -- ---------------------------------------------------------------------------
-local function BuildIconPicker()
-    if _iconPickerF then return _iconPickerF end
-
-    local PICKER_W  = 280
-    local PICKER_H  = 340
-    local CELL      = 32
-    local CELL_PAD  = 3
-    local GRID_COLS = math.floor((PICKER_W - CELL_PAD * 2) / (CELL + CELL_PAD))
-
-    local f = BNB.CreateBackdropFrame("Frame", "BNBNewNoteIconPicker", UIParent)
-    BNB.SetBackdrop(f, 0.06, 0.06, 0.09, 0.97, 0.35, 0.35, 0.38, 1)
-    f:SetSize(PICKER_W, PICKER_H)
-    f:SetFrameStrata("FULLSCREEN_DIALOG")
-    f:SetToplevel(true)
-    f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:Hide()
-
-    local titleLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  CELL_PAD, -6)
-    titleLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -CELL_PAD, -6)
-    titleLbl:SetJustifyH("CENTER")
-    titleLbl:SetText(L["NND_CHOOSE_ICON"])
-
-    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetSize(20, 20)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", 2, 2)
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
-
-    local TOP_OFF = 24
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     CELL_PAD, -TOP_OFF)
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, CELL_PAD)
-    if sf.ScrollBar then
-        sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-        end)
+local function ShowSelIcon()
+    if _iconBtn then
+        _iconBtn._tex:SetTexture(_selIcon or "Interface\\Icons\\INV_Misc_Note_06")
     end
+end
 
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(PICKER_W - CELL_PAD * 2 - 24)
-    ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    local icons = BNB.ICON_MANIFEST or {}
-    local rows  = math.max(1, math.ceil(#icons / GRID_COLS))
-    ct:SetHeight(rows * (CELL + CELL_PAD) + CELL_PAD)
-
-    for i, path in ipairs(icons) do
-        local btn = _iconBtns[i]
-        if not btn then
-            btn = CreateFrame("Button", nil, ct)
-            btn:SetSize(CELL, CELL)
-            local tex = btn:CreateTexture(nil, "ARTWORK")
-            tex:SetAllPoints(); tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            btn._tex = tex
-            local selTx = btn:CreateTexture(nil, "OVERLAY")
-            selTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",     -2,  2)
-            selTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",  2, -2)
-            selTx:SetColorTexture(0.2, 0.9, 0.2, 0.55); selTx:Hide()
-            btn._sel = selTx
-            local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-            hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.25)
-            btn:SetScript("OnEnter", function(s)
-                GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-                local name = (s._path or ""):match("([^\\/]+)$") or ""
-                GameTooltip:AddLine(name, 1, 1, 1); GameTooltip:Show()
-            end)
-            btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            _iconBtns[i] = btn
-        end
-
-        local col = (i - 1) % GRID_COLS
-        local row = math.floor((i - 1) / GRID_COLS)
-        btn:ClearAllPoints()
-        btn:SetPoint("TOPLEFT", ct, "TOPLEFT",
-            CELL_PAD + col * (CELL + CELL_PAD),
-            -(CELL_PAD + row * (CELL + CELL_PAD)))
-        btn._path = path
-        btn._tex:SetTexture(path)
-        btn:Show()
-
-        btn:SetScript("OnClick", function(s)
-            _selIcon = s._path
-            for _, ib in ipairs(_iconBtns) do
-                if ib._sel then ib._sel:SetShown(ib._path == _selIcon) end
-            end
-            if _iconBtn then _iconBtn._tex:SetTexture(_selIcon) end
-            f:Hide()
-        end)
-    end
-
-    _iconPickerF = f
-    return f
+local function IconPickHandlers()
+    return {
+        owner  = PICKER_KEY,
+        -- Over the main window's FULLSCREEN_DIALOG dimmer (ShowMainOverlay)
+        strata = "FULLSCREEN_DIALOG",
+        get    = function() return _selIcon end,
+        set    = function(icon) _selIcon = icon; ShowSelIcon() end,
+    }
 end
 
 -- ---------------------------------------------------------------------------
@@ -309,7 +227,7 @@ local function BuildDialog()
 
     f:HookScript("OnHide", function()
         ShowMainOverlay(false)
-        if _iconPickerF then _iconPickerF:Hide() end
+        BNB.IconPicker.Close(PICKER_KEY)
     end)
 
     -- ── TOP ROW: icon + title editbox ────────────────────────────────────────
@@ -333,14 +251,9 @@ local function BuildDialog()
         GameTooltip:Show()
     end)
     iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    iconBtn:SetScript("OnClick", function(self)
-        local picker = BuildIconPicker()
-        for _, ib in ipairs(_iconBtns) do
-            if ib._sel then ib._sel:SetShown(ib._path == _selIcon) end
-        end
-        picker:ClearAllPoints()
-        picker:SetPoint("TOPLEFT", self, "TOPRIGHT", 4, 0)
-        picker:Show(); picker:Raise()
+    -- Toggles the picker, top aligned beside the dialog
+    iconBtn:SetScript("OnClick", function()
+        BNB.IconPicker.Open(PICKER_KEY, f, IconPickHandlers())
     end)
     _iconBtn = iconBtn
 
@@ -738,7 +651,7 @@ function NND.Open()
     if _wowCheck  then _wowCheck:SetChecked(false) end
 
     -- Apply icon
-    if _iconBtn then _iconBtn._tex:SetTexture(_selIcon) end
+    ShowSelIcon()
 
     -- Reset title field and disable Create
     if _titleEB then
@@ -804,7 +717,7 @@ end
 function NND.Close()
     if _frame then _frame:Hide() end
     ShowMainOverlay(false)
-    if _iconPickerF then _iconPickerF:Hide() end
+    BNB.IconPicker.Close(PICKER_KEY)
 end
 
 function NND.Confirm()

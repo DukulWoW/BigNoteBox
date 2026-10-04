@@ -10,15 +10,24 @@
 -- The grid draws only the rows on screen from a small tile pool, so a long
 -- list costs no more than a short one (WoW never frees a frame).
 --
---   IP.Open(key, anchor, h)   key = who owns the pick (a note id); toggles.
+--   IP.Open(key, anchor, h)   key = what the pick is for (a note id, or a
+--                             dialog's own key); toggles.
 --                             anchor = the window to sit beside, top aligned
 --                             (as IconFramePicker). h = {
+--                               owner = "noteConfig" / "newNote" / "insertIcon":
+--                                     the window that opened the picker,
 --                               get = fn() -> current icon path / file id or nil,
 --                               set = fn(icon, source)  icon nil = no icon;
 --                                     source "curated" (catalog) / "blizzard",
+--                               gameOnly = true: game icons only, the bundled
+--                                     race portraits are left out ({icon} markup
+--                                     reads names under Interface\Icons),
+--                               strata = frame strata, nil = "DIALOG",
 --                             }
---   IP.Rebind(key, h)         another note in the same window
---   IP.Close() / IP.IsOpenFor(key)
+--   IP.Rebind(key, h)         another note in the same window; does nothing
+--                             while the picker belongs to another owner
+--   IP.Close(owner)           owner nil = whoever has it; else only that owner's
+--   IP.IsOpenFor(key)
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -35,6 +44,9 @@ local FOOT_H     = 38
 local SIDE_W     = 112
 local SIDE_ROW_H = 20
 local GAP        = 4
+-- The selection outline reaches this far past a tile; the grid keeps it as a
+-- margin, or the scroll frame clips the outline on the outer rows / columns
+local SEL_PAD    = 2
 local SBAR_W     = 20
 local GRID_X     = PAD + SIDE_W + 10
 local AREA_W     = W - GRID_X - PAD - SBAR_W   -- room for the grid
@@ -55,7 +67,7 @@ end
 local function ApplySize()
     CELL = SIZES[SizeIndex()].cell
     STEP = CELL + GAP
-    COLS = math.floor((AREA_W + GAP) / STEP)
+    COLS = math.floor((AREA_W - 2 * SEL_PAD + GAP) / STEP)
 end
 ApplySize()
 local GRID_W     = AREA_W
@@ -70,7 +82,7 @@ local SIDES = {
     { id = "notes",       label = "ICON_PICKER_CAT_NOTES",       cats = { "notes" } },
     { id = "books",       label = "ICON_PICKER_CAT_BOOKS",       cats = { "books" } },
     { id = "classes",     label = "ICON_PICKER_CAT_CLASSES",     cats = { "classes" } },
-    { id = "races",       label = "ICON_PICKER_CAT_RACES",       cats = { "races" } },
+    { id = "races",       label = "ICON_PICKER_CAT_RACES",       cats = { "races" }, bundled = true },
     { id = "factions",    label = "ICON_PICKER_CAT_FACTIONS",    cats = { "factions" } },
     { id = "professions", label = "ICON_PICKER_CAT_PROFESSIONS", cats = { "professions" } },
     { id = "zones",       label = "ICON_PICKER_CAT_ZONES",       cats = { "zones" } },
@@ -107,6 +119,17 @@ end
 
 local function SideDef(id)
     for _, s in ipairs(SIDES) do if s.id == id then return s end end
+end
+
+-- Bundled catalog categories (race portraits, Assets/Icons/Races) are left out
+-- for a game-only pick
+local function CatShown(key)
+    return not (_h and _h.gameOnly and key == "races")
+end
+
+local function SideShown(s)
+    if s.game then return GameListOn() end
+    return not (s.bundled and _h and _h.gameOnly)
 end
 
 local function IconName(icon)
@@ -159,7 +182,7 @@ local function BuildList()
             if cats then
                 for _, k in ipairs(cats) do if k == c.key then wanted = true end end
             end
-            if wanted then
+            if wanted and CatShown(c.key) then
                 for _, path in ipairs(c.list) do
                     if not terms or Matches(IconName(path), terms) then out[#out + 1] = path end
                 end
@@ -213,7 +236,7 @@ local function PickTyped()
     if fid then
         -- The catalog's own spelling when it is one of ours (races are bundled)
         for _, c in ipairs(BNB.ICON_CATALOG or {}) do
-            for _, path in ipairs(c.list) do
+            for _, path in ipairs(CatShown(c.key) and c.list or {}) do
                 if IconName(path):lower() == name:lower() then Pick(path, "curated"); return end
             end
         end
@@ -230,7 +253,7 @@ local function MakeTile()
     t.icon:SetAllPoints()
     t.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     t.sel = CreateFrame("Frame", nil, t, "BackdropTemplate")
-    t.sel:SetPoint("TOPLEFT", -2, 2); t.sel:SetPoint("BOTTOMRIGHT", 2, -2)
+    t.sel:SetPoint("TOPLEFT", -SEL_PAD, SEL_PAD); t.sel:SetPoint("BOTTOMRIGHT", SEL_PAD, -SEL_PAD)
     t.sel:SetBackdrop({ edgeFile = WHITE, edgeSize = 2 })
     t.sel:SetBackdropBorderColor(SEL_R, SEL_G, SEL_B, 1)
     t.sel:EnableMouse(false)
@@ -269,7 +292,8 @@ Fill = function()
         if icon then
             local r = math.floor((idx - 1) / COLS)
             t:ClearAllPoints()
-            t:SetPoint("TOPLEFT", _ct, "TOPLEFT", ((idx - 1) % COLS) * STEP, -r * STEP)
+            t:SetPoint("TOPLEFT", _ct, "TOPLEFT",
+                SEL_PAD + ((idx - 1) % COLS) * STEP, -SEL_PAD - r * STEP)
             t._icon = icon
             t.icon:SetTexture(icon)
             t.sel:SetShown(SameIcon(icon, cur))
@@ -285,17 +309,17 @@ local function PaintSide()
         local on = b._id == _side
         b.lbl:SetTextColor(on and SEL_R or 0.85, on and SEL_G or 0.85, on and SEL_B or 0.85)
         b.bg:SetShown(on)
-        b:SetShown(not SideDef(b._id).game or GameListOn())
+        b:SetShown(SideShown(SideDef(b._id)))
     end
 end
 
 Render = function(keepScroll)
     if not (_f and _h) then return end
-    if _side == "game" and not GameListOn() then _side = "all" end
+    if not SideShown(SideDef(_side) or SIDES[1]) then _side = "all" end
     BuildList()
     PaintSide()
     local rows = math.ceil(#_list / COLS)
-    _sf:FinaliseHeight(rows * STEP)
+    _sf:FinaliseHeight(rows * STEP - GAP + 2 * SEL_PAD)
     if not keepScroll then _sf:SetVerticalScroll(0) end
     Fill()
     if _revertBtn then
@@ -329,7 +353,7 @@ end
 local function ShowCurrent()
     local cur = _h and _h.get()
     local cat = type(cur) == "string" and BNB.ICON_CATEGORY and BNB.ICON_CATEGORY[cur]
-    if cat then
+    if cat and CatShown(cat) then
         for _, s in ipairs(SIDES) do
             for _, k in ipairs(s.cats or {}) do if k == cat then _side = s.id end end
         end
@@ -537,6 +561,8 @@ function IP.Open(key, anchor, h)
     _orig = h.get()
     _origSource = h.getSource and h.getSource() or nil
     _allCb:SetChecked(BigNoteBoxDB and BigNoteBoxDB.blizzardIconComplete == true)
+    -- The New note dialog dims the main window with a FULLSCREEN_DIALOG overlay
+    _f:SetFrameStrata(h.strata or "DIALOG")
     -- Top-aligned beside the window, as the Icon Frame picker
     _f:ClearAllPoints()
     if anchor and anchor.GetRight then
@@ -556,7 +582,7 @@ function IP.Open(key, anchor, h)
 end
 
 function IP.Rebind(key, h)
-    if not (_f and _f:IsShown()) then return end
+    if not (_f and _f:IsShown() and _h) or _h.owner ~= h.owner then return end
     _key, _h = key, h
     _orig = h.get()
     _origSource = h.getSource and h.getSource() or nil
@@ -569,6 +595,7 @@ function IP.Refresh()
     if _f and _f:IsShown() and _h then Render(true) end
 end
 
-function IP.Close()
+function IP.Close(owner)
+    if owner and not (_h and _h.owner == owner) then return end
     if _f and _f:IsShown() then _f:Hide() end
 end
