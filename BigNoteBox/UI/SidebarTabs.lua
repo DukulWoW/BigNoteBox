@@ -30,9 +30,10 @@ local AW, AH = 256, 64   -- art canvas (all four files)
 -- shape at any width, the two runs between them stretch
 local CAP, ORN_L, ORN_R = 24, 114, 142
 
--- Dukul's Export from the test; the same on both clients, only the art differs.
--- y = tab bottom against the window top (negative = overlaps it).
-local NORMAL = { h = 32, w = 150, minW = 80, gap = 0, x = 8, y = -4,
+-- Dukul's Export from the test; the same on both clients except y, only the art
+-- differs. y = tab bottom against the window top (negative = overlaps it);
+-- Forever's taller chrome needs 6 (Dukul, 2026-10-04).
+local NORMAL = { h = 32, w = 150, minW = 80, gap = 0, x = 8, y = BNB.IsForever and 6 or -4,
     iconSz = 18, iconX = 20, iconY = -0.5, border = 1, textGap = 5, textY = -1.5,
     rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.5, font = "GameFontNormal",
     pinSz = 14, pinX = -16, pinY = -6 }

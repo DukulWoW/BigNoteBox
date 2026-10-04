@@ -274,6 +274,17 @@ local function BuildWindow()
     ctxBtn:ClearAllPoints()
     ctxBtn:SetPoint("LEFT", setupBtn, "RIGHT", 8, 0)
     y = y + ROW_H
+    -- The top tabs tuning panel (ALL-248), beside Migration test. It lives in
+    -- the dev addon (/bnbtabs), so the button is only there while that is loaded.
+    local tabsBtn = MakeButton(L["CFG_DEV_TOPTABS_BTN"], 170,
+        L["CFG_DEV_TOPTABS_BTN"], L["CFG_DEV_TOPTABS_TIP_BODY"], function()
+            if SlashCmdList.BNBTOPTABS then SlashCmdList.BNBTOPTABS() end
+        end)
+    tabsBtn:ClearAllPoints()
+    tabsBtn:SetPoint("LEFT", migBtn, "RIGHT", 8, 0)
+    y = y + ROW_H
+    if not SlashCmdList.BNBTOPTABS then tabsBtn:Hide() end
+    dependents[#dependents + 1] = { btn = tabsBtn }
     dependents[#dependents + 1] = { btn = ctxBtn }
     dependents[#dependents + 1] = { btn = iconLabBtn }
     dependents[#dependents + 1] = { btn = bgLabBtn }

@@ -1665,6 +1665,8 @@ L["CFG_DEV_BGLAB_TIP_BODY"]         = "Opens a sticky-like preview of the game b
 L["DEV_WIN_BGLAB_TITLE"]            = "Background Lab"
 L["CFG_DEV_ICONLAB_BTN"]            = "Icon Lab"
 L["CFG_DEV_ICONLAB_TIP_BODY"]       = "Measures game art for note icon frames (/bnb iconlab): shows each file with its atlas regions, sets the picture area, then Export the result."
+L["CFG_DEV_TOPTABS_BTN"]            = "Top Tabs Test"
+L["CFG_DEV_TOPTABS_TIP_BODY"]       = "Opens the top tabs tuning panel from the dev addon (/bnbtabs): sizes and offsets for the sidebar tabs on top of the main window, then Export the layout. Open the main window first."
 L["DEV_WIN_ICONLAB_TITLE"]          = "Icon Lab"
 L["DEV_WIN_ICONLAB_CROP"]           = "Picture area (X Y W H, empty = whole file)"
 L["DEV_WIN_ICONLAB_REGIONS"]        = "Atlas regions in this file (%d)"
