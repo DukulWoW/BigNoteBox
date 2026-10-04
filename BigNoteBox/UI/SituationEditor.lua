@@ -8,7 +8,8 @@
 -- "bt-minimize", which nothing reads).
 --
 -- Stored as: note.situations = { "zone:Elwynn Forest" / "subzone:..." /
--- "instance:Molten Core" / "player:Thrall", ... } or nil (ALL-232), plus
+-- "instance:Molten Core" / "player:Thrall" / "npc:..." / "guild:..." /
+-- "itype:dungeon" / "open:vendor" / "state:rested", ... } or nil (ALL-232), plus
 -- contextDisplay, contextLeave, contextTrigger, contextFreq (ALL-232 S2),
 -- waypoint, wpClearOnLeave. The editor lists every situation (one row each,
 -- X removes it) above one add row (ALL-232 S3, Dukul's layout A,
@@ -35,12 +36,17 @@ local L   = BNB.L
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ROW_H  = 24
 local LIST_ROWS, LIST_ROW_H = 4, 20   -- the list box is always 4 rows; the wheel scrolls past that
-local TYPE_W = 100                    -- the add row's type dropdown
+local TYPE_W = 110                    -- the add row's type dropdown ("Instance type" fits)
 
 -- "npc" matches exactly like "player" (target or group); its own kind so the
 -- list says what the note is about (Dukul, 2026-10-04). "guild" matches a
--- target or group member in that guild, never yourself
-local TYPES        = { "zone", "subzone", "instance", "player", "npc", "guild" }
+-- target or group member in that guild, never yourself. "itype" / "open" /
+-- "state" are picked from fixed keys instead of typed (ALL-232 S4, the lists
+-- are BNB.SITUATION_CHOICES in Features/ContextNotes.lua)
+local TYPES        = { "zone", "subzone", "instance", "player", "npc", "guild", "itype", "open", "state" }
+-- Kinds whose value is a key from a list, not a typed name
+local KEY_KINDS    = { itype = true, open = true, state = true }
+local PLAYER_KINDS = { player = true, npc = true, guild = true }
 local DISPLAY_KEYS = { "popup", "sticky", "both" }
 local LEAVE_KEYS   = { "keep", "minimize", "hide" }
 -- contextTrigger / contextFreq; the first key of each is saved as nil
@@ -86,9 +92,9 @@ end
 -- is missing. onPick(key) runs on a player's choice; c:Set(key) only shows it;
 -- c:SetLabels(labels) swaps the wording (player situations, ALL-232).
 local function NewChoice(panel, keys, labels, width, onPick)
-    local c = { value = keys[1], labels = labels }
+    local c = { value = keys[1], labels = labels, keys = keys }
     local function LabelOf(k)
-        for i, kk in ipairs(keys) do if kk == k then return c.labels[i] end end
+        for i, kk in ipairs(c.keys) do if kk == k then return c.labels[i] end end
         return c.labels[1]
     end
     if HAS_DD then
@@ -96,7 +102,7 @@ local function NewChoice(panel, keys, labels, width, onPick)
         dd:SetHeight(24)
         dd:SetupMenu(function(_, root)
             for i, label in ipairs(c.labels) do
-                local key = keys[i]
+                local key = c.keys[i]
                 root:CreateRadio(label,
                     function() return c.value == key end,
                     function()
@@ -116,9 +122,9 @@ local function NewChoice(panel, keys, labels, width, onPick)
         local b = BNB.CreateButton(nil, panel, labels[1], width, 24)
         b:SetScript("OnClick", function(self)
             local idx = 1
-            for i, k in ipairs(keys) do if k == c.value then idx = i; break end end
-            idx = (idx % #keys) + 1
-            c.value = keys[idx]
+            for i, k in ipairs(c.keys) do if k == c.value then idx = i; break end end
+            idx = (idx % #c.keys) + 1
+            c.value = c.keys[idx]
             self:SetText(c.labels[idx])
             onPick(c.value)
         end)
@@ -126,6 +132,8 @@ local function NewChoice(panel, keys, labels, width, onPick)
         function c:Set(k) self.value = k; b:SetText(LabelOf(k)) end
     end
     function c:SetLabels(l) self.labels = l; self:Set(self.value) end
+    -- Other choices altogether (the add row's value picker); shows the first
+    function c:SetChoices(k, l) self.keys = k; self.labels = l; self:Set(k[1]) end
     return c
 end
 
@@ -250,7 +258,9 @@ function BNB.CreateSituationEditor(panel, opts)
 
     local KIND_LABELS = { zone = L["STICKY_KIND_ZONE"], subzone = L["STICKY_KIND_SUBZONE"],
                           instance = L["STICKY_KIND_INSTANCE"], player = L["STICKY_KIND_PLAYER"],
-                          npc = L["STICKY_KIND_NPC"], guild = L["STICKY_KIND_GUILD"] }
+                          npc = L["STICKY_KIND_NPC"], guild = L["STICKY_KIND_GUILD"],
+                          itype = L["SIT_ROWKIND_ITYPE"], open = L["SIT_ROWKIND_OPEN"],
+                          state = L["SIT_KIND_RESTED"] }
 
     local y = opts.top or -8
     local hdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -347,7 +357,8 @@ function BNB.CreateSituationEditor(panel, opts)
     -- ── Add row: [type v] [name] [browse] ────────────────────────────────────
     local TYPE_LABELS = { L["STICKY_KIND_ZONE"], L["STICKY_KIND_SUBZONE"],
                           L["STICKY_KIND_INSTANCE"], L["STICKY_KIND_PLAYER"], L["STICKY_KIND_NPC"],
-                          L["STICKY_KIND_GUILD"] }
+                          L["STICKY_KIND_GUILD"], L["SIT_KIND_ITYPE"], L["SIT_KIND_OPEN"],
+                          L["SIT_KIND_RESTED"] }
     local typ = NewChoice(panel, TYPES, TYPE_LABELS, TYPE_W, function(k) SelectType(k) end)
     typ.frame:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
     typ.frame:SetWidth(TYPE_W)
@@ -397,6 +408,18 @@ function BNB.CreateSituationEditor(panel, opts)
         valueEb:SetPoint("RIGHT", valueRow, "RIGHT", withBrowse and -26 or 0, 0)
     end
     PlaceValueBox(false)
+
+    -- Instance type and window are picked, not typed: this dropdown takes the
+    -- name box's place for them; Rested has nothing to pick (ALL-232 S4)
+    local function ChoiceLabels(kind)
+        local labels = {}
+        for i, k in ipairs(BNB.SITUATION_CHOICES[kind]) do labels[i] = BNB.SituationValueLabel(kind, k) end
+        return labels
+    end
+    local pick = NewChoice(valueRow, BNB.SITUATION_CHOICES.itype, ChoiceLabels("itype"), 120, function() end)
+    pick.frame:SetPoint("LEFT",  valueRow, "LEFT",  TYPE_W + 6, 0)
+    pick.frame:SetPoint("RIGHT", valueRow, "RIGHT", 0, 0)
+    pick.frame:Hide()
 
     -- ── Use current / Add / Clear all ────────────────────────────────────────
     local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 22)
@@ -467,6 +490,9 @@ function BNB.CreateSituationEditor(panel, opts)
 
     valueEb:SetScript("OnTextChanged", function(self, userInput)
         local text = self:GetText() or ""
+        -- A picked kind can always be added (the box is hidden, but a note
+        -- switch still empties it)
+        if KEY_KINDS[typ.value] then HideAC(); return end
         addBtn:SetEnabled(text:find("%S") ~= nil)
         if not userInput then return end
         -- No list of NPC or guild names to offer (GetMatches would answer with zones)
@@ -578,6 +604,8 @@ function BNB.CreateSituationEditor(panel, opts)
     local PLACE_TRIG   = { L["SIT_TRIGGER_ARRIVE"], L["SIT_TRIGGER_LEAVE"], L["SIT_TRIGGER_BOTH"] }
     local PLAYER_TRIG  = { L["SIT_TRIGGER_MEET"], L["SIT_TRIGGER_GONE"], L["SIT_TRIGGER_BOTH_PLAYER"] }
     local NEUTRAL_TRIG = { L["SIT_TRIGGER_START"], L["SIT_TRIGGER_END"], L["SIT_TRIGGER_BOTH_ANY"] }
+    -- A window is opened and closed (ALL-232 S4)
+    local WINDOW_TRIG  = { L["SIT_TRIGGER_OPEN"], L["SIT_TRIGGER_CLOSE"], L["SIT_TRIGGER_BOTH_WINDOW"] }
     trig = NewChoice(panel, TRIGGER_KEYS, PLACE_TRIG, optW,
         function(mode)
             local id = NoteID(); if not id then return end
@@ -602,12 +630,14 @@ function BNB.CreateSituationEditor(panel, opts)
     trig.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- Called by RefreshList: the trigger and leave rows speak of places, of
-    -- players, or neutrally of both, after the note's situations
-    -- (mode "place" / "player" / "mixed")
-    local function ApplyKindWords(mode)
-        hasPlayer = (mode ~= "place")
+    -- players, of windows, or neutrally of a mix, after the note's situations
+    -- (mode "place" / "player" / "window" / "mixed"); withPlayer = a player
+    -- kind is among them (the trigger's tooltip explains meeting)
+    local function ApplyKindWords(mode, withPlayer)
+        hasPlayer = withPlayer
         local words, leaveKey = PLACE_TRIG, "SIT_ROW_LEAVE"
         if mode == "player" then words, leaveKey = PLAYER_TRIG, "SIT_ROW_GONE"
+        elseif mode == "window" then words, leaveKey = WINDOW_TRIG, "SIT_ROW_CLOSED"
         elseif mode == "mixed" then words, leaveKey = NEUTRAL_TRIG, "SIT_ROW_END" end
         trig:SetLabels(words)
         leaveLabel:SetText(L[leaveKey])
@@ -830,7 +860,7 @@ function BNB.CreateSituationEditor(panel, opts)
                 local kind, value = BNB.DecodeContext(s)
                 row._index = idx
                 row._kind:SetText(KIND_LABELS[kind] or kind or "?")
-                row._value:SetText(value or s)
+                row._value:SetText(BNB.SituationValueLabel(kind, value) or s)
                 row:Show()
                 -- A hidden row gets no OnLeave: its X must not come back with it
                 if not row:IsMouseOver() then row._del:Hide() end
@@ -854,12 +884,17 @@ function BNB.CreateSituationEditor(panel, opts)
         else
             thumb:Hide()
         end
-        local place, player = false, false
+        -- Instance type and rested are places; a window is its own group
+        local place, player, window = false, false, false
         for _, s in ipairs(sits) do
             local k = BNB.DecodeContext(s)
-            if k == "player" or k == "npc" or k == "guild" then player = true else place = true end
+            if PLAYER_KINDS[k] then player = true
+            elseif k == "open" then window = true
+            else place = true end
         end
-        ApplyKindWords((place and player) and "mixed" or player and "player" or "place")
+        local groups = (place and 1 or 0) + (player and 1 or 0) + (window and 1 or 0)
+        ApplyKindWords(groups > 1 and "mixed" or player and "player" or window and "window" or "place",
+            player)
         ShowTypedControls(n > 0)
         clearBtn:SetEnabled(n > 0)
     end
@@ -870,6 +905,18 @@ function BNB.CreateSituationEditor(panel, opts)
         local browse = (t == "zone" or t == "instance")
         browseBtn:SetShown(browse)
         PlaceValueBox(browse)
+        -- Typed name, a picked key, or nothing to pick (Rested)
+        local choices = BNB.SITUATION_CHOICES and BNB.SITUATION_CHOICES[t]
+        valueEb:SetShown(not KEY_KINDS[t])
+        if choices then pick:SetChoices(choices, ChoiceLabels(t)); pick.frame:Show()
+        else pick.frame:Hide() end
+        useCurrentBtn:SetEnabled(t ~= "state")   -- Rested has nothing to fill in
+        if KEY_KINDS[t] then
+            valueEb:ClearFocus()
+            addBtn:SetEnabled(true)
+        else
+            addBtn:SetEnabled((valueEb:GetText() or ""):find("%S") ~= nil)
+        end
         HideAC()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
     end
@@ -901,7 +948,14 @@ function BNB.CreateSituationEditor(panel, opts)
     -- already has (situations match without case) is left out with a line
     local function AddSituation()
         local id = NoteID(); if not id then return end
-        local val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
+        local val
+        if typ.value == "state" then
+            val = "rested"   -- the one state there is
+        elseif KEY_KINDS[typ.value] then
+            val = pick.value or ""
+        else
+            val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
+        end
         if val == "" then return end
         local s = typ.value .. ":" .. val
         local sits = {}
@@ -920,6 +974,13 @@ function BNB.CreateSituationEditor(panel, opts)
     -- ── Button handlers ──────────────────────────────────────────────────────
     useCurrentBtn:SetScript("OnClick", function()
         local t, val = typ.value, ""
+        -- A picked kind: the instance type you are in or the window that is
+        -- open; nothing changes when there is none
+        if KEY_KINDS[t] then
+            local cur = BNB.CurrentSituationValue and BNB.CurrentSituationValue(t)
+            if cur and t ~= "state" then pick:Set(cur) end
+            return
+        end
         if t == "zone" then
             val = GetZoneText() or ""
         elseif t == "subzone" then

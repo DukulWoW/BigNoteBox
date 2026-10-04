@@ -15,7 +15,7 @@
 --
 --   BNB.ZonePicker.GetMatches(text, kind, maxResults)
 --     Returns a list of {name, continent, kind} tables matching text.
---     kind: "zone" | "instance" | "player"
+--     kind: "zone" | "instance" | "subzone" | "player"
 --     Used by the autocomplete dropdown in NoteConfig.
 
 local BNB = BigNoteBox
@@ -138,6 +138,42 @@ local function BuildCache()
     table.sort(_cache.instances, function(a, b) return a.name < b.name end)
 end
 
+-- ── Sub-zones: every area name the client knows ──────────────────────────────
+-- C_Map.GetAreaInfo(areaID) names any area, sub-zones included, in the
+-- client's language, on Retail and Forever (Dukul, 2026-10-04: sub-zones were
+-- missing; LibTourist has none, and there was no sub-zone list at all, so the
+-- autocomplete offered zones). No parent zone comes with a name, so the
+-- right-hand column stays empty. Built once per session, the first time a
+-- sub-zone is typed. Area ids run to about 16000 today; MAX_AREA_ID leaves room.
+local MAX_AREA_ID = 22000
+local _subzones   = nil   -- sorted list of { name }, one per name
+
+-- Leftover development names the client still carries
+local function IsJunkArea(name)
+    return name:find("[%[%]_<>]") or name:find("UNUSED") or name:find("[Uu]nused")
+        or name:find("DNT") or name:find("DEPRECATED") or name:find("[Dd]eprecated")
+        or name:find("^[Zz][Zz]") or name:find("TEST") or name:find("^Test ")
+        or name:find(" Test$") or name:find("^QA ") or name:find("^Dev ")
+end
+
+local function BuildSubzones()
+    if _subzones then return _subzones end
+    local list, seen = {}, {}
+    local get = C_Map and C_Map.GetAreaInfo
+    if get then
+        for id = 1, MAX_AREA_ID do
+            local ok, name = pcall(get, id)
+            if ok and type(name) == "string" and name ~= "" and not seen[name] and not IsJunkArea(name) then
+                seen[name] = true
+                list[#list + 1] = { name = name }
+            end
+        end
+    end
+    table.sort(list, function(a, b) return a.name < b.name end)
+    _subzones = list
+    return list
+end
+
 -- ── Public: GetMatches ────────────────────────────────────────────────────────
 -- Returns up to maxResults entries matching text for the given kind.
 -- kind = "zone" | "instance" | "player"
@@ -177,6 +213,23 @@ function ZP.GetMatches(text, kind, maxResults)
                             name = shortName, continent = "Guild", kind = "player"
                         }
                     end
+                end
+            end
+        end
+        return results
+    end
+
+    -- Sub-zones: names that start with the text first, then names that
+    -- only contain it (thousands of names: "the" would otherwise fill the
+    -- list with whatever sorts first)
+    if kind == "subzone" then
+        local list = BuildSubzones()
+        for pass = 1, 2 do
+            for _, entry in ipairs(list) do
+                if #results >= maxResults then return results end
+                local at = entry.name:lower():find(lower, 1, true)
+                if at and ((pass == 1) == (at == 1)) then
+                    results[#results + 1] = { name = entry.name, continent = "", kind = "subzone" }
                 end
             end
         end

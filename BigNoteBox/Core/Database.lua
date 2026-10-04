@@ -33,7 +33,9 @@
 --
 -- SITUATION STRING FORMAT (v1):  "<kind>:<value>"
 --   kind  = "zone" | "instance" | "subzone" | "player" | "npc" (npc matches as player) | "guild"
---   value = plain display name as returned by WoW APIs
+--           | "itype" | "open" | "state" (ALL-232 S4)
+--   value = plain display name as returned by WoW APIs; for itype / open /
+--           state a key instead (dungeon, vendor, rested: BNB.SITUATION_CHOICES)
 --   Held in the list note.situations since NOTES v10 (was the one string
 --   note.context, ALL-232); read through BNB.NoteSituations (NoteFields.lua).
 --   Parsed by: DecodeContext(), NoteMatches() in Features/ContextNotes.lua

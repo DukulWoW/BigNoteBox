@@ -220,11 +220,13 @@ local function ItemNames(note, f, ctx)
 end
 
 -- The `z` filter: a note that surfaces for a zone, instance or sub-zone
--- (Features/ContextNotes.lua), as opposed to a player/NPC note (p/n).
+-- (Features/ContextNotes.lua), as opposed to a player/NPC note (p/n). An
+-- instance type or rested counts as a place too (ALL-232 S4)
 local function IsZoneContext(note)
     for _, ctx in ipairs(BNB.NoteSituations(note)) do
         local kind = ctx:match("^(%a+):")
-        if kind == "zone" or kind == "instance" or kind == "subzone" then return true end
+        if kind == "zone" or kind == "instance" or kind == "subzone"
+           or kind == "itype" or kind == "state" then return true end
     end
     return false
 end

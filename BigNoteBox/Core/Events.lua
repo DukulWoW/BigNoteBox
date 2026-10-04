@@ -436,6 +436,52 @@ BNB.RegisterEvent("GROUP_ROSTER_UPDATE", function()
 end)
 
 --------------------------------------------------------------------------------
+-- Vendor / bank / mailbox / auction house / trainer windows (ALL-232 S4): an
+-- "open:" situation matches while its window is open. The window is kept open
+-- or shut on every event, the check runs only when a note has such a
+-- situation. Both the old events and the interaction manager's, whichever the
+-- client fires; a second "open" or "closed" for the same window changes nothing
+--------------------------------------------------------------------------------
+local WINDOW_EVENTS = {
+    MERCHANT_SHOW     = { "vendor",  true }, MERCHANT_CLOSED      = { "vendor",  false },
+    BANKFRAME_OPENED  = { "bank",    true }, BANKFRAME_CLOSED     = { "bank",    false },
+    MAIL_SHOW         = { "mailbox", true }, MAIL_CLOSED          = { "mailbox", false },
+    AUCTION_HOUSE_SHOW = { "auction", true }, AUCTION_HOUSE_CLOSED = { "auction", false },
+    TRAINER_SHOW      = { "trainer", true }, TRAINER_CLOSED       = { "trainer", false },
+}
+local function WindowChanged(key, open)
+    if not BNB.SetSituationWindow then return end
+    BNB.SetSituationWindow(key, open)
+    if BNB.HasSituationKind and BNB.HasSituationKind("open") then ScheduleContextCheck(0) end
+end
+for event, w in pairs(WINDOW_EVENTS) do
+    BNB.RegisterEvent(event, function() WindowChanged(w[1], w[2]) end)
+end
+
+-- Enum.PlayerInteractionType names -> window key, for the types the client knows
+local INTERACTION_WINDOWS = {}
+do
+    local PIT = Enum and Enum.PlayerInteractionType
+    if PIT then
+        for name, key in pairs({ Merchant = "vendor", Banker = "bank", MailInfo = "mailbox",
+                                 Auctioneer = "auction", Trainer = "trainer" }) do
+            if PIT[name] then INTERACTION_WINDOWS[PIT[name]] = key end
+        end
+    end
+end
+BNB.RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW", function(_, t)
+    if INTERACTION_WINDOWS[t] then WindowChanged(INTERACTION_WINDOWS[t], true) end
+end)
+BNB.RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE", function(_, t)
+    if INTERACTION_WINDOWS[t] then WindowChanged(INTERACTION_WINDOWS[t], false) end
+end)
+
+-- PLAYER_UPDATE_RESTING: entered or left an inn or city ("state:rested")
+BNB.RegisterEvent("PLAYER_UPDATE_RESTING", function()
+    if BNB.HasSituationKind and BNB.HasSituationKind("state") then ScheduleContextCheck(0.5) end
+end)
+
+--------------------------------------------------------------------------------
 -- PLAYER_REGEN_DISABLED — entered combat
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_REGEN_DISABLED", function()

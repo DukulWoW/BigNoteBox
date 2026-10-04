@@ -13,6 +13,9 @@
 --   "instance:Molten Core"
 --   "player:Thrall"
 --   "subzone:The Canals"
+--   "npc:Hogger", "guild:Some Guild"     (ALL-232 S3)
+--   "itype:dungeon"  instance type, "open:vendor"  window open,
+--   "state:rested"   (ALL-232 S4: values are keys, see SITUATION_CHOICES)
 --
 -- A note shows when it starts matching (arriving), when it stops (leaving) or
 -- both (note.contextTrigger), as often as note.contextFreq allows (ALL-232 S2).
@@ -115,6 +118,58 @@ local function GroupGuilds()
     return set
 end
 
+-- ── Instance types, windows, rested (ALL-232 S4) ─────────────────────────────
+-- Saved as keys, not names, so a note works in every language:
+-- "itype:dungeon", "open:vendor", "state:rested". The Situation editor offers
+-- the keys listed here (UI/SituationEditor.lua) and shows them through
+-- BNB.SituationValueLabel.
+local VALUE_LABELS = {
+    itype = { dungeon = "SIT_ITYPE_DUNGEON", raid = "SIT_ITYPE_RAID",
+              delve = "SIT_ITYPE_DELVE", battleground = "SIT_ITYPE_BATTLEGROUND" },
+    open  = { vendor = "SIT_OPEN_VENDOR", bank = "SIT_OPEN_BANK", mailbox = "SIT_OPEN_MAILBOX",
+              auction = "SIT_OPEN_AUCTION", trainer = "SIT_OPEN_TRAINER" },
+    state = { rested = "SIT_STATE_RESTED" },
+}
+BNB.SITUATION_CHOICES = {
+    -- No delves on Forever
+    itype = BNB.IsForever and { "dungeon", "raid", "battleground" }
+                           or { "dungeon", "raid", "delve", "battleground" },
+    open  = { "vendor", "bank", "mailbox", "auction", "trainer" },
+}
+
+-- A situation's value as the player reads it: the label of a key, any other
+-- value (a zone, a name) as it is
+function BNB.SituationValueLabel(kind, value)
+    local key = VALUE_LABELS[kind] and value and VALUE_LABELS[kind][value:lower()]
+    return key and L[key] or value
+end
+
+local DELVE_DIFFICULTY = 208
+
+-- The instance type key of the instance you are in, or nil (open world, or a
+-- type no choice covers: arena, other scenarios)
+local function CurrentInstanceType()
+    local inInst, t = IsInInstance()
+    if not inInst then return nil end
+    local diff = GetInstanceInfo and select(3, GetInstanceInfo())
+    if diff == DELVE_DIFFICULTY
+       or (C_PartyInfo and C_PartyInfo.IsDelveInProgress and C_PartyInfo.IsDelveInProgress()) then
+        return "delve"
+    end
+    if t == "party" then return "dungeon" end
+    if t == "raid"  then return "raid" end
+    if t == "pvp"   then return "battleground" end
+    return nil
+end
+
+-- Window key -> true while that window is open. Kept from events
+-- (Core/Events.lua calls BNB.SetSituationWindow): the game has no one
+-- question for "is the mailbox open" that other addons' frames cannot fool
+local _openWindows = {}
+function BNB.SetSituationWindow(key, open)
+    _openWindows[key] = open or nil
+end
+
 -- ── Match a single note against current context ────────────────────────────────
 -- Where the player is, read once per check (PERF-05: it was read again for
 -- every note): zone kind and name, sub-zone and target name, lower case.
@@ -128,7 +183,23 @@ local function CurrentEnv()
         subzone  = (GetSubZoneText and GetSubZoneText() or ""):lower(),
         target   = tgt and tgt:lower(),
         tguild   = UnitGuild("target"),
+        itype    = CurrentInstanceType(),
+        rested   = (IsResting and IsResting()) and true or false,
     }
+end
+
+-- What "Use Current" fills in for a key kind: the instance type you are in,
+-- the window that is open, or rested while you are. nil = none now
+function BNB.CurrentSituationValue(kind)
+    if kind == "itype" then return CurrentInstanceType() end
+    if kind == "open" then
+        for _, k in ipairs(BNB.SITUATION_CHOICES.open) do
+            if _openWindows[k] then return k end
+        end
+        return nil
+    end
+    if kind == "state" then return (IsResting and IsResting()) and "rested" or nil end
+    return nil
 end
 
 -- Does one situation string ("zone:Elwynn Forest", "player:Thrall", ...) match?
@@ -155,6 +226,12 @@ local function ContextMatches(ctx, env)
         -- The target's guild or anyone's in the group; typed without a realm,
         -- so the name matches on any realm (Dukul, 2026-10-04)
         return env.tguild == value or GroupGuilds()[value] == true
+    elseif kind == "itype" then
+        return env.itype == value
+    elseif kind == "open" then
+        return _openWindows[value] == true
+    elseif kind == "state" then
+        return value == "rested" and env.rested
     end
     return false
 end
@@ -175,18 +252,23 @@ local function NoteMatches(note, env)
 end
 
 -- Target and group changes only matter to notes with a player situation
--- (PERF-05): Core/Events.lua skips those checks when no note has one. A plain
+-- (PERF-05): Core/Events.lua skips those checks when no note has one, and
+-- window / rested changes when no note has that kind (ALL-232 S4). A plain
 -- scan, no API calls, so a newly set situation counts at once.
-function BNB.HasPlayerContexts()
+local PLAYER_KINDS = { player = true, npc = true, guild = true }
+local function HasKinds(kinds, one)
     local ndb = BNB.NotesDB()
     if not (ndb and ndb.notes) then return false end
     for _, note in pairs(ndb.notes) do
         for _, c in ipairs(BNB.NoteSituations(note)) do
-            if c:find("^player:") or c:find("^npc:") or c:find("^guild:") then return true end
+            local k = c:match("^(%w+):")
+            if k and (k == one or (kinds and kinds[k])) then return true end
         end
     end
     return false
 end
+function BNB.HasPlayerContexts() return HasKinds(PLAYER_KINDS) end
+function BNB.HasSituationKind(kind) return HasKinds(nil, kind) end
 
 -- ── Minimap badge ──────────────────────────────────────────────────────────────
 -- A small FontString overlaid on the minimap button icon showing a count.
@@ -427,7 +509,10 @@ local function ShowToast(matchIDs, locationName, leftBy)
         if not v then return nil end
         -- A player is not left but gone: "Thrall is gone", name without realm
         if k == "player" or k == "npc" or k == "guild" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
-        return string.format(L["CONTEXT_LEFT"], v)
+        -- A window is closed, not left: "Vendor closed" (ALL-232 S4)
+        if k == "open" then return string.format(L["CONTEXT_CLOSED"], BNB.SituationValueLabel(k, v)) end
+        if k == "state" then return L["CONTEXT_NOT_RESTED"] end
+        return string.format(L["CONTEXT_LEFT"], BNB.SituationValueLabel(k, v))
     end
     if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then return end
     local count = #matchIDs
