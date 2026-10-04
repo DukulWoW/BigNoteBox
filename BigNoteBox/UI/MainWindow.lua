@@ -234,15 +234,14 @@ local WINDOWS = {
     { name = "BigNoteBoxSendDialog",  raise = true,
       companion = function() Call(BNB, "CloseSendToChat") end,
       focus = 8, reopen = function(id) Call(BNB, "OpenSendToChat", id) end },
-    -- DIALOG-strata popups first: New Note dialog, clipboard hint, icon picker
-    -- (sidebar right-click > Change icon), any open right-click menu (it
-    -- takes ESC itself while it has the keyboard; this catches the rest)
+    -- DIALOG-strata popups first: New Note dialog, clipboard hint, any open
+    -- right-click menu (it takes ESC itself while it has the keyboard; this
+    -- catches the rest)
     { name = "BNBNewNoteDialogFrame",
       esc       = function() Call(BNB.NewNoteDialog, "Close") end,
       companion = function() Call(BNB.NewNoteDialog, "Close") end },
     { name = "BNBClipboardHintFrame",
       esc = function() Call(BNB._clipboardHint, "_dismiss") end },
-    { name = "BNBSidebarIconPickerFrame", esc = true, raise = true },
     { esc = function()
           local cm = BNB.ContextMenu
           if cm and cm.IsOpen() then cm.Close(); return true end
@@ -277,8 +276,11 @@ local WINDOWS = {
     -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
     { name = "BigNoteBoxIconFramePicker",
       esc = function() Call(BNB.IconFramePicker, "Close") end },
+    -- Its owners close their own picks; the sidebar's (Change icon, ALL-243)
+    -- closes with the main window
     { name = "BigNoteBoxIconPicker",
-      esc = function() Call(BNB.IconPicker, "Close") end },
+      esc       = function() Call(BNB.IconPicker, "Close") end,
+      companion = function() Call(BNB.IconPicker, "Close", "sidebar") end },
     { name = "BigNoteBoxNoteConfigFrame", esc = true, companion = true, raise = true,
       focus = 1, reopen = function(id) Call(BNB, "OpenNoteConfig", id) end },
     -- Task Edit Window before the Reference Box
@@ -1357,70 +1359,16 @@ end
 --------------------------------------------------------------------------------
 local _bcbPromoFrame
 
-local SK_PROMO_TITLE_H = 28
-
 local function BuildBCBPromo()
     local PROMO_W  = 360
     local PROMO_H  = 550
     local PAD_P    = 16
     local ASSETS   = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local titleH   = skinMode and SK_PROMO_TITLE_H or 36
-
-    local f
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxBCBPromoFrame", false)
-        _G["BigNoteBoxBCBPromoFrame"] = f
-        f:SetSize(PROMO_W, PROMO_H)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true); f:SetClampedToScreen(true)
-        f:SetMovable(true); f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_PROMO_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["MW_BCB_PROMO_TITLE"])
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxBCBPromoFrame", UIParent, "ButtonFrameTemplate")
-        f:SetSize(PROMO_W, PROMO_H)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:SetMovable(true)
-        f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetTitle(L["MW_BCB_PROMO_TITLE"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-        end
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxBCBPromoFrame")
-    BNB.AttachEscClose(f, f.Hide)
+    local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
+        name = "BigNoteBoxBCBPromoFrame", w = PROMO_W, h = PROMO_H,
+        title = L["MW_BCB_PROMO_TITLE"], toplevel = true, escClose = true, keyEsc = true,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 36
 
     -- Running Y cursor, starts just below the title bar
     local y = -(titleH + PAD_P)

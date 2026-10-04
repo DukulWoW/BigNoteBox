@@ -25,26 +25,34 @@ BNB.BUG_LINKS = {
 --------------------------------------------------------------------------------
 -- LINK BUTTONS: GitHub full width on top, the three sites in a row below.
 -- Returns a frame of the given width; its height is fixed (BUG_LINKS_H).
+-- skin = true: skin buttons, for a window built in skin mode (ALL-79); the
+-- Forever login notice has no skin mode and keeps the template buttons.
 --------------------------------------------------------------------------------
 local BTN_H, ROW_GAP = 24, 6
 BNB.BUG_LINKS_H = BTN_H * 2 + ROW_GAP
 
-function BNB.CreateBugLinkButtons(parent, width)
+function BNB.CreateBugLinkButtons(parent, width, skin)
     local box = CreateFrame("Frame", nil, parent)
     box:SetSize(width, BNB.BUG_LINKS_H)
 
     local function LinkBtn(text, url)
-        local b = CreateFrame("Button", nil, box, BNB.PanelButtonTemplate())
-        b:SetHeight(BTN_H)
-        b:SetText(text)
+        local b
+        if skin then
+            b = BNB.CreateSkinButton(nil, box, text, 80, BTN_H)
+        else
+            b = CreateFrame("Button", nil, box, BNB.PanelButtonTemplate())
+            b:SetHeight(BTN_H)
+            b:SetText(text)
+        end
         b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true) end)
-        b:SetScript("OnEnter", function(self)
+        -- Hooks: a skin button draws its hover in its own OnEnter / OnLeave
+        b:HookScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(L["BUG_LINK_TIP"], 1, 1, 1)
             GameTooltip:AddLine(url, 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end)
-        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        b:HookScript("OnLeave", function() GameTooltip:Hide() end)
         return b
     end
 
@@ -82,24 +90,13 @@ function BNB.ShowBugReport()
     local f = _win
     if not f then
         local W, PAD = 400, 20
-        f = CreateFrame("Frame", "BNBBugReportFrame", UIParent, "ButtonFrameTemplate")
-        f:SetWidth(W)
+        -- Shared chrome (CMP-02), so it follows skin mode like Settings beside it;
+        -- the height is set once the text is measured
+        f = BNB.CreateToolWindow({
+            name = "BNBBugReportFrame", w = W, h = 1, title = L["BUG_TITLE"],
+            toplevel = true, escClose = true,
+        })
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:EnableMouse(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", f.StartMoving)
-        f:SetScript("OnDragStop", f.StopMovingOrSizing)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)
-        BNB.AddForeverGlow(f, f.Bg)
-        f:SetTitle(L["BUG_TITLE"])
-        tinsert(UISpecialFrames, "BNBBugReportFrame")
 
         local body = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -40)
@@ -108,26 +105,25 @@ function BNB.ShowBugReport()
         body:SetSpacing(2)
         body:SetText(L["BUG_BODY"])
 
-        local links = BNB.CreateBugLinkButtons(f, W - PAD * 2)
+        local links = BNB.CreateBugLinkButtons(f, W - PAD * 2, f._isSkin)
         links:SetPoint("TOPLEFT", body, "BOTTOMLEFT", 0, -16)
 
-        local close = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
-        close:SetSize(120, 26)
+        local close = BNB.CreateButton(nil, f, CLOSE or "Close", 120, 26)
         close:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
-        close:SetText(CLOSE or "Close")
         close:SetScript("OnClick", function() f:Hide() end)
 
-        -- Created shown, so size it here (an OnShow set now would not fire)
         f:SetHeight(40 + body:GetStringHeight() + 16 + BNB.BUG_LINKS_H + 20 + 26 + 16)
 
         f:HookScript("OnShow", function(self)
-            if BNB.StartWindowGlow then BNB.StartWindowGlow(self, GLOW_KEY) end
+            -- A skin frame has no seated template edge to pad for (Forever)
+            if BNB.StartWindowGlow then
+                BNB.StartWindowGlow(self, GLOW_KEY, self._isSkin and { l = 0, t = 0, r = 0, b = 0 } or nil)
+            end
         end)
         f:HookScript("OnHide", function(self)
             if BNB.StopWindowGlow then BNB.StopWindowGlow(self, GLOW_KEY) end
         end)
-        _win = f
-        if BNB.StartWindowGlow then BNB.StartWindowGlow(f, GLOW_KEY) end
+        _win = f   -- built hidden: the Show below starts the glow
     end
     f:Show()
     f:Raise()

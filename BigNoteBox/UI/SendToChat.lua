@@ -199,61 +199,13 @@ end
 local SK_STC_TITLE_H = 28
 
 local function CreateConfirmDialog()
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f
-    local contentY  -- top of content below title chrome
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxSendConfirm", false)
-        _G["BigNoteBoxSendConfirm"] = f
-        f:SetSize(300, 180)
-        f:SetFrameStrata("FULLSCREEN_DIALOG")
-        f:SetToplevel(true); f:SetClampedToScreen(true)
-        f:SetMovable(true); f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_STC_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["STC_CONFIRM_SEND_TITLE"])
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-        contentY = -(SK_STC_TITLE_H + 8)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxSendConfirm", UIParent, "ButtonFrameTemplate")
-        f:SetSize(300, 180)
-        f:SetFrameStrata("FULLSCREEN_DIALOG")
-        f:SetToplevel(true); f:SetClampedToScreen(true)
-        f:SetMovable(true); f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f); ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetAlpha(0.97); f:SetTitle(L["STC_CONFIRM_SEND_TITLE"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-        end
-        contentY = -TITLE_H
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxSendConfirm")
+    local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
+        name = "BigNoteBoxSendConfirm", w = 300, h = 180,
+        title = L["STC_CONFIRM_SEND_TITLE"], strata = "FULLSCREEN_DIALOG",
+        toplevel = true, escClose = true,
+    })
+    -- top of content below title chrome
+    local contentY = f._isSkin and -(SK_STC_TITLE_H + 8) or -TITLE_H
 
     local statsLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     statsLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY)
@@ -267,7 +219,7 @@ local function CreateConfirmDialog()
     chanLbl:SetJustifyH("LEFT")
     f._chanLbl = chanLbl
 
-    if skinMode then
+    if f._isSkin then
         local divHost = CreateFrame("Frame", nil, f)
         divHost:SetHeight(1)
         divHost:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY - 44)

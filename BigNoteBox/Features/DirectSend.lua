@@ -55,7 +55,6 @@ local MAX_INCOMING = 20      -- messages being reassembled at once; more are dro
 local INCOMING_TTL = 180     -- seconds before a partial reassembly is purged
 local PROMPT_W     = 340
 local PROMPT_H     = 148
-local SK_TITLE_H   = 28
 local PAD          = 12
 
 --------------------------------------------------------------------------------
@@ -528,74 +527,24 @@ end
 
 --------------------------------------------------------------------------------
 -- INCOMING PROMPT
--- Skin-aware: uses CreateSkinFrame + CreateSkinStrip + CreateSkinCloseButton
--- in skin mode, ButtonFrameTemplate in normal mode.
+-- Chrome from the shared builder (CMP-02). The close button counts as a
+-- decline without the chat line: the queue moves on in both modes (in normal
+-- mode the X only hid the window and later notes never prompted, CMP-02).
 --------------------------------------------------------------------------------
-local function BuildPromptSkin()
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBDirectSendPrompt", false)
-    _G["BNBDirectSendPrompt"] = f
-    f:SetSize(PROMPT_W, PROMPT_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["DS_PROMPT_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function()
-        currentPrompt = nil
-        f:Hide()
-        DS.ShowNextPrompt()
-    end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    return f, SK_TITLE_H
-end
-
-local function BuildPromptNormal()
-    local f = CreateFrame("Frame", "BNBDirectSendPrompt", UIParent, "ButtonFrameTemplate")
-    _G["BNBDirectSendPrompt"] = f
-    f:SetSize(PROMPT_W, PROMPT_H)
-    f:SetFrameStrata("DIALOG"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f:SetTitle(L["DS_PROMPT_TITLE"])
-    return f, 32
-end
-
 local function EnsurePrompt()
     if _prompt then return _prompt end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f, titleH
-    if skinMode then
-        f, titleH = BuildPromptSkin()
-    else
-        f, titleH = BuildPromptNormal()
-    end
+    local f
+    f = BNB.CreateToolWindow({
+        name = "BNBDirectSendPrompt", w = PROMPT_W, h = PROMPT_H,
+        title = L["DS_PROMPT_TITLE"], toplevel = true,
+        onClose = function()
+            currentPrompt = nil
+            f:Hide()
+            DS.ShowNextPrompt()
+        end,
+    })
+    local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     local y = -(titleH + PAD)
 

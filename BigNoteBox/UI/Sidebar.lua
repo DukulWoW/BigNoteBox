@@ -50,18 +50,6 @@ local SIDE_OFFSET = {
     retail_normal  = { left = 7, right = -2 },
 }
 
--- Icon catalog categories offered in the sidebar icon picker (Assets/Icons/IconManifest.lua)
-local SLOT_ICON_CATEGORIES = { "classes", "races", "factions" }
-
--- Flat icon list built from the above categories at load time.
-local SLOT_ICON_LIST = {}
-do
-    for _, key in ipairs(SLOT_ICON_CATEGORIES) do
-        for _, path in ipairs(BNB.IconsIn and BNB.IconsIn(key) or {}) do
-            SLOT_ICON_LIST[#SLOT_ICON_LIST + 1] = path
-        end
-    end
-end
 local ICON_SZ       = 48     -- icon texture size: fills the border's inner frame opening (full size)
 local ICON_X        = 5     -- icon left offset (inner frame starts at 13px from left)
 local ICON_Y        = -8     -- icon top offset  (inner frame starts at 8px from top)
@@ -389,155 +377,25 @@ end
 
 --------------------------------------------------------------------------------
 -- ── Sidebar icon picker ───────────────────────────────────────────────────────
--- Flat scrollable grid of all Classes/Races/Factions icons, 6 per row.
-local _iconPickerFrame = nil
-local _ipBtns          = {}
-
-local function BuildIconPickerFrame()
-    if _iconPickerFrame then return _iconPickerFrame end
-
-    local COLS    = 6
-    local CELL    = 36
-    local GPAD    = 4
-    local PAD     = 10
-    local TITLE_H = 32
-    -- Width: 6 cells + 5 inner gaps + 2*pad + 28px scrollbar clearance
-    local PW = PAD * 2 + COLS * CELL + (COLS - 1) * GPAD + 28
-    local PH = 320
-
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local SK_IP_TITLE_H = 28
-    local ipTitleH = skinMode and SK_IP_TITLE_H or TITLE_H
-    local f
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BNBSidebarIconPickerFrame", false)
-        _G["BNBSidebarIconPickerFrame"] = f
-        f:SetSize(PW, PH)
-        f:SetFrameStrata("TOOLTIP")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_IP_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["NND_CHOOSE_ICON"])
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BNBSidebarIconPickerFrame", UIParent,
-            "ButtonFrameTemplate")
-        f:SetSize(PW, PH)
-        f:SetFrameStrata("TOOLTIP")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f:SetTitle(L["NND_CHOOSE_ICON"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-        end
-    end
-    tinsert(UISpecialFrames, "BNBSidebarIconPickerFrame")
-
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(ipTitleH + 6))
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, 8)
-    if sf.ScrollBar then sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, r)
-            sf.ScrollBar:SetAlpha((r or 0) > 1 and 1 or 0)
-        end)
-    end
-    local sc = CreateFrame("Frame", nil, sf)
-    sc:SetWidth(COLS * CELL + (COLS - 1) * GPAD)
-    sc:SetHeight(1)
-    sf:SetScrollChild(sc)
-
-    local icons = SLOT_ICON_LIST
-    local rows  = math.max(1, math.ceil(#icons / COLS))
-    sc:SetHeight(rows * (CELL + GPAD) + GPAD)
-
-    for i, path in ipairs(icons) do
-        local btn = CreateFrame("Button", nil, sc)
-        btn:SetSize(CELL, CELL)
-        local col = (i - 1) % COLS
-        local row = math.floor((i - 1) / COLS)
-        btn:SetPoint("TOPLEFT", sc, "TOPLEFT",
-            col * (CELL + GPAD),
-            -(GPAD + row * (CELL + GPAD)))
-        local tex = btn:CreateTexture(nil, "ARTWORK")
-        tex:SetAllPoints()
-        tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-        tex:SetTexture(path)
-        local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-        hi:SetAllPoints()
-        hi:SetColorTexture(1, 1, 1, 0.3)
-        btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine((path):match("([^\\/]+)$") or "", 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        btn._path = path
-        _ipBtns[i] = btn
-    end
-
-    f:Hide()
-    _iconPickerFrame = f
-    return f
-end
-
-local function ShowSidebarIconPicker(charKey, anchorBtn)
+-- The shared icon picker (UI/IconPicker.lua, ALL-243), every category: opens
+-- on the custom icon's category, or Classes while the slot shows its class
+-- icon. Use Default goes back to the class icon. Clicking Change icon again
+-- for the same character closes it.
+local function ShowSidebarIconPicker(charKey)
     local db  = BigNoteBoxDB
     local rec = db and db.knownChars and db.knownChars[charKey]
-    if not rec then return end
-
-    local f = BuildIconPickerFrame()
-
-    for _, btn in ipairs(_ipBtns) do
-        local p = btn._path
-        btn:SetScript("OnClick", function()
-            rec.slotIcon = p
+    if not (rec and BNB.IconPicker) then return end
+    BNB.IconPicker.Open("sidebar:" .. charKey, BNB.mainFrame, {
+        owner       = "sidebar",
+        startSide   = "classes",
+        defaultNone = true,
+        get = function() return rec.slotIcon end,
+        set = function(icon)
+            rec.slotIcon = icon
             SB.Refresh()
             if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-            f:Hide()
-        end)
-    end
-
-    f:ClearAllPoints()
-    if anchorBtn then
-        f:SetPoint("TOPLEFT", anchorBtn, "TOPRIGHT", 4, 0)
-    else
-        local cx, cy = GetCursorPosition()
-        local s = UIParent:GetEffectiveScale()
-        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s + f:GetHeight())
-    end
-    f:Show()
-    f:Raise()
+        end,
+    })
 end
 
 
@@ -546,7 +404,7 @@ end
 -- The character entries on `root` (a menu or a sub-menu row; the top tabs'
 -- "..." menu adds them under each character, ALL-248). Returns false for All /
 -- Global or an unknown character, which have no entries.
-local function AddSlotMenuEntries(root, key, btn)
+local function AddSlotMenuEntries(root, key)
     local db = BigNoteBoxDB
     if not db then return false end
     local charKey = key:match("^char:(.+)$")
@@ -594,7 +452,7 @@ local function AddSlotMenuEntries(root, key, btn)
 
         -- Change icon
         root:CreateButton(L["SB_CHANGE_ICON"], function()
-            ShowSidebarIconPicker(charKey, btn)
+            ShowSidebarIconPicker(charKey)
         end)
 
         -- Reset icon (only shown if a custom icon is set)
@@ -605,6 +463,13 @@ local function AddSlotMenuEntries(root, key, btn)
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end)
         end
+
+        -- Remove (ALL-249): asks where the notes go; never the character you are on
+        if charKey ~= BNB.currentChar and BNB.CharacterRemove then
+            root:CreateButton(L["SB_REMOVE_CHAR"], function()
+                BNB.CharacterRemove.Open(charKey)
+            end, { danger = true })
+        end
     end
     return true
 end
@@ -614,7 +479,7 @@ local function ShowSlotContextMenu(key, btn)
     local db = BigNoteBoxDB
     if not (ck and db and db.knownChars and db.knownChars[ck]) then return end
     BNB.ContextMenu.Open(btn, function(root)   -- ALL-148
-        AddSlotMenuEntries(root, key, btn)
+        AddSlotMenuEntries(root, key)
     end)
 end
 
@@ -902,71 +767,40 @@ end
 
 local _cmPopup = nil
 
+-- Copy/Move destinations: every character not hidden from the sidebar
+-- (ALL-249), the realm added where two share a name. skip(slotKey) -> true
+-- leaves one out.
+local function AddCharDests(dests, skip)
+    local db = BigNoteBoxDB
+    local chars, names = {}, {}
+    for charKey, rec in pairs(db and db.knownChars or {}) do
+        local slotKey = "char:" .. charKey
+        if not rec.slotHidden and not skip(slotKey) then
+            local name = rec.name or charKey
+            chars[#chars + 1] = { key = slotKey, name = name, realm = rec.realm }
+            names[name] = (names[name] or 0) + 1
+        end
+    end
+    for _, c in ipairs(chars) do
+        local label = c.name
+        if names[c.name] > 1 and c.realm and c.realm ~= "" then label = label .. " - " .. c.realm end
+        dests[#dests + 1] = { key = c.key, label = label }
+    end
+end
+
 local function BuildCopyMovePopup()
     if _cmPopup then return _cmPopup end
 
     local PW, PH_BASE = 260, 280
     local PAD = 12
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local SK_CM_TITLE_H = 28
-    local cmTitleH = skinMode and SK_CM_TITLE_H or 32
-    local BTN_H    = 26
-    local f
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxCopyMoveFrame", false)
-        _G["BigNoteBoxCopyMoveFrame"] = f
-        f:SetSize(PW, PH_BASE)
-        f:SetFrameStrata("TOOLTIP")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_CM_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["SB_COPY_MOVE_TITLE"])
-        f._titleLbl = titleLbl
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxCopyMoveFrame", UIParent,
-            "ButtonFrameTemplate")
-        f:SetSize(PW, PH_BASE)
-        f:SetFrameStrata("TOOLTIP")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(s) s:StartMoving() end)
-        f:SetScript("OnDragStop",  function(s) s:StopMovingOrSizing() end)
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-        end
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxCopyMoveFrame")
+    local BTN_H = 26
+    local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
+        name = "BigNoteBoxCopyMoveFrame", w = PW, h = PH_BASE,
+        title = L["SB_COPY_MOVE_TITLE"], strata = "TOOLTIP",
+        toplevel = true, escClose = true,
+    })
+    local cmTitleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(cmTitleH + 4))
@@ -1005,11 +839,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     if not note then return end
 
     local f = BuildCopyMovePopup()
-    if f.SetTitle then
-        f:SetTitle(L["SB_COPY_MOVE_TITLE"])
-    elseif f._titleLbl then
-        f._titleLbl:SetText(L["SB_COPY_MOVE_TITLE"])
-    end
+    f:SetWindowTitle(L["SB_COPY_MOVE_TITLE"])
 
     local sc = f._scrollChild
     for i = 1, sc._rowCount or 0 do
@@ -1023,12 +853,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     if noteScope ~= "global" then
         dests[#dests + 1] = { key = "global", label = L["SB_GLOBAL_NOTES"] }
     end
-    for charKey, rec in pairs(db.knownChars or {}) do
-        local slotKey = "char:" .. charKey
-        if slotKey ~= noteScope then
-            dests[#dests + 1] = { key = slotKey, label = rec.name or charKey }
-        end
-    end
+    AddCharDests(dests, function(slotKey) return slotKey == noteScope end)
     table.sort(dests, function(a, b) return a.label < b.label end)
 
     if #dests == 0 then
@@ -1128,11 +953,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     local cmTitle = #noteIDs > 1
         and string.format(L["SB_COPY_MOVE_MULTI_N_FMT"], #noteIDs)
         or  string.format(L["SB_COPY_MOVE_MULTI_ONE_FMT"], #noteIDs)
-    if f.SetTitle then
-        f:SetTitle(cmTitle)
-    elseif f._titleLbl then
-        f._titleLbl:SetText(cmTitle)
-    end
+    f:SetWindowTitle(cmTitle)
 
     -- Rebuild scroll child
     local sc = f._scrollChild
@@ -1154,12 +975,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     if not scopeSet["global"] then
         dests[#dests + 1] = { key = "global", label = L["SB_GLOBAL_NOTES"] }
     end
-    for charKey, rec in pairs(db.knownChars or {}) do
-        local slotKey = "char:" .. charKey
-        if not scopeSet[slotKey] then
-            dests[#dests + 1] = { key = slotKey, label = rec.name or charKey }
-        end
-    end
+    AddCharDests(dests, function(slotKey) return scopeSet[slotKey] end)
     table.sort(dests, function(a, b) return a.label < b.label end)
 
     if #dests == 0 then

@@ -14,8 +14,8 @@
 --                             dialog's own key); toggles.
 --                             anchor = the window to sit beside, top aligned
 --                             (as IconFramePicker). h = {
---                               owner = "noteConfig" / "newNote" / "insertIcon":
---                                     the window that opened the picker,
+--                               owner = "noteConfig" / "newNote" / "insertIcon" /
+--                                     "sidebar": the window that opened the picker,
 --                               get = fn() -> current icon path / file id or nil,
 --                               set = fn(icon, source)  icon nil = no icon;
 --                                     source "curated" (catalog) / "blizzard",
@@ -23,6 +23,12 @@
 --                                     race portraits are left out ({icon} markup
 --                                     reads names under Interface\Icons),
 --                               strata = frame strata, nil = "DIALOG",
+--                               startSide = side list id to open on while the
+--                                     current icon is in no catalog category,
+--                               defaultNone = true: Use Default clears the icon
+--                                     (the owner draws its own default; the
+--                                     sidebar's class icon, ALL-243), nil = a
+--                                     random note icon,
 --                             }
 --   IP.Rebind(key, h)         another note in the same window; does nothing
 --                             while the picker belongs to another owner
@@ -199,7 +205,7 @@ local function EntryIcon(i)
 end
 
 local function SameIcon(a, b)
-    if a == nil or b == nil then return false end
+    if a == nil or b == nil then return a == b end   -- no icon = no icon (Revert)
     if type(a) == "string" and type(b) == "string" then return a:lower() == b:lower() end
     return a == b
 end
@@ -349,7 +355,8 @@ local function ScrollToCurrent()
     end
 end
 
--- Opens on the category holding the current icon, scrolled to it
+-- Opens on the category holding the current icon, scrolled to it; else on
+-- h.startSide when given, else on the side last used
 local function ShowCurrent()
     local cur = _h and _h.get()
     local cat = type(cur) == "string" and BNB.ICON_CATEGORY and BNB.ICON_CATEGORY[cur]
@@ -357,6 +364,8 @@ local function ShowCurrent()
         for _, s in ipairs(SIDES) do
             for _, k in ipairs(s.cats or {}) do if k == cat then _side = s.id end end
         end
+    elseif _h and _h.startSide and SideDef(_h.startSide) then
+        _side = _h.startSide
     end
     ScrollToCurrent()
 end
@@ -402,8 +411,10 @@ local function Build()
         b:ClearAllPoints()
         b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + (i - 1) * (bW + 8), 6)
     end
-    -- Use Default: a random note icon, as Note Settings always did
+    -- Use Default: a random note icon, as Note Settings always did; no icon
+    -- for an owner with its own default (h.defaultNone)
     defBtn:SetScript("OnClick", function()
+        if _h and _h.defaultNone then Pick(nil); return end
         local notes = BNB.IconsIn("notes")
         if #notes > 0 then Pick(notes[math.random(#notes)], "curated") end
     end)

@@ -43,6 +43,15 @@ local SKIN = { h = 30, tuck = 8, w = 150, minW = 80, gap = 0, x = 8,
     iconSz = 18, iconX = 13, iconY = 0, border = 1, textGap = 5, textY = 0,
     rightPad = 14, dim = 0.5, font = "GameFontHighlight",
     pinSz = 14, pinX = -7, pinY = -6 }
+-- Forever skin (Dukul's /bnbtabs Export, 2026-10-04): taller, wider tabs with
+-- a gap between them, a smaller icon and small text. The test adds half the
+-- tuck to iconY / textY; these are the results (-2.5 + 3, -3 + 3)
+if BNB.IsForever then
+    for k, v in pairs({ h = 32, tuck = 6, w = 190, minW = 90, gap = 5,
+        iconSz = 16, iconY = 0.5, textY = 0, font = "GameFontHighlightSmall" }) do
+        SKIN[k] = v
+    end
+end
 -- More tabs than fit at w: they share the width, and icon, spacing and text
 -- shrink with it (Dukul, 2026-10-04): icon and spacing by w / S.w down to
 -- MIN_SCALE, the text down to MIN_TEXT_SCALE. Below minW the last tabs drop out.
@@ -259,7 +268,7 @@ local function MakeTab(parent)
                 -- tick is needed; hover = the tab's own right-click entries (Dukul)
                 for _, k in ipairs(self._moreKeys) do
                     local row = root:CreateButton(MenuLabel(k), function() Pick(k) end)
-                    SB._kit.AddSlotMenuEntries(row, k, self)
+                    SB._kit.AddSlotMenuEntries(row, k)
                 end
             end)
         elseif mouseBtn == "RightButton" then

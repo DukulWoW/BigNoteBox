@@ -32,7 +32,6 @@ function BNB.OpenImgDialog(insertFn)
 
     -- ── Build frame lazily ────────────────────────────────────────────────────
     if not _imgDialog then
-        local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
         local DW    = 320
         local DPAD  = 14
         local TITLE_H = 28
@@ -41,54 +40,12 @@ function BNB.OpenImgDialog(insertFn)
         -- We accumulate curY top-down, then set DH from the final curY.
         local curY = -(TITLE_H + 10)  -- start just below title bar
 
-        local f
-        if skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBImgTagDialog", false)
-        else
-            f = CreateFrame("Frame", "BNBImgTagDialog", UIParent, "ButtonFrameTemplate")
-            ButtonFrameTemplate_HidePortrait(f)
-            ButtonFrameTemplate_HideButtonBar(f)
-            if f.Inset then f.Inset:Hide() end
-            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        end
-        -- Size set after layout is computed
+        -- Chrome from the shared builder (CMP-02); size set after layout is computed
+        local f = BNB.CreateToolWindow({
+            name = "BNBImgTagDialog", w = DW, h = 1, title = L["NE_INSERT_IMAGE_TITLE"],
+            toplevel = true, escClose = true, keyEsc = true,
+        })
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-        f:SetToplevel(true)
-        f:SetMovable(true)
-        f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        f:SetFrameStrata("DIALOG")
-        f:SetClampedToScreen(true)
-        tinsert(UISpecialFrames, "BNBImgTagDialog")
-
-        -- Title bar (skin mode: custom strip; normal mode: ButtonFrameTemplate provides it)
-        if skinMode and BNB.CreateSkinStrip then
-            local titleBar = BNB.CreateSkinStrip(f, true, false)
-            titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            titleBar:SetHeight(TITLE_H)
-            titleBar:EnableMouse(true)
-            titleBar:RegisterForDrag("LeftButton")
-            titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-            titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-            local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText(L["NE_INSERT_IMAGE_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
-            local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-            closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        else
-            f:SetTitle(L["NE_INSERT_IMAGE_TITLE"])
-            if f.CloseButton then
-                f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-            end
-        end
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-        BNB.AttachEscClose(f, f.Hide)
 
         -- ── Layout helpers ────────────────────────────────────────────────────
         local INNER_W = DW - DPAD * 2  -- usable width between left/right padding
@@ -364,54 +321,15 @@ function BNB.OpenLnkDialog(insertFn)
     if not insertFn then return end
 
     if not _lnkDialog then
-        local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
         local DW, DH = 320, 180
         local DPAD    = 14
         local TITLE_H = 28
 
-        local f
-        if skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBLnkTagDialog", false)
-        else
-            f = CreateFrame("Frame", "BNBLnkTagDialog", UIParent, "ButtonFrameTemplate")
-            ButtonFrameTemplate_HidePortrait(f)
-            ButtonFrameTemplate_HideButtonBar(f)
-            if f.Inset then f.Inset:Hide() end
-            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        end
-        f:SetSize(DW, DH)
+        local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
+            name = "BNBLnkTagDialog", w = DW, h = DH, title = L["NE_INSERT_LINK_TITLE"],
+            toplevel = true, escClose = true, keyEsc = true,
+        })
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-        f:SetToplevel(true); f:SetMovable(true); f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        f:SetFrameStrata("DIALOG"); f:SetClampedToScreen(true)
-        tinsert(UISpecialFrames, "BNBLnkTagDialog")
-
-        if skinMode and BNB.CreateSkinStrip then
-            local titleBar = BNB.CreateSkinStrip(f, true, false)
-            titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            titleBar:SetHeight(TITLE_H)
-            titleBar:EnableMouse(true); titleBar:RegisterForDrag("LeftButton")
-            titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-            titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-            local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText(L["NE_INSERT_LINK_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
-            local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-            closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        else
-            f:SetTitle(L["NE_INSERT_LINK_TITLE"])
-            if f.CloseButton then
-                f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-            end
-        end
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-        BNB.AttachEscClose(f, f.Hide)
 
         local INNER_W = DW - DPAD * 2
         local curY = -(TITLE_H + 10)
@@ -497,7 +415,6 @@ function BNB.OpenIcoDialog(insertFn)
     if not insertFn then return end
 
     if not _icoDialog then
-        local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
         local DW        = 320
         local DPAD      = 12
         local TITLE_H   = 28
@@ -512,57 +429,13 @@ function BNB.OpenIcoDialog(insertFn)
         local DH = TOP + PICK_H + 10 + PREV_SIZE + 12 + ROW_H + 10 + ALIGN_H + 12
             + BTN_H + DPAD
 
-        local f
-        if skinMode and BNB.CreateSkinFrame then
-            f = BNB.CreateSkinFrame(UIParent, false, "BNBIcoTagDialog", false)
-        else
-            f = CreateFrame("Frame", "BNBIcoTagDialog", UIParent, "ButtonFrameTemplate")
-            ButtonFrameTemplate_HidePortrait(f)
-            ButtonFrameTemplate_HideButtonBar(f)
-            if f.Inset then f.Inset:Hide() end
-            BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        end
-        f:SetSize(DW, DH)
+        local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
+            name = "BNBIcoTagDialog", w = DW, h = DH, title = L["NE_INSERT_ICON_TITLE"],
+            toplevel = true, escClose = true, keyEsc = true,
+            -- The picker belongs to this dialog while it is open
+            onHide = function() BNB.IconPicker.Close(ICO_PICKER_KEY) end,
+        })
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-        f:SetToplevel(true); f:SetMovable(true); f:EnableMouse(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-        f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-        f:SetFrameStrata("DIALOG"); f:SetClampedToScreen(true)
-        tinsert(UISpecialFrames, "BNBIcoTagDialog")
-
-        -- Title bar
-        if skinMode and BNB.CreateSkinStrip then
-            local titleBar = BNB.CreateSkinStrip(f, true, false)
-            titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-            titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-            titleBar:SetHeight(TITLE_H)
-            titleBar:EnableMouse(true); titleBar:RegisterForDrag("LeftButton")
-            titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-            titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-            local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            titleLbl:SetPoint("CENTER", titleBar, "CENTER", -10, 0)
-            titleLbl:SetText(L["NE_INSERT_ICON_TITLE"]); titleLbl:SetTextColor(1, 0.82, 0)
-
-            local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-            closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        else
-            -- Normal mode: use ButtonFrameTemplate's built-in title and close button
-            if f.TitleText then
-                f.TitleText:SetText(L["NE_INSERT_ICON_TITLE"])
-            end
-            if f.CloseButton then
-                f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-            end
-        end
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-        -- The picker belongs to this dialog while it is open
-        f:HookScript("OnHide", function() BNB.IconPicker.Close(ICO_PICKER_KEY) end)
-        BNB.AttachEscClose(f, f.Hide)
 
         -- ── Shared state ──────────────────────────────────────────────────────
         local selIcon = nil   -- the picked icon: game path or file id

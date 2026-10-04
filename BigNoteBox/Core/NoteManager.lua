@@ -622,6 +622,20 @@ function BNB.PurgeTrashed(ids)
     BNB.SendMessage("TrashChanged")
 end
 
+-- A removed character's trashed notes go where its live notes went, so a
+-- restore lands on a character that still exists; its situation counters go
+-- too (ALL-249, UI/CharacterRemove.lua)
+function BNB.RescopeTrash(fromScope, toScope, charKey)
+    local trash = NDB() and NDB().trash
+    if not trash then return end
+    local changed = false
+    for _, note in pairs(trash) do
+        if note.scope == fromScope then note.scope = toScope; changed = true end
+        if charKey and note.contextSeen then note.contextSeen[charKey] = nil end
+    end
+    if changed then BNB.SendMessage("TrashChanged") end
+end
+
 --------------------------------------------------------------------------------
 -- EMPTY TRASH  (permanently delete everything in trash)
 --------------------------------------------------------------------------------
