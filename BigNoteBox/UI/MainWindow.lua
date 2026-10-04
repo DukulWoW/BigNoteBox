@@ -967,8 +967,10 @@ function BNB.CreateMainWindow()
 
     -- Sidebar width (BTN_SZ in Sidebar.lua = 64) subtracted when sidebar is visible
     -- so the label shows the notepad window size, not including the sidebar strip.
+    -- (none for the top tabs, ALL-248)
     local function SidebarW()
-        return (BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled()) and 64 or 0
+        local top = BigNoteBoxDB and BigNoteBoxDB.sidebarSide == "top"
+        return (not top and BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled()) and 64 or 0
     end
     -- Label text is the current size; it sits 14px right of and 4px below the cursor
     local function UpdateSizeLabel()

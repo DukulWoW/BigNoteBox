@@ -801,7 +801,19 @@ local function BuildSidebarPage(sf, ct, y, page)
     autoSwLbl:SetText(L["CFG_SIDEBAR_AUTOSWITCH_LABEL"])
     subY = subY - (ROW_H + ROW_GAP)
 
-    -- Side dropdown (Left / Right)
+    -- Start position and small icons mean nothing for the top tabs: greyed
+    -- while Top is chosen (Dukul, ALL-248)
+    local posDD, posLbl, smallCb, smallLbl
+    local function SyncTopGrey()
+        local top = (db.sidebarSide or BNB.DEFAULTS.sidebarSide) == "top"
+        local v = top and 0.5 or 1
+        if posDD then posDD:SetEnabled(not top) end
+        if smallCb then smallCb:SetEnabled(not top) end
+        if posLbl then posLbl:SetAlpha(v) end
+        if smallLbl then smallLbl:SetAlpha(v) end
+    end
+
+    -- Side dropdown (Top / Right / Left)
     do
         local sideLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         sideLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
@@ -810,6 +822,7 @@ local function BuildSidebarPage(sf, ct, y, page)
         subY = subY - (ROW_H + 2)
 
         local SIDE_ITEMS = {
+            { key = "top",   label = L["CFG_SIDEBAR_SIDE_TOP"] },
             { key = "right", label = L["CFG_SIDEBAR_SIDE_RIGHT"] },
             { key = "left",  label = L["CFG_SIDEBAR_SIDE_LEFT"] },
         }
@@ -825,6 +838,7 @@ local function BuildSidebarPage(sf, ct, y, page)
                         curSide = item.key
                         db.sidebarSide = item.key
                         sideDD:GenerateMenu()
+                        SyncTopGrey()
                         if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
                     end)
             end
@@ -841,7 +855,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Position dropdown (Top / Bottom)
     do
-        local posLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        posLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         posLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         posLbl:SetHeight(ROW_H); posLbl:SetJustifyH("LEFT")
         posLbl:SetText(L["CFG_SIDEBAR_STARTPOS_LABEL"])
@@ -852,7 +866,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             { key = true,  label = L["CFG_SIDEBAR_POS_BOTTOM"] },
         }
         local curBottom = db.sidebarAtBottom == true
-        local posDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
+        posDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
         posDD:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         posDD:SetWidth(CONTENT_W)
         posDD:SetupMenu(function(_, root)
@@ -879,7 +893,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Small icons toggle
     do
-        local smallCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
+        smallCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
         smallCb:SetSize(24, 24)
         smallCb:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", -2, subY + 2)
         smallCb:SetChecked(db.sidebarSmallIcons == true)
@@ -893,13 +907,14 @@ local function BuildSidebarPage(sf, ct, y, page)
             GameTooltip:Show()
         end)
         smallCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        local smallLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        smallLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         smallLbl:SetPoint("LEFT",  smallCb, "RIGHT", 4, 0)
         smallLbl:SetPoint("RIGHT", sidebarSub, "RIGHT", 0, 0)
         smallLbl:SetJustifyH("LEFT"); smallLbl:SetHeight(ROW_H)
         smallLbl:SetText(L["CFG_SIDEBAR_SMALLICONS_LABEL"])
         subY = subY - (ROW_H + ROW_GAP)
     end
+    SyncTopGrey()
 
     -- Description text
     local descLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

@@ -1813,7 +1813,8 @@ end
 -- every drag (probed 2026-10-03: one CENTER anchor on UIParent, height well
 -- inside the screen, and the jump stayed with the screen clamp off and with
 -- IsUserPlaced cleared). Same idea as StartGripSizing: pin TOPLEFT, follow the
--- pointer's movement, keep the window on screen when it is clamped.
+-- pointer's movement, keep the window on screen when it is clamped. The clamp
+-- honours SetClampRectInsets (the top sidebar tabs add theirs, ALL-248).
 -- Call StartDragMoving from OnDragStart and StopDragMoving from OnDragStop.
 function BNB.StartDragMoving(f)
     local left, top = f:GetLeft(), f:GetTop()
@@ -1829,6 +1830,9 @@ function BNB.StartDragMoving(f)
     local screenW = UIParent:GetWidth()  * us / s
     local screenH = UIParent:GetHeight() * us / s
     local clamp   = f:IsClampedToScreen()
+    -- Positive top / right and negative left / bottom insets reach outside the frame
+    local il, ir, it, ib = f:GetClampRectInsets()
+    il, ir, it, ib = il or 0, ir or 0, it or 0, ib or 0
 
     local drv = f._dragDriver or CreateFrame("Frame")
     f._dragDriver = drv
@@ -1838,8 +1842,8 @@ function BNB.StartDragMoving(f)
         local l = left + (x - cx) / s
         local t = top  + (y - cy) / s
         if clamp then
-            l = math.min(math.max(l, 0), math.max(0, screenW - w))
-            t = math.max(math.min(t, screenH), math.min(h, screenH))
+            l = math.min(math.max(l, -il), math.max(-il, screenW - w - ir))
+            t = math.max(math.min(t, screenH - it), math.min(h - ib, screenH - it))
         end
         f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", l, t)
     end)

@@ -963,6 +963,7 @@ local function BuildPage4(content)
     sideDD, sideY = MakeDropdown(ct, y, CW - 16, function(_, root)
         local cur = (BigNoteBoxDB and BigNoteBoxDB.sidebarSide) or BNB.DEFAULTS.sidebarSide
         local items = {
+            { key="top",   label=L["SW_SIDEBAR_TOP"] },
             { key="right", label=L["SW_SIDEBAR_RIGHT"] },
             { key="left",  label=L["SW_SIDEBAR_LEFT"] },
         }

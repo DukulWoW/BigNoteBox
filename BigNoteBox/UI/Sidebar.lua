@@ -24,6 +24,10 @@
 --   BNB.Sidebar.SetActive(key)
 --   BNB.Sidebar.GetActive()
 --   BNB.Sidebar.IsEnabled()
+--
+-- sidebarSide = "top" draws the same slots as long tabs on top of the main
+-- window instead (UI/SidebarTabs.lua, ALL-248); it reads the helpers below
+-- through SB._kit.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -228,7 +232,9 @@ end
 --------------------------------------------------------------------------------
 -- Build ordered slot key list from DB state + available height
 --------------------------------------------------------------------------------
-local function GetVisibleKeys(availH)
+-- maxTotal: slot cap (the top tabs pass math.huge and fit by width themselves);
+-- nil = as many as availH holds
+local function GetVisibleKeys(availH, maxTotal)
     local db = BigNoteBoxDB
     if not db then return { "all", "global" } end
 
@@ -241,7 +247,9 @@ local function GetVisibleKeys(availH)
     -- Collect known chars
     local chars = db.knownChars or {}
 
-    -- Separate pinned (sorted by pinnedOrder) and unpinned (sorted by lastSeen desc)
+    -- Separate pinned (sorted by pinnedOrder) and unpinned (most recent first:
+    -- the later of the last login, lastSeen, and the last pick on the top tabs,
+    -- tabPicked, which moves a character to the front, ALL-248)
     local pinned, recent = {}, {}
     for charKey, rec in pairs(chars) do
         if not rec.slotHidden then
@@ -259,7 +267,9 @@ local function GetVisibleKeys(availH)
         return ao < bo
     end)
     table.sort(recent, function(a, b)
-        return (a.rec.lastSeen or 0) > (b.rec.lastSeen or 0)
+        local at = math.max(a.rec.lastSeen or 0, a.rec.tabPicked or 0)
+        local bt = math.max(b.rec.lastSeen or 0, b.rec.tabPicked or 0)
+        return at > bt
     end)
 
     -- Cap pinned at MAX_PINNED
@@ -269,7 +279,7 @@ local function GetVisibleKeys(availH)
     end
 
     -- Fit as many recent as available height allows
-    local maxTotal = math.floor(availH / step)
+    maxTotal = maxTotal or math.floor(availH / step)
     for _, r in ipairs(recent) do
         if slotsUsed >= maxTotal then break end
         keys[#keys + 1] = r.key
@@ -533,19 +543,23 @@ end
 
 -- Right-click context menu for character slots
 --------------------------------------------------------------------------------
-local function ShowSlotContextMenu(key, btn)
+-- The character entries on `root` (a menu or a sub-menu row; the top tabs'
+-- "..." menu adds them under each character, ALL-248). Returns false for All /
+-- Global or an unknown character, which have no entries.
+local function AddSlotMenuEntries(root, key, btn)
     local db = BigNoteBoxDB
-    if not db then return end
+    if not db then return false end
     local charKey = key:match("^char:(.+)$")
-    if not charKey then return end  -- All and Global have no context menu
+    if not charKey then return false end  -- All and Global have no context menu
 
     local rec = db.knownChars and db.knownChars[charKey]
-    if not rec then return end
+    if not rec then return false end
 
-    BNB.ContextMenu.Open(btn, function(root)   -- ALL-148
+    do
         -- Pin / Unpin
         root:CreateButton(
-            rec.slotPinned and L["SB_UNPIN"] or L["SB_PIN_TO_TOP"],
+            -- The top tabs pin to the front, not the top (ALL-248)
+            rec.slotPinned and L["SB_UNPIN"] or L[db.sidebarSide == "top" and "SB_PIN_TO_FRONT" or "SB_PIN_TO_TOP"],
             function()
                 if rec.slotPinned then
                     rec.slotPinned  = false
@@ -591,8 +605,25 @@ local function ShowSlotContextMenu(key, btn)
                 if BNB.RefreshNoteList then BNB.RefreshNoteList() end
             end)
         end
+    end
+    return true
+end
+
+local function ShowSlotContextMenu(key, btn)
+    local ck = key:match("^char:(.+)$")
+    local db = BigNoteBoxDB
+    if not (ck and db and db.knownChars and db.knownChars[ck]) then return end
+    BNB.ContextMenu.Open(btn, function(root)   -- ALL-148
+        AddSlotMenuEntries(root, key, btn)
     end)
 end
+
+-- Shared with the top tabs (UI/SidebarTabs.lua, ALL-248)
+SB._kit = {
+    CountForKey = CountForKey, TooltipForKey = TooltipForKey,
+    GetVisibleKeys = GetVisibleKeys, ShowSlotContextMenu = ShowSlotContextMenu,
+    AddSlotMenuEntries = AddSlotMenuEntries,
+}
 
 --------------------------------------------------------------------------------
 -- SetActive — change the active filter
@@ -609,6 +640,7 @@ function SB.SetActive(key)
             ApplyActiveState(w, k == _activeKey)
         end
     end
+    if SB.PaintTop then SB.PaintTop() end
 
     -- Trigger note list refresh
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
@@ -621,12 +653,21 @@ end
 --------------------------------------------------------------------------------
 -- Refresh — rebuild visible slot buttons from current DB state
 --------------------------------------------------------------------------------
+-- If active key is no longer in the visible list, reset to "all"
+local function EnsureActiveVisible(keys)
+    for _, k in ipairs(keys) do
+        if k == _activeKey then return end
+    end
+    SB.SetActive("all")
+end
+
 function SB.Refresh()
     if not _strip then return end
 
     -- Show/hide strip based on feature toggle and collapsed state
     if not IsEnabled() or (BigNoteBoxDB and BigNoteBoxDB.sidebarCollapsed) then
         _strip:Hide()
+        if SB.HideTop then SB.HideTop() end
         return
     end
 
@@ -634,6 +675,15 @@ function SB.Refresh()
     local db   = BigNoteBoxDB
     local side = (db and db.sidebarSide) or BNB.DEFAULTS.sidebarSide
     local parent = _strip:GetParent()
+
+    -- Top: long tabs on the main window instead of this strip (ALL-248)
+    if side == "top" and SB.RefreshTop then
+        _strip:Hide()
+        _builtKeys = {}
+        EnsureActiveVisible(SB.RefreshTop(parent))
+        return
+    end
+    if SB.HideTop then SB.HideTop() end
 
     -- FOR-15: Forever normal mode gets its own measured offsets and draws
     -- below the main window so its border overlaps the strip cleanly.
@@ -756,14 +806,7 @@ function SB.Refresh()
         w.btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     end
 
-    -- If active key is no longer in the visible list, reset to "all"
-    local activeVisible = false
-    for _, k in ipairs(keys) do
-        if k == _activeKey then activeVisible = true; break end
-    end
-    if not activeVisible then
-        SB.SetActive("all")
-    end
+    EnsureActiveVisible(keys)
 end
 
 --------------------------------------------------------------------------------

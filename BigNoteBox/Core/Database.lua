@@ -236,10 +236,13 @@ BNB.DEFAULTS = {
     -- sidebarEnabled:    master toggle
     -- sidebarAutoSwitch: switch to the logged-in character's slot on login
     -- sidebarActiveKey:  active filter ("all", "global", "char:Name-Realm")
+    -- sidebarSide:       "top" (long tabs, UI/SidebarTabs.lua) / "right" / "left".
+    --                    "top" since ALL-248; only new installs get it, everyone
+    --                    else already has "right" saved (Dukul, 2026-10-04)
     sidebarEnabled    = false,
     sidebarAutoSwitch = false,
     sidebarActiveKey  = "all",
-    sidebarSide       = "right",
+    sidebarSide       = "top",
     sidebarAtBottom   = false,
     sidebarSmallIcons = false,
 

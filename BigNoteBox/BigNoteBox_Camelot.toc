@@ -100,6 +100,7 @@ UI\NoteConfig.lua
 UI\ReferenceBox.lua
 UI\ReferenceBoxTasks.lua
 UI\Sidebar.lua
+UI\SidebarTabs.lua
 UI\HistoryWindow.lua
 UI\NoteHistoryPanel.lua
 UI\HistoryCompareWindow.lua
