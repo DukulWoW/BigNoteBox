@@ -1,14 +1,14 @@
 -- BigNoteBox UI/BlizzardIconList.lua
 --
 -- Loader for the Blizzard icon name list (~32k names) used by the icon
--- autocomplete (UI/IconsAC.lua). The list itself lives in the load-on-demand
+-- picker (UI/IconPicker.lua, "All game icons"). The list itself lives in the load-on-demand
 -- addon BigNoteBox_Icons (ALL-62), so WoW never reads its 1.2 MB at login:
 -- it is loaded once, at PLAYER_LOGIN or when the setting is switched on, and
 -- only while db.blizzardIconComplete is true.
 --
 -- BNB.BlizzardIconList is the list, or nil. Every reader already treats nil as
 -- "feature off", so a missing, disabled or broken BigNoteBox_Icons folder only
--- turns the autocomplete off: no Lua error, no popup, nothing at login. A chat
+-- turns the full game list off: no Lua error, no popup, nothing at login. A chat
 -- line explains it only when the player switches the setting on.
 -- The saved setting is never rewritten, so fixing the folder later just works.
 
