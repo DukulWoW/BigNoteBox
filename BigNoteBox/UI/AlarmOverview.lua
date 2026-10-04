@@ -379,30 +379,19 @@ end
 local function BuildOverview()
     if _ovFrame then return _ovFrame end
 
-    -- Use ButtonFrameTemplate to match TrashWindow/TagManager visual style
-    local f = CreateFrame("Frame", "BNBAlarmOverviewFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(OV_W, OV_H)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:SetMovable(true); f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["MW_ALARM_TIP"])
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-    end
+    -- One body for both modes (CMP-02 S3): chrome, footer divider, drag, ESC
+    -- entry and Forever glow come from CreateToolWindow
+    local f = BNB.CreateToolWindow({
+        name = "BNBAlarmOverviewFrame", w = OV_W, h = OV_H,
+        title = L["MW_ALARM_TIP"], strata = "HIGH", toplevel = true, escClose = true,
+        pad = OV_PAD, footH = OV_FOOT_H,
+    })
+    _ovFootDiv = f._footDiv   -- hidden while there are no alarms
+    local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or OV_TITLE_H
 
     -- Scroll frame — bottom raised to leave room for footer strip
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     OV_PAD, -(OV_TITLE_H + 4))
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     OV_PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, OV_FOOT_H + OV_PAD)
 
     -- Hide scrollbar when not needed (alpha only - never Show/Hide ScrollFrameTemplate)
@@ -419,13 +408,6 @@ local function BuildOverview()
     sf:SetScrollChild(ct)
 
     -- ── Footer strip ──────────────────────────────────────────────────────────
-    local footDiv = f:CreateTexture(nil, "ARTWORK")
-    footDiv:SetHeight(1)
-    footDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  OV_PAD, OV_FOOT_H)
-    footDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -OV_PAD, OV_FOOT_H)
-    footDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
-    _ovFootDiv = footDiv
-
     local BW1 = OV_W - OV_PAD * 2
     local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
 
@@ -471,137 +453,11 @@ local function BuildOverview()
 
     f:HookScript("OnHide", function() SetOvMultiMode(false) end)
 
-    f:Hide()
-    tinsert(UISpecialFrames, "BNBAlarmOverviewFrame")
     _ovFrame = f
     return f
 end
 
--- ---------------------------------------------------------------------------
--- BUILD OVERVIEW  (SKIN VERSION)
--- ---------------------------------------------------------------------------
-local SK_OV_TITLE_H = 28
-
-local function BuildOverviewSkin()
-    if _ovFrame then return _ovFrame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BNBAlarmOverviewFrame", false)
-    _G["BNBAlarmOverviewFrame"] = f
-    f:SetSize(OV_W, OV_H)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:SetMovable(true); f:SetClampedToScreen(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    -- Title strip
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_OV_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["MW_ALARM_TIP"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- Scroll frame
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     OV_PAD, -(SK_OV_TITLE_H + 4))
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, OV_FOOT_H + OV_PAD)
-
-    if sf.ScrollBar then
-        sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-        end)
-    end
-
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(OV_CONTENT_W)
-    ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    -- Footer divider (host frame avoids backdrop overdraw)
-    local footHost = CreateFrame("Frame", nil, f)
-    footHost:SetHeight(1)
-    footHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  OV_PAD, OV_FOOT_H)
-    footHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -OV_PAD, OV_FOOT_H)
-    local footDiv = BNB.CreateDivider(footHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
-    footDiv:SetPoint("TOPLEFT",  footHost, "TOPLEFT",  0, 0)
-    footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
-    _ovFootDiv = footHost   -- hide the host to hide the divider
-
-    local BW1 = OV_W - OV_PAD * 2
-    local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
-
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], BW1, 26)
-    selectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
-    selectBtn:SetScript("OnClick", function() SetOvMultiMode(not _ovMultiMode) end)
-    _ovSelectBtn = selectBtn
-
-    local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], BW3, 26)
-    selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
-    selectAllBtn:Hide()
-    selectAllBtn:SetScript("OnClick", function()
-        local ndb = BNB.NotesDB()
-        if ndb and ndb.notes then
-            for noteID, note in pairs(ndb.notes) do
-                if note.alarm then _ovMultiSel[noteID] = true end
-            end
-        end
-        UpdateOvDeleteLabel()
-        if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then
-            BNB.AlarmOverview.Refresh()
-        end
-    end)
-    _ovSelectAllBtn = selectAllBtn
-
-    local deleteSelBtn = BNB.CreateButton(nil, f, string.format(L["AO_DELETE_FMT"], 0), BW3, 26)
-    deleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + (BW3 + 6) * 2, 14)
-    deleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
-    deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:Hide()
-    deleteSelBtn:SetScript("OnClick", function()
-        for noteID in pairs(_ovMultiSel) do
-            if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(noteID) end
-        end
-        SetOvMultiMode(false)
-    end)
-    _ovDeleteSelBtn = deleteSelBtn
-
-    f._scrollContent = ct
-    f._rowPool       = {}
-
-    f:HookScript("OnHide", function() SetOvMultiMode(false) end)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    f:Hide()
-    tinsert(UISpecialFrames, "BNBAlarmOverviewFrame")
-    _ovFrame = f
-    return f
-end
-
-local function GetOrBuildOverview()
-    if _ovFrame then return _ovFrame end
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        return BuildOverviewSkin()
-    else
-        return BuildOverview()
-    end
-end
-
+local GetOrBuildOverview = BuildOverview
 -- Row layout matches HistoryWindow: 36px icon left, title + label text,
 -- date/time bottom-right, separator line at bottom.
 local OV_ICON_SZ   = 36

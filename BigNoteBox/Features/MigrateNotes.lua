@@ -1087,13 +1087,18 @@ end
 
 -- ── Per-addon confirm popup (from Advanced tab) ───────────────────────────────
 local _addonPopup
+local _addonPopups = {}   -- built once per add-on key: WoW never frees a frame
 
 function M.ShowAddonPopup(key)
     if _addonPopup then _addonPopup:Hide() end
+    local f = _addonPopups[key]
+    if f then
+        f._reset(); _addonPopup = f; f:Show(); return
+    end
 
     local name = ADDON_NAMES[key] or key
-    -- Shared chrome (CMP-02); still a new frame per call, as before
-    local f = BNB.CreateToolWindow({
+    -- Shared chrome (CMP-02)
+    f = BNB.CreateToolWindow({
         w = 360, h = 200, title = string.format(L["MIG_MIGRATE_ADDON_FMT"], name),
         toplevel = true,
     })
@@ -1113,8 +1118,9 @@ function M.ShowAddonPopup(key)
 
     -- TakeANote sub-option
     local sel = { [key] = true, takeANoteCategoryTags = false }
+    local catCb
     if key == "TakeANote" then
-        local catCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        catCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         catCb:SetSize(24, 24)
         catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD - 2, y + 2)
         catCb:SetChecked(false)
@@ -1161,21 +1167,33 @@ function M.ShowAddonPopup(key)
     -- Resize to fit
     f:SetHeight(math.abs(y) + 24 + PAD + 24 + PAD)
 
+    -- Back to the opening state on every later show
+    f._reset = function()
+        sel.takeANoteCategoryTags = false
+        if catCb then catCb:SetChecked(false) end
+    end
+    _addonPopups[key] = f
     _addonPopup = f
     f:Show()
 end
 
 -- ── Login popup ───────────────────────────────────────────────────────────────
 local _popup
+local _popups = {}   -- built once per set of detected add-ons (WoW never frees a frame)
 
 function M.ShowPopup()
     local available = M.DetectAvailable()
     if #available == 0 then return end
 
     if _popup then _popup:Hide() end
+    local sig = table.concat(available, ",")
+    local f = _popups[sig]
+    if f then
+        f._reset(); _popup = f; f:Show(); return
+    end
 
     -- Window: shared chrome (CMP-02); height set at end
-    local f = BNB.CreateToolWindow({
+    f = BNB.CreateToolWindow({
         name = "BNBMigratePopupFrame", w = WIN_W, h = 100, title = L["MIG_POPUP_TITLE"],
         toplevel = true, escClose = true,
     })
@@ -1253,6 +1271,7 @@ function M.ShowPopup()
     local sel            = {}
     local declinedCbs    = {}  -- "don't ask again" checkboxes
     local addonCbs       = {}
+    local catCbs         = {}  -- TakeANote's category-tags checkbox
     local migrateBtn     -- forward ref
     local previewBtn     -- forward ref
 
@@ -1316,6 +1335,7 @@ function M.ShowPopup()
             catCb:SetScript("OnClick", function(self)
                 sel.takeANoteCategoryTags = self:GetChecked() and true or false
             end)
+            catCbs[k] = catCb
             y = y - 26
         end
 
@@ -1415,6 +1435,19 @@ function M.ShowPopup()
     local maxH = math.floor(UIParent:GetHeight() * 0.9)
     f:SetHeight(math.min(headerH + contentH + FOOT_H, maxH))
 
+    -- Back to the opening state on every later show: nothing ticked, the
+    -- buttons greyed (the add-on checkbox's own click handler does the rest)
+    f._reset = function()
+        for _, k in ipairs(available) do
+            if catCbs[k] then catCbs[k]:SetChecked(false) end
+            sel.takeANoteCategoryTags = false
+            addonCbs[k]:SetChecked(false)
+            addonCbs[k]:GetScript("OnClick")(addonCbs[k])
+            declinedCbs[k]:SetChecked(false)
+        end
+        sf:SetVerticalScroll(0)
+    end
+    _popups[sig] = f
     _popup = f
     f:Show()
 end

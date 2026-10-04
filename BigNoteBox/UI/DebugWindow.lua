@@ -17,15 +17,13 @@
 --   * One-shot tool buttons (toast, wizard, seed data) act at once, but only while
 --     the staged master checkbox is on.
 --   * A warning paragraph is always visible at the top.
---   Normal mode: ButtonFrameTemplate. Skin mode: a skin frame with its own title
---   strip, like UI/ToolWindow.lua (ALL-79, Dukul 2026-09-26).
+--   Built with BNB.CreateToolWindow, both modes (ALL-79, CMP-02 S3).
 
 local BNB = BigNoteBox
 local L = BNB.L
 BNB.DebugWindow = BNB.DebugWindow or {}
 local DW = BNB.DebugWindow
 
-local SK_TITLE_H   = 28   -- skin title strip height
 local WIN_W, WIN_H = 400, 508
 local PAD          = 20
 local ROW_H        = 26
@@ -73,56 +71,14 @@ end
 local function BuildWindow()
     if _frame then return _frame end
 
-    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f
-    if skin then
-        f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxDebugFrame", false)
-    else
-        f = CreateFrame("Frame", "BigNoteBoxDebugFrame", UIParent, "ButtonFrameTemplate")
-    end
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetFrameStrata("DIALOG")
-    f:SetSize(WIN_W, WIN_H)
+    -- Chrome for both modes (CMP-02 S3); the X is Cancel
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxDebugFrame", w = WIN_W, h = WIN_H,
+        title = L["DEV_WIN_TITLE"], toplevel = true, escClose = true,
+        onClose = function() DW.Close() end,
+    })
+    local skin = f._isSkin
     f:SetPoint("CENTER")
-
-    if skin then
-        -- Skin title strip, same build as UI/ToolWindow.lua (ALL-79)
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_TITLE_H)
-        titleBar:EnableMouse(true)
-        titleBar:RegisterForDrag("LeftButton")
-        titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-        titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["DEV_WIN_TITLE"])
-
-        -- X = Cancel
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() DW.Close() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-        -- Preset recolour runs in the OnShow handler at the bottom (SetScript there)
-    else
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)
-        f._forGlow = BNB.AddForeverGlow(f, f.Bg)
-        f:SetTitle(L["DEV_WIN_TITLE"])
-
-        -- X = Cancel
-        if f.CloseButton then f.CloseButton:SetScript("OnClick", function() DW.Close() end) end
-    end
-    tinsert(UISpecialFrames, "BigNoteBoxDebugFrame")
 
     local y = -36
 
@@ -310,8 +266,7 @@ local function BuildWindow()
     cancelBtn:SetScript("OnClick", function() DW.Close() end)
 
     -- Re-read the DB every time the window shows
-    f:SetScript("OnShow", function()
-        if skin and BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
+    f:HookScript("OnShow", function()
         local db = BigNoteBoxDB or {}
         staged.master = db.debugMode == true
         staged.wp     = db.debugWaypoint == true

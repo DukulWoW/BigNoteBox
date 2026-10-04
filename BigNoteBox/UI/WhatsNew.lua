@@ -45,7 +45,6 @@ local CFG_W       = 480     -- matches ConfigWindow
 local WN_MIN_H    = 300     -- window grows from this minimum
 local PAD         = 16
 local TITLE_H_N   = 28      -- ButtonFrameTemplate title bar (normal mode)
-local TITLE_H_S   = 26      -- skin title bar
 local OK_BTN_H    = 44      -- height of the OK button
 local OK_BTN_PAD  = 10      -- padding above and below OK button area
 local ENTRY_PAD_X = 12      -- horizontal padding inside scroll area
@@ -125,72 +124,14 @@ local function GetMaxHeight()
     return math.min(math.max(math.floor(UIParent:GetHeight() * 0.75), WN_MIN_H), 900)
 end
 
--- ── Window chrome: normal mode ────────────────────────────────────────────────
-local function BuildFrameNormal(onClose)
-    local f = CreateFrame("Frame", "BigNoteBoxWhatsNewFrame", UIParent, "ButtonFrameTemplate")
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    f:SetAlpha(0.95)
-    f:SetFrameStrata("DIALOG")
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"))
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", onClose)
-    end
-
-    tinsert(UISpecialFrames, "BigNoteBoxWhatsNewFrame")
-
-    return f, TITLE_H_N
-end
-
--- ── Window chrome: skin mode ──────────────────────────────────────────────────
-local function BuildFrameSkin(onClose)
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxWhatsNewFrame", false)
-    _G["BigNoteBoxWhatsNewFrame"] = f
-    f:SetToplevel(true)
-    f:SetFrameStrata("DIALOG")
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(TITLE_H_S)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"))
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, onClose)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    tinsert(UISpecialFrames, "BigNoteBoxWhatsNewFrame")
-
-    return f, TITLE_H_S
+-- ── Window chrome, both modes (CMP-02 S3) ─────────────────────────────────────
+local function BuildFrame(onClose)
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxWhatsNewFrame", w = CFG_W, h = WN_MIN_H,   -- sized to the notes later
+        title = string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"),
+        toplevel = true, escClose = true, onClose = onClose,
+    })
+    return f, f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H_N
 end
 
 -- ── Build the window (once) ───────────────────────────────────────────────────
@@ -208,12 +149,7 @@ local function BuildWindow()
 
     local onClose = function() WN.Close() end
 
-    local f, titleH
-    if skinMode and BNB.CreateSkinFrame then
-        f, titleH = BuildFrameSkin(onClose)
-    else
-        f, titleH = BuildFrameNormal(onClose)
-    end
+    local f, titleH = BuildFrame(onClose)
 
     -- Store titleH on frame for content positioning
     f._titleH = titleH

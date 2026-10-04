@@ -389,44 +389,23 @@ PopulateTagManager = function()
 end
 
 --------------------------------------------------------------------------------
--- BUILD WINDOW
+-- BUILD WINDOW. One body for both modes (CMP-02 S3): chrome, drag, ESC entry
+-- and Forever glow come from CreateToolWindow; only the rows' y differ.
 --------------------------------------------------------------------------------
 local function BuildTagManager()
     if _tmFrame then return _tmFrame end
 
-    local f = CreateFrame("Frame", "BigNoteBoxTagManagerFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(TM_W, 460)
-    f:SetFrameStrata("DIALOG")
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxTagManagerFrame", w = TM_W, h = 460,
+        title = L["TAG_MGR_TITLE"], toplevel = true, escClose = true,
+    })
+    -- Select strip, tip, list: normal mode leaves room for the template's title
+    local selY    = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -43
+    local tipY    = f._isSkin and selY - 30 or -76
+    local scrollY = f._isSkin and tipY - 22 or -96
 
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["TAG_MGR_TITLE"])
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function() f:Hide() end)
-    end
-
-    local tipLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    tipLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  -76)
-    tipLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -76)
-    tipLbl:SetJustifyH("LEFT")
-    tipLbl:SetTextColor(0.5, 0.5, 0.5)
-    tipLbl:SetText(L["TAG_MGR_MERGE_NOTE"])
-    tipLbl:SetWordWrap(true)
-
-    -- ── Select strip (between title bar and tip) ──────────────────────────────
     local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 68, 22)
-    selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -43)
+    selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, selY)
     selectBtn:SetScript("OnClick", function() SetMultiMode(true) end)
     _selectBtn = selectBtn
 
@@ -443,7 +422,7 @@ local function BuildTagManager()
     selAllBtn:Hide()
     _selAllBtn = selAllBtn
 
-    local delSelBtn = BNB.CreateButton(nil, f, "|cffff4444Delete|r", 68, 22)
+    local delSelBtn = BNB.CreateButton(nil, f, "|cffff4444" .. L["TAG_MGR_DELETE"] .. "|r", 68, 22)
     delSelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
     delSelBtn:SetEnabled(false)
     delSelBtn:SetScript("OnClick", function()
@@ -452,7 +431,7 @@ local function BuildTagManager()
         local n = #selTags
         if n == 0 then return end
         StaticPopupDialogs["BNB_DELETE_SEL_TAGS"] = {
-            text           = string.format("Remove %d tag(s) from all notes? This cannot be undone.", n),
+            text           = string.format(L["TAG_MGR_DELETE_SEL_CONFIRM"], n),
             button1        = L["DELETE"],
             button2        = L["CANCEL"],
             OnAccept       = function()
@@ -471,8 +450,16 @@ local function BuildTagManager()
     delSelBtn:Hide()
     _delSelBtn = delSelBtn
 
+    local tipLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    tipLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  tipY)
+    tipLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, tipY)
+    tipLbl:SetJustifyH("LEFT")
+    tipLbl:SetTextColor(0.5, 0.5, 0.5)
+    tipLbl:SetText(L["TAG_MGR_MERGE_NOTE"])
+    tipLbl:SetWordWrap(true)
+
     local sf, child = BNB.CreateSmartScrollFrame("BigNoteBoxTagManagerScroll", f)
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SCROLL_LPAD,  -96)
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SCROLL_LPAD,  scrollY)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,   PAD)
     _scrollFrame = sf
     _scrollChild = child
@@ -489,131 +476,6 @@ local function BuildTagManager()
     _emptyLbl = emptyLbl
 
     _tmFrame = f
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxTagManagerFrame")
-    return f
-end
-
-local SK_TM_TITLE_H = 28
-
-local function BuildTagManagerSkin()
-    if _tmFrame then return _tmFrame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxTagManagerFrame", false)
-    _G["BigNoteBoxTagManagerFrame"] = f
-    f:SetSize(TM_W, 460)
-    f:SetFrameStrata("DIALOG")
-    f:SetToplevel(true)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    -- Title strip
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_TM_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["TAG_MGR_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() f:Hide() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- Select strip (just below title bar)
-    local SK_SEL_Y = -(SK_TM_TITLE_H + 8)
-
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 68, 22)
-    selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, SK_SEL_Y)
-    selectBtn:SetScript("OnClick", function() SetMultiMode(true) end)
-    _selectBtn = selectBtn
-
-    local selAllBtn = BNB.CreateButton(nil, f, L["TAG_MGR_SELECT_ALL_BTN"], 80, 22)
-    selAllBtn:SetPoint("LEFT", selectBtn, "RIGHT", 6, 0)
-    selAllBtn:SetScript("OnClick", function()
-        local tags = BNB.GetAllTags()
-        for _, entry in ipairs(tags) do
-            _multiSel[entry.tag] = true
-        end
-        UpdateDelSelBtn()
-        PopulateTagManager()
-    end)
-    selAllBtn:Hide()
-    _selAllBtn = selAllBtn
-
-    local delSelBtn = BNB.CreateButton(nil, f, "|cffff4444Delete|r", 68, 22)
-    delSelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
-    delSelBtn:SetEnabled(false)
-    delSelBtn:SetScript("OnClick", function()
-        local selTags = {}
-        for tag in pairs(_multiSel) do selTags[#selTags + 1] = tag end
-        local n = #selTags
-        if n == 0 then return end
-        StaticPopupDialogs["BNB_DELETE_SEL_TAGS"] = {
-            text           = string.format("Remove %d tag(s) from all notes? This cannot be undone.", n),
-            button1        = L["DELETE"],
-            button2        = L["CANCEL"],
-            OnAccept       = function()
-                for _, tag in ipairs(selTags) do
-                    BNB.DeleteTag(tag)
-                end
-                SetMultiMode(false)
-            end,
-            timeout        = 0,
-            whileDead      = true,
-            hideOnEscape   = true,
-            preferredIndex = 3,
-        }
-        StaticPopup_Show("BNB_DELETE_SEL_TAGS")
-    end)
-    delSelBtn:Hide()
-    _delSelBtn = delSelBtn
-
-    -- Tip label (below select strip)
-    local SK_TIP_Y = SK_SEL_Y - 26 - 4
-    local tipLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    tipLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  SK_TIP_Y)
-    tipLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, SK_TIP_Y)
-    tipLbl:SetJustifyH("LEFT")
-    tipLbl:SetTextColor(0.5, 0.5, 0.5)
-    tipLbl:SetText(L["TAG_MGR_MERGE_NOTE"])
-    tipLbl:SetWordWrap(true)
-
-    -- Scroll frame (below tip label)
-    local SK_SCROLL_Y = SK_TIP_Y - 18 - 4
-    local sf, child = BNB.CreateSmartScrollFrame("BigNoteBoxTagManagerScroll", f)
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SCROLL_LPAD,  SK_SCROLL_Y)
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,  PAD)
-    _scrollFrame = sf
-    _scrollChild = child
-
-    sf:SetScript("OnSizeChanged", function(self)
-        child:SetWidth(self:GetWidth())
-    end)
-
-    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontDisable")
-    emptyLbl:SetPoint("TOP", child, "TOP", 0, -40)
-    emptyLbl:SetJustifyH("CENTER")
-    emptyLbl:SetText(L["TAG_MGR_EMPTY"])
-    emptyLbl:Hide()
-    _emptyLbl = emptyLbl
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    _tmFrame = f
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxTagManagerFrame")
     return f
 end
 
@@ -621,12 +483,7 @@ end
 -- PUBLIC API
 --------------------------------------------------------------------------------
 function BNB.ToggleTagManager()
-    local f
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        f = BuildTagManagerSkin()
-    else
-        f = BuildTagManager()
-    end
+    local f = BuildTagManager()
     if f:IsShown() then
         f:Hide()
     else

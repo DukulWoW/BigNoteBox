@@ -269,11 +269,7 @@ function BNB.PopulateNoteHistoryPanel()
     local note = ndb and ndb.notes and ndb.notes[_currentID]
     local title = note and note.title or "(untitled)"
     local nhpTitle = string.format(L["HISTORY_NOTE_TITLE"], title)
-    if _nhpFrame.SetTitle then
-        _nhpFrame:SetTitle(nhpTitle)
-    elseif _nhpFrame._titleLbl then
-        _nhpFrame._titleLbl:SetText(nhpTitle)
-    end
+    _nhpFrame:SetWindowTitle(nhpTitle)
 end
 
 function BNB.RefreshNoteHistoryPanel()
@@ -282,118 +278,26 @@ function BNB.RefreshNoteHistoryPanel()
 end
 
 --------------------------------------------------------------------------------
--- BuildNoteHistoryPanel — lazy-build
+-- BuildNoteHistoryPanel — lazy-build. One body for both modes (CMP-02 S3):
+-- chrome, footer divider, drag and ESC entry from CreateToolWindow.
 --------------------------------------------------------------------------------
-local SK_NHP_TITLE_H = 28
-
-local function BuildNoteHistoryPanelSkin()
-    if _nhpFrame then return _nhpFrame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxNoteHistoryFrame", false)
-    _G["BigNoteBoxNoteHistoryFrame"] = f
-    f:SetWidth(HW_W)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_NHP_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["HISTORY_WINDOW_TITLE"])
-    f._titleLbl = titleLbl
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() BNB.CloseNoteHistoryPanel() end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(SK_NHP_TITLE_H + 4))
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
-    f._scrollFrame = sf
-
-    if sf.ScrollBar then
-        sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-        end)
-    end
-
-    local child = CreateFrame("Frame", nil, sf)
-    child:SetWidth(CONTENT_W); child:SetHeight(200)
-    sf:SetScrollChild(child)
-    f._scrollChild = child
-
-    local footHost = CreateFrame("Frame", nil, f)
-    footHost:SetHeight(1)
-    footHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,       BOTTOM_STRIP_H - 1)
-    footHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, BOTTOM_STRIP_H - 1)
-    local footDiv = BNB.CreateDivider(footHost, "HORIZONTAL", 0.25, 0.25, 0.28, 1)
-    footDiv:SetPoint("TOPLEFT",  footHost, "TOPLEFT",  0, 0)
-    footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
-
-    local clearBtn = BNB.CreateButton(nil, f, L["HISTORY_CLEAR_NOTE_BTN"], 150, 26)
-    clearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
-    clearBtn:SetScript("OnClick", function()
-        if _currentID then
-            BNB.HistoryDeleteAuto(_currentID)
-            BNB.CloseNoteHistoryPanel()
-            BNB.RefreshHistoryWindow()
-        end
-    end)
-    clearBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["HISTORY_CLEAR_NOTE_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["HISTORY_CLEAR_NOTE_SUB"], 0.8, 0.4, 0.4, true)
-        GameTooltip:Show()
-    end)
-    clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxNoteHistoryFrame")
-    _nhpFrame = f
-    return f
-end
-
 local function BuildNoteHistoryPanel()
     if _nhpFrame then return _nhpFrame end
 
-    local f = CreateFrame("Frame", "BigNoteBoxNoteHistoryFrame", UIParent,
-        "ButtonFrameTemplate")
-    f:SetWidth(HW_W)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(L["HISTORY_WINDOW_TITLE"])
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function()
-            BNB.CloseNoteHistoryPanel()
-        end)
-    end
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxNoteHistoryFrame", w = HW_W, h = MIN_H,   -- Populate sizes it
+        title = L["HISTORY_WINDOW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
+        onClose = function() BNB.CloseNoteHistoryPanel() end,
+        -- A hide that skips CloseNoteHistoryPanel (UISpecialFrames) still un-greys
+        onHide = function()
+            if BNB.SetHistoryWindowGreyout then BNB.SetHistoryWindowGreyout(false) end
+        end,
+    })
+    local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
 
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(TITLE_H + 4))
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf
 
@@ -408,11 +312,6 @@ local function BuildNoteHistoryPanel()
     child:SetWidth(CONTENT_W); child:SetHeight(200)
     sf:SetScrollChild(child)
     f._scrollChild = child
-
-    local rule = f:CreateTexture(nil, "ARTWORK")
-    rule:SetHeight(1); rule:SetColorTexture(0.25, 0.25, 0.28, 1)
-    rule:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,       BOTTOM_STRIP_H - 1)
-    rule:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, BOTTOM_STRIP_H - 1)
 
     local clearBtn = BNB.CreateButton(nil, f, L["HISTORY_CLEAR_NOTE_BTN"], 150, 26)
     clearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
@@ -431,8 +330,6 @@ local function BuildNoteHistoryPanel()
     end)
     clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxNoteHistoryFrame")
     _nhpFrame = f
     return f
 end
@@ -450,12 +347,7 @@ end)
 function BNB.OpenNoteHistoryPanel(noteID)
     if InCombatLockdown() then return end
     _currentID = noteID
-    local f
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        f = BuildNoteHistoryPanelSkin()
-    else
-        f = BuildNoteHistoryPanel()
-    end
+    local f = BuildNoteHistoryPanel()
 
     -- Grey out history window if open
     if BNB.SetHistoryWindowGreyout then

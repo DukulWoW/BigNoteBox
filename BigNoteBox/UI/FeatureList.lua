@@ -38,7 +38,6 @@ local FL_MIN_H      = 420       -- minimum window height
 local FL_MAX_H      = 820       -- maximum window height (clipped by screen if needed)
 local PAD           = 18        -- horizontal and vertical padding inside scroll area
 local TITLE_H_N     = 28        -- ButtonFrameTemplate title bar height (normal mode)
-local TITLE_H_S     = 26        -- skin mode title bar height
 local OK_BTN_H      = 44        -- height of the bottom OK button
 local OK_BTN_PAD    = 10        -- padding above and below OK button area
 local HEADER_SIZE   = 14        -- section header font size (px)
@@ -166,71 +165,18 @@ local function RestoreSnapshot()
     end)
 end
 
--- ── Window chrome builders ────────────────────────────────────────────────────
+-- ── Window chrome, both modes (CMP-02 S3) ─────────────────────────────────────
 local TITLE_TEXT = "Features in BigNoteBox"
 
-local function BuildFrameNormal(onClose)
-    local f = CreateFrame("Frame", "BigNoteBoxFeatureListFrame", UIParent, "ButtonFrameTemplate")
-    f:SetToplevel(true)
-    f:SetFrameStrata("DIALOG")
+local function BuildFrame(onClose)
+    -- ESC through its own key handler (keyEsc); not UISpecialFrames, which
+    -- calls Hide() directly, bypassing FL.Close()
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxFeatureListFrame", w = FL_W, h = 400,   -- sized to the list later
+        title = TITLE_TEXT, toplevel = true, keyEsc = true, onClose = onClose,
+    })
     f:SetFrameLevel(100)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-    f:SetTitle(TITLE_TEXT)
-    if f.CloseButton then f.CloseButton:SetScript("OnClick", onClose) end
-    -- ESC handled via OnKeyDown below; do NOT add to UISpecialFrames
-    -- (UISpecialFrames calls Hide() directly, bypassing FL.Close())
-    BNB.AttachEscClose(f, function() onClose() end)
-    return f, TITLE_H_N
-end
-
-local function BuildFrameSkin(onClose)
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxFeatureListFrame", false)
-    _G["BigNoteBoxFeatureListFrame"] = f
-    f:SetToplevel(true)
-    f:SetFrameStrata("DIALOG")
-    f:SetFrameLevel(100)
-    f:EnableMouse(true)
-    f:SetMovable(true)
-    f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(TITLE_H_S)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(TITLE_TEXT)
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, onClose)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    -- ESC handled via OnKeyDown; do NOT add to UISpecialFrames
-    BNB.AttachEscClose(f, function() onClose() end)
-
-    return f, TITLE_H_S
+    return f, f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H_N
 end
 
 -- ── Build window (once; rebuilds if skin mode changed) ────────────────────────
@@ -246,12 +192,7 @@ local function BuildWindow()
 
     local onClose = function() FL.Close() end
 
-    local f, titleH
-    if skinMode and BNB.CreateSkinFrame then
-        f, titleH = BuildFrameSkin(onClose)
-    else
-        f, titleH = BuildFrameNormal(onClose)
-    end
+    local f, titleH = BuildFrame(onClose)
     f._titleH    = titleH
     f._builtSkin = skinMode
 

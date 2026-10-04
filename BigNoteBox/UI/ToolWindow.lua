@@ -16,6 +16,8 @@
 --     opts.cw           content width (the two buttons share it)
 --     opts.footH        footer height; the divider sits on its top edge
 --                       (nil = no divider)
+--     opts.footR        right inset of the divider (nil = pad), e.g. to stop
+--                       short of a scroll bar
 --     opts.btn1/btn2    footer button labels, left and right (nil = no footer
 --                       buttons; both are returned nil)
 --     opts.onClose      close button handler (nil = hide the window)
@@ -24,6 +26,7 @@
 --     opts.onHide       optional, hooked to OnHide
 --     opts.strata       frame strata, nil = "DIALOG"
 --     opts.toplevel     SetToplevel(true)
+--     opts.noDrag       not movable (a dialog pinned to another window)
 --     opts.escClose     add to UISpecialFrames
 --     opts.noGlow       no whole-window Forever glow (the window draws its own,
 --                       e.g. one per pane in History compare)
@@ -33,6 +36,8 @@
 --   frame:SetWindowTitle(text)   works in both modes
 --   frame._isSkin                true when built as a skin frame
 --   frame._strata                the strata it was built with
+--   frame._footDiv               the footer divider (nil without footH), to
+--                                hide it while there is nothing above it
 --   BNB.TOOL_SKIN_TITLE_H        the skin title strip height
 --   BNB.SeatWindow(f, strata)    call before Show for a window that can be
 --                                opened from Focus mode (see below)
@@ -73,8 +78,9 @@ local function BuildNormal(o)
         local footerDiv = f:CreateTexture(nil, "ARTWORK")
         footerDiv:SetHeight(1)
         footerDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  o.pad, o.footH)
-        footerDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -o.pad, o.footH)
+        footerDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(o.footR or o.pad), o.footH)
         footerDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
+        f._footDiv = footerDiv
     end
     return f
 end
@@ -90,9 +96,11 @@ local function BuildSkin(o)
     titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
     titleBar:SetHeight(SK_TITLE_H)
     titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() DragStart(f, o) end)
-    titleBar:SetScript("OnDragStop",  function() DragStop(f, o) end)
+    if not o.noDrag then
+        titleBar:RegisterForDrag("LeftButton")
+        titleBar:SetScript("OnDragStart", function() DragStart(f, o) end)
+        titleBar:SetScript("OnDragStop",  function() DragStop(f, o) end)
+    end
 
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -15, 0)
@@ -107,10 +115,11 @@ local function BuildSkin(o)
         local footerHost = CreateFrame("Frame", nil, f)
         footerHost:SetHeight(1)
         footerHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  o.pad, o.footH)
-        footerHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -o.pad, o.footH)
+        footerHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(o.footR or o.pad), o.footH)
         local footerDiv = BNB.CreateDivider(footerHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
         footerDiv:SetPoint("TOPLEFT",  footerHost, "TOPLEFT",  0, 0)
         footerDiv:SetPoint("TOPRIGHT", footerHost, "TOPRIGHT", 0, 0)
+        f._footDiv = footerHost   -- hide the host to hide the divider
     end
 
     f:HookScript("OnShow", function()
@@ -130,10 +139,13 @@ function BNB.CreateToolWindow(o)
     f._strata = o.strata or "DIALOG"
     f:SetFrameStrata(f._strata)
     if o.toplevel then f:SetToplevel(true) end
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) DragStart(self, o) end)
-    f:SetScript("OnDragStop",  function(self) DragStop(self, o) end)
+    f:EnableMouse(true); f:SetClampedToScreen(true)
+    if not o.noDrag then
+        f:SetMovable(true)
+        f:RegisterForDrag("LeftButton")
+        f:SetScript("OnDragStart", function(self) DragStart(self, o) end)
+        f:SetScript("OnDragStop",  function(self) DragStop(self, o) end)
+    end
     f:SetAlpha(BNB.WindowAlpha(f))
     if o.onHide then f:HookScript("OnHide", o.onHide) end
 

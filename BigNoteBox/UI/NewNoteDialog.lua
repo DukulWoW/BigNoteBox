@@ -170,60 +170,19 @@ end
 -- ---------------------------------------------------------------------------
 -- BUILD DIALOG (once; re-parented to mainFrame on first Open)
 -- ---------------------------------------------------------------------------
-local SK_NND_TITLE_H = 28
-
 local function BuildDialog()
     if _frame then return _frame end
 
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local f
-
-    if skinMode then
-        f = BNB.CreateSkinFrame(UIParent, false, "BNBNewNoteDialogFrame", false)
-        _G["BNBNewNoteDialogFrame"] = f
-        f:SetSize(DLG_W, 10)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:EnableMouse(true)
-
-        local titleBar = BNB.CreateSkinStrip(f, true, false)
-        titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-        titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-        titleBar:SetHeight(SK_NND_TITLE_H)
-
-        local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-        titleLbl:SetTextColor(1, 0.82, 0)
-        titleLbl:SetText(L["NND_TITLE"])
-
-        local closeBtn = BNB.CreateSkinCloseButton(titleBar, function() NND.Close() end)
-        closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-        f:SetScript("OnShow", function()
-            if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-        end)
-    else
-        f = CreateFrame("Frame", "BNBNewNoteDialogFrame", UIParent, "ButtonFrameTemplate")
-        f:SetSize(DLG_W, 10)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:EnableMouse(true)
-        -- Not movable — anchored to and moves with mainFrame
-
-        ButtonFrameTemplate_HidePortrait(f)
-        ButtonFrameTemplate_HideButtonBar(f)
-        if f.Inset then f.Inset:Hide() end
-        BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
-        f:SetTitle(L["NND_TITLE"])
-        if f.CloseButton then
-            f.CloseButton:SetScript("OnClick", function() NND.Close() end)
-        end
-    end
-
-    tinsert(UISpecialFrames, "BNBNewNoteDialogFrame")
+    -- Chrome for both modes (CMP-02 S3). Not movable: it stays centred on the
+    -- main window (NND.Open re-anchors it after a main window drag)
+    local f, createBtn, cancelBtn = BNB.CreateToolWindow({
+        name = "BNBNewNoteDialogFrame", w = DLG_W, h = 10,   -- height set below
+        title = L["NND_TITLE"], toplevel = true, escClose = true, noDrag = true,
+        pad = DLG_PAD, cw = DLG_CW, footH = DLG_FOOT,
+        btn1 = L["NND_CREATE_BTN"], btn2 = L["CANCEL"],
+        onClose = function() NND.Close() end,
+    })
+    local skinMode = f._isSkin
 
     f:HookScript("OnHide", function()
         ShowMainOverlay(false)
@@ -231,7 +190,7 @@ local function BuildDialog()
     end)
 
     -- ── TOP ROW: icon + title editbox ────────────────────────────────────────
-    local topY = skinMode and -(SK_NND_TITLE_H + 8) or -36
+    local topY = skinMode and -(BNB.TOOL_SKIN_TITLE_H + 8) or -36
 
     local iconBtn = BNB.CreateBackdropFrame("Button", nil, f)
     BNB.SetBackdrop(iconBtn, 0.06, 0.06, 0.09, 0.95, 0.35, 0.35, 0.38, 1)
@@ -562,7 +521,7 @@ local function BuildDialog()
     -- that same value both to place the checkbox and to size the dialog below it
     -- (ALL-29 fix: the two used to disagree, so the checkbox overlapped the footer).
     local colMaxH = math.max(math.abs(leftColH or 0), math.abs(rightY))
-    local chromeTopH = skinMode and (SK_NND_TITLE_H + 8) or 36
+    local chromeTopH = skinMode and (BNB.TOOL_SKIN_TITLE_H + 8) or 36
     local richCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
@@ -601,31 +560,9 @@ local function BuildDialog()
     local dlgH = chromeTopH + ICON_SZ + 10 + totalContentH + DLG_FOOT + 8
     f:SetHeight(dlgH)
 
-    if skinMode then
-        local footHost = CreateFrame("Frame", nil, f)
-        footHost:SetHeight(1)
-        footHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  DLG_PAD,  DLG_FOOT)
-        footHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -DLG_PAD, DLG_FOOT)
-        local footDiv = BNB.CreateDivider(footHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
-        footDiv:SetPoint("TOPLEFT",  footHost, "TOPLEFT",  0, 0)
-        footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
-    else
-        local footDiv = f:CreateTexture(nil, "ARTWORK")
-        footDiv:SetHeight(1)
-        footDiv:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  DLG_PAD, DLG_FOOT)
-        footDiv:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -DLG_PAD, DLG_FOOT)
-        footDiv:SetColorTexture(0.28, 0.28, 0.30, 1)
-    end
-
-    local bW = math.floor(DLG_CW / 2) - 4
-    local createBtn = BNB.CreateButton(nil, f, L["NND_CREATE_BTN"], bW, 26)
-    createBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DLG_PAD, 8)
     createBtn:SetScript("OnClick", function() NND.Confirm() end)
     createBtn:SetEnabled(false)   -- disabled until user types a title
     _createBtn = createBtn
-
-    local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], bW, 26)
-    cancelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DLG_PAD + bW + 8, 8)
     cancelBtn:SetScript("OnClick", function() NND.Close() end)
 
     f:Hide()

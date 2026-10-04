@@ -437,34 +437,29 @@ function BNB.PopulateTrashWindow()
     end
 end
 
--- Build window (once)
+-- Build window (once). One body for both modes (CMP-02 S3): the chrome,
+-- footer divider, drag, ESC entry and Forever glow come from CreateToolWindow.
 local function BuildTrashWindow()
     if _twFrame then return _twFrame end
 
-    local f = CreateFrame("Frame", "BigNoteBoxTrashFrame", UIParent, "ButtonFrameTemplate")
-    f:SetWidth(TW_W)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    ButtonFrameTemplate_HidePortrait(f)
-    ButtonFrameTemplate_HideButtonBar(f)
-    if f.Inset then f.Inset:Hide() end
-    BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f:SetTitle(L["TW_TITLE"])
-
-    if f.CloseButton then
-        f.CloseButton:SetScript("OnClick", function()
+    local f = BNB.CreateToolWindow({
+        name = "BigNoteBoxTrashFrame", w = TW_W, h = 400,   -- height follows the main window
+        title = L["TW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
+        onClose = function()
             if _multiMode then SetTrashMultiMode(false) end
-            f:Hide()
-        end)
-    end
+            _twFrame:Hide()
+        end,
+        -- Leave select mode on any hide (ESC, main window close), not only the close button
+        onHide = function()
+            if _multiMode then SetTrashMultiMode(false) end
+        end,
+    })
+    local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
 
     -- Scroll frame (28px right clearance for scrollbar)
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(TITLE_H + 4))
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf
 
@@ -489,12 +484,6 @@ local function BuildTrashWindow()
     emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText(L["TW_EMPTY_STATE"])
     emptyLbl:Hide()
     _emptyLbl = emptyLbl
-
-    -- Bottom strip rule
-    local rule = f:CreateTexture(nil, "ARTWORK")
-    rule:SetHeight(1); rule:SetColorTexture(0.25, 0.25, 0.28, 1)
-    rule:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,       BOTTOM_STRIP_H - 1)
-    rule:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, BOTTOM_STRIP_H - 1)
 
     -- ── Normal mode: Empty Trash | Select ────────────────────────────────────
     local emptyBtn = BNB.CreateButton(nil, f, L["TW_EMPTY_BTN"], 110, 26)
@@ -576,180 +565,6 @@ local function BuildTrashWindow()
     infoLbl:SetTextColor(0.45, 0.45, 0.45)
     _infoLbl = infoLbl
 
-    -- ButtonFrameTemplate starts shown — hide immediately so ToggleTrashWindow
-    -- sees IsShown() == false on the first click and takes the show branch.
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxTrashFrame")
-
-    -- Leave select mode on any hide (ESC, main window close), not only the close button
-    f:HookScript("OnHide", function()
-        if _multiMode then SetTrashMultiMode(false) end
-    end)
-    _twFrame = f
-    return f
-end
-
-local SK_TW_TITLE_H = 28
-
-local function BuildTrashWindowSkin()
-    if _twFrame then return _twFrame end
-
-    local f = BNB.CreateSkinFrame(UIParent, false, "BigNoteBoxTrashFrame", false)
-    _G["BigNoteBoxTrashFrame"] = f
-    f:SetWidth(TW_W)
-    f:SetFrameStrata("HIGH"); f:SetToplevel(true)
-    f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-    f:SetScript("OnDragStop",  function(self) self:StopMovingOrSizing() end)
-
-    -- Title strip
-    local titleBar = BNB.CreateSkinStrip(f, true, false)
-    titleBar:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, 0)
-    titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, 0)
-    titleBar:SetHeight(SK_TW_TITLE_H)
-    titleBar:EnableMouse(true)
-    titleBar:RegisterForDrag("LeftButton")
-    titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
-    titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
-
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
-    titleLbl:SetText(L["TW_TITLE"])
-
-    local closeBtn = BNB.CreateSkinCloseButton(titleBar, function()
-        if _multiMode then SetTrashMultiMode(false) end
-        f:Hide()
-    end)
-    closeBtn:SetPoint("RIGHT", titleBar, "RIGHT", -3, 0)
-
-    -- Scroll frame
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(SK_TW_TITLE_H + 4))
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
-    f._scrollFrame = sf
-
-    if sf.ScrollBar then
-        sf.ScrollBar:SetAlpha(0)
-        sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-            sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-        end)
-    end
-
-    local child = CreateFrame("Frame", nil, sf)
-    child:SetWidth(CONTENT_W); child:SetHeight(200)
-    sf:SetScrollChild(child)
-    f._scrollChild = child
-
-    -- Empty state label
-    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    emptyLbl:SetPoint("TOP", child, "TOP", 0, -20)
-    emptyLbl:SetWidth(CONTENT_W); emptyLbl:SetJustifyH("CENTER")
-    emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText(L["TW_EMPTY_STATE"])
-    emptyLbl:Hide()
-    _emptyLbl = emptyLbl
-
-    -- Footer divider (host frame avoids backdrop overdraw)
-    local footHost = CreateFrame("Frame", nil, f)
-    footHost:SetHeight(1)
-    footHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,       BOTTOM_STRIP_H - 1)
-    footHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, BOTTOM_STRIP_H - 1)
-    local footDiv = BNB.CreateDivider(footHost, "HORIZONTAL", 0.25, 0.25, 0.28, 1)
-    footDiv:SetPoint("TOPLEFT",  footHost, "TOPLEFT",  0, 0)
-    footDiv:SetPoint("TOPRIGHT", footHost, "TOPRIGHT", 0, 0)
-
-    -- ── Normal mode: Empty Trash | Select ────────────────────────────────────
-    local emptyBtn = BNB.CreateButton(nil, f, L["TW_EMPTY_BTN"], 110, 26)
-    emptyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
-    emptyBtn:SetEnabled(false)
-    emptyBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_EMPTY_TRASH") end)
-    emptyBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["TW_EMPTY_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
-        GameTooltip:Show()
-    end)
-    emptyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    _emptyBtn = emptyBtn
-
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 72, 26)
-    selectBtn:SetPoint("LEFT", emptyBtn, "RIGHT", 6, 0)
-    selectBtn:SetEnabled(false)
-    selectBtn:SetScript("OnClick", function() SetTrashMultiMode(true) end)
-    selectBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["TW_SELECT_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    _selectBtn = selectBtn
-
-    -- ── Select mode: Restore selected | Delete selected | Cancel ──────────────
-    local restoreSelBtn = BNB.CreateButton(nil, f, L["TW_RESTORE_SEL_BTN"], 110, 26)
-    restoreSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
-    restoreSelBtn:SetEnabled(false)
-    restoreSelBtn:SetScript("OnClick", function()
-        local ids = {}
-        for id in pairs(_multiSel) do ids[#ids + 1] = id end
-        for _, id in ipairs(ids) do
-            if BNB.RestoreNote then BNB.RestoreNote(id) end
-        end
-        SetTrashMultiMode(false)
-    end)
-    restoreSelBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["TW_RESTORE_SEL_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    restoreSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    restoreSelBtn:Hide()
-    _restoreSelBtn = restoreSelBtn
-
-    local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
-    deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
-    deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:SetScript("OnClick", PurgeSelectedConfirm)
-    deleteSelBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
-        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
-        GameTooltip:Show()
-    end)
-    deleteSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    deleteSelBtn:Hide()
-    _deleteSelBtn = deleteSelBtn
-
-    local cancelSelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 68, 26)
-    cancelSelBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
-    cancelSelBtn:SetScript("OnClick", function() SetTrashMultiMode(false) end)
-    cancelSelBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["TW_CANCEL_SEL_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    cancelSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    cancelSelBtn:Hide()
-    _cancelSelBtn = cancelSelBtn
-
-    -- Info block: "Kept X days\nX notes in trash" -- bottom-right of strip
-    local infoLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    infoLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 10)
-    infoLbl:SetJustifyH("RIGHT")
-    infoLbl:SetTextColor(0.45, 0.45, 0.45)
-    _infoLbl = infoLbl
-
-    f:SetScript("OnShow", function()
-        if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
-    end)
-
-    f:Hide()
-    tinsert(UISpecialFrames, "BigNoteBoxTrashFrame")
-
-    -- Leave select mode on any hide (ESC, main window close), not only the close button
-    f:HookScript("OnHide", function()
-        if _multiMode then SetTrashMultiMode(false) end
-    end)
     _twFrame = f
     return f
 end
@@ -767,12 +582,7 @@ function BNB.HookTrashHeightTracking()
     BNB.mainFrame:HookScript("OnShow",        SyncTrashHeight)
 end
 
-local function TrashFrame()
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        return BuildTrashWindowSkin()
-    end
-    return BuildTrashWindow()
-end
+local TrashFrame = BuildTrashWindow
 
 local function ShowTrashWindow(f)
     SyncTrashHeight()
