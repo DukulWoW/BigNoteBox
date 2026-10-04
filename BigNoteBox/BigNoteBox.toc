@@ -64,6 +64,7 @@ UI\SituationEditor.lua
 UI\StickySettings.lua
 UI\StickyBgPicker.lua
 UI\IconFramePicker.lua
+UI\IconPicker.lua
 UI\SendToChat.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua

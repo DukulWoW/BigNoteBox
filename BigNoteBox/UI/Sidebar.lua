@@ -34,7 +34,7 @@ local SB = BNB.Sidebar
 -- Constants
 --------------------------------------------------------------------------------
 local ASSETS        = "Interface\\AddOns\\BigNoteBox\\Assets\\"
-local ICON_PATH     = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Classes\\"
+local ICON_PATH     = "Interface\\Icons\\"   -- class icons are the game's own (ALL-238)
 local BTN_SZ        = 64     -- button frame size (matches sidebar-border.tga)
 
 -- FOR-15: strip offset against the main window, per client/mode. Forever and
@@ -46,23 +46,15 @@ local SIDE_OFFSET = {
     retail_normal  = { left = 7, right = -2 },
 }
 
--- Icon folders available in the sidebar icon picker (Classes, Races, Factions only).
-local SLOT_ICON_FOLDERS = {
-    { path = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Classes\\" },
-    { path = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Races\\" },
-    { path = "Interface\\AddOns\\BigNoteBox\\Assets\\Icons\\Factions\\" },
-}
+-- Icon catalog categories offered in the sidebar icon picker (Assets/Icons/IconManifest.lua)
+local SLOT_ICON_CATEGORIES = { "classes", "races", "factions" }
 
--- Flat icon list built from the above folders at load time.
+-- Flat icon list built from the above categories at load time.
 local SLOT_ICON_LIST = {}
 do
-    local manifest = BigNoteBox and BigNoteBox.ICON_MANIFEST or {}
-    for _, folder in ipairs(SLOT_ICON_FOLDERS) do
-        local lower = folder.path:lower()
-        for _, path in ipairs(manifest) do
-            if path:lower():sub(1, #lower) == lower then
-                SLOT_ICON_LIST[#SLOT_ICON_LIST + 1] = path
-            end
+    for _, key in ipairs(SLOT_ICON_CATEGORIES) do
+        for _, path in ipairs(BNB.IconsIn and BNB.IconsIn(key) or {}) do
+            SLOT_ICON_LIST[#SLOT_ICON_LIST + 1] = path
         end
     end
 end

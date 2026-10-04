@@ -245,6 +245,8 @@ function BNB.CleanNoteFields(src, want)
             if (def.key == "body" or def.key == "title") and type(v) == "string" then
                 v = v:gsub("\t", "    ")
             end
+            -- A bundled icon from before ALL-238 becomes its game icon
+            if def.key == "icon" then v = BNB.LegacyIconPath(v) end
             out[def.key] = v
         end
     end
@@ -256,6 +258,43 @@ function BNB.CleanNoteFields(src, want)
         out.situations = { ctx }
     end
     return out
+end
+
+-- Note icons came bundled in Assets\Icons\<Folder>\ until ALL-238 (v1.18.0);
+-- now only Races\ ships and every other icon is the game's own file of the
+-- same name. Returns the path to save for an old bundled one: the game path,
+-- nil (= the default icon) for one this client does not have, the race
+-- portraits unchanged. Anything else comes back as it was. Used by the NOTES
+-- v11 / SETTINGS v18 migrations and by CleanNoteFields (imports, shares).
+-- Probed on both clients with the dev addon's /bnbicons (2026-10-04).
+local OLD_ICONS = "^interface\\addons\\bignotebox\\assets\\icons\\(%w+)\\([%w_]+)$"
+local ICON_GONE = { trade_archaeology_insect_in_amber = true, trade_archaeology_zinrokh_sword = true }
+local ICON_GONE_FOREVER = {}
+for _, n in ipairs({ "Classicon_DemonHunter_Void_64", "INV_112_Achievement_Dungeon_Ecodome",
+    "INV_Achievement_Dungeon_Lightbloom", "INV_Achievement_Dungeon_ProveYourWorth",
+    "INV_Achievement_Dungeon_VoidscarArena", "INV_Achievement_Raid_RiftOfAln", "INV_Achievement_Raid_Voidspire",
+    "INV_12_Profession_Alchemy_AlhemySpecializations_Transmutation", "INV_12_Profession_Enchanting_EnchantingCrystal_Red",
+    "INV_12_Profession_Herbalism_Mulch_Purple", "INV_12_Profession_Inscriptions_DarkmoonDeck_Bloom",
+    "INV_12_Profession_Inscriptions_DarkmoonDeck_Hunt", "INV_12_Profession_Inscriptions_DarkmoonDeck_Rot",
+    "INV_12_Profession_Inscriptions_DarkmoonDeck_Void", "INV_12_Profession_Inscriptions_DarkmoonDominions_Bloom",
+    "INV_12_Profession_Inscriptions_DarkmoonDominions_Hunt", "INV_12_Profession_Inscriptions_DarkmoonDominions_Rot",
+    "INV_12_Profession_Inscriptions_DarkmoonDominions_Violet", "INV_12_Profession_Inscriptions_DarkmoonDominions_Void",
+    "INV_12_Profession_Inscriptions_DarkmoonSigil_Bloom", "INV_12_Profession_Inscriptions_DarkmoonSigil_Hunt",
+    "INV_12_Profession_Inscriptions_DarkmoonSigil_Rot", "INV_12_Profession_Inscriptions_DarkmoonSigil_Void",
+    "INV_12_Profession_Jewelcrafting_Inscription_MagnifyingGlass_Blue",
+    "INV_12_Profession_Jewelcrafting_Inscription_MagnifyingGlass_Red",
+    "INV_12_Profession_Jewelcrafting_Inscription_MagnifyingGlass_Yellow",
+    "INV_112_Achievement_Zone_Karesh", "INV_Achievement_Zone_Arcantina_Arcantina" }) do
+    ICON_GONE_FOREVER[n:lower()] = true
+end
+
+function BNB.LegacyIconPath(path)
+    if type(path) ~= "string" then return path end
+    local folder, name = path:lower():match(OLD_ICONS)
+    if not folder or folder == "races" then return path end
+    if ICON_GONE[name] or (BNB.IsForever and ICON_GONE_FOREVER[name]) then return nil end
+    -- Keep the name's own spelling: the lower-cased match is only for the test
+    return "Interface\\Icons\\" .. path:match("([^\\]+)$")
 end
 
 -- For anything written for another build to read (JSON backup, share

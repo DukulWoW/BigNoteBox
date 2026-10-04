@@ -277,6 +277,8 @@ local WINDOWS = {
     -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
     { name = "BigNoteBoxIconFramePicker",
       esc = function() Call(BNB.IconFramePicker, "Close") end },
+    { name = "BigNoteBoxIconPicker",
+      esc = function() Call(BNB.IconPicker, "Close") end },
     { name = "BigNoteBoxNoteConfigFrame", esc = true, companion = true, raise = true,
       focus = 1, reopen = function(id) Call(BNB, "OpenNoteConfig", id) end },
     -- Task Edit Window before the Reference Box

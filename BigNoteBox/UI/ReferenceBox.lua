@@ -1697,7 +1697,7 @@ local TAB_OFF    = BNB.IsForever and { left = 5, right = -2 } or { left = 8, rig
 local TAB_SKIN_OUT = 2
 local TAB_BORDER = ASSETS .. (BNB.IsForever and "Sidebar\\sb-border-forever" or "Sidebar\\sb-border")
 local TAB_BOTTOM = BOTTOM_PAD + 4
-local TAB_TASK_ICON = ASSETS .. "Icons\\Notes\\INV_Misc_Note_03"
+local TAB_TASK_ICON = "Interface\\Icons\\INV_Misc_Note_03"
 local TAB_FALLBACK  = "Interface\\Icons\\INV_Misc_QuestionMark"
 local ACTIVE_R, ACTIVE_G, ACTIVE_B = 0.40, 0.85, 0.40   -- Sidebar.lua ACTIVE_R/G/B
 local ACTIVE_GLOW_MULT = 2.0                             -- Sidebar.lua ACTIVE_GLOW_MULT

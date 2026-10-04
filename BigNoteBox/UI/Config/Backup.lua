@@ -7,7 +7,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ASSET, ROW_H, ROW_GAP = K.CONTENT_W, K.ASSET, K.ROW_H, K.ROW_GAP
+local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader = K.AddRule, K.AddHeader
 
 -- Export window HTML mode: "noteonly", "plain", "stylized". Kept for the
@@ -308,7 +308,7 @@ local function BuildBackupTab(sf, ct)
     local RESET = "|r"
     local SZ    = 14   -- inline icon size
 
-    local ICO_N  = ASSET .. "Icons\\Notes\\INV_Misc_Note_01"  -- note count
+    local ICO_N  = "Interface\\Icons\\INV_Misc_Note_01"       -- note count
     local ICO_S  = "Interface\\Icons\\INV_Misc_Coin_01"       -- notes size
     local ICO_A  = "Interface\\Icons\\Trade_Engineering"      -- average
     local ICO_T  = "Interface\\Icons\\inv_misc_1h_bucket_b_01"-- trash count

@@ -44,8 +44,8 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 10  -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 17  -- bump + add block to MigrateSettingsDB()
+local NOTES_SCHEMA_VERSION    = 11  -- bump + add block to MigrateNotesDB()
+local SETTINGS_SCHEMA_VERSION = 18  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -490,6 +490,19 @@ function BNB.MigrateNotesDB()
         v = 10
     end
 
+    -- Note icons come from the game, only the race portraits still ship
+    -- (ALL-238): an old bundled path becomes the game icon of the same name,
+    -- or nil (the default icon) for one this client lacks. History snapshots
+    -- hold no icon (SV-11)
+    if v < 11 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                if note.icon then note.icon = BNB.LegacyIconPath(note.icon) end
+            end
+        end
+        v = 11
+    end
+
     -- Never lower the stored version: running an older build must not make the
     -- next upgrade run the migrations again (SV-10)
     ndb.dbVersion = math.max(ndb.dbVersion or 1, NOTES_SCHEMA_VERSION)
@@ -570,6 +583,17 @@ local function MigrateSettingsDB()
         db.tagIndex = nil
         db._needsTagRebuild = nil
         v = 17
+    end
+
+    if v < 18 then
+        -- A character's sidebar icon could be a bundled class / faction icon;
+        -- those come from the game now (ALL-238, as NOTES v11)
+        for _, rec in pairs(db.knownChars or {}) do
+            if type(rec) == "table" and rec.slotIcon then
+                rec.slotIcon = BNB.LegacyIconPath(rec.slotIcon)
+            end
+        end
+        v = 18
     end
 
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)

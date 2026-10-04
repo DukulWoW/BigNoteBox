@@ -40,11 +40,11 @@ local QL_Y =  -2   -- fallback: pixels down  from QuestLogPopupDetailFrame TOPLE
 -- Books + Notes from the manifest — used when no item icon is available.
 local RANDOM_ICONS = {}
 do
-    -- Collect Books and Notes sub-paths from ICON_MANIFEST at runtime.
-    -- The manifest is loaded before Features, so BNB.ICON_MANIFEST is ready.
-    if BNB.ICON_MANIFEST then
-        for _, path in ipairs(BNB.ICON_MANIFEST) do
-            if path:find("\\Books\\") or path:find("\\Notes\\") then
+    -- The books and notes categories of the icon catalog (ALL-238).
+    -- The manifest is loaded before Features, so BNB.IconsIn is ready.
+    if BNB.IconsIn then
+        for _, key in ipairs({ "books", "notes" }) do
+            for _, path in ipairs(BNB.IconsIn(key)) do
                 RANDOM_ICONS[#RANDOM_ICONS + 1] = path
             end
         end

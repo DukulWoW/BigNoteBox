@@ -304,6 +304,19 @@ function BNB.CreateButton(name, parent, text, w, h)
     return btn
 end
 
+-- Keeps a BNB.CreateButton label inside the button: fixed width, one line,
+-- ends in "..." when too long (an icon name overflowed the Note Settings
+-- Icon button, Dukul 2026-10-04). pad = room on each side, default 8.
+function BNB.TruncateButtonText(btn, pad)
+    local fs = btn._lbl or (btn.GetFontString and btn:GetFontString())
+    if not fs then return end
+    pad = pad or 8
+    fs:ClearAllPoints()
+    fs:SetPoint("LEFT",  btn, "LEFT",   pad, 0)
+    fs:SetPoint("RIGHT", btn, "RIGHT", -pad, 0)
+    fs:SetWordWrap(false)
+end
+
 --------------------------------------------------------------------------------
 -- TINT BUTTON  (skin mode only)
 -- Recolours all texture regions of a UIPanelButtonTemplate-based button to

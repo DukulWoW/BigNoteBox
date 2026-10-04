@@ -221,6 +221,7 @@ local function TogglePopup(ed)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
     end
     f:Show()
+    f:Raise()   -- Note Settings is DIALOG too since 2026-10-04: stay above it
 end
 
 --------------------------------------------------------------------------------

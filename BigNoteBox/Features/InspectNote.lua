@@ -57,6 +57,8 @@ local RACE_ICON_MAP = {
     -- Midnight
     EarthenDwarf         = "race_earthendwarf",
     Harronir             = "race_harronir",
+    -- Forever only: "High Order Skyborne", race id 95 (Dukul, 2026-10-04)
+    Skyborne             = "race_skyborne",
 }
 
 -- Goblin uses a different naming convention for male/female

@@ -387,16 +387,8 @@ local function RegisterConfigPopups()
             OnAccept = function() C_UI.Reload() end,
         }
     end
-
-    if not StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] then
-        StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
-            text = L["CFG_BLZICON_DISABLED_MSG"],
-            button1 = L["CFG_RELOAD_NOW_BTN"],
-            button2 = L["CFG_LATER_BTN"],
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            OnAccept = function() C_UI.Reload() end,
-        }
-    end
+    -- BNB_BLZICON_AC_DISABLE lives in UI/BlizzardIconList.lua (the icon picker
+    -- shows it too, before this window exists)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────

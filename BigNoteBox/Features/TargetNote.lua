@@ -169,9 +169,13 @@ end
 -- Draws the NPC's portrait into tex for an NPC note. Returns true when drawn;
 -- otherwise starts the display-ID lookup and returns false, and the caller
 -- keeps the note icon (BNB.NpcNoteIcon).
+-- An icon the player picked wins over the portrait: a target note is made
+-- without iconSource, and every pick sets one (Dukul, 2026-10-04: the
+-- "Target note: Hogger" icon could not be changed). Revert in the icon
+-- picker brings the portrait back.
 function BNB.SetNpcNotePortrait(tex, note)
     if not (tex and note and note.source == "target" and note.targetNpcID)
-       or note.targetIsPet then
+       or note.targetIsPet or note.iconSource then
         return false
     end
     local id = note.targetDisplayID

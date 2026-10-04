@@ -71,6 +71,17 @@ function BNB.InitBlizzardIconList(announce)
     return false
 end
 
+-- Shown when the setting is switched off, from Settings > Modules or the icon
+-- picker's "All game icons" box. Defined here at load, not with the Settings
+-- window's popups: the picker can switch it off before Settings was ever built
+StaticPopupDialogs["BNB_BLZICON_AC_DISABLE"] = {
+    text = L["CFG_BLZICON_DISABLED_MSG"],
+    button1 = L["CFG_RELOAD_NOW_BTN"],
+    button2 = L["CFG_LATER_BTN"],
+    timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+    OnAccept = function() C_UI.Reload() end,
+}
+
 -- Login: load quietly if the setting is on (still behind the loading screen)
 BNB.RegisterEvent("PLAYER_LOGIN", function()
     BNB.InitBlizzardIconList(false)

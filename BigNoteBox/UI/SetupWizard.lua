@@ -920,7 +920,7 @@ local function BuildPage4(content)
         local iconTex = btn:CreateTexture(nil, "ARTWORK")
         iconTex:SetSize(iconSz, iconSz)
         iconTex:SetPoint("LEFT", btn, "LEFT", 8, 0)
-        iconTex:SetTexture(ASSETS .. "Icons\\Notes\\INV_Misc_Note_01")
+        iconTex:SetTexture("Interface\\Icons\\INV_Misc_Note_01")
         iconTex:SetTexCoord(0, 1, 0, 1)
 
         -- Label

@@ -35,61 +35,6 @@ local TAB_GEN   = 1
 local TAB_APP   = 2
 local TAB_SIT   = 3
 
--- Icon grid state
-local GRID_COLS  = 6
-local CELL       = 32
-local CELL_PAD   = 3
-local iconBtns   = {}
-local _filter    = ""
-
--- ── Icon list — sourced from Assets/Icons/IconManifest.lua ───────────────────
--- Add/remove icons by editing Assets/Icons/ subfolders and re-running
--- Tools/gen_icon_manifest.py; no changes needed in this file.
-local ICON_LIST = BNB.ICON_MANIFEST or {}
--- Synonym table: each entry maps a full keyword to a list of additional search terms.
--- Partial-match lookup: if the typed text is a prefix of a key, its synonyms are included.
-local ICON_SYNONYMS = {
-    ["race"]       = {"character", "achievement_character"},
-    ["character"]  = {"race",      "achievement_character"},
-    ["class"]      = {"classicon"},
-    ["dungeon"]    = {"instance",  "achievement_dungeon"},
-    ["raid"]       = {"achievement_raid"},
-    ["zone"]       = {"achievement_zone", "teleport"},
-    ["profession"] = {"trade", "inv_misc_profession"},
-    ["spell"]      = {"ability"},
-    ["note"]       = {"inv_misc_note", "inv_misc_notescript"},
-}
-
-local function GetFilteredIcons(filter)
-    if not filter or filter == "" then return ICON_LIST end
-    local lower = filter:lower()
-    -- Build the set of search terms: start with the typed text, then add synonyms
-    -- for any ICON_SYNONYMS key that the typed text is a prefix of.
-    local terms = {lower}
-    local seen  = {[lower] = true}
-    for key, syns in pairs(ICON_SYNONYMS) do
-        if key:sub(1, #lower) == lower then   -- typed text is a prefix of this key
-            for _, syn in ipairs(syns) do
-                if not seen[syn] then
-                    terms[#terms+1] = syn
-                    seen[syn] = true
-                end
-            end
-        end
-    end
-    local result = {}
-    for _, path in ipairs(ICON_LIST) do
-        local name = (path:match("([^\\/:]+)$") or path):lower()
-        for _, term in ipairs(terms) do
-            if name:find(term, 1, true) then
-                result[#result+1] = path
-                break
-            end
-        end
-    end
-    return result
-end
-
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 local function GetNote()  return _noteID and BNB.GetNote(_noteID) end
 local function Save(fields)
@@ -581,135 +526,7 @@ local function BuildGeneralTab(sf, ct)
         fsSl:SetValue(GetNoteFontSize(), true)
     end
 
-    -- E — Text alignment (applies to main editor body)
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,L["NC_HDR_TEXT_ALIGNMENT"])
-
-    -- ALIGN_KEYS_NC holds the WoW native justify constants that note.textAlign is
-    -- actually saved as (unaffected by locale); ALIGN_LABELS_NC is the translatable
-    -- display text, looked up by that same key. See StickyNote.lua's identical fix
-    -- (ALL-08) for why the old display-string-doubles-as-key shape is unsafe.
-    local ALIGN_KEYS_NC   = { "LEFT", "CENTER", "RIGHT" }
-    local ALIGN_LABELS_NC = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
-
-    local function GetNoteAlignLabel()
-        local note = GetNote()
-        return ALIGN_LABELS_NC[(note and note.textAlign) or "LEFT"] or ALIGN_LABELS_NC.LEFT
-    end
-    local function ApplyNoteAlign(align)
-        Save({textAlign = align})
-        if BNB._editorBody then
-            pcall(function() BNB._editorBody:SetJustifyH(align) end)
-        end
-    end
-
-    local useNativeAlignNC = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-    if useNativeAlignNC then
-        local alignDD = CreateFrame("DropdownButton", "BNBNoteAlignDD", panel,
-            "WowStyle1DropdownTemplate")
-        alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        alignDD:SetWidth(CW_SCROLL)
-        alignDD:SetupMenu(function(_, root)
-            for _, key in ipairs(ALIGN_KEYS_NC) do
-                local k = key
-                root:CreateRadio(ALIGN_LABELS_NC[k],
-                    function()
-                        local note = GetNote()
-                        return ((note and note.textAlign) or "LEFT") == k
-                    end,
-                    function()
-                        ApplyNoteAlign(k)
-                        alignDD:GenerateMenu()
-                    end)
-            end
-        end)
-        y = y - 36
-    else
-        local alignBtn = BNB.CreateButton(nil, panel, GetNoteAlignLabel(), CW_SCROLL, 22)
-        alignBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        alignBtn:SetScript("OnClick", function(self)
-            local note = GetNote()
-            local cur = (note and note.textAlign) or "LEFT"
-            local idx = 1
-            for i, k in ipairs(ALIGN_KEYS_NC) do if k == cur then idx = i; break end end
-            idx = (idx % #ALIGN_KEYS_NC) + 1
-            local key = ALIGN_KEYS_NC[idx]
-            ApplyNoteAlign(key)
-            self:SetText(ALIGN_LABELS_NC[key])
-        end)
-        y = y - 28
-    end
-
-    -- F — Font outline (applies to main editor body)
-    y = Rule(panel,y) - 4
-    y = Hdr(panel,y,L["NC_HDR_FONT_OUTLINE"])
-
-    local OUTLINE_OPTIONS_NC = {
-        "None", "Outline", "Thick Outline", "Monochrome Outline",
-        "SLUG", "SLUG Outline", "SLUG Thick Outline",
-        "Drop Shadow", "Strong Drop Shadow", "Strongest Drop Shadow",
-    }
-    local function GetNoteOutlineLabel()
-        local note = GetNote()
-        return (note and note.fontOutline) or "None"
-    end
-    local function ApplyNoteOutline(outline)
-        Save({fontOutline = outline})
-        if BNB._editorBody then
-            local flags, ox, oy, sr, sg, sb, sa
-            if     outline == "Outline"           then flags = "OUTLINE"
-            elseif outline == "Thick Outline"     then flags = "THICKOUTLINE"
-            elseif outline == "Monochrome Outline" then flags = "MONOCHROME,OUTLINE"
-            elseif outline == "SLUG"              then flags = "SLUG"
-            elseif outline == "SLUG Outline"      then flags = "OUTLINE, SLUG"
-            elseif outline == "SLUG Thick Outline" then flags = "THICKOUTLINE, SLUG"
-            else flags = "" end
-            if     outline == "Drop Shadow"           then ox,oy,sr,sg,sb,sa = 1,-1,0,0,0,0.8
-            elseif outline == "Strong Drop Shadow"    then ox,oy,sr,sg,sb,sa = 2,-2,0,0,0,1.0
-            elseif outline == "Strongest Drop Shadow" then ox,oy,sr,sg,sb,sa = 3,-3,0,0,0,1.0
-            else ox,oy,sr,sg,sb,sa = 0,0,0,0,0,0 end
-            local path, sz = BNB._editorBody:GetFont()
-            if path then pcall(function() BNB._editorBody:SetFont(path, sz, flags) end) end
-            pcall(function() BNB._editorBody:SetShadowOffset(ox, oy) end)
-            pcall(function() BNB._editorBody:SetShadowColor(sr, sg, sb, sa) end)
-        end
-    end
-
-    local useNativeOutlineNC = useNativeAlignNC
-    if useNativeOutlineNC then
-        local outlineDD = CreateFrame("DropdownButton", "BNBNoteOutlineDD", panel,
-            "WowStyle1DropdownTemplate")
-        outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        outlineDD:SetWidth(CW_SCROLL)
-        outlineDD:SetupMenu(function(_, root)
-            for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
-                local o = opt
-                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
-                    function() return GetNoteOutlineLabel() == o end,
-                    function()
-                        ApplyNoteOutline(o)
-                        outlineDD:GenerateMenu()
-                    end)
-            end
-        end)
-        y = y - 36
-    else
-        local outlineBtn = BNB.CreateButton(nil, panel,
-            BNB.AdvancedMode.OutlineLabel(GetNoteOutlineLabel()), CW_SCROLL, 22)
-        outlineBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        outlineBtn:SetScript("OnClick", function(self)
-            local cur = GetNoteOutlineLabel()
-            local idx = 1
-            for i, o in ipairs(OUTLINE_OPTIONS_NC) do if o == cur then idx = i; break end end
-            idx = (idx % #OUTLINE_OPTIONS_NC) + 1
-            local opt = OUTLINE_OPTIONS_NC[idx]
-            ApplyNoteOutline(opt)
-            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
-        end)
-        y = y - 28
-    end
-
     y = Hdr(panel,y,L["NC_HDR_LOCK"])
 
     local lockBtns = {}
@@ -942,120 +759,142 @@ end
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 2 — APPEARANCE
--- Uses a scrollable panel because the icon grid can be tall
 -- ─────────────────────────────────────────────────────────────────────────────
-local iconScrollChild
-local iconGridSF   -- scroll frame, stored so RefreshIconGrid can sync scrollbar alpha
-
-local function RefreshIconGrid(scrollToSelected)
-    if not iconScrollChild then return end
-    local note    = GetNote()
-    local current = note and note.icon or ""
-    local icons   = GetFilteredIcons(_filter)
-
-    local rows   = math.max(1, math.ceil(#icons / GRID_COLS))
-    local totalH = rows * (CELL + CELL_PAD) + CELL_PAD
-    iconScrollChild:SetHeight(totalH)
-
-    local selectedRow = nil   -- 0-based row of the selected icon (for scroll)
-
-    for i, path in ipairs(icons) do
-        if not iconBtns[i] then
-            local btn = CreateFrame("Button", nil, iconScrollChild)
-            btn:SetSize(CELL, CELL)
-            local tex = btn:CreateTexture(nil, "ARTWORK")
-            tex:SetAllPoints(); tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-            btn._tex = tex
-            -- Stronger selection highlight: solid green border overlay
-            local sel = btn:CreateTexture(nil, "OVERLAY")
-            sel:SetPoint("TOPLEFT",     btn, "TOPLEFT",     -2, 2)
-            sel:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",  2, -2)
-            sel:SetColorTexture(0.2, 0.9, 0.2, 0.55)
-            sel:Hide()
-            btn._sel = sel
-            local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-            hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.25)
-            btn:SetScript("OnEnter", function(s)
-                GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-                local name = (s._path or ""):match("([^\\/:]+)$") or ""
-                GameTooltip:AddLine(name, 1, 1, 1)
-                GameTooltip:Show()
-            end)
-            btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            btn:SetScript("OnClick", function(s)
-                Save({icon = s._path}); RefreshIconGrid()
-            end)
-            iconBtns[i] = btn
-        end
-        local btn = iconBtns[i]
-        local col = (i - 1) % GRID_COLS
-        local row = math.floor((i - 1) / GRID_COLS)
-        btn:ClearAllPoints()
-        btn:SetPoint("TOPLEFT", iconScrollChild, "TOPLEFT",
-            CELL_PAD + col * (CELL + CELL_PAD),
-            -(CELL_PAD + row * (CELL + CELL_PAD)))
-        btn._path = path
-        btn._tex:SetTexture(path)
-        local isSel = (path == current)
-        btn._sel:SetShown(isSel)
-        if isSel then selectedRow = row end
-        btn:Show()
-    end
-    for i = #icons + 1, #iconBtns do iconBtns[i]:Hide() end
-
-    -- Scroll to show the selected icon when requested (on open or icon change)
-    if scrollToSelected and selectedRow and iconGridSF then
-        C_Timer.After(0, function()
-            if not iconGridSF then return end
-            local sfH    = iconGridSF:GetHeight()
-            local rowTop = selectedRow * (CELL + CELL_PAD)
-            local rowBot = rowTop + CELL + CELL_PAD
-            local cur    = iconGridSF:GetVerticalScroll()
-            if rowTop < cur then
-                iconGridSF:SetVerticalScroll(math.max(0, rowTop - CELL_PAD))
-            elseif rowBot > cur + sfH then
-                iconGridSF:SetVerticalScroll(rowTop - CELL_PAD)
-            end
-        end)
-    end
-
-    -- Sync scrollbar visibility. sf.ScrollBar may be nil on some retail builds;
-    -- fall back to searching for a Slider child on the scroll frame itself.
-    -- Then set alpha on it plus all its own children and regions so
-    -- (which doesn't propagate parent alpha) also shows/hides correctly.
-    local function SyncIconScrollbar()
-        local sf = iconGridSF
-        if not sf then return end
-        -- Find the scrollbar widget
-        local bar = sf.ScrollBar
-        if not bar then
-            for _, child in ipairs({sf:GetChildren()}) do
-                if child.IsObjectType and child:IsObjectType("Slider") then
-                    bar = child; break
-                end
-            end
-        end
-        if not bar then return end
-        local ch       = sf:GetScrollChild()
-        local overflow = ch and (ch:GetHeight() > sf:GetHeight() + 2)
-        local a = overflow and 1.0 or 0.0
-        bar:SetAlpha(a)
-        for _, child in ipairs({bar:GetChildren()}) do
-            pcall(function() child:SetAlpha(a) end)
-        end
-        for _, region in ipairs({bar:GetRegions()}) do
-            pcall(function() region:SetAlpha(a) end)
-        end
-    end
-    C_Timer.After(0, SyncIconScrollbar)
-end
-
 local function BuildAppearanceTab(panel)
     local y = -4
+
+    -- Text alignment (applies to main editor body), moved from General (Dukul, 2026-10-04)
+    y = Hdr(panel,y,L["NC_HDR_TEXT_ALIGNMENT"])
+
+    -- ALIGN_KEYS_NC holds the WoW native justify constants that note.textAlign is
+    -- actually saved as (unaffected by locale); ALIGN_LABELS_NC is the translatable
+    -- display text, looked up by that same key. See StickyNote.lua's identical fix
+    -- (ALL-08) for why the old display-string-doubles-as-key shape is unsafe.
+    local ALIGN_KEYS_NC   = { "LEFT", "CENTER", "RIGHT" }
+    local ALIGN_LABELS_NC = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
+
+    local function GetNoteAlignLabel()
+        local note = GetNote()
+        return ALIGN_LABELS_NC[(note and note.textAlign) or "LEFT"] or ALIGN_LABELS_NC.LEFT
+    end
+    local function ApplyNoteAlign(align)
+        Save({textAlign = align})
+        if BNB._editorBody then
+            pcall(function() BNB._editorBody:SetJustifyH(align) end)
+        end
+    end
+
+    local useNativeAlignNC = C_XMLUtil and C_XMLUtil.GetTemplateInfo
+        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+    if useNativeAlignNC then
+        local alignDD = CreateFrame("DropdownButton", "BNBNoteAlignDD", panel,
+            "WowStyle1DropdownTemplate")
+        alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+        alignDD:SetWidth(CW)
+        alignDD:SetupMenu(function(_, root)
+            for _, key in ipairs(ALIGN_KEYS_NC) do
+                local k = key
+                root:CreateRadio(ALIGN_LABELS_NC[k],
+                    function()
+                        local note = GetNote()
+                        return ((note and note.textAlign) or "LEFT") == k
+                    end,
+                    function()
+                        ApplyNoteAlign(k)
+                        alignDD:GenerateMenu()
+                    end)
+            end
+        end)
+        y = y - 36
+    else
+        local alignBtn = BNB.CreateButton(nil, panel, GetNoteAlignLabel(), CW, 22)
+        alignBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+        alignBtn:SetScript("OnClick", function(self)
+            local note = GetNote()
+            local cur = (note and note.textAlign) or "LEFT"
+            local idx = 1
+            for i, k in ipairs(ALIGN_KEYS_NC) do if k == cur then idx = i; break end end
+            idx = (idx % #ALIGN_KEYS_NC) + 1
+            local key = ALIGN_KEYS_NC[idx]
+            ApplyNoteAlign(key)
+            self:SetText(ALIGN_LABELS_NC[key])
+        end)
+        y = y - 28
+    end
+
+    -- F — Font outline (applies to main editor body)
+    y = Rule(panel,y) - 4
+    y = Hdr(panel,y,L["NC_HDR_FONT_OUTLINE"])
+
+    local OUTLINE_OPTIONS_NC = {
+        "None", "Outline", "Thick Outline", "Monochrome Outline",
+        "SLUG", "SLUG Outline", "SLUG Thick Outline",
+        "Drop Shadow", "Strong Drop Shadow", "Strongest Drop Shadow",
+    }
+    local function GetNoteOutlineLabel()
+        local note = GetNote()
+        return (note and note.fontOutline) or "None"
+    end
+    local function ApplyNoteOutline(outline)
+        Save({fontOutline = outline})
+        if BNB._editorBody then
+            local flags, ox, oy, sr, sg, sb, sa
+            if     outline == "Outline"           then flags = "OUTLINE"
+            elseif outline == "Thick Outline"     then flags = "THICKOUTLINE"
+            elseif outline == "Monochrome Outline" then flags = "MONOCHROME,OUTLINE"
+            elseif outline == "SLUG"              then flags = "SLUG"
+            elseif outline == "SLUG Outline"      then flags = "OUTLINE, SLUG"
+            elseif outline == "SLUG Thick Outline" then flags = "THICKOUTLINE, SLUG"
+            else flags = "" end
+            if     outline == "Drop Shadow"           then ox,oy,sr,sg,sb,sa = 1,-1,0,0,0,0.8
+            elseif outline == "Strong Drop Shadow"    then ox,oy,sr,sg,sb,sa = 2,-2,0,0,0,1.0
+            elseif outline == "Strongest Drop Shadow" then ox,oy,sr,sg,sb,sa = 3,-3,0,0,0,1.0
+            else ox,oy,sr,sg,sb,sa = 0,0,0,0,0,0 end
+            local path, sz = BNB._editorBody:GetFont()
+            if path then pcall(function() BNB._editorBody:SetFont(path, sz, flags) end) end
+            pcall(function() BNB._editorBody:SetShadowOffset(ox, oy) end)
+            pcall(function() BNB._editorBody:SetShadowColor(sr, sg, sb, sa) end)
+        end
+    end
+
+    local useNativeOutlineNC = useNativeAlignNC
+    if useNativeOutlineNC then
+        local outlineDD = CreateFrame("DropdownButton", "BNBNoteOutlineDD", panel,
+            "WowStyle1DropdownTemplate")
+        outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+        outlineDD:SetWidth(CW)
+        outlineDD:SetupMenu(function(_, root)
+            for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
+                local o = opt
+                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
+                    function() return GetNoteOutlineLabel() == o end,
+                    function()
+                        ApplyNoteOutline(o)
+                        outlineDD:GenerateMenu()
+                    end)
+            end
+        end)
+        y = y - 36
+    else
+        local outlineBtn = BNB.CreateButton(nil, panel,
+            BNB.AdvancedMode.OutlineLabel(GetNoteOutlineLabel()), CW, 22)
+        outlineBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+        outlineBtn:SetScript("OnClick", function(self)
+            local cur = GetNoteOutlineLabel()
+            local idx = 1
+            for i, o in ipairs(OUTLINE_OPTIONS_NC) do if o == cur then idx = i; break end end
+            idx = (idx % #OUTLINE_OPTIONS_NC) + 1
+            local opt = OUTLINE_OPTIONS_NC[idx]
+            ApplyNoteOutline(opt)
+            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
+        end)
+        y = y - 28
+    end
 
     -- Icon frame / edge border picker (ALL-127: replaces the old LSM border
     -- dropdown; a game-art frame and an LSM edge border are mutually
     -- exclusive, the picker's two tabs enforce that)
+    y = Rule(panel, y) - 4
     y = Hdr(panel, y, L["NC_HDR_BORDER"])
     local function CurIconFrameLabel()
         local n = GetNote()
@@ -1068,6 +907,7 @@ local function BuildAppearanceTab(panel)
         return L["STICKY_BG_NONE"]
     end
     local ifBtn = BNB.CreateButton(nil, panel, L["NC_ICON_FRAME_BTN"], CW, 22)
+    BNB.TruncateButtonText(ifBtn)   -- LSM border names can be long
     local function RefreshIconFrameBtn()
         ifBtn:SetText(L["NC_ICON_FRAME_BTN"] .. ": " .. CurIconFrameLabel())
         if ifBtn._syncOffset then ifBtn._syncOffset() end
@@ -1138,330 +978,137 @@ local function BuildAppearanceTab(panel)
     end
     ifBtn._syncOffset()
 
-    -- Icon section with BNB Icons / Blizzard Icon tabs
+    -- Icon: the current icon and a button that opens the icon picker beside
+    -- the window (ALL-238, UI/IconPicker.lua); the old grid / Blizzard tabs
     y = Rule(panel, y) - 4
     y = Hdr(panel, y, L["NC_HDR_ICON"])
 
-    -- ── Tab buttons ──────────────────────────────────────────────────────────
-    local TAB_W  = math.floor((CW - 4) / 2)
-    local TAB_H  = 22
-    local tabBNB = BNB.CreateButton(nil, panel, L["NC_TAB_BNB_ICONS"],     TAB_W, TAB_H)
-    local tabBLZ = BNB.CreateButton(nil, panel, L["NC_TAB_BLIZZARD_ICON"], TAB_W, TAB_H)
-    tabBNB:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    tabBLZ:SetPoint("TOPLEFT", panel, "TOPLEFT", TAB_W + 4, y)
-    y = y - TAB_H - 6
+    local iconBtn = BNB.CreateButton(nil, panel, L["NC_ICON_PICK_BTN"], CW, 22)
+    BNB.TruncateButtonText(iconBtn)   -- icon names can be long
+    iconBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    y = y - 28
 
-    -- Containers for each tab's content — both anchored to same y, one shown at a time
-    local bnbPane = CreateFrame("Frame", nil, panel)
-    bnbPane:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    bnbPane:SetWidth(CW)
+    -- Preview section at the bottom: the icon as the note list draws it, with
+    -- the icon frame or edge border and the Border sliders (Dukul, 2026-10-04).
+    -- Room above and below for a frame's art, which reaches past the icon.
+    y = Rule(panel, y) - 4
+    y = Hdr(panel, y, L["NC_HDR_PREVIEW"])
+    local PREV = 64
+    local prevHost = CreateFrame("Frame", nil, panel)
+    prevHost:SetSize(PREV, PREV)
+    prevHost:SetPoint("TOP", panel, "TOPLEFT", CW / 2, y - 16)
+    local iconTex = prevHost:CreateTexture(nil, "ARTWORK")
+    iconTex:SetAllPoints()
+    iconTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    local prevBorder = BNB.CreateBackdropFrame("Frame", nil, prevHost)
+    prevBorder:SetFrameLevel(prevHost:GetFrameLevel() + 2)
+    prevBorder:EnableMouse(false)
+    prevBorder:Hide()
+    -- Random: a random icon and a random icon frame (Dukul, 2026-10-04); its
+    -- click is set after IconPickHandlers below
+    local rndLookBtn = BNB.CreateButton(nil, panel, L["NC_RANDOM_BTN"], CW, 22)
+    rndLookBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y - 16 - PREV - 22)
 
-    local blzPane = CreateFrame("Frame", nil, panel)
-    blzPane:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    blzPane:SetWidth(CW)
-
-    -- ── BNB Icons tab content ────────────────────────────────────────────────
-    -- Search bar
-    local sBg = BNB.CreateBackdropFrame("Frame", nil, bnbPane); BNB.SetBackdropDark(sBg)
-    sBg:SetPoint("TOPLEFT", bnbPane, "TOPLEFT", 0, 0); sBg:SetWidth(CW); sBg:SetHeight(22)
-    local sEb = CreateFrame("EditBox", nil, sBg)
-    sEb:SetPoint("TOPLEFT", sBg, "TOPLEFT", 4, 0)
-    sEb:SetPoint("BOTTOMRIGHT", sBg, "BOTTOMRIGHT", -24, 0)
-    sEb:SetFontObject("GameFontNormal"); sEb:SetAutoFocus(false); sEb:SetMaxLetters(60)
-    BNB.AddPlaceholder(sEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.4, 0.4, 0.4)
-
-    -- Clear (X) button
-    local sClear = CreateFrame("Button", nil, sBg)
-    sClear:SetSize(18, 18)
-    sClear:SetPoint("RIGHT", sBg, "RIGHT", -2, 0)
-    local sClearLbl = sClear:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    sClearLbl:SetAllPoints(); sClearLbl:SetText(L["NC_CLEAR_X"])
-    sClearLbl:SetTextColor(0.65, 0.65, 0.65)
-    sClear:Hide()
-    sClear:SetScript("OnEnter", function() sClearLbl:SetTextColor(1, 0.4, 0.4) end)
-    sClear:SetScript("OnLeave", function() sClearLbl:SetTextColor(0.65, 0.65, 0.65) end)
-    sClear:SetScript("OnClick", function()
-        sEb:SetText(""); sEb._showingPlaceholder = false
-        BNB.AddPlaceholder(sEb, L["NC_SEARCH_ICONS_PLACEHOLDER"], 0.4, 0.4, 0.4)
-        _filter = ""; sClear:Hide()
-        RefreshIconGrid()
-    end)
-    sEb:SetScript("OnTextChanged", function(self, u)
-        if not u then return end
-        _filter = self._showingPlaceholder and "" or (self:GetText() or "")
-        if _filter ~= "" then sClear:Show() else sClear:Hide() end
-        RefreshIconGrid()
-    end)
-    sEb:SetScript("OnEscapePressed", function(s) s:ClearFocus() end)
-
-    -- Grid — 7 full rows of 32px icons, scrollbar on left (was 8, which pushed
-    -- the Use Default / Random buttons below the window's bottom edge)
-    local AREA_H = 7 * (CELL + CELL_PAD) + CELL_PAD   -- 248px
-    local SBAR_W = 20
-    local iSF = CreateFrame("ScrollFrame", nil, bnbPane, "ScrollFrameTemplate")
-    iconGridSF = iSF
-    iSF:SetPoint("TOPLEFT",  bnbPane, "TOPLEFT",  SBAR_W, -28)
-    iSF:SetPoint("TOPRIGHT", bnbPane, "TOPRIGHT", 0, -28)
-    iSF:SetHeight(AREA_H)
-
-    local _iconBar
-    local function SetIconBarAlpha(a)
-        if not _iconBar then
-            _iconBar = iSF.ScrollBar
-            if not _iconBar then
-                for _, child in ipairs({iSF:GetChildren()}) do
-                    if child.IsObjectType and child:IsObjectType("Slider") then
-                        _iconBar = child; break
-                    end
-                end
-            end
-        end
-        if not _iconBar then return end
-        _iconBar:ClearAllPoints()
-        _iconBar:SetPoint("TOPLEFT",    iSF, "TOPLEFT",    -SBAR_W, 0)
-        _iconBar:SetPoint("BOTTOMLEFT", iSF, "BOTTOMLEFT", -SBAR_W, 0)
-        _iconBar:SetAlpha(a)
-        for _, child in ipairs({_iconBar:GetChildren()}) do
-            pcall(function() child:SetAlpha(a) end)
-        end
-        for _, region in ipairs({_iconBar:GetRegions()}) do
-            pcall(function() region:SetAlpha(a) end)
-        end
+    local function PaintPreviewBorder(n)
+        prevBorder:Hide()
+        if BNB.ApplyIconFrame(iconTex, n, PREV) then return end
+        -- Same maths as the note list's LSM edge border (UI/NoteList.lua)
+        local bord = n and n.borderOverride
+        if not bord or bord == "" or bord == "None" then return end
+        local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+        local path = LSM and LSM:Fetch("border", bord)
+        if not path then return end
+        local off    = n.borderOffset or 2
+        local bright = (n.borderBrightness or 100) / 100
+        local es = math.max(1, math.floor(12 * (n.borderScale or 100) / 100 + 0.5))
+        prevBorder:ClearAllPoints()
+        prevBorder:SetPoint("TOPLEFT",     iconTex, "TOPLEFT",     -off,  off)
+        prevBorder:SetPoint("BOTTOMRIGHT", iconTex, "BOTTOMRIGHT",  off, -off)
+        pcall(function()
+            prevBorder:SetBackdrop({ edgeFile = path, edgeSize = es })
+            prevBorder:SetBackdropBorderColor(math.min(1, 0.70 * bright),
+                math.min(1, 0.70 * bright), math.min(1, 0.75 * bright), 0.85)
+        end)
+        prevBorder:Show()
     end
-    SetIconBarAlpha(0)
-    iSF:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-        SetIconBarAlpha((yRange or 0) > 1 and 1.0 or 0)
-    end)
-    iconScrollChild = CreateFrame("Frame", nil, iSF)
-    iconScrollChild:SetWidth(iSF:GetWidth() - 20)
-    iconScrollChild:SetHeight(10)
-    iSF:SetScrollChild(iconScrollChild)
-    iSF:SetScript("OnSizeChanged", function(s)
-        iconScrollChild:SetWidth(s:GetWidth() - 20)
-    end)
 
-    -- Use Default / Random buttons
-    local btnW = math.floor((CW - 4) / 2)
-    local clrBtn = BNB.CreateButton(nil, bnbPane, L["NC_USE_DEFAULT_BTN"], btnW, 22)
-    clrBtn:SetPoint("TOPLEFT", bnbPane, "TOPLEFT", 0, -(28 + AREA_H + 4))
-    clrBtn:SetScript("OnClick", function()
+    local function RefreshIconRow()
+        local n = GetNote()
+        local shown = n and (BNB.NpcNoteIcon and BNB.NpcNoteIcon(n) or n.icon)
+        iconTex:SetTexture((shown and shown ~= "") and shown or "Interface\\Icons\\INV_Misc_Note_06")
+        if n and BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(iconTex, n) end
+        PaintPreviewBorder(n)
+        local name = (n and n.icon and n.icon ~= "") and BNB.IconPicker.IconName(n.icon)
+            or L["NC_ICON_PICK_NONE"]
+        iconBtn:SetText(L["NC_ICON_PICK_BTN"] .. ": " .. name)
+    end
+    local function IconPickHandlers()
+        local n0 = GetNote()
+        local isNpc = n0 and n0.source == "target" and n0.targetNpcID and not n0.targetIsPet
+        return {
+            get       = function() local n = GetNote(); return n and n.icon end,
+            getSource = function() local n = GetNote(); return n and n.iconSource end,
+            -- NPC target notes: the picker's "NPC portrait" button (Dukul, 2026-10-04)
+            portraitOn  = isNpc and function() local n = GetNote(); return n and not n.iconSource end or nil,
+            usePortrait = isNpc and function()
+                if not _noteID then return end
+                BNB.UpdateNote(_noteID, {_clear = {"iconSource"}})
+                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
+                RefreshIconRow()
+            end or nil,
+            set = function(icon, source)
+                if not _noteID then return end
+                if icon == nil then BNB.UpdateNote(_noteID, {_clear = {"icon", "iconSource"}})
+                elseif source then BNB.UpdateNote(_noteID, {icon = icon, iconSource = source})
+                else
+                    -- No source (Revert to a note that had none): an NPC note
+                    -- shows its portrait again (BNB.SetNpcNotePortrait)
+                    BNB.UpdateNote(_noteID, {icon = icon, _clear = {"iconSource"}})
+                end
+                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
+                RefreshIconRow()
+                -- The frame picker's tiles wear the note's icon
+                if BNB.IconFramePicker.IsOpenFor(_noteID) then
+                    BNB.IconFramePicker.Rebind(_noteID, IconFrameHandlers())
+                end
+            end,
+        }
+    end
+    -- Both pickers open in the same spot beside the window: one at a time
+    iconBtn:SetScript("OnClick", function(self)
+        BNB.IconFramePicker.Close()
+        BNB.IconPicker.Open(_noteID, ncFrame or self, IconPickHandlers())
+    end)
+    ifBtn:HookScript("OnClick", function() BNB.IconPicker.Close() end)
+    rndLookBtn:SetScript("OnClick", function()
         if not _noteID then return end
-        -- Pick a random icon from the Notes subfolder
-        local noteIcons = {}
-        for _, path in ipairs(ICON_LIST) do
-            if path:find("\\Notes\\", 1, true) then
-                noteIcons[#noteIcons + 1] = path
-            end
+        local icons = BNB.ICON_MANIFEST or {}
+        if #icons > 0 then IconPickHandlers().set(icons[math.random(#icons)], "curated") end
+        local frames = BNB.IconFrames and BNB.IconFrames.LIST or {}
+        if #frames > 0 then
+            local h = IconFrameHandlers()
+            h.setFrame(frames[math.random(#frames)].key)
+            local b = h.getBorder()
+            if b and b ~= "" and b ~= "None" then h.setBorder("None") end
         end
-        if #noteIcons == 0 then return end
-        local pick = noteIcons[math.random(#noteIcons)]
-        BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        RefreshIconGrid(true)
+        BNB.IconPicker.Refresh()
+        if BNB.IconFramePicker.IsOpenFor(_noteID) then
+            BNB.IconFramePicker.Rebind(_noteID, IconFrameHandlers())
+        end
     end)
-
-    local rndBtn = BNB.CreateButton(nil, bnbPane, L["NC_RANDOM_BTN"], btnW, 22)
-    rndBtn:SetPoint("TOPLEFT", bnbPane, "TOPLEFT", btnW + 4, -(28 + AREA_H + 4))
-    rndBtn:SetScript("OnClick", function()
-        if not _noteID then return end
-        local icons = GetFilteredIcons("")
-        if #icons == 0 then return end
-        local pick = icons[math.random(#icons)]
-        BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        RefreshIconGrid()
-    end)
-
-    -- Total height consumed by bnbPane content
-    local BNB_PANE_H = 28 + AREA_H + 4 + 22   -- search + grid + gap + buttons
-
-    bnbPane:SetHeight(BNB_PANE_H)
-
-    -- ── Blizzard Icon tab content ────────────────────────────────────────────
-    -- Input label
-    local blzLbl = blzPane:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    blzLbl:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, 0)
-    blzLbl:SetTextColor(0.78, 0.78, 0.78)
-    blzLbl:SetText(L["NC_ICON_NAME_LABEL"])
-
-    -- Name input
-    local blzBg = BNB.CreateBackdropFrame("Frame", nil, blzPane); BNB.SetBackdropDark(blzBg)
-    blzBg:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, -16); blzBg:SetWidth(CW); blzBg:SetHeight(24)
-    -- Plain EditBox filling the whole backdrop (like the editor's icon field):
-    -- InputBoxTemplate drew a second border inside blzBg, and its 6px inset
-    -- left the outer ring unclickable, so clicking the "field" did not focus it
-    -- and the placeholder stayed.
-    local blzEb = CreateFrame("EditBox", nil, blzBg)
-    blzEb:SetAllPoints(blzBg)
-    blzEb:SetTextInsets(6, 6, 0, 0)
-    blzEb:SetFontObject("GameFontNormal"); blzEb:SetAutoFocus(false); blzEb:SetMaxLetters(128)
-    BNB.AddPlaceholder(blzEb, L["NC_ICON_NAME_PLACEHOLDER"], 0.4, 0.4, 0.4)
-
-    -- Preview icon (64x64)
-    local PREV_SZ   = 64
-    local PREV_PAD  = 8
-    local blzPreviewBg = BNB.CreateBackdropFrame("Frame", nil, blzPane); BNB.SetBackdropDark(blzPreviewBg)
-    blzPreviewBg:SetSize(PREV_SZ + 4, PREV_SZ + 4)
-    blzPreviewBg:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, -(16 + 24 + PREV_PAD))
-    local blzPreviewTex = blzPreviewBg:CreateTexture(nil, "ARTWORK")
-    blzPreviewTex:SetPoint("TOPLEFT",     blzPreviewBg, "TOPLEFT",     2, -2)
-    blzPreviewTex:SetPoint("BOTTOMRIGHT", blzPreviewBg, "BOTTOMRIGHT", -2,  2)
-    blzPreviewTex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-    -- Info label below preview
-    local blzInfo = blzPane:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    blzInfo:SetPoint("TOPLEFT",  blzPane, "TOPLEFT",  PREV_SZ + 4 + 8, -(16 + 24 + PREV_PAD))
-    blzInfo:SetPoint("TOPRIGHT", blzPane, "TOPRIGHT", 0, -(16 + 24 + PREV_PAD))
-    blzInfo:SetTextColor(0.55, 0.55, 0.55)
-    blzInfo:SetJustifyH("LEFT"); blzInfo:SetWordWrap(true)
-    blzInfo:SetText(L["NC_ICON_NAME_INFO"])
-
-    -- The label ends in the wowhead.com/icons link: clicking it opens the copy
-    -- box, as the same hint does in the editor's Insert icon popup. deferFocus
-    -- so this click does not pull focus back out of the copy box.
-    local blzInfoBtn = CreateFrame("Button", nil, blzPane)
-    blzInfoBtn:SetAllPoints(blzInfo)
-    blzInfoBtn:SetScript("OnClick", function(self)
-        BNB.ShowClipboardHint("www.wowhead.com/icons", self, true)
-    end)
-    blzInfoBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 1, 1, 1)
+    rndLookBtn:SetScript("OnEnter", function(self)
+        -- Below the button: above it would cover the preview (Dukul, 2026-10-04)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(L["NC_RANDOM_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["NC_RANDOM_LOOK_TIP"], 1, 0.82, 0, true)
         GameTooltip:Show()
     end)
-    blzInfoBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    rndLookBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Apply / Clear buttons for Blizzard tab
-    local BLZ_BTN_Y = -(16 + 24 + PREV_PAD + PREV_SZ + 4 + 6)
-    local blzApply = BNB.CreateButton(nil, blzPane, L["STICKY_SIT_APPLY_BTN"], btnW, 22)
-    blzApply:SetPoint("TOPLEFT", blzPane, "TOPLEFT", 0, BLZ_BTN_Y)
-    blzApply:SetEnabled(false)
-    blzApply:SetAlpha(0.4)
-
-    local blzClear = BNB.CreateButton(nil, blzPane, L["NC_USE_DEFAULT_BTN"], btnW, 22)
-    blzClear:SetPoint("TOPLEFT", blzPane, "TOPLEFT", btnW + 4, BLZ_BTN_Y)
-    blzClear:SetEnabled(false)
-    blzClear:SetAlpha(0.4)
-
-    local BLZ_PANE_H = 16 + 24 + PREV_PAD + PREV_SZ + 4 + 6 + 22
-
-    blzPane:SetHeight(BLZ_PANE_H)
-
-    -- Live preview update — sets texture and dynamic name label
-    local function ApplyBlzName(name)
-        if not name or name == "" then
-            blzPreviewTex:SetTexture(nil)
-            return false
-        end
-        local path = "Interface\\Icons\\" .. name
-        blzPreviewTex:SetTexture(path)
-        return true
-    end
-
-    local function CommitBlzIcon(name)
-        if not _noteID or not name or name == "" then return end
-        local path = "Interface\\Icons\\" .. name
-        BNB.UpdateNote(_noteID, {icon = path, iconSource = "blizzard"})
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-    end
-
-    blzEb:SetScript("OnTextChanged", function(self, u)
-        if not u then return end
-        if self._showingPlaceholder then return end
-        local name = self:GetText() or ""
-        local hasText = name ~= ""
-        blzApply:SetEnabled(hasText); blzApply:SetAlpha(hasText and 1.0 or 0.4)
-        ApplyBlzName(name)
+    -- An icon set somewhere else (editor, sticky) while this window is open
+    BNB.RegisterMessage("NoteConfigIcon", "NoteChanged", function(_, id)
+        if id == _noteID and ncFrame and ncFrame:IsShown() then RefreshIconRow() end
     end)
-    blzEb:SetScript("OnEnterPressed", function(self)
-        local name = self._showingPlaceholder and "" or (self:GetText() or "")
-        if ApplyBlzName(name) then CommitBlzIcon(name) end
-        self:ClearFocus()
-    end)
-    blzEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
-
-    blzApply:SetScript("OnClick", function()
-        local name = blzEb._showingPlaceholder and "" or (blzEb:GetText() or "")
-        if ApplyBlzName(name) then CommitBlzIcon(name) end
-    end)
-
-    -- Forward-declared so blzClear:SetScript closure can reference it before the definition below
-    local SetIconTab
-
-    blzClear:SetScript("OnClick", function()
-        if not _noteID then return end
-        -- Pick a random icon from the Notes subfolder and switch to BNB Icons tab
-        local noteIcons = {}
-        for _, path in ipairs(ICON_LIST) do
-            if path:find("\\Notes\\", 1, true) then
-                noteIcons[#noteIcons + 1] = path
-            end
-        end
-        if #noteIcons == 0 then return end
-        local pick = noteIcons[math.random(#noteIcons)]
-        BNB.UpdateNote(_noteID, {icon = pick, iconSource = "curated"})
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-        -- SetRealText, never AddPlaceholder again: that SetScripts the focus
-        -- handlers and wipes the icon autocomplete's hooks (see CLAUDE.md)
-        blzEb:SetRealText("")
-        blzPreviewTex:SetTexture(nil)
-        SetIconTab("bnb")
-        RefreshIconGrid(true)
-    end)
-
-    -- ── Tab switching ────────────────────────────────────────────────────────
-    local _activeIconTab = "bnb"  -- "bnb" or "blizzard"
-
-    SetIconTab = function(which)
-        _activeIconTab = which
-        if which == "blizzard" then
-            bnbPane:Hide(); blzPane:Show()
-        else
-            blzPane:Hide(); bnbPane:Show()
-        end
-    end
-
-    tabBNB:SetScript("OnClick", function() SetIconTab("bnb") end)
-    tabBLZ:SetScript("OnClick", function() SetIconTab("blizzard") end)
-
-    -- ── Sync on note open ────────────────────────────────────────────────────
-    -- Called from panel._refreshAppearance whenever a new note is loaded.
-    local function SyncIconTab()
-        local n = GetNote()
-        if n and n.iconSource == "blizzard" then
-            SetIconTab("blizzard")
-            blzClear:SetEnabled(true); blzClear:SetAlpha(1.0)
-            -- Populate input + preview with the stored icon name
-            local stored = n.icon or ""
-            -- Strip "Interface\Icons\" prefix to get bare name for the editbox
-            local name = stored:match("[^\\/]+$") or stored
-            -- Shows the placeholder when name is empty, without replacing the
-            -- focus handlers (AddPlaceholder would wipe the autocomplete hooks)
-            blzEb:SetRealText(name)
-            ApplyBlzName(name)
-            local hasText = name ~= ""
-            blzApply:SetEnabled(hasText); blzApply:SetAlpha(hasText and 1.0 or 0.4)
-        else
-            SetIconTab("bnb")
-            blzClear:SetEnabled(false); blzClear:SetAlpha(0.4)
-            blzApply:SetEnabled(false); blzApply:SetAlpha(0.4)
-        end
-        RefreshIconGrid()
-    end
-
-    -- Advance y past whichever pane is taller (they share the same y anchor)
-    local ICON_SECTION_H = math.max(BNB_PANE_H, BLZ_PANE_H)
-    y = y - ICON_SECTION_H - 4
-
-    -- Icon autocomplete — attached here, AFTER all SetScript/AddPlaceholder calls
-    -- above, so repeated AddPlaceholder calls in SyncIconTab and the Use Default
-    -- handler cannot overwrite our hooks (SetScript clears HookScript handlers).
-    if BNB.AttachIconAutocomplete then
-        BNB.AttachIconAutocomplete(blzEb, function(name)
-            ApplyBlzName(name)
-            blzApply:SetEnabled(true); blzApply:SetAlpha(1.0)
-        end)
-    end
 
     -- Refresh all border controls when switching notes (called by OpenNoteConfig/SyncNoteConfig)
     panel._refreshAppearance = function()
@@ -1479,12 +1126,9 @@ local function BuildAppearanceTab(panel)
         boSl:SetValue(bo, true)
         bbSl:SetValue(bb, true)
 
-        SyncIconTab()
+        RefreshIconRow()
+        BNB.IconPicker.Rebind(_noteID, IconPickHandlers())
     end
-
-    panel:HookScript("OnShow", function()
-        C_Timer.After(0.1, SyncIconTab)
-    end)
 end
 
 --------------------------------------------------------------------------------
@@ -1556,6 +1200,10 @@ local function CreateNoteConfigWindow()
         if f.CloseButton then f.CloseButton:SetScript("OnClick", function() f:Hide() end) end
     end
     tinsert(UISpecialFrames, "BigNoteBoxNoteConfigFrame")
+    -- Same strata as the Reference Box (DIALOG), which drew over this window
+    -- from MEDIUM whatever was clicked (Dukul, 2026-10-04). Raised on open,
+    -- and BNB.RaiseBNBWindows raises it after the Reference Box (WINDOWS order)
+    f:SetFrameStrata("DIALOG")
 
     -- Close ZonePicker whenever NoteConfig hides (any path: close btn, ESC, main
     -- window close); the Situation editor closes its waypoint info popup itself
@@ -1563,6 +1211,7 @@ local function CreateNoteConfigWindow()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
         -- The icon frame picker belongs to this window (ALL-127)
         if BNB.IconFramePicker then BNB.IconFramePicker.Close() end
+        if BNB.IconPicker then BNB.IconPicker.Close() end
     end)
 
     local tabDefs = {
@@ -1658,7 +1307,6 @@ function BNB.OpenNoteConfig(noteID, tab)
     if not ncFrame then ncFrame=CreateNoteConfigWindow() end
 
     RefreshTitle()
-    RefreshIconGrid(true)   -- scroll to show the currently selected icon on open
     local gPanel = tabPanels[TAB_GEN]
     if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
     if gPanel and gPanel._hlFonts         then gPanel._hlFonts()         end
@@ -1689,6 +1337,7 @@ function BNB.OpenNoteConfig(noteID, tab)
         ncFrame:SetPoint("CENTER")
     end
     ncFrame:Show()
+    ncFrame:Raise()
 end
 
 -- Refreshes NoteConfig content when the selected note changes, but only if the
@@ -1703,7 +1352,6 @@ function BNB.SyncNoteConfig(noteID)
 
     _noteID = noteID
     RefreshTitle()
-    RefreshIconGrid(true)   -- scroll to selected icon when syncing to a new note
 
     local gPanel = tabPanels[TAB_GEN]
     if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
@@ -1724,4 +1372,16 @@ function BNB.SyncNoteConfig(noteID)
 
     -- Stay on the current tab -- don't reset to General
     BNB._NoteConfigSelectTab(ncFrame._activeTab or TAB_GEN)
+
+    -- Back on top of a Reference Box this note switch opened or synced
+    -- (Dukul, 2026-10-04): next frame, after its own NoteSelected handler,
+    -- with the pickers that sit beside this window above it
+    C_Timer.After(0, function()
+        if not (ncFrame and ncFrame:IsShown()) then return end
+        ncFrame:Raise()
+        for _, name in ipairs({ "BigNoteBoxIconFramePicker", "BigNoteBoxIconPicker" }) do
+            local w = _G[name]
+            if w and w:IsShown() then w:Raise() end
+        end
+    end)
 end
