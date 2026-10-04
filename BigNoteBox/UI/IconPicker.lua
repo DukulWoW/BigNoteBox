@@ -572,8 +572,9 @@ function IP.Open(key, anchor, h)
     _orig = h.get()
     _origSource = h.getSource and h.getSource() or nil
     _allCb:SetChecked(BigNoteBoxDB and BigNoteBoxDB.blizzardIconComplete == true)
-    -- The New note dialog dims the main window with a FULLSCREEN_DIALOG overlay
-    _f:SetFrameStrata(h.strata or "DIALOG")
+    -- The New note dialog dims the main window with a FULLSCREEN_DIALOG overlay;
+    -- from Focus mode (the Ico dialog) it goes over the Focus window (ALL-251)
+    BNB.SeatWindow(_f, h.strata or "DIALOG")
     -- Top-aligned beside the window, as the Icon Frame picker
     _f:ClearAllPoints()
     if anchor and anchor.GetRight then

@@ -9,7 +9,7 @@
 --
 -- Public API:
 --   BNB.CreateToolWindow(opts) -> frame, leftButton, rightButton
---     opts.name         global frame name
+--     opts.name         global frame name (nil = none)
 --     opts.w, opts.h    size (may be set again later, once the content is laid out)
 --     opts.title        title text
 --     opts.pad          side padding (footer divider and buttons)
@@ -25,12 +25,17 @@
 --     opts.strata       frame strata, nil = "DIALOG"
 --     opts.toplevel     SetToplevel(true)
 --     opts.escClose     add to UISpecialFrames
+--     opts.noGlow       no whole-window Forever glow (the window draws its own,
+--                       e.g. one per pane in History compare)
 --     opts.keyEsc       ESC closes it through its own key handler
 --                       (BNB.AttachEscClose with onClose), for windows that
 --                       must close on ESC where UISpecialFrames does not reach
 --   frame:SetWindowTitle(text)   works in both modes
 --   frame._isSkin                true when built as a skin frame
+--   frame._strata                the strata it was built with
 --   BNB.TOOL_SKIN_TITLE_H        the skin title strip height
+--   BNB.SeatWindow(f, strata)    call before Show for a window that can be
+--                                opened from Focus mode (see below)
 --   BNB.PlaceBeside(f, anchor, w)
 
 local BNB = BigNoteBox
@@ -55,7 +60,9 @@ local function BuildNormal(o)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
-    f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
+    if not o.noGlow then
+        f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
+    end
     f:SetTitle(o.title)
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() o.onClose() end)
@@ -74,7 +81,7 @@ end
 
 local function BuildSkin(o)
     local f = BNB.CreateSkinFrame(UIParent, false, o.name, false)
-    _G[o.name] = f
+    if o.name then _G[o.name] = f end   -- a window may have no global name
     f:SetSize(o.w, o.h)
     f._isSkin = true
 
@@ -120,7 +127,8 @@ function BNB.CreateToolWindow(o)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then f = BuildSkin(o)
     else f = BuildNormal(o) end
 
-    f:SetFrameStrata(o.strata or "DIALOG")
+    f._strata = o.strata or "DIALOG"
+    f:SetFrameStrata(f._strata)
     if o.toplevel then f:SetToplevel(true) end
     f:EnableMouse(true); f:SetMovable(true); f:SetClampedToScreen(true)
     f:RegisterForDrag("LeftButton")
@@ -142,6 +150,20 @@ function BNB.CreateToolWindow(o)
     if o.escClose then tinsert(UISpecialFrames, o.name) end
     if o.keyEsc then BNB.AttachEscClose(f, o.onClose) end
     return f, btn1, btn2
+end
+
+-- Where a window opens (ALL-251). On UIParent, or on WorldFrame at the UI
+-- scale while UIParent is hidden (Focus mode's "hide UI", Alt+Z: the alarm
+-- popup's rule, BUG-10). While Focus mode is open it goes over the Focus
+-- window (FULLSCREEN_DIALOG), else at its own strata. Call before Show and
+-- Raise after; any frame works, ColorPickerFrame included.
+function BNB.SeatWindow(f, strata)
+    local parent = UIParent:IsShown() and UIParent or WorldFrame
+    if f:GetParent() ~= parent then f:SetParent(parent) end
+    f:SetScale(parent == WorldFrame and UIParent:GetScale() or 1)
+    local focus = BNB.IsFocusModeOpen and BNB.IsFocusModeOpen()
+    if focus and strata ~= "TOOLTIP" then strata = "FULLSCREEN_DIALOG" end
+    f:SetFrameStrata(strata or "DIALOG")
 end
 
 -- Place f (w wide) beside anchor: to its right when it fits on screen,

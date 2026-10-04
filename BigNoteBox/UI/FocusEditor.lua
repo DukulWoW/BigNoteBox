@@ -453,6 +453,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     local _fColCancelled = false
     local _fColR, _fColG, _fColB = 1, 1, 1
     local _fColHooked = false
+    local _fColSeat              -- ColorPickerFrame's parent / strata / scale before Col
 
     MkBtn("Col", L["FE_MK_COL"],  function()
         if not focusBodyEb then return end
@@ -467,11 +468,23 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
                 cancelFunc = function() _fColCancelled = true end,
                 hasOpacity = false, r = 1, g = 1, b = 1,
             })
+            -- Over the Focus window, on WorldFrame while "hide UI" hides
+            -- UIParent; put back as it was when it closes (ALL-251)
+            _fColSeat = { ColorPickerFrame:GetParent(), ColorPickerFrame:GetFrameStrata(),
+                ColorPickerFrame:GetScale() }
+            BNB.SeatWindow(ColorPickerFrame, _fColSeat[2])
+            ColorPickerFrame:Raise()
             if not _fColHooked then
                 _fColHooked = true
-                ColorPickerFrame:HookScript("OnHide", function()
+                ColorPickerFrame:HookScript("OnHide", function(self)
                     if not _fColActive then return end
                     _fColActive = false
+                    if _fColSeat then
+                        self:SetParent(_fColSeat[1])
+                        self:SetFrameStrata(_fColSeat[2])
+                        self:SetScale(_fColSeat[3])
+                        _fColSeat = nil
+                    end
                     if _fColCancelled then return end
                     local hex = string.format("%02x%02x%02x",
                         math.floor(_fColR * 255 + 0.5),
@@ -1260,6 +1273,10 @@ function BNB.CloseFocusMode()
             BNB.Sticky.ShowAll()
         end
         C_Timer.After(FADE_TIME + 0.05, function()
+            -- A quick ESC can close the main window inside this delay, or
+            -- Focus mode can be open again: then nothing comes back (the
+            -- main window's preview reopened on its own and stuck, ALL-251)
+            if not (BNB.mainFrame and BNB.mainFrame:IsShown()) or BNB._focusHiddenWindows then return end
             BNB.ReopenWindows(snap.windows, id)
             if snap.richPreview and BNB.RichPreview          then BNB.RichPreview.Open()       end
         end)

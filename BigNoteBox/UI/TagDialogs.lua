@@ -309,7 +309,9 @@ function BNB.OpenImgDialog(insertFn)
     _imgDialog._resetPicker()
     _imgDialog._prevTex:SetTexture(nil)
     _imgDialog._prevBg:Hide()
+    BNB.SeatWindow(_imgDialog, _imgDialog._strata)   -- also from Focus mode (ALL-251)
     _imgDialog:Show()
+    _imgDialog:Raise()
     _imgDialog._fileEb:SetFocus()
 end
 
@@ -396,7 +398,9 @@ function BNB.OpenLnkDialog(insertFn)
 
     _lnkDialog._urlEb:SetText("")
     _lnkDialog._textEb:SetText("")
+    BNB.SeatWindow(_lnkDialog, _lnkDialog._strata)   -- also from Focus mode (ALL-251)
     _lnkDialog:Show()
+    _lnkDialog:Raise()
     _lnkDialog._urlEb:SetFocus()
 end
 
@@ -575,7 +579,9 @@ function BNB.OpenIcoDialog(insertFn)
 
     -- Reset and show, with the picker beside it
     _icoDialog._resetState()
+    BNB.SeatWindow(_icoDialog, _icoDialog._strata)   -- also from Focus mode (ALL-251)
     _icoDialog:Show()
+    _icoDialog:Raise()
     _icoDialog:Raise()
     _icoDialog._openPicker()
 end
