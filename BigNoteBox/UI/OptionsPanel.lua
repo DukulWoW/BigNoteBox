@@ -17,7 +17,7 @@ local function CreateOptionsPanel()
     local logo = panel:CreateTexture(nil, "ARTWORK")
     logo:SetSize(128, 128)
     logo:SetPoint("CENTER", panel, "CENTER", 0, 80)
-    logo:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\logo-256")
+    logo:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\logo")
 
     local title = panel:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge3")
     title:SetPoint("TOP", logo, "BOTTOM", 0, -8)

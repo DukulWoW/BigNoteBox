@@ -392,7 +392,7 @@ local function BuildPage1(content)
     local logo = ct:CreateTexture(nil, "ARTWORK")
     logo:SetSize(96, 96)
     logo:SetPoint("TOP", ct, "TOP", 0, y)
-    logo:SetTexture(ASSETS .. "logo-256")
+    logo:SetTexture(ASSETS .. "logo")
     y = y - 96 - 10
 
     -- Addon name
