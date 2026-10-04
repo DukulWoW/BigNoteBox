@@ -1863,10 +1863,7 @@ local function RefreshNoteList()
         -- Divider between pinned and regular (expanded mode only)
         if not collapsed then
             if not child._pinnedDiv then
-                local div = child:CreateTexture(nil, "ARTWORK")
-                div:SetHeight(1)
-                div:SetColorTexture(0.35, 0.35, 0.38, 0.7)
-                child._pinnedDiv = div
+                child._pinnedDiv = BNB.CreateNoteRule(child)   -- the editor's rules match it
             end
             child._pinnedDiv:ClearAllPoints()
             child._pinnedDiv:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -(totalH + 3))

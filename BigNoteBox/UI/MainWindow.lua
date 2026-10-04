@@ -369,6 +369,127 @@ local function AddDevModeOverlay(f)
     f._devOverlay = ov
 end
 
+-- Toolbar strip art, normal mode only (ALL-240, Dukul 2026-10-04): a tiling
+-- header piece from a game file, one per client, repeated across the strip under
+-- the title, behind the sort dropdowns and the toolbar icons. Drawn as copies cut
+-- from the file (an atlas piece cannot SetHorizTile), the last one cut short,
+-- half a texel inside the region. Tune live with /bnb topbar (debug mode);
+-- nothing saved.
+--   file, fw, fh  the game file and its size in pixels
+--   region        x, y, w, h of the tiling piece in file pixels
+--   y        top of the strip, from the window's TOP (just under the title bar)
+--   h        drawn height
+--   cropTop  file rows cut off the top of the region
+--   tileW    drawn width of one copy
+--   l, r     insets from the window's left and right edges
+--   lift     how much higher the sort row and toolbar icons sit while the strip
+--            is drawn, centred on its art; the icons also drop their 2px offset
+--            so they line up with the dropdowns
+--   header   title + toolbar height while the strip is drawn (the panes start
+--            below it); nil = the chrome's own
+local TOPBAR_ARTS = {
+    -- Forever: atlas QuestLog-reward-top-frame (Interface\QuestFrame\QuestlogFrame2x).
+    -- 8 rows off the top, drawn taller; lift 7 measured on Dukul's screenshot
+    -- (3 was still low), "Perfect" (Dukul)
+    forever = { file = 5684767, fw = 1024, fh = 1024, region = { 1, 593, 614, 103 },
+                y = -22, h = 46, cropTop = 8, tileW = 307, l = 2, r = 2, lift = 7 },
+    -- Retail: atlas _UI-Frame-DiamondMetal-Header-Tile
+    -- (Interface\FrameGeneral\UIFrameDiamondMetalHeader2x), 38 rows off the top
+    -- (Dukul); the 40 rows left drawn 64 wide and stretched to 50 tall, so its
+    -- bottom rim clears the dropdowns (at 40 it ran right under them). l = 8:
+    -- at 2 it showed past the left border line, whose outer side is see-through
+    -- on Retail (measured on Dukul's screenshot, 2026-10-04). At h 50 / header 60
+    -- the dropdowns filled the art's dark panel and the search box sat right
+    -- under its rims, so the header grows to 82 (the strip ends at -78) and the
+    -- art to 56 (dark panel ~40 of it); lift 8 = the dropdowns' visual centre on
+    -- the panel's (measured at 1.17 px per unit: their centre is -50 + lift).
+    -- Then "much better", but too much space under the rims: h 66 (ends at -88,
+    -- over the empty top of the panes), lift 5 (panel centre 3.5 lower)
+    retail  = { file = 3058483, fw = 128, fh = 256, region = { 0, 0.5, 64, 78 },
+                y = -22, h = 66, cropTop = 38, tileW = 64, l = 8, r = 2, lift = 5,
+                header = 82 },
+}
+local TOPBAR_ART = BNB.IsForever and TOPBAR_ARTS.forever or TOPBAR_ARTS.retail
+
+-- Toolbar icon row (see TOOLBAR ICON ROW below); declared here so the live
+-- lift can move the slots
+local _tbRow, _tbSlots
+
+-- Moves every point of frame that hangs off rel by dy
+local function ShiftPointsOn(frame, rel, dy)
+    local pts = {}
+    for i = 1, frame:GetNumPoints() do pts[i] = { frame:GetPoint(i) } end
+    frame:ClearAllPoints()
+    for _, p in ipairs(pts) do
+        frame:SetPoint(p[1], p[2], p[3], p[4], p[5] + (p[2] == rel and dy or 0))
+    end
+end
+
+local function TopBarArtKnown()
+    return not (C_UIFileAsset and C_UIFileAsset.IsKnownFile)
+        or C_UIFileAsset.IsKnownFile(TOPBAR_ART.file)
+end
+
+local function LayoutTopBarArt(f)
+    local tiles = f._topBarArt
+    if not tiles then return end
+    local a = TOPBAR_ART
+    local rg = a.region
+    local W = (f:GetWidth() or 0) - a.l - a.r
+    local cut = math.max(0, math.min(rg[4] - 2, a.cropTop))
+    local v0, v1 = (rg[2] + cut + 0.5) / a.fh, (rg[2] + rg[4] - 0.5) / a.fh
+    local n, x = 0, 0
+    while W > 0 and a.tileW > 0 and x < W - 0.01 do
+        n = n + 1
+        local t = tiles[n]
+        if not t then
+            t = f:CreateTexture(nil, "BORDER")
+            t:SetTexture(a.file, "CLAMP", "CLAMP")
+            tiles[n] = t
+        end
+        local w = math.min(a.tileW, W - x)
+        local u1 = rg[1] + (w / a.tileW) * rg[3]
+        t:ClearAllPoints()
+        t:SetPoint("TOPLEFT", f, "TOPLEFT", a.l + x, a.y)
+        t:SetSize(w, a.h)
+        t:SetTexCoord((rg[1] + 0.5) / a.fw, (u1 - 0.5) / a.fw, v0, v1)
+        t:Show()
+        x = x + w
+    end
+    for i = n + 1, #tiles do tiles[i]:Hide() end
+end
+
+-- Returns true when the strip is drawn
+local function AddTopBarArt(f)
+    if not TopBarArtKnown() then return false end
+    f._topBarArt = {}
+    f:HookScript("OnSizeChanged", LayoutTopBarArt)
+    LayoutTopBarArt(f)
+    return true
+end
+
+-- /bnb topbar [y h cropTop tileW lift l header]: live tuning; no args = print the current set
+function BNB.TuneTopBarArt(y, h, cropTop, tileW, lift, l, header)
+    local a, f = TOPBAR_ART, BNB.mainFrame
+    if y then a.y, a.h, a.cropTop, a.tileW = y, h or a.h, cropTop or a.cropTop, tileW or a.tileW end
+    if l then a.l = l end
+    if f then LayoutTopBarArt(f) end
+    if header and f and f._topBarArt and BNB.listPane then
+        a.header, f._headerH = header, header
+        BNB.listPane:SetPoint("TOPLEFT", f, "TOPLEFT", 0, -header)
+        ApplySplit(f)
+    end
+    -- The lift only exists while the strip is drawn (the row was built with it)
+    if lift and f and f._topBarArt and lift ~= a.lift then
+        local dy = lift - a.lift
+        for _, fr in ipairs(f._liftFrames or {}) do ShiftPointsOn(fr, f, dy) end
+        for _, p in ipairs(_tbSlots or {}) do p[5] = p[5] + dy end
+        a.lift = lift
+        BNB.ApplyToolbarIcons()
+    end
+    return a.y, a.h, a.cropTop, a.tileW, a.lift, a.l, f and f._headerH, (f and f._topBarArt) ~= nil
+end
+
 --------------------------------------------------------------------------------
 -- CLASSIC CHROME  (ButtonFrameTemplate, matches BCB)
 --------------------------------------------------------------------------------
@@ -385,6 +506,8 @@ local function BuildClassicChrome()
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
     f:SetAlpha(0.95)
     f:SetTitle(BNB.MainWindowTitle())
+    local drawn = AddTopBarArt(f)   -- ALL-240
+    local lift = drawn and TOPBAR_ART.lift or 0
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function()
@@ -394,10 +517,10 @@ local function BuildClassicChrome()
 
     -- The toolbar strip sits in the title area below the "BigNoteBox" title:
     -- sort row top-left, icons top-right 4px above the pane top edge.
-    local sortY = -(TITLE_H - 14) + SORT_BTN_H / 2
+    local sortY = -(TITLE_H - 14) + SORT_BTN_H / 2 + lift
     return {
         frame     = f,
-        headerH   = TITLE_H,
+        headerH   = drawn and TOPBAR_ART.header or TITLE_H,
         closeBtn  = f.CloseButton,
         -- Parented to the CloseButton so they inherit its frame level and
         -- stacking context — guaranteed above ButtonFrameTemplate chrome.
@@ -408,7 +531,7 @@ local function BuildClassicChrome()
         sortY     = sortY,
         selY      = sortY + 1,
         iconX     = -6,
-        iconY     = -(TITLE_H - 22),
+        iconY     = -(TITLE_H - 22) + (lift > 0 and lift + 2 or 0),
         -- Forever: soft glow behind the note list so the side panel stands out
         -- against the wood grain; stretches with the pane (splitter, resize, collapse).
         -- The note pane gets the same glow (trial, Dukul 2026-09-26).
@@ -742,6 +865,7 @@ function BNB.CreateMainWindow()
         L["MW_SELECT_TIP"], L["MW_SELECT_TIP_SUB"], nil)
     selBtn:SetPoint("LEFT", dirDD or dirCycleBtn, "RIGHT", 6, 0)
     selBtn:SetPoint("TOP", f, "TOP", 0, chrome.selY)
+    f._liftFrames = { sortDD or sortCycleBtn, selBtn }   -- /bnb topbar lift (ALL-240)
     selBtn:SetScript("OnClick", function()
         -- Read the list's own state: popups, export and the sidebar leave multi
         -- mode through SetMultiMode, which a local flag here never saw (ALL-58)
@@ -809,9 +933,22 @@ function BNB.CreateMainWindow()
     resizeHandle:SetSize(16, 16)
     resizeHandle:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
     resizeHandle:SetFrameLevel(f:GetFrameLevel() + 10)
+    -- Grip art (Dukul, 2026-10-04): the damage meter's scale handle, with its
+    -- own hover and pressed atlases; the chat grabber where the atlas is missing.
+    -- 20 was far too small (Dukul): art 32, click area 24
+    local GRIP_ATLAS, GRIP_ART, GRIP_HIT = "damagemeters-scalehandle", 32, 24
+    local gripAtlas = C_Texture and C_Texture.GetAtlasInfo
+        and C_Texture.GetAtlasInfo(GRIP_ATLAS) ~= nil
     local rtex = resizeHandle:CreateTexture(nil, "OVERLAY")
-    rtex:SetAllPoints()
-    rtex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    if gripAtlas then
+        resizeHandle:SetSize(GRIP_HIT, GRIP_HIT)
+        rtex:SetSize(GRIP_ART, GRIP_ART)
+        rtex:SetPoint("BOTTOMRIGHT", resizeHandle, "BOTTOMRIGHT", 0, 0)
+        rtex:SetAtlas(GRIP_ATLAS)
+    else
+        rtex:SetAllPoints()
+        rtex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    end
     f._resizeHandle = resizeHandle  -- stored for scale-lock toggle
 
     -- Small label that tracks the cursor during resize and shows WxH.
@@ -847,9 +984,17 @@ function BNB.CreateMainWindow()
         if _resizing then UpdateSizeLabel() end
     end)
 
+    -- Pressed while sizing, hover while the pointer is over it, else normal
+    local function SetGripState()
+        if not gripAtlas then return end
+        rtex:SetAtlas(GRIP_ATLAS .. (_resizing and "-pressed"
+            or (resizeHandle:IsMouseOver() and "-hover" or "")))
+    end
+
     resizeHandle:SetScript("OnMouseDown", function(self, btn)
         if btn ~= "LeftButton" then return end
         _resizing = true
+        SetGripState()
         -- Seed the label with current size before first OnSizeChanged fires
         UpdateSizeLabel()
         sizeLabel:Show()
@@ -857,6 +1002,7 @@ function BNB.CreateMainWindow()
     end)
     resizeHandle:SetScript("OnMouseUp", function()
         _resizing = false
+        SetGripState()
         sizeLabel:Hide()
         BNB.StopGripSizing(f)
         local w = math.max(MIN_W, math.min(MAX_W, f:GetWidth()))
@@ -868,6 +1014,8 @@ function BNB.CreateMainWindow()
         -- Recalculate sidebar slot visibility after resize
         if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
     end)
+    resizeHandle:HookScript("OnEnter", SetGripState)
+    resizeHandle:HookScript("OnLeave", SetGripState)
     BNB.SetHoverCursor(resizeHandle, "resize")   -- ALL-95
 
     -- ── Splitter drag handle (7px wide button over the divider) ─────────────
@@ -1075,7 +1223,7 @@ end
 -- Visibility: everything hides in multi-select (the action buttons use that
 -- space); the trash icon also hides while Trash is off in Settings.
 --------------------------------------------------------------------------------
-local _tbRow, _tbSlots
+-- _tbRow, _tbSlots are declared with the toolbar strip art above (live lift)
 
 function BNB.InitToolbarIconRow(row)
     _tbRow, _tbSlots = row, {}

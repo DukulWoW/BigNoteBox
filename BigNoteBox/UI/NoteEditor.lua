@@ -239,11 +239,9 @@ local function BuildTitleField(parent)
     BNB._editorRichBadge = richBadge
 
     -- Underline (always visible)
-    local underline = parent:CreateTexture(nil, "ARTWORK")
-    underline:SetHeight(1)
+    local underline = BNB.CreateNoteRule(parent)
     underline:SetPoint("TOPLEFT",  bg, "BOTTOMLEFT",  0, -1)
     underline:SetPoint("TOPRIGHT", bg, "BOTTOMRIGHT", 0, -1)
-    underline:SetColorTexture(0.16, 0.16, 0.18, 1)
 
     -- Timestamp strip anchored below the underline
     local tsStrip = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -622,6 +620,9 @@ function BNB.UpdateBodyTopAnchor()
     local topAnchor = ts
     if bar  and bar:IsShown()  then topAnchor = bar  end
     if mbar and mbar:IsShown() then topAnchor = mbar end
+    if mbar and mbar._sepT then
+        if bar and bar:IsShown() then mbar._sepT:Hide() else mbar._sepT:Show() end
+    end
 
     local bottomOffset = TOOLBAR_H
         + (BNB._editorTagStrip and BNB._editorTagStrip:GetHeight() or TAG_STRIP_H)
@@ -665,7 +666,7 @@ local function BuildToolbar(parent)
     bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
     bar:SetHeight(TOOLBAR_H)
 
-    local sep = BNB.CreateDivider(parent, "HORIZONTAL", 0.16, 0.16, 0.18, 0.20)
+    local sep = BNB.CreateNoteRule(parent)
     sep:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, TOOLBAR_H)
     sep:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -1, TOOLBAR_H)
 
@@ -1072,7 +1073,7 @@ local function BuildTagStrip(parent, toolbarFrame)
     strip:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -1, TOOLBAR_H)
 
     -- Sep anchors to the strip's top so it moves up as the strip grows
-    local sep = BNB.CreateDivider(parent, "HORIZONTAL", 0.14, 0.14, 0.16, 0.18)
+    local sep = BNB.CreateNoteRule(parent)
     sep:SetPoint("BOTTOMLEFT",  strip, "TOPLEFT",  0, 0)
     sep:SetPoint("BOTTOMRIGHT", strip, "TOPRIGHT", 0, 0)
 
@@ -1639,33 +1640,18 @@ local function BuildMarkupBar(parent, wysiwygBar)
     bar:SetPoint("TOPRIGHT", wysiwygBar, "BOTTOMRIGHT", 0, 0)
     bar:SetHeight(MARKUP_H)
 
-    -- Top separator
-    local sep = bar:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
+    -- Top separator: drawn only while the WYSIWYG bar is hidden, whose bottom
+    -- line sits right above it (together they drew one 2px line);
+    -- BNB.UpdateBodyTopAnchor shows / hides it
+    local sep = BNB.CreateNoteRule(bar)
     sep:SetPoint("TOPLEFT",  bar, "TOPLEFT",  0, 0)
     sep:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        sep:SetColorTexture(br, bg_, bb, 0.20)
-        BNB.RegisterSkinRule(sep, 0.20)
-    else
-        sep:SetColorTexture(0.22, 0.22, 0.24, 1)
-    end
+    bar._sepT = sep
 
     -- Bottom separator (between markup bar and note body)
-    local sepB = bar:CreateTexture(nil, "ARTWORK")
-    sepB:SetHeight(1)
+    local sepB = BNB.CreateNoteRule(bar)
     sepB:SetPoint("BOTTOMLEFT",  bar, "BOTTOMLEFT",  0, 0)
     sepB:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        sepB:SetColorTexture(br, bg_, bb, 0.20)
-        BNB.RegisterSkinRule(sepB, 0.20)
-    else
-        sepB:SetColorTexture(0.22, 0.22, 0.24, 1)
-    end
 
     -- Button helper
     local MkBtn, Divider = BNB.MakeToolbarFactory(bar, PAD)

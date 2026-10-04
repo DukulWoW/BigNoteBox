@@ -36,33 +36,14 @@ local function BuildWysiwygBar(parent, tsStrip)
     bar:SetPoint("TOPRIGHT", tsStrip, "BOTTOMRIGHT",  0, -2)
     bar:SetHeight(WYSIWYG_H)
 
-    -- Top edge line
-    local sepT = bar:CreateTexture(nil, "ARTWORK")
-    sepT:SetHeight(1)
+    -- Top and bottom edge lines (BNB.CreateNoteRule: the note list's divider)
+    local sepT = BNB.CreateNoteRule(bar)
     sepT:SetPoint("TOPLEFT",  bar, "TOPLEFT",  0, 0)
     sepT:SetPoint("TOPRIGHT", bar, "TOPRIGHT", 0, 0)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        sepT:SetColorTexture(br, bg_, bb, 0.20)
-        BNB.RegisterSkinRule(sepT, 0.20)
-    else
-        sepT:SetColorTexture(0.22, 0.22, 0.24, 1)
-    end
 
-    -- Bottom edge line
-    local sepB = bar:CreateTexture(nil, "ARTWORK")
-    sepB:SetHeight(1)
+    local sepB = BNB.CreateNoteRule(bar)
     sepB:SetPoint("BOTTOMLEFT",  bar, "BOTTOMLEFT",  0, 0)
     sepB:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        sepB:SetColorTexture(br, bg_, bb, 0.20)
-        BNB.RegisterSkinRule(sepB, 0.20)
-    else
-        sepB:SetColorTexture(0.22, 0.22, 0.24, 1)
-    end
 
     -- ── Shared helpers ────────────────────────────────────────────────────────
 

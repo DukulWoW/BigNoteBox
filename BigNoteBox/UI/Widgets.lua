@@ -636,6 +636,31 @@ function BNB.CreateDivider(parent, orientation, r, g, b, a)
     return t
 end
 
+-- The one horizontal rule of the note list and the note editor (Dukul,
+-- 2026-10-04: the editor's lines were four colours and sizes): the grey of the
+-- pinned / regular divider, in both looks, one screen pixel tall at any UI
+-- scale (a 1-unit line drew 1 or 2 px depending on where it landed). Pixel
+-- snapping is off: snapped, a 1px line half a pixel off the grid had both edges
+-- rounded onto the same row and vanished (the pinned divider in the scrolled
+-- note list, 2026-10-04); unsnapped, it always fills exactly one row. The
+-- caller anchors it.
+BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
+function BNB.CreateNoteRule(parent)
+    local t = parent:CreateTexture(nil, "ARTWORK")
+    local c = BNB.NOTE_RULE_RGBA
+    t:SetColorTexture(c[1], c[2], c[3], c[4])
+    if t.SetSnapToPixelGrid then
+        t:SetSnapToPixelGrid(false)
+        t:SetTexelSnappingBias(0)
+    end
+    if PixelUtil and PixelUtil.SetHeight then
+        PixelUtil.SetHeight(t, 1, 1)
+    else
+        t:SetHeight(1)
+    end
+    return t
+end
+
 --------------------------------------------------------------------------------
 -- SETTINGS-PANEL PIECES  (ALL-65.8)
 -- Shared by AlarmWindow, TaskEditWindow, NoteConfig, StickyNote and

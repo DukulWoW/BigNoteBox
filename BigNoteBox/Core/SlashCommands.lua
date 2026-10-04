@@ -113,6 +113,23 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.OpenIconLab then BNB.OpenIconLab() end
 
+        -- ── Developer: main window toolbar strip art (ALL-240, UI/MainWindow.lua) ─
+        elseif cmd == "topbar" or cmd:sub(1, 7) == "topbar " then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            if not BNB.TuneTopBarArt then return end
+            local y, h, c, w, lf, li, hd = cmd:sub(8):match("^%s*(%S+)%s*(%S*)%s*(%S*)%s*(%S*)%s*(%S*)%s*(%S*)%s*(%S*)")
+            local y2, h2, c2, w2, l2, i2, hd2, drawn = BNB.TuneTopBarArt(tonumber(y), tonumber(h), tonumber(c),
+                tonumber(w), tonumber(lf), tonumber(li), tonumber(hd))
+            BNB:Print(string.format("|cff88bbffTop bar art:|r y=%s h=%s cropTop=%s tileW=%s lift=%s left=%s header=%s%s",
+                tostring(y2), tostring(h2), tostring(c2), tostring(w2), tostring(l2), tostring(i2), tostring(hd2),
+                drawn and "" or "  (not drawn: skin mode, file missing, or window not built)"))
+            if not y then
+                BNB:Print("|cffffff00Usage:|r /bnb topbar <y> [h] [cropTop] [tileW] [lift] [left] [header]  (live, not saved)")
+            end
+
         -- ── Developer: chrome seating (FOR-05, UI/Chrome.lua) ─────────────────
         -- "chromeprobe" dumps the template layout; "chrome l t r b" re-seats
         -- every window live. Nothing is saved: Forever drops SavedVariables.
