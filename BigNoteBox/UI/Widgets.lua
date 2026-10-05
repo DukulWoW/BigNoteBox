@@ -588,10 +588,17 @@ function BNB.AddPlaceholder(eb, text, r, g, b)
         end
     end
 
+    -- The typed text's colour: white unless set with eb:SetRealColor
+    -- (the editor title takes the note's title colour, ALL-260)
+    local function realColor(self)
+        local c = self._realColor
+        if c then setColor(self, c.r, c.g, c.b) else setColor(self, 1, 1, 1) end
+    end
+
     local function hidePlaceholder()
         if eb._showingPlaceholder then
             eb:SetText("")
-            setColor(eb, 1, 1, 1)
+            realColor(eb)
             eb._showingPlaceholder = false
         end
     end
@@ -608,8 +615,13 @@ function BNB.AddPlaceholder(eb, text, r, g, b)
     eb.SetRealText = function(self, t)
         hidePlaceholder()
         self:SetText(t or "")
-        setColor(self, 1, 1, 1)
+        realColor(self)
         if not t or t == "" then showPlaceholder() end
+    end
+    -- c = { r, g, b } or nil (white); the placeholder keeps its own grey
+    eb.SetRealColor = function(self, c)
+        self._realColor = c
+        if not self._showingPlaceholder then realColor(self) end
     end
 end
 
@@ -643,12 +655,21 @@ end
 -- snapping is off: snapped, a 1px line half a pixel off the grid had both edges
 -- rounded onto the same row and vanished (the pinned divider in the scrolled
 -- note list, 2026-10-04); unsnapped, it always fills exactly one row. The
--- caller anchors it.
+-- caller anchors it. Skin mode: the preset's border tint at the same alpha,
+-- following preset changes (ALL-262, Dukul 2026-10-05: "The dividers in skin
+-- mode should all be tinted, not grey."). Focus mode uses it too.
 BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
 function BNB.CreateNoteRule(parent)
     local t = parent:CreateTexture(nil, "ARTWORK")
     local c = BNB.NOTE_RULE_RGBA
-    t:SetColorTexture(c[1], c[2], c[3], c[4])
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode
+       and BNB.GetSkinPreset and BNB.SkinBorderOf and BNB.RegisterSkinRule then
+        local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+        t:SetColorTexture(br, bg_, bb, c[4])
+        BNB.RegisterSkinRule(t, c[4])
+    else
+        t:SetColorTexture(c[1], c[2], c[3], c[4])
+    end
     if t.SetSnapToPixelGrid then
         t:SetSnapToPixelGrid(false)
         t:SetTexelSnappingBias(0)
@@ -886,6 +907,43 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
 
     c:SetValue(initial or lo)
     return c
+end
+
+-- Tab / Shift+Tab steps through the edit boxes in list order, wrapping at both
+-- ends, and selects the text it lands in (dialog fields, ALL-255).
+function BNB.TabChain(boxes)
+    for i, eb in ipairs(boxes) do
+        eb:SetScript("OnTabPressed", function()
+            local n = #boxes
+            local nxt = boxes[IsShiftKeyDown() and ((i - 2) % n + 1) or (i % n + 1)]
+            nxt:SetFocus()
+            nxt:HighlightText()
+        end)
+    end
+end
+
+-- The highlighted text in an edit box, or nil, leaving the box as it was. The
+-- game has no getter: Insert("") deletes the selection, so the text is put
+-- back and highlighted again. Programmatic Insert is not user input, so the
+-- note is not marked edited. Used by the link dialog (ALL-253). singleLine: a
+-- selection over more than one line is not returned and its highlight is
+-- collapsed (cursor after it), so a following Insert does not replace it.
+function BNB.PeekSelection(eb, singleLine)
+    if not eb then return nil end
+    eb:SetFocus()
+    local before = eb:GetText() or ""
+    eb:Insert("")
+    local after = eb:GetText() or ""
+    if #after >= #before then return nil end
+    local start = eb:GetCursorPosition() or 0
+    local sel = before:sub(start + 1, start + (#before - #after))
+    eb:Insert(sel)
+    if singleLine and sel:find("\n", 1, true) then
+        eb:SetCursorPosition(start + #sel)
+        return nil
+    end
+    eb:HighlightText(start, start + #sel)
+    return sel
 end
 
 -- Scroll panel whose bar stays invisible (alpha, never Hide) until the
@@ -1230,41 +1288,40 @@ function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, 
 
     return h
 end
--- 24-color grid: 8 columns × 3 rows.
--- Row 1: class colors (Death Knight → Paladin)
--- Row 2: class colors (Priest → Warrior) + 4 BNB accent colors
--- Row 3: item quality colors + BNB accent gold + BNB teal
--- label: concise color description used in tooltips.
+-- 24-color grid: 8 columns × 3 rows, Dukul's named palette (ALL-259,
+-- 2026-10-05; it replaced class colours, several of which looked alike).
+-- Saved colours are RGB values, never an index here, so notes keep theirs.
+-- label: the colour's name, used in tooltips.
 -- Tooltip format: "Description (R:255 G:255 B:255)"
 --------------------------------------------------------------------------------
 BNB.COLOR_PALETTE = {
-    -- Row 1 — white + black first, then class colors
-    { r=1.000, g=1.000, b=1.000, label=L["COLOR_WHITE"]          },
-    { r=0.000, g=0.000, b=0.000, label=L["COLOR_BLACK"]          },
-    { r=0.769, g=0.118, b=0.227, label=L["COLOR_CRIMSON_RED"]    },  -- Death Knight
-    { r=0.639, g=0.188, b=0.788, label=L["COLOR_DEEP_PURPLE"]    },  -- Demon Hunter
-    { r=1.000, g=0.486, b=0.039, label=L["COLOR_BURNT_ORANGE"]   },  -- Druid
-    { r=0.200, g=0.576, b=0.498, label=L["COLOR_TEAL_GREEN"]     },  -- Evoker
-    { r=0.667, g=0.827, b=0.447, label=L["COLOR_SAGE_GREEN"]     },  -- Hunter
-    { r=0.247, g=0.780, b=0.922, label=L["COLOR_SKY_BLUE"]       },  -- Mage
-    -- Row 2 — class colors + BNB accents
-    { r=0.000, g=1.000, b=0.596, label=L["COLOR_MINT_GREEN"]     },  -- Monk
-    { r=0.957, g=0.549, b=0.729, label=L["COLOR_ROSE_PINK"]      },  -- Paladin
-    { r=1.000, g=0.957, b=0.408, label=L["COLOR_PALE_YELLOW"]    },  -- Rogue
-    { r=0.529, g=0.533, b=0.933, label=L["COLOR_PERIWINKLE"]     },  -- Warlock
-    { r=0.776, g=0.608, b=0.427, label=L["COLOR_WARM_TAN"]       },  -- Warrior
-    { r=0.961, g=0.902, b=0.784, label=L["COLOR_WARM_CREAM"]     },  -- BNB accent
-    { r=0.416, g=0.690, b=0.831, label=L["COLOR_SOFT_BLUE"]      },  -- BNB accent
-    { r=0.478, g=0.749, b=0.541, label=L["COLOR_MUTED_GREEN"]    },  -- BNB accent
-    -- Row 3 — item quality colors + BNB accents
-    { r=0.616, g=0.616, b=0.616, label=L["COLOR_STONE_GREY"]     },  -- Poor
-    { r=0.118, g=1.000, b=0.000, label=L["COLOR_BRIGHT_GREEN"]   },  -- Uncommon
-    { r=0.000, g=0.439, b=0.867, label=L["COLOR_ROYAL_BLUE"]     },  -- Rare
-    { r=0.639, g=0.208, b=0.933, label=L["COLOR_VIVID_PURPLE"]   },  -- Epic
-    { r=1.000, g=0.502, b=0.000, label=L["COLOR_FLAME_ORANGE"]   },  -- Legendary
-    { r=0.902, g=0.800, b=0.502, label=L["COLOR_ANTIQUE_GOLD"]   },  -- Artifact
-    { r=1.000, g=0.800, b=0.000, label=L["COLOR_GOLD"]           },  -- BNB accent gold
-    { r=0.302, g=0.851, b=0.675, label=L["COLOR_AQUA_TEAL"]      },  -- BNB teal
+    -- Row 1
+    { r=1.000, g=1.000, b=1.000, label=L["COLOR_WHITE"] },  -- #ffffff
+    { r=0.000, g=0.000, b=0.000, label=L["COLOR_BLACK"] },  -- #000000
+    { r=0.769, g=0.118, b=0.227, label=L["COLOR_CARDINAL"] },  -- #c41e3a
+    { r=0.533, g=0.000, b=0.082, label=L["COLOR_MAROON"] },  -- #880015
+    { r=0.725, g=0.478, b=0.341, label=L["COLOR_PHEASANT"] },  -- #b97a57
+    { r=1.000, g=0.682, b=0.788, label=L["COLOR_BABY_PINK"] },  -- #ffaec9
+    { r=1.000, g=0.788, b=0.055, label=L["COLOR_MIKADO_YELLOW"] },  -- #ffc90e
+    { r=1.000, g=0.949, b=0.000, label=L["COLOR_DORN_YELLOW"] },  -- #fff200
+    -- Row 2
+    { r=0.937, g=0.894, b=0.690, label=L["COLOR_BONE_WHITE"] },  -- #efe4b0
+    { r=0.133, g=0.694, b=0.298, label=L["COLOR_BABYLON_GREEN"] },  -- #22b14c
+    { r=0.710, g=0.902, b=0.114, label=L["COLOR_LURID_LETTUCE"] },  -- #b5e61d
+    { r=0.000, g=0.635, b=0.910, label=L["COLOR_BEL_AIR_BLUE"] },  -- #00a2e8
+    { r=0.600, g=0.851, b=0.918, label=L["COLOR_OVER_THE_SKY"] },  -- #99d9ea
+    { r=0.247, g=0.282, b=0.800, label=L["COLOR_WARM_BLUE"] },  -- #3f48cc
+    { r=0.439, g=0.573, b=0.745, label=L["COLOR_KING_NEPTUNE"] },  -- #7092be
+    { r=0.639, g=0.286, b=0.643, label=L["COLOR_FUCHSIA_PHEROMONE"] },  -- #a349a4
+    -- Row 3: light purple, then the item quality colours (names from the game)
+    { r=0.784, g=0.749, b=0.906, label=L["COLOR_LIGHT_PURPLE"] },  -- #c8bfe7
+    { r=0.616, g=0.616, b=0.616, label=_G["ITEM_QUALITY0_DESC"] or "Poor" },  -- #9d9d9d
+    { r=0.118, g=1.000, b=0.000, label=_G["ITEM_QUALITY2_DESC"] or "Uncommon" },  -- #1eff00
+    { r=0.000, g=0.439, b=0.867, label=_G["ITEM_QUALITY3_DESC"] or "Rare" },  -- #0070dd
+    { r=0.639, g=0.208, b=0.933, label=_G["ITEM_QUALITY4_DESC"] or "Epic" },  -- #a335ee
+    { r=1.000, g=0.502, b=0.000, label=_G["ITEM_QUALITY5_DESC"] or "Legendary" },  -- #ff8000
+    { r=0.902, g=0.800, b=0.502, label=_G["ITEM_QUALITY6_DESC"] or "Artifact" },  -- #e6cc80
+    { r=0.000, g=0.800, b=1.000, label=_G["ITEM_QUALITY7_DESC"] or "Heirloom" },  -- #00ccff
 }
 
 --------------------------------------------------------------------------------

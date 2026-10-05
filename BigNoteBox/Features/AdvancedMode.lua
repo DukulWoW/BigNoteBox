@@ -48,6 +48,42 @@ local STRUCT_CLOSE = {
     ["{/p}"]  = "</P>",
 }
 
+-- The closing html for each open tag's block, so a block is always closed with
+-- its own tag, whatever the player typed ({h1}...{/p} closes the h1)
+local STRUCT_END = {}
+for tag, html in pairs(STRUCT_OPEN) do
+    STRUCT_END[tag] = "</" .. html:match("^<(%w+)") .. ">"
+end
+
+-- Body-level text must sit inside a block element: a bare text node between
+-- blocks makes SimpleHTML drop the whole document (ALL-236: "{p}a{/p}b" on one
+-- line lost everything). Wraps the text around any <P ...>...</P> (an aligned
+-- icon) or <img .../> already in s. keepBlank: a line that is only spaces
+-- still makes an empty paragraph, as before; gaps between tags do not.
+local function WrapBare(s, keepBlank)
+    local out, pos = {}, 1
+    local function text(t)
+        if t ~= "" and (keepBlank or t:find("%S")) then
+            out[#out + 1] = "<P>" .. t .. "</P>"
+        end
+    end
+    while true do
+        local ps = s:find("<P", pos, true)
+        local is = s:find("<img ", pos, true)
+        local st = ps and (not is or ps < is) and ps or is
+        if not st then break end
+        local _, en
+        if st == ps then _, en = s:find("</P>", st, true)
+        else _, en = s:find("/>", st, true) end
+        if not en then break end
+        text(s:sub(pos, st - 1))
+        out[#out + 1] = s:sub(st, en)
+        pos = en + 1
+    end
+    text(s:sub(pos))
+    return table.concat(out)
+end
+
 --------------------------------------------------------------------------------
 -- MAIN CONVERTER: AM.ToHTML(text, bodySize)
 -- Converts BNB rich-note markup to WoW SimpleHTML format.
@@ -63,7 +99,7 @@ function AM.ToHTML(text, bodySize)
     end
 
     local out = {}
-    local inBlock = false  -- true when inside a {h*} or {p} block
+    local openEnd = nil  -- closing html of the open {h*} / {p} block, nil = none
 
     for _, rawLine in ipairs(lines) do
         local line = HtmlEscape(rawLine)
@@ -128,31 +164,50 @@ function AM.ToHTML(text, bodySize)
         -- 5. {br} -> <BR/> — inline line break with no paragraph margin
         line = line:gsub("{br}", "<BR/>")
 
-        -- 6. Structure open tags — set inBlock before step 7 decides to wrap
-        for tag, html in pairs(STRUCT_OPEN) do
-            if line:find(tag, 1, true) then
-                line = line:gsub(tag:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%1"), html)
-                inBlock = true
+        -- 6-8. Structure tags, left to right, so the result is always well
+        --      formed (ALL-236). An open tag while a block is open closes that
+        --      block first (SimpleHTML cannot nest them); a close tag closes
+        --      the open block with its own tag; a stray close tag is dropped.
+        --      Text outside a block becomes its own <P> (WrapBare); text inside
+        --      one is kept as it is. A block left open runs on to the next
+        --      lines and is closed at the end of the note at the latest.
+        -- hadTag: a line with tags drops blank gaps between them (WrapBare).
+        -- carried: this line continues a block opened on an earlier line, so
+        -- its first text starts on a new line (<BR/>), as typed: the lines of
+        -- a multi-line block used to run together with no break or space.
+        local parts, pos, scan, hadTag = {}, 1, 1, false
+        local carried = openEnd ~= nil
+        local function emit(t)
+            if t == "" then return end
+            if openEnd then
+                if carried then parts[#parts + 1] = "<BR/>" end
+                parts[#parts + 1] = t
+            else
+                parts[#parts + 1] = WrapBare(t, not hadTag)
             end
+            carried = false
         end
-
-        -- 7. Structure close tags
-        for tag, html in pairs(STRUCT_CLOSE) do
-            if line:find(tag, 1, true) then
-                line = line:gsub(tag:gsub("[%(%)%.%%%+%-%*%?%[%]%^%$]", "%%%1"), html)
-                inBlock = false
+        while true do
+            local st, en = line:find("{/?[hp]%d?:?[cr]?}", scan)
+            if not st then break end
+            local tag = line:sub(st, en)
+            if STRUCT_OPEN[tag] or STRUCT_CLOSE[tag] then   -- else plain text
+                hadTag = true
+                emit(line:sub(pos, st - 1))
+                carried = false
+                if openEnd then parts[#parts + 1] = openEnd; openEnd = nil end
+                if STRUCT_OPEN[tag] then
+                    parts[#parts + 1] = STRUCT_OPEN[tag]
+                    openEnd = STRUCT_END[tag]
+                end
+                pos = en + 1
             end
+            scan = en + 1
         end
-
-        -- 8. Bare lines (not inside a block tag, not empty) → wrap in <P>…</P>
-        -- Skip wrapping if the line already contains block-level HTML elements
-        -- (<h1>/<h2>/<h3>/<P>/<img>) — nesting them inside <P> kills the parser.
-        if not inBlock and line ~= "" then
-            local hasBlock = line:match("<h%d") or line:match("<P") or line:match("<img ")
-            if not hasBlock then
-                line = "<P>" .. line .. "</P>"
-            end
-        end
+        emit(line:sub(pos))
+        -- An empty line inside a block is a blank line there
+        if carried and line == "" then parts[1] = "<BR/>" end
+        line = table.concat(parts)
 
         -- 9. Spacer after block closes for visual breathing room.
         --    WoW SimpleHTML has no CSS margins; inject a <P><br/></P> after
@@ -167,6 +222,10 @@ function AM.ToHTML(text, bodySize)
         end
 
         table.insert(out, line)
+    end
+    if openEnd then
+        -- Never closed: close it, so the text in it still shows (ALL-236)
+        table.insert(out, openEnd .. "<P><br/></P>")
     end
 
     -- SimpleHTML requires a complete <HTML><BODY>...</BODY></HTML> document.

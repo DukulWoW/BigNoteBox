@@ -216,14 +216,29 @@ local function UpdateFocusStats(text)
     focusStatsStrip:SetText(string.format(L["NE_STATS_FMT"], chars, words))
 end
 
+local SaveFocusNote   -- below; the autosave in UpdateFocusSaveBtn calls it
+
+-- Runs after every Focus edit and save. The Save button follows the save mode
+-- like the editor's action bar (ALL-226): shown only with "manual". In
+-- automatic mode an edit schedules a save after the editor's idle delay, as
+-- the main editor does: Focus mode saved only on Save or close before, and
+-- the logout save reads the main editor, not this one.
 local function UpdateFocusSaveBtn()
     if not focusSaveBtn then return end
+    local auto = BNB.IsAutoSave()
     local en = focusDirty == true
+    focusSaveBtn:SetShown(not auto)
     focusSaveBtn:SetEnabled(en)
     focusSaveBtn:SetAlpha(en and 1.0 or 0.4)
+    if auto and en then
+        local idle = (BigNoteBoxDB and BigNoteBoxDB.undoIdleDelay) or 0.8
+        BNB.Debounce("focusAutoSave", idle, function()
+            if focusDirty and BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then SaveFocusNote() end
+        end)
+    end
 end
 
-local function SaveFocusNote()
+SaveFocusNote = function()
     local id = BNB._currentNoteID
     if not id then return end
     local title = (focusTitleEb and not focusTitleEb._showingPlaceholder)
@@ -316,7 +331,10 @@ local function LoadNoteInFocus(id)
     -- eb:SetWidth is valid before SetText triggers GrowToContent.
     C_Timer.After(0, function()
         if not focusFrame or not focusFrame:IsShown() then return end
-        if focusTitleEb then focusTitleEb:SetRealText(note.title or "") end
+        if focusTitleEb then
+            focusTitleEb:SetRealColor(note.titleColor)   -- ALL-260
+            focusTitleEb:SetRealText(note.title or "")
+        end
         if focusBodyEb  then
             focusBodyEb:SetRealText(note.body or "")
             if focusBodyScroll then
@@ -424,18 +442,10 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     bar:SetPoint("TOPRIGHT", anchorBelow, "BOTTOMRIGHT", 0, -2)
     bar:SetHeight(FOCUS_MARKUP_H)
 
-    local sep = bar:CreateTexture(nil, "ARTWORK")
-    sep:SetHeight(1)
+    -- The editor's one rule (ALL-246 / ALL-262): grey, skin-tinted in skin mode
+    local sep = BNB.CreateNoteRule(bar)
     sep:SetPoint("BOTTOMLEFT",  bar, "BOTTOMLEFT",  0, 0)
     sep:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        sep:SetColorTexture(br, bg_, bb, 0.20)
-        if BNB.RegisterSkinRule then BNB.RegisterSkinRule(sep, 0.20) end
-    else
-        sep:SetColorTexture(0.22, 0.22, 0.24, 1)
-    end
 
     local MkBtn, Divider = BNB.MakeToolbarFactory(bar, 4)
 
@@ -495,7 +505,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
             end
         end
     end)
-    MkBtn("Lnk", L["FE_MK_LNK"],       function() BNB.OpenLnkDialog(FocusInsertTag) end)
+    MkBtn("Lnk", L["FE_MK_LNK"],       function() BNB.OpenLnkDialog(FocusInsertTag, BNB.PeekSelection(focusBodyEb, true)) end)
     MkBtn("Ico", L["FE_MK_ICO"],       function() BNB.OpenIcoDialog(FocusInsertTag) end)
     MkBtn("Img", L["FE_MK_IMG"],      function() BNB.OpenImgDialog(FocusInsertTag) end)
 
@@ -629,11 +639,9 @@ local function BuildFocusFrame()
     end)
     focusTitleEb = titleEb
 
-    local underline = content:CreateTexture(nil, "ARTWORK")
-    underline:SetHeight(1)
+    local underline = BNB.CreateNoteRule(content)   -- as the editor's (ALL-262)
     underline:SetPoint("TOPLEFT",  titleBg, "BOTTOMLEFT",  0, -1)
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
-    underline:SetColorTexture(0.28, 0.28, 0.30, 1)
     focusTitleUl = underline
 
     local tsStrip = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -934,11 +942,9 @@ local function BuildFocusFrameSkin()
     end)
     focusTitleEb = titleEb
 
-    local underline = content:CreateTexture(nil, "ARTWORK")
-    underline:SetHeight(1)
+    local underline = BNB.CreateNoteRule(content)   -- as the editor's (ALL-262)
     underline:SetPoint("TOPLEFT",  titleBg, "BOTTOMLEFT",  0, -1)
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
-    underline:SetColorTexture(0.28, 0.28, 0.30, 1)
     focusTitleUl = underline
 
     local tsStrip = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

@@ -1270,6 +1270,19 @@ BNB.RegisterMessage("NoteEditor", "NoteChanged", function(_, id, fields)
     if touched then BNB.Debounce("editorTagStrip", 0, BNB.RefreshTagStrip) end
 end)
 
+-- The open note's title colour changed (Note Settings, New note): the editor
+-- title follows it (ALL-260)
+BNB.RegisterMessage("NoteEditorTitleColor", "NoteChanged", function(_, id, fields)
+    if id ~= BNB._currentNoteID or not fields or not BNB._editorTitle then return end
+    local touched = fields.titleColor ~= nil
+    for _, k in ipairs(fields._clear or {}) do
+        if k == "titleColor" then touched = true end
+    end
+    if not touched then return end
+    local note = BNB.GetNote(id)
+    BNB._editorTitle:SetRealColor(note and note.titleColor)
+end)
+
 -- Public: rebuild chips for current note
 function BNB.RefreshTagStrip()
     if not tagStripFrame then return end
@@ -1298,6 +1311,10 @@ end
 -- locked = true  → editboxes disabled, Edit button shown, Save hidden
 -- locked = false → editboxes enabled,  Edit button hidden, Save shown
 --------------------------------------------------------------------------------
+-- Hover cursor kind for the editor's text frames (BNB.SetHoverCursor): the
+-- lock while the open note is locked (ALL-95, ALL-239)
+function BNB.EditorLockKind() if BNB._editorLocked then return "lock" end end
+
 local function SetEditorLocked(locked)
     BNB._editorLocked = locked
 
@@ -1507,7 +1524,10 @@ function BNB.LoadNoteInEditor(id)
         pcall(function() BNB._editorBody:SetShadowColor(sr, sg, sb, sa) end)
     end
 
-    if titleEb then titleEb:SetRealText(note.title or "") end
+    if titleEb then
+        titleEb:SetRealColor(note.titleColor)   -- the note's title colour (ALL-260)
+        titleEb:SetRealText(note.title or "")
+    end
     if bodyEb  then
         bodyEb:SetRealText(note.body or "")
         if BNB._editorBodyScroll then
@@ -1709,7 +1729,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
             end
         end)
     MkBtn("Lnk", L["NE_INSERT_LINK_TIP"],
-        function() BNB.OpenLnkDialog(InsertTag) end)
+        function() BNB.OpenLnkDialog(InsertTag, BNB.PeekSelection(BNB._editorBody, true)) end)
     MkBtn("Ico", L["NE_INSERT_ICON_TIP"],
         function() BNB.OpenIcoDialog(InsertTag) end)
     MkBtn("Img", L["NE_INSERT_IMAGE_TIP"],
@@ -2062,6 +2082,9 @@ function BNB.AM_EnterViewMode(id)
         end
         rsf:EnableMouse(true); rsf:HookScript("OnMouseDown", OnPress)
         rf:EnableMouse(true);  rf:HookScript("OnMouseDown", OnPress)
+        -- Lock cursor over the rendered text too (ALL-239)
+        BNB.SetHoverCursor(rsf, BNB.EditorLockKind)
+        BNB.SetHoverCursor(rf, BNB.EditorLockKind)
 
         rsf:Hide()
     end
@@ -2189,10 +2212,11 @@ function BNB.BuildNoteEditor()
     local bodyScroll, bodyEb = BuildBodyField(pane, topAnchor)
     BNB._editorBodyScroll = bodyScroll
     BNB._editorBody       = bodyEb
-    -- ALL-95: the lock cursor over a locked note's text
-    local function LockKind() if BNB._editorLocked then return "lock" end end
-    BNB.SetHoverCursor(bodyEb, LockKind)
-    if bodyScroll:IsMouseEnabled() then BNB.SetHoverCursor(bodyScroll, LockKind) end
+    -- ALL-95: the lock cursor over a locked note's text. The scroll frame too,
+    -- always: a short plain note leaves most of the area to it (ALL-239). The
+    -- rich view frames get it where they are built (AM_EnterViewMode)
+    BNB.SetHoverCursor(bodyEb, BNB.EditorLockKind)
+    BNB.SetHoverCursor(bodyScroll, BNB.EditorLockKind)
 
     -- When focus enters the body, the user is still working on the new note —
     -- dismiss any open discard popup so it doesn't fire while they type.

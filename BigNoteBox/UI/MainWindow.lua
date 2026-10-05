@@ -629,10 +629,15 @@ function BNB.CreateMainWindow()
                 GameTooltip:Show()
             end)
         end
+        -- Greyed while no world sticky is open or hidden (ALL-237); refreshed
+        -- by sticky open / close / hide / show and the ESC-screen toggle
         function BNB.RefreshStickyEyeBtn()
             local hidden = BigNoteBoxDB and BigNoteBoxDB.stickiesHidden == true
             eyeOpen:SetShown(not hidden)
             eyeClosed:SetShown(hidden)
+            local any = BNB.Sticky and BNB.Sticky.WorldCount and BNB.Sticky.WorldCount() > 0
+            eyeOpen:SetEnabled(any and true or false)
+            eyeClosed:SetEnabled(any and true or false)
         end
         BNB.RefreshStickyEyeBtn()
 

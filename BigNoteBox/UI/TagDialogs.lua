@@ -317,9 +317,11 @@ end
 
 --------------------------------------------------------------------------------
 -- LNK TAG DIALOG
--- Opened by the Lnk button in both markup bars.
+-- Opened by the Lnk button in both markup bars. selText: the text highlighted
+-- in the editor (BNB.PeekSelection), filled in as the link text, so Insert
+-- wraps the link around it instead of deleting it (ALL-253).
 --------------------------------------------------------------------------------
-function BNB.OpenLnkDialog(insertFn)
+function BNB.OpenLnkDialog(insertFn, selText)
     if not insertFn then return end
 
     if not _lnkDialog then
@@ -365,7 +367,8 @@ function BNB.OpenLnkDialog(insertFn)
         local textEb = FieldEB(INNER_W)
         f._textEb = textEb
 
-        -- Tab between fields
+        -- Enter: URL -> link text -> Insert; Tab / Shift+Tab between the two (ALL-255)
+        BNB.TabChain({ urlEb, textEb })
         urlEb:SetScript("OnEnterPressed", function() textEb:SetFocus() end)
         textEb:SetScript("OnEnterPressed", function()
             if f._insertBtn then f._insertBtn:Click() end
@@ -397,7 +400,7 @@ function BNB.OpenLnkDialog(insertFn)
     end)
 
     _lnkDialog._urlEb:SetText("")
-    _lnkDialog._textEb:SetText("")
+    _lnkDialog._textEb:SetText(selText or "")
     BNB.SeatWindow(_lnkDialog, _lnkDialog._strata)   -- also from Focus mode (ALL-251)
     _lnkDialog:Show()
     _lnkDialog:Raise()

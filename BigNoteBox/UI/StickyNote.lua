@@ -2155,6 +2155,8 @@ local function CreateStickyFrame(noteID)
     end
     BNB.SetHoverCursor(bodyEb, LockKind)
     BNB.SetHoverCursor(sf2, LockKind)
+    BNB.SetHoverCursor(richScroll, LockKind)   -- rich view too (ALL-239)
+    BNB.SetHoverCursor(richRender, LockKind)
     richScroll:HookScript("OnMouseUp", OnBodyMouseUp)
     richRender:HookScript("OnMouseUp", OnBodyMouseUp)
 
@@ -2531,6 +2533,7 @@ function SN.Open(noteID, noESCOpen)
     end
     local rec = StickyDB()[noteID]
     if rec and rec.minimized then SN.SetMinimized(noteID, true) end
+    if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end   -- ALL-237
 end
 
 -- Quick-note key in sticky mode (the default: BigNoteBoxDB.quickNoteKeyMode ~= "main"):
@@ -2617,6 +2620,7 @@ function SN.Close(noteID)
     -- Exit fade (FadeFrame, ALL-64)
     openFrames[noteID] = nil   -- remove from open set immediately so
                                -- re-open during fade doesn't conflict
+    if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end   -- ALL-237
     local db2 = DB()
     if db2 and db2.postits and db2.postits[noteID] then
         db2.postits[noteID].shown = false
@@ -2666,16 +2670,22 @@ function SN.ShowAll()
     if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
 end
 
--- ALL-101: hiding is otherwise silent, so an accidental Ctrl+H looked like
--- lost stickies. How many world stickies the hide flag is holding back.
-function SN.HiddenCount()
-    local db = BigNoteBoxDB
-    if not (db and db.stickiesHidden) then return 0 end
+-- Open stickies that live in the world (ESC-screen ones left out): what Hide
+-- all hides. The main window's eye greys out at 0 (ALL-237).
+function SN.WorldCount()
     local n = 0
     for _, f in pairs(openFrames) do
         if not (f._cfg and f._cfg.escOnly) then n = n + 1 end
     end
     return n
+end
+
+-- ALL-101: hiding is otherwise silent, so an accidental Ctrl+H looked like
+-- lost stickies. How many world stickies the hide flag is holding back.
+function SN.HiddenCount()
+    local db = BigNoteBoxDB
+    if not (db and db.stickiesHidden) then return 0 end
+    return SN.WorldCount()
 end
 
 -- The hide-all keybind as the player sees it ("CTRL-H"), or nil when unbound.
@@ -2711,6 +2721,8 @@ end
 
 function SN.ToggleHidden()
     local db = BigNoteBoxDB
+    -- Nothing to hide: the key does nothing, as the greyed eye (ALL-237)
+    if not (db and db.stickiesHidden) and SN.WorldCount() == 0 then return end
     if db and db.stickiesHidden then
         SN.ShowAll()
     else

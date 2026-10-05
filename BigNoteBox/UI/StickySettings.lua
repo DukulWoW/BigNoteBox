@@ -378,6 +378,8 @@ local function PopulateStickySettings(noteID)
                     end
                 end
             end
+            -- An ESC-screen sticky is not one Hide all hides (ALL-237)
+            if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
         end)
         local escLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         escLbl:SetPoint("LEFT", escChk, "RIGHT", 4, 0)

@@ -1101,6 +1101,16 @@ end
 --------------------------------------------------------------------------------
 -- LIST ENTRY
 --------------------------------------------------------------------------------
+-- The normal-mode row art starts ROW_ART_L in from the list's left edge, so
+-- its rounded end is not squashed against it (ALL-254); skin fills stay full
+local ROW_ART_L = 3
+local function ArtPoints(tex, rowArt)
+    if not rowArt then tex:SetAllPoints(); return end
+    local btn = tex:GetParent()
+    tex:SetPoint("TOPLEFT",     btn, "TOPLEFT",     ROW_ART_L, 0)
+    tex:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 0, 0)
+end
+
 local function CreateListEntry(parent)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetHeight(ENTRY_H)
@@ -1116,7 +1126,7 @@ local function CreateListEntry(parent)
     -- The normal-mode art goes on BACKGROUND, under the icon (ARTWORK) too
     -- (Dukul 2026-10-03); skin mode's faint fill stays where it was.
     local selBg = btn:CreateTexture(nil, rowArt and "BACKGROUND" or "ARTWORK", nil, 1)
-    selBg:SetAllPoints()
+    ArtPoints(selBg, rowArt)
     if rowArt then selBg:SetTexture(ROW_SEL_TEX); TintRowArt(selBg)
     else selBg:SetColorTexture(unpack(COL_SEL_BG)) end
     selBg:Hide()
@@ -1125,7 +1135,7 @@ local function CreateListEntry(parent)
     -- Multi-select highlight. Normal mode: Dukul's row art (2026-10-03), on
     -- BACKGROUND over the selection and under the hover; skin mode: blue tint
     local multiSelBg = btn:CreateTexture(nil, rowArt and "BACKGROUND" or "ARTWORK", nil, 2)
-    multiSelBg:SetAllPoints()
+    ArtPoints(multiSelBg, rowArt)
     if rowArt then multiSelBg:SetTexture(ROW_MULTI_TEX); TintRowArt(multiSelBg)
     else multiSelBg:SetColorTexture(0.20, 0.45, 0.90, 0.18) end
     multiSelBg:Hide()
@@ -1136,7 +1146,7 @@ local function CreateListEntry(parent)
     -- so it is a BACKGROUND texture shown while the row is hovered (Dukul 2026-10-03)
     if rowArt then
         local hiBg = btn:CreateTexture(nil, "BACKGROUND", nil, 3)   -- over the multi-select art
-        hiBg:SetAllPoints()
+        ArtPoints(hiBg, true)
         hiBg:SetTexture(ROW_HOVER_TEX); TintRowArt(hiBg)
         hiBg:Hide()
         btn:HookScript("OnEnter", function() hiBg:Show() end)
@@ -1989,7 +1999,11 @@ function BNB.RefreshNoteListEntry(id, opts)
         return BNB.RefreshNoteList()
     end
     if sortBy == "edited" and not note.pinned and not AtEditedEdge(btn, db and db.sortAsc) then
-        return BNB.RefreshNoteList()
+        BNB.RefreshNoteList()
+        -- The note you are typing in just moved to the top (or the bottom,
+        -- oldest first): the list follows it there (ALL-207)
+        if id == BNB._currentNoteID then BNB.ScrollNoteListTo(id) end
+        return
     end
     _seq = _seq + 1; _rowAt[id] = _seq
     PopulateEntry(btn, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
