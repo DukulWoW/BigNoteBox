@@ -41,8 +41,8 @@ end
 
 -- The entries a main item's click can run, for the settings page and the
 -- sample menu: { item, label key, icon, { { entry key, label key, icon }, ... } }.
--- Keys match the entries built below; a choice missing on a note (Copy /
--- Move with the sidebar off) falls back to a sub-menu-only click there.
+-- Keys match the entries built below; a choice missing on a note falls
+-- back to a sub-menu-only click there.
 BNB.NOTE_MENU_CLICKS = {
     { "open", "NL_CTX_OPEN", "note", {
         { "editor", "NL_CM_OPEN_EDITOR", "editor" }, { "settings", "NL_CTX_OPEN_SETTINGS", "note-settings" },
@@ -257,10 +257,12 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
         Parent(root, L["NL_CM_ACTIONS"], "action", ClickKey("actions"), {
             { key = "duplicate", label = L["NL_CTX_DUPLICATE"], fn = function() K.DuplicateNote(noteID) end,
               opts = { icon = "duplicate" } },
-            (BNB.Sidebar and BNB.Sidebar.IsEnabled()) and {   -- Copy/Move to character
-              key = "copyMove", label = L["NL_CTX_COPY_MOVE"], fn = function()
+            -- Copy/Move to character: the only way to change a note's scope
+            -- since Note Settings lost Note visibility, so shown with the
+            -- sidebar off too (ALL-265)
+            { key = "copyMove", label = L["NL_CTX_COPY_MOVE"], fn = function()
                 if BNB.OpenCopyMovePopup then BNB.OpenCopyMovePopup(noteID, "copy") end
-            end, opts = { icon = "copy-move" } } or false,
+            end, opts = { icon = "copy-move" } },
             { key = "clipboard", label = L["NL_CM_COPY_CLIPBOARD"], fn = CopyBody,
               opts = { icon = "copy-clipboard" } },
             BNB.AdvancedMode and {
@@ -483,7 +485,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
 
         local act = root:CreateButton(L["NL_CM_ACTIONS"], nil, { icon = "action" })
         act:CreateButton(L["MULTI_CM_DUPLICATE"], Duplicate, { icon = "duplicate" })
-        if BNB.Sidebar and BNB.Sidebar.IsEnabled() and BNB.OpenCopyMovePopupMulti then
+        if BNB.OpenCopyMovePopupMulti then   -- sidebar on or off (ALL-265)
             act:CreateButton(L["NL_CTX_COPY_MOVE"], function() BNB.OpenCopyMovePopupMulti(ids) end,
                 { icon = "copy-move" })
         end

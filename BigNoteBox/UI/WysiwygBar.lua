@@ -721,9 +721,12 @@ local function BuildWysiwygBar(parent, tsStrip)
         end
     end
 
-    -- Sync sidebar copy/move button visibility
+    -- Copy/move button visibility. Always shown since ALL-265: Note Settings
+    -- lost Note visibility, so this and the right-click menu are the ways to
+    -- change a note's character, sidebar on or off. Kept as a function: the
+    -- sidebar switch and Sidebar.lua still call it.
     function BNB.SyncSidebarWysiwygBtns()
-        local enabled = BNB.Sidebar and BNB.Sidebar.IsEnabled()
+        local enabled = true
         if BNB._wysiwygCopyMoveBtn then BNB._wysiwygCopyMoveBtn:SetShown(enabled) end
         if cmDiv                   then cmDiv:SetShown(enabled)                   end
     end

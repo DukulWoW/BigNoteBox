@@ -8,7 +8,7 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
-local TM_W        = 380
+local TM_W        = BNB.SIDE_WINDOW_W   -- 380 until ALL-269: Note History's width
 local PAD         = 14
 local SCROLL_PAD  = PAD + 20   -- right inset: scrollbar clears the border
 local SCROLL_LPAD = PAD + 4    -- left inset: tiny air gap on left
@@ -487,10 +487,11 @@ function BNB.ToggleTagManager()
     if f:IsShown() then
         f:Hide()
     else
-        f:ClearAllPoints()
-        if BNB.mainFrame then
-            f:SetPoint("TOPLEFT", BNB.mainFrame, "TOPRIGHT", 8, 0)
-        else
+        -- Side from Settings > Notes > Tag Tree, as tall as the main window
+        -- (ALL-269)
+        BNB.FollowMainHeight(f)
+        if not BNB.PlaceBesideMain(f, BNB.WindowSide("tagManagerSide")) then
+            f:ClearAllPoints()
             f:SetPoint("CENTER", UIParent, "CENTER", 200, 0)
         end
         _openTag   = nil

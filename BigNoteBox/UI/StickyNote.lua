@@ -1719,11 +1719,8 @@ local function CreateStickyFrame(noteID)
                 end
                 return tip
             end })
-        -- Position: right-aligned with gap, centred vertically in header.
-        -- Single anchor so SetSize is respected (two anchors stretch the button).
-        local xOff = -BTN_RIGHT_PAD - (slot - 1) * (BTN_SZ + BTN_GAP)
-        local yOff = (HEADER_H - BTN_SZ) / 2
-        btn:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT", xOff, yOff)
+        -- Placed by f._layoutHdrBtns (right-aligned, hidden ones leave no gap)
+        btn._slot = slot
         btn:SetFrameLevel(btnOverlay:GetFrameLevel() + 1)
 
         -- Start hidden; will be shown by FadeBtns when root is hovered
@@ -1824,7 +1821,29 @@ local function CreateStickyFrame(noteID)
         GameTooltip:Show()
     end)
     f._tasksHdrBtn = tasksHdrBtn
-    if not BNB.TasksEnabled() then tasksHdrBtn:Hide() end   -- ALL-102
+
+    -- Settings > Modules > Sticky Notes can hide four of the buttons
+    -- (stickyHideBtn, ALL-266); the right-click menu keeps them all.
+    -- Tasks also hides while the Tasks module is off (ALL-102).
+    _hdrBtns[3]._hideKey, _hdrBtns[4]._hideKey = "settings", "edit"
+    alarmHdrBtn._hideKey, tasksHdrBtn._hideKey = "alarm", "tasks"
+    -- Right-aligned, slot order, hidden buttons leave no gap. Single anchor
+    -- so SetSize is respected (two anchors stretch the button).
+    f._layoutHdrBtns = function()
+        local n = 0
+        for _, btn in ipairs(_hdrBtns) do
+            local show = not (btn._hideKey and SN.HdrBtnHidden(btn._hideKey))
+            if btn == tasksHdrBtn and not BNB.TasksEnabled() then show = false end
+            btn:ClearAllPoints()
+            if show then
+                btn:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT",
+                    -BTN_RIGHT_PAD - n * (BTN_SZ + BTN_GAP), (HEADER_H - BTN_SZ) / 2)
+                n = n + 1
+            end
+            btn:SetShown(show)
+        end
+    end
+    f._layoutHdrBtns()
 
     -- ── Right-click context menu (ALL-83) ─────────────────────────────────────
     -- Same entries as the header buttons: Open in editor, Settings, Set/Edit
@@ -2366,7 +2385,7 @@ local function ReopenStickyFrame(f, noteID)
             BNB.Alarm.RegisterGlowTarget(noteID, f._miniTile)
         end
     end
-    if f._tasksHdrBtn then f._tasksHdrBtn:SetShown(BNB.TasksEnabled()) end
+    if f._layoutHdrBtns then f._layoutHdrBtns() end
     LoadGeometry(noteID, f)
 
     local cfg = GetCfg(noteID)
@@ -2897,13 +2916,27 @@ function SN.RefreshNpcPortraits()
     end
 end
 
+-- Header buttons the player switched off on Settings > Modules > Sticky
+-- Notes (ALL-266): BigNoteBoxDB.stickyHideBtn[key] = true, key = "settings",
+-- "edit", "alarm" or "tasks"; nil = shown. Close and Minimize always show.
+function SN.HdrBtnHidden(key)
+    local h = BigNoteBoxDB and BigNoteBoxDB.stickyHideBtn
+    return h ~= nil and h[key] == true
+end
+
+function SN.ApplyHeaderButtons()
+    for _, f in pairs(openFrames) do
+        if f._layoutHdrBtns then f._layoutHdrBtns() end
+    end
+end
+
 -- The Tasks switch changed (UI/Config/Modules.lua, ALL-102): show or hide
 -- each open sticky's Tasks header button; a sticky showing its tasks goes
 -- back to the note.
 function SN.ApplyTasksModule()
     local on = BNB.TasksEnabled()
     for id, f in pairs(openFrames) do
-        if f._tasksHdrBtn then f._tasksHdrBtn:SetShown(on) end
+        if f._layoutHdrBtns then f._layoutHdrBtns() end
         if not on and f._taskViewActive then
             -- Keep the saved view, so Tasks back on reopens it in task view
             local rec = StickyDB()[id]

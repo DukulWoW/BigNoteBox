@@ -19,16 +19,17 @@ local NND = BNB.NewNoteDialog
 -- ---------------------------------------------------------------------------
 -- LAYOUT CONSTANTS
 -- ---------------------------------------------------------------------------
-local DLG_W    = 360
+local DLG_W    = 420   -- 360 until ALL-267: wider font cards, room for the character dropdown
 local DLG_PAD  = 12
 local DLG_FOOT = 42
-local DLG_CW   = DLG_W - DLG_PAD * 2   -- 336
+local DLG_CW   = DLG_W - DLG_PAD * 2   -- 396
 
 local COL_GAP  = 8
-local COL_L_W  = 148
+local COL_L_W  = 196
 local COL_R_W  = DLG_CW - COL_L_W - COL_GAP
 
 local ICON_SZ  = 40
+local SCOPE_W  = 130   -- character dropdown right of the title (ALL-267)
 local CARD_H   = 38
 local CARD_GAP = 4
 
@@ -53,6 +54,8 @@ local _sizeSlider     = nil
 local _sizePreviewLbl = nil
 local _createBtn      = nil
 local _richCheck      = nil
+local _scopeDD        = nil   -- which character the note belongs to (ALL-267)
+local _scopeEntries   = {}    -- filled on every Open (knownChars can change)
 local _wowCheck        = nil
 local _refreshLSM      = nil   -- LSM font dropdown closed-state refresh (ALL-41)
 
@@ -108,6 +111,41 @@ local function IconPickHandlers()
         get    = function() return _selIcon end,
         set    = function(icon) _selIcon = icon; ShowSelIcon() end,
     }
+end
+
+-- ---------------------------------------------------------------------------
+-- CHARACTER DROPDOWN (ALL-267)
+-- Global, this character, then every other known character by name in its
+-- class colour (realm added when two share a name). Filled in place: the
+-- dropdown keeps a reference to this table and builds its menu on open.
+-- ---------------------------------------------------------------------------
+local function FillScopeEntries()
+    wipe(_scopeEntries)
+    local cur = BNB.currentChar
+    _scopeEntries[#_scopeEntries + 1] = { value = "global", label = L["SCOPE_GLOBAL"] }
+    if cur then
+        _scopeEntries[#_scopeEntries + 1] = { value = "char:" .. cur, label = L["SCOPE_THIS_CHAR"] }
+    end
+    local others, names = {}, {}
+    for key, rec in pairs(BigNoteBoxDB and BigNoteBoxDB.knownChars or {}) do
+        if key ~= cur then
+            local name = rec.name or key
+            others[#others + 1] = { key = key, name = name, realm = rec.realm, class = rec.class }
+            names[name] = (names[name] or 0) + 1
+        end
+    end
+    table.sort(others, function(a, b) return a.name < b.name end)
+    for _, c in ipairs(others) do
+        local clr = RAID_CLASS_COLORS and c.class and RAID_CLASS_COLORS[c.class]
+        local label = c.name
+        if clr then
+            label = string.format("|cff%02x%02x%02x%s|r", clr.r * 255, clr.g * 255, clr.b * 255, c.name)
+        end
+        if names[c.name] > 1 and c.realm and c.realm ~= "" then
+            label = label .. " |cff888888" .. c.realm .. "|r"
+        end
+        _scopeEntries[#_scopeEntries + 1] = { value = "char:" .. c.key, label = label }
+    end
 end
 
 -- ---------------------------------------------------------------------------
@@ -216,11 +254,25 @@ local function BuildDialog()
     end)
     _iconBtn = iconBtn
 
+    -- Character dropdown at the right end of the title row (ALL-267)
+    FillScopeEntries()
+    local scopeDD = BNB.CreateValueDropdown(f, _scopeEntries, "global", nil, SCOPE_W, 26)
+    scopeDD:SetPoint("TOPRIGHT", f, "TOPRIGHT", -DLG_PAD, topY - (ICON_SZ - 26) / 2)
+    local scopeTipOwner = scopeDD._dd or scopeDD
+    scopeTipOwner:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["NND_SCOPE_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NND_SCOPE_TIP_SUB"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    scopeTipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    _scopeDD = scopeDD
+
     -- Title editbox — 20pt bold, same as the main note editor title
     local titleBg = BNB.CreateBackdropFrame("Frame", nil, f)
     BNB.SetBackdrop(titleBg, 0.06, 0.06, 0.09, 0.85, 0.35, 0.35, 0.38, 1)
     titleBg:SetPoint("TOPLEFT",  iconBtn, "TOPRIGHT",  6, 0)
-    titleBg:SetPoint("TOPRIGHT", f,       "TOPRIGHT", -DLG_PAD, 0)
+    titleBg:SetPoint("TOPRIGHT", scopeDD, "TOPLEFT",  -6, (ICON_SZ - 26) / 2)
     titleBg:SetHeight(ICON_SZ)
 
     local titleEB = CreateFrame("EditBox", nil, titleBg)
@@ -586,6 +638,11 @@ function NND.Open()
     _selRich  = (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
     if _richCheck then _richCheck:SetChecked(_selRich) end
     if _wowCheck  then _wowCheck:SetChecked(false) end
+    -- Character: starts on "New notes belong to" (Settings > Notes, ALL-267)
+    if _scopeDD then
+        FillScopeEntries()
+        _scopeDD:SetSelected(BNB.NewNoteScope())
+    end
 
     -- Apply icon
     ShowSelIcon()
@@ -677,10 +734,14 @@ function NND.Confirm()
     local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     if _selSize ~= defaultSize then updates.fontSize = _selSize end
     if _selRich then updates.richMode = true end
+    local scope = _scopeDD and _scopeDD:GetSelected()
+    if scope then updates.scope = scope end   -- ALL-267
     BNB.UpdateNote(id, updates)
 
     if not BNB.mainFrame then BNB.CreateMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
+    -- Another character's note is not in the selected tab: show All
+    if BNB.RevealNoteInList then BNB.RevealNoteInList(id) end
     if BNB.SelectNote      then BNB.SelectNote(id)    end
     C_Timer.After(0.05, function()
         if BNB.OpenConfigOnNew() and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id) end

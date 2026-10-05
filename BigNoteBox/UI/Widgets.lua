@@ -5,6 +5,11 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
+-- Width of the list windows beside the main window: Note History, Trash,
+-- Alarms, Tag Manager (ALL-269; placement helpers in UI/ToolWindow.lua).
+-- Here because those files read it at load time.
+BNB.SIDE_WINDOW_W = 400
+
 --------------------------------------------------------------------------------
 -- BACKDROP DEFINITIONS
 -- White8x8 bg + Tooltip border — present on all WoW versions.

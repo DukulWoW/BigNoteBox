@@ -15,7 +15,7 @@ local L   = BNB.L
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 
 -- Layout constants
-local TW_W           = 400
+local TW_W           = BNB.SIDE_WINDOW_W   -- 400 (ALL-269)
 local TITLE_H        = 32
 local PAD            = 14
 local ROW_H          = 86
@@ -577,10 +577,9 @@ local TrashFrame = BuildTrashWindow
 
 local function ShowTrashWindow(f)
     SyncTrashHeight()
-    f:ClearAllPoints()
-    if BNB.mainFrame and BNB.mainFrame:IsShown() then
-        f:SetPoint("TOPRIGHT", BNB.mainFrame, "TOPLEFT", -8, 0)
-    else
+    -- Side from Settings > Notes > Trash (ALL-269, right by default)
+    if not BNB.PlaceBesideMain(f, BNB.WindowSide("trashSide")) then
+        f:ClearAllPoints()
         f:SetPoint("CENTER")
     end
     f:Show()

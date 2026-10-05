@@ -297,10 +297,8 @@ function RP.Open()
 
     if not _mainFrame:IsShown() then
         _mainFrame:Show()
-        if BNB.mainFrame and BNB.mainFrame:IsShown() then
-            _mainFrame:ClearAllPoints()
-            _mainFrame:SetPoint("TOPLEFT", BNB.mainFrame, "TOPRIGHT", 8, 0)
-        else
+        -- Side from Settings > Notes > Live Preview (ALL-269, right by default)
+        if not BNB.PlaceBesideMain(_mainFrame, BNB.WindowSide("richPreviewSide")) then
             _mainFrame:ClearAllPoints()
             _mainFrame:SetPoint("CENTER")
         end

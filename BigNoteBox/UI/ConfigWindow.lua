@@ -513,6 +513,38 @@ end
 -- Only read when the window is built.
 local BUILDERS = {}
 
+-- "Opens on: [Left / Right]" for a window beside the main window (ALL-269).
+-- dbKey = BigNoteBoxDB key (default in BNB.DEFAULTS), frameName = the
+-- window's global name: an open window moves at once. Returns y, holder.
+local function AddSideRow(ct, y, label, dbKey, frameName)
+    local db = BigNoteBoxDB
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+    lbl:SetText(label)
+    local dd = BNB.CreateValueDropdown(ct, {
+            { label = L["CFG_SIDE_LEFT"],  value = "left"  },
+            { label = L["CFG_SIDE_RIGHT"], value = "right" },
+        }, BNB.WindowSide(dbKey),
+        function(v)
+            db[dbKey] = v
+            local f = frameName and _G[frameName]
+            if f and f:IsShown() then BNB.PlaceBesideMain(f, v) end
+        end, 140, 24)
+    dd:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y - 2)
+    lbl:SetPoint("RIGHT", dd, "LEFT", -6, 0)
+    local tipOwner = dd._dd or dd
+    tipOwner:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(label, 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_SIDE_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    dd._lbl = lbl
+    return y - (ROW_H + ROW_GAP), dd
+end
+
 -- Shared with the tab files under UI/Config/.
 local K = {
     CONTENT_W            = CONTENT_W,
@@ -524,6 +556,7 @@ local K = {
     AddHeader            = AddHeader,
     AddCheck             = AddCheck,
     AddSlider            = AddSlider,
+    AddSideRow           = AddSideRow,
     MakeKeybindRow       = MakeKeybindRow,
     MakeKeybindPair      = MakeKeybindPair,
     BuildLSMFontDropdown = BuildLSMFontDropdown,

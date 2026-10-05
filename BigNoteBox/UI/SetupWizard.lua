@@ -425,12 +425,22 @@ local function BuildPage1(content)
     txt:SetTextColor(0.88, 0.88, 0.88)
     y = y - (txt:GetStringHeight() or 60) - 16
 
-    -- Language selector (ALL-14) — retail only; selecting a language reloads.
-    if not BNB.IsForever then
-        local lgLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        lgLbl:SetPoint("TOP", ct, "TOP", 0, y)
+    -- Language selector (ALL-14): pinned to the bottom of the page, right
+    -- above Get started, out of the scrolling text (ALL-268); on Forever too
+    -- since ALL-268. Selecting a language asks, then reloads into page 1.
+    do
+        local LANG_BOX_H = 56
+        local lb = CreateFrame("Frame", nil, f)
+        lb:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)
+        lb:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+        lb:SetHeight(LANG_BOX_H)
+        sf:SetPoint("BOTTOMRIGHT", lb, "TOPRIGHT", -16, 4)
+        local ly = 0
+
+        local lgLbl = lb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        lgLbl:SetPoint("TOP", lb, "TOP", 0, ly)
         lgLbl:SetText(L["SW_WELCOME_LANG_LBL"])
-        y = y - (lgLbl:GetStringHeight() or 14) - 6
+        ly = ly - (lgLbl:GetStringHeight() or 14) - 6
 
         local FLAG = ASSETS .. "Flags\\"
         -- { code, label, flag, available }  available=false -> greyed "(Coming soon)"
@@ -463,10 +473,9 @@ local function BuildPage1(content)
             and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
         if useNativeLangDrop then
-            local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-            langDD:SetPoint("TOP", ct, "TOP", 0, y)
+            local langDD = CreateFrame("DropdownButton", nil, lb, "WowStyle1DropdownTemplate")
+            langDD:SetPoint("TOP", lb, "TOP", 0, ly)
             langDD:SetWidth(CW - 40)
-            y = y - 30
             langDD:SetupMenu(function(_, root)
                 for _, entry in ipairs(LANG_LIST) do
                     local lbl = MakeLangLabel(entry)
@@ -491,18 +500,20 @@ local function BuildPage1(content)
                 end
             end)
         else
-            -- Fallback: only the available entries, as plain stacked buttons.
+            -- Fallback: only the available entries, as buttons in one row.
+            local avail = {}
             for _, entry in ipairs(LANG_LIST) do
-                if entry.available then
-                    local lb = BNB.CreateButton(nil, ct, MakeLangLabel(entry), CW - 40, 22)
-                    lb:SetPoint("TOP", ct, "TOP", 0, y)
-                    lb:SetScript("OnClick", function()
-                        if entry.code == curLangCode then return end
-                        BNB._pendingLangCode = entry.code
-                        StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
-                    end)
-                    y = y - 26
-                end
+                if entry.available then avail[#avail + 1] = entry end
+            end
+            local bw = math.floor((CW - 40 - (#avail - 1) * 4) / #avail)
+            for i, entry in ipairs(avail) do
+                local btn = BNB.CreateButton(nil, lb, MakeLangLabel(entry), bw, 22)
+                btn:SetPoint("TOPLEFT", lb, "TOP", -(CW - 40) / 2 + (i - 1) * (bw + 4), ly)
+                btn:SetScript("OnClick", function()
+                    if entry.code == curLangCode then return end
+                    BNB._pendingLangCode = entry.code
+                    StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
+                end)
             end
         end
     end
@@ -528,8 +539,10 @@ local function BuildPage2(content)
         nil, 0.75, 0.75, 0.75)
     y = ny - 4
 
-    -- Two image buttons side by side
-    local IMG_W, IMG_H = 200, 125
+    -- Two image buttons side by side. The art is 256x128 (ALL-154): the
+    -- picture inside the 2 px border keeps that 2:1 shape.
+    local IMG_W = 200
+    local IMG_H = (IMG_W - 4) / 2
     local GAP = CW - IMG_W * 2
     local _selected = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and "skin" or "normal"
 
@@ -573,6 +586,7 @@ local function BuildPage2(content)
             _selected = choiceKey
             f._normalBtn._hl()
             f._skinBtn._hl()
+            if f._themeRow then f._themeRow:SetShown(_selected == "skin") end
         end)
         btn._hl = Highlight
         return btn
@@ -585,6 +599,29 @@ local function BuildPage2(content)
     f._normalBtn = normalBtn
     f._skinBtn   = skinBtn
     y = y - (IMG_H + 28 + 12)
+
+    -- Skin theme, shown while skin mode is picked (ALL-223). Saved on Next,
+    -- which reloads into page 3 already in that theme.
+    local _theme = (BigNoteBoxDB and BigNoteBoxDB.skinPreset) or "obsidian"
+    do
+        local row = CreateFrame("Frame", nil, f)
+        row:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
+        row:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
+        row:SetHeight(28)
+        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("LEFT", row, "LEFT", 0, 0)
+        lbl:SetText(L["SW_THEME_COLOR_HDR"])
+        local entries = {}
+        for _, key in ipairs(BNB.SKIN_PRESET_ORDER) do
+            entries[#entries + 1] = { label = BNB.SkinPresetLabel(key, true), value = key }
+        end
+        local dd = BNB.CreateValueDropdown(row, entries, _theme,
+            function(v) _theme = v end, IMG_W, 26)
+        dd:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row:SetShown(_selected == "skin")
+        f._themeRow = row
+    end
+    y = y - 28 - 10
 
     -- Explanation text
     local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -604,6 +641,7 @@ local function BuildPage2(content)
         local choice = _selected
         if choice == "skin" then
             db.skinMode  = true
+            db.skinPreset = _theme   -- page 2's theme dropdown (ALL-223)
             db.setupPage = 3
             db.setupComplete = false
             C_UI.Reload()

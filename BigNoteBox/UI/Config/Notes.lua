@@ -67,6 +67,35 @@ local function BuildNotesTab(sf, ct)
         y = y - (32 + ROW_GAP)
     end
 
+    -- Which character a new note belongs to (ALL-267); nil = the selected
+    -- tab. Read by BNB.NewNoteScope (Core/NoteManager.lua), which the New
+    -- note dialog's character dropdown starts on.
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_NEWNOTE_SCOPE"])
+        y = y - (ROW_H + 2)
+
+        local scDD = BNB.CreateValueDropdown(ct, {
+                { label = L["CFG_NEWNOTE_SCOPE_FOLLOW"], value = "follow" },
+                { label = L["CFG_NEWNOTE_SCOPE_GLOBAL"], value = "global" },
+                { label = L["CFG_NEWNOTE_SCOPE_CHAR"],   value = "char"   },
+            }, db.newNoteScope or "follow",
+            function(v) db.newNoteScope = (v ~= "follow") and v or nil end,
+            CONTENT_W, 26)
+        scDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        local tipOwner = scDD._dd or scDD
+        tipOwner:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_NEWNOTE_SCOPE"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_NEWNOTE_SCOPE_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - (32 + ROW_GAP)
+    end
+
     -- What double-clicking a note in the list does (ALL-100); nil = settings
     do
         local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -207,6 +236,10 @@ local function BuildNotesTab(sf, ct)
     retainSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     y = y - (SLIDER_H + ROW_GAP)
 
+    -- Which side the Trash window opens on (ALL-269)
+    local trashSideDD
+    y, trashSideDD = K.AddSideRow(ct, y, L["CFG_SIDE_TRASH"], "trashSide", "BigNoteBoxTrashFrame")
+
     -- ── Apply greying / trash button visibility ────────────────────────────────
     local function ApplyTrashSection(enabled)
         local a = enabled and 1 or 0.35
@@ -215,6 +248,8 @@ local function BuildNotesTab(sf, ct)
         warnLbl:SetAlpha(a)
         retainSlider:SetAlpha(a)
         retainSlider:SetEnabled(enabled)
+        trashSideDD:SetAlpha(a); trashSideDD._lbl:SetAlpha(a)
+        if trashSideDD._dd then trashSideDD._dd:SetEnabled(enabled) end
         -- Show/hide the trashcan icon in the main window toolbar; the row
         -- closes up so no gap is left (reads db.trashFeature, set by the caller)
         if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
@@ -244,6 +279,9 @@ local function BuildNotesTab(sf, ct)
         function() return db.tagTreeStartExpanded == true end,
         function(v) db.tagTreeStartExpanded = v end,
         L["CFG_TAGTREE_START_EXPANDED_TIP"])
+
+    -- Which side the Tag Manager opens on (ALL-269)
+    y = K.AddSideRow(ct, y, L["CFG_SIDE_TAGMGR"], "tagManagerSide", "BigNoteBoxTagManagerFrame")
 
     y = AddRule(ct, y) - 4
 
@@ -412,6 +450,9 @@ local function BuildNotesTab(sf, ct)
         function(v) db.richPreviewAutoShow = v end,
         L["CFG_RICH_PREVIEW_AUTO_TIP"])
 
+    -- Which side the rich preview opens on (ALL-269)
+    y = K.AddSideRow(ct, y, L["CFG_SIDE_PREVIEW"], "richPreviewSide", "BigNoteBoxRichPreviewFrame")
+
     y = AddCheck(ct, y, L["CFG_FOCUS_PREVIEW_ALWAYS"],
         function() return db.focusPreviewAlwaysShow ~= false end,
         function(v)
@@ -544,6 +585,9 @@ local function BuildNotesTab(sf, ct)
     histDesc:SetTextColor(0.60, 0.60, 0.60)
     histDesc:SetText(L["CFG_AUTOSAVE_HIST_DESC"])
     y = y - 32
+
+    -- Which side Note History opens on (ALL-269)
+    y = K.AddSideRow(ct, y, L["CFG_SIDE_HISTORY"], "historySide", "BigNoteBoxHistoryFrame")
 
     -- History slots slider
     local curSlots = BigNoteBoxDB and BigNoteBoxDB.historyMaxSlots or BNB.DEFAULTS.historyMaxSlots

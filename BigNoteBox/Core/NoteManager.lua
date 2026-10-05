@@ -308,19 +308,24 @@ end
 --------------------------------------------------------------------------------
 -- CREATE
 --------------------------------------------------------------------------------
+-- Where a new note goes: Settings > Notes "New notes belong to"
+-- (BigNoteBoxDB.newNoteScope, ALL-267). nil = the selected tab (a character
+-- tab -> that character, anything else -> global), "global", or "char" = the
+-- character being played. The New note dialog starts its dropdown here.
+function BNB.NewNoteScope()
+    local mode = BigNoteBoxDB and BigNoteBoxDB.newNoteScope
+    if mode == "global" then return "global" end
+    if mode == "char" and BNB.currentChar then return "char:" .. BNB.currentChar end
+    local activeKey = BNB.Sidebar and BNB.Sidebar.GetActive() or "all"
+    if activeKey and activeKey:find("^char:") then return activeKey end
+    return "global"
+end
+
 function BNB.CreateNote(title, body)
     if not NDB() then return nil end
     local id  = BNB.GenerateID()
     local now = time()
-    -- New note scope follows the active sidebar filter:
-    -- character slot -> char-scoped, everything else -> global
-    local activeKey = BNB.Sidebar and BNB.Sidebar.GetActive() or "all"
-    local newScope
-    if activeKey and activeKey:find("^char:") then
-        newScope = activeKey
-    else
-        newScope = "global"
-    end
+    local newScope = BNB.NewNoteScope()
     -- Capture creation coordinates and zone via C_Map if available.
     local coordX, coordY, coordMapID, coordZone
     if C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then

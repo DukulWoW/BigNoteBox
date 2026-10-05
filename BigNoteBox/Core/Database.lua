@@ -127,6 +127,12 @@ BNB.DEFAULTS = {
     refboxMaxItems      = 50,
     refboxAutoOpen      = true,
     refboxSide          = "left",
+    -- Side of the main window the list windows open on (ALL-269)
+    historySide         = "right",
+    trashSide           = "right",
+    alarmsSide          = "right",
+    tagManagerSide      = "right",
+    richPreviewSide     = "right",
     -- Reference Box: show ItemID / SpellID in the game's tooltip for any item or spell
     refboxShowIDs       = false,
 

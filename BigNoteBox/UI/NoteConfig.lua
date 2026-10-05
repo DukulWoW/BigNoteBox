@@ -506,144 +506,6 @@ local function BuildGeneralTab(sf, ct)
         fsSl:SetValue(GetNoteFontSize(), true)
     end
 
-    y = Rule(panel,y) - 4
-    -- ── Scope (Global / This character) ───────────────────────────────────────
-    y = Hdr(panel, y, L["NC_HDR_NOTE_VISIBILITY"])
-
-    -- Two-button toggle: [Global]  [This character ▾]
-    -- Below them: Send to Alt dropdown (only shown when scope is character-scoped)
-    local scopeBtnW = math.floor(CW_SCROLL / 2) - 2
-
-    local scopeGlobalBtn = BNB.CreateButton(nil, panel, L["SCOPE_GLOBAL"], scopeBtnW, 24)
-    scopeGlobalBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-
-    local scopeCharBtn = BNB.CreateButton(nil, panel, L["SCOPE_THIS_CHAR"], scopeBtnW, 24)
-    scopeCharBtn:SetPoint("LEFT", scopeGlobalBtn, "RIGHT", 4, 0)
-
-    y = y - 28
-
-    -- "Send to Alt" row — only visible when note is character-scoped
-    local sendRow = CreateFrame("Frame", nil, panel)
-    sendRow:SetHeight(26)
-    sendRow:SetPoint("TOPLEFT",  panel, "TOPLEFT",  0, y)
-    sendRow:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, y)
-    sendRow:Hide()
-
-    local sendLbl = sendRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    sendLbl:SetPoint("LEFT", sendRow, "LEFT", 0, 0)
-    sendLbl:SetTextColor(0.65, 0.65, 0.65)
-    sendLbl:SetText(L["SCOPE_SEND_LABEL"])
-
-    local sendBtn = BNB.CreateButton(nil, sendRow, L["SCOPE_SEND_BTN"], 160, 22)
-    sendBtn:SetPoint("LEFT", sendLbl, "RIGHT", 8, 0)
-
-    -- Send-to dropdown (WowStyle1DropdownTemplate)
-    local sendDrop = nil
-    local function GetKnownChars()
-        local list = {}
-        local db = BigNoteBoxDB
-        if db and db.knownChars then
-            for key, info in pairs(db.knownChars) do
-                if key ~= BNB.currentChar then
-                    list[#list + 1] = { key = key, name = info.name, realm = info.realm, class = info.class }
-                end
-            end
-            table.sort(list, function(a, b) return (a.name or "") < (b.name or "") end)
-        end
-        return list
-    end
-
-    local function DoSendToChar(charKey)
-        if not _noteID then return end
-        BNB.UpdateNote(_noteID, { scope = "char:" .. charKey })
-        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        -- Close NoteConfig — the note is no longer visible to this character
-        if ncFrame then ncFrame:Hide() end
-    end
-
-    sendBtn:SetScript("OnClick", function()
-        local chars = GetKnownChars()
-        if #chars == 0 then
-            BNB:Print(L["SCOPE_NO_ALTS"])
-            return
-        end
-        -- Build dropdown
-        if not sendDrop then
-            sendDrop = CreateFrame("DropdownButton", "BNBScopeSendDrop", UIParent,
-                "WowStyle1DropdownTemplate")
-            sendDrop:SetSize(1, 1)
-            sendDrop:SetAlpha(0)
-        end
-        sendDrop:ClearAllPoints()
-        sendDrop:SetPoint("TOPLEFT", sendBtn, "TOPRIGHT", 0, 0)
-        sendDrop:SetupMenu(function(_, root)
-            for _, c in ipairs(chars) do
-                local clr = RAID_CLASS_COLORS and c.class and RAID_CLASS_COLORS[c.class]
-                local hex = clr and string.format("|cff%02x%02x%02x", clr.r*255, clr.g*255, clr.b*255) or "|cffffffff"
-                local label = hex .. (c.name or c.key) .. "|r  |cff888888" .. (c.realm or "") .. "|r"
-                local key = c.key
-                root:CreateButton(label, function() DoSendToChar(key) end)
-            end
-        end)
-        sendDrop:OpenMenu()
-    end)
-
-    y = y - 30
-
-    -- Highlight helper for the two toggle buttons
-    local function RefreshScopeBtns()
-        local note = GetNote()
-        local sc   = note and note.scope or "global"
-        local isChar = sc and sc:match("^char:") ~= nil
-
-        -- Global button: gold-tinted when active
-        if scopeGlobalBtn._fs then
-            scopeGlobalBtn._fs:SetTextColor(
-                isChar and 0.6 or 1,
-                isChar and 0.55 or 0.82,
-                isChar and 0.45 or 0)
-        end
-        -- Char button: amber when active
-        if scopeCharBtn._fs then
-            if isChar then
-                -- Show short char name inside the button
-                local charName = (sc:match("^char:(.-)%-") or BNB.currentChar or ""):sub(1, 12)
-                scopeCharBtn._fs:SetText("|cffffaa00" .. charName .. "|r")
-            else
-                scopeCharBtn._fs:SetText(L["SCOPE_THIS_CHAR"])
-                scopeCharBtn._fs:SetTextColor(0.6, 0.6, 0.6)
-            end
-        end
-        -- Send row: only shown when note is scoped to a character
-        if isChar then sendRow:Show() else sendRow:Hide() end
-    end
-
-    -- Capture FontStrings on the toggle buttons (UIPanelButtonTemplate exposes
-    -- the label via GetFontString()). Deferred one tick so layout finishes first.
-    C_Timer.After(0, function()
-        scopeGlobalBtn._fs = scopeGlobalBtn._fs
-            or (scopeGlobalBtn.GetFontString and scopeGlobalBtn:GetFontString())
-        scopeCharBtn._fs  = scopeCharBtn._fs
-            or (scopeCharBtn.GetFontString  and scopeCharBtn:GetFontString())
-        RefreshScopeBtns()
-    end)
-
-    scopeGlobalBtn:SetScript("OnClick", function()
-        if not _noteID then return end
-        BNB.UpdateNote(_noteID, { scope = "global" })
-        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        RefreshScopeBtns()
-    end)
-    scopeCharBtn:SetScript("OnClick", function()
-        if not _noteID then return end
-        local cur = BNB.currentChar or "Unknown"
-        BNB.UpdateNote(_noteID, { scope = "char:" .. cur })
-        if BNB.Sticky and BNB.Sticky.RefreshMarkers then BNB.Sticky.RefreshMarkers(_noteID) end
-        RefreshScopeBtns()
-    end)
-
-    -- Store refresh callback so OpenNoteConfig can call it when switching notes
-    sf._refreshScope = RefreshScopeBtns
     panel._hlFonts    = HLFonts
     sf._hlFonts       = HLFonts
     sf._reapplyFontPreviews = ReapplyFontPreviews
@@ -1164,7 +1026,6 @@ function BNB.OpenNoteConfig(noteID, tab)
 
     RefreshTitle()
     local gPanel = tabPanels[TAB_GEN]
-    if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
     if gPanel and gPanel._hlFonts         then gPanel._hlFonts()         end
     if gPanel and gPanel._refreshChecks   then gPanel._refreshChecks()   end
     if gPanel and gPanel._refreshFontSize then gPanel._refreshFontSize() end
@@ -1209,7 +1070,6 @@ function BNB.SyncNoteConfig(noteID)
     RefreshTitle()
 
     local gPanel = tabPanels[TAB_GEN]
-    if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
     if gPanel and gPanel._hlFonts         then gPanel._hlFonts()         end
     if gPanel and gPanel._refreshChecks   then gPanel._refreshChecks()   end
     if gPanel and gPanel._refreshFontSize then gPanel._refreshFontSize() end

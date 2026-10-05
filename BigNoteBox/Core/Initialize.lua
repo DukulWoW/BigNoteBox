@@ -155,6 +155,20 @@ function BNB.Initialize()
         SafeCall("Minimap", BNB.InitMinimapButton)
     end
 
+    -- 5b. Settings > General > Window (ALL-270): put the main window back in
+    -- the centre and/or at its default size on every login and reload, before
+    -- it is built (x = 0 = centred, see RestoreWindowPos in UI/MainWindow.lua)
+    do
+        local db  = BigNoteBoxDB
+        local pos = db and db.windowPos
+        if pos then
+            if db.resetWindowPosOnLoad == true then pos.x, pos.y = 0, 0 end
+            if db.resetWindowSizeOnLoad == true then
+                pos.w, pos.h = BNB.DEFAULTS.windowPos.w, BNB.DEFAULTS.windowPos.h
+            end
+        end
+    end
+
     -- 6. Main window — build always, show only if openOnLogin is enabled
     if BNB.OpenMainWindow then
         SafeCall("MainWindow", function()

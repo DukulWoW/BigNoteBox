@@ -266,8 +266,8 @@ end
 BNB.AlarmOverview = BNB.AlarmOverview or {}
 local AO = BNB.AlarmOverview
 
-local OV_W    = 400
-local OV_H    = 640
+local OV_W    = BNB.SIDE_WINDOW_W   -- same width as Note History (ALL-269)
+local OV_H    = 640   -- start height; follows the main window once open (ALL-269)
 local OV_PAD  = 10
 local OV_ROW  = 36
 
@@ -721,17 +721,19 @@ function AO.Toggle()
         f:Hide()
     else
         AO.Refresh()
-        -- Anchor left of main window
-        local mf = BNB.mainFrame
-        if mf then
-            f:ClearAllPoints()
-            f:SetPoint("TOPRIGHT", mf, "TOPLEFT", -4, 0)
-        else
-            f:ClearAllPoints()
-            f:SetPoint("CENTER", UIParent, "CENTER", -200, 0)
-        end
+        AO.Place(f)
         f:Show()
         f:Raise()
+    end
+end
+
+-- Beside the main window on the side set in Settings > General > Window
+-- (alarmsSide, right by default), as tall as the main window (ALL-269)
+function AO.Place(f)
+    BNB.FollowMainHeight(f)
+    if not BNB.PlaceBesideMain(f, BNB.WindowSide("alarmsSide")) then
+        f:ClearAllPoints()
+        f:SetPoint("CENTER", UIParent, "CENTER", -200, 0)
     end
 end
 
@@ -755,14 +757,7 @@ StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
 function AO.ShowMissed(noteIDs)
     local f = GetOrBuildOverview()
     AO.Refresh()
-    local mf = BNB.mainFrame
-    if mf then
-        f:ClearAllPoints()
-        f:SetPoint("TOPRIGHT", mf, "TOPLEFT", -4, 0)
-    else
-        f:ClearAllPoints()
-        f:SetPoint("CENTER", UIParent, "CENTER", -200, 0)
-    end
+    AO.Place(f)
     f:Show()
     f:Raise()
     BNB:Print(string.format(L["AO_MISSED_FMT"], #noteIDs))

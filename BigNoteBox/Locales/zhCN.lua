@@ -730,9 +730,6 @@ L["COMBAT_BLOCKED"]      = "战斗中无法打开。"
 -- ── Note scope ────────────────────────────────────────────────────────────────
 L["SCOPE_GLOBAL"]        = "全局"
 L["SCOPE_THIS_CHAR"]     = "此角色"
-L["SCOPE_SEND_LABEL"]    = "发送给小号："
-L["SCOPE_SEND_BTN"]      = "选择角色..."
-L["SCOPE_NO_ALTS"]       = "尚未注册其他角色。请至少登录每个小号一次。"
 
 -- ── Reference Box ─────────────────────────────────────────────────────────────
 L["REFBOX_TITLE"]           = "参考框"
@@ -1524,7 +1521,6 @@ L["NC_RICH_NOTE_LABEL"]             = "富文本笔记 (标记格式)"
 L["NC_RICH_NOTE_TIP"]               = "富文本笔记支持格式化标记：{h1} 标题、{img} 图像、\n{icon} 图标、{col} 颜色和 {link} 链接。\n\n禁用将从笔记正文中删除所有格式化标签。"
 L["NC_HDR_TITLE_COLOR"]             = "标题颜色"
 L["NC_HDR_TEXT_ALIGNMENT"]          = "文本对齐"
-L["NC_HDR_NOTE_VISIBILITY"]         = "笔记可见性"
 L["NC_HDR_BORDER"]                  = "边框"
 L["NC_HDR_FONT"]                    = "字体"
 L["NC_HDR_FONT_OUTLINE"]            = "字体轮廓"

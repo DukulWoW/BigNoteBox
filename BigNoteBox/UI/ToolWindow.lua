@@ -184,6 +184,53 @@ function BNB.SeatWindow(f, strata)
     f:SetFrameStrata(strata or "DIALOG")
 end
 
+-- List windows beside the main window (ALL-269): Note History, Trash,
+-- Alarms, Tag Manager and Rich preview share one width and follow the main
+-- window's height; each has a Left / Right setting (BigNoteBoxDB.<key>,
+-- default in BNB.DEFAULTS). Windows the size of Note Settings stay on the left.
+-- Their width is BNB.SIDE_WINDOW_W (UI/Widgets.lua, read at load time).
+
+-- The side a window's setting names, "left" or "right".
+function BNB.WindowSide(dbKey)
+    local v = BigNoteBoxDB and BigNoteBoxDB[dbKey]
+    if v ~= "left" and v ~= "right" then v = BNB.DEFAULTS[dbKey] or "right" end
+    return v
+end
+
+-- Top-aligned beside the shown main window on that side; false (nothing
+-- placed) while the main window is closed, so the caller uses its fallback.
+function BNB.PlaceBesideMain(f, side)
+    local mf = BNB.mainFrame
+    if not (mf and mf:IsShown()) then return false end
+    f:ClearAllPoints()
+    if side == "left" then
+        f:SetPoint("TOPRIGHT", mf, "TOPLEFT", -8, 0)
+    else
+        f:SetPoint("TOPLEFT", mf, "TOPRIGHT", 8, 0)
+    end
+    return true
+end
+
+-- f takes the main window's height now and whenever it changes. Safe to call
+-- on every open; the main window is hooked once, when it exists.
+local _heightFollowers, _heightHooked = {}, false
+local function SyncFollowers()
+    local mf = BNB.mainFrame
+    local h = mf and mf:GetHeight()
+    if not (h and h > 0) then return end
+    for f in pairs(_heightFollowers) do f:SetHeight(h) end
+end
+function BNB.FollowMainHeight(f)
+    _heightFollowers[f] = true
+    local mf = BNB.mainFrame
+    if mf and not _heightHooked then
+        _heightHooked = true
+        mf:HookScript("OnSizeChanged", SyncFollowers)
+        mf:HookScript("OnShow",        SyncFollowers)
+    end
+    SyncFollowers()
+end
+
 -- Place f (w wide) beside anchor: to its right when it fits on screen,
 -- otherwise to its left. No anchor: slightly above screen centre.
 function BNB.PlaceBeside(f, anchor, w)

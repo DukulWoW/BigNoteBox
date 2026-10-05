@@ -327,10 +327,25 @@ local function BuildGeneralTab(sf, ct)
         function(v) db.openOnLogin = v end,
         L["CFG_CHK_OPEN_LOGIN_TIP"])
 
+    -- Applied at login / reload (Core/Initialize.lua 5b, ALL-270); nil = off
+    y = AddCheck(ct, y, L["CFG_CHK_RESET_WIN_POS_LABEL"],
+        function() return db.resetWindowPosOnLoad == true end,
+        function(v) db.resetWindowPosOnLoad = v or nil end,
+        L["CFG_CHK_RESET_WIN_POS_TIP"])
+
+    y = AddCheck(ct, y, L["CFG_CHK_RESET_WIN_SIZE_LABEL"],
+        function() return db.resetWindowSizeOnLoad == true end,
+        function(v) db.resetWindowSizeOnLoad = v or nil end,
+        L["CFG_CHK_RESET_WIN_SIZE_TIP"])
+
     y = AddCheck(ct, y, L["CFG_CHK_CONFIRM_CLOSE_LABEL"],
         function() return db.confirmClose == true end,
         function(v) db.confirmClose = v end,
         L["CFG_CHK_CONFIRM_CLOSE_TIP"])
+
+    -- Which side the Alarms window opens on (ALL-269). Here because alarms
+    -- have no settings page of their own.
+    y = K.AddSideRow(ct, y, L["CFG_SIDE_ALARMS"], "alarmsSide", "BNBAlarmOverviewFrame")
 
     -- Combat action dropdown
     do

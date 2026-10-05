@@ -1499,6 +1499,8 @@ function BNB.CreateNewNote()
     if not BNB.mainFrame then BNB.OpenMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
 
+    -- "New notes belong to" may put it outside the selected tab (ALL-267)
+    if BNB.RevealNoteInList then BNB.RevealNoteInList(id) end
     if BNB.SelectNote      then BNB.SelectNote(id)   end
 
     C_Timer.After(0.05, function()

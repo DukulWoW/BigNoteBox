@@ -1071,7 +1071,7 @@ local function BuildStickyPage(sf, ct, y)
         desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
         desc:SetTextColor(0.60, 0.60, 0.60)
-        desc:SetText(L["CFG_ALARM_DESC"])
+        desc:SetText(L["CFG_SUB_STICKY_DESC"])   -- was the alarm page's text
         local h = desc:GetStringHeight() + 6
         desc:SetHeight(h)
         y = y - h - 6
@@ -1118,6 +1118,29 @@ local function BuildStickyPage(sf, ct, y)
     -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
     y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
         "BIGNOTEBOXHIDESTICKIES", L["CFG_KB_HINT_CTRL_H"], L["CFG_KB_DESC_HIDE_STICKIES"])
+
+    -- ── Hover buttons (ALL-266) ───────────────────────────────────────────────
+    -- stickyHideBtn[key] = true hides that header button (UI/StickyNote.lua
+    -- SN.HdrBtnHidden); nil = shown. The right-click menu keeps them all.
+    y = AddRule(ct, y)
+    y = AddHeader(ct, y, L["CFG_HDR_STICKY_HOVER_BTNS"])
+    for _, b in ipairs({
+        { "tasks",    "CFG_STICKY_BTN_TASKS"    },
+        { "alarm",    "CFG_STICKY_BTN_ALARM"    },
+        { "edit",     "CFG_STICKY_BTN_EDIT"     },
+        { "settings", "CFG_STICKY_BTN_SETTINGS" },
+    }) do
+        local key = b[1]
+        y = AddCheck(ct, y, L[b[2]],
+            function() return not (BNB.Sticky and BNB.Sticky.HdrBtnHidden(key)) end,
+            function(v)
+                local h = db.stickyHideBtn or {}
+                h[key] = (not v) or nil
+                db.stickyHideBtn = next(h) and h or nil
+                if BNB.Sticky and BNB.Sticky.ApplyHeaderButtons then BNB.Sticky.ApplyHeaderButtons() end
+            end,
+            L["CFG_STICKY_BTN_TIP"])
+    end
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
