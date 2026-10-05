@@ -306,8 +306,9 @@ end
 
 -- State buttons in a 2-column grid at (0, y) of parent, `width` wide (ALL-256,
 -- Note Settings; Sticky settings ALL-257). defs = { { text = fn -> label,
--- tip = fn -> title, body, onClick = fn }, ... }: the label says what a click
--- does and follows the state through Refresh. Returns the y under the grid and
+-- tip = fn -> title, body, onClick = fn, enabled = fn or nil }, ... }: the
+-- label says what a click does and follows the state through Refresh, as does
+-- the enabled state when `enabled` is given. Returns the y under the grid and
 -- the Refresh function.
 function BNB.CreateStateButtonGrid(parent, y, width, defs, h)
     h = h or 24
@@ -315,7 +316,15 @@ function BNB.CreateStateButtonGrid(parent, y, width, defs, h)
     local bw  = math.floor((width - GAP) / 2)
     local btns = {}
     local function Refresh()
-        for _, b in ipairs(btns) do b:SetText(b._def.text() or "") end
+        for _, b in ipairs(btns) do
+            b:SetText(b._def.text() or "")
+            if b._def.enabled then
+                local on = b._def.enabled() and true or false
+                b:SetEnabled(on)
+                -- A skin button has no disabled look of its own: grey its label
+                if b._lbl then local c = on and 1 or 0.5; b._lbl:SetTextColor(c, c, c) end
+            end
+        end
     end
     for i, def in ipairs(defs) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
@@ -834,10 +843,15 @@ end
 -- digits; GetValue() reads the box as typed, so nothing needs confirming.
 -- opts: { onDirty, onTab(shift), onEnter } -- onTab moves focus, ":" counts as Tab;
 -- Enter always just leaves the box, onEnter runs after that.
+-- Sizes (ALL-261): opts.values = the list's entries instead of lo..hi (any
+-- value in range can still be typed), opts.fmt = how a value shows (default
+-- "%02d"), opts.digits = how many digits can be typed (default 2).
 -- Returns a container with :GetValue() / :SetValue(n) / :SetRange(lo, hi) /
--- :SetFieldWidth(w) and .eb (the EditBox).
+-- :SetFieldWidth(w) / :SetEnabled(on) and .eb (the EditBox).
 function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     opts = opts or {}
+    local FMT    = opts.fmt or "%02d"
+    local DIGITS = opts.digits or 2
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(width, height)
 
@@ -857,7 +871,7 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
         eb = CreateFrame("EditBox", nil, box)
         eb:SetAllPoints()
     end
-    eb:SetAutoFocus(false); eb:SetMaxLetters(3)
+    eb:SetAutoFocus(false); eb:SetMaxLetters(DIGITS + 1)
     eb:SetFontObject("GameFontHighlightSmall"); eb:SetJustifyH("CENTER")
     eb:SetTextInsets(6, 6, 0, 0)
 
@@ -868,7 +882,7 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     end
     function c:SetValue(n)
         n = Clamp(n)
-        eb:SetText(string.format("%02d", n))
+        eb:SetText(string.format(FMT, n))
         if dd then dd._selected = n end
     end
     function c:GetValue()
@@ -883,11 +897,19 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
         c:SetWidth(w)
         if dd then dd:SetWidth(w) end
     end
+    -- Greyed and untouchable while off (Insert image height under Keep ratio)
+    function c:SetEnabled(on)
+        on = on and true or false
+        if not on then eb:ClearFocus() end
+        eb:EnableMouse(on)
+        if dd then dd:SetEnabled(on) end
+        c:SetAlpha(on and 1 or 0.45)
+    end
 
-    -- Digits only, two at most; ":" or "." jumps to the next field like Tab
+    -- Digits only, DIGITS at most; ":" or "." jumps to the next field like Tab
     local function DigitsOnly(self)
         local t = self:GetText()
-        local digits = t:gsub("%D", ""):sub(1, 2)
+        local digits = t:gsub("%D", ""):sub(1, DIGITS)
         if digits ~= t then self:SetText(digits) end
     end
     eb:SetScript("OnChar", function(self, ch)
@@ -930,15 +952,20 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     if dd then
         dd:SetupMenu(function(_, root)
             local cur = c:GetValue()
-            for n = lo, hi do
-                root:CreateRadio(string.format("%02d", n),
+            local list = opts.values
+            if not list then
+                list = {}
+                for n = lo, hi do list[#list + 1] = n end
+            end
+            for _, n in ipairs(list) do
+                root:CreateRadio(string.format(FMT, n),
                     function() return cur == n end,
                     function()
                         c:SetValue(n)
                         if opts.onDirty then opts.onDirty() end
                     end)
             end
-            if hi - lo + 1 > 20 then root:SetScrollMode(20 * 20) end
+            if #list > 20 then root:SetScrollMode(20 * 20) end
         end)
     end
 
@@ -1900,6 +1927,75 @@ end
 
 function BNB.StopGripSizing(f)
     if f._gripDriver then f._gripDriver:SetScript("OnUpdate", nil) end
+end
+
+-- The resize grip every resizable window uses (ALL-263): the damage meter's
+-- scale handle with its own hover and pressed atlases (Dukul, 2026-10-04: art
+-- 32, click area 24), the chat grabber where the atlas is missing. Drives
+-- BNB.StartGripSizing / StopGripSizing. opts: { x, y = BOTTOMRIGHT offset,
+-- canSize = fn -> false to refuse a press (a locked sticky), onStart, onStop,
+-- onLeave }. grip._sizing is true while sizing. The grip owns OnMouseDown /
+-- OnMouseUp / OnEnter / OnLeave: add behaviour through opts or HookScript.
+local GRIP_ATLAS, GRIP_ART, GRIP_HIT = "damagemeters-scalehandle", 32, 24
+local GRABBER = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-"
+function BNB.CreateResizeGrip(f, opts)
+    opts = opts or {}
+    local grip = CreateFrame("Button", nil, f)
+    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", opts.x or 0, opts.y or 0)
+    grip:SetFrameLevel(f:GetFrameLevel() + 10)
+    local hasAtlas = C_Texture and C_Texture.GetAtlasInfo
+        and C_Texture.GetAtlasInfo(GRIP_ATLAS) ~= nil
+    local tex
+    if hasAtlas then
+        grip:SetSize(GRIP_HIT, GRIP_HIT)
+        tex = grip:CreateTexture(nil, "OVERLAY")
+        tex:SetSize(GRIP_ART, GRIP_ART)
+        tex:SetPoint("BOTTOMRIGHT", grip, "BOTTOMRIGHT", 0, 0)
+        tex:SetAtlas(GRIP_ATLAS)
+    else
+        grip:SetSize(16, 16)
+        grip:SetNormalTexture(GRABBER .. "Up")
+        grip:SetHighlightTexture(GRABBER .. "Highlight")
+        grip:SetPushedTexture(GRABBER .. "Down")
+    end
+
+    -- Pressed while sizing, hover while the pointer is over it, else normal
+    local function SetState()
+        if not tex then return end
+        tex:SetAtlas(GRIP_ATLAS .. (grip._sizing and "-pressed"
+            or (grip:IsMouseOver() and "-hover" or "")))
+    end
+    grip:SetScript("OnMouseDown", function(_, btn)
+        if btn ~= "LeftButton" then return end
+        if opts.canSize and not opts.canSize() then return end
+        grip._sizing = true
+        SetState()
+        if opts.onStart then opts.onStart() end
+        BNB.StartGripSizing(f)
+    end)
+    grip:SetScript("OnMouseUp", function()
+        if not grip._sizing then return end
+        grip._sizing = false
+        BNB.StopGripSizing(f)
+        SetState()
+        if opts.onStop then opts.onStop() end
+    end)
+    grip:SetScript("OnEnter", SetState)
+    grip:SetScript("OnLeave", function()
+        SetState()
+        if opts.onLeave then opts.onLeave() end
+    end)
+    grip:HookScript("OnHide", function()
+        -- Hidden mid-drag (window closed): stop following the pointer
+        if grip._sizing then
+            grip._sizing = false
+            BNB.StopGripSizing(f)
+            if opts.onStop then opts.onStop() end
+        end
+        SetState()
+    end)
+    BNB.SetHoverCursor(grip, "resize")   -- ALL-95
+    return grip
 end
 
 -- Window drag without StartMoving (ALL-97, drag half). On Retail with a UI

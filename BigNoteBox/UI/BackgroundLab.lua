@@ -329,19 +329,9 @@ local function BuildPreview()
     f.warn = f:CreateFontString(nil, "OVERLAY", "GameFontRedSmall")
     f.warn:SetPoint("CENTER")
 
-    local grip = CreateFrame("Button", nil, f)
-    grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
-    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    grip:SetScript("OnMouseDown", function(_, btn)
-        if btn == "LeftButton" then BNB.StartGripSizing(f) end
-    end)
-    grip:SetScript("OnMouseUp", function()
-        BNB.StopGripSizing(f)
-        local s = Store(); s.pw, s.ph = f:GetSize()
-    end)
+    BNB.CreateResizeGrip(f, {   -- UI/Widgets.lua (ALL-263)
+        onStop = function() local s = Store(); s.pw, s.ph = f:GetSize() end,
+    })
 
     f:SetScript("OnSizeChanged", LayoutPreview)
     f:HookScript("OnShow", LayoutPreview)

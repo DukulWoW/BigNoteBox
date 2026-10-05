@@ -20,6 +20,13 @@ local USER_IMG_PREFIX_DIALOG = "Interface\\AddOns\\BigNoteBox\\UserImages\\"
 local ALIGN_OPTS   = { "center", "left", "right" }
 local ALIGN_LABELS = { L["STICKY_ALIGN_CENTER"], L["STICKY_ALIGN_LEFT"], L["STICKY_ALIGN_RIGHT"] }
 
+-- Icon / image size fields: the list's entries, and the largest value that
+-- can be typed (ALL-261, Dukul 2026-10-05)
+local SIZE_CHOICES = { 12, 16, 24, 32, 48, 64, 96, 128 }
+local SIZE_MAX     = 256
+local IMG_SIZE_MAX = 1024   -- images can be wider than a note's icons (Dukul)
+local IMG_SIZE_CHOICES = { 12, 16, 24, 32, 48, 64, 96, 128, 256 }   -- 256 = the default
+
 local function ResolvePath(raw)
     local s = raw and raw:match("^%s*(.-)%s*$") or ""
     if s == "" then return nil end
@@ -196,22 +203,56 @@ function BNB.OpenImgDialog(insertFn)
         hLbl:SetTextColor(0.78, 0.78, 0.78); hLbl:SetText(L["NE_HEIGHT_LABEL"])
         curY = curY - 16
 
-        local widthEb = FieldEB(NUM_W, true)
-        widthEb:SetText("256")
-        f._widthEb = widthEb
+        -- Typeable value lists, like the alarm's hour / minute (ALL-261).
+        -- Keep ratio: height follows width at the ratio they had when it was
+        -- ticked, and is greyed while it is on.
+        local keepRatio, ratio = true, 1
+        local widthBox, heightBox
+        local function FollowWidth()
+            if keepRatio then
+                heightBox:SetValue(math.floor(widthBox:GetValue() * ratio + 0.5))
+            end
+        end
+        widthBox = BNB.CreateNumberCombo(f, 1, IMG_SIZE_MAX, 256, NUM_W, 22, {
+            values = IMG_SIZE_CHOICES, fmt = "%d", digits = 4, onDirty = FollowWidth,
+        })
+        widthBox:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
+        heightBox = BNB.CreateNumberCombo(f, 1, IMG_SIZE_MAX, 256, NUM_W, 22, {
+            values = IMG_SIZE_CHOICES, fmt = "%d", digits = 4,
+        })
+        heightBox:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD + NUM_W + NUM_GAP, curY)
+        widthBox.eb:SetScript("OnEscapePressed", function() f:Hide() end)
+        heightBox.eb:SetScript("OnEscapePressed", function() f:Hide() end)
+        curY = curY - 28
 
-        -- Height editbox: manual placement at same row as widthEb (FieldEB advanced curY)
-        local heightEbY = curY + 28  -- curY was advanced by FieldEB, step back one row
-        local heightEb = CreateFrame("EditBox", nil, f,
-            "BackdropTemplate")
-        BNB.EnsureBackdrop(heightEb); BNB.SetBackdropDark(heightEb)
-        heightEb:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD + NUM_W + NUM_GAP, heightEbY)
-        heightEb:SetSize(NUM_W, 22)
-        heightEb:SetFontObject("GameFontNormal"); heightEb:SetAutoFocus(false)
-        heightEb:SetMaxLetters(6); heightEb:SetTextInsets(4, 4, 0, 0)
-        heightEb:SetNumeric(false); heightEb:SetText("256")
-        heightEb:SetScript("OnEscapePressed", function() f:Hide() end)
-        f._heightEb = heightEb
+        local ratioCb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        ratioCb:SetSize(22, 22)
+        ratioCb:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD - 3, curY)
+        local ratioLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        ratioLbl:SetPoint("LEFT", ratioCb, "RIGHT", 2, 0)
+        ratioLbl:SetTextColor(0.78, 0.78, 0.78); ratioLbl:SetText(L["NE_KEEP_RATIO"])
+        local function SetKeepRatio(on)
+            keepRatio = on and true or false
+            ratioCb:SetChecked(keepRatio)
+            if keepRatio then
+                ratio = heightBox:GetValue() / math.max(1, widthBox:GetValue())
+            end
+            heightBox:SetEnabled(not keepRatio)
+        end
+        ratioCb:SetScript("OnClick", function(self) SetKeepRatio(self:GetChecked()) end)
+        ratioCb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["NE_KEEP_RATIO"], 1, 0.82, 0)
+            GameTooltip:AddLine(L["NE_KEEP_RATIO_TIP"], 0.85, 0.85, 0.85, true)
+            GameTooltip:Show()
+        end)
+        ratioCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        curY = curY - 26
+        f._widthBox, f._heightBox = widthBox, heightBox
+        f._resetSize = function()
+            widthBox:SetValue(256); heightBox:SetValue(256)
+            SetKeepRatio(true)
+        end
         curY = curY - 6  -- gap before preview
 
         -- ── Preview thumbnail (hidden until texture resolves) ─────────────────
@@ -291,10 +332,8 @@ function BNB.OpenImgDialog(insertFn)
             _imgDialog._fileEb:SetFocus()
             return
         end
-        local w = math.abs(tonumber(_imgDialog._widthEb:GetText())  or 256)
-        local h = math.abs(tonumber(_imgDialog._heightEb:GetText()) or 256)
-        w = math.max(1, math.min(w, 4096))
-        h = math.max(1, math.min(h, 4096))
+        local w = _imgDialog._widthBox:GetValue()
+        local h = _imgDialog._heightBox:GetValue()
         local align = ALIGN_OPTS[_imgDialog._selAlign()]
         local tag = string.format("{img:%s:%d:%d:%s}", path, w, h, align)
         _imgDialog:Hide()
@@ -303,8 +342,7 @@ function BNB.OpenImgDialog(insertFn)
 
     -- ── Reset fields and show ─────────────────────────────────────────────────
     _imgDialog._fileEb:SetText("")
-    _imgDialog._widthEb:SetText("256")
-    _imgDialog._heightEb:SetText("256")
+    _imgDialog._resetSize()
     _imgDialog._resetAlign()
     _imgDialog._resetPicker()
     _imgDialog._prevTex:SetTexture(nil)
@@ -429,7 +467,7 @@ function BNB.OpenIcoDialog(insertFn)
         local INNER_W   = DW - DPAD * 2
         local PICK_H    = 22
         local PREV_SIZE = 48
-        local SIZE_EB_W = 70
+        local SIZE_EB_W = 90
         local ROW_H     = 22
         local BTN_H     = 26
         local ALIGN_H   = 36   -- alignment label (14) + dropdown (22)
@@ -503,18 +541,15 @@ function BNB.OpenIcoDialog(insertFn)
         sizeLbl:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, sizeY - 4)
         sizeLbl:SetTextColor(0.65, 0.65, 0.65)
         sizeLbl:SetText(L["NE_SIZE_LABEL"])
-        local sizeEb = CreateFrame("EditBox", nil, f, "BackdropTemplate")
-        BNB.EnsureBackdrop(sizeEb); BNB.SetBackdropDark(sizeEb)
-        sizeEb:SetPoint("TOPRIGHT", f, "TOPRIGHT", -DPAD, sizeY)
-        sizeEb:SetSize(SIZE_EB_W, ROW_H)
-        sizeEb:SetFontObject("GameFontNormal"); sizeEb:SetAutoFocus(false)
-        sizeEb:SetMaxLetters(4); sizeEb:SetTextInsets(4, 4, 0, 0)
-        sizeEb:SetNumeric(false); sizeEb:SetText("25")
-        sizeEb:SetScript("OnEscapePressed", function() f:Hide() end)
-        sizeEb:SetScript("OnEnterPressed", function(self)
-            self:ClearFocus()
-            if f._insertBtn and f._insertBtn:IsEnabled() then f._insertBtn:Click() end
-        end)
+        -- Typeable value list, like the alarm's hour / minute (ALL-261)
+        local sizeBox = BNB.CreateNumberCombo(f, 1, SIZE_MAX, 24, SIZE_EB_W, ROW_H, {
+            values = SIZE_CHOICES, fmt = "%d", digits = 3,
+            onEnter = function()
+                if f._insertBtn and f._insertBtn:IsEnabled() then f._insertBtn:Click() end
+            end,
+        })
+        sizeBox:SetPoint("TOPRIGHT", f, "TOPRIGHT", -DPAD, sizeY)
+        sizeBox.eb:SetScript("OnEscapePressed", function() f:Hide() end)
 
         -- Alignment dropdown
         local ICO_ALIGN_ITEMS = {
@@ -553,14 +588,11 @@ function BNB.OpenIcoDialog(insertFn)
 
         -- ── Stored helpers ────────────────────────────────────────────────────
         f._getIcon  = function() return selIcon end
-        f._getSize  = function()
-            local sz = math.abs(tonumber(sizeEb:GetText()) or 25)
-            return math.max(1, math.min(sz, 256))
-        end
+        f._getSize  = function() return sizeBox:GetValue() end
         f._getAlign = function() return _icoAlign end
         f._resetState = function()
             SetIcon(nil)
-            sizeEb:SetText("25")
+            sizeBox:SetValue(24)
             _icoAlign = ""; alignDD:GenerateMenu()
         end
 

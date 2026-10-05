@@ -936,27 +936,6 @@ function BNB.CreateMainWindow()
 
     -- ── Resize (whole window, bottom-right) ─────────────────────────────────
     f:SetResizeBounds(MIN_W, MIN_H, MAX_W, MAX_H)
-    local resizeHandle = CreateFrame("Button", nil, f)
-    resizeHandle:SetSize(16, 16)
-    resizeHandle:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
-    resizeHandle:SetFrameLevel(f:GetFrameLevel() + 10)
-    -- Grip art (Dukul, 2026-10-04): the damage meter's scale handle, with its
-    -- own hover and pressed atlases; the chat grabber where the atlas is missing.
-    -- 20 was far too small (Dukul): art 32, click area 24
-    local GRIP_ATLAS, GRIP_ART, GRIP_HIT = "damagemeters-scalehandle", 32, 24
-    local gripAtlas = C_Texture and C_Texture.GetAtlasInfo
-        and C_Texture.GetAtlasInfo(GRIP_ATLAS) ~= nil
-    local rtex = resizeHandle:CreateTexture(nil, "OVERLAY")
-    if gripAtlas then
-        resizeHandle:SetSize(GRIP_HIT, GRIP_HIT)
-        rtex:SetSize(GRIP_ART, GRIP_ART)
-        rtex:SetPoint("BOTTOMRIGHT", resizeHandle, "BOTTOMRIGHT", 0, 0)
-        rtex:SetAtlas(GRIP_ATLAS)
-    else
-        rtex:SetAllPoints()
-        rtex:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    end
-    f._resizeHandle = resizeHandle  -- stored for scale-lock toggle
 
     -- Small label that tracks the cursor during resize and shows WxH.
     local sizeLabel = CreateFrame("Frame", nil, UIParent)
@@ -993,39 +972,30 @@ function BNB.CreateMainWindow()
         if _resizing then UpdateSizeLabel() end
     end)
 
-    -- Pressed while sizing, hover while the pointer is over it, else normal
-    local function SetGripState()
-        if not gripAtlas then return end
-        rtex:SetAtlas(GRIP_ATLAS .. (_resizing and "-pressed"
-            or (resizeHandle:IsMouseOver() and "-hover" or "")))
-    end
-
-    resizeHandle:SetScript("OnMouseDown", function(self, btn)
-        if btn ~= "LeftButton" then return end
-        _resizing = true
-        SetGripState()
-        -- Seed the label with current size before first OnSizeChanged fires
-        UpdateSizeLabel()
-        sizeLabel:Show()
-        BNB.StartGripSizing(f)   -- ALL-97: not StartSizing (UI/Widgets.lua)
-    end)
-    resizeHandle:SetScript("OnMouseUp", function()
-        _resizing = false
-        SetGripState()
-        sizeLabel:Hide()
-        BNB.StopGripSizing(f)
-        local w = math.max(MIN_W, math.min(MAX_W, f:GetWidth()))
-        local h = math.max(MIN_H, math.min(MAX_H, f:GetHeight()))
-        f:SetSize(w, h)
-        SaveWindowPos(f)
-        -- Re-apply split so panes adjust to new width
-        ApplySplit(f)
-        -- Recalculate sidebar slot visibility after resize
-        if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
-    end)
-    resizeHandle:HookScript("OnEnter", SetGripState)
-    resizeHandle:HookScript("OnLeave", SetGripState)
-    BNB.SetHoverCursor(resizeHandle, "resize")   -- ALL-95
+    -- The shared grip (UI/Widgets.lua, ALL-263): the damage meter's scale
+    -- handle, BNB.StartGripSizing, not StartSizing (ALL-97)
+    local resizeHandle = BNB.CreateResizeGrip(f, {
+        x = -2, y = 2,
+        onStart = function()
+            _resizing = true
+            -- Seed the label with current size before first OnSizeChanged fires
+            UpdateSizeLabel()
+            sizeLabel:Show()
+        end,
+        onStop = function()
+            _resizing = false
+            sizeLabel:Hide()
+            local w = math.max(MIN_W, math.min(MAX_W, f:GetWidth()))
+            local h = math.max(MIN_H, math.min(MAX_H, f:GetHeight()))
+            f:SetSize(w, h)
+            SaveWindowPos(f)
+            -- Re-apply split so panes adjust to new width
+            ApplySplit(f)
+            -- Recalculate sidebar slot visibility after resize
+            if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
+        end,
+    })
+    f._resizeHandle = resizeHandle  -- stored for scale-lock toggle
 
     -- ── Splitter drag handle (7px wide button over the divider) ─────────────
     -- Three grip dots, plus the game's Size cursor (ALL-95). An addon file

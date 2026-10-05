@@ -317,103 +317,88 @@ local function PopulateStickySettings(noteID)
     -- ══════════════════════════════════════════════════════════════════════════
     ct1._y = -8
 
-    -- ── Focus mode toggle ─────────────────────────────────────────────────────
-    -- Hides title, icon and border (fade in on hover). Compact content padding.
-    -- Rich notes render as plain text. Task view uses compact row spacing.
-    do
-        local focusChk = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
-        focusChk:SetSize(24, 24)
-        focusChk:SetPoint("TOPLEFT", ct1, "TOPLEFT", -4, ct1._y)
-        focusChk:SetChecked(cfg.focusMode == true)
-        focusChk:SetScript("OnClick", function(self)
-            cfg.focusMode = self:GetChecked() and true or nil
-            SaveCfg(noteID, cfg)
-            if stickyFrame then
-                ApplyConfig(stickyFrame, noteID)
-            end
-        end)
-        local focusLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        focusLbl:SetPoint("LEFT", focusChk, "RIGHT", 4, 0)
-        focusLbl:SetText(L["STICKY_FOCUS_MODE_LABEL"])
-        focusChk:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["STICKY_FOCUS_MODE_LABEL"], 1, 1, 1)
-            GameTooltip:AddLine(L["STICKY_FOCUS_MODE_TIP"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        focusChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        ct1._y = ct1._y - 30
-    end
-
-    -- ── Pin to ESC screen toggle ───────────────────────────────────────────────
-    -- When on, this sticky is hidden in the game world and only appears when the
-    -- ESC menu is open.  It is mutually exclusive with being shown in the world.
-    do
-        local escChk = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
-        escChk:SetSize(24, 24)
-        escChk:SetPoint("TOPLEFT", ct1, "TOPLEFT", -4, ct1._y)
-        escChk:SetChecked(cfg.escOnly == true)
-        escChk:SetScript("OnClick", function(self)
-            -- Tri-state: nil=unset, true=ESC-only, false=explicitly normal.
-            -- Write false (not nil) when unchecking so global default doesn't re-apply.
-            local checked = self:GetChecked() and true or false
-            cfg.escOnly = checked
-            SaveCfg(noteID, cfg)
-            local f = openFrames[noteID]
-            if f then
-                f._escOnly = checked and true or false
-                EnsureESCHook()
-                if checked then
-                    -- Switching to ESC-only: hide from world, set correct strata.
-                    f:SetFrameStrata("FULLSCREEN_DIALOG")
-                    if not (GameMenuFrame and GameMenuFrame:IsShown()) then
-                        f:Hide()
-                        if f._miniTile then f._miniTile:Hide() end
-                    end
-                else
-                    -- Switching back to normal: restore strata and show in world.
-                    f:SetFrameStrata(BNB.Sticky.Strata())
-                    if not f._minimized then
-                        f:Show(); f:Raise()
-                    end
-                end
-            end
-            -- An ESC-screen sticky is not one Hide all hides (ALL-237)
-            if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
-        end)
-        local escLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        escLbl:SetPoint("LEFT", escChk, "RIGHT", 4, 0)
-        escLbl:SetText(L["STICKY_ESC_PIN_LABEL"])
-        escChk:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["STICKY_ESC_PIN_LABEL"], 1, 1, 1)
-            GameTooltip:AddLine(L["STICKY_ESC_PIN_TIP"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        escChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        ct1._y = ct1._y - 30
-    end
-    -- Hidden entirely for plain notes. When on, the sticky renders raw text
-    -- instead of the SimpleHTML view, and text color/style controls become active.
+    -- Minimal sticky / ESC pin / plain text / lock: state buttons, the label
+    -- says what a click does (ALL-257, same grid as Note Settings ALL-256).
+    -- Plain text applies to rich notes only (greyed for a plain note).
     local note         = BNB.GetNote(noteID)
     local noteIsRich   = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
-    local richPlainChk, richPlainChkLbl
+    local SyncPlainOnlyControls   -- defined below, with the controls it greys
 
-    if noteIsRich then
-        richPlainChk = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
-        richPlainChk:SetSize(24, 24)
-        richPlainChk:SetPoint("TOPLEFT", ct1, "TOPLEFT", -4, ct1._y)
-        richPlainChk:SetChecked(cfg.richPlainText == true)
-
-        richPlainChkLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        richPlainChkLbl:SetPoint("LEFT", richPlainChk, "RIGHT", 2, 0)
-        richPlainChkLbl:SetText(L["STICKY_RICH_PLAIN_LABEL"])
-        richPlainChkLbl:SetTextColor(0.9, 0.9, 0.9)
-
-        ct1._y = ct1._y - 30
-        Rule(ct1)
-        ct1._y = ct1._y - 4
+    local function SetEscOnly(checked)
+        -- Tri-state: nil=unset, true=ESC-only, false=explicitly normal.
+        -- Write false (not nil) when turning off so global default doesn't re-apply.
+        cfg.escOnly = checked
+        SaveCfg(noteID, cfg)
+        local sf = openFrames[noteID]
+        if sf then
+            sf._escOnly = checked and true or false
+            EnsureESCHook()
+            if checked then
+                -- Switching to ESC-only: hide from world, set correct strata.
+                sf:SetFrameStrata("FULLSCREEN_DIALOG")
+                if not (GameMenuFrame and GameMenuFrame:IsShown()) then
+                    sf:Hide()
+                    if sf._miniTile then sf._miniTile:Hide() end
+                end
+            else
+                -- Switching back to normal: restore strata and show in world.
+                sf:SetFrameStrata(BNB.Sticky.Strata())
+                if not sf._minimized then
+                    sf:Show(); sf:Raise()
+                end
+            end
+        end
+        -- An ESC-screen sticky is not one Hide all hides (ALL-237)
+        if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
     end
+
+    -- The sticky's right-click Lock / Unlock writes into this same cfg table
+    -- and refreshes the labels (SN.SetLocked, ALL-257)
+    f._cfg = cfg
+    ct1._y, f._refreshStates = BNB.CreateStateButtonGrid(ct1, ct1._y, SETTINGS_CW, {
+        -- Minimal sticky (saved as focusMode): hides title, icon and border
+        -- (fade in on hover), compact padding, rich notes as plain text,
+        -- compact task rows
+        { text = function()
+              return cfg.focusMode and L["STICKY_STATE_NORMAL"] or L["STICKY_STATE_MINIMAL"] end,
+          tip  = function() return L["STICKY_FOCUS_MODE_LABEL"], L["STICKY_FOCUS_MODE_TIP"] end,
+          onClick = function()
+              cfg.focusMode = (not cfg.focusMode) and true or nil
+              SaveCfg(noteID, cfg)
+              if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+          end },
+        -- ESC pin: hidden in the game world, shown only while the ESC menu is open
+        { text = function()
+              return cfg.escOnly and L["STICKY_STATE_ESC_UNPIN"] or L["STICKY_STATE_ESC_PIN"] end,
+          tip  = function() return L["STICKY_ESC_PIN_LABEL"], L["STICKY_ESC_PIN_TIP"] end,
+          onClick = function() SetEscOnly(not cfg.escOnly) end },
+        -- Plain text: the sticky renders the raw text instead of the
+        -- SimpleHTML view, and text color/style controls become active
+        { text = function()
+              return cfg.richPlainText and L["NC_STATE_RICH"] or L["NC_STATE_NORMAL"] end,
+          tip  = function()
+              return L["STICKY_RICH_PLAIN_LABEL"],
+                  noteIsRich and L["STICKY_RICH_PLAIN_TIP"] or L["STICKY_RICH_PLAIN_RICH_ONLY"]
+          end,
+          enabled = function() return noteIsRich end,
+          onClick = function()
+              cfg.richPlainText = (not cfg.richPlainText) and true or nil
+              SaveCfg(noteID, cfg)
+              SyncPlainOnlyControls()
+              -- Re-render the sticky with the new mode
+              if BNB.Sticky and BNB.Sticky.RefreshNote then
+                  BNB.Sticky.RefreshNote(noteID)
+              end
+          end },
+        -- Lock sticky: position and size stay put (UI/StickyNote.lua StickyLocked)
+        { text = function()
+              return cfg.locked and L["NC_LOCK_UNLOCK_BTN"] or L["NC_LOCK_LOCK_BTN"] end,
+          tip  = function() return L["STICKY_LOCK_LABEL"], L["STICKY_LOCK_TIP"] end,
+          onClick = function() SN.SetLocked(noteID, not cfg.locked) end },
+    })
+    ct1._y = ct1._y - 8
+    Rule(ct1)
+    ct1._y = ct1._y - 4
 
     -- ── Text color ────────────────────────────────────────────────────────────
     -- Greyed out when the note is rich AND "show as plain text" is off,
@@ -456,7 +441,7 @@ local function PopulateStickySettings(noteID)
     -- Shared greying helper: dims controls that have no effect on a rich note
     -- rendered as SimpleHTML. Covers text color, font, font-size, text-style,
     -- and text-opacity. Called at build time and when the plain-text checkbox toggles.
-    local function SyncPlainOnlyControls()
+    function SyncPlainOnlyControls()
         local isPlain = (not noteIsRich) or (cfg.richPlainText == true)
         local a = isPlain and 1.0 or 0.4
         for _, w in ipairs(textColorWidgets) do
@@ -472,26 +457,6 @@ local function PopulateStickySettings(noteID)
                 elseif w.EnableMouse then w:EnableMouse(isPlain) end
             end)
         end
-    end
-
-    -- Wire the richPlainText checkbox now that SyncPlainOnlyControls is defined
-    if richPlainChk then
-        richPlainChk:SetScript("OnClick", function(self)
-            cfg.richPlainText = self:GetChecked() and true or nil
-            SaveCfg(noteID, cfg)
-            SyncPlainOnlyControls()
-            -- Re-render the sticky with the new mode
-            if BNB.Sticky and BNB.Sticky.RefreshNote then
-                BNB.Sticky.RefreshNote(noteID)
-            end
-        end)
-        richPlainChk:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(L["STICKY_RICH_PLAIN_LABEL"], 1, 1, 1)
-            GameTooltip:AddLine(L["STICKY_RICH_PLAIN_TIP"], 0.78, 0.78, 0.78, true)
-            GameTooltip:Show()
-        end)
-        richPlainChk:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
 
     Rule(ct1)
@@ -1152,3 +1117,14 @@ function SN._HideSettingsFor(noteID)
 end
 
 SN._OpenSettings = OpenStickySettings
+
+-- The cfg table the open settings window edits for this note, so a change
+-- made from elsewhere lands in it instead of being overwritten by its next
+-- save; and a refresh of its state button labels (ALL-257)
+function SN._SettingsCfg(noteID)
+    if SN._IsSettingsOpenFor(noteID) then return _stickySettingsFrame._cfg end
+end
+function SN._RefreshSettingsStates(noteID)
+    local f = _stickySettingsFrame
+    if SN._IsSettingsOpenFor(noteID) and f._refreshStates then f._refreshStates() end
+end

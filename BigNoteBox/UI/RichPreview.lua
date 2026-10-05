@@ -184,23 +184,10 @@ local function BuildFrameNormal(frameName, onClose, frameParent)
         f.CloseButton:SetScript("OnClick", onClose)
     end
 
-    local grip = CreateFrame("Button", nil, f)
-    grip:SetSize(16, 16)
-    grip:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -2, 2)
-    grip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    grip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    grip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-    grip:SetScript("OnMouseDown", function(self, btn)
-        if btn == "LeftButton" then
-            -- It used to anchor f to itself before StartSizing, which left the
-            -- frame with no position and threw it to a corner (ALL-97)
-            BNB.StartGripSizing(f)   -- UI/Widgets.lua
-        end
-    end)
-    grip:SetScript("OnMouseUp", function(self, btn)
-        if btn == "LeftButton" then BNB.StopGripSizing(f) end
-    end)
-    BNB.SetHoverCursor(grip, "resize")   -- ALL-95
+    -- The shared grip (UI/Widgets.lua, ALL-263). It used to anchor f to itself
+    -- before StartSizing, which left the frame with no position and threw it
+    -- to a corner (ALL-97)
+    BNB.CreateResizeGrip(f, { x = -2, y = 2 })
 
     return f, TITLE_H_NORMAL
 end

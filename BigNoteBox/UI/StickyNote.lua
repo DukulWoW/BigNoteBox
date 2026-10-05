@@ -235,6 +235,22 @@ local function SaveCfg(noteID, cfg)
     db.postits[noteID].cfg = cfg
 end
 
+-- Lock sticky (ALL-257): position and size stay where they are, everything
+-- else still works. Every drag start and the resize grip ask this.
+local function StickyLocked(noteID)
+    local rec = noteID and StickyDB()[noteID]
+    return (rec and rec.cfg and rec.cfg.locked == true) or false
+end
+SN.IsLocked = StickyLocked
+
+-- Lock or unlock a sticky (Sticky settings button and the right-click menu)
+function SN.SetLocked(noteID, on)
+    local cfg = (SN._SettingsCfg and SN._SettingsCfg(noteID)) or GetCfg(noteID)
+    cfg.locked = on and true or nil
+    SaveCfg(noteID, cfg)
+    if SN._RefreshSettingsStates then SN._RefreshSettingsStates(noteID) end
+end
+
 local function SaveGeometry(noteID, frame)
     if not noteID then return end
     local db = DB(); if not db then return end
@@ -767,47 +783,31 @@ SN._kit = {
 
 -- ── Resize handle ─────────────────────────────────────────────────────────────
 local function AddResizeHandle(frame, noteID)
-    local h = CreateFrame("Button", nil, frame)
-    h:SetSize(16, 16)
-    h:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", 0, 0)
-    h:SetFrameLevel(frame:GetFrameLevel() + 10)
-    h:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    h:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    h:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-
-    -- Hover forwarding — inline so we can also control visibility.
-    -- ForwardHover is NOT called here; it uses SetScript which would overwrite these.
-    h:SetScript("OnEnter", function() h:Show() end)
-    h:SetScript("OnLeave", function()
-        if not h._sizing then h:Hide() end
-    end)
-
-    h:SetScript("OnMouseDown", function(_, btn)
-        if btn ~= "LeftButton" or frame._minimized then return end
-        h._sizing = true
-        BNB.StartGripSizing(frame)   -- ALL-97: not StartSizing (UI/Widgets.lua)
-    end)
-    h:SetScript("OnMouseUp", function()
-        h._sizing = false
-        BNB.StopGripSizing(frame)
-        local w  = math.max(MIN_W, math.min(1200, frame:GetWidth()))
-        local ht = math.max(MIN_H, math.min(800,  frame:GetHeight()))
-        frame:SetSize(w, ht)
-        frame._savedW = w
-        frame._savedH = ht
-        if frame._bodyScroll then
-            local fm = frame._cfg and frame._cfg.focusMode
-            local fp = fm and FOCUS_PAD or PAD
-            local hH = fm and 0 or HEADER_H
-            frame._bodyScroll:ClearAllPoints()
-            AnchorScrollTop(frame._bodyScroll, frame._frontFace, hH, fp)
-            frame._bodyScroll:SetPoint("BOTTOMRIGHT", frame._frontFace, "BOTTOMRIGHT", -(fp+22),  fp)
-        end
-        SaveGeometry(noteID, frame)
-        -- Hide only if cursor has left the frame entirely
-        if not frame:IsMouseOver() then h:Hide() end
-    end)
-    BNB.SetHoverCursor(h, "resize")   -- ALL-95
+    -- The shared grip (UI/Widgets.lua, ALL-263); a locked sticky refuses the
+    -- press (ALL-257). Shown and hidden by the hover poll in the OnUpdate.
+    local h
+    h = BNB.CreateResizeGrip(frame, {
+        canSize = function() return not frame._minimized and not StickyLocked(noteID) end,
+        onLeave = function() if not h._sizing then h:Hide() end end,
+        onStop  = function()
+            local w  = math.max(MIN_W, math.min(1200, frame:GetWidth()))
+            local ht = math.max(MIN_H, math.min(800,  frame:GetHeight()))
+            frame:SetSize(w, ht)
+            frame._savedW = w
+            frame._savedH = ht
+            if frame._bodyScroll then
+                local fm = frame._cfg and frame._cfg.focusMode
+                local fp = fm and FOCUS_PAD or PAD
+                local hH = fm and 0 or HEADER_H
+                frame._bodyScroll:ClearAllPoints()
+                AnchorScrollTop(frame._bodyScroll, frame._frontFace, hH, fp)
+                frame._bodyScroll:SetPoint("BOTTOMRIGHT", frame._frontFace, "BOTTOMRIGHT", -(fp+22),  fp)
+            end
+            SaveGeometry(noteID, frame)
+            -- Hide only if cursor has left the frame entirely
+            if not frame:IsMouseOver() then h:Hide() end
+        end,
+    })
 
     -- Show/hide driven by the same IsMouseOver poll used for btnOverlay.
     -- This avoids relying on OnEnter/OnLeave from frame (which fires through
@@ -859,6 +859,7 @@ local function CreateMiniTile(frame, noteID, note)
     local _tileDragging = false
     tile:RegisterForDrag("LeftButton")
     tile:SetScript("OnDragStart", function(self)
+        if StickyLocked(noteID) then return end
         _tileDragging = true
         self:StartMoving()
     end)
@@ -1599,7 +1600,9 @@ local function CreateStickyFrame(noteID)
     f:SetClampedToScreen(true)
     f:EnableMouse(true)
     f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    f:SetScript("OnDragStart", function(self)
+        if not StickyLocked(noteID) then self:StartMoving() end
+    end)
     f:SetScript("OnDragStop",  function(self)
         self:StopMovingOrSizing(); SaveGeometry(noteID, self)
     end)
@@ -1627,13 +1630,19 @@ local function CreateStickyFrame(noteID)
     end
     header:EnableMouse(true)
     header:RegisterForDrag("LeftButton")
-    header:SetScript("OnDragStart", function() f:StartMoving() end)
+    header:SetScript("OnDragStart", function()
+        if not StickyLocked(noteID) then f:StartMoving() end
+    end)
     header:SetScript("OnDragStop",  function()
         f:StopMovingOrSizing(); SaveGeometry(noteID, f)
     end)
     ForwardHover(header, f)
     f._headerBar = header
-    BNB.SetMoveCursor(header)   -- ALL-95, after ForwardHover (it uses SetScript)
+    -- ALL-95, after ForwardHover (it uses SetScript); no move cursor while
+    -- the sticky is locked (ALL-257)
+    BNB.SetHoverCursor(header, function()
+        if not StickyLocked(noteID) then return "move" end
+    end)
 
     -- ── Overhanging icon badge ────────────────────────────────────────────────
     local titleLeft = BuildIconBadge(f, noteID, note)
@@ -1885,6 +1894,11 @@ local function CreateStickyFrame(noteID)
                 end)
             end
             root:CreateDivider()
+            -- Lock sticky: position and size (ALL-257)
+            local locked = StickyLocked(noteID)
+            root:CreateButton(locked and L["STICKY_UNLOCK_LABEL"] or L["STICKY_LOCK_LABEL"], function()
+                SN.SetLocked(noteID, not locked)
+            end, { tip = L["STICKY_LOCK_TIP"] })
             root:CreateButton(f._minimized and L["STICKY_RESTORE_TIP"] or L["STICKY_MINIMIZE_TO_ICON_TIP"], function()
                 SN.SetMinimized(noteID, not f._minimized)
             end)
@@ -1995,6 +2009,7 @@ local function CreateStickyFrame(noteID)
         local rh = f._resizeHandle
         if rh then
             local shouldShow = (over or rh._sizing) and not f._minimized
+                and not StickyLocked(f._noteID)
             if shouldShow and not rh:IsShown() then rh:Show()
             elseif not shouldShow and rh:IsShown() then rh:Hide() end
         end
