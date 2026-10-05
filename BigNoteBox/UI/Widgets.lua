@@ -304,6 +304,43 @@ function BNB.CreateButton(name, parent, text, w, h)
     return btn
 end
 
+-- State buttons in a 2-column grid at (0, y) of parent, `width` wide (ALL-256,
+-- Note Settings; Sticky settings ALL-257). defs = { { text = fn -> label,
+-- tip = fn -> title, body, onClick = fn }, ... }: the label says what a click
+-- does and follows the state through Refresh. Returns the y under the grid and
+-- the Refresh function.
+function BNB.CreateStateButtonGrid(parent, y, width, defs, h)
+    h = h or 24
+    local GAP = 6
+    local bw  = math.floor((width - GAP) / 2)
+    local btns = {}
+    local function Refresh()
+        for _, b in ipairs(btns) do b:SetText(b._def.text() or "") end
+    end
+    for i, def in ipairs(defs) do
+        local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+        local b = BNB.CreateButton(nil, parent, "", bw, h)
+        b:SetPoint("TOPLEFT", parent, "TOPLEFT", col * (bw + GAP), y - row * (h + 4))
+        b._def = def
+        b:SetScript("OnClick", function() def.onClick(); Refresh() end)
+        if def.tip then
+            b:SetScript("OnEnter", function(s)
+                local title, body = def.tip()
+                GameTooltip:SetOwner(s, "ANCHOR_TOP")
+                if title then GameTooltip:AddLine(title, 1, 0.82, 0) end
+                if body then GameTooltip:AddLine(body, 0.85, 0.85, 0.85, true) end
+                GameTooltip:Show()
+            end)
+            b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+        BNB.TruncateButtonText(b)
+        btns[#btns + 1] = b
+    end
+    Refresh()
+    local rows = math.ceil(#defs / 2)
+    return y - rows * (h + 4) + 4, Refresh
+end
+
 -- Keeps a BNB.CreateButton label inside the button: fixed width, one line,
 -- ends in "..." when too long (an icon name overflowed the Note Settings
 -- Icon button, Dukul 2026-10-04). pad = room on each side, default 8.

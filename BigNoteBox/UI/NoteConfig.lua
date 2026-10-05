@@ -22,8 +22,6 @@ local PAD     = 12
 -- Width: window minus left pad minus right margin (no scrollbar on most panels)
 local CW      = NCW - PAD - 8
 local CW_SCROLL = NCW - PAD - 28  -- used only where a scrollbar IS present
-local ROW_H   = 28
-local ROW_GAP = 4
 
 -- ── Module state ──────────────────────────────────────────────────────────────
 local ncFrame   = nil
@@ -121,24 +119,6 @@ local function Rule(parent, y)
     BNB.CreateRule(parent, y)
     return y - 10
 end
-local function Check(parent, y, text, getter, setter, tip)
-    local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cb:SetSize(24, 24); cb:SetPoint("TOPLEFT", parent, "TOPLEFT", -2, y + 2)
-    cb:SetChecked(getter())
-    cb._getter = getter   -- stored for refresh
-    cb:SetScript("OnClick", function(s) setter(s:GetChecked() and true or false) end)
-    if tip then
-        cb:SetScript("OnEnter", function(s)
-            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true); GameTooltip:Show()
-        end)
-        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    end
-    local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lbl:SetPoint("LEFT", cb, "RIGHT", 4, 0); lbl:SetPoint("RIGHT", parent, "RIGHT", 0, 0)
-    lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H); lbl:SetText(text)
-    return y - (ROW_H + ROW_GAP), cb
-end
 
 -- ── Dropdown helper (WowStyle1 with cycling button fallback) ────────────────────────────
 local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
@@ -215,62 +195,66 @@ local function BuildGeneralTab(sf, ct)
     -- Use ct as the parent for all content; finalise scroll height at end.
     local panel = ct   -- alias so existing code is unchanged
     local y = -4
-    local _cbPinned, _cbFavorited
 
-    y, _cbPinned = Check(panel, y, L["NC_PIN_TOP_LABEL"],
-        function() local n=GetNote(); return n and n.pinned==true end,
-        function(v) Save({pinned=v}) end,
-        L["NC_PIN_TOP_TIP"])
-    y = y - 2
-
-    -- Favorite ─────────────────────────────────────────────────────────────────
-    y, _cbFavorited = Check(panel, y, L["NC_FAVORITE_LABEL"],
-        function() local n=GetNote(); return n and n.favorited==true end,
-        function(v)
-            if v then
-                Save({favorited = true})
-            else
-                if not _noteID then return end
-                BNB.UpdateNote(_noteID, {_clear = {"favorited"}})
-                if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-            end
-        end,
-        L["NC_FAVORITE_TIP"])
-    y = y - 4
-
-    -- Rich note ────────────────────────────────────────────────────────────────
-    y = Rule(panel, y) - 4
-    y = Hdr(panel, y, L["NC_HDR_NOTE_TYPE"])
-
-    local _cbRich
-    y, _cbRich = Check(panel, y, L["NC_RICH_NOTE_LABEL"],
-        function() local n=GetNote(); return n and n.richMode==true end,
-        function(v)
-            if not _noteID then return end
-            if v then
-                Save({richMode = true})
-                if BNB.LoadNoteInEditor and BNB._currentNoteID == _noteID then
-                    BNB.LoadNoteInEditor(_noteID)
-                end
-            else
-                -- Confirm before stripping tags
-                if BNB.AdvancedMode then
-                    BNB.AdvancedMode.ConvertToPlain(_noteID, function(confirmed)
-                        if not confirmed then
-                            -- User cancelled — revert checkbox
-                            if _cbRich then _cbRich:SetChecked(true) end
-                        end
-                    end)
-                else
-                    Save({richMode = false})
-                    if BNB.LoadNoteInEditor and BNB._currentNoteID == _noteID then
-                        BNB.LoadNoteInEditor(_noteID)
-                    end
-                end
-            end
-        end,
-        L["NC_RICH_NOTE_TIP"])
-    y = y - 4
+    -- Pin / Favorite / Lock / Rich note: state buttons, the label says what a
+    -- click does (ALL-256). Pin, favorite and lock go through the list's
+    -- NOTE_ACTIONS, so they act exactly as the right-click menu does.
+    local function Act(key)
+        if not _noteID then return end
+        local K = BNB._NoteListKit
+        if K and K.NOTE_ACTIONS[key] then K.NOTE_ACTIONS[key](_noteID) end
+        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
+    end
+    local function IsLocked()
+        local n, K = GetNote(), BNB._NoteListKit
+        return n and K and K.NoteIsLocked(n) or false
+    end
+    local _refreshStates
+    y, _refreshStates = BNB.CreateStateButtonGrid(panel, y, CW_SCROLL, {
+        { text = function() local n = GetNote()
+              return (n and n.pinned) and L["NC_STATE_UNPIN"] or L["NC_STATE_PIN"] end,
+          tip  = function() return L["NC_PIN_TOP_LABEL"], L["NC_PIN_TOP_TIP"] end,
+          onClick = function() Act("pin") end },
+        { text = function() local n = GetNote()
+              return (n and n.favorited) and L["NC_STATE_UNFAV"] or L["NC_STATE_FAV"] end,
+          tip  = function() return L["NC_FAVORITE_LABEL"], L["NC_FAVORITE_TIP"] end,
+          onClick = function() Act("fav") end },
+        { text = function() return IsLocked() and L["NC_LOCK_UNLOCK_BTN"] or L["NC_LOCK_LOCK_BTN"] end,
+          tip  = function()
+              return L["NC_HDR_LOCK"], IsLocked() and L["NC_LOCK_CLICK_UNLOCK_TIP"] or L["NC_LOCK_CLICK_LOCK_TIP"]
+          end,
+          onClick = function()
+              Act("lock")
+              if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
+          end },
+        { text = function() local n = GetNote()
+              return (n and n.richMode) and L["NC_STATE_NORMAL"] or L["NC_STATE_RICH"] end,
+          tip  = function() return L["NC_RICH_NOTE_LABEL"], L["NC_RICH_NOTE_TIP"] end,
+          onClick = function()
+              local n = GetNote(); if not n then return end
+              if not n.richMode then
+                  Save({richMode = true})
+                  if BNB.LoadNoteInEditor and BNB._currentNoteID == _noteID then
+                      BNB.LoadNoteInEditor(_noteID)
+                  end
+              elseif BNB.AdvancedMode then
+                  -- Confirms before stripping tags; the label follows NoteChanged
+                  BNB.AdvancedMode.ConvertToPlain(_noteID)
+              else
+                  Save({richMode = false})
+                  if BNB.LoadNoteInEditor and BNB._currentNoteID == _noteID then
+                      BNB.LoadNoteInEditor(_noteID)
+                  end
+              end
+          end },
+    })
+    -- Labels follow changes made anywhere else (list menu, editor, sticky)
+    BNB.RegisterMessage("NoteConfigStates", "NoteChanged", function(_, id)
+        if id == _noteID and ncFrame and ncFrame:IsShown() then
+            _refreshStates()
+        end
+    end)
+    y = y - 8
     y = Rule(panel, y) - 4
     y = Hdr(panel, y, L["NC_HDR_TITLE_COLOR"])
 
@@ -523,84 +507,6 @@ local function BuildGeneralTab(sf, ct)
     end
 
     y = Rule(panel,y) - 4
-    y = Hdr(panel,y,L["NC_HDR_LOCK"])
-
-    local lockBtns = {}
-    local BTN_W = 110
-
-    -- Default button — clears per-note override, follows global setting
-    local defaultBtn = BNB.CreateButton(nil, panel, L["NC_DEFAULT_BTN"], BTN_W, 22)
-    defaultBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    defaultBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        local globalLocked = BigNoteBoxDB and BigNoteBoxDB.lockNotes == true
-        GameTooltip:AddLine(L["NC_LOCK_FOLLOW_GLOBAL_TIP"]
-            .. "\n" .. L["NC_LOCK_CURRENTLY_GLOBAL_IS"]
-            .. (globalLocked and "|cffff9900" .. L["NC_LOCK_LOCKED"] .. "|r" or "|cff66bb6a" .. L["NC_LOCK_UNLOCKED"] .. "|r"),
-            0.85, 0.85, 0.85, true)
-        GameTooltip:Show()
-    end)
-    defaultBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    lockBtns[#lockBtns+1] = { btn = defaultBtn, val = nil }
-
-    -- Single Lock / Unlock toggle button — label changes based on current state
-    local toggleBtn = BNB.CreateButton(nil, panel, L["NC_LOCK_LOCK_BTN"], BTN_W, 22)
-    toggleBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", BTN_W + 6, y)
-    toggleBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        local note = GetNote()
-        local cur  = note and note.locked
-        if cur == true then
-            GameTooltip:AddLine(L["NC_LOCK_CLICK_UNLOCK_TIP"], 0.85, 0.85, 0.85, true)
-        else
-            GameTooltip:AddLine(L["NC_LOCK_CLICK_LOCK_TIP"], 0.85, 0.85, 0.85, true)
-        end
-        GameTooltip:Show()
-    end)
-    toggleBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    lockBtns[#lockBtns+1] = { btn = toggleBtn, val = "toggle" }
-
-    local function HLLockBtns()
-        local note = GetNote()
-        local cur  = note and note.locked
-        -- Default button is disabled when note is already in default state
-        defaultBtn:SetEnabled(cur ~= nil)
-        -- Toggle button label reflects what clicking it will DO next
-        if cur == true then
-            toggleBtn:SetText(L["NC_LOCK_UNLOCK_BTN"])
-        else
-            toggleBtn:SetText(L["NC_LOCK_LOCK_BTN"])
-        end
-    end
-
-    defaultBtn:SetScript("OnClick", function()
-        Save({_clear = {"locked"}})
-        if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
-        if _noteID == BNB._currentNoteID and BNB.LoadNoteInEditor then
-            BNB.LoadNoteInEditor(_noteID)
-        end
-        HLLockBtns()
-    end)
-    toggleBtn:SetScript("OnClick", function()
-        local note = GetNote()
-        local cur  = note and note.locked
-        local newVal
-        if cur == true then
-            newVal = false   -- was locked → unlock explicitly
-        else
-            newVal = true    -- was nil/false → lock explicitly
-        end
-        Save({locked = newVal})
-        if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
-        if _noteID == BNB._currentNoteID and BNB.LoadNoteInEditor then
-            BNB.LoadNoteInEditor(_noteID)
-        end
-        HLLockBtns()
-    end)
-
-    y = y - 30
-
-    y = Rule(panel,y) - 4
     -- ── Scope (Global / This character) ───────────────────────────────────────
     y = Hdr(panel, y, L["NC_HDR_NOTE_VISIBILITY"])
 
@@ -739,16 +645,13 @@ local function BuildGeneralTab(sf, ct)
     -- Store refresh callback so OpenNoteConfig can call it when switching notes
     sf._refreshScope = RefreshScopeBtns
     panel._hlFonts    = HLFonts
-    panel._hlLockBtns = HLLockBtns
     sf._hlFonts       = HLFonts
-    sf._hlLockBtns    = HLLockBtns
     sf._reapplyFontPreviews = ReapplyFontPreviews
     sf._refreshFontSize     = panel._refreshFontSize
-    -- Refresh pinned/favorited checkboxes when switching notes
-    panel._refreshChecks = function()
-        if _cbPinned   then _cbPinned:SetChecked(_cbPinned._getter())     end
-        if _cbFavorited then _cbFavorited:SetChecked(_cbFavorited._getter()) end
-    end
+    -- Refresh the state button labels when switching notes
+    -- (on sf: the refresh reads tabPanels[TAB_GEN], the scroll frame; the old
+    -- checkboxes hung it on ct and never refreshed)
+    sf._refreshChecks = _refreshStates
     -- Finalise scroll content height
     sf:FinaliseHeight(math.abs(y) + 12)
 end
@@ -1263,7 +1166,6 @@ function BNB.OpenNoteConfig(noteID, tab)
     local gPanel = tabPanels[TAB_GEN]
     if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
     if gPanel and gPanel._hlFonts         then gPanel._hlFonts()         end
-    if gPanel and gPanel._hlLockBtns      then gPanel._hlLockBtns()      end
     if gPanel and gPanel._refreshChecks   then gPanel._refreshChecks()   end
     if gPanel and gPanel._refreshFontSize then gPanel._refreshFontSize() end
 
@@ -1309,7 +1211,6 @@ function BNB.SyncNoteConfig(noteID)
     local gPanel = tabPanels[TAB_GEN]
     if gPanel and gPanel._refreshScope    then gPanel._refreshScope()    end
     if gPanel and gPanel._hlFonts         then gPanel._hlFonts()         end
-    if gPanel and gPanel._hlLockBtns      then gPanel._hlLockBtns()      end
     if gPanel and gPanel._refreshChecks   then gPanel._refreshChecks()   end
     if gPanel and gPanel._refreshFontSize then gPanel._refreshFontSize() end
     if gPanel and gPanel._reapplyFontPreviews then

@@ -104,7 +104,9 @@ local function BuildNotesTab(sf, ct)
         function(v) if v then db.openConfigOnNew = nil else db.openConfigOnNew = false end end,
         L["CFG_CHK_OPEN_CONFIG_NEW_TIP"])
 
-    y = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
+    local lockRowY = y
+    local lockCb
+    y, lockCb = AddCheck(ct, y, L["CFG_CHK_LOCK_NOTES_LABEL"],
         function() return db.lockNotes == true end,
         function(v)
             db.lockNotes = v
@@ -113,6 +115,51 @@ local function BuildNotesTab(sf, ct)
             if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons() end
         end,
         L["CFG_CHK_LOCK_NOTES_TIP"])
+
+    -- Reset all: every note with its own lock (note.locked true/false, written
+    -- by any Lock / Unlock) follows the setting above again (nil). Not an
+    -- edit, so "Edited" sort stays put (noTouch).
+    do
+        local function Overrides()
+            local ids, ndb = {}, BNB.NotesDB()
+            for id, n in pairs(ndb and ndb.notes or {}) do
+                if n.locked ~= nil then ids[#ids + 1] = id end
+            end
+            return ids
+        end
+        local btn = BNB.CreateButton(nil, ct, L["CFG_LOCK_RESET_BTN"], 90, 22)
+        btn:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, lockRowY + 1)
+        lockCb._lbl:SetPoint("RIGHT", btn, "LEFT", -6, 0)
+        btn:SetMotionScriptsWhileDisabled(true)   -- the tooltip explains the grey
+        local function Refresh() btn:SetEnabled(#Overrides() > 0) end
+        btn:HookScript("OnShow", Refresh)
+        btn:SetScript("OnEnter", function(s)
+            GameTooltip:SetOwner(s, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["CFG_LOCK_RESET_BTN"], 1, 0.82, 0)
+            GameTooltip:AddLine(s:IsEnabled() and L["CFG_LOCK_RESET_TIP"] or L["CFG_LOCK_RESET_NONE"],
+                0.85, 0.85, 0.85, true)
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        btn:SetScript("OnClick", function()
+            local ids = Overrides()
+            if #ids == 0 then Refresh(); return end
+            StaticPopup_Show("BNB_MULTI_CONFIRM", string.format(L["CFG_LOCK_RESET_CONFIRM"], #ids), nil, function()
+                for _, id in ipairs(Overrides()) do
+                    BNB.UpdateNote(id, { _clear = { "locked" } }, { noTouch = true })
+                end
+                if BNB.RefreshEditorLock then BNB.RefreshEditorLock() end
+                if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons() end
+                if BNB.LoadNoteInEditor and BNB._currentNoteID then BNB.LoadNoteInEditor(BNB._currentNoteID) end
+                if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+                Refresh()
+            end)
+        end)
+        -- A Lock / Unlock anywhere else while Settings is open
+        BNB.RegisterMessage("ConfigLockReset", "NoteChanged", function(_, _, fields)
+            if fields and (fields.locked ~= nil or fields._clear) and btn:IsVisible() then Refresh() end
+        end)
+    end
 
     -- Trash and Tag tree are part of how notes work, not modules (ALL-84)
     y = AddSubHeader(ct, y, L["CFG_HDR_TRASH"])
