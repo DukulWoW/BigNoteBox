@@ -80,11 +80,10 @@ local function GetOrMakeOverlay(target, key)
 end
 
 local function SetWindowsLocked(locked)
-    -- Apply black overlay to history windows only.
+    -- Apply black overlay to the history window only (both its pages, ALL-258).
     -- Main window gets no overlay (per design) — just the click blocker via ESC chain.
     local targets = {
         history = _G["BigNoteBoxHistoryFrame"],
-        nhp     = _G["BigNoteBoxNoteHistoryFrame"],
     }
     for key, frame in pairs(targets) do
         if frame then

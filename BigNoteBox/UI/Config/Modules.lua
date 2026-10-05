@@ -1036,6 +1036,16 @@ local function BuildSidebarPage(sf, ct, y, page)
     -- The sidebar's "Hide from sidebar" and CharacterRemove call this, so an
     -- open page follows (ALL-211, ALL-249)
     BNB.RefreshHiddenCharList = RebuildCharList
+    -- The note counts follow note changes while the page is open: a new,
+    -- deleted, restored or moved (scope) note; one rebuild per frame
+    local function CharListFollow(msg, _, fields)
+        if not sf:IsVisible() then return end
+        if msg == "NoteChanged" and not (fields and fields.scope ~= nil) then return end
+        BNB.Debounce("cfgCharList", 0, RebuildCharList)
+    end
+    for _, msg in ipairs({ "NoteCreated", "NoteChanged", "NoteDeleted", "NoteRestored" }) do
+        BNB.RegisterMessage("ConfigCharList", msg, CharListFollow)
+    end
 
     -- y must advance past the sub-frame; GetHeight() is now set by RebuildCharList
     y = y - sidebarSub:GetHeight()

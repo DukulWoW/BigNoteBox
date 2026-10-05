@@ -1201,7 +1201,6 @@ L["HISTORY_CLEAR_ALL_TIP"]       = "Delete all history for all notes"
 L["HISTORY_CLEAR_ALL_CONFIRM"]   = "Delete ALL history for ALL notes? This cannot be undone."
 
 -- Per-Note History Panel
-L["HISTORY_NOTE_TITLE"]          = "History: %s"
 L["HISTORY_NOTE_EMPTY"]          = "No history for this note yet."
 L["HISTORY_SECTION_MANUAL"]      = "Manual Restore Point"
 L["HISTORY_SECTION_AUTO"]        = "Auto Snapshots (%d)"

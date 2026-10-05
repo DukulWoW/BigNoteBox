@@ -260,18 +260,14 @@ local WINDOWS = {
       esc = function() Call(BNB.Sticky, "CloseSettings") end },
     { name = "BigNoteBoxTagManagerFrame", esc = true, companion = true, raise = true,
       focus = 4, reopen = function() Call(BNB, "ToggleTagManager") end },
-    -- Per-note history panel, then the main history window (also closes panel)
-    { name = "BigNoteBoxNoteHistoryFrame", raise = true,
-      esc       = function() Call(BNB, "CloseNoteHistoryPanel") end,
-      companion = function() Call(BNB, "CloseNoteHistoryPanel") end,
-      focus = 6, reopen = function(id) Call(BNB, "OpenNoteHistoryPanel", id) end },
+    -- Note History and Trash have a second page (ALL-258): ESC goes back to
+    -- the list first, then closes the window
     { name = "BigNoteBoxHistoryFrame", raise = true,
-      esc       = function() Call(BNB, "CloseHistoryWindow") end,
+      esc       = function(w) if not w:PageBack() then Call(BNB, "CloseHistoryWindow") end end,
       companion = function() Call(BNB, "CloseHistoryWindow") end,
-      focus = 5, reopen = function() Call(BNB, "OpenHistoryWindow") end },
-    -- Trash view popup before the trash window itself
-    { name = "BNBTrashViewPopup", esc = true },
-    { name = "BigNoteBoxTrashFrame", esc = true, companion = true, raise = true,
+      focus = 5, reopen = function() Call(BNB, "ReopenHistoryWindow") end },
+    { name = "BigNoteBoxTrashFrame", companion = true, raise = true,
+      esc = function(w) if not w:PageBack() then w:Hide() end end,
       focus = 3, reopen = function() ShowNamed("BigNoteBoxTrashFrame") end },
     -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
     { name = "BigNoteBoxIconFramePicker",
@@ -1285,12 +1281,24 @@ local function RaiseShown(name)
     local fr = _G[name]
     if fr and fr:IsShown() then pcall(fr.Raise, fr) end
 end
+-- The open windows keep their stacking among themselves: raised lowest first
+-- (strata, then frame level), so the one on top stays on top. Raising them in
+-- WINDOWS order reset the stack to that order on every click.
+local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5,
+    FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
 function BNB.RaiseBNBWindows()
     RaiseShown("BigNoteBoxFrame")
-    for i = #WINDOWS, 1, -1 do
-        local e = WINDOWS[i]
-        if e.raise then RaiseShown(e.name) end
+    local open = {}
+    for _, e in ipairs(WINDOWS) do
+        local fr = e.raise and _G[e.name]
+        if fr and fr:IsShown() then open[#open + 1] = fr end
     end
+    table.sort(open, function(a, b)
+        local ra, rb = STRATA_RANK[a:GetFrameStrata()] or 0, STRATA_RANK[b:GetFrameStrata()] or 0
+        if ra ~= rb then return ra < rb end
+        return a:GetFrameLevel() < b:GetFrameLevel()
+    end)
+    for _, fr in ipairs(open) do pcall(fr.Raise, fr) end
 end
 
 -- Focus mode (UI/FocusEditor.lua): which `focus` windows are open now, and

@@ -4,15 +4,17 @@
 -- Same width as TrashWindow, same height tracking (follows main window height).
 -- Anchors TOPRIGHT of main window's TOPLEFT, same as Trash.
 --
--- When a row is clicked, opens NoteHistoryPanel for that note on top.
--- The history window greys out (alpha + click blocker) while the panel is open.
+-- Two pages in one window (ALL-258): the list (root) and one note's
+-- snapshots ("note", built by UI/NoteHistoryPanel.lua). A row click shows
+-- that note's page; its back arrow or ESC returns to the list.
 --
 -- Public API:
 --   BNB.ToggleHistoryWindow()
 --   BNB.OpenHistoryWindow()
+--   BNB.ShowHistoryWindow(pageKey, ...)  -- opens the window on a page
+--   BNB.ReopenHistoryWindow()            -- Focus mode: the page it closed on
 --   BNB.CloseHistoryWindow()
 --   BNB.RefreshHistoryWindow()
---   BNB.SetHistoryWindowGreyout(bool)   -- called by NoteHistoryPanel
 --   BNB.InitHistoryWindow()
 
 local BNB = BigNoteBox
@@ -33,9 +35,9 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 local _hwFrame    = nil
 local _rows       = {}
 local _emptyLbl   = nil
-local _blocker    = nil   -- invisible frame to eat clicks when greyed out
 local _clearAllBtn = nil
 local _sizeLbl    = nil
+local _reopenNote = nil   -- the note page's note when the window last closed on it
 
 --------------------------------------------------------------------------------
 -- INTERNAL: count total slots across auto + manual
@@ -219,20 +221,10 @@ function BNB.PopulateHistoryWindow()
     end
 end
 
+-- The list page only: the note page refreshes itself (RefreshNoteHistoryPanel)
 function BNB.RefreshHistoryWindow()
-    if not _hwFrame or not _hwFrame:IsShown() then return end
+    if not _hwFrame or not _hwFrame:IsShown() or _hwFrame:PageKey() ~= "list" then return end
     BNB.PopulateHistoryWindow()
-end
-
---------------------------------------------------------------------------------
--- SetHistoryWindowGreyout — dim + block clicks while NoteHistoryPanel is open
---------------------------------------------------------------------------------
-function BNB.SetHistoryWindowGreyout(grey)
-    if not _hwFrame then return end
-    _hwFrame:SetAlpha(grey and 0.45 or BNB.WindowAlpha(_hwFrame))   -- ALL-78
-    if _blocker then
-        if grey then _blocker:Show() else _blocker:Hide() end
-    end
 end
 
 --------------------------------------------------------------------------------
@@ -242,16 +234,26 @@ end
 local function BuildHistoryWindow()
     if _hwFrame then return _hwFrame end
 
-    local f = BNB.CreateToolWindow({
+    local f
+    f = BNB.CreateToolWindow({
         name = "BigNoteBoxHistoryFrame", w = HW_W, h = 400,   -- height follows the main window
         title = L["HISTORY_WINDOW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
         pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
         onClose = function() BNB.CloseHistoryWindow() end,
+        -- Focus mode reopens the page the window closed on (ReopenHistoryWindow)
+        -- Reads the frame from its argument: the builder's own Hide() runs
+        -- this before `f` is assigned
+        onHide = function(self)
+            local np = self._pages.note
+            _reopenNote = self:PageKey() == "note" and np and np._noteID or nil
+        end,
     })
     local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
+    -- Root page: the list, filled on every show (back from a note included)
+    local list = f:AddPage("list", { onShow = function() BNB.PopulateHistoryWindow() end })
 
     -- Scroll frame
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = CreateFrame("ScrollFrame", nil, list, "ScrollFrameTemplate")
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf
@@ -278,7 +280,7 @@ local function BuildHistoryWindow()
     _emptyLbl = emptyLbl
 
     -- Clear all button
-    local clearBtn = BNB.CreateButton(nil, f, L["HISTORY_CLEAR_ALL_BTN"], 140, 26)
+    local clearBtn = BNB.CreateButton(nil, list, L["HISTORY_CLEAR_ALL_BTN"], 140, 26)
     clearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
     clearBtn:SetEnabled(false)
     clearBtn:SetScript("OnClick", function()
@@ -294,19 +296,14 @@ local function BuildHistoryWindow()
     _clearAllBtn = clearBtn
 
     -- Size label
-    local szLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local szLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     szLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
     szLbl:SetJustifyH("RIGHT")
     szLbl:SetTextColor(0.45, 0.45, 0.45)
     _sizeLbl = szLbl
 
-    -- Invisible click blocker (shown when NoteHistoryPanel greys us out)
-    local blocker = CreateFrame("Frame", nil, f)
-    blocker:SetAllPoints()
-    blocker:SetFrameLevel(f:GetFrameLevel() + 50)
-    blocker:EnableMouse(true)
-    blocker:Hide()
-    _blocker = blocker
+    -- The per-note page (UI/NoteHistoryPanel.lua)
+    BNB._BuildNoteHistoryPage(f, top)
 
     -- StaticPopup for clear all
     if not StaticPopupDialogs["BNB_HISTORY_CLEAR_ALL"] then
@@ -336,7 +333,7 @@ local function BuildHistoryWindow()
 end
 
 --------------------------------------------------------------------------------
--- Height sync (mirrors TrashWindow pattern)
+-- Height sync (mirrors TrashWindow pattern), every page (ALL-258)
 --------------------------------------------------------------------------------
 local function SyncHistoryHeight()
     if not _hwFrame or not BNB.mainFrame then return end
@@ -353,25 +350,38 @@ end
 --------------------------------------------------------------------------------
 -- Public toggle / open / close
 --------------------------------------------------------------------------------
-function BNB.OpenHistoryWindow()
+-- Opens the window on a page: "list", or "note" with the note id
+-- (BNB.OpenNoteHistoryPanel). Extra arguments go to the page's onShow.
+function BNB.ShowHistoryWindow(pageKey, ...)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local f = BuildHistoryWindow()
-    -- Close NoteHistoryPanel and Trash if open (per ESC-chain rules)
-    if BNB.CloseNoteHistoryPanel then BNB.CloseNoteHistoryPanel() end
+    -- Close Trash if open (per ESC-chain rules)
     local tw = _G["BigNoteBoxTrashFrame"]
     if tw and tw:IsShown() then tw:Hide() end
-    SyncHistoryHeight()
-    -- Side from Settings > Notes > Session History (ALL-269, right by default)
-    if not BNB.PlaceBesideMain(f, BNB.WindowSide("historySide")) then
-        f:ClearAllPoints()
-        f:SetPoint("CENTER")
+    if not f:IsShown() then
+        SyncHistoryHeight()
+        -- Side from Settings > Notes > Session History (ALL-269, right by default)
+        if not BNB.PlaceBesideMain(f, BNB.WindowSide("historySide")) then
+            f:ClearAllPoints()
+            f:SetPoint("CENTER")
+        end
+        f:Show()
     end
-    f:Show()
-    BNB.PopulateHistoryWindow()
+    f:Raise()
+    f:ShowPage(pageKey, ...)
+end
+
+function BNB.OpenHistoryWindow()
+    BNB.ShowHistoryWindow("list")
+end
+
+-- Focus mode's reopen (MainWindow.lua WINDOWS): the page it closed on
+function BNB.ReopenHistoryWindow()
+    if _reopenNote then BNB.ShowHistoryWindow("note", _reopenNote)
+    else BNB.ShowHistoryWindow("list") end
 end
 
 function BNB.CloseHistoryWindow()
-    if BNB.CloseNoteHistoryPanel then BNB.CloseNoteHistoryPanel() end
     if _hwFrame then _hwFrame:Hide() end
 end
 

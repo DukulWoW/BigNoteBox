@@ -854,7 +854,6 @@ L["HISTORY_CLEAR_ALL_TIP"]       = "删除所有笔记的所有历史记录"
 L["HISTORY_CLEAR_ALL_CONFIRM"]   = "确定要删除所有笔记的所有历史记录吗？此操作无法撤销。"
 
 -- Per-Note History Panel
-L["HISTORY_NOTE_TITLE"]          = "历史：%s"
 L["HISTORY_NOTE_EMPTY"]          = "此笔记暂无历史记录。"
 L["HISTORY_SECTION_MANUAL"]      = "手动还原点"
 L["HISTORY_SECTION_AUTO"]        = "自动快照 (%d)"

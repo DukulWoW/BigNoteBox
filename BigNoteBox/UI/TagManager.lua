@@ -397,7 +397,10 @@ local function BuildTagManager()
 
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxTagManagerFrame", w = TM_W, h = 460,
-        title = L["TAG_MGR_TITLE"], toplevel = true, escClose = true,
+        -- HIGH like the other windows beside the main window (Note History,
+        -- Trash, Alarms, Rich preview): one strata, so the last opened is on
+        -- top (was DIALOG, always over them)
+        title = L["TAG_MGR_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
     })
     -- Select strip, tip, list: normal mode leaves room for the template's title
     local selY    = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -43

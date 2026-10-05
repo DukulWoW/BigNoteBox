@@ -121,8 +121,7 @@ local function SnapshotAndHide()
         config       = shown("BigNoteBoxConfigFrame"),
         trash        = shown("BigNoteBoxTrashFrame"),
         tagManager   = shown("BigNoteBoxTagManagerFrame"),
-        historyWin   = shown("BigNoteBoxHistoryFrame"),
-        historyPanel = shown("BigNoteBoxNoteHistoryFrame"),
+        historyWin   = shown("BigNoteBoxHistoryFrame"),   -- either page (ALL-258)
         refBox       = shown("BigNoteBoxReferenceBoxFrame"),
         sendToChat   = shown("BigNoteBoxSendDialog"),
         richPreview  = BNB.RichPreview and BNB.RichPreview.IsOpen(),
@@ -157,8 +156,7 @@ local function RestoreSnapshot()
             if tw then tw:Show() end
         end
         if snap.tagManager  and BNB.ToggleTagManager      then BNB.ToggleTagManager()                  end
-        if snap.historyWin  and BNB.OpenHistoryWindow     then BNB.OpenHistoryWindow()                 end
-        if snap.historyPanel and BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(BNB._currentNoteID) end
+        if snap.historyWin  and BNB.ReopenHistoryWindow   then BNB.ReopenHistoryWindow()               end
         if snap.refBox      and BNB.OpenReferenceBox      then BNB.OpenReferenceBox(BNB._currentNoteID) end
         if snap.sendToChat  and BNB.OpenSendToChat        then BNB.OpenSendToChat(BNB._currentNoteID)  end
         if snap.richPreview and BNB.RichPreview           then BNB.RichPreview.Open()                  end

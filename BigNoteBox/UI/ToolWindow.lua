@@ -38,6 +38,7 @@
 --   frame._strata                the strata it was built with
 --   frame._footDiv               the footer divider (nil without footH), to
 --                                hide it while there is nothing above it
+--   frame:AddPage / ShowPage / PageBack / PageKey   pages, see below
 --   BNB.TOOL_SKIN_TITLE_H        the skin title strip height
 --   BNB.SeatWindow(f, strata)    call before Show for a window that can be
 --                                opened from Focus mode (see below)
@@ -134,6 +135,77 @@ local function BuildSkin(o)
     return f
 end
 
+-- ── Pages (ALL-258) ──────────────────────────────────────────────────────────
+-- A window with a second page (Note History's per-note page, Trash's View)
+-- swaps pages inside itself instead of opening a second window (Dukul,
+-- 2026-10-05). A page is a frame over the whole window, footer included, so
+-- each page has its own footer buttons; the builder's footer divider is shared.
+-- The first page added is the root; any other page is a sub-page with a back
+-- arrow, a heading and a rule across its top, like Settings' sub-pages.
+--   f:AddPage(key, opts) -> page
+--     opts.top     y under the title (the window's content top, positive)
+--     opts.pad     side padding; opts.padR the right one (nil = pad)
+--     opts.onShow(page, ...)   runs on every ShowPage(key, ...)
+--     sub-pages only: page:SetHeading(text), page.top = where the content
+--     starts under the rule (positive, from the window top)
+--   f:ShowPage(key, ...)  shows that page, hides the others
+--   f:PageBack()          a sub-page goes back to the root; true when it did.
+--                         ESC asks this first (back one page, then close)
+--   f:PageKey()           the key of the page shown now
+local SUB_HEAD_H = 40   -- back arrow row + rule
+
+local function ShowPage(f, key, ...)
+    local page = f._pages[key]
+    if not page then return end
+    for _, p in pairs(f._pages) do if p ~= page then p:Hide() end end
+    f._pageKey = key
+    page:Show()
+    if page._onShow then page._onShow(page, ...) end
+end
+
+local function PageBack(f)
+    if not f._pageKey or f._pageKey == f._rootPage then return false end
+    ShowPage(f, f._rootPage)
+    return true
+end
+
+local function PageKey(f) return f._pageKey end
+
+local function AddPage(f, key, opts)
+    opts = opts or {}
+    local page = CreateFrame("Frame", nil, f)
+    page:SetAllPoints(f)
+    page:Hide()
+    page._onShow = opts.onShow
+    f._pages[key] = page
+    if not f._rootPage then
+        f._rootPage = key
+        return page
+    end
+
+    local top, pad = opts.top or 0, opts.pad or 0
+    local padR = opts.padR or pad
+    local back = BNB.CreateIconButton(page, 22, "left", {
+        onClick = function() PageBack(f) end,
+        tip = BNB.L["CFG_SUBPAGE_BACK"], tipAnchor = "ANCHOR_RIGHT" })
+    back:SetPoint("TOPLEFT", page, "TOPLEFT", pad, -(top + 8))
+
+    local head = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    head:SetPoint("LEFT",  back, "RIGHT", 8, 0)
+    head:SetPoint("RIGHT", page, "TOPRIGHT", -padR, -(top + 19))
+    head:SetJustifyH("LEFT"); head:SetWordWrap(false)
+    head:SetTextColor(1, 0.82, 0)
+    function page:SetHeading(text) head:SetText(text) end
+
+    local rule = BNB.CreateRule(page, -(top + 36))
+    rule:ClearAllPoints()
+    rule:SetPoint("TOPLEFT",  page, "TOPLEFT",  pad,   -(top + 36))
+    rule:SetPoint("TOPRIGHT", page, "TOPRIGHT", -padR, -(top + 36))
+
+    page.top = top + SUB_HEAD_H
+    return page
+end
+
 function BNB.CreateToolWindow(o)
     local f
     -- The close handlers are built before the window exists: look it up then
@@ -141,6 +213,12 @@ function BNB.CreateToolWindow(o)
     o.onClose = function() if userClose then userClose() else f:Hide() end end
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then f = BuildSkin(o)
     else f = BuildNormal(o) end
+
+    f._pages   = {}
+    f.AddPage  = AddPage
+    f.ShowPage = ShowPage
+    f.PageBack = PageBack
+    f.PageKey  = PageKey
 
     f._strata = o.strata or "DIALOG"
     f:SetFrameStrata(f._strata)

@@ -8,6 +8,8 @@
 -- Per-row Delete shows an inline "Sure?" button for 3 seconds.
 -- Select toggles multi-select mode; label becomes "Cancel" to exit without restoring.
 -- "Restore" and "Restore selected" are the explicit restore actions.
+-- Two pages in one window (ALL-258): the list (root) and View, one trashed
+-- note's title and body with Restore / Delete; back arrow or ESC = the list.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -218,6 +220,12 @@ end
 -- TrashChanged (Core/NoteManager.lua): the window and the toolbar button
 -- follow it, once per frame, so a restore of 20 selected notes is one redraw.
 local function FollowTrash()
+    -- The note on the View page left the trash (restored, purged, expired)
+    local vp = _twFrame and _twFrame._pages.view
+    if vp and vp:IsVisible() then
+        local ndb = BNB.NotesDB()
+        if not (ndb and ndb.trash and ndb.trash[vp._noteID]) then _twFrame:PageBack() end
+    end
     BNB.RefreshTrashWindow()
     UpdateTrashBtnState()
 end
@@ -225,34 +233,76 @@ BNB.RegisterMessage("TrashWindow", "TrashChanged", function()
     BNB.Debounce("trashWindow", 0, FollowTrash)
 end)
 
--- The View popup: a trashed note's title (as the window title) and body, with
--- Restore / Close. Built once, on the shared builder (CMP-02 S4); the name and
--- ESC entry stay, so the main window's WINDOWS registry still finds it.
-local VP_W, VP_H, VP_PAD, VP_FOOT = 340, 340, 12, 38
-local function BuildViewPopup()
-    local vp, restoreBtn, closeBtn = BNB.CreateToolWindow({
-        name = "BNBTrashViewPopup", w = VP_W, h = VP_H, title = "",
-        pad = VP_PAD, cw = VP_W - VP_PAD * 2, footH = VP_FOOT,
-        btn1 = L["TW_ROW_RESTORE_BTN"], btn2 = L["CLOSE"],
-        toplevel = true, escClose = true,
+-- The View page (ALL-258; was the BNBTrashViewPopup window): a trashed note's
+-- title as the heading and its body, with Restore and Delete (the rows' 3 s
+-- "Sure?" step). Either action goes back to the list: Restore and Sure? by
+-- TrashChanged (FollowTrash), since the note leaves the trash.
+-- ShowPage("view", id, note) fills it.
+local function BuildViewPage(f, top)
+    local page
+    page = f:AddPage("view", {
+        top = top, pad = PAD, padR = PAD + 28,
+        onShow = function(p, id, note)
+            p._noteID = id
+            p:SetHeading((note.title and note.title ~= "") and note.title or L["TW_VIEW_UNTITLED"])
+            p._bodyFs:SetText(note.body or "")
+            p._bodyCt:SetHeight(math.max(p._bodyFs:GetStringHeight(), 1))
+            p._sf:SetVerticalScroll(0)
+            if p._sureTimer then p._sureTimer:Cancel(); p._sureTimer = nil end
+            p._sureBtn:Hide()
+        end,
     })
-    vp:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
-    local top = vp._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
-    local sf = CreateFrame("ScrollFrame", nil, vp, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     vp, "TOPLEFT",     VP_PAD, -(top + 6))
-    sf:SetPoint("BOTTOMRIGHT", vp, "BOTTOMRIGHT", -28,    VP_FOOT + 4)
-    if sf.ScrollBar then sf.ScrollBar:SetAlpha(1) end
-    local cw = VP_W - VP_PAD - 28   -- the scroll frame's width
+
+    local sf = CreateFrame("ScrollFrame", nil, page, "ScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(page.top + 4))
+    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
+    if sf.ScrollBar then
+        sf.ScrollBar:SetAlpha(0)
+        sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
+            sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
+        end)
+    end
+    page._sf = sf
     local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(cw); sf:SetScrollChild(ct)
+    ct:SetWidth(CONTENT_W); sf:SetScrollChild(ct)
     local bodyFs = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    bodyFs:SetPoint("TOPLEFT"); bodyFs:SetWidth(cw)
+    bodyFs:SetPoint("TOPLEFT"); bodyFs:SetWidth(CONTENT_W)
     bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
     bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
-    vp._bodyFs = bodyFs; vp._bodyCt = ct
-    vp._restoreVpBtn = restoreBtn
-    closeBtn:SetScript("OnClick", function() vp:Hide() end)
-    return vp
+    page._bodyFs = bodyFs; page._bodyCt = ct
+
+    local restoreBtn = BNB.CreateButton(nil, page, L["TW_ROW_RESTORE_BTN"], 110, 26)
+    restoreBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
+    restoreBtn:SetScript("OnClick", function()
+        if BNB.RestoreNote then BNB.RestoreNote(page._noteID) end
+    end)
+
+    local delBtn = BNB.CreateButton(nil, page, L["TW_ROW_DELETE_BTN"], 72, 26)
+    delBtn:SetPoint("LEFT", restoreBtn, "RIGHT", 6, 0)
+    delBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
+        GameTooltip:Show()
+    end)
+    delBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    local sureBtn = BNB.CreateButton(nil, page, L["TW_ROW_SURE_BTN"], 60, 26)
+    sureBtn:SetPoint("LEFT", delBtn, "RIGHT", 4, 0)
+    sureBtn:Hide()
+    page._sureBtn = sureBtn
+
+    delBtn:SetScript("OnClick", function()
+        sureBtn:Show()
+        if page._sureTimer then page._sureTimer:Cancel() end
+        page._sureTimer = C_Timer.NewTimer(3, function()
+            sureBtn:Hide(); page._sureTimer = nil
+        end)
+    end)
+    sureBtn:SetScript("OnClick", function()
+        if page._sureTimer then page._sureTimer:Cancel(); page._sureTimer = nil end
+        BNB.PurgeTrashed({ page._noteID })
+    end)
+    return page
 end
 
 function BNB.PopulateTrashWindow()
@@ -356,26 +406,9 @@ function BNB.PopulateTrashWindow()
             row._viewBtn:Show(); row._restoreBtn:Show(); row._permDelBtn:Show()
             row:SetScript("OnClick", nil)
 
-            -- View: open a popup showing the full note title + body
+            -- View: the note's title + body on the View page (ALL-258)
             row._viewBtn:SetScript("OnClick", function()
-                local note = item.note
-                if not note then return end
-                local title = (note.title and note.title ~= "") and note.title or L["TW_VIEW_UNTITLED"]
-                local body  = note.body or ""
-                if not _twFrame._viewPopup then _twFrame._viewPopup = BuildViewPopup() end
-                local vp = _twFrame._viewPopup
-                -- Wire Restore to current item (rewired each open)
-                vp._restoreVpBtn:SetScript("OnClick", function()
-                    if BNB.RestoreNote then BNB.RestoreNote(id) end
-                    vp:Hide()
-                end)
-                vp:SetWindowTitle(title)
-                vp._bodyFs:SetText(body)
-                local textH = vp._bodyFs:GetStringHeight()
-                vp._bodyCt:SetHeight(math.max(textH, 1))
-                vp:ClearAllPoints()
-                vp:SetPoint("CENTER", UIParent, "CENTER", 0, 30)
-                vp:Show(); vp:Raise()
+                if item.note then _twFrame:ShowPage("view", id, item.note) end
             end)
 
             row._restoreBtn:SetScript("OnClick", function()
@@ -447,9 +480,11 @@ local function BuildTrashWindow()
         end,
     })
     local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
+    -- Root page: the list, filled on every show (back from View included)
+    local list = f:AddPage("list", { onShow = function() BNB.PopulateTrashWindow() end })
 
     -- Scroll frame (28px right clearance for scrollbar)
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = CreateFrame("ScrollFrame", nil, list, "ScrollFrameTemplate")
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf
@@ -477,7 +512,7 @@ local function BuildTrashWindow()
     _emptyLbl = emptyLbl
 
     -- ── Normal mode: Empty Trash | Select ────────────────────────────────────
-    local emptyBtn = BNB.CreateButton(nil, f, L["TW_EMPTY_BTN"], 110, 26)
+    local emptyBtn = BNB.CreateButton(nil, list, L["TW_EMPTY_BTN"], 110, 26)
     emptyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     emptyBtn:SetEnabled(false)
     emptyBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_EMPTY_TRASH") end)
@@ -490,7 +525,7 @@ local function BuildTrashWindow()
     emptyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _emptyBtn = emptyBtn
 
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 72, 26)
+    local selectBtn = BNB.CreateButton(nil, list, L["MW_SELECT_BTN"], 72, 26)
     selectBtn:SetPoint("LEFT", emptyBtn, "RIGHT", 6, 0)
     selectBtn:SetEnabled(false)
     selectBtn:SetScript("OnClick", function() SetTrashMultiMode(true) end)
@@ -503,7 +538,7 @@ local function BuildTrashWindow()
     _selectBtn = selectBtn
 
     -- ── Select mode: Restore selected | Delete selected | Cancel ──────────────
-    local restoreSelBtn = BNB.CreateButton(nil, f, L["TW_RESTORE_SEL_BTN"], 110, 26)
+    local restoreSelBtn = BNB.CreateButton(nil, list, L["TW_RESTORE_SEL_BTN"], 110, 26)
     restoreSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     restoreSelBtn:SetEnabled(false)
     restoreSelBtn:SetScript("OnClick", function()
@@ -523,7 +558,7 @@ local function BuildTrashWindow()
     restoreSelBtn:Hide()
     _restoreSelBtn = restoreSelBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, L["TW_DELETE_SEL_BTN"], 110, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, list, L["TW_DELETE_SEL_BTN"], 110, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
     deleteSelBtn:SetScript("OnClick", PurgeSelectedConfirm)
@@ -537,7 +572,7 @@ local function BuildTrashWindow()
     deleteSelBtn:Hide()
     _deleteSelBtn = deleteSelBtn
 
-    local cancelSelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 68, 26)
+    local cancelSelBtn = BNB.CreateButton(nil, list, L["CANCEL"], 68, 26)
     cancelSelBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
     cancelSelBtn:SetScript("OnClick", function() SetTrashMultiMode(false) end)
     cancelSelBtn:SetScript("OnEnter", function(self)
@@ -550,11 +585,13 @@ local function BuildTrashWindow()
     _cancelSelBtn = cancelSelBtn
 
     -- Info block: "Kept X days\nX notes in trash" — bottom-right of strip
-    local infoLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local infoLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     infoLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 10)
     infoLbl:SetJustifyH("RIGHT")
     infoLbl:SetTextColor(0.45, 0.45, 0.45)
     _infoLbl = infoLbl
+
+    BuildViewPage(f, top)
 
     _twFrame = f
     return f
@@ -583,7 +620,7 @@ local function ShowTrashWindow(f)
         f:SetPoint("CENTER")
     end
     f:Show()
-    BNB.PopulateTrashWindow()
+    f:ShowPage("list")   -- fills it
 end
 
 -- Public API
@@ -601,15 +638,14 @@ end
 -- (MainWindow.lua OnEscapeKey). Opened on its own (the Oracle bar's `b`
 -- prefix) the main window is closed, so that cascade never runs, and
 -- UISpecialFrames is not reliable on Forever. Our own handler closes it
--- then (view popup first), and steps aside while the main window is shown,
+-- then (the View page goes back first), and steps aside while the main window is shown,
 -- so the cascade order is untouched. Same pattern as UI/ReferenceBox.lua
 -- OpenReferenceBox (ALL-69.2).
 local function HookStandaloneEscape(f)
     if f._escHooked then return end
     f._escHooked = true
     BNB.AttachEscClose(f, function(self)
-        local vp = self._viewPopup
-        if vp and vp:IsShown() then vp:Hide(); return end
+        if self:PageBack() then return end
         if _multiMode then SetTrashMultiMode(false) end
         self:Hide()
     end)
@@ -645,7 +681,7 @@ function BNB.OpenTrashWindow(focusID)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local f = TrashFrame()
     HookStandaloneEscape(f)
-    if not f:IsShown() then ShowTrashWindow(f) else BNB.PopulateTrashWindow() end
+    if not f:IsShown() then ShowTrashWindow(f) else f:ShowPage("list") end
     f:Raise()
     if focusID then FocusTrashItem(focusID) end
 end

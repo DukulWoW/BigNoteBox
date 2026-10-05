@@ -1,25 +1,23 @@
 -- BigNoteBox UI/NoteHistoryPanel.lua
 --
--- Per-note history panel. Shows one note's manual snapshot (top) and
+-- Per-note history page. Shows one note's manual snapshot (top) and
 -- auto snapshot slots (below), separated by a section divider.
 --
--- Height: dynamic — grows with slot count up to the main window's height.
--- Width: same as HistoryWindow (HW_W = 400).
--- Anchors same as HistoryWindow (TOPRIGHT of main window TOPLEFT).
---
--- When open, greys out the HistoryWindow if it is also open.
--- Can be opened standalone (from right-click or WYSIWYG tb-history button).
+-- A page of the History window (ALL-258, Dukul 2026-10-05: one window with a
+-- back button instead of a second window on top): BuildHistoryWindow calls
+-- BNB._BuildNoteHistoryPage, the back arrow and ESC return to the list.
+-- Opened from a History row, the note right-click menu or the WYSIWYG
+-- tb-history button; it follows the note selected in the main window.
 --
 -- Public API:
---   BNB.OpenNoteHistoryPanel(noteID)
---   BNB.CloseNoteHistoryPanel()
+--   BNB.OpenNoteHistoryPanel(noteID)   -- the History window on this note's page
+--   BNB.CloseNoteHistoryPanel()        -- back to the list, if on the page
 --   BNB.RefreshNoteHistoryPanel()
 
 local BNB = BigNoteBox
 local L   = BNB.L
 
 local HW_W           = BNB.SIDE_WINDOW_W   -- 400 (ALL-269)
-local TITLE_H        = 32
 local PAD            = 14
 local ROW_H          = 64
 local ROW_GAP        = 4
@@ -28,33 +26,14 @@ local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = HW_W - PAD * 2 - 30
 local BOTTOM_STRIP_H = 44
 local SECTION_H      = 22   -- section header height
-local MIN_H          = 200
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 
-local _nhpFrame  = nil
-local _currentID = nil
-local _rows      = {}
+local _hwFrame = nil   -- the History window
+local _page    = nil   -- its "note" page; _page._noteID = the note shown
+local _rows    = {}
 
 local FmtTs = BNB.FmtTs
-
---------------------------------------------------------------------------------
--- ComputeHeight — panel height based on slot count
---------------------------------------------------------------------------------
-local function ComputeHeight(numAuto, hasManual)
-    local rows = numAuto + (hasManual and 1 or 0)
-    local sectionHeaders = 1 + (hasManual and 1 or 0)   -- "Auto" always; "Manual" if exists
-    local interGap = hasManual and 4 or 0               -- extra gap between manual and auto
-    local h = TITLE_H + PAD
-        + PAD                                           -- top padding before first header
-        + sectionHeaders * (SECTION_H + 4)
-        + rows * (ROW_H + ROW_GAP)
-        + interGap
-        + BOTTOM_STRIP_H + 8
-    -- Cap at main window height
-    local maxH = (BNB.mainFrame and BNB.mainFrame:GetHeight()) or 640
-    return math.max(MIN_H, math.min(h, maxH))
-end
 
 --------------------------------------------------------------------------------
 -- BuildSectionHeader — pinned/notes style divider + label
@@ -203,30 +182,38 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
 end
 
 --------------------------------------------------------------------------------
--- PopulateNoteHistoryPanel — rebuild content for _currentID
+-- PopulateNoteHistoryPanel — rebuild content for the page's note
 --------------------------------------------------------------------------------
 function BNB.PopulateNoteHistoryPanel()
-    if not _nhpFrame or not _currentID then return end
-    local sf = _nhpFrame._scrollFrame
-    if not sf then return end
+    local id = _page and _page._noteID
+    if not id then return end
+    local sf = _page._scrollFrame
 
     -- Destroy the old scroll child entirely so all parented textures and
     -- fontstrings (created by BuildSectionHeader) are discarded with it.
     -- Plain Hide/reparent only works for Frames, not for CreateTexture /
     -- CreateFontString objects, which would otherwise stack on re-populate.
-    if _nhpFrame._scrollChild then
-        _nhpFrame._scrollChild:Hide()
-        _nhpFrame._scrollChild:SetParent(nil)
+    if _page._scrollChild then
+        _page._scrollChild:Hide()
+        _page._scrollChild:SetParent(nil)
     end
     local child = CreateFrame("Frame", nil, sf)
     child:SetWidth(CONTENT_W); child:SetHeight(200)
     sf:SetScrollChild(child)
-    _nhpFrame._scrollChild = child
+    sf:SetVerticalScroll(0)
+    _page._scrollChild = child
     _rows = {}
 
-    local slots = BNB.HistoryGetSlots(_currentID)
+    local ndb  = BNB.NotesDB()
+    local note = ndb and ndb.notes and ndb.notes[id]
+    local title = note and note.title
+    _page:SetHeading((title and title ~= "") and title or L["HW_UNTITLED"])
+    _page._sizeLbl:SetText(BNB.HistoryFormatSize(BNB.HistoryNoteSize(id)))
+
+    local slots = BNB.HistoryGetSlots(id)
     local numAuto   = #slots.auto
     local hasManual = slots.manual ~= nil
+    _page._clearBtn:SetEnabled(numAuto > 0)
 
     if numAuto == 0 and not hasManual then
         local e = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -236,18 +223,17 @@ function BNB.PopulateNoteHistoryPanel()
         e:SetText(L["HISTORY_NOTE_EMPTY"])
         _rows[1] = e
         child:SetHeight(80)
-        _nhpFrame:SetHeight(ComputeHeight(0, false))
         return
     end
 
     -- Use a single negative y cursor (WoW convention: y goes down as negative).
-    -- Start with top padding so the first section header clears the title bar.
-    local y = -PAD
+    -- The page's rule sits right above, so the first header starts close under it.
+    local y = -4
 
     -- Manual section (top, amber)
     if hasManual then
         y = BuildSectionHeader(child, y, L["HISTORY_SECTION_MANUAL"], 0.85, 0.65, 0.20)
-        local r = BuildSnapRow(child, slots.manual, _currentID, "manual", nil, y)
+        local r = BuildSnapRow(child, slots.manual, id, "manual", nil, y)
         _rows[#_rows + 1] = r
         y = y - ROW_H - ROW_GAP - 4   -- extra gap before auto section
     end
@@ -256,50 +242,38 @@ function BNB.PopulateNoteHistoryPanel()
     y = BuildSectionHeader(child, y, string.format(L["HISTORY_SECTION_AUTO"], numAuto),
         0.55, 0.55, 0.55)
     for i, snap in ipairs(slots.auto) do
-        local r = BuildSnapRow(child, snap, _currentID, "auto", i, y)
+        local r = BuildSnapRow(child, snap, id, "auto", i, y)
         _rows[#_rows + 1] = r
         y = y - ROW_H - ROW_GAP
     end
 
     child:SetHeight(math.max(math.abs(y) + 8, 40))
-    _nhpFrame:SetHeight(ComputeHeight(numAuto, hasManual))
-
-    -- Update title
-    local ndb  = BNB.NotesDB()
-    local note = ndb and ndb.notes and ndb.notes[_currentID]
-    local title = note and note.title or "(untitled)"
-    local nhpTitle = string.format(L["HISTORY_NOTE_TITLE"], title)
-    _nhpFrame:SetWindowTitle(nhpTitle)
 end
 
 function BNB.RefreshNoteHistoryPanel()
-    if not _nhpFrame or not _nhpFrame:IsShown() then return end
+    if not (_page and _page:IsVisible()) then return end
     BNB.PopulateNoteHistoryPanel()
 end
 
 --------------------------------------------------------------------------------
--- BuildNoteHistoryPanel — lazy-build. One body for both modes (CMP-02 S3):
--- chrome, footer divider, drag and ESC entry from CreateToolWindow.
+-- BNB._BuildNoteHistoryPage(f, top) — the "note" page of the History window,
+-- built with it (BuildHistoryWindow). top = the window's content top.
 --------------------------------------------------------------------------------
-local function BuildNoteHistoryPanel()
-    if _nhpFrame then return _nhpFrame end
-
-    local f = BNB.CreateToolWindow({
-        name = "BigNoteBoxNoteHistoryFrame", w = HW_W, h = MIN_H,   -- Populate sizes it
-        title = L["HISTORY_WINDOW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
-        pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
-        onClose = function() BNB.CloseNoteHistoryPanel() end,
-        -- A hide that skips CloseNoteHistoryPanel (UISpecialFrames) still un-greys
-        onHide = function()
-            if BNB.SetHistoryWindowGreyout then BNB.SetHistoryWindowGreyout(false) end
+function BNB._BuildNoteHistoryPage(f, top)
+    _hwFrame = f
+    local page = f:AddPage("note", {
+        top = top, pad = PAD, padR = PAD + 28,
+        onShow = function(p, noteID)
+            if noteID then p._noteID = noteID end
+            BNB.PopulateNoteHistoryPanel()
         end,
     })
-    local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
+    _page = page
 
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
+    local sf = CreateFrame("ScrollFrame", nil, page, "ScrollFrameTemplate")
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(page.top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
-    f._scrollFrame = sf
+    page._scrollFrame = sf
 
     if sf.ScrollBar then
         sf.ScrollBar:SetAlpha(0)
@@ -308,18 +282,12 @@ local function BuildNoteHistoryPanel()
         end)
     end
 
-    local child = CreateFrame("Frame", nil, sf)
-    child:SetWidth(CONTENT_W); child:SetHeight(200)
-    sf:SetScrollChild(child)
-    f._scrollChild = child
-
-    local clearBtn = BNB.CreateButton(nil, f, L["HISTORY_CLEAR_NOTE_BTN"], 150, 26)
+    local clearBtn = BNB.CreateButton(nil, page, L["HISTORY_CLEAR_NOTE_BTN"], 150, 26)
     clearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
     clearBtn:SetScript("OnClick", function()
-        if _currentID then
-            BNB.HistoryDeleteAuto(_currentID)
-            BNB.CloseNoteHistoryPanel()
-            BNB.RefreshHistoryWindow()
+        if page._noteID then
+            BNB.HistoryDeleteAuto(page._noteID)
+            f:PageBack()   -- the list refreshes as it shows
         end
     end)
     clearBtn:SetScript("OnEnter", function(self)
@@ -329,47 +297,32 @@ local function BuildNoteHistoryPanel()
         GameTooltip:Show()
     end)
     clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    page._clearBtn = clearBtn
 
-    _nhpFrame = f
-    return f
+    -- This note's history size, where the list page shows the total
+    local szLbl = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    szLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
+    szLbl:SetJustifyH("RIGHT")
+    szLbl:SetTextColor(0.45, 0.45, 0.45)
+    page._sizeLbl = szLbl
 end
 
 --------------------------------------------------------------------------------
 -- Public API
 --------------------------------------------------------------------------------
--- While the panel is open it switches to the note selected in the main window
--- (NoteSelected from SelectNote; a hand call there until ARCH-02)
+-- While the note page is open it switches to the note selected in the main
+-- window (NoteSelected from SelectNote)
 BNB.RegisterMessage("NoteHistoryPanel", "NoteSelected", function(_, id)
-    local nhp = _G["BigNoteBoxNoteHistoryFrame"]
-    if nhp and nhp:IsShown() then BNB.OpenNoteHistoryPanel(id) end
+    if _page and _page:IsVisible() and id and id ~= _page._noteID then
+        _hwFrame:ShowPage("note", id)
+    end
 end)
 
 function BNB.OpenNoteHistoryPanel(noteID)
-    if InCombatLockdown() then return end
-    _currentID = noteID
-    local f = BuildNoteHistoryPanel()
-
-    -- Grey out history window if open
-    if BNB.SetHistoryWindowGreyout then
-        BNB.SetHistoryWindowGreyout(true)
-    end
-
-    f:SetHeight(MIN_H)   -- will be resized by Populate
-    -- Same side as Note History (ALL-269)
-    if not BNB.PlaceBesideMain(f, BNB.WindowSide("historySide")) then
-        f:ClearAllPoints()
-        f:SetPoint("CENTER")
-    end
-    f:Show()
-    f:Raise()
-    BNB.PopulateNoteHistoryPanel()
+    if not noteID then return end
+    BNB.ShowHistoryWindow("note", noteID)
 end
 
 function BNB.CloseNoteHistoryPanel()
-    if _nhpFrame then _nhpFrame:Hide() end
-    _currentID = nil
-    -- Un-grey history window
-    if BNB.SetHistoryWindowGreyout then
-        BNB.SetHistoryWindowGreyout(false)
-    end
+    if _page and _page:IsVisible() then _hwFrame:PageBack() end
 end
