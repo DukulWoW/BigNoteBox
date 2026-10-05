@@ -59,6 +59,25 @@ local _scopeEntries   = {}    -- filled on every Open (knownChars can change)
 local _wowCheck        = nil
 local _refreshLSM      = nil   -- LSM font dropdown closed-state refresh (ALL-41)
 
+-- Font preview in the picked font at the picked size. One resolver for every
+-- pick (card, LSM, WoW Default, none), so "Use WoW's default font" shows too:
+-- it only ever updated the preview from the card loops, never from its
+-- checkbox (ALL-216).
+local function UpdateSizePreview()
+    if not _sizePreviewLbl then return end
+    pcall(function()
+        local def  = BNB.ResolveFontDef and BNB.ResolveFontDef(_selFont)
+        local path = def and def.bold
+        if not path or path == "" then path = BNB.GetBoldFont and BNB.GetBoldFont() end
+        local size = _selSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+        if path and path ~= "" then
+            _sizePreviewLbl:SetFont(path, BNB.FontPx(path, size), "")
+        else
+            _sizePreviewLbl:SetFontObject(GameFontNormal)
+        end
+    end)
+end
+
 -- ---------------------------------------------------------------------------
 -- RANDOM NOTE ICON
 -- ---------------------------------------------------------------------------
@@ -327,21 +346,7 @@ local function BuildDialog()
         if _wowCheck then _wowCheck:SetChecked(false) end
         RefreshFontHighlight()
         ApplyTitleFont()
-        -- Update size preview to use the newly selected font
-        if _sizePreviewLbl then
-            pcall(function()
-                for _, d in ipairs(BNB.FONTS or {}) do
-                    if d.id == _selFont and d.bold and d.bold ~= "" then
-                        _sizePreviewLbl:SetFont(d.bold, BNB.FontPx(d.bold, _selSize), "")
-                        return
-                    end
-                end
-                local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
-                if boldPath and boldPath ~= "" then
-                    _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
-                end
-            end)
-        end
+        UpdateSizePreview()
     end
 
     for i, def in ipairs(fonts) do
@@ -420,6 +425,7 @@ local function BuildDialog()
             RefreshFontHighlight()
         end
         ApplyTitleFont()
+        UpdateSizePreview()
     end)
     wowCheck:SetChecked(_selFont == "wow")
     _wowCheck = wowCheck
@@ -520,22 +526,7 @@ local function BuildDialog()
         fmt = function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end,
         onChange = function(v)
             _selSize = v
-            if _sizePreviewLbl then
-                pcall(function()
-                    local boldPath = (_selFont and (function()
-                        for _, d in ipairs(BNB.FONTS or {}) do
-                            if d.id == _selFont then return d.bold end
-                        end
-                    end)()) or (BNB.GetBoldFont and BNB.GetBoldFont())
-                    if boldPath and boldPath ~= "" then
-                        _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
-                    else
-                        -- GameFontNormal is always valid; size override handles the rest
-                        _sizePreviewLbl:SetFontObject(GameFontNormal)
-                        _sizePreviewLbl:SetFont(GameFontNormal:GetFont(), _selSize, "")
-                    end
-                end)
-            end
+            UpdateSizePreview()
         end,
     })
     szWidget:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
@@ -658,16 +649,7 @@ function NND.Open()
     ApplyTitleFont()
 
     -- Reset size preview to default font + current size
-    if _sizePreviewLbl then
-        pcall(function()
-            local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
-            if boldPath and boldPath ~= "" then
-                _sizePreviewLbl:SetFont(boldPath, BNB.FontPx(boldPath, _selSize), "")
-            else
-                _sizePreviewLbl:SetFont(GameFontNormalLarge:GetFont(), _selSize, "")
-            end
-        end)
-    end
+    UpdateSizePreview()
 
     RefreshFontHighlight()
     RefreshColorHighlight()

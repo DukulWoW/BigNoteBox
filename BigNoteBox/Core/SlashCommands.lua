@@ -28,6 +28,11 @@ function BNB.RegisterSlashCommands()
         elseif cmd == "search" or cmd:sub(1, 7) == "search " then
             -- Oracle search (ALL-69); the text keeps its case
             if BNB.Oracle then BNB.Oracle.Open((msg:match("^%s*%S+%s+(.-)%s*$"))) end
+        elseif cmd == "whatsnew" then
+            -- Routes into existing windows (ALL-33); text resolves at call time
+            if BNB.WhatsNew and BNB.WhatsNew.Open then BNB.WhatsNew.Open(false) end
+        elseif cmd == "features" then
+            if BNB.FeatureList and BNB.FeatureList.Open then BNB.FeatureList.Open() end
         elseif cmd == "help" then
             print(L["SLASH_HELP"])
             print(L["SLASH_HELP_OPEN"])
@@ -35,6 +40,8 @@ function BNB.RegisterSlashCommands()
             print(L["SLASH_HELP_SEARCH"])
             print(L["SLASH_HELP_CONFIG"])
             print(L["SLASH_HELP_RESET"])
+            print(L["SLASH_HELP_WHATSNEW"])
+            print(L["SLASH_HELP_FEATURES"])
             print(L["SLASH_HELP_DEBUG"])
 
         -- ── Developer: testwp ─────────────────────────────────────────────────
@@ -363,18 +370,13 @@ BNB.RegisterEvent("PLAYER_LOGIN", BuildPopups)
 -- ADDON COMPARTMENT FRAME (global wrappers referenced in retail .toc)
 --------------------------------------------------------------------------------
 function BNB_OnAddonCompartmentClick(addonName, buttonName)
-    if buttonName == "RightButton" then
-        if BNB.CreateNewNote then BNB.CreateNewNote() end
-    else
-        if BNB.ToggleWindow then BNB.ToggleWindow() end
-    end
+    BNB.MinimapClick(buttonName)   -- same clicks as the minimap button (Minimap.lua)
 end
 
 function BNB_OnAddonCompartmentEnter(addonName, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
     GameTooltip:AddLine("BigNoteBox", 0.4, 0.73, 0.42)
-    GameTooltip:AddLine(L["MINIMAP_LEFT_CLICK"], 1, 1, 1)
-    GameTooltip:AddLine(L["MINIMAP_RIGHT_CLICK"], 1, 1, 1)
+    BNB.AddMinimapClickLines(GameTooltip)
     GameTooltip:Show()
 end
 

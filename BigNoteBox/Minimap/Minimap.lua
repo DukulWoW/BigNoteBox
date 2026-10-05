@@ -10,23 +10,42 @@ local ICON_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\icon"
 local LDB = LibStub and LibStub("LibDataBroker-1.1", true)
 local DBIcon = LibStub and LibStub("LibDBIcon-1.0", true)
 
+-- One click handler for the minimap button and the addon compartment.
+-- Shift+Left hides / shows the sticky notes, Shift+Right opens Settings
+-- (ALL-159); plain Left toggles the window, plain Right makes a new note.
+function BNB.MinimapClick(button)
+    if IsShiftKeyDown() then
+        if button == "RightButton" then
+            local cf = _G["BigNoteBoxConfigFrame"]
+            if not (cf and cf:IsShown()) and BNB.OpenConfig then BNB.OpenConfig() end
+        elseif BNB.Sticky and BNB.Sticky.ToggleHidden then
+            BNB.Sticky.ToggleHidden()
+        end
+    elseif button == "RightButton" then
+        if BNB.CreateNewNote then BNB.CreateNewNote() end
+    else
+        if BNB.ToggleWindow then BNB.ToggleWindow() end
+    end
+end
+
+-- The click lines of both tooltips
+function BNB.AddMinimapClickLines(tooltip)
+    tooltip:AddLine(L["MINIMAP_LEFT_CLICK"], 1, 1, 1)
+    tooltip:AddLine(L["MINIMAP_RIGHT_CLICK"], 1, 1, 1)
+    tooltip:AddLine(L["MINIMAP_SHIFT_LEFT_CLICK"], 1, 1, 1)
+    tooltip:AddLine(L["MINIMAP_SHIFT_RIGHT_CLICK"], 1, 1, 1)
+end
+
 local ldbObject
 if LDB then
     ldbObject = LDB:NewDataObject("BigNoteBox", {
         type = "launcher",
         icon = ICON_PATH,
         label = "BigNoteBox",
-        OnClick = function(self, button)
-            if button == "RightButton" then
-                if BNB.CreateNewNote then BNB.CreateNewNote() end
-            else
-                if BNB.ToggleWindow then BNB.ToggleWindow() end
-            end
-        end,
+        OnClick = function(self, button) BNB.MinimapClick(button) end,
         OnTooltipShow = function(tooltip)
             tooltip:AddLine("BigNoteBox", 0.4, 0.73, 0.42)
-            tooltip:AddLine(L["MINIMAP_LEFT_CLICK"], 1, 1, 1)
-            tooltip:AddLine(L["MINIMAP_RIGHT_CLICK"], 1, 1, 1)
+            BNB.AddMinimapClickLines(tooltip)
             tooltip:AddLine(L["MINIMAP_DRAG"], 0.7, 0.7, 0.7)
 
             -- Badge: show contextual note count if available

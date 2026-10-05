@@ -326,3 +326,14 @@ end
 function BNB.CloseNoteHistoryPanel()
     if _page and _page:IsVisible() then _hwFrame:PageBack() end
 end
+
+-- The formatting toolbar's History button is a toggle (ALL-131): a second
+-- click while this note's page is open closes the History window
+function BNB.ToggleNoteHistoryPanel(noteID)
+    if not noteID then return end
+    if _page and _page:IsVisible() and _page._noteID == noteID then
+        _hwFrame:Hide()
+    else
+        BNB.OpenNoteHistoryPanel(noteID)
+    end
+end

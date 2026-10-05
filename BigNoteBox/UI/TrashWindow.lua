@@ -135,7 +135,8 @@ local function GetRow(parent, index)
     if row then row:SetParent(parent); row:Show(); return row end
 
     row = BNB.CreateBackdropFrame("Button", nil, parent)
-    BNB.SetBackdrop(row, 0.07, 0.07, 0.09, 0.55, 0.22, 0.22, 0.26, 1)
+    -- See-through enough for the Forever glow behind the list (ALL-272)
+    BNB.SetBackdrop(row, 0.07, 0.07, 0.09, 0.30, 0.22, 0.22, 0.26, 1)
     row:SetHeight(ROW_H)
     row:RegisterForClicks("LeftButtonUp")
 
@@ -369,6 +370,10 @@ function BNB.PopulateTrashWindow()
         -- Title
         row._titleLbl:SetText(
             (note.title and note.title ~= "") and note.title or L["TW_UNTITLED"])
+        -- The note's own title colour, as in the note list; gold without one (ALL-272)
+        local tc = note.titleColor
+        if tc and tc.r then row._titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
+        else row._titleLbl:SetTextColor(1, 0.82, 0, 1) end
 
         -- Date
         row._dateLbl:SetText(FormatDeleted(note.deletedAt))

@@ -693,7 +693,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     histBtn:SetPoint("RIGHT", cmDiv, "LEFT", -6, 0)
     histBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
-        if id and BNB.OpenNoteHistoryPanel then BNB.OpenNoteHistoryPanel(id) end
+        if id and BNB.ToggleNoteHistoryPanel then BNB.ToggleNoteHistoryPanel(id) end
     end)
     histBtn:SetIconEnabled(false)
     BNB._wysiwygHistoryBtn = histBtn

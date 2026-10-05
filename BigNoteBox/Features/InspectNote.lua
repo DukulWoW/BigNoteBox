@@ -515,6 +515,9 @@ local function CreateInspectNote(richMode, silent)
     if data.className and data.className ~= UNKNOWN_STR then tags[#tags + 1] = data.className end
     if data.spec then tags[#tags + 1] = data.spec end
     if data.factionLabel then tags[#tags + 1] = data.factionLabel end
+    -- The player's guild as a tag (ALL-153, e.g. "Raven Council"); player
+    -- targets come here too, TargetNote redirects them to Inspect
+    if data.guild and data.guild ~= "" then tags[#tags + 1] = data.guild end
 
     local fields = {
         source         = "inspect",

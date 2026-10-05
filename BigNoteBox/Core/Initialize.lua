@@ -287,6 +287,8 @@ function BNB.Initialize()
 
     -- 11c. Sync trash button state (grey + disabled when trash is empty)
     if BNB.SyncTrashBtnState then BNB.SyncTrashBtnState() end
+    -- Tag Manager button the same way, while no note has a tag (ALL-273)
+    if BNB.SyncTagsBtnState then BNB.SyncTagsBtnState() end
 
     -- 11d. Sync history button state (grey + disabled when no history exists)
     if BNB.SyncHistoryBtnState then BNB.SyncHistoryBtnState() end

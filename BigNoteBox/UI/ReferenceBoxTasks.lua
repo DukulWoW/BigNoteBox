@@ -697,6 +697,24 @@ local function CreateTaskRow(tsc)
         _taskEdit = nil  -- edit ends here; the re-render below must not reopen it
         local T, task = BNB.Task, row._task
         local newText = self:GetText()
+        if IsControlKeyDown() and not IsShiftKeyDown() then
+            -- Ctrl+Enter (ALL-224): save and add a sub-task. One level only, so
+            -- on a sub-task the new one goes under the same parent.
+            if newText ~= "" then
+                T.UpdateTask(NoteID(), task.id, { text = newText })
+                task.text = newText
+            end
+            self:ClearFocus()
+            local parentID = row._isSub and task.parentID or task.id
+            local subID = T.AddTask(NoteID(), "", parentID)
+            if subID then
+                _collapsedTasks[parentID] = nil
+                RenderTaskPanel()
+                ApplyTaskLayout(RBFrame())
+                BNB.FocusTaskEditBox(subID)
+            end
+            return
+        end
         if IsShiftKeyDown() then
             -- Shift+Enter: save current task and create a new sibling below it
             if newText ~= "" then
@@ -1017,6 +1035,7 @@ local function DoRenderTaskPanel()
 
     -- Gather top-level tasks, sort completed to bottom if configured
     local topLevel = T.GetTopLevel(NoteID())
+    local firstDone   -- index of the first completed task when both groups have rows
     if completedPos == "bottom" then
         local active, completed = {}, {}
         for _, t in ipairs(topLevel) do
@@ -1026,7 +1045,15 @@ local function DoRenderTaskPanel()
         topLevel = {}
         for _, t in ipairs(active)    do topLevel[#topLevel + 1] = t end
         for _, t in ipairs(completed) do topLevel[#topLevel + 1] = t end
+        if #active > 0 and #completed > 0 then firstDone = #active + 1 end
     end
+
+    -- Divider and a gap between active and completed tasks (ALL-219): one
+    -- reused rule per scroll child, never a row; sub-tasks stay with their parent
+    local DONE_GAP = 6
+    local doneRule = tsc._doneRule
+    if not doneRule then doneRule = BNB.CreateNoteRule(tsc); tsc._doneRule = doneRule end
+    doneRule:Hide()
 
     local used = 0
     local function RenderTaskRow(task, isSubTask)
@@ -1046,7 +1073,15 @@ local function DoRenderTaskPanel()
         end
     end
 
-    for _, task in ipairs(topLevel) do
+    for i, task in ipairs(topLevel) do
+        if i == firstDone then
+            y = y - DONE_GAP
+            doneRule:ClearAllPoints()
+            doneRule:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  4, y)
+            doneRule:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -4, y)
+            doneRule:Show()
+            y = y - DONE_GAP
+        end
         RenderTaskRow(task, false)
     end
 

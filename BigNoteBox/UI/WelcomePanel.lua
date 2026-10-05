@@ -250,6 +250,18 @@ local function GetImportFrame()
     importBtn:SetScript("OnClick", function()
         local text = eb:GetText() or ""
         text = text:match("^%s*(.-)%s*$")
+        -- A share code (BNB2: / BNB1:) goes through the share preview, as from
+        -- the Import shared note window (ALL-275); JSON as before
+        if text:find("^BNB%d:") then
+            local data, err = BNB.ShareDecode and BNB.ShareDecode(text)
+            if not data then
+                BNB:Print("|cffff4444" .. (err or L["SHARE_ERR_INVALID"]) .. "|r")
+                return
+            end
+            f:Hide()
+            BNB.OpenSharePreview(data)
+            return
+        end
         if text == "" or not text:find("\"export_version\"") or not text:find("\"notes\"") then
             BNB:Print(L["IMPORT_ERR_JSON"])
             return

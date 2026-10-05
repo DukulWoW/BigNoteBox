@@ -1208,13 +1208,26 @@ local function BuildPage7(content)
     urlLbl:SetText(L["SW_CF_URL_LBL"])
     y = y - 20
 
-    local cfBtn = BNB.CreateButton(nil, f, L["SW_COPY_CF_URL_BTN"], 200, 24)
-    cfBtn:SetPoint("TOPLEFT", f, "TOPLEFT", math.floor((CW - 200) / 2), y)
-    cfBtn:SetScript("OnClick", function()
-        if BNB.ShowClipboardHint then
-            BNB.ShowClipboardHint(BNB_URL, cfBtn, true)
-        end
-    end)
+    -- One row, Wago.io | CurseForge | WoWInterface (ALL-218, Dukul's order),
+    -- each opens the Ctrl+C copy box; links from BNB.BUG_LINKS (UI/BugReport.lua)
+    local LINK_GAP = 8
+    local linkW = math.min(140, math.floor((CW - 2 * LINK_GAP) / 3))
+    local linkX = math.floor((CW - (3 * linkW + 2 * LINK_GAP)) / 2)
+    local links = BNB.BUG_LINKS or {}
+    for i, def in ipairs({
+        { L["SW_LINK_WAGO_BTN"],       links.wago },
+        { L["SW_COPY_CF_URL_BTN"],     links.curseforge or BNB_URL },
+        { L["SW_LINK_WOWI_BTN"],       links.wowi },
+    }) do
+        local btn = BNB.CreateButton(nil, f, def[1], linkW, 24)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", linkX + (i - 1) * (linkW + LINK_GAP), y)
+        local url = def[2]
+        btn:SetScript("OnClick", function()
+            if url and BNB.ShowClipboardHint then
+                BNB.ShowClipboardHint(url, btn, true)
+            end
+        end)
+    end
     y = y - 32
 
     -- Dukul.net link

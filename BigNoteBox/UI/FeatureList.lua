@@ -164,14 +164,15 @@ local function RestoreSnapshot()
 end
 
 -- ── Window chrome, both modes (CMP-02 S3) ─────────────────────────────────────
-local TITLE_TEXT = "Features in BigNoteBox"
+-- Title from the locale, read when the window is built (ALL-36); the
+-- feature prose itself is ALL-37
 
 local function BuildFrame(onClose)
     -- ESC through its own key handler (keyEsc); not UISpecialFrames, which
     -- calls Hide() directly, bypassing FL.Close()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxFeatureListFrame", w = FL_W, h = 400,   -- sized to the list later
-        title = TITLE_TEXT, toplevel = true, keyEsc = true, onClose = onClose,
+        title = BNB.L["FL_WINDOW_TITLE"], toplevel = true, keyEsc = true, onClose = onClose,
     })
     f:SetFrameLevel(100)
     return f, f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H_N

@@ -930,9 +930,14 @@ function BNB.CreateMainWindow()
 
     -- The shared grip (UI/Widgets.lua, ALL-263): the damage meter's scale
     -- handle, BNB.StartGripSizing, not StartSizing (ALL-97). Retail sits 2 px
-    -- further left and down, art and click area together (RET-07, Dukul)
+    -- further left and down, art and click area together (RET-07, Dukul).
+    -- Forever: normal mode 3 px further down-right, skin mode 2 px (FOR-29)
+    local gripX, gripY = -4, 0
+    if BNB.IsForever then
+        if BigNoteBoxDB.skinMode then gripX, gripY = 0, 0 else gripX, gripY = 1, -1 end
+    end
     local resizeHandle = BNB.CreateResizeGrip(f, {
-        x = BNB.IsForever and -2 or -4, y = BNB.IsForever and 2 or 0,
+        x = gripX, y = gripY,
         onStart = function()
             _resizing = true
             -- Seed the label with current size before first OnSizeChanged fires

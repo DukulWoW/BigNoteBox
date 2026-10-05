@@ -131,10 +131,13 @@ local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
     local id = BNB.CreateNote(title or "", body or "")
     if not id then return end
     -- Through UpdateNote, so the tags are deduped and indexed (SV-07)
+    -- Every quick note also gets BNB.QUICK_NOTE_TAG (ALL-152), first
+    local all = { BNB.QUICK_NOTE_TAG }
+    for _, t in ipairs(tags or {}) do all[#all + 1] = t end
     BNB.UpdateNote(id, {
         icon   = icon or RandomIcon(),
         source = "quicknote",   -- made from a quest, gossip or book frame; Oracle badge (ALL-69)
-        tags   = tags or {},
+        tags   = all,
     })
     if rewardAttacher then rewardAttacher(id) end
     return id

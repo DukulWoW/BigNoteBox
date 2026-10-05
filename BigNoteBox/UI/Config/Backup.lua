@@ -30,7 +30,7 @@ local function BuildBackupTab(sf, ct)
     y = y - 38
 
     -- Format radio buttons
-    local _exportFmt = NE.FMT_MARKDOWN   -- local state for this tab instance
+    local _exportFmt = NE.FMT_JSON   -- local state for this tab instance; JSON by default (ALL-220)
 
     local function MakeRadio(label, fmt, xOff)
         local rb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
@@ -46,7 +46,7 @@ local function BuildBackupTab(sf, ct)
     local rbMd   = MakeRadio(L["BACKUP_FORMAT_MARKDOWN"], NE.FMT_MARKDOWN, 0)
     local rbJson = MakeRadio(L["BACKUP_FORMAT_JSON"],     NE.FMT_JSON,     CONTENT_W / 2)
     -- Explicitly sync state after both buttons exist so neither is stuck visually checked
-    rbMd:SetChecked(true); rbJson:SetChecked(false)
+    rbJson:SetChecked(true); rbMd:SetChecked(false)
 
     -- Format description (single label, swaps text with the radio selection)
     y = y - 26
@@ -57,7 +57,7 @@ local function BuildBackupTab(sf, ct)
     fmtDesc:SetWordWrap(true)
     fmtDesc:SetHeight(32)   -- two wrapped lines at GameFontNormalSmall ≈ 13px each + gap
     fmtDesc:SetTextColor(0.60, 0.60, 0.60)
-    fmtDesc:SetText(L["BACKUP_FMT_DESC_MARKDOWN"])
+    fmtDesc:SetText(L["BACKUP_FMT_DESC_JSON"])
     y = y - 38
 
     rbMd:SetScript("OnClick", function()

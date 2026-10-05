@@ -1021,9 +1021,26 @@ local function BuildIconBadge(f, noteID, note)
         if btn == "RightButton" then
             if f._showStickyCtxMenu then f._showStickyCtxMenu(iconFrame) end
         elseif btn == "LeftButton" then
+            -- The release that ends a drag is not a click (ALL-217)
+            if iconFrame._dragged then iconFrame._dragged = nil; return end
             SN.SetMinimized(noteID, not f._minimized)
         end
     end)
+    -- Drag the open sticky by its icon, as the minimized tile already moves
+    -- (ALL-217); a locked sticky stays put (ALL-257)
+    iconFrame:RegisterForDrag("LeftButton")
+    iconFrame:SetScript("OnDragStart", function()
+        if f._minimized or StickyLocked(noteID) then return end
+        iconFrame._dragged = true
+        f:StartMoving()
+    end)
+    iconFrame:SetScript("OnDragStop", function()
+        if not iconFrame._dragged then return end
+        f:StopMovingOrSizing(); SaveGeometry(noteID, f)
+    end)
+    -- Each press starts clean, whether or not the client sent a click after
+    -- the last drag
+    iconFrame:HookScript("OnMouseDown", function() iconFrame._dragged = nil end)
 
     ForwardHover(iconFrame, f)
     f._iconFrame = iconFrame
@@ -1855,9 +1872,17 @@ local function CreateStickyFrame(noteID)
                 OpenInMainEditor(noteID)
             end)
             root:CreateButton(L["STICKY_SETTINGS_MENU"], function()
-                -- Same special case as the header settings button: minimized
-                -- just restores instead of opening settings on a hidden frame.
-                if f._minimized then SN.SetMinimized(noteID, false); return end
+                -- Minimized: restore, then open the settings beside the shown
+                -- sticky one frame later (ALL-144; it used to stop at restore)
+                if f._minimized then
+                    SN.SetMinimized(noteID, false)
+                    C_Timer.After(0, function()
+                        if f:IsShown() and not SN._IsSettingsOpenFor(noteID) then
+                            SN._OpenSettings(f, noteID)
+                        end
+                    end)
+                    return
+                end
                 if SN._IsSettingsOpenFor(noteID) then
                     SN.CloseSettings()
                 else

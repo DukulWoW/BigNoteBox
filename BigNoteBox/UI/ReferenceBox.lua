@@ -616,9 +616,10 @@ end
 
 -- Returns the Wowhead URL for an attachment (all types supported).
 local function BuildWowheadURL(att)
-    if att.type == "item"  then return "https://www.wowhead.com/item="  .. att.id end
-    if att.type == "spell" then return "https://www.wowhead.com/spell=" .. att.id end
-    if att.type == "quest" then return "https://www.wowhead.com/quest=" .. att.id end
+    -- Per client (ALL-151, BNB.WowheadURL in Init.lua)
+    if att.type == "item" or att.type == "spell" or att.type == "quest" then
+        return BNB.WowheadURL(att.type, att.id)
+    end
     return nil
 end
 
@@ -772,8 +773,27 @@ local function BuildPickerWindow()
     })
     local top = f._isSkin and SK_RB_TITLE_H or TITLE_H
 
+    -- Search above the list (ALL-276): filters the rows by title as you type,
+    -- the rows are not rebuilt (OpenPicker's ApplyFilter only places them)
+    local SEARCH_H = 22
+    local sBg = BNB.CreateBackdropFrame("Frame", nil, f); BNB.SetBackdropDark(sBg)
+    sBg:SetPoint("TOPLEFT",  f, "TOPLEFT",  8, -(top + 4))
+    sBg:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -(top + 4))
+    sBg:SetHeight(SEARCH_H)
+    local search = CreateFrame("EditBox", nil, sBg)
+    search:SetAllPoints()
+    search:SetTextInsets(6, 6, 0, 0)
+    search:SetFontObject("GameFontNormal"); search:SetAutoFocus(false); search:SetMaxLetters(64)
+    BNB.AddPlaceholder(search, L["SEARCH_PLACEHOLDER"], 0.4, 0.4, 0.4)
+    search:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
+    search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    search:SetScript("OnTextChanged", function()
+        if f._applyFilter then f._applyFilter() end
+    end)
+    f._search = search
+
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
-    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    1,           -(top + 4))
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    1,           -(top + 4 + SEARCH_H + 6))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
 
     if sf.ScrollBar then
@@ -829,6 +849,7 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
     local BTN_W = 52
     local ICON_W = 20   -- note icon in each row
     local y = 0
+    local rows = {}     -- { row, key = lower-case title } for the search (ALL-276)
 
     for _, entry in ipairs(notes) do
         if entry.id ~= noteID then
@@ -840,12 +861,12 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
             row:SetPoint("TOPLEFT",  sc, "TOPLEFT",  0, y)
             row:SetPoint("TOPRIGHT", sc, "TOPRIGHT", 0, y)
 
-            -- Alternating tint
-            if math.floor(math.abs(y) / ROW_H) % 2 == 1 then
-                local rowBg = row:CreateTexture(nil, "BACKGROUND")
-                rowBg:SetAllPoints()
-                rowBg:SetColorTexture(1, 1, 1, 0.03)
-            end
+            -- Alternating tint, set again by ApplyFilter as rows move
+            local rowBg = row:CreateTexture(nil, "BACKGROUND")
+            rowBg:SetAllPoints()
+            rowBg:SetColorTexture(1, 1, 1, 0.03)
+            row._bg = rowBg
+            rows[#rows + 1] = { row = row, key = title:lower() }
 
             -- Note icon
             local noteIcon = row:CreateTexture(nil, "ARTWORK")
@@ -900,17 +921,39 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
             end)
             copyBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-            -- Row separator
-            if y < 0 then
-                local rowSep = row:CreateTexture(nil, "ARTWORK")
-                rowSep:SetHeight(1); rowSep:SetColorTexture(0.20, 0.20, 0.22, 0.8)
-                rowSep:SetPoint("TOPLEFT"); rowSep:SetPoint("TOPRIGHT")
-            end
+            -- Row separator (hidden on the first shown row by ApplyFilter)
+            local rowSep = row:CreateTexture(nil, "ARTWORK")
+            rowSep:SetHeight(1); rowSep:SetColorTexture(0.20, 0.20, 0.22, 0.8)
+            rowSep:SetPoint("TOPLEFT"); rowSep:SetPoint("TOPRIGHT")
+            row._sep = rowSep
 
             y = y - ROW_H
         end
     end
-    sc:SetHeight(math.max(math.abs(y), _pickerFrame._sf:GetHeight()))
+
+    -- Places the rows whose title holds the search text, in order (ALL-276)
+    local function ApplyFilter()
+        local q = _pickerFrame._search and _pickerFrame._search:GetRealText() or ""
+        q = q:lower():match("^%s*(.-)%s*$")
+        local n = 0
+        for _, r in ipairs(rows) do
+            local show = q == "" or r.key:find(q, 1, true) ~= nil
+            r.row:SetShown(show)
+            if show then
+                r.row:ClearAllPoints()
+                r.row:SetPoint("TOPLEFT",  sc, "TOPLEFT",  0, -n * ROW_H)
+                r.row:SetPoint("TOPRIGHT", sc, "TOPRIGHT", 0, -n * ROW_H)
+                r.row._bg:SetShown(n % 2 == 1)
+                r.row._sep:SetShown(n > 0)
+                n = n + 1
+            end
+        end
+        sc:SetHeight(math.max(n * ROW_H, _pickerFrame._sf:GetHeight()))
+        _pickerFrame._sf:SetVerticalScroll(0)
+    end
+    _pickerFrame._applyFilter = ApplyFilter
+    if _pickerFrame._search then _pickerFrame._search:SetRealText("") end
+    ApplyFilter()
 
     -- Centre on the RefBox frame
     _pickerFrame:ClearAllPoints()
@@ -1075,7 +1118,11 @@ local function ParseManualEntry(text)
     -- Wowhead URL: https://www.wowhead.com/item=2529/zweihander
     --              https://www.wowhead.com/quest=93932/legendary-prosperity
     --              https://www.wowhead.com/spell=7328/redemption
-    local whType, whID, whSlug = text:match("wowhead%.com/([a-z]+)=(%d+)/?([^%s]*)")
+    -- Any client's path too (wowhead.com/forever/item=..., ALL-151)
+    local whType, whID, whSlug = text:match("wowhead%.com/[%w%-]+/([a-z]+)=(%d+)/?([^%s]*)")
+    if not whType then
+        whType, whID, whSlug = text:match("wowhead%.com/([a-z]+)=(%d+)/?([^%s]*)")
+    end
     if whType and whID then
         local id = tonumber(whID)
         if whType == "item"  then return "item",  id end
@@ -1563,7 +1610,12 @@ RenderList = function()
     end
 
     local sf = rbFrame._scrollFrame
-    sc:SetHeight(math.max(math.abs(y), sf:GetHeight()))
+    -- Content height is kept so the child follows later window resizes
+    -- (OnSizeChanged below): sized to the scroll frame as it was here, then
+    -- left taller once the window shrank, it showed a scrollbar with nothing
+    -- to scroll (ALL-138)
+    sc._contentH = math.abs(y)
+    sc:SetHeight(math.max(sc._contentH, sf:GetHeight()))
 
     -- Resize the window to fit content (clamped to main window height)
     SyncRefBoxHeight()
@@ -2027,7 +2079,11 @@ local function BuildReferenceBox()
     local sc = CreateFrame("Frame", nil, sf)
     sc:SetWidth(sf:GetWidth()); sc:SetHeight(1)
     sf:SetScrollChild(sc)
-    sf:SetScript("OnSizeChanged", function(self) sc:SetWidth(self:GetWidth()) end)
+    sf:SetScript("OnSizeChanged", function(self)
+        sc:SetWidth(self:GetWidth())
+        -- Never taller than the content needs once the frame changes (ALL-138)
+        if sc._contentH then sc:SetHeight(math.max(sc._contentH, self:GetHeight())) end
+    end)
 
     -- Empty label lives inside the scroll child so it scrolls with gear sections.
     local emptyLabel = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

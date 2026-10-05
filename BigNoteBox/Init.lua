@@ -40,6 +40,26 @@ local _, _, _, _tocVersion = GetBuildInfo()
 _tocVersion = _tocVersion or 0
 BNB.IsForever = _tocVersion >= 16000 and _tocVersion < 20000
 
+-- Wowhead URL for this client (ALL-151): kind = "item" / "spell" / "quest".
+-- Retail www.wowhead.com/item=1, Forever /forever/, Classic Era /classic/,
+-- TBC /tbc/, MoP /mop-classic/. Forever is told by interface range, never by
+-- project id (FOR-27).
+local function WowheadPath()
+    if BNB.IsForever then return "forever/" end
+    local p = WOW_PROJECT_ID
+    if p == nil or p == WOW_PROJECT_MAINLINE then return "" end
+    if p == WOW_PROJECT_CLASSIC then return "classic/" end
+    if WOW_PROJECT_BURNING_CRUSADE_CLASSIC and p == WOW_PROJECT_BURNING_CRUSADE_CLASSIC then return "tbc/" end
+    if WOW_PROJECT_WRATH_CLASSIC and p == WOW_PROJECT_WRATH_CLASSIC then return "wotlk/" end
+    if WOW_PROJECT_CATACLYSM_CLASSIC and p == WOW_PROJECT_CATACLYSM_CLASSIC then return "cata/" end
+    if WOW_PROJECT_MISTS_CLASSIC and p == WOW_PROJECT_MISTS_CLASSIC then return "mop-classic/" end
+    return ""
+end
+function BNB.WowheadURL(kind, id)
+    if not kind or not id then return nil end
+    return "https://www.wowhead.com/" .. WowheadPath() .. kind .. "=" .. id
+end
+
 -- Action bar icon path relative to Assets\ ("Actionbar\\ab-lock"). On Forever, icons
 -- that have an ab-forever-<name> variant use it; the rest keep the shared art.
 local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,

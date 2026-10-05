@@ -830,8 +830,9 @@ local function BuildCopyMovePopup()
     return f
 end
 
+-- Opens with the sidebar off too: Copy/Move is the only way to change a
+-- note's scope since ALL-265, and returning here opened nothing (ALL-281)
 function BNB.OpenCopyMovePopup(noteID, mode)
-    if not IsEnabled() then return end
     local db  = BigNoteBoxDB
     local ndb = BNB.NotesDB()
     if not db or not ndb or not ndb.notes then return end
@@ -932,7 +933,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     f:ClearAllPoints()
     local cx, cy = GetCursorPosition()
     local s = UIParent:GetEffectiveScale()
-    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s + f:GetHeight())
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)   -- top-left on the pointer (ALL-130); clamped to screen by the builder
     f:Show(); f:Raise()
 end
 
@@ -1072,7 +1073,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     f:ClearAllPoints()
     local cx, cy = GetCursorPosition()
     local s = UIParent:GetEffectiveScale()
-    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s + f:GetHeight())
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)   -- top-left on the pointer (ALL-130); clamped to screen by the builder
 
     f:Show()
     f:Raise()

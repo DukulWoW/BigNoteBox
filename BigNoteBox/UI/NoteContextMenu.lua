@@ -54,7 +54,8 @@ BNB.NOTE_MENU_CLICKS = {
     { "actions", "NL_CM_ACTIONS", "action", {
         { "duplicate", "NL_CTX_DUPLICATE", "duplicate" }, { "copyMove", "NL_CTX_COPY_MOVE", "copy-move" },
         { "clipboard", "NL_CM_COPY_CLIPBOARD", "copy-clipboard" }, { "convert", "NL_CM_CONVERT", "rich-note" },
-        { "share", "NL_CTX_SHARE", "share" }, { "exportJson", "NL_CM_EXPORT_JSON", "export-json" },
+        { "share", "NL_CTX_SHARE", "share" }, { "sendChat", "SEND_TITLE", "chat" },
+        { "exportJson", "NL_CM_EXPORT_JSON", "export-json" },
         { "exportMd", "NL_CM_EXPORT_MD", "export-markdown" }, { "exportHtml", "NL_CM_EXPORT_HTML", "export-html" } } },
     -- Clear note history is left out: never a one-click action
     { "history", "NL_CM_HISTORY", "history", {
@@ -276,6 +277,11 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             { key = "share", label = L["NL_CTX_SHARE"], fn = function()
                 if BNB.OpenShareWindow then BNB.OpenShareWindow(noteID) end
             end, opts = { icon = "share" } },
+            -- Send to Chat: the note's lines to a chat channel, no BigChatBox
+            -- needed (ALL-280; the editor's bottom bar had the only way in)
+            { key = "sendChat", label = L["SEND_TITLE"], fn = function()
+                if BNB.OpenSendToChat then BNB.OpenSendToChat(noteID) end
+            end, opts = { icon = "chat" } },
             { key = "exportJson", label = L["NL_CM_EXPORT_JSON"], fn = function()
                 if BNB.ExportNoteJSON then BNB.ExportNoteJSON(noteID) end
             end, opts = { icon = "export-json" } },

@@ -319,13 +319,13 @@ local function BuildRefboxHtml(note)
         if a.type == "item" then
             local name, _, quality = C_Item.GetItemInfo(a.id)
             label     = name or ("Item " .. a.id)
-            url       = "https://www.wowhead.com/item=" .. a.id
+            url       = BNB.WowheadURL("item", a.id)   -- per client (ALL-151)
             typeLabel = "Item"
             qualityHex = QUALITY_COLORS[quality or 1] or QUALITY_COLORS[1]
         elseif a.type == "spell" then
             local si = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(a.id)
             label     = (si and si.name) or ("Spell " .. a.id)
-            url       = "https://www.wowhead.com/spell=" .. a.id
+            url       = BNB.WowheadURL("spell", a.id)
             typeLabel = "Spell"
             qualityHex = "#4db8ff"
         elseif a.type == "quest" then
@@ -334,7 +334,7 @@ local function BuildRefboxHtml(note)
             label     = (title and title ~= "") and title
                 or (a.title and a.title ~= "") and a.title
                 or ("Quest " .. a.id)
-            url       = "https://www.wowhead.com/quest=" .. a.id
+            url       = BNB.WowheadURL("quest", a.id)
             typeLabel = "Quest"
             qualityHex = "#ffd100"
         else

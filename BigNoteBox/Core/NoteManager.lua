@@ -72,6 +72,25 @@ function BNB.SyncTrashBtnState()
     pcall(function() btn._tx:SetDesaturated(not hasItems) end)
 end
 
+-- The toolbar's Tag Manager button is greyed while no note has a tag, like
+-- Trash (ALL-273). Follows the note messages below; first call at login
+-- (Core/Initialize.lua, beside SyncTrashBtnState).
+function BNB.SyncTagsBtnState()
+    local btn = BNB._toolbarTagsBtn
+    if not btn then return end
+    local hasTags = next(BNB.TagIndex()) ~= nil
+    btn:SetEnabled(hasTags)
+    btn:SetAlpha(hasTags and 1.0 or 0.4)
+    pcall(function() btn._tx:SetDesaturated(not hasTags) end)
+end
+local function SyncTagsOnTagChange(_, _, fields)
+    if fields == nil or fields.tags ~= nil or fields._clear then BNB.SyncTagsBtnState() end
+end
+BNB.RegisterMessage("TagsButton", "NoteCreated",  function() BNB.SyncTagsBtnState() end)
+BNB.RegisterMessage("TagsButton", "NoteDeleted",  function() BNB.SyncTagsBtnState() end)
+BNB.RegisterMessage("TagsButton", "NoteRestored", function() BNB.SyncTagsBtnState() end)
+BNB.RegisterMessage("TagsButton", "NoteChanged",  SyncTagsOnTagChange)
+
 --------------------------------------------------------------------------------
 -- TAG INDEX HELPERS
 -- BNB.TagIndex() maps tag → { [noteID] = true }.
@@ -298,10 +317,15 @@ end
 -- Creates the next quick note (title + note icon) and returns its id, or nil.
 -- Opening it is the caller's job: BNB.ShowQuickNote (main window) or
 -- BNB.Sticky.OpenQuick.
+-- The tag every quick note gets (ALL-152). Not translated, like the source
+-- tags Quest / Gossip / Book / Letter: whether tags follow the language is
+-- ALL-108, for all of them at once
+BNB.QUICK_NOTE_TAG = "Quick Note"
+
 function BNB.CreateQuickNote()
     local id = BNB.CreateNote(BNB.NextQuickNoteTitle())
     if not id then return nil end
-    BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04" })
+    BNB.UpdateNote(id, { icon = "Interface\\Icons\\INV_Misc_Note_04", tags = { BNB.QUICK_NOTE_TAG } })
     return id
 end
 

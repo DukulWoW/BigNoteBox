@@ -1764,6 +1764,7 @@ end
 -- onLeave }. grip._sizing is true while sizing. The grip owns OnMouseDown /
 -- OnMouseUp / OnEnter / OnLeave: add behaviour through opts or HookScript.
 local GRIP_ATLAS, GRIP_ART, GRIP_HIT = "damagemeters-scalehandle", 32, 24
+local GRIP_HOVER_R, GRIP_HOVER_G, GRIP_HOVER_B = 0.40, 0.85, 0.40   -- BNB green (NoteList COL_SEL_BG)
 local GRABBER = "Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-"
 function BNB.CreateResizeGrip(f, opts)
     opts = opts or {}
@@ -1783,14 +1784,19 @@ function BNB.CreateResizeGrip(f, opts)
         grip:SetSize(16, 16)
         grip:SetNormalTexture(GRABBER .. "Up")
         grip:SetHighlightTexture(GRABBER .. "Highlight")
+        grip:GetHighlightTexture():SetVertexColor(GRIP_HOVER_R, GRIP_HOVER_G, GRIP_HOVER_B)
         grip:SetPushedTexture(GRABBER .. "Down")
     end
 
-    -- Pressed while sizing, hover while the pointer is over it, else normal
+    -- Pressed while sizing, hover while the pointer is over it, else normal.
+    -- The hover art is tinted BNB green (ALL-278, Dukul), the rest untinted.
     local function SetState()
         if not tex then return end
+        local hover = not grip._sizing and grip:IsMouseOver()
         tex:SetAtlas(GRIP_ATLAS .. (grip._sizing and "-pressed"
-            or (grip:IsMouseOver() and "-hover" or "")))
+            or (hover and "-hover" or "")))
+        if hover then tex:SetVertexColor(GRIP_HOVER_R, GRIP_HOVER_G, GRIP_HOVER_B)
+        else tex:SetVertexColor(1, 1, 1) end
     end
     grip:SetScript("OnMouseDown", function(_, btn)
         if btn ~= "LeftButton" then return end

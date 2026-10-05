@@ -7,6 +7,9 @@ local BNB = BigNoteBox
 if not BNB then return end
 local L = BNB.L
 
+-- A note's icon when it has none set, as the note list draws it (ALL-274)
+local DEFAULT_NOTE_ICON = "Interface\\Icons\\INV_Misc_Note_06"
+
 -- ============================================================================
 -- ALARM POPUP
 -- ============================================================================
@@ -505,6 +508,12 @@ local function MakeRow(parent)
     resetBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 4)
     resetBtn:Hide()
 
+    -- Dismiss button (shown while the alarm has gone off and not been
+    -- answered, ALL-183); same spot as the time and Reset
+    local dismissBtn = BNB.CreateButton(nil, row, L["AO_DISMISS_BTN"], 64, 16)
+    dismissBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 4)
+    dismissBtn:Hide()
+
     -- Bottom separator (same as HistoryWindow)
     local sep = row:CreateTexture(nil, "ARTWORK")
     sep:SetHeight(1)
@@ -518,6 +527,7 @@ local function MakeRow(parent)
     row._labelLbl      = labelLbl
     row._timeLbl       = timeLbl
     row._resetBtn      = resetBtn
+    row._dismissBtn    = dismissBtn
     return row
 end
 
@@ -575,9 +585,11 @@ function AO.Refresh()
         -- Sync selection highlight
         if row._selHi then row._selHi:SetShown(_ovMultiSel[noteID] == true) end
 
-        -- Icon
-        local iconTex = note.icon or "Interface/AddOns/BigNoteBox/Assets/icon"
+        -- Icon: the note's own, as the note list draws it (default icon, NPC
+        -- portrait), never the BNB logo for a note on the default icon (ALL-274)
+        local iconTex = (note.icon and note.icon ~= "") and note.icon or DEFAULT_NOTE_ICON
         row._iconTx:SetTexture(iconTex)
+        if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(row._iconTx, note) end
 
         -- Title
         local t = (note.title and note.title ~= "") and note.title or L["AO_UNTITLED"]
@@ -588,6 +600,12 @@ function AO.Refresh()
         row._labelLbl:SetText(lbl)
         row._labelLbl:SetShown(lbl ~= "")
 
+        -- Gone off and not answered: due time passed or still ringing (ALL-183)
+        local due  = BNB.Alarm.GetNextFireTime(noteID)
+        local gone = not alarm.fired and ((BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID))
+            or (due and due <= time()))
+        row._dismissBtn:Hide()
+
         -- Desaturate icon and grey title for fired alarms
         if alarm.fired then
             pcall(function() row._iconTx:SetDesaturated(true) end)
@@ -595,6 +613,14 @@ function AO.Refresh()
             row._timeLbl:Hide(); row._resetBtn:Show()
             row._resetBtn:SetScript("OnClick", function()
                 BNB.Alarm.ResetFired(noteID)
+            end)
+        elseif gone then
+            pcall(function() row._iconTx:SetDesaturated(false) end)
+            row._titleLbl:SetTextColor(1, 1, 1, 1)
+            row._timeLbl:Hide(); row._resetBtn:Hide(); row._dismissBtn:Show()
+            -- Recurring alarms move on to their next time, one-off ones end (AM.Dismiss)
+            row._dismissBtn:SetScript("OnClick", function()
+                BNB.Alarm.Dismiss(noteID)
             end)
         else
             pcall(function() row._iconTx:SetDesaturated(false) end)
@@ -648,6 +674,11 @@ function AO.Refresh()
                     root:CreateButton(L["AO_CTX_OPEN_STICKY"], function()
                         if BNB.Sticky and BNB.Sticky.Open then BNB.Sticky.Open(nid) end
                     end)
+                    if gone then
+                        root:CreateButton(L["AO_CTX_DISMISS_ALARM"], function()
+                            BNB.Alarm.Dismiss(nid)
+                        end)
+                    end
                     root:CreateDivider()
                     root:CreateButton(L["AO_CTX_DELETE_ALARM"], function()
                         local popup = StaticPopup_Show("BNB_DELETE_ALARM_CONFIRM")
