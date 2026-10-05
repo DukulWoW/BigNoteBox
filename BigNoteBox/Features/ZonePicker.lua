@@ -492,15 +492,20 @@ local function BuildPicker()
         Populate(text ~= "" and text or nil)
     end)
 
-    -- ── Close button (top-right, matches NoteConfig × style) ─────────────────
-    local closeBtn = CreateFrame("Button", nil, f)
-    closeBtn:SetSize(20, 20)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
-    local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    closeLbl:SetAllPoints(); closeLbl:SetText("|cffaaaaaax|r")
+    -- ── Close button (top-right) ─────────────────────────────────────────────
+    -- Normal mode: the client's UIPanelCloseButton (Retail / Forever look);
+    -- skin mode: the skin close icon button (ALL-297). Both are built, since
+    -- the picker is built once and skin mode can change; Open shows one.
+    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    closeBtn:SetSize(26, 26)
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
     closeBtn:SetScript("OnClick", function() ZP.Close() end)
-    closeBtn:SetScript("OnEnter", function() closeLbl:SetText("|cffff4444x|r") end)
-    closeBtn:SetScript("OnLeave", function() closeLbl:SetText("|cffaaaaaax|r") end)
+    local skinClose = BNB.CreateSkinCloseButton(f, function() ZP.Close() end)
+    skinClose:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
+    f._syncClose = function()
+        local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+        closeBtn:SetShown(not skin); skinClose:SetShown(skin and true or false)
+    end
 
     f:Hide()
     return f
@@ -561,6 +566,7 @@ function ZP.Open(anchorFrame, onSelect, filterType)
         BNB.AddPlaceholder(eb, "Filter...", 0.40, 0.40, 0.40)
     end
 
+    _picker._syncClose()
     _picker._updateTabs()
     _picker._populate(nil)
     _picker:Show()

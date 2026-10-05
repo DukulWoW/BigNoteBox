@@ -815,6 +815,38 @@ local function BuildSidebarPage(sf, ct, y, page)
         subY = subY - (32 + ROW_GAP)
     end
 
+    -- Sort order of the character icons, both side strip and top tabs
+    -- (ALL-298): nil = newest first; pinned characters stay in front
+    do
+        local sortLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        sortLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
+        sortLbl:SetHeight(ROW_H); sortLbl:SetJustifyH("LEFT")
+        sortLbl:SetText(L["CFG_SIDEBAR_SORT_LABEL"])
+        subY = subY - (ROW_H + 2)
+
+        local entries = {
+            { label = L["CFG_SIDEBAR_SORT_NEWEST"], value = "newest" },
+            { label = L["CFG_SIDEBAR_SORT_NAME"],   value = "name" },
+            { label = L["CFG_SIDEBAR_SORT_CLASS"],  value = "class" },
+            { label = L["CFG_SIDEBAR_SORT_NOTES"],  value = "notes" },
+        }
+        local dd = BNB.CreateValueDropdown(sidebarSub, entries, db.sidebarSort or "newest",
+            function(v)
+                db.sidebarSort = (v ~= "newest") and v or nil
+                if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
+            end, CONTENT_W, 26)
+        dd:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
+        local tipOwner = dd._dd or dd
+        tipOwner:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_SIDEBAR_SORT_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_SIDEBAR_SORT_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        subY = subY - (32 + ROW_GAP)
+    end
+
     -- Position dropdown (Top / Bottom)
     do
         posLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")

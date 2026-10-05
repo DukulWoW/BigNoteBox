@@ -23,7 +23,9 @@ local ICON_SIZE  = ICON_SIZE_NORMAL
 
 -- Collapsed mode width — sized for the largest icon (spacious = 42px) so icons
 -- are never clipped regardless of list display mode. Must match COLLAPSED_W in MainWindow.lua.
-local COLLAPSED_W  = PAD_L + ICON_SIZE_SPACIOUS + PAD_L + 22 + 2   -- 82px
+-- The row is ICON_SIZE_SPACIOUS + 12 + 6 wide, so the square row art around
+-- the largest icon fits with room on both sides (2026-10-05, was 82).
+local COLLAPSED_W  = PAD_L + ICON_SIZE_SPACIOUS + 12 + 6 + 22   -- 90px
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 local ICON_BORDER  = "Interface\\Common\\WhiteIconFrame"
@@ -37,6 +39,17 @@ local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G
 local ROW_SEL_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-selection"
 local ROW_HOVER_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-hover"
 local ROW_MULTI_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-multi-selection"
+-- Collapsed (icon-only) list: square versions drawn around the icon instead
+-- of stretched over the row, which skewed and cut them (Dukul 2026-10-05)
+local ROW_SEL_SQ   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-collapsed-selection"
+local ROW_HOVER_SQ = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-collapsed-hover"
+local ROW_MULTI_SQ = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-collapsed-multi-selection"
+-- Player-note rows: the faction crest, subdued, at the row's right (ALL-305)
+local FACTION_ART = {
+    Horde    = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-model-horde",
+    Alliance = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-model-alliance",
+}
+local FACTION_ALPHA = 1   -- the art is already subdued; 1 as a test (Dukul 2026-10-05), was 0.18 (invisible)
 -- The three row pictures are greyscale and take the BNB green here (Dukul,
 -- 2026-10-03): one colour for all, the art keeps its shading and alpha
 local function TintRowArt(tex)
@@ -1121,6 +1134,15 @@ local function CreateListEntry(parent)
 
     -- Normal mode draws the row art; skin mode the flat colour fills
     local rowArt = not (BigNoteBoxDB and BigNoteBoxDB.skinMode)
+    btn._rowArt = rowArt
+
+    -- Faction crest of a player note (ALL-305): icon-high, subdued, at the
+    -- right edge, under the row art, the icon and the text
+    local factionTex = btn:CreateTexture(nil, "BACKGROUND", nil, 0)
+    factionTex:SetTexCoord(6/128, 122/128, 6/128, 122/128)   -- the art's empty rim
+    factionTex:SetAlpha(FACTION_ALPHA)
+    factionTex:Hide()
+    btn._factionTex = factionTex
 
     -- Selection highlight: ARTWORK layer so OVERLAY text draws on top of it.
     -- The normal-mode art goes on BACKGROUND, under the icon (ARTWORK) too
@@ -1149,6 +1171,7 @@ local function CreateListEntry(parent)
         ArtPoints(hiBg, true)
         hiBg:SetTexture(ROW_HOVER_TEX); TintRowArt(hiBg)
         hiBg:Hide()
+        btn._hiBg = hiBg
         btn:HookScript("OnEnter", function() hiBg:Show() end)
         btn:HookScript("OnLeave", function() hiBg:Hide() end)
         btn:HookScript("OnHide",  function() hiBg:Hide() end)   -- a row reused under the pointer
@@ -1507,6 +1530,53 @@ local function PreviewText(note)
     return body
 end
 
+-- Normal-mode row art: stretched over the row under the icon, or in the
+-- collapsed list the square pictures, ICON_SIZE + 12 on a side, centred on
+-- the icon and drawn over it (Dukul 2026-10-05); the badges sit on their
+-- own frame above both
+local function ShapeRowArt(btn, collapsed)
+    if not btn._rowArt then return end
+    local sq = ICON_SIZE + 12
+    local function Shape(tex, wide, square, sub)
+        if not tex then return end
+        tex:ClearAllPoints()
+        if collapsed then
+            tex:SetTexture(square)
+            tex:SetDrawLayer("OVERLAY", sub + 1)   -- over the icon border (OVERLAY 0)
+            tex:SetSize(sq, sq)
+            tex:SetPoint("CENTER", btn._icon, "CENTER", 0, 0)
+        else
+            tex:SetTexture(wide)
+            tex:SetDrawLayer("BACKGROUND", sub)
+            ArtPoints(tex, true)
+        end
+    end
+    if btn._artCollapsed ~= collapsed then
+        btn._artCollapsed = collapsed
+        Shape(btn._selBg,      ROW_SEL_TEX,   ROW_SEL_SQ,   1)
+        Shape(btn._multiSelBg, ROW_MULTI_TEX, ROW_MULTI_SQ, 2)
+        Shape(btn._hiBg,       ROW_HOVER_TEX, ROW_HOVER_SQ, 3)
+    elseif collapsed then
+        -- Same shape, but the list mode (icon size) may have changed
+        btn._selBg:SetSize(sq, sq); btn._multiSelBg:SetSize(sq, sq)
+        if btn._hiBg then btn._hiBg:SetSize(sq, sq) end
+    end
+end
+
+-- "Horde" / "Alliance" for a note about a player, nil otherwise (ALL-305).
+-- The saved token first, then the faction tag (notes from before the field).
+local function PlayerNoteFaction(note)
+    local player = note.source == "inspect"
+        or (note.source == "target" and note.targetPlayerKey ~= nil)
+    if not player then return nil end
+    local f = note.inspectFaction or note.targetFaction
+    if FACTION_ART[f] then return f end
+    for _, t in ipairs(note.tags or {}) do
+        if FACTION_ART[t] then return t end
+    end
+    return nil
+end
+
 local function PopulateEntry(btn, note, selected, collapsed)
     btn._noteID = note.id
     btn._title  = note.title   -- RefreshNoteListEntry: did a save change it?
@@ -1609,10 +1679,33 @@ local function PopulateEntry(btn, note, selected, collapsed)
         btn._multiSelBg:SetShown(_multiMode and _multiSel[note.id] == true)
     end
 
+    -- Clear first: a row built while collapsed still had CreateListEntry's
+    -- LEFT point, and CENTER on top of it pulled the icon off centre
+    btn._icon:ClearAllPoints()
     if collapsed then
         btn._icon:SetPoint("CENTER", btn, "CENTER", 0, 0)
     else
         btn._icon:SetPoint("LEFT", btn, "LEFT", PAD_L, 0)
+    end
+    if btn._iconGlowFrame then
+        btn._iconGlowFrame:ClearAllPoints()
+        btn._iconGlowFrame:SetPoint("CENTER", btn._icon, "CENTER", 0, 0)
+    end
+    ShapeRowArt(btn, collapsed)
+
+    -- Faction crest of a player note (ALL-305); none in the collapsed list
+    if btn._factionTex then
+        local fac = not collapsed and PlayerNoteFaction(note)
+        if fac then
+            local ft = btn._factionTex
+            ft:SetTexture(FACTION_ART[fac])
+            ft:SetSize(ICON_SIZE, ICON_SIZE)
+            ft:ClearAllPoints()
+            ft:SetPoint("RIGHT", btn, "RIGHT", -6, 0)
+            ft:Show()
+        else
+            btn._factionTex:Hide()
+        end
     end
 
     -- Alarm indicator: colour when pending, desaturated when fired, hidden while actively firing

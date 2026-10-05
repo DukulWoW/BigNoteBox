@@ -21,7 +21,7 @@ local MAX_LIST_W     = 460
 local DEFAULT_LIST_W = BNB.DEFAULTS.splitX
 -- Icon-only collapsed width: 8px left pad + 32px icon + 8px right pad + 22px scrollbar + 2px buffer = 72px
 -- Must match COLLAPSED_W in NoteList.lua
-local COLLAPSED_W    = 82   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + PAD_L(8) + scrollbar(22) + 2
+local COLLAPSED_W    = 90   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + square row art margin(12) + 6 + scrollbar(22)
 
 local SORT_BTN_H = 22   -- height to match WowStyle1 button
 local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4)

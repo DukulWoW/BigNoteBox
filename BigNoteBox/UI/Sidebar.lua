@@ -254,11 +254,43 @@ local function GetVisibleKeys(availH, maxTotal)
         local bo = b.rec.pinnedOrder or 99
         return ao < bo
     end)
-    table.sort(recent, function(a, b)
-        local at = math.max(a.rec.lastSeen or 0, a.rec.tabPicked or 0)
-        local bt = math.max(b.rec.lastSeen or 0, b.rec.tabPicked or 0)
-        return at > bt
-    end)
+    -- The unpinned order follows db.sidebarSort (ALL-298; nil = newest first);
+    -- pinned characters stay in front whatever the order (Dukul, 2026-10-05).
+    -- Ties fall back to newest first, then the key, so the order is stable.
+    local function Newest(r) return math.max(r.rec.lastSeen or 0, r.rec.tabPicked or 0) end
+    local function ByNewest(a, b)
+        local at, bt = Newest(a), Newest(b)
+        if at ~= bt then return at > bt end
+        return a.key < b.key
+    end
+    local mode = db.sidebarSort
+    local cmp = ByNewest
+    if mode == "name" then
+        for _, r in ipairs(recent) do r.sk = r.key:lower() end
+        cmp = function(a, b)
+            if a.sk ~= b.sk then return a.sk < b.sk end
+            return ByNewest(a, b)
+        end
+    elseif mode == "class" then
+        local names = LOCALIZED_CLASS_NAMES_MALE or {}
+        for _, r in ipairs(recent) do
+            local cls = r.rec.class
+            r.sk = cls and (names[cls] or cls):lower() or "~"
+            r.sk2 = r.key:lower()
+        end
+        cmp = function(a, b)
+            if a.sk ~= b.sk then return a.sk < b.sk end
+            if a.sk2 ~= b.sk2 then return a.sk2 < b.sk2 end
+            return ByNewest(a, b)
+        end
+    elseif mode == "notes" then
+        for _, r in ipairs(recent) do r.sk = CountForKey(r.key) end
+        cmp = function(a, b)
+            if a.sk ~= b.sk then return a.sk > b.sk end
+            return ByNewest(a, b)
+        end
+    end
+    table.sort(recent, cmp)
 
     -- Cap pinned at MAX_PINNED
     for i = 1, math.min(#pinned, MAX_PINNED) do
@@ -1077,4 +1109,20 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
 
     f:Show()
     f:Raise()
+end
+
+-- "By notes" order (ALL-298): a note created, deleted, restored or moved to
+-- another character can change the order, so the strip / tabs are redrawn,
+-- once per burst. The other orders do not depend on notes.
+do
+    local function Resort()
+        if BigNoteBoxDB and BigNoteBoxDB.sidebarSort == "notes" then SB.Refresh() end
+    end
+    local function Soon() BNB.Debounce("sidebarResort", 0.3, Resort) end
+    BNB.RegisterMessage("Sidebar", "NoteCreated", Soon)
+    BNB.RegisterMessage("Sidebar", "NoteDeleted", Soon)
+    BNB.RegisterMessage("Sidebar", "NoteRestored", Soon)
+    BNB.RegisterMessage("Sidebar", "NoteChanged", function(_, _, fields)
+        if fields and fields.scope ~= nil then Soon() end
+    end)
 end
