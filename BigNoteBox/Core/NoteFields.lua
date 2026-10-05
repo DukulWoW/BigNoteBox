@@ -65,7 +65,12 @@ local FIELDS = {
     -- every time, "session", "day", "daily", "weekly", "once"), ALL-232 S2
     { "contextTrigger", "s", share = "situation" },
     { "contextFreq",    "s", share = "situation" },
-    { "waypoint",       "t", share = "situation" },
+    -- The note's waypoints, { { mapID, x, y, label, name, on }, ... } (ALL-282,
+    -- NOTES v12): label = zone name when saved, name = the player's own (nil =
+    -- the note title, read live), on = placed when the situation matches. The
+    -- single table `waypoint` it replaced is still written next to it on the
+    -- way out and read on the way in, for older builds
+    { "waypoints",      "t", share = "situation" },
     { "wpClearOnLeave", "b", share = "situation" },
     -- true = the situation waypoint is placed but not tracked (no arrow), SUG-10
     { "wpNoTrack",      "b", share = "situation" },
@@ -101,6 +106,9 @@ local FIELDS = {
     { "coordY",     "n", nocopy = true },
     { "coordMapID", "n", nocopy = true },
     { "coordZone",  "s", nocopy = true },
+    -- true = the creation spot above is placed when the situation matches,
+    -- like a waypoint whose `on` is set (ALL-282). Not shared: the coords are not
+    { "wpCreatedOn", "b", nocopy = true },
     -- Internal: identity, edit history, bookkeeping
     { "id",             "s", internal = true },
     { "history",        "t", internal = true },
@@ -187,8 +195,13 @@ local SHAPES = {
     titleColor = function(v)
         if type(v.r) == "number" and type(v.g) == "number" and type(v.b) == "number" then return v end
     end,
-    waypoint = function(v)
-        if type(v.mapID) == "number" and type(v.x) == "number" and type(v.y) == "number" then return v end
+    waypoints = function(v)
+        local out = {}
+        for _, wp in ipairs(v) do
+            wp = BNB.CleanWaypoint(wp)
+            if wp then out[#out + 1] = wp end
+        end
+        return #out > 0 and out or nil
     end,
     situations = function(v)
         local out = {}
@@ -259,7 +272,78 @@ function BNB.CleanNoteFields(src, want)
        and (not want or want(BNB.NOTE_FIELD.situations)) then
         out.situations = { ctx }
     end
+    -- ...and one waypoint as `waypoint` (ALL-282), the same way. It was always
+    -- placed, so it arrives on; its title was a copy of the note title, never
+    -- a name the player typed, so it is left behind
+    local wp = type(src.waypoint) == "table" and BNB.CleanWaypoint(src.waypoint)
+    if out.waypoints == nil and wp and (not want or want(BNB.NOTE_FIELD.waypoints)) then
+        wp.name, wp.on = nil, true
+        out.waypoints = { wp }
+    end
     return out
+end
+
+--------------------------------------------------------------------------------
+-- WAYPOINTS (ALL-282)
+-- note.waypoints = { { mapID, x, y, label, name, on }, ... }, x and y 0-100.
+-- The spot where the note was made (coordMapID / coordX / coordY) is shown as a
+-- row above them and can be placed too (note.wpCreatedOn), never removed.
+-- Read them only through these.
+--------------------------------------------------------------------------------
+local NO_WAYPOINTS = {}   -- shared, never written to
+
+-- A copy of one waypoint with only its known fields, or nil when it has no
+-- usable map and coordinates
+function BNB.CleanWaypoint(v)
+    if type(v) ~= "table" or type(v.mapID) ~= "number"
+       or type(v.x) ~= "number" or type(v.y) ~= "number" then return nil end
+    return {
+        mapID = v.mapID, x = v.x, y = v.y,
+        label = type(v.label) == "string" and v.label ~= "" and v.label or nil,
+        name  = type(v.name)  == "string" and v.name  ~= "" and v.name  or nil,
+        on    = v.on == true or nil,
+    }
+end
+
+-- The note's own waypoints, an empty list when it has none
+function BNB.NoteWaypoints(note)
+    local w = note and note.waypoints
+    return type(w) == "table" and w or NO_WAYPOINTS
+end
+
+-- Where the note was made, as a waypoint (created = true), or nil when the
+-- note has no position (made in an instance, or before positions were saved)
+function BNB.CreationWaypoint(note)
+    if not (note and note.coordMapID and note.coordX and note.coordY) then return nil end
+    return { mapID = note.coordMapID, x = note.coordX, y = note.coordY,
+             label = note.coordZone, on = note.wpCreatedOn == true or nil, created = true }
+end
+
+-- The name a waypoint shows on the map: its own, else the note title (read
+-- now, so a renamed note renames it), else "BigNoteBox"
+function BNB.WaypointName(note, wp)
+    if wp and wp.name and wp.name ~= "" then return wp.name end
+    if note and note.title and note.title ~= "" then return note.title end
+    return "BigNoteBox"
+end
+
+-- The waypoints placed when the note's situation matches: the creation spot
+-- first when on, then every waypoint that is on. single = only the first,
+-- for the game's own map pin, which holds one point
+function BNB.ActiveWaypoints(note, single)
+    local out = {}
+    local c = BNB.CreationWaypoint(note)
+    if c and c.on then out[1] = c end
+    for _, wp in ipairs(BNB.NoteWaypoints(note)) do
+        if single and out[1] then break end
+        if wp.on then out[#out + 1] = wp end
+    end
+    return out
+end
+
+-- Does any waypoint (or the creation spot) get placed by the situation?
+function BNB.HasActiveWaypoint(note)
+    return BNB.ActiveWaypoints(note, true)[1] ~= nil
 end
 
 -- Note icons came bundled in Assets\Icons\<Folder>\ until ALL-238 (v1.18.0);
@@ -299,11 +383,26 @@ function BNB.LegacyIconPath(path)
     return "Interface\\Icons\\" .. path:match("([^\\]+)$")
 end
 
+-- The `waypoint` a build from before ALL-282 reads: the first waypoint that
+-- is on (older builds always place theirs), else the first one; nil = none
+function BNB.LegacyWaypoint(waypoints)
+    if type(waypoints) ~= "table" then return nil end
+    local pick
+    for _, wp in ipairs(waypoints) do
+        if wp.on then pick = wp; break end
+    end
+    pick = pick or waypoints[1]
+    if type(pick) ~= "table" then return nil end
+    return { mapID = pick.mapID, x = pick.x, y = pick.y, label = pick.label, title = pick.name }
+end
+
 -- For anything written for another build to read (JSON backup, share
 -- string, Direct Send): the first situation as `context` too, so a build
--- from before ALL-232 still gets one
+-- from before ALL-232 still gets one, and one waypoint as `waypoint` for a
+-- build from before ALL-282
 function BNB.AddLegacyContext(fields)
     local s = fields.situations
     if type(s) == "table" and type(s[1]) == "string" then fields.context = s[1] end
+    fields.waypoint = BNB.LegacyWaypoint(fields.waypoints)
     return fields
 end

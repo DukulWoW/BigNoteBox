@@ -35,9 +35,12 @@ local function JsonEncodeNote(note)
             parts[#parts + 1] = JsonEscapeStr(def.key) .. ":" .. Json.Encode(v)
         end
     end
-    -- The first situation as "context" too, for a build from before ALL-232
+    -- The first situation as "context" too, for a build from before ALL-232,
+    -- and one waypoint as "waypoint", for a build from before ALL-282
     local first = BNB.FirstSituation(note)
     if first then parts[#parts + 1] = JsonEscapeStr("context") .. ":" .. Json.Encode(first) end
+    local legacyWp = BNB.LegacyWaypoint(note.waypoints)
+    if legacyWp then parts[#parts + 1] = JsonEscapeStr("waypoint") .. ":" .. Json.Encode(legacyWp) end
     return "  {" .. table.concat(parts, ",") .. "}"
 end
 
@@ -85,6 +88,15 @@ local function MdEncodeNote(note)
     if note.contextLeave   then lines[#lines + 1] = "contextLeave: "   .. note.contextLeave   end
     if note.contextTrigger then lines[#lines + 1] = "contextTrigger: " .. note.contextTrigger end
     if note.contextFreq    then lines[#lines + 1] = "contextFreq: "    .. note.contextFreq    end
+    -- Waypoints as mapID:x:y:name (ALL-282): "waypoint" lines for those
+    -- placed by the situation (what a build from before ALL-282 reads, the
+    -- last one winning there), "waypointOff" for the others
+    for _, wp in ipairs(BNB.NoteWaypoints(note)) do
+        lines[#lines + 1] = string.format("%s: %d:%s:%s:%s", wp.on and "waypoint" or "waypointOff",
+            wp.mapID, tostring(wp.x), tostring(wp.y), wp.name or "")
+    end
+    if note.wpClearOnLeave then lines[#lines + 1] = "wpClearOnLeave: true" end
+    if note.wpNoTrack      then lines[#lines + 1] = "wpNoTrack: true"      end
     if note.pinned        then lines[#lines + 1] = "pinned: true"                            end
     if note.favorited      then lines[#lines + 1] = "favorited: true"                         end
     if note.richMode       then lines[#lines + 1] = "richMode: true"                          end
@@ -1025,15 +1037,20 @@ local function ParseMarkdownNotes(text)
                     elseif key == "scope"            then note.scope            = val
                     elseif key == "wpClearOnLeave"   then note.wpClearOnLeave   = (val == "true") or nil
                     elseif key == "wpNoTrack"        then note.wpNoTrack        = (val == "true") or nil
-                    elseif key == "waypoint" and val ~= "" and val ~= "null" then
-                        -- Format: mapID:x:y:label
-                        local mid, wx, wy, wlbl = val:match("^(%d+):(%-?[%d.]+):(%-?[%d.]+):(.*)$")
+                    elseif (key == "waypoint" or key == "waypointOff") and val ~= "" and val ~= "null" then
+                        -- Format: mapID:x:y:name, one line per waypoint (ALL-282);
+                        -- "waypointOff" = not placed by the situation. Before
+                        -- ALL-282 the last part was the zone label, written
+                        -- by nothing, so it is read as the name
+                        local mid, wx, wy, wname = val:match("^(%d+):(%-?[%d.]+):(%-?[%d.]+):(.*)$")
                         if mid then
-                            note.waypoint = {
+                            note.waypoints = note.waypoints or {}
+                            note.waypoints[#note.waypoints + 1] = {
                                 mapID = tonumber(mid),
                                 x     = tonumber(wx),
                                 y     = tonumber(wy),
-                                label = wlbl or "",
+                                name  = wname,
+                                on    = key == "waypoint" or nil,
                             }
                         end
                     elseif key == "iconSource"      then note.iconSource      = val

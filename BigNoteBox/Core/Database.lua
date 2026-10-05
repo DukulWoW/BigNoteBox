@@ -46,7 +46,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 11  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 12  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 18  -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -512,6 +512,25 @@ function BNB.MigrateNotesDB()
             end
         end
         v = 11
+    end
+
+    -- A note can have several waypoints (ALL-282): the single table
+    -- note.waypoint becomes the list note.waypoints = { wp }, on (it was always
+    -- placed by the situation). Its title was a copy of the note title taken
+    -- when it was pinned, so a renamed note kept the old name: dropped, the
+    -- name is read from the note title now
+    if v < 12 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                local wp = BNB.CleanWaypoint(note.waypoint)
+                if wp and note.waypoints == nil then
+                    wp.name, wp.on = nil, true
+                    note.waypoints = { wp }
+                end
+                note.waypoint = nil
+            end
+        end
+        v = 12
     end
 
     -- Never lower the stored version: running an older build must not make the

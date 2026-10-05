@@ -11,7 +11,7 @@
 -- "instance:Molten Core" / "player:Thrall" / "npc:..." / "guild:..." /
 -- "itype:dungeon" / "open:vendor" / "state:rested", ... } or nil (ALL-232), plus
 -- contextDisplay, contextLeave, contextTrigger, contextFreq (ALL-232 S2),
--- waypoint, wpClearOnLeave, wpNoTrack (SUG-10). The editor lists every situation (one row each,
+-- waypoints (ALL-282), wpCreatedOn, wpClearOnLeave, wpNoTrack (SUG-10). The editor lists every situation (one row each,
 -- X removes it) above one add row (ALL-232 S3, Dukul's layout A,
 -- 2026-10-04); fixing a typo is X and add again.
 --
@@ -645,7 +645,8 @@ function BNB.CreateSituationEditor(panel, opts)
     freq.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
     -- ── Waypoint ─────────────────────────────────────────────────────────────
-    -- note.waypoint = { mapID, x, y, label, title }. TomTom (TomTom:AddWaypoint)
+    -- note.waypoints = { { mapID, x, y, label, name, on }, ... } (ALL-282,
+    -- Core/NoteFields.lua). TomTom (TomTom:AddWaypoint)
     -- and the built-in map pin (C_Map.SetUserWaypoint) are both used if present.
     local wpDiv = Divider(panel)
     wpDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -(6 + 4 * OPT_PITCH + 4))
@@ -801,11 +802,14 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- ── Refreshers ───────────────────────────────────────────────────────────
     local function RefreshWaypointDisplay()
+        -- The last waypoint added (ALL-282 S2 turns this into a list)
         local note = NoteID() and BNB.GetNote(NoteID())
-        local wp   = note and note.waypoint
+        local wps  = BNB.NoteWaypoints(note)
+        local wp   = wps[#wps]
         if wp and wp.x and wp.y then
-            local title = wp.title or wp.label or ""
+            local title = BNB.WaypointName(note, wp)
             local coords = string.format("%.1f, %.1f", wp.x, wp.y)
+            if #wps > 1 then coords = coords .. string.format(" (+%d)", #wps - 1) end
             wpStatusLbl:SetText(L["STICKY_WP_STATUS_LABEL"] .. "\n"
                 .. (title ~= "" and (title .. "\n") or "") .. coords)
             wpStatusLbl:Show()
@@ -1021,27 +1025,32 @@ function BNB.CreateSituationEditor(panel, opts)
         trig:Set("arrive"); freq:Set("always")
         listOffset = 0
         RefreshList()
-        -- Also remove an active waypoint of this note
-        local uid = BNB._autoWaypoints and BNB._autoWaypoints[id]
-        if uid then
-            if TomTom and TomTom.RemoveWaypoint and type(uid) == "table" then
-                pcall(function() TomTom:RemoveWaypoint(uid) end)
-            elseif uid == true and C_Map and C_Map.ClearUserWaypoint then
-                pcall(C_Map.ClearUserWaypoint)
-            end
-            BNB._autoWaypoints[id] = nil
-        end
+        -- Also take this note's placed waypoints off the map
+        if BNB.RemoveNoteWaypoints then BNB.RemoveNoteWaypoints(id) end
         if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
         Sync(id)
     end)
 
-    -- Saves a waypoint at x, y (0-100) on the player's current map
+    -- Adds a waypoint at x, y (0-100) on mapID, placed by the situation (on).
+    -- Without TomTom the game's pin holds one point, so the others go off
     local function SetWaypoint(note, id, mapID, x, y, msgKey)
-        local zone  = GetRealZoneText() or GetZoneText() or ""
-        local title = (note.title and note.title ~= "") and note.title or zone
-        BNB.UpdateNote(id, { waypoint = { mapID = mapID, x = x, y = y, label = zone, title = title } })
+        local zone = GetRealZoneText() or GetZoneText() or ""
+        local list = {}
+        local single = not (TomTom and TomTom.AddWaypoint)
+        for _, wp in ipairs(BNB.NoteWaypoints(note)) do
+            local c = BNB.CleanWaypoint(wp)
+            if c then
+                if single then c.on = nil end
+                list[#list + 1] = c
+            end
+        end
+        local wp = { mapID = mapID, x = x, y = y, label = zone ~= "" and zone or nil, on = true }
+        list[#list + 1] = wp
+        local fields = { waypoints = list }
+        if single and note.wpCreatedOn then fields._clear = { "wpCreatedOn" } end
+        BNB.UpdateNote(id, fields)
         RefreshWaypointDisplay()
-        BNB:Print(string.format(L[msgKey], title, x, y))
+        BNB:Print(string.format(L[msgKey], BNB.WaypointName(note, wp), x, y))
         Sync(id)
     end
 
@@ -1057,14 +1066,16 @@ function BNB.CreateSituationEditor(panel, opts)
         y2 = math.max(0, math.min(100, y2))
         local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
         wpManualRow:Hide()
-        SetWaypoint(note, id, mapID or (note.waypoint and note.waypoint.mapID), x, y2, "NC_WP_SET_MANUAL_MSG")
+        local last = BNB.NoteWaypoints(note)[#BNB.NoteWaypoints(note)]
+        SetWaypoint(note, id, mapID or (last and last.mapID), x, y2, "NC_WP_SET_MANUAL_MSG")
     end
 
     wpManualBtn:SetScript("OnClick", function()
         if wpManualRow:IsShown() then wpManualRow:Hide(); return end
-        -- Pre-filled with the saved waypoint
+        -- Pre-filled with the last saved waypoint
         local note = NoteID() and BNB.GetNote(NoteID())
-        local wp   = note and note.waypoint
+        local wps  = BNB.NoteWaypoints(note)
+        local wp   = wps[#wps]
         if wp and wp.x then wpXEb:SetText(string.format("%.1f", wp.x)) end
         if wp and wp.y then wpYEb:SetText(string.format("%.1f", wp.y)) end
         wpManualRow:Show()
@@ -1090,47 +1101,22 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     Tip(wpPinBtn, L["STICKY_WP_PIN_TIP_TITLE"], L["STICKY_WP_PIN_TIP_BODY"], true)
 
+    -- Every waypoint placed by the situation; none on = the first waypoint,
+    -- else where the note was made
     wpNavBtn:SetScript("OnClick", function()
         local note = NoteID() and BNB.GetNote(NoteID()); if not note then return end
-        local wp = note.waypoint
-        if not (wp and wp.x and wp.y and wp.mapID) then
+        local list = BNB.ActiveWaypoints(note)
+        if not list[1] then list = { BNB.NoteWaypoints(note)[1] or BNB.CreationWaypoint(note) } end
+        if not list[1] then
             BNB:Print("|cffff6666No waypoint set on this note.|r"); return
         end
-        local wpTitle = wp.title or wp.label or "BigNoteBox"
-        local handled = false
-        -- TomTom (any version with AddWaypoint)
-        if TomTom and TomTom.AddWaypoint then
-            pcall(function()
-                TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, { title = wpTitle, from = "BigNoteBox" })
-            end)
-            handled = true
-            BNB:Print(string.format(L["NC_WP_TOMTOM_MSG"], wpTitle, wp.x, wp.y))
-        end
-        -- Built-in map pin
-        if not handled and C_Map and C_Map.SetUserWaypoint then
-            local ok = pcall(function()
-                C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(wp.mapID, wp.x / 100, wp.y / 100))
-                if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
-                    C_SuperTrack.SetSuperTrackedUserWaypoint(true)
-                end
-            end)
-            if ok then
-                handled = true
-                BNB:Print(string.format(L["NC_WP_MAP_PIN_MSG"], wpTitle, wp.x, wp.y))
-            end
-        end
-        -- Otherwise a /way line to copy into a waypoint addon
-        if not handled then
-            local wayStr = string.format("/way %s %.1f %.1f %s",
-                wp.label or GetRealZoneText() or "", wp.x, wp.y, wpTitle)
-            BNB:Print(string.format(L["STICKY_WP_NO_ADDON_COPY_FMT"], wayStr))
-        end
+        BNB.NavigateWaypoints(note, list)
     end)
     Tip(wpNavBtn, L["STICKY_WP_NAV_TIP_TITLE"], L["STICKY_WP_NAV_TIP_BODY"], true)
 
     wpClearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
-        BNB.UpdateNote(id, { _clear = { "waypoint" } })
+        BNB.UpdateNote(id, { _clear = { "waypoints", "wpCreatedOn" } })
         RefreshWaypointDisplay()
         Sync(id)
     end)

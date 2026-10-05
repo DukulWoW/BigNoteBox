@@ -32,10 +32,12 @@ local L   = BNB.L
 BNB._contextMatches = BNB._contextMatches or {}
 -- noteID -> the situation string it matched by in the last check
 BNB._contextMatchedBy = BNB._contextMatchedBy or {}
-BNB._autoWaypoints  = BNB._autoWaypoints  or {}  -- noteID → TomTom uid (or true for retail)
--- noteID -> "mapID:x:y" of the waypoint last set for it while it matched. A
--- waypoint is set again only when the note newly matches or its waypoint changed,
--- not on every check (every target change stole quest super-tracking, BUG-16).
+-- noteID -> list of TomTom uids placed for it, or true for the game's own pin
+BNB._autoWaypoints  = BNB._autoWaypoints  or {}
+-- noteID -> signature of the waypoints last placed for it while it matched
+-- (WaypointSig). They are placed again only when the note newly matches or
+-- its waypoints changed, not on every check (every target change stole quest
+-- super-tracking, BUG-16).
 local _wpSent = {}
 
 -- Developer tools > "Trace situation checks" (ALL-192): one chat line per check,
@@ -719,6 +721,147 @@ local function AddByDisplay(note, stickyIDs, popupIDs)
 end
 
 -- ── Main check ────────────────────────────────────────────────────────────────
+-- ── Situation waypoints (ALL-282) ───────────────────────────────────────────
+-- A note places every waypoint that is on (BNB.ActiveWaypoints) through
+-- TomTom:AddWaypoint (WaypointUI shims it), or, without one, the first of them
+-- as the game's own map pin, which holds one point.
+local function HasTomTom() return TomTom and TomTom.AddWaypoint and true or false end
+
+-- Removes the TomTom waypoints placed for a note. The game's pin (true) is
+-- left to the caller: it may belong to another note by now
+local function RemoveTomTomWaypoints(id)
+    local placed = BNB._autoWaypoints[id]
+    if type(placed) == "table" and TomTom and TomTom.RemoveWaypoint then
+        for _, uid in ipairs(placed) do
+            pcall(function() TomTom:RemoveWaypoint(uid) end)
+        end
+    end
+end
+
+-- The game's pin is one point: another note may have placed it since
+local function NativePinTaken(byOtherThan)
+    for id, placed in pairs(BNB._autoWaypoints) do
+        if placed == true and id ~= byOtherThan then return true end
+    end
+    return false
+end
+
+local function ClearNativePin()
+    if C_Map and C_Map.ClearUserWaypoint then pcall(C_Map.ClearUserWaypoint) end
+end
+
+-- What the placed waypoints look like: map, coordinates and, with TomTom, the
+-- name (the game's pin has none, and placing it again would take quest
+-- super-tracking back, BUG-16). nil = nothing to place
+local function WaypointSig(note, list, withNames)
+    if not list[1] then return nil end
+    local parts = {}
+    for i, wp in ipairs(list) do
+        parts[i] = wp.mapID .. ":" .. wp.x .. ":" .. wp.y
+            .. (withNames and (":" .. BNB.WaypointName(note, wp)) or "")
+    end
+    return table.concat(parts, "|")
+end
+
+-- Places a matching note's waypoints when they differ from what was placed
+-- for it last; the old ones go first, so a moved waypoint is replaced, not
+-- doubled. A note with none left has its own removed.
+local function PlaceNoteWaypoints(id)
+    local note   = BNB.GetNote(id)
+    local tomtom = HasTomTom()
+    local list   = note and BNB.ActiveWaypoints(note, not tomtom) or {}
+    local sig    = note and WaypointSig(note, list, tomtom)
+    if _wpSent[id] == sig then return end
+    _wpSent[id] = sig
+
+    local placed = BNB._autoWaypoints[id]
+    RemoveTomTomWaypoints(id)
+    BNB._autoWaypoints[id] = nil
+    if not sig then
+        if placed == true and not NativePinTaken(id) then ClearNativePin() end
+        return
+    end
+
+    if tomtom then
+        local uids = {}
+        for i, wp in ipairs(list) do
+            -- crazy = false: placed, but TomTom's arrow is not switched to it.
+            -- The arrow goes to the first one only, never with "Don't track
+            -- it" (note.wpNoTrack, SUG-10)
+            local wpOpts = { title = BNB.WaypointName(note, wp), from = "BigNoteBox" }
+            if note.wpNoTrack or i > 1 then wpOpts.crazy = false end
+            local ok, uid = pcall(function()
+                return TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, wpOpts)
+            end)
+            if ok and uid then uids[#uids + 1] = uid end
+        end
+        if uids[1] then BNB._autoWaypoints[id] = uids end
+    elseif C_Map and C_Map.SetUserWaypoint then
+        local wp = list[1]
+        -- The pin moves here: no other note holds it any more
+        for other, p in pairs(BNB._autoWaypoints) do
+            if p == true then BNB._autoWaypoints[other] = nil end
+        end
+        pcall(function()
+            C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(wp.mapID, wp.x / 100, wp.y / 100))
+            if not note.wpNoTrack and C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+                C_SuperTrack.SetSuperTrackedUserWaypoint(true)
+            end
+        end)
+        BNB._autoWaypoints[id] = true
+    end
+end
+
+-- The zone name of a waypoint: the map's own name in this client's language,
+-- else the name saved with it
+function BNB.WaypointZone(wp)
+    local info = wp and wp.mapID and C_Map and C_Map.GetMapInfo and C_Map.GetMapInfo(wp.mapID)
+    return (info and info.name) or (wp and wp.label) or ""
+end
+
+-- Navigate: places the given waypoints and tracks them, whatever "Don't track
+-- it" says (only the situation's own placement honours it). TomTom takes them
+-- all, its arrow on the first; the game's pin takes the first; with neither, a
+-- /way line to copy into a waypoint addon
+function BNB.NavigateWaypoints(note, list)
+    local first = list and list[1]
+    if not first then return end
+    local name = BNB.WaypointName(note, first)
+    if HasTomTom() then
+        for i, wp in ipairs(list) do
+            local opts = { title = BNB.WaypointName(note, wp), from = "BigNoteBox" }
+            if i > 1 then opts.crazy = false end
+            pcall(function() TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, opts) end)
+        end
+        BNB:Print(string.format(L["NC_WP_TOMTOM_MSG"], name, first.x, first.y))
+        return
+    end
+    if C_Map and C_Map.SetUserWaypoint then
+        local ok = pcall(function()
+            C_Map.SetUserWaypoint(UiMapPoint.CreateFromCoordinates(first.mapID, first.x / 100, first.y / 100))
+            if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+                C_SuperTrack.SetSuperTrackedUserWaypoint(true)
+            end
+        end)
+        if ok then
+            BNB:Print(string.format(L["NC_WP_MAP_PIN_MSG"], name, first.x, first.y))
+            return
+        end
+    end
+    local wayStr = string.format("/way %s %.1f %.1f %s", BNB.WaypointZone(first), first.x, first.y, name)
+    BNB:Print(string.format(L["STICKY_WP_NO_ADDON_COPY_FMT"], wayStr))
+end
+
+-- Takes a note's placed waypoints off the map (Clear all situations), and
+-- forgets them, so the next match places them again
+function BNB.RemoveNoteWaypoints(id)
+    local placed = BNB._autoWaypoints[id]
+    RemoveTomTomWaypoints(id)
+    if placed == true and not NativePinTaken(id) then ClearNativePin() end
+    BNB._autoWaypoints[id] = nil
+    _wpSent[id] = nil
+end
+
 function BNB.CheckContextualNotes()
     if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then
         UpdateMinimapBadge(0)
@@ -793,15 +936,11 @@ function BNB.CheckContextualNotes()
                     pcall(function() BNB.Sticky.SetMinimized(id, true) end)
                 end
             end
-            -- Waypoint removal on zone leave
+            -- Waypoint removal on zone leave. The game's own pin (true) is
+            -- deferred: cleared after the loop only if no other departing note
+            -- wants to keep it
             if note and note.wpClearOnLeave and BNB._autoWaypoints[id] then
-                local uid = BNB._autoWaypoints[id]
-                if TomTom and TomTom.RemoveWaypoint and type(uid) == "table" then
-                    pcall(function() TomTom:RemoveWaypoint(uid) end)
-                elseif uid == true and C_Map and C_Map.ClearUserWaypoint then
-                    -- Retail: only clear if no other departing note wants to keep its WP
-                    -- Deferred — checked after the full loop
-                end
+                RemoveTomTomWaypoints(id)
                 BNB._autoWaypoints[id] = nil
             elseif note and not note.wpClearOnLeave and BNB._autoWaypoints[id] then
                 hasKeepWP = true
@@ -814,7 +953,7 @@ function BNB.CheckContextualNotes()
         for _, id in ipairs(prev) do
             if not matchSet[id] then
                 local note = BNB.GetNote(id)
-                if note and note.wpClearOnLeave and note.waypoint then
+                if note and note.wpClearOnLeave and BNB.HasActiveWaypoint(note) then
                     shouldClear = true; break
                 end
             end
@@ -861,53 +1000,32 @@ function BNB.CheckContextualNotes()
     end
 
     -- ── Waypoint dispatch on zone entry ───────────────────────────────────────
-    -- Set for every matching note whose waypoint was not set yet while it has
-    -- been matching: a new match, or a waypoint added or moved since (e.g. saved
-    -- while already in the zone, picked up by the next check). Read when the
-    -- timer fires, so a check that ran in between (left the zone) wins.
-    -- Uses TomTom:AddWaypoint (WaypointUI shims this) or the retail map pin API.
+    -- Placed for every matching note whose waypoints were not placed yet while
+    -- it has been matching: a new match, or waypoints changed since (also
+    -- picked up at once through NoteChanged, below). Read when the timer
+    -- fires, so a check that ran in between (left the zone) wins.
     C_Timer.After(1.0, function()
-        for _, id in ipairs(BNB._contextMatches or {}) do
-            local note = BNB.GetNote(id)
-            local wp   = note and note.waypoint
-            local sig  = wp and wp.x and wp.y and wp.mapID
-                and (wp.mapID .. ":" .. wp.x .. ":" .. wp.y) or nil
-            local due  = sig and _wpSent[id] ~= sig
-            _wpSent[id] = sig
-            if due then
-                local wpTitle = (wp.title and wp.title ~= "") and wp.title
-                           or  (note.title and note.title ~= "") and note.title
-                           or  "BigNoteBox"
-                if TomTom and TomTom.AddWaypoint then
-                    -- A moved waypoint replaces the old one rather than adding a second
-                    local old = BNB._autoWaypoints[id]
-                    if type(old) == "table" and TomTom.RemoveWaypoint then
-                        pcall(function() TomTom:RemoveWaypoint(old) end)
-                    end
-                    -- crazy = false: placed, but TomTom's arrow is not
-                    -- switched to it (note.wpNoTrack, SUG-10)
-                    local wpOpts = { title = wpTitle, from = "BigNoteBox" }
-                    if note.wpNoTrack then wpOpts.crazy = false end
-                    local ok, uid = pcall(function()
-                        return TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, wpOpts)
-                    end)
-                    if ok and uid then BNB._autoWaypoints[id] = uid end
-                elseif C_Map and C_Map.SetUserWaypoint then
-                    pcall(function()
-                        local pt = UiMapPoint.CreateFromCoordinates(
-                            wp.mapID, wp.x / 100, wp.y / 100)
-                        C_Map.SetUserWaypoint(pt)
-                        if not note.wpNoTrack and C_SuperTrack
-                           and C_SuperTrack.SetSuperTrackedUserWaypoint then
-                            C_SuperTrack.SetSuperTrackedUserWaypoint(true)
-                        end
-                    end)
-                    BNB._autoWaypoints[id] = true  -- retail flag
-                end
-            end
-        end
+        for _, id in ipairs(BNB._contextMatches or {}) do PlaceNoteWaypoints(id) end
     end)
 end
+
+-- A note's matching waypoints changed (a row turned on or off, added,
+-- removed, or the note renamed): placed again at once rather than on the
+-- next situation check. Debounced, so typing a title re-places once.
+local _wpRefresh = {}
+local function RefreshChangedWaypoints()
+    for id in pairs(_wpRefresh) do PlaceNoteWaypoints(id) end
+    wipe(_wpRefresh)
+end
+BNB.RegisterMessage("ContextWaypoints", "NoteChanged", function(_, id)
+    for _, m in ipairs(BNB._contextMatches or {}) do
+        if m == id then
+            _wpRefresh[id] = true
+            BNB.Debounce("contextWaypoints", 0.5, RefreshChangedWaypoints)
+            return
+        end
+    end
+end)
 
 -- Match one situation string against where the player is now, as note
 -- situations are matched. ctx e.g. "zone:stormwind city", "player:Arthas".

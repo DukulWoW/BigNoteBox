@@ -48,13 +48,19 @@ function BNB.RegisterSlashCommands()
                 local id = BNB._currentNoteID
                 local note = id and BNB.GetNote(id)
                 if not note then BNB:Print("No note selected."); return end
-                local wp = note.waypoint
-                if not wp then BNB:Print("Note has no waypoint data."); return end
-                BNB:Print(string.format("|cff88bbffWaypoint data:|r mapID=%s  x=%s  y=%s  title=%s  label=%s",
-                    tostring(wp.mapID), tostring(wp.x), tostring(wp.y),
-                    tostring(wp.title), tostring(wp.label)))
-                BNB:Print(string.format("|cff88bbffFlags:|r wpClearOnLeave=%s  situations=%s",
-                    tostring(note.wpClearOnLeave), table.concat(BNB.NoteSituations(note), ", ")))
+                local list = {}
+                local created = BNB.CreationWaypoint(note)
+                if created then list[1] = created end
+                for _, wp in ipairs(BNB.NoteWaypoints(note)) do list[#list + 1] = wp end
+                if not list[1] then BNB:Print("Note has no waypoint data."); return end
+                for _, wp in ipairs(list) do
+                    BNB:Print(string.format("|cff88bbffWaypoint%s:|r mapID=%s  x=%s  y=%s  on=%s  name=%s  label=%s",
+                        wp.created and " (created)" or "", tostring(wp.mapID), tostring(wp.x), tostring(wp.y),
+                        tostring(wp.on == true), BNB.WaypointName(note, wp), tostring(wp.label)))
+                end
+                BNB:Print(string.format("|cff88bbffFlags:|r wpClearOnLeave=%s  wpNoTrack=%s  situations=%s",
+                    tostring(note.wpClearOnLeave), tostring(note.wpNoTrack),
+                    table.concat(BNB.NoteSituations(note), ", ")))
             elseif sub == "fire" then
                 BNB:Print("|cff88bbffSimulating zone-enter (calling CheckContextualNotes)...|r")
                 if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
@@ -78,10 +84,11 @@ function BNB.RegisterSlashCommands()
                 end)
             elseif sub == "auto" then
                 local count = 0
-                for id, uid in pairs(BNB._autoWaypoints or {}) do
+                for id, placed in pairs(BNB._autoWaypoints or {}) do
                     local note = BNB.GetNote(id)
                     local title = note and note.title or "?"
-                    BNB:Print(string.format("  |cff88bbff%s|r -> uid=%s", title, tostring(uid)))
+                    BNB:Print(string.format("  |cff88bbff%s|r -> %s", title,
+                        placed == true and "map pin" or (#placed .. " TomTom waypoint(s)")))
                     count = count + 1
                 end
                 if count == 0 then BNB:Print("|cff88bbffNo auto-placed waypoints tracked.|r") end
