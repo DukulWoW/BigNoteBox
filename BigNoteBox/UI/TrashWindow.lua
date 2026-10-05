@@ -1,15 +1,15 @@
 -- BigNoteBox UI/TrashWindow.lua — Trash Browser
 --
--- Row style matches NoteList: icon left, title + 3-line preview right, date top-right.
--- Bottom strip (left→right): Empty Trash | Select/Cancel
+-- Rows as in Note History (ALL-299): icon, title, how long it has been in the
+-- trash, size. A click opens the note's page; right-click = View / Restore / Delete.
+-- Bottom strip (left->right): Empty Trash | Select; in Select mode
+-- Restore selected | Delete selected | Select all | Cancel (ALL-300).
 -- Info block (bottom-right): "Kept X days / X notes in trash"
 --
--- Empty Trash uses a StaticPopup for confirmation (same pattern as Reset).
--- Per-row Delete shows an inline "Sure?" button for 3 seconds.
--- Select toggles multi-select mode; label becomes "Cancel" to exit without restoring.
--- "Restore" and "Restore selected" are the explicit restore actions.
+-- Empty Trash and Delete selected confirm with a StaticPopup.
 -- Two pages in one window (ALL-258): the list (root) and View, one trashed
--- note's title and body with Restore / Delete; back arrow or ESC = the list.
+-- note's title and body with Restore / Delete (a 3 s "Sure?" step) and, for a
+-- rich note, a Markup / Note button (opens on Note); back arrow or ESC = the list.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -20,9 +20,9 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 local TW_W           = BNB.SIDE_WINDOW_W   -- 400 (ALL-269)
 local TITLE_H        = 32
 local PAD            = 14
-local ROW_H          = 86
+local ROW_H          = 56    -- as Note History's rows (ALL-299)
 local ROW_GAP        = 4
-local ICON_SZ        = 42
+local ICON_SZ        = 36
 local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = TW_W - PAD * 2 - 30   -- 30px scrollbar clearance
 local BOTTOM_STRIP_H = 52
@@ -36,6 +36,7 @@ local _selectBtn     = nil   -- "Select" (normal mode only)
 local _restoreSelBtn = nil   -- "Restore selected" (select mode only)
 local _deleteSelBtn  = nil   -- "Delete selected"  (select mode only)
 local _cancelSelBtn  = nil   -- "Cancel"            (select mode only)
+local _selAllBtn     = nil   -- "Select all"        (select mode only, ALL-300)
 local _infoLbl       = nil   -- "Kept X days\nX notes in trash" (bottom-right)
 local _multiSel  = {}
 local _multiMode = false
@@ -78,7 +79,23 @@ local function SetTrashMultiMode(enabled)
         _deleteSelBtn:SetEnabled(false)
     end
     if _cancelSelBtn  then _cancelSelBtn:SetShown(enabled) end
+    if _selAllBtn     then _selAllBtn:SetShown(enabled) end
+    if _infoLbl       then _infoLbl:SetShown(not enabled) end   -- the four buttons need the width
     BNB.RefreshTrashWindow()
+end
+
+-- A note's size as Note History counts it: title + body
+local function NoteSize(note)
+    local b = #(note.title or "") + #(note.body or "")
+    if BNB.HistoryFormatSize then return BNB.HistoryFormatSize(b) end
+    return b < 1024 and (b .. " B") or string.format("%.1f KB", b / 1024)
+end
+
+-- Enables the select-mode actions by the number of ticked rows
+local function SyncSelButtons()
+    local hasAny = next(_multiSel) ~= nil
+    if _restoreSelBtn then _restoreSelBtn:SetEnabled(hasAny) end
+    if _deleteSelBtn  then _deleteSelBtn:SetEnabled(hasAny)  end
 end
 
 -- Update the info block (retention + count)
@@ -106,9 +123,12 @@ end
 
 -- "Delete selected": permanently removes the ticked rows, after a confirm.
 -- It used to purge on the first click with no way back (found with ALL-58).
-local function PurgeSelectedConfirm()
-    local ids = {}
-    for id in pairs(_multiSel) do ids[#ids + 1] = id end
+-- ids: a list to delete instead of the ticked rows (a row's right-click Delete)
+local function PurgeSelectedConfirm(ids)
+    if not ids then
+        ids = {}
+        for id in pairs(_multiSel) do ids[#ids + 1] = id end
+    end
     if #ids == 0 then return end
     if not StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] then
         StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] = {
@@ -129,16 +149,27 @@ local function PurgeSelectedConfirm()
     if popup then popup.data = ids end
 end
 
--- Row builder — Button with backdrop, matching NoteList style
+-- Row builder: a Button with backdrop, laid out as Note History's rows (ALL-299)
 local function GetRow(parent, index)
     local row = _rows[index]
     if row then row:SetParent(parent); row:Show(); return row end
 
-    row = BNB.CreateBackdropFrame("Button", nil, parent)
-    -- See-through enough for the Forever glow behind the list (ALL-272)
-    BNB.SetBackdrop(row, 0.07, 0.07, 0.09, 0.30, 0.22, 0.22, 0.26, 1)
+    -- No background or border, a divider under each row: exactly Note
+    -- History's rows (Dukul, 2026-10-05; replaces ALL-272's see-through box)
+    row = CreateFrame("Button", nil, parent)
     row:SetHeight(ROW_H)
-    row:RegisterForClicks("LeftButtonUp")
+    local sep = row:CreateTexture(nil, "ARTWORK")
+    sep:SetHeight(1)
+    sep:SetPoint("BOTTOMLEFT",  row, "BOTTOMLEFT",  0, 0)
+    sep:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", 0, 0)
+    sep:SetColorTexture(0.22, 0.22, 0.25, 1)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+
+    -- Hover highlight
+    local hl = row:CreateTexture(nil, "ARTWORK", nil, 0)
+    hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.05); hl:Hide()
+    row:SetScript("OnEnter", function() hl:Show() end)
+    row:SetScript("OnLeave", function() hl:Hide() end)
 
     -- Selection highlight
     local selHi = row:CreateTexture(nil, "ARTWORK", nil, 1)
@@ -147,65 +178,35 @@ local function GetRow(parent, index)
     selHi:Hide()
     row._selHi = selHi
 
-    -- Icon
-    local icon = row:CreateTexture(nil, "ARTWORK")
+    -- Icon (its frame, if the note has one, comes from ApplyIconFrame)
+    local icon = row:CreateTexture(nil, "ARTWORK", nil, 2)
     icon:SetSize(ICON_SZ, ICON_SZ)
-    icon:SetPoint("LEFT", row, "LEFT", PAD, 0)
+    icon:SetPoint("LEFT", row, "LEFT", 0, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     row._icon = icon
 
-    -- Icon border
-    local iconBorder = row:CreateTexture(nil, "OVERLAY")
-    iconBorder:SetSize(ICON_SZ + 2, ICON_SZ + 2)
-    iconBorder:SetPoint("CENTER", icon, "CENTER", 0, 0)
-    iconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
-    row._iconBorder = iconBorder
-
-    -- Title — full width, no right truncation needed since date is no longer beside it
+    local textLeft = ICON_SZ + 10
+    -- Title
     local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  TEXT_LEFT, -8)
-    titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -8, -8)
+    titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  textLeft, -4)
+    titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -4)
     titleLbl:SetJustifyH("LEFT")
     titleLbl:SetMaxLines(1); titleLbl:SetWordWrap(false)
     row._titleLbl = titleLbl
 
-    -- Deletion date — bottom-right corner, same baseline as action buttons
+    -- How long it has been in the trash
     local dateLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    dateLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -8, 8)
-    dateLbl:SetJustifyH("RIGHT")
-    dateLbl:SetTextColor(0.50, 0.50, 0.50)
+    dateLbl:SetPoint("TOPLEFT", row, "TOPLEFT", textLeft, -22)
+    dateLbl:SetJustifyH("LEFT")
+    dateLbl:SetTextColor(0.55, 0.55, 0.55)
     row._dateLbl = dateLbl
 
-    -- Body preview (3 lines) — stops above the bottom action strip
-    local previewLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    previewLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  TEXT_LEFT, -24)
-    previewLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -8, -24)
-    previewLbl:SetPoint("BOTTOM",   row, "BOTTOM",    0,  28)
-    previewLbl:SetJustifyH("LEFT")
-    previewLbl:SetJustifyV("TOP")
-    previewLbl:SetMaxLines(3); previewLbl:SetWordWrap(true)
-    previewLbl:SetTextColor(0.55, 0.55, 0.55)
-    row._previewLbl = previewLbl
-
-    -- Action buttons (bottom of row): View | Restore | Delete | Sure?
-    local viewBtn = BNB.CreateButton(nil, row, L["TW_ROW_VIEW_BTN"], 52, 20)
-    viewBtn:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", TEXT_LEFT, 6)
-    row._viewBtn = viewBtn
-
-    local restoreBtn = BNB.CreateButton(nil, row, L["TW_ROW_RESTORE_BTN"], 72, 20)
-    restoreBtn:SetPoint("LEFT", viewBtn, "RIGHT", 6, 0)
-    row._restoreBtn = restoreBtn
-
-    local permDelBtn = BNB.CreateButton(nil, row, L["TW_ROW_DELETE_BTN"], 60, 20)
-    permDelBtn:SetPoint("LEFT", restoreBtn, "RIGHT", 6, 0)
-    row._permDelBtn = permDelBtn
-
-    -- "Sure?" confirm button — appears right of Delete for 3s, then hides
-    local sureBtn = BNB.CreateButton(nil, row, L["TW_ROW_SURE_BTN"], 52, 20)
-    sureBtn:SetPoint("LEFT", permDelBtn, "RIGHT", 4, 0)
-    sureBtn:Hide()
-    row._sureBtn = sureBtn
-    row._sureTimer = nil
+    -- Size, bottom-right
+    local sizeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    sizeLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
+    sizeLbl:SetJustifyH("RIGHT")
+    sizeLbl:SetTextColor(0.40, 0.40, 0.40)
+    row._sizeLbl = sizeLbl
 
     _rows[index] = row
     return row
@@ -245,10 +246,10 @@ local function BuildViewPage(f, top)
         top = top, pad = PAD, padR = PAD + 28,
         onShow = function(p, id, note)
             p._noteID = id
+            p._note = note
+            p._markup = false   -- a rich note opens on Note (ALL-299)
             p:SetHeading((note.title and note.title ~= "") and note.title or L["TW_VIEW_UNTITLED"])
-            p._bodyFs:SetText(note.body or "")
-            p._bodyCt:SetHeight(math.max(p._bodyFs:GetStringHeight(), 1))
-            p._sf:SetVerticalScroll(0)
+            p._showBody()
             if p._sureTimer then p._sureTimer:Cancel(); p._sureTimer = nil end
             p._sureBtn:Hide()
         end,
@@ -271,6 +272,46 @@ local function BuildViewPage(f, top)
     bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
     bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
     page._bodyFs = bodyFs; page._bodyCt = ct
+
+    -- A rich note is shown rendered (Note) or as its source (Markup), one
+    -- button flipping between them (ALL-299). Built on first use.
+    local AM = BNB.AdvancedMode
+    local rf
+    local toggleBtn = BNB.CreateButton(nil, page, L["NE_RICH_TAB_MARKUP"], 76, 26)
+    toggleBtn:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
+    toggleBtn:Hide()
+    page._showBody = function()
+        local note = page._note or {}
+        local rich = note.richMode and AM and AM.ToHTML and true or false
+        local html = rich and not page._markup
+        if html and not rf then
+            rf = AM.CreateRenderFrame(nil, ct)
+            rf:SetPoint("TOPLEFT")
+            rf:SetWidth(CONTENT_W)
+        end
+        local h
+        if html then
+            local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+            AM.ApplyFontsToRenderFrame(rf, sz, AM.OutlineFlagStr(note.fontOutline))
+            rf:SetHTML(AM.ToHTML(note.body or "", sz))
+            rf:Show(); bodyFs:Hide()
+            h = rf:GetHeight()
+        else
+            if rf then rf:Hide() end
+            bodyFs:SetText(note.body or "")
+            bodyFs:Show()
+            h = bodyFs:GetStringHeight()
+        end
+        ct:SetHeight(math.max(h or 0, 1))
+        sf:SetVerticalScroll(0)
+        -- The button names the view it switches to
+        toggleBtn:SetText(page._markup and L["NE_RICH_TAB_NOTE"] or L["NE_RICH_TAB_MARKUP"])
+        toggleBtn:SetShown(rich)
+    end
+    toggleBtn:SetScript("OnClick", function()
+        page._markup = not page._markup
+        page._showBody()
+    end)
 
     local restoreBtn = BNB.CreateButton(nil, page, L["TW_ROW_RESTORE_BTN"], 110, 26)
     restoreBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
@@ -347,6 +388,8 @@ function BNB.PopulateTrashWindow()
     if _restoreSelBtn then _restoreSelBtn:SetShown(_multiMode) end
     if _deleteSelBtn  then _deleteSelBtn:SetShown(_multiMode)  end
     if _cancelSelBtn  then _cancelSelBtn:SetShown(_multiMode)  end
+    if _selAllBtn     then _selAllBtn:SetShown(_multiMode)     end
+    if _infoLbl       then _infoLbl:SetShown(not _multiMode)   end
     if _emptyBtn      then _emptyBtn:SetShown(not _multiMode)  end
 
     local scrollChild = _twFrame._scrollChild
@@ -365,7 +408,7 @@ function BNB.PopulateTrashWindow()
         -- Icon
         local iconPath = (note.icon and note.icon ~= "") and note.icon or DEFAULT_ICON
         row._icon:SetTexture(iconPath)
-        if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row._icon, note) end
+        if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row._icon, note, ICON_SZ) end
 
         -- Title
         row._titleLbl:SetText(
@@ -375,68 +418,40 @@ function BNB.PopulateTrashWindow()
         if tc and tc.r then row._titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
         else row._titleLbl:SetTextColor(1, 0.82, 0, 1) end
 
-        -- Date
-        row._dateLbl:SetText(FormatDeleted(note.deletedAt))
-
-        -- Preview
-        local bodyStr = note.body or ""
-        row._previewLbl:SetText(bodyStr ~= "" and bodyStr or L["TW_NO_CONTENT"])
+        -- In the trash since, and size (ALL-299)
+        row._dateLbl:SetText(string.format(L["TW_ROW_DELETED_FMT"], FormatDeleted(note.deletedAt)))
+        row._sizeLbl:SetText(NoteSize(note))
 
         -- Selection highlight
         if row._selHi then
             row._selHi:SetShown(_multiMode and _multiSel[id] == true)
         end
 
-        -- Cancel any pending Sure? timer on refresh
-        if row._sureTimer then row._sureTimer:Cancel(); row._sureTimer = nil end
-        if row._sureBtn   then row._sureBtn:Hide() end
-
-        if _multiMode then
-            row._viewBtn:Hide(); row._restoreBtn:Hide(); row._permDelBtn:Hide()
-            if row._sureBtn then row._sureBtn:Hide() end
-            row:SetScript("OnClick", function()
-                if _multiSel[id] then _multiSel[id] = nil
-                else                  _multiSel[id] = true end
-                if row._selHi then
-                    row._selHi:SetShown(_multiSel[id] == true)
-                end
-                -- Update action button enabled state immediately
-                local selCount = 0
-                for _ in pairs(_multiSel) do selCount = selCount + 1 end
-                local hasAny = selCount > 0
-                if _restoreSelBtn then _restoreSelBtn:SetEnabled(hasAny) end
-                if _deleteSelBtn  then _deleteSelBtn:SetEnabled(hasAny)  end
-            end)
-        else
-            row._viewBtn:Show(); row._restoreBtn:Show(); row._permDelBtn:Show()
-            row:SetScript("OnClick", nil)
-
-            -- View: the note's title + body on the View page (ALL-258)
-            row._viewBtn:SetScript("OnClick", function()
-                if item.note then _twFrame:ShowPage("view", id, item.note) end
-            end)
-
-            row._restoreBtn:SetScript("OnClick", function()
-                if BNB.RestoreNote then BNB.RestoreNote(id) end
-            end)
-
-            -- Delete: show "Sure?" for 3s, then auto-hide
-            row._permDelBtn:SetScript("OnClick", function()
-                local sb = row._sureBtn
-                if not sb then return end
-                sb:Show()
-                if row._sureTimer then row._sureTimer:Cancel() end
-                row._sureTimer = C_Timer.NewTimer(3, function()
-                    sb:Hide(); row._sureTimer = nil
+        -- Select mode: a click ticks the row. Otherwise a click opens the
+        -- note's page and right-click offers View / Restore / Delete (ALL-299)
+        row:SetScript("OnClick", function(self, button)
+            if _multiMode then
+                if button ~= "LeftButton" then return end
+                if _multiSel[id] then _multiSel[id] = nil else _multiSel[id] = true end
+                if row._selHi then row._selHi:SetShown(_multiSel[id] == true) end
+                SyncSelButtons()
+            elseif button == "RightButton" then
+                BNB.ContextMenu.Open(row, function(root)
+                    root:CreateButton(L["TW_ROW_VIEW_BTN"], function()
+                        if item.note then _twFrame:ShowPage("view", id, item.note) end
+                    end)
+                    root:CreateButton(L["TW_ROW_RESTORE_BTN"], function()
+                        if BNB.RestoreNote then BNB.RestoreNote(id) end
+                    end)
+                    root:CreateDivider()
+                    root:CreateButton(L["TW_ROW_DELETE_BTN"], function()
+                        PurgeSelectedConfirm({ id })   -- the same confirm as Delete selected
+                    end, { danger = true })   -- irreversible = red (Dukul)
                 end)
-            end)
-
-            -- Sure?: permanently delete from trash
-            row._sureBtn:SetScript("OnClick", function()
-                if row._sureTimer then row._sureTimer:Cancel(); row._sureTimer = nil end
-                BNB.PurgeTrashed({ id })   -- the window follows TrashChanged
-            end)
-        end
+            elseif item.note then
+                _twFrame:ShowPage("view", id, item.note)
+            end
+        end)
 
         totalH = totalH + ROW_H + ROW_GAP
     end
@@ -451,13 +466,7 @@ function BNB.PopulateTrashWindow()
     scrollChild:SetHeight(math.max(minH, totalH > 0 and totalH or 40))
 
     -- Keep action buttons in sync with current selection count
-    if _multiMode then
-        local selCount = 0
-        for _ in pairs(_multiSel) do selCount = selCount + 1 end
-        local hasAny = selCount > 0
-        if _restoreSelBtn then _restoreSelBtn:SetEnabled(hasAny) end
-        if _deleteSelBtn  then _deleteSelBtn:SetEnabled(hasAny)  end
-    end
+    if _multiMode then SyncSelButtons() end
 
     -- Auto-close when the last item is removed
     if n == 0 and _twFrame:IsShown() then
@@ -543,7 +552,7 @@ local function BuildTrashWindow()
     _selectBtn = selectBtn
 
     -- ── Select mode: Restore selected | Delete selected | Cancel ──────────────
-    local restoreSelBtn = BNB.CreateButton(nil, list, L["TW_RESTORE_SEL_BTN"], 110, 26)
+    local restoreSelBtn = BNB.CreateButton(nil, list, L["TW_RESTORE_SEL_BTN"], 104, 26)
     restoreSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     restoreSelBtn:SetEnabled(false)
     restoreSelBtn:SetScript("OnClick", function()
@@ -563,10 +572,10 @@ local function BuildTrashWindow()
     restoreSelBtn:Hide()
     _restoreSelBtn = restoreSelBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, list, L["TW_DELETE_SEL_BTN"], 110, 26)
+    local deleteSelBtn = BNB.CreateButton(nil, list, L["TW_DELETE_SEL_BTN"], 100, 26)
     deleteSelBtn:SetPoint("LEFT", restoreSelBtn, "RIGHT", 6, 0)
     deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:SetScript("OnClick", PurgeSelectedConfirm)
+    deleteSelBtn:SetScript("OnClick", function() PurgeSelectedConfirm() end)
     deleteSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["TW_DELETE_SEL_TIP"], 1, 1, 1)
@@ -577,8 +586,18 @@ local function BuildTrashWindow()
     deleteSelBtn:Hide()
     _deleteSelBtn = deleteSelBtn
 
-    local cancelSelBtn = BNB.CreateButton(nil, list, L["CANCEL"], 68, 26)
-    cancelSelBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
+    -- Select all (ALL-300): ticks every row
+    local selAllBtn = BNB.CreateButton(nil, list, L["TAG_MGR_SELECT_ALL_BTN"], 76, 26)
+    selAllBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
+    selAllBtn:SetScript("OnClick", function()
+        for _, item in ipairs(_itemOrder) do _multiSel[item.id] = true end
+        BNB.RefreshTrashWindow()
+    end)
+    selAllBtn:Hide()
+    _selAllBtn = selAllBtn
+
+    local cancelSelBtn = BNB.CreateButton(nil, list, L["CANCEL"], 62, 26)
+    cancelSelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
     cancelSelBtn:SetScript("OnClick", function() SetTrashMultiMode(false) end)
     cancelSelBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")

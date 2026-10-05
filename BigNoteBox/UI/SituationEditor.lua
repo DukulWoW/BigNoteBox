@@ -61,6 +61,10 @@ local _popupOwner     -- the editor that opened it
 
 local function HasWPAddon()   return TomTom and TomTom.AddWaypoint end
 local function HasRetailPin() return C_Map and C_Map.SetUserWaypoint end
+-- WaypointUI draws the game's own pin in the world (arrow, distance). It does
+-- not provide TomTom's API, so placement stays one point through the game's
+-- pin; only the status says it is there (ALL-307)
+local function HasWaypointUI() return WaypointUIAPI and WaypointUIAPI.Navigation and true or false end
 local function WPAvailable()  return HasWPAddon() or HasRetailPin() end
 
 -- Divider line in the skin border colour (skin mode) or grey
@@ -215,6 +219,9 @@ local function TogglePopup(ed)
     if HasWPAddon() then
         f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_ADDON"] .. "|r")
         f._descLbl:SetText(L["NC_WP_FULL_SUPPORT_DETAIL"])
+    elseif HasWaypointUI() and HasRetailPin() then
+        f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_WAYPOINTUI"] .. "|r")
+        f._descLbl:SetText(L["NC_WP_WAYPOINTUI_DETAIL"])
     elseif HasRetailPin() then
         f._statusLbl:SetText("|cffffaa00" .. L["STICKY_WP_STATUS_BASIC"] .. "|r")
         f._descLbl:SetText(L["NC_WP_BASIC_PIN_DETAIL"])
@@ -707,6 +714,9 @@ function BNB.CreateSituationEditor(panel, opts)
     local function RefreshWPStatusTag()
         if HasWPAddon() then
             wpStatusTag:SetText(HasRetailPin() and L["STICKY_WP_TAG_ENHANCED"] or L["STICKY_WP_TAG_ADDON"])
+            wpStatusTag:SetTextColor(0.4, 1, 0.4)
+        elseif HasWaypointUI() and HasRetailPin() then
+            wpStatusTag:SetText(L["STICKY_WP_TAG_WAYPOINTUI"])
             wpStatusTag:SetTextColor(0.4, 1, 0.4)
         elseif HasRetailPin() then
             wpStatusTag:SetText(L["STICKY_WP_TAG_BASIC"])

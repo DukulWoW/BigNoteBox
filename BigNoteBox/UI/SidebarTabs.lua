@@ -116,6 +116,12 @@ local function NewSlices(btn, layer, sub, file)
     for i = 1, 5 do
         t[i] = btn:CreateTexture(nil, layer, nil, sub)
         t[i]:SetTexture(file)
+        -- Snapped one by one, two pieces at fractional x can round apart and
+        -- leave a 1 px split (window at a fractional spot, FOR-31)
+        if t[i].SetSnapToPixelGrid then
+            t[i]:SetSnapToPixelGrid(false)
+            t[i]:SetTexelSnappingBias(0)
+        end
     end
     return t
 end
@@ -129,15 +135,17 @@ local function LayoutSlices(set, btn, w, h)
         and { { 0, CAP, capW }, { CAP, ORN_L, runW }, { ORN_L, ORN_R, ornW },
               { ORN_R, AW - CAP, runW }, { AW - CAP, AW, capW } }
         or  { { 0, AW, w } }
-    local x = 0
+    -- Each piece hangs from the previous one's right edge, so they always meet
+    local prev
     for i, t in ipairs(set) do
         local c = cuts[i]
         t:ClearAllPoints()
         if c then
             t:SetTexCoord(c[1] / AW, c[2] / AW, 0, 1)
-            t:SetPoint("TOPLEFT", btn, "TOPLEFT", x, 0)
+            if prev then t:SetPoint("TOPLEFT", prev, "TOPRIGHT", 0, 0)
+            else t:SetPoint("TOPLEFT", btn, "TOPLEFT", 0, 0) end
             t:SetSize(c[3], h)
-            x = x + c[3]
+            prev = t
         end
         t._used = c and true or false
     end

@@ -723,7 +723,8 @@ end
 -- ── Main check ────────────────────────────────────────────────────────────────
 -- ── Situation waypoints (ALL-282) ───────────────────────────────────────────
 -- A note places every waypoint that is on (BNB.ActiveWaypoints) through
--- TomTom:AddWaypoint (WaypointUI shims it), or, without one, the first of them
+-- TomTom:AddWaypoint, or, without it, the first of them (WaypointUI has no
+-- TomTom API: it draws the game's pin in the world, ALL-307)
 -- as the game's own map pin, which holds one point.
 local function HasTomTom() return TomTom and TomTom.AddWaypoint and true or false end
 

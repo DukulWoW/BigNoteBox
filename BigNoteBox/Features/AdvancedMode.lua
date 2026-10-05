@@ -246,6 +246,7 @@ end
 --------------------------------------------------------------------------------
 local _fontObjs = {}  -- cache: key = "tag|path|px|flags"
 local _fontCount = 0
+local FONT_RESET_SECS = 15   -- how long a new object is set again per use (ALL-16)
 
 -- Resolve note.fontOutline to a SetFont flag string.
 -- Handles SLUG, SLUG Outline, and SLUG Thick Outline as first-class options.
@@ -295,13 +296,25 @@ local function GetOrCreateFontObj(tag, path, size, flags)
         _fontCount = _fontCount + 1
         fo = CreateFont("BNBRichFont" .. _fontCount)
         _fontObjs[cacheKey] = fo
+        fo._bnbSetUntil = GetTime() + FONT_RESET_SECS
     end
-    -- Set on every call, not only on creation: a bundled TTF that was not
-    -- loaded yet on a cold login draws blank until it is set again (ALL-16)
-    if px then
+    -- Set again only while the object is new: a bundled TTF that was not
+    -- loaded yet on a cold login draws blank until it is set again (ALL-16).
+    -- After that never: every SetFont makes the client walk all text using the
+    -- object, and SimpleHTML frees its lines on each render. Setting it on every
+    -- render is the lead for the Forever crashes (FOR-30, use-after-free in a walk).
+    if px and GetTime() <= fo._bnbSetUntil then
         pcall(fo.SetFont, fo, path, px, flags)
     end
     return fo
+end
+
+-- Binds a tag's font object only when it changed for this frame (FOR-30)
+local function SetTagFont(f, tag, fo)
+    f._bnbTagFonts = f._bnbTagFonts or {}
+    if f._bnbTagFonts[tag] == fo then return end
+    f._bnbTagFonts[tag] = fo
+    f:SetFontObject(tag, fo)
 end
 
 -- flagStr (optional): pass AM.OutlineFlagStr(note.fontOutline).
@@ -330,10 +343,10 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
         psz  = bodySize
     end
 
-    f:SetFontObject("h1", GetOrCreateFontObj("h1", boldPath, h1sz, flagStr))
-    f:SetFontObject("h2", GetOrCreateFontObj("h2", boldPath, h2sz, flagStr))
-    f:SetFontObject("h3", GetOrCreateFontObj("h3", boldPath, h3sz, flagStr))
-    f:SetFontObject("p",  GetOrCreateFontObj("p",  bodyPath, psz,  flagStr))
+    SetTagFont(f, "h1", GetOrCreateFontObj("h1", boldPath, h1sz, flagStr))
+    SetTagFont(f, "h2", GetOrCreateFontObj("h2", boldPath, h2sz, flagStr))
+    SetTagFont(f, "h3", GetOrCreateFontObj("h3", boldPath, h3sz, flagStr))
+    SetTagFont(f, "p",  GetOrCreateFontObj("p",  bodyPath, psz,  flagStr))
 
     -- White text for headings/body; colour tags in markup override per-span.
     -- Note: SimpleHTML does not support SetFontObject/SetTextColor for "a" tags —

@@ -39,6 +39,13 @@ local _clearAllBtn = nil
 local _sizeLbl    = nil
 local _reopenNote = nil   -- the note page's note when the window last closed on it
 
+-- Select mode (ALL-301), as in Trash: rows tick, the footer swaps to
+-- Clear selected | Select all | Cancel
+local _multiMode  = false
+local _multiSel   = {}    -- { [noteID] = true }
+local _selectBtn, _clearSelBtn, _selAllBtn, _cancelSelBtn = nil, nil, nil, nil
+local _entries    = {}    -- the rows' note ids, as last populated
+
 --------------------------------------------------------------------------------
 -- INTERNAL: count total slots across auto + manual
 --------------------------------------------------------------------------------
@@ -68,6 +75,12 @@ local function BuildRow(parent, note, id, yOff)
     row:SetScript("OnEnter", function() hl:Show() end)
     row:SetScript("OnLeave", function() hl:Hide() end)
 
+    -- Selection highlight (Select mode, ALL-301)
+    local selHi = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+    selHi:SetAllPoints()
+    selHi:SetColorTexture(0.20, 0.40, 0.20, 0.25)
+    selHi:SetShown(_multiMode and _multiSel[id] == true)
+
     -- Icon
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SZ, ICON_SZ)
@@ -79,6 +92,8 @@ local function BuildRow(parent, note, id, yOff)
     else
         pcall(function() icon:SetAtlas(iconTex) end)
     end
+    -- The note's icon frame, as the note list and Trash draw it (ALL-296)
+    if BNB.ApplyIconFrame then BNB.ApplyIconFrame(icon, note, ICON_SZ) end
 
     -- Title
     local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -116,6 +131,13 @@ local function BuildRow(parent, note, id, yOff)
     sep:SetColorTexture(0.22, 0.22, 0.25, 1)
 
     row:SetScript("OnClick", function(self, mouseBtn)
+        if _multiMode then
+            if mouseBtn ~= "LeftButton" then return end
+            if _multiSel[id] then _multiSel[id] = nil else _multiSel[id] = true end
+            selHi:SetShown(_multiSel[id] == true)
+            if _clearSelBtn then _clearSelBtn:SetEnabled(next(_multiSel) ~= nil) end
+            return
+        end
         if mouseBtn == "RightButton" then
             BNB.ContextMenu.Open(row, function(root)   -- ALL-148
                 root:CreateButton(L["HISTORY_CTX_VIEW"], function()
@@ -155,6 +177,41 @@ local function BuildRow(parent, note, id, yOff)
     end)
 
     return row
+end
+
+--------------------------------------------------------------------------------
+-- Select mode (ALL-301): swaps the footer and redraws the rows
+--------------------------------------------------------------------------------
+local function SetHistoryMultiMode(on)
+    _multiMode = on and true or false
+    _multiSel  = {}
+    if _clearAllBtn  then _clearAllBtn:SetShown(not _multiMode) end
+    if _selectBtn    then _selectBtn:SetShown(not _multiMode) end
+    if _sizeLbl      then _sizeLbl:SetShown(not _multiMode) end
+    if _clearSelBtn  then _clearSelBtn:SetShown(_multiMode); _clearSelBtn:SetEnabled(false) end
+    if _selAllBtn    then _selAllBtn:SetShown(_multiMode) end
+    if _cancelSelBtn then _cancelSelBtn:SetShown(_multiMode) end
+    BNB.RefreshHistoryWindow()
+end
+
+-- "Clear selected": the same clear as Clear all (automatic snapshots; a manual
+-- restore point is kept), for the ticked notes, after one confirm with the count
+local function ClearSelectedConfirm()
+    local ids = {}
+    for id in pairs(_multiSel) do ids[#ids + 1] = id end
+    if #ids == 0 then return end
+    StaticPopupDialogs["BNB_HISTORY_CLEAR_SEL"] = StaticPopupDialogs["BNB_HISTORY_CLEAR_SEL"] or {
+        text = L["HW_CLEAR_SEL_CONFIRM_FMT"],
+        button1 = L["DELETE"], button2 = L["CANCEL"],
+        OnAccept = function(self, data)
+            if type(data) ~= "table" then return end
+            for _, id in ipairs(data) do BNB.HistoryDeleteAuto(id) end
+            SetHistoryMultiMode(false)
+            if BNB.SyncHistoryBtnState then BNB.SyncHistoryBtnState() end
+        end,
+        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3, showAlert = true,
+    }
+    StaticPopup_Show("BNB_HISTORY_CLEAR_SEL", tostring(#ids), nil, ids)
 end
 
 --------------------------------------------------------------------------------
@@ -198,13 +255,18 @@ function BNB.PopulateHistoryWindow()
     if #entries == 0 then
         _emptyLbl:Show()
         child:SetHeight(40)
+        _entries = {}
         if _clearAllBtn then _clearAllBtn:SetEnabled(false) end
+        if _selectBtn   then _selectBtn:SetEnabled(false) end
         if _sizeLbl     then _sizeLbl:SetText(L["HISTORY_SIZE_NONE"]) end
         return
     end
+    if _selectBtn then _selectBtn:SetEnabled(true) end
 
     _emptyLbl:Hide()
     if _clearAllBtn then _clearAllBtn:SetEnabled(true) end
+    _entries = {}
+    for i, e in ipairs(entries) do _entries[i] = e.id end
 
     local yOff = 0
     for _, e in ipairs(entries) do
@@ -246,6 +308,7 @@ local function BuildHistoryWindow()
         onHide = function(self)
             local np = self._pages.note
             _reopenNote = self:PageKey() == "note" and np and np._noteID or nil
+            if _multiMode then SetHistoryMultiMode(false) end
         end,
     })
     local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H
@@ -294,6 +357,48 @@ local function BuildHistoryWindow()
     end)
     clearBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _clearAllBtn = clearBtn
+
+    -- Select mode (ALL-301): Select | then Clear selected | Select all | Cancel
+    local selectBtn = BNB.CreateButton(nil, list, L["MW_SELECT_BTN"], 72, 26)
+    selectBtn:SetPoint("LEFT", clearBtn, "RIGHT", 6, 0)
+    selectBtn:SetEnabled(false)
+    selectBtn:SetScript("OnClick", function() SetHistoryMultiMode(true) end)
+    selectBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["HW_SELECT_TIP"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    _selectBtn = selectBtn
+
+    local clearSelBtn = BNB.CreateButton(nil, list, L["HW_CLEAR_SEL_BTN"], 120, 26)
+    clearSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
+    clearSelBtn:SetScript("OnClick", ClearSelectedConfirm)
+    clearSelBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["HW_CLEAR_SEL_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["HW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
+        GameTooltip:Show()
+    end)
+    clearSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    clearSelBtn:Hide()
+    _clearSelBtn = clearSelBtn
+
+    local selAllBtn = BNB.CreateButton(nil, list, L["TAG_MGR_SELECT_ALL_BTN"], 80, 26)
+    selAllBtn:SetPoint("LEFT", clearSelBtn, "RIGHT", 6, 0)
+    selAllBtn:SetScript("OnClick", function()
+        for _, id in ipairs(_entries) do _multiSel[id] = true end
+        BNB.RefreshHistoryWindow()
+        clearSelBtn:SetEnabled(next(_multiSel) ~= nil)
+    end)
+    selAllBtn:Hide()
+    _selAllBtn = selAllBtn
+
+    local cancelSelBtn = BNB.CreateButton(nil, list, L["CANCEL"], 68, 26)
+    cancelSelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
+    cancelSelBtn:SetScript("OnClick", function() SetHistoryMultiMode(false) end)
+    cancelSelBtn:Hide()
+    _cancelSelBtn = cancelSelBtn
 
     -- Size label
     local szLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

@@ -188,10 +188,13 @@ local function BuildBackupTab(sf, ct)
             return
         end
 
-        local notes = NE.ParseJsonNotes(raw) or NE.ParseMarkdownNotes(raw)
+        -- A damaged JSON file says where it breaks (ALL-294), never falls
+        -- through to Markdown
+        local notes, jsonErr = NE.ParseJsonNotes(raw)
+        if not notes and not jsonErr then notes = NE.ParseMarkdownNotes(raw) end
         if not notes then
             importStatus:SetTextColor(0.82, 0.55, 0.55)
-            importStatus:SetText(L["BACKUP_IMPORT_ERR"])
+            importStatus:SetText(jsonErr or L["BACKUP_IMPORT_ERR"])
             return
         end
 
@@ -264,44 +267,52 @@ local function BuildBackupTab(sf, ct)
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_HDR_DATA_SUMMARY"])
 
-    -- Compute stats from live notes DB
-    local noteCount    = 0
-    local totalBytes   = 0
-    local largestBytes = 0
-    local trashCount   = 0
-    local trashBytes   = 0
-    local ndb = BNB.NotesDB()
-    if ndb then
-        if ndb.notes then
-            for _, note in pairs(ndb.notes) do
-                noteCount = noteCount + 1
-                local sz  = #(note.title or "") + #(note.body or "")
-                totalBytes = totalBytes + sz
-                if sz > largestBytes then largestBytes = sz end
+    -- Counted on every refresh, never once at build: the page is built once and
+    -- an import or delete must show at once (ALL-293)
+    local function ComputeStats()
+        local noteCount    = 0
+        local totalBytes   = 0
+        local largestBytes = 0
+        local trashCount   = 0
+        local trashBytes   = 0
+        local ndb = BNB.NotesDB()
+        if ndb then
+            if ndb.notes then
+                for _, note in pairs(ndb.notes) do
+                    noteCount = noteCount + 1
+                    local sz  = #(note.title or "") + #(note.body or "")
+                    totalBytes = totalBytes + sz
+                    if sz > largestBytes then largestBytes = sz end
+                end
+            end
+            if ndb.trash then
+                for _, note in pairs(ndb.trash) do
+                    trashCount = trashCount + 1
+                    trashBytes = trashBytes + #(note.title or "") + #(note.body or "")
+                end
             end
         end
-        if ndb.trash then
-            for _, note in pairs(ndb.trash) do
-                trashCount = trashCount + 1
-                trashBytes = trashBytes + #(note.title or "") + #(note.body or "")
+
+        local function fmtSize(bytes)
+            if bytes >= 1024 * 1024 then
+                return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024))
+            elseif bytes >= 1024 then
+                return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024)
+            else
+                return string.format(L["CFG_SIZE_B_FMT"], bytes)
             end
         end
-    end
 
-    local function fmtSize(bytes)
-        if bytes >= 1024 * 1024 then
-            return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024))
-        elseif bytes >= 1024 then
-            return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024)
-        else
-            return string.format(L["CFG_SIZE_B_FMT"], bytes)
-        end
+        local avgBytes   = noteCount > 0 and (totalBytes / noteCount) or 0
+        local histBytes  = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
+        local totalCount = noteCount + trashCount
+        local grandTotal = totalBytes + trashBytes
+        return {
+            string.format(L["CFG_STAT_COUNT_FMT"], noteCount), fmtSize(totalBytes), fmtSize(avgBytes),
+            string.format(L["CFG_STAT_COUNT_FMT"], trashCount), fmtSize(trashBytes), fmtSize(histBytes),
+            string.format(L["CFG_STAT_COUNT_FMT"], totalCount), fmtSize(grandTotal), fmtSize(largestBytes),
+        }
     end
-
-    local avgBytes   = noteCount > 0 and (totalBytes / noteCount) or 0
-    local histBytes  = BNB.HistoryTotalSize and BNB.HistoryTotalSize() or 0
-    local totalCount = noteCount + trashCount
-    local grandTotal = totalBytes + trashBytes
 
     local GREEN = "|cff66bb6a"
     local GREY  = "|cffaaaaaa"
@@ -325,17 +336,17 @@ local function BuildBackupTab(sf, ct)
 
     local stats = {
         -- Row 1: live notes
-        { icon = ICO_N,  label = L["CFG_STAT_NOTES"],        value = string.format(L["CFG_STAT_COUNT_FMT"], noteCount) },
-        { icon = ICO_S,  label = L["CFG_STAT_NOTES_SIZE"],   value = fmtSize(totalBytes) },
-        { icon = ICO_A,  label = L["CFG_STAT_AVG_SIZE"],     value = fmtSize(avgBytes) },
+        { icon = ICO_N,  label = L["CFG_STAT_NOTES"] },
+        { icon = ICO_S,  label = L["CFG_STAT_NOTES_SIZE"] },
+        { icon = ICO_A,  label = L["CFG_STAT_AVG_SIZE"] },
         -- Row 2: trash + history
-        { icon = ICO_T,  label = L["CFG_STAT_IN_TRASH"],     value = string.format(L["CFG_STAT_COUNT_FMT"], trashCount) },
-        { icon = ICO_TS, label = L["CFG_STAT_TRASH_SIZE"],   value = fmtSize(trashBytes) },
-        { icon = ICO_H,  label = L["CFG_STAT_HISTORY_SIZE"], value = fmtSize(histBytes) },
+        { icon = ICO_T,  label = L["CFG_STAT_IN_TRASH"] },
+        { icon = ICO_TS, label = L["CFG_STAT_TRASH_SIZE"] },
+        { icon = ICO_H,  label = L["CFG_STAT_HISTORY_SIZE"] },
         -- Row 3: totals
-        { icon = ICO_TN, label = L["CFG_STAT_TOTAL_NOTES"],  value = string.format(L["CFG_STAT_COUNT_FMT"], totalCount) },
-        { icon = ICO_GS, label = L["CFG_STAT_TOTAL_SIZE"],   value = fmtSize(grandTotal) },
-        { icon = ICO_L,  label = L["CFG_STAT_LARGEST_NOTE"], value = fmtSize(largestBytes) },
+        { icon = ICO_TN, label = L["CFG_STAT_TOTAL_NOTES"] },
+        { icon = ICO_GS, label = L["CFG_STAT_TOTAL_SIZE"] },
+        { icon = ICO_L,  label = L["CFG_STAT_LARGEST_NOTE"] },
     }
 
     -- 3-column grid, 3 rows — render each stat at the correct col/row offset
@@ -349,11 +360,27 @@ local function BuildBackupTab(sf, ct)
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff)
         lbl:SetWidth(COL - 4)
         lbl:SetJustifyH("LEFT")
-        lbl:SetText(
-            "|T" .. s.icon .. ":" .. SZ .. "|t " ..
-            GREY .. s.label .. ": " .. RESET ..
-            GREEN .. s.value .. RESET
-        )
+        s.lbl = lbl
+    end
+
+    local function RefreshStats()
+        local values = ComputeStats()
+        for i, s in ipairs(stats) do
+            s.lbl:SetText(
+                "|T" .. s.icon .. ":" .. SZ .. "|t " ..
+                GREY .. s.label .. ": " .. RESET ..
+                GREEN .. values[i] .. RESET
+            )
+        end
+    end
+    RefreshStats()
+    sf:HookScript("OnShow", RefreshStats)
+    -- Follows note changes while the page is shown; one recount per frame
+    local function StatsFollow()
+        if sf:IsVisible() then BNB.Debounce("cfgDataSummary", 0, RefreshStats) end
+    end
+    for _, msg in ipairs({ "NoteCreated", "NoteChanged", "NoteDeleted", "NoteRestored", "TrashChanged" }) do
+        BNB.RegisterMessage("ConfigDataSummary", msg, StatsFollow)
     end
 
     local numRows = math.ceil(#stats / NCOLS)

@@ -260,7 +260,7 @@ local AO = BNB.AlarmOverview
 local OV_W    = BNB.SIDE_WINDOW_W   -- same width as Note History (ALL-269)
 local OV_H    = 640   -- start height; follows the main window once open (ALL-269)
 local OV_PAD  = 10
-local OV_ROW  = 36
+local OV_ROW  = 56   -- as Note History's rows (ALL-303)
 
 local _ovFrame    = nil
 local _ovMultiMode = false
@@ -270,6 +270,8 @@ local _ovSelectBtn    = nil   -- "Select" (normal) / "Cancel" (select mode)
 local _ovSelectAllBtn = nil   -- "Select All" (select mode only)
 local _ovDeleteSelBtn = nil   -- "Delete (N)" (select mode only)
 local _ovFootDiv      = nil   -- footer separator line
+local _ovClearAllBtn  = nil   -- "Clear all Alarms" (normal mode, ALL-303)
+local _ovCancelBtn    = nil   -- "Cancel" (select mode)
 
 local function UpdateOvDeleteLabel()
     if not _ovDeleteSelBtn then return end
@@ -292,6 +294,25 @@ local function FormatFireTime(noteID)
     if diff < 86400 then return string.format(L["AO_HOUR_MIN_LEFT_FMT"],
         math.floor(diff / 3600), math.floor((diff % 3600) / 60)) end
     return string.format(L["AO_DATE_FMT"], BNB.Date("%Y-%m-%d %H:%M", t))
+end
+
+-- What kind of alarm and how it repeats, for the row's bottom line (ALL-303)
+local RECUR_KEYS = { weekly = "AW_RECUR_WEEKLY", weekdays = "AW_RECUR_WEEKDAYS", interval = "AW_RECUR_INTERVAL" }
+local function AlarmInfo(alarm)
+    local kind = alarm.timeType == "ingame" and L["AW_TIME_INGAME"] or L["AW_TIME_REAL"]
+    local rep
+    if alarm.timeType == "ingame" then rep = L["AO_INFO_DAILY"]
+    else rep = RECUR_KEYS[alarm.recur or ""] and L[RECUR_KEYS[alarm.recur]] or L["AO_INFO_ONCE"] end
+    return kind .. " - " .. rep
+end
+
+-- The date on the row: when it fires next, or when a fired one went off
+local function RowDate(noteID, alarm)
+    if alarm.fired then
+        return alarm.time and string.format(L["AO_FIRED_AT_FMT"], BNB.Date("%Y-%m-%d %H:%M", alarm.time)) or ""
+    end
+    local t = BNB.Alarm and BNB.Alarm.GetNextFireTime(noteID)
+    return t and BNB.Date("%a %Y-%m-%d %H:%M", t) or ""
 end
 
 -- Full timestamp for tooltip
@@ -324,43 +345,20 @@ local function SetOvMultiMode(enabled)
         end
     end
 
-    local BW1 = OV_W - OV_PAD * 2
-    local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
-
-    if enabled then
-        -- Three-button layout: Cancel | Select All | Delete (N)
-        if _ovSelectBtn then
-            _ovSelectBtn:SetText(L["CANCEL"])
-            _ovSelectBtn:SetWidth(BW3)
-            _ovSelectBtn:ClearAllPoints()
-            _ovSelectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
-            _ovSelectBtn:Show()
-        end
-        if _ovSelectAllBtn then
-            _ovSelectAllBtn:SetWidth(BW3)
-            _ovSelectAllBtn:ClearAllPoints()
-            _ovSelectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
-            _ovSelectAllBtn:Show()
-        end
-        if _ovDeleteSelBtn then
-            _ovDeleteSelBtn:SetWidth(BW3)
-            _ovDeleteSelBtn:ClearAllPoints()
-            _ovDeleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + (BW3 + 6) * 2, 14)
-            _ovDeleteSelBtn:Show()
-            UpdateOvDeleteLabel()
-        end
-    else
-        -- Normal mode: one full-width "Select" button (hidden when no alarms)
-        if _ovSelectBtn then
-            _ovSelectBtn:SetText(L["MW_SELECT_BTN"])
-            _ovSelectBtn:SetWidth(BW1)
-            _ovSelectBtn:ClearAllPoints()
-            _ovSelectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
-            _ovSelectBtn:SetShown(hasAlarms)
-        end
-        if _ovSelectAllBtn then _ovSelectAllBtn:Hide() end
-        if _ovDeleteSelBtn  then _ovDeleteSelBtn:Hide()  end
+    -- Footer as Trash's (ALL-303): Clear all Alarms | Select, or
+    -- Delete (N) | Select all | Cancel
+    if _ovClearAllBtn then
+        _ovClearAllBtn:SetShown(not enabled)
+        _ovClearAllBtn:SetEnabled(hasAlarms)
     end
+    if _ovSelectBtn then
+        _ovSelectBtn:SetShown(not enabled)
+        _ovSelectBtn:SetEnabled(hasAlarms)
+    end
+    if _ovDeleteSelBtn then _ovDeleteSelBtn:SetShown(enabled) end
+    if _ovSelectAllBtn then _ovSelectAllBtn:SetShown(enabled) end
+    if _ovCancelBtn    then _ovCancelBtn:SetShown(enabled) end
+    if enabled then UpdateOvDeleteLabel() end
 
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then
         BNB.AlarmOverview.Refresh()
@@ -398,19 +396,59 @@ local function BuildOverview()
     ct:SetHeight(1)
     sf:SetScrollChild(ct)
 
-    -- ── Footer strip ──────────────────────────────────────────────────────────
-    local BW1 = OV_W - OV_PAD * 2
-    local BW3 = math.floor((OV_W - OV_PAD * 2 - 12) / 3)
-
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], BW1, 26)
-    selectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
-    selectBtn:SetScript("OnClick", function()
-        SetOvMultiMode(not _ovMultiMode)
+    -- ── Footer strip (ALL-303): normal-size buttons, as Trash ───────────────────
+    -- Clear all Alarms: every alarm, after one confirm with the count
+    local clearAllBtn = BNB.CreateButton(nil, f, L["AO_CLEAR_ALL_BTN"], 120, 26)
+    clearAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
+    clearAllBtn:SetScript("OnClick", function()
+        local ids = {}
+        local ndb = BNB.NotesDB()
+        for noteID, note in pairs(ndb and ndb.notes or {}) do
+            if note.alarm then ids[#ids + 1] = noteID end
+        end
+        if #ids == 0 then return end
+        StaticPopupDialogs["BNB_CLEAR_ALL_ALARMS"] = StaticPopupDialogs["BNB_CLEAR_ALL_ALARMS"] or {
+            text = L["AO_CLEAR_ALL_CONFIRM_FMT"],
+            button1 = L["DELETE"], button2 = L["CANCEL"],
+            OnAccept = function(self, data)
+                if type(data) ~= "table" then return end
+                for _, id in ipairs(data) do
+                    if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(id) end
+                end
+                SetOvMultiMode(false)
+            end,
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3, showAlert = true,
+        }
+        StaticPopup_Show("BNB_CLEAR_ALL_ALARMS", tostring(#ids), nil, ids)
     end)
+    clearAllBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["AO_CLEAR_ALL_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["TW_CANNOT_UNDO_TIP"], 0.8, 0.4, 0.4, true)
+        GameTooltip:Show()
+    end)
+    clearAllBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    _ovClearAllBtn = clearAllBtn
+
+    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 72, 26)
+    selectBtn:SetPoint("LEFT", clearAllBtn, "RIGHT", 6, 0)
+    selectBtn:SetScript("OnClick", function() SetOvMultiMode(true) end)
     _ovSelectBtn = selectBtn
 
-    local selectAllBtn = BNB.CreateButton(nil, f, L["MW_SELECT_ALL_BTN"], BW3, 26)
-    selectAllBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + BW3 + 6, 14)
+    local deleteSelBtn = BNB.CreateButton(nil, f, string.format(L["AO_DELETE_FMT"], 0), 100, 26)
+    deleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD, 14)
+    deleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
+    deleteSelBtn:SetEnabled(false)
+    deleteSelBtn:Hide()
+    deleteSelBtn:SetScript("OnClick", function()
+        for noteID in pairs(_ovMultiSel) do
+            if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(noteID) end
+        end
+        SetOvMultiMode(false)
+    end)
+
+    local selectAllBtn = BNB.CreateButton(nil, f, L["TAG_MGR_SELECT_ALL_BTN"], 80, 26)
+    selectAllBtn:SetPoint("LEFT", deleteSelBtn, "RIGHT", 6, 0)
     selectAllBtn:Hide()
     selectAllBtn:SetScript("OnClick", function()
         local ndb = BNB.NotesDB()
@@ -426,17 +464,12 @@ local function BuildOverview()
     end)
     _ovSelectAllBtn = selectAllBtn
 
-    local deleteSelBtn = BNB.CreateButton(nil, f, string.format(L["AO_DELETE_FMT"], 0), BW3, 26)
-    deleteSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", OV_PAD + (BW3 + 6) * 2, 14)
-    deleteSelBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
-    deleteSelBtn:SetEnabled(false)
-    deleteSelBtn:Hide()
-    deleteSelBtn:SetScript("OnClick", function()
-        for noteID in pairs(_ovMultiSel) do
-            if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(noteID) end
-        end
-        SetOvMultiMode(false)
-    end)
+    local cancelBtn = BNB.CreateButton(nil, f, L["CANCEL"], 62, 26)
+    cancelBtn:SetPoint("LEFT", selectAllBtn, "RIGHT", 6, 0)
+    cancelBtn:Hide()
+    cancelBtn:SetScript("OnClick", function() SetOvMultiMode(false) end)
+    _ovCancelBtn = cancelBtn
+
     _ovDeleteSelBtn = deleteSelBtn
 
     f._scrollContent = ct
@@ -484,34 +517,46 @@ local function MakeRow(parent)
     iconGlowFrame:SetFrameLevel(row:GetFrameLevel() + 10)
     iconGlowFrame:EnableMouse(false)
 
-    -- Title
+    -- Title, with the time left on the right (ALL-303: History-size rows)
+    local timeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    timeLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -8)
+    timeLbl:SetHeight(14); timeLbl:SetJustifyH("RIGHT")
+    timeLbl:SetTextColor(0.50, 0.50, 0.50, 1)
+
     local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -5)
-    titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -5)
+    titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -6)
+    titleLbl:SetPoint("RIGHT",    timeLbl, "LEFT", -6, 0)
     titleLbl:SetJustifyH("LEFT"); titleLbl:SetHeight(16)
+    titleLbl:SetWordWrap(false)
 
     -- Alarm label (subtitle)
     local labelLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    labelLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -22)
-    labelLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -22)
+    labelLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -23)
+    labelLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -23)
     labelLbl:SetJustifyH("LEFT"); labelLbl:SetHeight(14)
-    labelLbl:SetTextColor(0.55, 0.55, 0.55, 1)
+    labelLbl:SetTextColor(0.75, 0.75, 0.75, 1)
+    labelLbl:SetWordWrap(false)
 
-    -- Date/time bottom-right
-    local timeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    timeLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
-    timeLbl:SetHeight(12); timeLbl:SetJustifyH("RIGHT")
-    timeLbl:SetTextColor(0.50, 0.50, 0.50, 1)
+    -- Bottom line: kind and repeat on the left, the date on the right
+    local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", OV_TEXT_LEFT, 6)
+    infoLbl:SetHeight(12); infoLbl:SetJustifyH("LEFT")
+    infoLbl:SetTextColor(0.45, 0.45, 0.45, 1)
+
+    local dateLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    dateLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
+    dateLbl:SetHeight(12); dateLbl:SetJustifyH("RIGHT")
+    dateLbl:SetTextColor(0.50, 0.50, 0.50, 1)
 
     -- Reset button (shown when alarm.fired)
     local resetBtn = BNB.CreateButton(nil, row, L["RESET"], 52, 16)
-    resetBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 4)
+    resetBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -6)
     resetBtn:Hide()
 
     -- Dismiss button (shown while the alarm has gone off and not been
     -- answered, ALL-183); same spot as the time and Reset
     local dismissBtn = BNB.CreateButton(nil, row, L["AO_DISMISS_BTN"], 64, 16)
-    dismissBtn:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 4)
+    dismissBtn:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -6)
     dismissBtn:Hide()
 
     -- Bottom separator (same as HistoryWindow)
@@ -526,6 +571,8 @@ local function MakeRow(parent)
     row._titleLbl      = titleLbl
     row._labelLbl      = labelLbl
     row._timeLbl       = timeLbl
+    row._infoLbl       = infoLbl
+    row._dateLbl       = dateLbl
     row._resetBtn      = resetBtn
     row._dismissBtn    = dismissBtn
     return row
@@ -590,6 +637,8 @@ function AO.Refresh()
         local iconTex = (note.icon and note.icon ~= "") and note.icon or DEFAULT_NOTE_ICON
         row._iconTx:SetTexture(iconTex)
         if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(row._iconTx, note) end
+        -- The note's icon frame, as the note list and Trash draw it (ALL-296)
+        if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row._iconTx, note, OV_ICON_SZ) end
 
         -- Title
         local t = (note.title and note.title ~= "") and note.title or L["AO_UNTITLED"]
@@ -599,6 +648,9 @@ function AO.Refresh()
         local lbl = (alarm.label and alarm.label ~= "") and alarm.label or ""
         row._labelLbl:SetText(lbl)
         row._labelLbl:SetShown(lbl ~= "")
+        -- Kind and repeat, and when it fires / fired (ALL-303)
+        row._infoLbl:SetText(AlarmInfo(alarm))
+        row._dateLbl:SetText(RowDate(noteID, alarm))
 
         -- Gone off and not answered: due time passed or still ringing (ALL-183)
         local due  = BNB.Alarm.GetNextFireTime(noteID)
@@ -714,8 +766,9 @@ function AO.Refresh()
     end
 
     -- Sync Select button and footer divider visibility based on whether alarms exist
-    if not _ovMultiMode and _ovSelectBtn then
-        _ovSelectBtn:SetShown(#entries > 0)
+    if not _ovMultiMode then
+        if _ovSelectBtn    then _ovSelectBtn:SetEnabled(#entries > 0) end
+        if _ovClearAllBtn  then _ovClearAllBtn:SetEnabled(#entries > 0) end
     end
     if _ovFootDiv then _ovFootDiv:SetShown(#entries > 0) end
 

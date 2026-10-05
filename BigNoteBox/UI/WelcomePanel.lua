@@ -270,9 +270,9 @@ local function GetImportFrame()
             BNB:Print("|cffff4444Import not available: ConfigWindow not loaded yet.|r")
             return
         end
-        local noteList = BNB._ParseJsonNotes(text)
+        local noteList, jsonErr = BNB._ParseJsonNotes(text)
         if not noteList or #noteList == 0 then
-            BNB:Print(L["IMPORT_ERR_JSON"])
+            BNB:Print(jsonErr or L["IMPORT_ERR_JSON"])
             return
         end
         -- Same remap question as Settings > Backup. This used to set

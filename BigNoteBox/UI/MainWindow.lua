@@ -258,7 +258,9 @@ local WINDOWS = {
     { name = "BNBAlarmOverviewFrame", esc = true, companion = true, raise = true },
     { name = "BigNoteBoxStickySettingsFrame", raise = true,
       esc = function() Call(BNB.Sticky, "CloseSettings") end },
-    { name = "BigNoteBoxTagManagerFrame", esc = true, companion = true, raise = true,
+    -- The Tag Manager's note picker is a second page (ALL-302): ESC goes back first
+    { name = "BigNoteBoxTagManagerFrame", companion = true, raise = true,
+      esc = function(w) if not w:PageBack() then w:Hide() end end,
       focus = 4, reopen = function() Call(BNB, "ToggleTagManager") end },
     -- Note History and Trash have a second page (ALL-258): ESC goes back to
     -- the list first, then closes the window

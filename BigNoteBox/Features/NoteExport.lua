@@ -957,10 +957,20 @@ local function ParseJsonNotes(text)
         BNB:Print(string.format(L["BACKUP_IMPORT_VERSION_WARN"], expVer, JSON_VERSION))
     end
 
-    local doc = Json.Decode(text)
+    local doc, err = Json.Decode(text)
     local list = type(doc) == "table" and type(doc.notes) == "table" and doc.notes
-    if not list then list = ParseJsonNotesLegacy(text) end
-    if not list then return nil end
+    if not list then
+        -- The brace-counting fallback is only for the old unquoted igTime. Any
+        -- other broken file is refused: the fallback imported part of a file
+        -- with one missing comma and said nothing (ALL-294)
+        if text:find("\"igTime\"%s*:%s*%d") then list = ParseJsonNotesLegacy(text) end
+        if not list then
+            -- Second return: where the file breaks, as a line number
+            local pos = tonumber(err and err:match("at (%d+)"))
+            local line = pos and select(2, text:sub(1, pos):gsub("\n", "")) + 1
+            return nil, line and string.format(L["IMPORT_ERR_JSON_LINE"], line) or L["IMPORT_ERR_JSON"]
+        end
+    end
 
     local parsed = {}
     for _, raw in ipairs(list) do

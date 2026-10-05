@@ -4,6 +4,9 @@
 -- Accordion: click a tag header to expand/collapse its notes.
 -- Only one tag open at a time; clicking the open tag closes it.
 -- Per-tag: Rename (inline) | Delete All.
+-- Bottom strip as in Trash and Note History (ALL-302): Select; in Select mode
+-- Add to notes | Delete | Select all | Cancel. "Add to notes" opens a second
+-- page in the window: a searchable note list, tick notes, Add.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -34,6 +37,9 @@ local _multiSel    = {}   -- { [tag] = true }
 local _selectBtn   = nil
 local _selAllBtn   = nil
 local _delSelBtn   = nil
+local _addSelBtn   = nil   -- "Add to notes" (select mode, ALL-302)
+local _cancelBtn   = nil
+local FOOT_H       = 52    -- bottom strip, as Trash's
 
 --------------------------------------------------------------------------------
 -- TAG HEADER ROW POOL
@@ -173,25 +179,22 @@ end
 local UpdateDelSelBtn
 local SetMultiMode
 local PopulateTagManager
+local BuildNotesPage
 
 UpdateDelSelBtn = function()
-    if not _delSelBtn then return end
-    local n = 0
-    for _ in pairs(_multiSel) do n = n + 1 end
-    _delSelBtn:SetEnabled(n > 0)
+    local any = next(_multiSel) ~= nil
+    if _delSelBtn then _delSelBtn:SetEnabled(any) end
+    if _addSelBtn then _addSelBtn:SetEnabled(any) end
 end
 
 SetMultiMode = function(enabled)
     _multiMode = enabled
     _multiSel  = {}
-    if _selectBtn then
-        _selectBtn:SetText(enabled and L["CANCEL"] or L["MW_SELECT_BTN"])
-        _selectBtn:SetScript("OnClick", function()
-            SetMultiMode(not enabled)
-        end)
+    if _selectBtn then _selectBtn:SetShown(not enabled) end
+    for _, b in ipairs({ _addSelBtn, _delSelBtn, _selAllBtn, _cancelBtn }) do
+        b:SetShown(enabled)
     end
-    if _selAllBtn then _selAllBtn:SetShown(enabled)                              end
-    if _delSelBtn then _delSelBtn:SetShown(enabled); _delSelBtn:SetEnabled(false) end
+    UpdateDelSelBtn()
     PopulateTagManager()
 end
 
@@ -389,6 +392,147 @@ PopulateTagManager = function()
 end
 
 --------------------------------------------------------------------------------
+-- NOTE PICKER PAGE (ALL-302): ShowPage("notes", tags) lists every note with a
+-- search above (as the Reference Box Move / Copy window); a click ticks a note,
+-- "Add to N notes" adds the tags to the ticked ones (UpdateNote dedupes) and
+-- goes back to the tag list, out of Select mode.
+--------------------------------------------------------------------------------
+local PICK_ROW_H = 26
+
+function BuildNotesPage(f, top)
+    local page
+    local rows, picked, tags = {}, {}, {}
+    local search, sc, sf, addBtn
+
+    local function SyncAdd()
+        local n = 0
+        for _ in pairs(picked) do n = n + 1 end
+        addBtn:SetText(string.format(L["TAG_MGR_PICK_ADD_FMT"], n))
+        addBtn:SetEnabled(n > 0)
+    end
+
+    -- Places the rows that match the search, top to bottom
+    local function ApplyFilter()
+        local q = search:GetText()
+        if search._showingPlaceholder then q = "" end
+        q = (q or ""):lower()
+        local y = 0
+        for _, r in ipairs(rows) do
+            if r:IsShown() or r._inUse then
+                local hit = r._inUse and (q == "" or r._key:find(q, 1, true) ~= nil)
+                r:SetShown(hit)
+                if hit then
+                    r:ClearAllPoints()
+                    r:SetPoint("TOPLEFT",  sc, "TOPLEFT",  0, -y)
+                    r:SetPoint("TOPRIGHT", sc, "TOPRIGHT", 0, -y)
+                    y = y + PICK_ROW_H
+                end
+            end
+        end
+        sc:SetHeight(math.max(y, 1))
+    end
+
+    local function GetPickRow(i)
+        local r = rows[i]
+        if r then return r end
+        r = CreateFrame("Button", nil, sc)
+        r:SetHeight(PICK_ROW_H)
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06)
+        r._sel = r:CreateTexture(nil, "BACKGROUND")
+        r._sel:SetAllPoints(); r._sel:SetColorTexture(0.20, 0.40, 0.20, 0.30)
+        r._icon = r:CreateTexture(nil, "ARTWORK")
+        r._icon:SetSize(20, 20)
+        r._icon:SetPoint("LEFT", r, "LEFT", 4, 0)
+        r._icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r._check = r:CreateTexture(nil, "OVERLAY")
+        r._check:SetSize(20, 20)
+        r._check:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+        r._check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        r._title = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        r._title:SetPoint("LEFT",  r._icon, "RIGHT", 8, 0)
+        r._title:SetPoint("RIGHT", r._check, "LEFT", -6, 0)
+        r._title:SetJustifyH("LEFT"); r._title:SetWordWrap(false)
+        r:SetScript("OnClick", function(self)
+            picked[self._id] = not picked[self._id] or nil
+            self._sel:SetShown(picked[self._id] == true)
+            self._check:SetShown(picked[self._id] == true)
+            SyncAdd()
+        end)
+        rows[i] = r
+        return r
+    end
+
+    page = f:AddPage("notes", {
+        top = top, pad = PAD, padR = PAD,
+        onShow = function(p, list)
+            tags = list or {}
+            picked = {}
+            p:SetHeading(string.format(L["TAG_MGR_PICK_HEAD_FMT"], #tags))
+            search:SetRealText("")
+            local notes = BNB.GetOrderedNotes and BNB.GetOrderedNotes(nil, nil, false, true) or {}
+            table.sort(notes, function(a, b) return (a.title or ""):lower() < (b.title or ""):lower() end)
+            for _, r in ipairs(rows) do r._inUse = false; r:Hide() end
+            for i, e in ipairs(notes) do
+                local r = GetPickRow(i)
+                local title = (e.title and e.title ~= "") and e.title or L["HW_UNTITLED"]
+                r._id, r._key, r._inUse = e.id, title:lower(), true
+                r._title:SetText(title)
+                r._icon:SetTexture((e.icon and e.icon ~= "") and e.icon or DEFAULT_ICON)
+                r._sel:Hide(); r._check:Hide()
+                r:Show()
+            end
+            sf:SetVerticalScroll(0)
+            ApplyFilter()
+            SyncAdd()
+        end,
+    })
+
+    -- Search, as the Move / Copy window's (ALL-276)
+    local sBg = BNB.CreateBackdropFrame("Frame", nil, page); BNB.SetBackdropDark(sBg)
+    sBg:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  -(page.top + 2))
+    sBg:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(page.top + 2))
+    sBg:SetHeight(22)
+    search = CreateFrame("EditBox", nil, sBg)
+    search:SetAllPoints()
+    search:SetTextInsets(6, 6, 0, 0)
+    search:SetFontObject("GameFontNormal"); search:SetAutoFocus(false); search:SetMaxLetters(64)
+    BNB.AddPlaceholder(search, L["SEARCH_PLACEHOLDER"], 0.4, 0.4, 0.4)
+    search:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
+    search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+    search:SetScript("OnTextChanged", function() ApplyFilter() end)
+
+    sf, sc = BNB.CreateSmartScrollFrame(nil, page)
+    sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SCROLL_LPAD, -(page.top + 30))
+    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, FOOT_H + 4)
+    sf:SetScript("OnSizeChanged", function(self) sc:SetWidth(self:GetWidth()) end)
+
+    addBtn = BNB.CreateButton(nil, page, string.format(L["TAG_MGR_PICK_ADD_FMT"], 0), 130, 26)
+    addBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
+    addBtn:SetScript("OnClick", function()
+        local nNotes = 0
+        for id in pairs(picked) do
+            local note = BNB.GetNote and BNB.GetNote(id)
+            if note then
+                local t = {}
+                for _, tag in ipairs(note.tags or {}) do t[#t + 1] = tag end
+                for _, tag in ipairs(tags) do t[#t + 1] = tag end
+                BNB.UpdateNote(id, { tags = t })   -- dedupes the tags
+                nNotes = nNotes + 1
+            end
+        end
+        BNB:Print(string.format(L["TAG_MGR_ADDED_FMT"], #tags, nNotes))
+        f:PageBack()
+        SetMultiMode(false)
+    end)
+
+    local cancel = BNB.CreateButton(nil, page, L["CANCEL"], 68, 26)
+    cancel:SetPoint("LEFT", addBtn, "RIGHT", 6, 0)
+    cancel:SetScript("OnClick", function() f:PageBack() end)
+    return page
+end
+
+--------------------------------------------------------------------------------
 -- BUILD WINDOW. One body for both modes (CMP-02 S3): chrome, drag, ESC entry
 -- and Forever glow come from CreateToolWindow; only the rows' y differ.
 --------------------------------------------------------------------------------
@@ -401,32 +545,47 @@ local function BuildTagManager()
         -- Trash, Alarms, Rich preview): one strata, so the last opened is on
         -- top (was DIALOG, always over them)
         title = L["TAG_MGR_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        pad = PAD, footH = FOOT_H - 1,
+        onHide = function() if _multiMode then SetMultiMode(false) end end,
     })
-    -- Select strip, tip, list: normal mode leaves room for the template's title
-    local selY    = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -43
-    local tipY    = f._isSkin and selY - 30 or -76
-    local scrollY = f._isSkin and tipY - 22 or -96
+    local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
+    -- Root page: tip and tag list; the note picker is the second page (ALL-302)
+    local list = f:AddPage("list")
+    local tipY    = -(top + 10)
+    local scrollY = tipY - 22
 
-    local selectBtn = BNB.CreateButton(nil, f, L["MW_SELECT_BTN"], 68, 22)
-    selectBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, selY)
+    -- ── Bottom strip (ALL-302, as Trash): Select | Add to notes, Delete, Select all, Cancel
+    local selectBtn = BNB.CreateButton(nil, list, L["MW_SELECT_BTN"], 72, 26)
+    selectBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     selectBtn:SetScript("OnClick", function() SetMultiMode(true) end)
+    selectBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["TAG_MGR_SELECT_TIP"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _selectBtn = selectBtn
 
-    local selAllBtn = BNB.CreateButton(nil, f, L["TAG_MGR_SELECT_ALL_BTN"], 80, 22)
-    selAllBtn:SetPoint("LEFT", selectBtn, "RIGHT", 6, 0)
-    selAllBtn:SetScript("OnClick", function()
-        local tags = BNB.GetAllTags()
-        for _, entry in ipairs(tags) do
-            _multiSel[entry.tag] = true
+    local addSelBtn = BNB.CreateButton(nil, list, L["TAG_MGR_ADD_TO_NOTES_BTN"], 104, 26)
+    addSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
+    addSelBtn:SetScript("OnClick", function()
+        local tags = {}
+        for _, entry in ipairs(BNB.GetAllTags()) do   -- in the list's order
+            if _multiSel[entry.tag] then tags[#tags + 1] = entry.tag end
         end
-        UpdateDelSelBtn()
-        PopulateTagManager()
+        if #tags > 0 then f:ShowPage("notes", tags) end
     end)
-    selAllBtn:Hide()
-    _selAllBtn = selAllBtn
+    addSelBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["TAG_MGR_ADD_TO_NOTES_TIP"], 1, 1, 1, true)
+        GameTooltip:Show()
+    end)
+    addSelBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    addSelBtn:Hide()
+    _addSelBtn = addSelBtn
 
-    local delSelBtn = BNB.CreateButton(nil, f, "|cffff4444" .. L["TAG_MGR_DELETE"] .. "|r", 68, 22)
-    delSelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
+    local delSelBtn = BNB.CreateButton(nil, list, "|cffff4444" .. L["TAG_MGR_DELETE"] .. "|r", 68, 26)
+    delSelBtn:SetPoint("LEFT", addSelBtn, "RIGHT", 6, 0)
     delSelBtn:SetEnabled(false)
     delSelBtn:SetScript("OnClick", function()
         local selTags = {}
@@ -453,7 +612,26 @@ local function BuildTagManager()
     delSelBtn:Hide()
     _delSelBtn = delSelBtn
 
-    local tipLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local selAllBtn = BNB.CreateButton(nil, list, L["TAG_MGR_SELECT_ALL_BTN"], 80, 26)
+    selAllBtn:SetPoint("LEFT", delSelBtn, "RIGHT", 6, 0)
+    selAllBtn:SetScript("OnClick", function()
+        local tags = BNB.GetAllTags()
+        for _, entry in ipairs(tags) do
+            _multiSel[entry.tag] = true
+        end
+        UpdateDelSelBtn()
+        PopulateTagManager()
+    end)
+    selAllBtn:Hide()
+    _selAllBtn = selAllBtn
+
+    local cancelBtn = BNB.CreateButton(nil, list, L["CANCEL"], 62, 26)
+    cancelBtn:SetPoint("LEFT", selAllBtn, "RIGHT", 6, 0)
+    cancelBtn:SetScript("OnClick", function() SetMultiMode(false) end)
+    cancelBtn:Hide()
+    _cancelBtn = cancelBtn
+
+    local tipLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     tipLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,  tipY)
     tipLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, tipY)
     tipLbl:SetJustifyH("LEFT")
@@ -462,8 +640,9 @@ local function BuildTagManager()
     tipLbl:SetWordWrap(true)
 
     local sf, child = BNB.CreateSmartScrollFrame("BigNoteBoxTagManagerScroll", f)
+    sf:SetParent(list)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     SCROLL_LPAD,  scrollY)
-    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,   PAD)
+    sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD,   FOOT_H + 4)
     _scrollFrame = sf
     _scrollChild = child
 
@@ -477,6 +656,8 @@ local function BuildTagManager()
     emptyLbl:SetText(L["TAG_MGR_EMPTY"])
     emptyLbl:Hide()
     _emptyLbl = emptyLbl
+
+    BuildNotesPage(f, top)
 
     _tmFrame = f
     return f
@@ -498,9 +679,9 @@ function BNB.ToggleTagManager()
             f:SetPoint("CENTER", UIParent, "CENTER", 200, 0)
         end
         _openTag   = nil
-        SetMultiMode(false)
-        PopulateTagManager()
         f:Show()
+        f:ShowPage("list")
+        SetMultiMode(false)   -- also fills the list
         f:Raise()
     end
 end

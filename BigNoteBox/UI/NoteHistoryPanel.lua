@@ -83,6 +83,8 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     else
         pcall(function() icon:SetAtlas(iconTex) end)
     end
+    -- The note's icon frame, as the note list and Trash draw it (ALL-296)
+    if live and BNB.ApplyIconFrame then BNB.ApplyIconFrame(icon, live, ICON_SZ) end
 
     -- Timestamp
     local tsLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -125,9 +127,21 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     end)
     cmpBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
+    -- Restore button, between Compare and Delete (ALL-304). The note's current
+    -- state is kept as a snapshot first, so a restore can be undone from here
+    local function Restore()
+        BNB.HistoryRestoreNote(noteID, snap, true)
+        BNB:Print(L["HISTORY_RESTORED"])
+        BNB.RefreshNoteHistoryPanel()
+        BNB.RefreshHistoryWindow()
+    end
+    local restBtn = BNB.CreateButton(nil, row, L["HISTORY_CTX_RESTORE"], 66, 22)
+    restBtn:SetPoint("LEFT", cmpBtn, "RIGHT", 6, 0)
+    restBtn:SetScript("OnClick", Restore)
+
     -- Delete button
     local delBtn = BNB.CreateButton(nil, row, L["BTN_DELETE_NOTE"], 60, 22)
-    delBtn:SetPoint("LEFT", cmpBtn, "RIGHT", 6, 0)
+    delBtn:SetPoint("LEFT", restBtn, "RIGHT", 6, 0)
     local delConfirm = BNB.CreateButton(nil, row, "|cffff4444" .. L["HISTORY_SLOT_DELETE_CONFIRM"] .. "|r", 60, 22)
     delConfirm:SetPoint("LEFT", delBtn, "RIGHT", 4, 0)
     delConfirm:Hide()
@@ -147,6 +161,12 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
         else
             BNB.HistoryDeleteAutoSlot(noteID, slotIndex)
         end
+        -- The last snapshot gone: back to the list, never an empty page (ALL-295)
+        local left = BNB.HistoryGetSlots(noteID)
+        if #left.auto == 0 and not left.manual and _page and _page:IsVisible() then
+            _hwFrame:PageBack()   -- the list refreshes as it shows
+            return
+        end
         BNB.RefreshNoteHistoryPanel()
         BNB.RefreshHistoryWindow()
     end)
@@ -159,10 +179,7 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
             root:CreateButton(L["HISTORY_OVERRIDE_COMPARE"], function()
                 if BNB.OpenHistoryCompare then BNB.OpenHistoryCompare(noteID, snap) end
             end)
-            root:CreateButton(L["HISTORY_CTX_RESTORE"], function()
-                BNB.HistoryRestoreNote(noteID, snap, true)
-                BNB:Print(L["HISTORY_RESTORED"])
-            end)
+            root:CreateButton(L["HISTORY_CTX_RESTORE"], Restore)
             root:CreateDivider()
             root:CreateButton(L["BTN_DELETE_NOTE"], function()
                 local onClick = delBtn:GetScript("OnClick")
