@@ -254,10 +254,17 @@ local function BuildContent(f, ct, saveBtn)
     browseBtn:SetScript("OnClick", function()
         if BNB.ZonePicker and BNB.ZonePicker.Open then
             -- Anchor first, callback second (they were swapped, so Browse threw)
-            BNB.ZonePicker.Open(browseBtn, function(name)
+            -- Opens on the tab the type says; a pick from the other tab
+            -- (Zones / Instances) switches the type too, as in the Situation
+            -- editor (ALL-282)
+            BNB.ZonePicker.Open(browseBtn, function(name, kind)
+                if (kind == "zone" or kind == "instance") and kind ~= _selSitType then
+                    if _sitTypeDD then _sitTypeDD:SetSelected(kind) end
+                    OnSitTypeChanged(kind)
+                end
                 valueEb:SetText(name or "")
                 MarkDirty()
-            end)
+            end, _selSitType)
         end
     end)
     _sitBrowseBtn = browseBtn

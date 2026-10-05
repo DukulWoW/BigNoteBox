@@ -12,15 +12,18 @@
 -- "itype:dungeon" / "open:vendor" / "state:rested", ... } or nil (ALL-232), plus
 -- contextDisplay, contextLeave, contextTrigger, contextFreq (ALL-232 S2),
 -- waypoints (ALL-282), wpCreatedOn, wpClearOnLeave, wpNoTrack (SUG-10). The editor lists every situation (one row each,
--- X removes it) above one add row (ALL-232 S3, Dukul's layout A,
--- 2026-10-04); fixing a typo is X and add again.
+-- X removes it, right-click = Edit / Remove) above one add row (ALL-232 S3,
+-- Dukul's layout A, 2026-10-04). The waypoint list sits at the bottom, shown
+-- with or without a situation: the creation spot, then every waypoint
+-- (Name | Zone | X, Y; click = green / grey, double-click the name = rename,
+-- hover arrow = navigate, hover X = remove, right-click = all of those,
+-- ALL-282 S2).
 --
 -- Public API:
 --   BNB.CreateSituationEditor(panel, opts) -> ed   build once per window
 --     opts.padL, opts.padR  panel edge to the content
 --     opts.ddR              right inset of the dropdowns
 --     opts.top              y of the header
---     opts.bottom           panel bottom to the waypoint line
 --     opts.host             the window: the waypoint info popup opens beside it
 --                           and closes when it hides
 --   ed:Load(noteID)         show a note's saved situation (open, note switch)
@@ -34,7 +37,7 @@ local L   = BNB.L
 
 local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ROW_H  = 24
-local LIST_ROWS, LIST_ROW_H = 4, 20   -- the list box is always 4 rows; the wheel scrolls past that
+local LIST_ROWS, LIST_ROW_H = 5, 20   -- the list box is always 5 rows; the wheel scrolls past that
 local TYPE_W = 110                    -- the add row's type dropdown ("Instance type" fits)
 
 -- "npc" matches exactly like "player" (target or group); its own kind so the
@@ -82,6 +85,17 @@ local function Tip(btn, title, body, wrap)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
+-- The thin scroll bar of a list box showing `shown` of n rows from offset
+local function PlaceThumb(thumb, list, shown, n, offset)
+    if n <= shown then thumb:Hide(); return end
+    local inner = shown * LIST_ROW_H
+    local h = math.max(8, inner * shown / n)
+    thumb:ClearAllPoints()
+    thumb:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2 - (inner - h) * offset / (n - shown))
+    thumb:SetHeight(h)
+    thumb:Show()
 end
 
 -- A value picker on a WowStyle1 dropdown. onPick(key) runs on a player's choice;
@@ -259,10 +273,11 @@ function BNB.CreateSituationEditor(panel, opts)
     desc:SetWordWrap(false)
     y = y - 16
 
-    local SelectType, RemoveAt, RefreshList   -- below
+    local SelectType, RemoveAt, RefreshList, SitMenu   -- below
+    local editIndex   -- the situation loaded into the add row by Edit; Add saves over it
 
-    -- ── The list: one row per situation, always 4 rows tall ──────────────────
-    -- Nothing below it moves with the count; past 4 the mouse wheel scrolls
+    -- ── The list: one row per situation, always 5 rows tall ──────────────────
+    -- Nothing below it moves with the count; past 5 the mouse wheel scrolls
     -- and a thin bar on the right shows where (Dukul, 2026-10-04)
     local LIST_H = LIST_ROWS * LIST_ROW_H + 4
     local list = BNB.CreateBackdropFrame("Frame", nil, panel)
@@ -327,6 +342,10 @@ function BNB.CreateSituationEditor(panel, opts)
             end
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
+        -- Right-click: Edit / Remove (ALL-282)
+        row:SetScript("OnMouseUp", function(self, button)
+            if button == "RightButton" and self._index then GameTooltip:Hide(); SitMenu(self) end
+        end)
         row:Hide()
         rows[i] = row
     end
@@ -503,30 +522,51 @@ function BNB.CreateSituationEditor(panel, opts)
         if BNB.ZonePicker.IsShown and BNB.ZonePicker.IsShown() then
             BNB.ZonePicker.Close()
         else
-            BNB.ZonePicker.Open(valueRow, function(name) valueEb:SetText(name) end, typ.value)
+            -- The picker has a Zones and an Instances tab: a pick from the
+            -- other tab switches the type too, or an instance picked while
+            -- the type says Zone would be saved as a zone and never match
+            BNB.ZonePicker.Open(valueRow, function(name, kind)
+                if (kind == "zone" or kind == "instance") and kind ~= typ.value then
+                    typ:Set(kind)
+                    SelectType(kind)
+                end
+                valueEb:SetText(name)
+            end, typ.value)
         end
     end)
 
-    -- ── Show as / Trigger / How often / On leaving ───────────────────────────
-    -- Label above a full-width dropdown, as everywhere else (Dukul,
-    -- 2026-10-03; label-left rows ran past the window's right edge). The gaps
-    -- are tighter than the old two blocks so four fit above the waypoint
+    -- ── Show as | Trigger / How often | On leaving ───────────────────────────
+    -- Label above a dropdown, as everywhere else (Dukul, 2026-10-03;
+    -- label-left rows ran past the window's right edge), two per row since
+    -- ALL-282 (the room went to the waypoint list); the dropdown cuts a long
+    -- choice short
     local dispDiv = Divider(panel)
     dispDiv:SetPoint("TOPLEFT",  useCurrentBtn, "BOTTOMLEFT", 0, -14)
     dispDiv:SetPoint("TOPRIGHT", panel,         "TOPRIGHT",  -padR, 0)
 
-    local OPT_PITCH = 44   -- label 12 + 3 + dropdown 24 + gap
-    -- Places row n (1-based) of the option block: its label and, under it,
-    -- its picker from the left edge to the right inset of the type dropdown
-    local function OptionRow(n, labelKey, c)
-        local y = -6 - (n - 1) * OPT_PITCH
+    local OPT_PITCH, OPT_GAP = 44, 8   -- label 12 + 3 + dropdown 24 + gap; between the columns
+    -- dispDiv ends padR from the panel edge; the dropdowns end ddR from it
+    local optArea = CreateFrame("Frame", nil, panel)
+    optArea:SetPoint("TOPLEFT",  dispDiv, "BOTTOMLEFT",  0, 0)
+    optArea:SetPoint("TOPRIGHT", dispDiv, "BOTTOMRIGHT", padR - ddR, 0)
+    optArea:SetHeight(1)
+    -- Places the picker in row n, column col (1 = left, 2 = right) of the
+    -- option block, its label above it
+    local function OptionRow(n, col, labelKey, c)
+        local y = -6 - (n - 1) * OPT_PITCH - 15
+        if col == 1 then
+            c.frame:SetPoint("TOPLEFT",  optArea, "TOPLEFT", 0, y)
+            c.frame:SetPoint("TOPRIGHT", optArea, "TOP", -OPT_GAP / 2, y)
+        else
+            c.frame:SetPoint("TOPLEFT",  optArea, "TOP", OPT_GAP / 2, y)
+            c.frame:SetPoint("TOPRIGHT", optArea, "TOPRIGHT", 0, y)
+        end
         local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, y)
+        lbl:SetPoint("BOTTOMLEFT",  c.frame, "TOPLEFT",  0, 3)
+        lbl:SetPoint("BOTTOMRIGHT", c.frame, "TOPRIGHT", 0, 3)
+        lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false)
         lbl:SetText(L[labelKey])
         lbl:SetTextColor(0.78, 0.78, 0.78)
-        c.frame:SetPoint("TOPLEFT", dispDiv, "BOTTOMLEFT", 0, y - 15)
-        -- dispDiv ends padR from the panel edge; the dropdowns end ddR from it
-        c.frame:SetPoint("TOPRIGHT", dispDiv, "BOTTOMRIGHT", padR - ddR, y - 15)
         return lbl
     end
 
@@ -541,7 +581,7 @@ function BNB.CreateSituationEditor(panel, opts)
             end
             Sync(id)
         end)
-    local dispLabel = OptionRow(1, "SIT_ROW_SHOW_AS", disp)
+    local dispLabel = OptionRow(1, 1, "SIT_ROW_SHOW_AS", disp)
 
     local trig   -- the trigger picker, built below; RefreshLeaveRow reads it
 
@@ -559,7 +599,7 @@ function BNB.CreateSituationEditor(panel, opts)
             end
             Sync(id)
         end)
-    local leaveLabel = OptionRow(4, "SIT_ROW_LEAVE", leave)
+    local leaveLabel = OptionRow(2, 2, "SIT_ROW_LEAVE", leave)
 
     local function RefreshLeaveRow(show)
         if show == nil then show = dispDiv:IsShown() end
@@ -596,7 +636,7 @@ function BNB.CreateSituationEditor(panel, opts)
             RefreshLeaveRow()
             Sync(id)
         end)
-    local trigLabel = OptionRow(2, "SIT_ROW_TRIGGER", trig)
+    local trigLabel = OptionRow(1, 2, "SIT_ROW_TRIGGER", trig)
     local hasPlayer = false   -- a player is among the note's situations
     trig.frame:HookScript("OnEnter", function(self)
         if not hasPlayer then return end
@@ -635,7 +675,7 @@ function BNB.CreateSituationEditor(panel, opts)
             ResetSeen(id)
             Sync(id)
         end)
-    local freqLabel = OptionRow(3, "SIT_ROW_FREQ", freq)
+    local freqLabel = OptionRow(2, 1, "SIT_ROW_FREQ", freq)
     freq.frame:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SIT_ROW_FREQ"], 1, 1, 1)
@@ -644,13 +684,16 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     freq.frame:HookScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- ── Waypoint ─────────────────────────────────────────────────────────────
+    -- ── Waypoints ────────────────────────────────────────────────────────────
     -- note.waypoints = { { mapID, x, y, label, name, on }, ... } (ALL-282,
-    -- Core/NoteFields.lua). TomTom (TomTom:AddWaypoint)
-    -- and the built-in map pin (C_Map.SetUserWaypoint) are both used if present.
+    -- Core/NoteFields.lua), listed under the spot where the note was made.
+    -- Shown with or without a situation: Navigate works either way (Dukul,
+    -- 2026-10-05). A green row is placed when the situation matches (TomTom
+    -- takes every green row, the game's pin only one), a grey one is kept for
+    -- Navigate.
     local wpDiv = Divider(panel)
-    wpDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -(6 + 4 * OPT_PITCH + 4))
-    wpDiv:SetPoint("TOPRIGHT", panel,    "TOPRIGHT", -padR, 0)
+    wpDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -(6 + 2 * OPT_PITCH + 4))
+    wpDiv:SetPoint("TOPRIGHT", panel,   "TOPRIGHT", -padR, 0)
 
     local wpHdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     wpHdr:SetPoint("TOPLEFT", wpDiv, "BOTTOMLEFT", 0, -6)
@@ -695,27 +738,170 @@ function BNB.CreateSituationEditor(panel, opts)
         GameTooltip:Hide()
     end)
 
-    local wpDesc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    wpDesc:SetPoint("TOPLEFT",  wpHdr, "BOTTOMLEFT", 0, -4)
-    wpDesc:SetPoint("TOPRIGHT", panel, "TOPRIGHT",  -padR, 0)
-    wpDesc:SetJustifyH("LEFT"); wpDesc:SetWordWrap(true)
+    -- Name | Zone | X, Y inside a holder as wide as a row, room for the two
+    -- hover buttons on the right; the column labels above the list use it too
+    local WP_ROWS = LIST_ROWS               -- as tall as the situation list (Dukul, 2026-10-05)
+    local XY_W, ZONE_W, HOVER_W = 58, 74, 38
+    local function PlaceCols(holder, nameFS, zoneFS, xyFS)
+        xyFS:SetPoint("RIGHT", holder, "RIGHT", -HOVER_W, 0); xyFS:SetWidth(XY_W)
+        zoneFS:SetPoint("RIGHT", xyFS, "LEFT", -4, 0);        zoneFS:SetWidth(ZONE_W)
+        nameFS:SetPoint("LEFT",  holder, "LEFT", 6, 0)
+        nameFS:SetPoint("RIGHT", zoneFS, "LEFT", -4, 0)
+        for _, fs in ipairs({ nameFS, zoneFS, xyFS }) do
+            fs:SetJustifyH("LEFT"); fs:SetWordWrap(false)
+        end
+    end
 
-    -- [Pin here] [Navigate] [Clear WP] / [Manual] beside a column of two
-    -- checkboxes (Dukul, 2026-10-03: one row less than the old 2x2 grid with
-    -- the checkbox under it; the room went to the Situation options above)
+    local WP_LIST_H = WP_ROWS * LIST_ROW_H + 4
+    local wpList = BNB.CreateBackdropFrame("Frame", nil, panel)
+    BNB.SetBackdropDark(wpList)
+    wpList:SetPoint("TOPLEFT",  wpDiv, "BOTTOMLEFT",  0, -38)
+    wpList:SetPoint("TOPRIGHT", wpDiv, "BOTTOMRIGHT", 0, -38)
+    wpList:SetHeight(WP_LIST_H)
+
+    local colHdr = CreateFrame("Frame", nil, panel)
+    colHdr:SetPoint("BOTTOMLEFT",  wpList, "TOPLEFT",  2, 2)
+    colHdr:SetPoint("BOTTOMRIGHT", wpList, "TOPRIGHT", -7, 2)
+    colHdr:SetHeight(12)
+    local function ColLabel(key)
+        local fs = colHdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        fs:SetText(L[key])
+        fs:SetTextColor(0.60, 0.60, 0.60)
+        return fs
+    end
+    PlaceCols(colHdr, ColLabel("WP_COL_NAME"), ColLabel("WP_COL_ZONE"), ColLabel("WP_COL_XY"))
+
+    local wpEmpty = wpList:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    wpEmpty:SetPoint("LEFT",  wpList, "LEFT",  8, 0)
+    wpEmpty:SetPoint("RIGHT", wpList, "RIGHT", -8, 0)
+    wpEmpty:SetJustifyH("CENTER")
+    wpEmpty:SetTextColor(0.45, 0.45, 0.45)
+    wpEmpty:SetText(L["WP_LIST_EMPTY"])
+
+    local wpThumb = wpList:CreateTexture(nil, "OVERLAY")
+    wpThumb:SetWidth(3)
+    wpThumb:SetColorTexture(0.6, 0.6, 0.6, 0.6)
+    wpThumb:Hide()
+
+    local wpOffset  = 0    -- rows scrolled past the top
+    local wpEntries = {}   -- what the rows show: { created = true, wp } / { index, wp }
+    local wpRows    = {}
+    local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartRename   -- below
+
+    -- One press on the name toggles the row a moment later; a second press
+    -- inside that time renames it instead, so a double-click never toggles
+    -- first (two presses, as the sticky's inline edit counts them, ALL-47)
+    local DBL_SECS = 0.35
+    local pendingRow, pendingTimer
+    local function CancelPending()
+        if pendingTimer then pendingTimer:Cancel() end
+        pendingRow, pendingTimer = nil, nil
+    end
+
+    for i = 1, WP_ROWS do
+        local row = CreateFrame("Button", nil, wpList)
+        row:SetHeight(LIST_ROW_H)
+        row:SetPoint("TOPLEFT",  wpList, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
+        row:SetPoint("TOPRIGHT", wpList, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
+        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        local hi = row:CreateTexture(nil, "BACKGROUND")
+        hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.06); hi:Hide()
+        row._name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row._zone = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        row._xy   = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        PlaceCols(row, row._name, row._zone, row._xy)
+        -- Hover buttons, as on a situation row: X removes (no confirm, never
+        -- on the creation row), the arrow navigates to this row alone
+        row._del = BNB.CreateIconButton(row, 16, "close",
+            { tip = L["WP_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
+        row._del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row._del:SetScript("OnClick", function() GameTooltip:Hide(); WpRemove(row._entry) end)
+        row._nav = BNB.CreateIconButton(row, 16, "right",
+            { tip = L["WP_NAV_ROW_TIP"], tipAnchor = "ANCHOR_TOP" })
+        row._nav:SetPoint("RIGHT", row._del, "LEFT", -2, 0)
+        row._nav:SetScript("OnClick", function() WpNavigate(row._entry) end)
+        row._del:Hide(); row._nav:Hide()
+        local function HoverOff()
+            if row:IsMouseOver() then return end   -- moved between the row and its buttons
+            hi:Hide(); row._del:Hide(); row._nav:Hide()
+        end
+        for _, b in ipairs({ row._del, row._nav }) do
+            b:HookScript("OnEnter", function() hi:Show() end)
+            b:HookScript("OnLeave", HoverOff)
+        end
+        function row._showHover(self)
+            hi:Show(); self._nav:Show()
+            if self._entry and not self._entry.created then self._del:Show() end
+        end
+        row:SetScript("OnEnter", function(self)
+            self:_showHover()
+            local e = self._entry; if not e then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(self._name:GetText() or "", 1, 1, 1)
+            GameTooltip:AddLine(string.format("%s  %.1f, %.1f", BNB.WaypointZone(e.wp), e.wp.x, e.wp.y),
+                0.78, 0.78, 0.78)
+            if e.created then GameTooltip:AddLine(L["WP_ROW_TIP_CREATED"], 0.60, 0.60, 0.60, true) end
+            GameTooltip:AddLine(e.wp.on and L["WP_ROW_TIP_ON"] or L["WP_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
+            if not HasWPAddon() then GameTooltip:AddLine(L["WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
+            if not e.created then GameTooltip:AddLine(L["WP_ROW_TIP_RENAME"], 0.60, 0.60, 0.60, true) end
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
+        row:SetScript("OnClick", function(self, button)
+            local e = self._entry; if not e then return end
+            GameTooltip:Hide()
+            if button == "RightButton" then CancelPending(); WpMenu(self); return end
+            if e.created or not self._name:IsMouseOver() then CancelPending(); WpToggle(e); return end
+            if pendingRow == self then CancelPending(); StartRename(self); return end
+            CancelPending()
+            pendingRow = self
+            pendingTimer = C_Timer.NewTimer(DBL_SECS, function()
+                pendingRow, pendingTimer = nil, nil
+                WpToggle(e)
+            end)
+        end)
+        row:Hide()
+        wpRows[i] = row
+    end
+    wpList:SetScript("OnMouseWheel", function(_, delta)
+        wpOffset = wpOffset - delta
+        RefreshWaypoints()
+    end)
+
+    -- Rename in place: one box laid over the row's name. Enter saves (empty =
+    -- the note title again), ESC or a click elsewhere leaves it as it was
+    local renameEb = CreateFrame("EditBox", nil, wpList, "BackdropTemplate")
+    BNB.EnsureBackdrop(renameEb)
+    BNB.SetBackdropDark(renameEb)
+    renameEb:SetHeight(18)
+    renameEb:SetFontObject("GameFontHighlightSmall")
+    renameEb:SetAutoFocus(false)
+    renameEb:SetMaxLetters(64)
+    renameEb:SetTextInsets(3, 3, 0, 0)
+    renameEb:SetFrameLevel(wpList:GetFrameLevel() + 10)
+    renameEb:Hide()
+    local renaming   -- index into note.waypoints of the row being renamed
+    local function EndRename()
+        renaming = nil
+        renameEb:ClearFocus()
+        renameEb:Hide()
+    end
+    renameEb:SetScript("OnEscapePressed", EndRename)
+    renameEb:SetScript("OnEditFocusLost", function() if renaming then EndRename() end end)
+
+    -- [Pin Here] [Manual] [Navigate]
     local BTN_W, BTN_H, BTN_GAP = 72, 22, 6
     local wpPinBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_PIN_HERE"], BTN_W, BTN_H)
-    wpPinBtn:SetPoint("TOPLEFT", wpDesc, "BOTTOMLEFT", 0, -6)
-    local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
-    wpNavBtn:SetPoint("LEFT", wpPinBtn, "RIGHT", BTN_GAP, 0)
-    local wpClearBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_CLEAR"], BTN_W, BTN_H)
-    wpClearBtn:SetPoint("LEFT", wpNavBtn, "RIGHT", BTN_GAP, 0)
+    wpPinBtn:SetPoint("TOPLEFT", wpList, "BOTTOMLEFT", 0, -6)
     local wpManualBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_MANUAL"], BTN_W, BTN_H)
+    wpManualBtn:SetPoint("LEFT", wpPinBtn, "RIGHT", BTN_GAP, 0)
+    local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
+    wpNavBtn:SetPoint("LEFT", wpManualBtn, "RIGHT", BTN_GAP, 0)
 
-    -- The two checkboxes in one column right of Manual, Manual centred on the
-    -- pair (Dukul, 2026-10-05: "Don't track it" alone on a row looked lost).
-    -- One line each; a long translation is cut at the panel edge, the
-    -- tooltips carry the full text.
+    -- The two checkboxes, one under the other. One line each; a long
+    -- translation is cut at the panel edge, the tooltips carry the full text.
+    -- Greyed while the note has no situation: both act on the waypoints a
+    -- situation places
     local CHK_PITCH = 22
     local function WpCheck(labelKey, tipKey, field)
         local chk = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
@@ -727,6 +913,7 @@ function BNB.CreateSituationEditor(panel, opts)
         lbl:SetWordWrap(false)
         lbl:SetText(L[labelKey])
         lbl:SetTextColor(0.78, 0.78, 0.78)
+        chk._lbl = lbl
         chk:SetScript("OnClick", function(self)
             local id = NoteID(); if not id then return end
             if self:GetChecked() then
@@ -742,25 +929,24 @@ function BNB.CreateSituationEditor(panel, opts)
             GameTooltip:Show()
         end)
         chk:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        chk:SetMotionScriptsWhileDisabled(true)   -- the tooltip says what it does while greyed
         return chk
     end
     -- "Remove on zone leave" (wpClearOnLeave)
     local wpLeaveChk = WpCheck("STICKY_WP_LEAVE_REMOVE_LABEL", "NC_WP_LEAVE_REMOVE_TIP", "wpClearOnLeave")
-    wpLeaveChk:SetPoint("TOPLEFT", wpPinBtn, "BOTTOMRIGHT", BTN_GAP - 2, -2)
+    wpLeaveChk:SetPoint("TOPLEFT", wpPinBtn, "BOTTOMLEFT", -2, -2)
     -- "Don't track it" (note.wpNoTrack, SUG-10). Only the waypoint a situation
     -- places honours it; Navigate and waypoint links in the text always track.
     local wpNoTrackChk = WpCheck("STICKY_WP_NOTRACK_LABEL", "NC_WP_NOTRACK_TIP", "wpNoTrack")
     wpNoTrackChk:SetPoint("TOPLEFT", wpLeaveChk, "TOPLEFT", 0, -CHK_PITCH)
-    -- Manual's right edge on the pair's middle (1 px over the first box's bottom)
-    wpManualBtn:SetPoint("RIGHT", wpLeaveChk, "BOTTOMLEFT", -(BTN_GAP - 2), 1)
 
-    -- Manual coordinates row (hidden until Manual is clicked), under the
-    -- checkbox column; nothing else lives there, so nothing has to move
-    -- (ALL-233)
+    -- Manual row (hidden until Manual is clicked) under the checkboxes:
+    -- X, Y and an optional name; nothing else lives there, so nothing has to
+    -- move (ALL-233)
     local wpManualRow = CreateFrame("Frame", nil, panel)
     wpManualRow:SetHeight(22)
     wpManualRow:SetPoint("TOPLEFT",  wpPinBtn, "BOTTOMLEFT", 0, -(2 + CHK_PITCH + 24 + 4))
-    wpManualRow:SetPoint("TOPRIGHT", panel,      "TOPRIGHT",  -padR, 0)
+    wpManualRow:SetPoint("TOPRIGHT", panel,    "TOPRIGHT",  -padR, 0)
     wpManualRow:Hide()
 
     local function CoordBox(anchor, label)
@@ -774,7 +960,7 @@ function BNB.CreateSituationEditor(panel, opts)
         BNB.EnsureBackdrop(eb)
         BNB.SetBackdropDark(eb)
         eb:SetPoint("LEFT", lbl, "RIGHT", 2, 0)
-        eb:SetSize(52, 20)
+        eb:SetSize(46, 20)
         eb:SetFontObject("GameFontNormalSmall")
         eb:SetAutoFocus(false); eb:SetMaxLetters(8)
         eb:SetNumeric(false); eb:SetTextInsets(3, 3, 0, 0)
@@ -783,40 +969,92 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpXEb = CoordBox(nil, L["STICKY_WP_X_LABEL"])
     local wpYEb = CoordBox(wpXEb, L["STICKY_WP_Y_LABEL"])
     local wpSetBtn = BNB.CreateButton(nil, wpManualRow, L["STICKY_WP_BTN_SET"], 38, 20)
-    wpSetBtn:SetPoint("LEFT", wpYEb, "RIGHT", 4, 0)
+    wpSetBtn:SetPoint("RIGHT", wpManualRow, "RIGHT", 0, 0)
+    local wpNameEb = CreateFrame("EditBox", nil, wpManualRow, "BackdropTemplate")
+    BNB.EnsureBackdrop(wpNameEb)
+    BNB.SetBackdropDark(wpNameEb)
+    wpNameEb:SetPoint("LEFT",  wpYEb,    "RIGHT", 6, 0)
+    wpNameEb:SetPoint("RIGHT", wpSetBtn, "LEFT", -4, 0)
+    wpNameEb:SetHeight(20)
+    wpNameEb:SetFontObject("GameFontNormalSmall")
+    wpNameEb:SetAutoFocus(false); wpNameEb:SetMaxLetters(64)
+    wpNameEb:SetTextInsets(3, 3, 0, 0)
+    BNB.AddPlaceholder(wpNameEb, L["WP_NAME_PLACEHOLDER"])
 
+    -- Without any waypoint support: the red line in the manual row's place
+    -- (Manual is greyed then, so the row never shows)
+    local wpNoSupport = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    wpNoSupport:SetPoint("TOPLEFT",  wpManualRow, "TOPLEFT",  0, 0)
+    wpNoSupport:SetPoint("TOPRIGHT", wpManualRow, "TOPRIGHT", 0, 0)
+    wpNoSupport:SetJustifyH("LEFT"); wpNoSupport:SetWordWrap(true)
+    wpNoSupport:SetTextColor(0.65, 0.40, 0.35)
+    wpNoSupport:SetText(L["NC_WP_INSTALL_ADDON_FEATURE"])
+    wpNoSupport:Hide()
 
-    -- Waypoint line at the panel bottom
-    local bottom = opts.bottom or 6
-    local wpStatusLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    wpStatusLbl:SetPoint("BOTTOMLEFT",  panel, "BOTTOMLEFT",  padL, bottom)
-    wpStatusLbl:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -padR, bottom)
-    wpStatusLbl:SetJustifyH("CENTER")
-    wpStatusLbl:SetTextColor(0.55, 0.85, 1, 1)
-    wpStatusLbl:Hide()
-
-    -- Everything below the add row shows only while the note has a situation
-    local typedOnly = { dispDiv, dispLabel, disp.frame, trigLabel, trig.frame, freqLabel, freq.frame,
-                        wpDiv, wpHdr, wpDesc, wpStatusTag, wpInfoLbl, wpInfoHit,
-                        wpPinBtn, wpNavBtn, wpClearBtn, wpManualBtn, wpLeaveChk, wpNoTrackChk }
+    -- Everything below the add row except the waypoints shows only while the
+    -- note has a situation
+    local typedOnly = { dispDiv, dispLabel, disp.frame, trigLabel, trig.frame, freqLabel, freq.frame }
 
     -- ── Refreshers ───────────────────────────────────────────────────────────
-    local function RefreshWaypointDisplay()
-        -- The last waypoint added (ALL-282 S2 turns this into a list)
+    -- The two checkboxes: greyed without a situation or waypoint support
+    local function RefreshWpChecks()
         local note = NoteID() and BNB.GetNote(NoteID())
-        local wps  = BNB.NoteWaypoints(note)
-        local wp   = wps[#wps]
-        if wp and wp.x and wp.y then
-            local title = BNB.WaypointName(note, wp)
-            local coords = string.format("%.1f, %.1f", wp.x, wp.y)
-            if #wps > 1 then coords = coords .. string.format(" (+%d)", #wps - 1) end
-            wpStatusLbl:SetText(L["STICKY_WP_STATUS_LABEL"] .. "\n"
-                .. (title ~= "" and (title .. "\n") or "") .. coords)
-            wpStatusLbl:Show()
-        else
-            wpStatusLbl:SetText("")
-            wpStatusLbl:Hide()
+        local on = WPAvailable() and #BNB.NoteSituations(note) > 0 and true or false
+        wpLeaveChk:SetChecked(note and note.wpClearOnLeave == true)
+        wpNoTrackChk:SetChecked(note and note.wpNoTrack == true)
+        for _, chk in ipairs({ wpLeaveChk, wpNoTrackChk }) do
+            chk:SetEnabled(on)
+            local v = on and 0.78 or 0.40
+            chk._lbl:SetTextColor(v, v, v)
         end
+    end
+
+    -- The waypoint rows, the scroll bar, the buttons
+    RefreshWaypoints = function()
+        local note = NoteID() and BNB.GetNote(NoteID())
+        if renaming then EndRename() end   -- the rows may move under the box
+        wipe(wpEntries)
+        local c = BNB.CreationWaypoint(note)
+        if c then wpEntries[1] = { created = true, wp = c } end
+        for i, wp in ipairs(BNB.NoteWaypoints(note)) do
+            if BNB.CleanWaypoint(wp) then wpEntries[#wpEntries + 1] = { index = i, wp = wp } end
+        end
+        local n = #wpEntries
+        wpOffset = math.max(0, math.min(wpOffset, n - WP_ROWS))
+        for i, row in ipairs(wpRows) do
+            local e = wpEntries[wpOffset + i]
+            row._entry = e
+            if e then
+                row._name:SetText(BNB.WaypointName(note, e.wp))
+                row._zone:SetText(BNB.WaypointZone(e.wp))
+                row._xy:SetText(string.format("%.1f, %.1f", e.wp.x, e.wp.y))
+                -- Green = placed by the situation, grey = kept for Navigate;
+                -- the note title standing in for a name is dimmer
+                local r, g, b = 0.55, 0.55, 0.55
+                if e.wp.on then r, g, b = 0.40, 0.85, 0.40 end
+                row._zone:SetTextColor(r, g, b)
+                row._xy:SetTextColor(r, g, b)
+                local dim = e.wp.name and 1 or 0.7
+                row._name:SetTextColor(r * dim, g * dim, b * dim)
+                row:Show()
+                -- A hidden row gets no OnLeave: its buttons must not come back with it
+                if row:IsMouseOver() then row:_showHover() else row._del:Hide(); row._nav:Hide() end
+            else
+                row:Hide()
+                row._del:Hide(); row._nav:Hide()
+            end
+        end
+        if n == 0 then wpEmpty:Show() else wpEmpty:Hide() end
+        wpList:EnableMouseWheel(n > WP_ROWS)   -- otherwise the wheel is the window's
+        PlaceThumb(wpThumb, wpList, WP_ROWS, n, wpOffset)
+
+        RefreshWPStatusTag()
+        local avail = WPAvailable() and note and true or false
+        wpPinBtn:SetEnabled(avail); wpManualBtn:SetEnabled(avail)
+        wpNavBtn:SetEnabled(avail and n > 0)
+        if not avail then wpManualRow:Hide() end
+        if WPAvailable() then wpNoSupport:Hide() else wpNoSupport:Show() end
+        RefreshWpChecks()
     end
 
     local function ShowTypedControls(show)
@@ -824,23 +1062,6 @@ function BNB.CreateSituationEditor(panel, opts)
             if show then w:Show() else w:Hide() end
         end
         RefreshLeaveRow(show)
-        if not show then wpManualRow:Hide(); return end
-        RefreshWPStatusTag()
-        local note = NoteID() and BNB.GetNote(NoteID())
-        wpLeaveChk:SetChecked(note and note.wpClearOnLeave == true)
-        wpNoTrackChk:SetChecked(note and note.wpNoTrack == true)
-        -- Greyed without any waypoint support
-        local avail = WPAvailable() and true or false
-        wpPinBtn:SetEnabled(avail); wpNavBtn:SetEnabled(avail)
-        wpClearBtn:SetEnabled(avail); wpManualBtn:SetEnabled(avail)
-        wpLeaveChk:SetEnabled(avail); wpNoTrackChk:SetEnabled(avail)
-        if avail then
-            wpDesc:SetText(L["STICKY_WP_DESC"])
-            wpDesc:SetTextColor(0.60, 0.60, 0.60)
-        else
-            wpDesc:SetText(L["NC_WP_INSTALL_ADDON_FEATURE"])
-            wpDesc:SetTextColor(0.65, 0.40, 0.35)
-        end
     end
 
     -- The list rows, the scroll bar, the trigger words and what shows below
@@ -856,6 +1077,9 @@ function BNB.CreateSituationEditor(panel, opts)
                 row._index = idx
                 row._kind:SetText(KIND_LABELS[kind] or kind or "?")
                 row._value:SetText(BNB.SituationValueLabel(kind, value) or s)
+                -- Gold while Edit has it in the add row
+                if idx == editIndex then row._value:SetTextColor(1, 0.82, 0)
+                else row._value:SetTextColor(1, 1, 1) end
                 row:Show()
                 -- A hidden row gets no OnLeave: its X must not come back with it
                 if not row:IsMouseOver() then row._del:Hide() end
@@ -869,16 +1093,7 @@ function BNB.CreateSituationEditor(panel, opts)
         -- "Situations (4)" (Dukul, 2026-10-04); no count while empty
         hdr:SetText(n > 0 and string.format(L["SIT_LIST_HDR_FMT"], n) or L["SIT_LIST_HDR"])
         list:EnableMouseWheel(n > LIST_ROWS)   -- otherwise the wheel is the window's
-        if n > LIST_ROWS then
-            local inner = LIST_ROWS * LIST_ROW_H
-            local h = math.max(8, inner * LIST_ROWS / n)
-            thumb:ClearAllPoints()
-            thumb:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2 - (inner - h) * listOffset / (n - LIST_ROWS))
-            thumb:SetHeight(h)
-            thumb:Show()
-        else
-            thumb:Hide()
-        end
+        PlaceThumb(thumb, list, LIST_ROWS, n, listOffset)
         -- Instance type and rested are places; a window is its own group
         local place, player, window = false, false, false
         for _, s in ipairs(sits) do
@@ -891,6 +1106,7 @@ function BNB.CreateSituationEditor(panel, opts)
         ApplyKindWords(groups > 1 and "mixed" or player and "player" or window and "window" or "place",
             player)
         ShowTypedControls(n > 0)
+        RefreshWpChecks()
         clearBtn:SetEnabled(n > 0)
     end
 
@@ -930,8 +1146,16 @@ function BNB.CreateSituationEditor(panel, opts)
         Sync(id)
     end
 
+    -- Edit is over: the add row adds again
+    local function EndEdit()
+        if not editIndex then return end
+        editIndex = nil
+        addBtn:SetText(L["SIT_ADD_BTN"])
+    end
+
     RemoveAt = function(idx)
         local id = NoteID(); if not id or not idx then return end
+        EndEdit()   -- the rows below move up
         local sits = {}
         for i, s in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
             if i ~= idx then sits[#sits + 1] = s end
@@ -939,8 +1163,42 @@ function BNB.CreateSituationEditor(panel, opts)
         SaveSituations(id, sits)
     end
 
-    -- Adds the add row's situation at the end of the list; one the note
-    -- already has (situations match without case) is left out with a line
+    -- Loads situation idx into the add row; Add (now Save) puts it back in
+    -- its place (ALL-282, Dukul 2026-10-05)
+    local function EditAt(idx)
+        local id = NoteID(); if not id then return end
+        local s = BNB.NoteSituations(BNB.GetNote(id))[idx]; if not s then return end
+        local kind, value = BNB.DecodeContext(s)
+        local known = false
+        for _, t in ipairs(TYPES) do if t == kind then known = true end end
+        if not known then return end
+        typ:Set(kind)
+        SelectType(kind)
+        if KEY_KINDS[kind] then
+            if kind ~= "state" then pick:Set(value) end
+        else
+            valueEb:SetText(value or "")
+        end
+        editIndex = idx
+        addBtn:SetText(L["SIT_SAVE_BTN"])
+        addBtn:SetEnabled(true)
+        RefreshList()
+        if not KEY_KINDS[kind] then valueEb:SetFocus(); valueEb:HighlightText() end
+    end
+
+    SitMenu = function(row)
+        local idx = row._index; if not idx then return end
+        BNB.ContextMenu.Open(row, function(root)
+            root:CreateTitle(row._value:GetText() or "")
+            root:CreateButton(L["SIT_MENU_EDIT"], function() EditAt(idx) end)
+            root:CreateDivider()
+            root:CreateButton(L["SIT_MENU_REMOVE"], function() RemoveAt(idx) end, { danger = true })
+        end)
+    end
+
+    -- Adds the add row's situation at the end of the list, or over the one
+    -- Edit loaded; one the note already has (situations match without case)
+    -- is left out with a line
     local function AddSituation()
         local id = NoteID(); if not id then return end
         local val
@@ -955,14 +1213,19 @@ function BNB.CreateSituationEditor(panel, opts)
         local s = typ.value .. ":" .. val
         local sits = {}
         for i, old in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
-            if old:lower() == s:lower() then BNB:Print(L["SIT_DUPLICATE"]); return end
+            if i ~= editIndex and old:lower() == s:lower() then BNB:Print(L["SIT_DUPLICATE"]); return end
             sits[i] = old
         end
-        sits[#sits + 1] = s
+        if editIndex and sits[editIndex] then
+            sits[editIndex] = s
+        else
+            sits[#sits + 1] = s
+            listOffset = #sits   -- clamped by RefreshList: the new row shows at the bottom
+        end
+        EndEdit()
         valueEb:SetText("")
         valueEb:ClearFocus()
         HideAC()
-        listOffset = #sits   -- clamped by RefreshList: the new row shows at the bottom
         SaveSituations(id, sits)
     end
 
@@ -995,6 +1258,15 @@ function BNB.CreateSituationEditor(panel, opts)
 
     addBtn:SetScript("OnClick", AddSituation)
     valueEb:SetScript("OnEnterPressed", AddSituation)
+    -- ESC while editing drops the edit; the row stays as it was
+    valueEb:SetScript("OnEscapePressed", function(self)
+        if editIndex then
+            EndEdit()
+            self:SetText("")
+            RefreshList()
+        end
+        self:ClearFocus()
+    end)
 
     -- With 2+ situations Clear all takes two clicks: the first turns the
     -- button into "Sure?" for a few seconds (Dukul, 2026-10-04)
@@ -1017,6 +1289,7 @@ function BNB.CreateSituationEditor(panel, opts)
             return
         end
         DisarmClear()
+        EndEdit()
         BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave",
                                         "contextTrigger", "contextFreq" } })
         ResetSeen(id)
@@ -1031,27 +1304,132 @@ function BNB.CreateSituationEditor(panel, opts)
         Sync(id)
     end)
 
-    -- Adds a waypoint at x, y (0-100) on mapID, placed by the situation (on).
-    -- Without TomTom the game's pin holds one point, so the others go off
-    local function SetWaypoint(note, id, mapID, x, y, msgKey)
-        local zone = GetRealZoneText() or GetZoneText() or ""
+    -- ── Waypoint handlers ────────────────────────────────────────────────────
+    -- Without TomTom the game's pin holds one point: one green row at most
+    local function SinglePin() return not HasWPAddon() end
+
+    -- A fresh copy of the note's waypoints to change and save; an unusable
+    -- one is false, so the indices still match the rows
+    local function CopyWaypoints(note)
         local list = {}
-        local single = not (TomTom and TomTom.AddWaypoint)
-        for _, wp in ipairs(BNB.NoteWaypoints(note)) do
-            local c = BNB.CleanWaypoint(wp)
-            if c then
-                if single then c.on = nil end
-                list[#list + 1] = c
-            end
-        end
-        local wp = { mapID = mapID, x = x, y = y, label = zone ~= "" and zone or nil, on = true }
-        list[#list + 1] = wp
-        local fields = { waypoints = list }
-        if single and note.wpCreatedOn then fields._clear = { "wpCreatedOn" } end
+        for i, wp in ipairs(BNB.NoteWaypoints(note)) do list[i] = BNB.CleanWaypoint(wp) or false end
+        return list
+    end
+
+    -- Saves the list (false = left out) and the creation row's green flag
+    local function SaveWaypoints(id, list, createdOn)
+        local out = {}
+        for _, wp in ipairs(list) do if wp then out[#out + 1] = wp end end
+        local fields, clear = {}, {}
+        if out[1] then fields.waypoints = out else clear[#clear + 1] = "waypoints" end
+        if createdOn then fields.wpCreatedOn = true else clear[#clear + 1] = "wpCreatedOn" end
+        if clear[1] then fields._clear = clear end
         BNB.UpdateNote(id, fields)
-        RefreshWaypointDisplay()
-        BNB:Print(string.format(L[msgKey], BNB.WaypointName(note, wp), x, y))
+        RefreshWaypoints()
         Sync(id)
+    end
+
+    -- Green <-> grey; turning one green without TomTom greys the others
+    WpToggle = function(e)
+        local id = NoteID(); local note = id and BNB.GetNote(id)
+        if not (note and e) then return end
+        local turnOn = not e.wp.on
+        local list = CopyWaypoints(note)
+        local createdOn = note.wpCreatedOn == true
+        if turnOn and SinglePin() then
+            for _, wp in ipairs(list) do if wp then wp.on = nil end end
+            createdOn = false
+        end
+        if e.created then
+            createdOn = turnOn
+        elseif list[e.index] then
+            list[e.index].on = turnOn or nil
+        end
+        SaveWaypoints(id, list, createdOn)
+    end
+
+    WpRemove = function(e)
+        local id = NoteID(); local note = id and BNB.GetNote(id)
+        if not (note and e) or e.created then return end
+        local list = CopyWaypoints(note)
+        list[e.index] = false
+        SaveWaypoints(id, list, note.wpCreatedOn == true)
+    end
+
+    local function WpRename(index, text)
+        local id = NoteID(); local note = id and BNB.GetNote(id)
+        if not note then return end
+        local list = CopyWaypoints(note)
+        if not list[index] then return end
+        text = (text or ""):match("^%s*(.-)%s*$") or ""
+        list[index].name = text ~= "" and text or nil
+        SaveWaypoints(id, list, note.wpCreatedOn == true)
+    end
+
+    WpNavigate = function(e)
+        local note = NoteID() and BNB.GetNote(NoteID())
+        if note and e then BNB.NavigateWaypoints(note, { e.wp }) end
+    end
+
+    StartRename = function(row)
+        local e = row._entry
+        if not e or e.created then return end
+        renaming = e.index
+        renameEb:ClearAllPoints()
+        renameEb:SetPoint("LEFT",  row._name, "LEFT",  -3, 0)
+        renameEb:SetPoint("RIGHT", row._name, "RIGHT",  3, 0)
+        renameEb:SetText(e.wp.name or "")
+        renameEb:Show()
+        renameEb:SetFocus()
+        renameEb:HighlightText()
+    end
+    renameEb:SetScript("OnEnterPressed", function(self)
+        local index, text = renaming, self:GetText()
+        EndRename()
+        if index then WpRename(index, text) end
+    end)
+
+    -- The same choices as the row's click, arrow and X (Dukul, 2026-10-05)
+    WpMenu = function(row)
+        local e = row._entry; if not e then return end
+        local note = BNB.GetNote(NoteID())
+        BNB.ContextMenu.Open(row, function(root)
+            root:CreateTitle(BNB.WaypointName(note, e.wp))
+            root:CreateButton(L["WP_MENU_NAVIGATE"], function() WpNavigate(e) end)
+            if not e.created then
+                root:CreateButton(L["WP_MENU_RENAME"], function()
+                    -- Still the same row (nothing reloaded the list meanwhile)
+                    local now = row._entry
+                    if now and not now.created and now.index == e.index then StartRename(row) end
+                end)
+            end
+            root:CreateRadio(L["WP_MENU_AUTO"], function() return e.wp.on == true end,
+                function() WpToggle(e) end)
+            if not e.created then
+                root:CreateDivider()
+                root:CreateButton(L["WP_MENU_REMOVE"], function() WpRemove(e) end, { danger = true })
+            end
+        end)
+    end
+
+    -- Adds a waypoint at x, y (0-100) on mapID at the end of the list, green
+    local function AddWaypoint(mapID, x, y, name, msgKey)
+        local id = NoteID(); local note = id and BNB.GetNote(id)
+        if not (note and mapID) then return end
+        local list = CopyWaypoints(note)
+        local createdOn = note.wpCreatedOn == true
+        if SinglePin() then
+            for _, wp in ipairs(list) do if wp then wp.on = nil end end
+            createdOn = false
+        end
+        local zone = BNB.WaypointZone({ mapID = mapID })
+        if zone == "" then zone = GetRealZoneText() or GetZoneText() or "" end
+        local wp = { mapID = mapID, x = x, y = y, label = zone ~= "" and zone or nil,
+                     name = name and name ~= "" and name or nil, on = true }
+        list[#list + 1] = wp
+        wpOffset = #list + 1   -- clamped by RefreshWaypoints: the new row shows at the bottom
+        SaveWaypoints(id, list, createdOn)
+        BNB:Print(string.format(L[msgKey], BNB.WaypointName(note, wp), x, y))
     end
 
     local function CommitManualCoords()
@@ -1065,44 +1443,48 @@ function BNB.CreateSituationEditor(panel, opts)
         x  = math.max(0, math.min(100, x))
         y2 = math.max(0, math.min(100, y2))
         local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+        local wps   = BNB.NoteWaypoints(note)
+        local last  = wps[#wps] or BNB.CreationWaypoint(note)
+        local name  = (wpNameEb:GetRealText() or ""):match("^%s*(.-)%s*$")
         wpManualRow:Hide()
-        local last = BNB.NoteWaypoints(note)[#BNB.NoteWaypoints(note)]
-        SetWaypoint(note, id, mapID or (last and last.mapID), x, y2, "NC_WP_SET_MANUAL_MSG")
+        AddWaypoint(mapID or (last and last.mapID), x, y2, name, "NC_WP_SET_MANUAL_MSG")
     end
 
     wpManualBtn:SetScript("OnClick", function()
         if wpManualRow:IsShown() then wpManualRow:Hide(); return end
-        -- Pre-filled with the last saved waypoint
+        -- Pre-filled with the last saved waypoint; the name starts empty
         local note = NoteID() and BNB.GetNote(NoteID())
         local wps  = BNB.NoteWaypoints(note)
         local wp   = wps[#wps]
         if wp and wp.x then wpXEb:SetText(string.format("%.1f", wp.x)) end
         if wp and wp.y then wpYEb:SetText(string.format("%.1f", wp.y)) end
+        wpNameEb:SetRealText("")
         wpManualRow:Show()
         wpXEb:SetFocus()
     end)
     Tip(wpManualBtn, L["STICKY_WP_MANUAL_TIP"])
     wpSetBtn:SetScript("OnClick", CommitManualCoords)
+    BNB.TabChain({ wpXEb, wpYEb, wpNameEb })
     wpXEb:SetScript("OnEnterPressed", function() wpYEb:SetFocus() end)
     wpYEb:SetScript("OnEnterPressed", CommitManualCoords)
-    wpXEb:SetScript("OnEscapePressed", function() wpManualRow:Hide() end)
-    wpYEb:SetScript("OnEscapePressed", function() wpManualRow:Hide() end)
+    wpNameEb:SetScript("OnEnterPressed", CommitManualCoords)
+    for _, eb in ipairs({ wpXEb, wpYEb, wpNameEb }) do
+        eb:SetScript("OnEscapePressed", function(self) self:ClearFocus(); wpManualRow:Hide() end)
+    end
 
     wpPinBtn:SetScript("OnClick", function()
-        local id   = NoteID(); if not id then return end
-        local note = BNB.GetNote(id); if not note then return end
         local mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
         if not mapID then BNB:Print("|cffff6666Cannot get map position.|r"); return end
         local pos = C_Map.GetPlayerMapPosition and C_Map.GetPlayerMapPosition(mapID, "player")
         if not pos then BNB:Print("|cffff6666Cannot get map position.|r"); return end
         local px, py = pos:GetXY()
-        SetWaypoint(note, id, mapID, math.floor(px * 1000 + 0.5) / 10,
-            math.floor(py * 1000 + 0.5) / 10, "NC_WP_PINNED_MSG")
+        AddWaypoint(mapID, math.floor(px * 1000 + 0.5) / 10,
+            math.floor(py * 1000 + 0.5) / 10, nil, "NC_WP_PINNED_MSG")
     end)
     Tip(wpPinBtn, L["STICKY_WP_PIN_TIP_TITLE"], L["STICKY_WP_PIN_TIP_BODY"], true)
 
-    -- Every waypoint placed by the situation; none on = the first waypoint,
-    -- else where the note was made
+    -- Every green row (TomTom), the first green one (the game's pin); none
+    -- green = the first waypoint, else where the note was made
     wpNavBtn:SetScript("OnClick", function()
         local note = NoteID() and BNB.GetNote(NoteID()); if not note then return end
         local list = BNB.ActiveWaypoints(note)
@@ -1113,14 +1495,6 @@ function BNB.CreateSituationEditor(panel, opts)
         BNB.NavigateWaypoints(note, list)
     end)
     Tip(wpNavBtn, L["STICKY_WP_NAV_TIP_TITLE"], L["STICKY_WP_NAV_TIP_BODY"], true)
-
-    wpClearBtn:SetScript("OnClick", function()
-        local id = NoteID(); if not id then return end
-        BNB.UpdateNote(id, { _clear = { "waypoints", "wpCreatedOn" } })
-        RefreshWaypointDisplay()
-        Sync(id)
-    end)
-    Tip(wpClearBtn, L["STICKY_WP_REMOVE_TIP"])
 
     -- The popup is parented to UIParent, so it would outlive the window
     if ed.host then
@@ -1135,11 +1509,16 @@ function BNB.CreateSituationEditor(panel, opts)
         -- note's half-typed name. The same note (a save in the other editor)
         -- keeps both
         if noteID ~= self.noteID then
-            listOffset = 0
+            listOffset, wpOffset = 0, 0
             valueEb:SetText("")
             HideAC()
             DisarmClear()
+            wpManualRow:Hide()
         end
+        -- The other editor may have changed the list: Edit's row number and a
+        -- pending click no longer hold
+        EndEdit()
+        CancelPending()
         self.noteID = noteID
         local note = noteID and BNB.GetNote(noteID)
         local cd = note and note.contextDisplay
@@ -1153,12 +1532,21 @@ function BNB.CreateSituationEditor(panel, opts)
         for _, k in ipairs(FREQ_KEYS) do if k == fq then known = true end end
         freq:Set(known and fq or "always")
         RefreshList()
-        RefreshWaypointDisplay()
+        RefreshWaypoints()
     end
+
+    -- A renamed note renames every row that shows its title (ALL-282; the
+    -- placed TomTom waypoints follow through ContextNotes' NoteChanged)
+    BNB.RegisterMessage("SituationEditor" .. #_editors, "NoteChanged", function(_, id, fields)
+        if id == ed.noteID and type(fields) == "table" and fields.title ~= nil and panel:IsVisible() then
+            RefreshWaypoints()
+        end
+    end)
 
     -- Start empty: nothing below the add row until the note has a situation
     typ:Set("zone")
     SelectType("zone")
     ShowTypedControls(false)
+    RefreshWaypoints()
     return ed
 end

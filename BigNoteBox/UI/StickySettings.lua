@@ -188,7 +188,7 @@ local function BuildStickySettingsWindow()
     -- The Situation tab is the shared editor (UI/SituationEditor.lua, CMP-03),
     -- built once; PopulateStickySettings only loads the note into it
     f._sitEditor = BNB.CreateSituationEditor(ct3, {
-        padL = 0, padR = 0, ddR = 0, top = -8, bottom = 6,
+        padL = 0, padR = 0, ddR = 0, top = -8,
         host = f,
     })
 
