@@ -37,6 +37,16 @@ local NORMAL = { h = 32, w = 150, minW = 80, gap = 0, x = 8, y = BNB.IsForever a
     iconSz = 18, iconX = 20, iconY = -0.5, border = 1, textGap = 5, textY = -1.5,
     rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.5, font = "GameFontNormal",
     pinSz = 14, pinX = -16, pinY = -6 }
+-- Forever normal (Dukul's /bnbtabs Export, 2026-10-05): wider tabs with a gap,
+-- white text, and two switches the Retail set leaves off: fill = the tabs share
+-- the whole width (never below minW), under = drawn in the strata below the
+-- window, so its top border covers their lower end (as the skin tabs are)
+if BNB.IsForever then
+    for k, v in pairs({ w = 170, minW = 90, gap = 5, y = 6.5, iconX = 18, textY = -1,
+        rightPad = 18, font = "GameFontHighlight", fill = true, under = true }) do
+        NORMAL[k] = v
+    end
+end
 -- Skin: icon and text centred on the whole tab, the tucked part included
 -- (the test's -4 offsets + half the tuck)
 local SKIN = { h = 30, tuck = 8, w = 150, minW = 80, gap = 0, x = 8,
@@ -231,6 +241,20 @@ local function MakeTab(parent)
     btn.cnt:SetWordWrap(false)
     btn.cnt:SetPoint("LEFT", btn.name, "RIGHT", 0, 0)
 
+    -- Above the tab, or below it when there is no room above: GameTooltip is
+    -- clamped to the screen, so near the top it was pushed down over the
+    -- tabs (ALL-285). Compared in screen pixels after Show (height known)
+    local function ShowTip(self)
+        GameTooltip:Show()
+        local top = self:GetTop()
+        if not top then return end
+        local tipH = GameTooltip:GetHeight() * GameTooltip:GetEffectiveScale()
+        local screenH = UIParent:GetTop() * UIParent:GetEffectiveScale()
+        if top * self:GetEffectiveScale() + tipH + 4 > screenH then
+            GameTooltip:ClearAllPoints()
+            GameTooltip:SetPoint("TOP", self, "BOTTOM", 0, -2)
+        end
+    end
     btn:SetScript("OnEnter", function(self)
         self._hover = true; Paint(self)
         if self._moreKeys then
@@ -240,7 +264,7 @@ local function MakeTab(parent)
                 local c = ClassColor(k)
                 GameTooltip:AddLine(NameFor(k) .. " (" .. SB._kit.CountForKey(k) .. ")", c[1], c[2], c[3])
             end
-            GameTooltip:Show()
+            ShowTip(self)
             return
         end
         local title, sub = SB._kit.TooltipForKey(self._key)
@@ -253,7 +277,7 @@ local function MakeTab(parent)
             GameTooltip:AddLine(n == 1 and BNB.L["SB_NOTE_COUNT_ONE"]
                 or string.format(BNB.L["SB_NOTE_COUNT_N_FMT"], n), 0.6, 0.9, 0.6)
         end
-        GameTooltip:Show()
+        ShowTip(self)
     end)
     btn:SetScript("OnLeave", function(self)
         self._hover = false; Paint(self)
@@ -407,9 +431,9 @@ function SB.RefreshTop(parent)
         if BNB.RegisterSkinButton then BNB.RegisterSkinButton(PaintAll) end
     end
     -- Skin tabs draw in the strata below the window, so its top border covers
-    -- their lower end; normal tabs stand on the border
+    -- their lower end; normal tabs stand on the border (unless S.under)
     local strata = parent:GetFrameStrata()
-    if skin then
+    if skin or S.under then
         _strip:SetFrameStrata(STRATA_BELOW[strata] or "LOW")
     else
         _strip:SetFrameStrata(strata)
@@ -427,7 +451,7 @@ function SB.RefreshTop(parent)
     local avail = parent:GetWidth() - 2 * S.x
     local n = #keys
     local w, shown, rest, moreW = S.w, n, nil, nil
-    if n * w + (n - 1) * S.gap > avail then
+    if S.fill or n * w + (n - 1) * S.gap > avail then
         w = (avail - (n - 1) * S.gap) / n
         if w < S.minW then
             -- As many as fit at minW beside the "More..." tab, sharing that room

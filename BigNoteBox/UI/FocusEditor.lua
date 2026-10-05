@@ -37,6 +37,8 @@ local focusSaveBtn
 local focusSpinBtn      -- orbit toggle button (set in both builders)
 local focusDirty = false
 local focusMarkupBar    -- rich note markup toolbar
+local focusWyBar        -- formatting toolbar, writing tools only (ALL-163)
+local focusNoteID       -- the note loaded here (NoteDeleted closes without saving)
 
 -- FadeTo and the skin-tinted overlay colour check are shared with WhatsNew/
 -- FeatureList/SetupWizard/DangerZone in UI/GlowOverlay.lua (ALL-65.4).
@@ -256,12 +258,75 @@ SaveFocusNote = function()
 end
 
 --------------------------------------------------------------------------------
+-- FONT AND BARS
+--------------------------------------------------------------------------------
+-- Body and title font: the note's own font and size when set (Note Settings,
+-- or the formatting toolbar since ALL-163; the main editor already used the
+-- note's size), else the global ones
+local function ApplyFocusFont(note)
+    if not note then return end
+    local fo = note.fontOverride
+    local def = fo and BNB.ResolveFontDef and BNB.ResolveFontDef(fo)
+    if def then
+        local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
+        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
+    else
+        if BNB.GetBodyFont and focusBodyEb then
+            local path, gsz = BNB.GetBodyFont()
+            local sz = note.fontSize or gsz
+            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
+        end
+        if BNB.GetBoldFont and focusTitleEb then
+            local path = BNB.GetBoldFont()
+            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
+        end
+    end
+end
+
+-- Under the timestamp strip: the formatting toolbar (Settings > Notes,
+-- focusWysiwygBar, ALL-163), then the rich markup bar, then the body
+local function LayoutFocusBars(note)
+    local isRich = note and BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
+    local wy = note and focusWyBar and not (BigNoteBoxDB and BigNoteBoxDB.focusWysiwygBar == false)
+    if focusWyBar then
+        if wy then focusWyBar:Show() else focusWyBar:Hide() end
+    end
+    local off = BODY_TOP_OFFSET
+    if wy then off = off - focusWyBar:GetHeight() - 2 end
+    if focusMarkupBar then
+        local above = wy and focusWyBar or focusTsStrip
+        focusMarkupBar:ClearAllPoints()
+        focusMarkupBar:SetPoint("TOPLEFT",  above, "BOTTOMLEFT",  0, -2)
+        focusMarkupBar:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
+        if isRich then
+            focusMarkupBar:Show()
+            off = off - FOCUS_MARKUP_H - 2
+        else
+            focusMarkupBar:Hide()
+        end
+    end
+    if focusBodyScroll then
+        local pt, rel, rp, xo = focusBodyScroll:GetPoint(1)
+        if pt and rel then focusBodyScroll:SetPoint(pt, rel, rp, xo, off) end
+    end
+end
+
+-- Settings > Notes > "Show formatting toolbar in focus mode editor"
+function BNB.ApplyFocusWysiwygBar()
+    if focusFrame and focusFrame:IsShown() then
+        LayoutFocusBars(BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID))
+    end
+end
+
+--------------------------------------------------------------------------------
 -- LOAD NOTE INTO FOCUS FRAME
 -- Defers SetText one tick so ScrollFrame OnSizeChanged has fired and
 -- eb:SetWidth is non-zero before GrowToContent runs.
 --------------------------------------------------------------------------------
 local function LoadNoteInFocus(id)
     local note = id and BNB.GetNote(id)
+    focusNoteID = note and id or nil
 
     if not note then
         if focusTitleBg    then focusTitleBg:Hide()    end
@@ -270,6 +335,7 @@ local function LoadNoteInFocus(id)
         if focusStatsStrip then focusStatsStrip:Hide() end
         if focusBodyScroll then focusBodyScroll:Hide() end
         if focusMarkupBar  then focusMarkupBar:Hide()  end
+        if focusWyBar      then focusWyBar:Hide()      end
         focusDirty = false
         UpdateFocusSaveBtn()
         return
@@ -281,44 +347,11 @@ local function LoadNoteInFocus(id)
     if focusStatsStrip then focusStatsStrip:Show() end
     if focusBodyScroll then focusBodyScroll:Show() end
 
-    -- Show/hide markup bar and adjust body scroll top offset
-    local isRich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
-    if isRich and focusMarkupBar then
-        focusMarkupBar:Show()
-        if focusBodyScroll then
-            local pt, rel, rp, xo = focusBodyScroll:GetPoint(1)
-            if pt and rel then
-                focusBodyScroll:SetPoint(pt, rel, rp, xo,
-                    BODY_TOP_OFFSET - FOCUS_MARKUP_H - 2)
-            end
-        end
-    else
-        if focusMarkupBar then focusMarkupBar:Hide() end
-        if focusBodyScroll then
-            local pt, rel, rp, xo = focusBodyScroll:GetPoint(1)
-            if pt and rel then
-                focusBodyScroll:SetPoint(pt, rel, rp, xo, BODY_TOP_OFFSET)
-            end
-        end
-    end
-
-    -- Apply font first
-    local fo = note.fontOverride
-    if fo and BNB.ResolveFontDef then
-        local def = BNB.ResolveFontDef(fo)
-        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
-        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
-        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
-    else
-        if BNB.GetBodyFont and focusBodyEb then
-            local path, sz = BNB.GetBodyFont()
-            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
-        end
-        if BNB.GetBoldFont and focusTitleEb then
-            local path = BNB.GetBoldFont()
-            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
-        end
-    end
+    -- Formatting toolbar, markup bar and body offset; then the note's font
+    LayoutFocusBars(note)
+    ApplyFocusFont(note)
+    if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
+    if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
 
     -- Timestamps can be set immediately
     if focusTsStrip then
@@ -355,25 +388,8 @@ end
 --------------------------------------------------------------------------------
 function BNB.RefreshFocusFont()
     if not focusFrame or not focusFrame:IsShown() then return end
-    local id   = BNB._currentNoteID
-    local note = id and BNB.GetNote(id)
-    if not note then return end
-    local fo = note.fontOverride
-    if fo and BNB.ResolveFontDef then
-        local def = BNB.ResolveFontDef(fo)
-        local sz  = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
-        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
-        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
-    else
-        if BNB.GetBodyFont and focusBodyEb then
-            local path, sz = BNB.GetBodyFont()
-            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
-        end
-        if BNB.GetBoldFont and focusTitleEb then
-            local path = BNB.GetBoldFont()
-            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
-        end
-    end
+    local id = BNB._currentNoteID
+    ApplyFocusFont(id and BNB.GetNote(id))
 end
 
 --------------------------------------------------------------------------------
@@ -435,6 +451,67 @@ local function FocusInsertTag(tag)
     eb:SetCursorPosition(cursor + #tag)
     focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
 end
+
+--------------------------------------------------------------------------------
+-- FORMATTING TOOLBAR AND RIGHT-CLICK MENU (ALL-163)
+--------------------------------------------------------------------------------
+-- The main editor's toolbar builder (UI/WysiwygBar.lua) on this body:
+-- writing tools only (Dukul), pickers on BNB.ContextMenu (UIParent is hidden)
+local FOCUS_WY_CTX = {
+    body      = function() return focusBodyEb end,
+    timers    = function()
+        BNB._focusUndoTimers = BNB._focusUndoTimers or {}
+        BNB._focusUndoForced = BNB._focusUndoForced or {}
+        return BNB._focusUndoTimers, BNB._focusUndoForced
+    end,
+    markDirty = function()
+        focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
+        UpdateFocusStats()
+        if BNB.RichPreviewFocus and BNB.RichPreviewFocus.ScheduleRefresh then
+            BNB.RichPreviewFocus.ScheduleRefresh()
+        end
+    end,
+    applyFont   = function(note) ApplyFocusFont(note) end,
+    writingOnly = true,
+    ownMenus    = true,
+}
+
+local function BuildFocusWysiwygBar(parent, anchorBelow)
+    if not BNB._BuildWysiwygBar then return end
+    focusWyBar = BNB._BuildWysiwygBar(parent, anchorBelow, FOCUS_WY_CTX)
+    focusWyBar:Hide()   -- LayoutFocusBars shows it
+end
+
+-- Right-click in the body: the note list's menu for this note, then Close
+-- Focus Mode under a divider. Owned by the Focus window, so closing it
+-- closes the menu.
+local function OpenFocusMenu()
+    local id = BNB._currentNoteID
+    if not (id and focusFrame and BNB.ShowNoteContextMenu) then return end
+    BNB.ShowNoteContextMenu(focusFrame, id, nil, nil, function(root)
+        root:CreateButton(L["FE_CTX_CLOSE_FOCUS"], function() BNB.CloseFocusMode() end,
+            { icon = "focus-mode" })
+    end)
+end
+
+local function WireFocusMenu(eb, sf)
+    local function Up(_, btn) if btn == "RightButton" then OpenFocusMenu() end end
+    eb:HookScript("OnMouseUp", Up)
+    sf:HookScript("OnMouseUp", Up)
+end
+
+-- The note in Focus mode deleted (its menu can do that): close without
+-- saving, or the save would land on whatever note is current by then
+BNB.RegisterMessage("FocusEditor", "NoteDeleted", function(_, ids)
+    if not (focusNoteID and focusFrame and focusFrame:IsShown()) then return end
+    for _, id in ipairs(ids or {}) do
+        if id == focusNoteID then
+            focusDirty = false
+            BNB.CloseFocusMode()
+            return
+        end
+    end
+end)
 
 local function BuildFocusMarkupBar(parent, anchorBelow)
     local bar = CreateFrame("Frame", nil, parent)
@@ -662,7 +739,9 @@ local function BuildFocusFrame()
     statsStrip:SetText("")
     focusStatsStrip = statsStrip
 
-    -- Markup bar for rich notes (anchored below timestamp strip)
+    -- Formatting toolbar (ALL-163) and the markup bar for rich notes, both
+    -- below the timestamp strip; LayoutFocusBars stacks them per note
+    BuildFocusWysiwygBar(content, tsStrip)
     BuildFocusMarkupBar(content, tsStrip)
 
     local bodyPath, bodySize
@@ -698,6 +777,7 @@ local function BuildFocusFrame()
                 local ff = BNB._focusUndoForced
                 if not BNB._undoSnap[id] or BNB._undoStack[id] == nil then
                     BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                    if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                 else
                     if ft[id] then ft[id]:Cancel(); ft[id] = nil end
                     ft[id] = C_Timer.NewTimer(idleDelay, function()
@@ -705,6 +785,7 @@ local function BuildFocusFrame()
                         if ff[id] then ff[id]:Cancel(); ff[id] = nil end
                         if not BNB._undoActive then
                             BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                            if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                         end
                     end)
                     if not ff[id] then
@@ -713,6 +794,7 @@ local function BuildFocusFrame()
                             if ft[id] then ft[id]:Cancel(); ft[id] = nil end
                             if not BNB._undoActive then
                                 BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                             end
                         end)
                     end
@@ -740,6 +822,7 @@ local function BuildFocusFrame()
                     focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
+                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
             end
         elseif ctrl and ((key == "Z" and shift) or key == "Y") then
             BNB.SetPropagate(self, false)
@@ -757,6 +840,7 @@ local function BuildFocusFrame()
                     focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
+                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
             end
         end
     end)
@@ -764,6 +848,7 @@ local function BuildFocusFrame()
     focusBodyScroll = sf
     focusBodyEb     = eb
     BNB._focusEditorBody = eb
+    WireFocusMenu(eb, sf)
 
     if BNB.WireDropTarget       then BNB.WireDropTarget(eb)       end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
@@ -965,7 +1050,9 @@ local function BuildFocusFrameSkin()
     statsStrip2:SetText("")
     focusStatsStrip = statsStrip2
 
-    -- Markup bar for rich notes (anchored below timestamp strip)
+    -- Formatting toolbar (ALL-163) and the markup bar for rich notes, both
+    -- below the timestamp strip; LayoutFocusBars stacks them per note
+    BuildFocusWysiwygBar(content, tsStrip)
     BuildFocusMarkupBar(content, tsStrip)
 
     -- Body scroll (identical to normal version)
@@ -1002,6 +1089,7 @@ local function BuildFocusFrameSkin()
                 local ff = BNB._focusUndoForced
                 if not BNB._undoSnap[id] or BNB._undoStack[id] == nil then
                     BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                    if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                 else
                     if ft[id] then ft[id]:Cancel(); ft[id] = nil end
                     ft[id] = C_Timer.NewTimer(idleDelay, function()
@@ -1009,6 +1097,7 @@ local function BuildFocusFrameSkin()
                         if ff[id] then ff[id]:Cancel(); ff[id] = nil end
                         if not BNB._undoActive then
                             BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                            if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                         end
                     end)
                     if not ff[id] then
@@ -1017,6 +1106,7 @@ local function BuildFocusFrameSkin()
                             if ft[id] then ft[id]:Cancel(); ft[id] = nil end
                             if not BNB._undoActive then
                                 BNB.UndoPush(id, self:GetText() or "", self:GetCursorPosition() or 0)
+                                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
                             end
                         end)
                     end
@@ -1044,6 +1134,7 @@ local function BuildFocusFrameSkin()
                     focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
+                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
             end
         elseif ctrl and ((key == "Z" and shift) or key == "Y") then
             BNB.SetPropagate(self, false)
@@ -1061,6 +1152,7 @@ local function BuildFocusFrameSkin()
                     focusDirty = true; BNB.Editor.SetDirty(true); UpdateFocusSaveBtn()
                 end
                 BNB._undoActive = false
+                if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
             end
         end
     end)
@@ -1068,6 +1160,7 @@ local function BuildFocusFrameSkin()
     focusBodyScroll = sf
     focusBodyEb     = eb
     BNB._focusEditorBody = eb
+    WireFocusMenu(eb, sf)
 
     if BNB.WireDropTarget      then BNB.WireDropTarget(eb)      end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end

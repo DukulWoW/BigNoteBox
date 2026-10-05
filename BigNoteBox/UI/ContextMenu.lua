@@ -540,6 +540,9 @@ function ShowLevel(i, d, row)
     CloseFrom(i)
     local f = _levels[i] or NewLevel(i)
     _levels[i] = f
+    -- On WorldFrame while Focus mode hides UIParent (ALL-163), before Place
+    -- reads the scale
+    BNB.SeatWindow(f, STRATA)
     f._parentRow = row
     Paint(f)
     local w, h = Fill(f, d)

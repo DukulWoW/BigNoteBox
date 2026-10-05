@@ -156,6 +156,13 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     return y - (ROW_H + ROW_GAP), cb   -- cb: for an overview-row twin (ALL-84)
 end
 
+-- A checkbox that is on two pages (Modules > Window placement, ALL-291)
+-- re-reads its setting whenever its page shows
+local function ReadOnShow(cb, getter)
+    cb:HookScript("OnShow", function(self) self:SetChecked(getter()) end)
+    return cb
+end
+
 -- Stacked slider with Reset (ALL-121). Width is CONTENT_W, the narrower of
 -- the two content widths, so the row clears the scrollbar whether or not it
 -- shows. default = the value Reset puts back; fmt = the value text.
@@ -487,8 +494,11 @@ local BUILDERS = {}
 
 -- "Opens on: [Left / Right]" for a window beside the main window (ALL-269).
 -- dbKey = BigNoteBoxDB key (default in BNB.DEFAULTS), frameName = the
--- window's global name: an open window moves at once. Returns y, holder.
-local function AddSideRow(ct, y, label, dbKey, frameName)
+-- window's global name: an open window moves at once. apply(v): optional,
+-- replaces that move for a window placed its own way (Reference Box).
+-- Re-reads the saved side on show: the same row is also on Modules > Window
+-- placement (ALL-291), so a change on one page shows on the other. Returns y, holder.
+local function AddSideRow(ct, y, label, dbKey, frameName, apply)
     local db = BigNoteBoxDB
     local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -500,9 +510,11 @@ local function AddSideRow(ct, y, label, dbKey, frameName)
         }, BNB.WindowSide(dbKey),
         function(v)
             db[dbKey] = v
+            if apply then apply(v); return end
             local f = frameName and _G[frameName]
             if f and f:IsShown() then BNB.PlaceBesideMain(f, v) end
         end, 140, 24)
+    dd:HookScript("OnShow", function(self) self:SetSelected(BNB.WindowSide(dbKey)) end)
     dd:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y - 2)
     lbl:SetPoint("RIGHT", dd, "LEFT", -6, 0)
     local tipOwner = dd._dd or dd
@@ -527,6 +539,7 @@ local K = {
     AddRule              = AddRule,
     AddHeader            = AddHeader,
     AddCheck             = AddCheck,
+    ReadOnShow           = ReadOnShow,
     AddSlider            = AddSlider,
     AddSideRow           = AddSideRow,
     MakeKeybindRow       = MakeKeybindRow,

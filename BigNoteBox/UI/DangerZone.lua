@@ -481,11 +481,34 @@ local function PopulateContent(ct, sf)
         L["DZ_FACTORY_BTN"], 140,
         L["DZ_CONFIRM_FACTORY"], 220,
         function()
-            BNB.SetNotesDB({})
+            -- An empty set with its tables, so the UI still open behind the
+            -- popup reads no notes instead of erroring (ALL-284); the load
+            -- after the reload fills in the rest (InitNotesDB)
+            BNB.SetNotesDB({ notes = {}, noteOrder = {}, trash = {} })
+            BNB._contextMatches = {}
+            BNB.Editor.SetCurrent(nil)
+            if BNB.LoadNoteInEditor then pcall(BNB.LoadNoteInEditor, nil) end
             BigNoteBoxDB      = {}
-            BNB:Print(L["DZ_MSG_FACTORY_DONE"])
-            C_UI.Reload()   -- in the click itself, see Clear migration flags
+            -- The reload is the popup's own click: straight from this confirm
+            -- click it was blocked (ADDON_ACTION_BLOCKED, ALL-284, as ALL-252)
+            StaticPopup_Show("BNB_FACTORY_RESET_DONE")
         end)
+    if not StaticPopupDialogs["BNB_FACTORY_RESET_DONE"] then
+        StaticPopupDialogs["BNB_FACTORY_RESET_DONE"] = {
+            preferredIndex = 3,
+            text    = L["DZ_FACTORY_RELOAD_TEXT"],
+            button1 = L["CFG_RELOAD_NOW_BTN"],
+            timeout = 0, whileDead = true, hideOnEscape = false,
+            OnShow = function(self)
+                self._bnbStrata = self:GetFrameStrata()
+                self:SetFrameStrata(STRATA)
+            end,
+            OnHide = function(self)
+                if self._bnbStrata then self:SetFrameStrata(self._bnbStrata); self._bnbStrata = nil end
+            end,
+            OnAccept = function() C_UI.Reload() end,
+        }
+    end
     y = y - PAD
 
     -- Finalise scroll child height

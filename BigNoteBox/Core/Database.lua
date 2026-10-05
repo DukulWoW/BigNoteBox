@@ -204,6 +204,7 @@ BNB.DEFAULTS = {
 
     -- Focus mode: hide the whole WoW UI while it is open
     focusHideUI = true,
+    focusWysiwygBar = true,   -- formatting toolbar in the Focus mode editor (ALL-163)
 
     -- Focus Mode Orbit
     focusOrbitEnabled        = true,

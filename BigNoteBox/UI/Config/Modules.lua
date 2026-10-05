@@ -576,6 +576,16 @@ local function BuildTasksPage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- After a Reference Box side change, here or on Window placement (ALL-291)
+function K.ApplyRefboxSide()
+    if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+    -- Re-position the open refbox immediately
+    local rbf = _G["BigNoteBoxReferenceBoxFrame"]
+    if rbf and rbf:IsShown() and BNB.OpenReferenceBox then
+        BNB.OpenReferenceBox(BigNoteBoxDB.selectedNoteID)
+    end
+end
+
 local function BuildRefBoxPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     -- ── Reference Box ─────────────────────────────────────────────────────────
@@ -621,17 +631,14 @@ local function BuildRefBoxPage(sf, ct, y, page)
                         function()
                             db.refboxSide = key
                             sideDD:GenerateMenu()
-                            if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                            -- Re-position the open refbox immediately
-                            local rbf = _G["BigNoteBoxReferenceBoxFrame"]
-                            if rbf and rbf:IsShown() and BNB.OpenReferenceBox then
-                                BNB.OpenReferenceBox(db.selectedNoteID)
-                            end
+                            K.ApplyRefboxSide()
                         end)
                 end
             end)
         end
         RebuildSideMenu()
+        -- Also on Modules > Window placement (ALL-291): re-read on show
+        sideDD:HookScript("OnShow", function(self) self:GenerateMenu() end)
         y = y - (22 + ROW_GAP)
 
         -- Display style dropdown
@@ -1249,10 +1256,16 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_REFBOX"],         L["CFG_SUB_REFBOX_DESC"],     BuildRefBoxPage       },
         { L["CFG_HDR_SIDEBAR"],        L["CFG_SUB_SIDEBAR_DESC"],    BuildSidebarPage      },
         { L["CFG_FOCUS_ORBIT_HEADER"], L["CFG_SUB_FOCUS_DESC"],      BuildFocusPage        },
+        -- UI/Config/NotePages.lua (ALL-290)
+        { L["CFG_RICH_SIZES_HEADER"],  L["CFG_SUB_RICH_DESC"],       K.BuildRichNotesPage, "richNotes" },
+        { L["CFG_HDR_NOTE_HISTORY"],   L["CFG_SUB_HISTORY_DESC"],    K.BuildHistoryPage,   "history"   },
+        { L["CFG_HDR_TRASH"],          L["CFG_SUB_TRASH_DESC"],      K.BuildTrashPage,     "trash"     },
+        { L["CFG_HDR_ALARMS"],         L["CFG_SUB_ALARMS_DESC"],     K.BuildAlarmsPage,    "alarms"    },
         { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage    },
         { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage    },
         { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage },
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
+        { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
     }
     for _, m in ipairs(MODULES) do
         local page = K.NewSubPage(m[1], m[3], m[4])

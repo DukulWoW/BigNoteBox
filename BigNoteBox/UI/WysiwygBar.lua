@@ -28,10 +28,43 @@ local ASSETS_WY = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\"
 -- +/- buttons step 1pt at a time regardless of this list.
 local WY_SIZE_PRESETS = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32 }
 
-local function BuildWysiwygBar(parent, tsStrip)
-    local db = BigNoteBoxDB
+-- The main editor's context. Focus mode passes its own (ALL-163): body() =
+-- its edit box, timers() = its undo timer tables, markDirty(), applyFont(note)
+-- = re-apply font and size to its body, writingOnly = the left side only,
+-- ownMenus = BNB.ContextMenu for the pickers (Blizzard menus sit under
+-- UIParent, which Focus mode hides).
+local MAIN_CTX = {
+    body      = function() return BNB._editorBody end,
+    timers    = function() return _undoTimers, _undoForced end,
+    markDirty = function() BNB.MarkDirty() end,
+}
 
-    local bar = CreateFrame("Frame", "BigNoteBoxWysiwygBar", parent)
+-- Every bar's refreshers: the main editor's and Focus mode's show the same
+-- note, so the public refresh calls reach both
+local _undoRefreshers, _fontRefreshers = {}, {}
+BNB._refreshUndoButtons = function() for _, fn in ipairs(_undoRefreshers) do fn() end end
+BNB._refreshWysiwygFont = function() for _, fn in ipairs(_fontRefreshers) do fn() end end
+
+local function BuildWysiwygBar(parent, tsStrip, ctx)
+    local db = BigNoteBoxDB
+    local main = ctx == nil
+    ctx = ctx or MAIN_CTX
+    local function Body() return ctx.body() end
+
+    -- A picker menu (font, size, timestamp): Blizzard's dropdown in the main
+    -- editor, BNB.ContextMenu in Focus mode (ctx.ownMenus), whose radios close
+    -- on click, so there is nothing to regenerate
+    local function OpenPicker(dd, owner, fill)
+        if ctx.ownMenus then
+            BNB.ContextMenu.Open(owner, fill)
+        else
+            dd:SetupMenu(function(_, root) fill(root) end)
+            dd:OpenMenu()
+        end
+    end
+    local function Regen(dd) if not ctx.ownMenus then dd:GenerateMenu() end end
+
+    local bar = CreateFrame("Frame", main and "BigNoteBoxWysiwygBar" or nil, parent)
     bar:SetPoint("TOPLEFT",  tsStrip, "BOTTOMLEFT",  0, -2)
     bar:SetPoint("TOPRIGHT", tsStrip, "BOTTOMRIGHT",  0, -2)
     bar:SetHeight(WYSIWYG_H)
@@ -146,15 +179,16 @@ local function BuildWysiwygBar(parent, tsStrip)
     undoBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if not id or BNB._editorLocked then return end
-        local eb = BNB._editorBody; if not eb then return end
-        if _undoTimers[id] then _undoTimers[id]:Cancel(); _undoTimers[id] = nil end
-        if _undoForced[id] then _undoForced[id]:Cancel(); _undoForced[id] = nil end
+        local eb = Body(); if not eb then return end
+        local ut, uf = ctx.timers()
+        if ut[id] then ut[id]:Cancel(); ut[id] = nil end
+        if uf[id] then uf[id]:Cancel(); uf[id] = nil end
         BNB._undoActive = true
         local text, cursor = BNB.UndoStep(id)
         if text then
             eb:SetText(text)
             C_Timer.After(0, function() eb:SetCursorPosition(cursor or 0) end)
-            BNB.MarkDirty()
+            ctx.markDirty()
         end
         BNB._undoActive = false
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
@@ -164,21 +198,22 @@ local function BuildWysiwygBar(parent, tsStrip)
     redoBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if not id or BNB._editorLocked then return end
-        local eb = BNB._editorBody; if not eb then return end
-        if _undoTimers[id] then _undoTimers[id]:Cancel(); _undoTimers[id] = nil end
-        if _undoForced[id] then _undoForced[id]:Cancel(); _undoForced[id] = nil end
+        local eb = Body(); if not eb then return end
+        local ut, uf = ctx.timers()
+        if ut[id] then ut[id]:Cancel(); ut[id] = nil end
+        if uf[id] then uf[id]:Cancel(); uf[id] = nil end
         BNB._undoActive = true
         local text, cursor = BNB.RedoStep(id)
         if text then
             eb:SetText(text)
             C_Timer.After(0, function() eb:SetCursorPosition(cursor or 0) end)
-            BNB.MarkDirty()
+            ctx.markDirty()
         end
         BNB._undoActive = false
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
     end)
 
-    BNB._refreshUndoButtons = function()
+    _undoRefreshers[#_undoRefreshers + 1] = function()
         local id     = BNB._currentNoteID
         local locked = BNB._editorLocked
         undoBtn:SetIconEnabled(not locked and BNB.UndoCanUndo(id))
@@ -260,6 +295,7 @@ local function BuildWysiwygBar(parent, tsStrip)
             BNB.UpdateNote(id, {fontOverride = fontID})
         end
         if BNB.SyncNoteConfig then BNB.SyncNoteConfig(id) end
+        if ctx.applyFont then ctx.applyFont(BNB.GetNote(id)) end
         -- Apply to editor body live
         local eb = BNB._editorBody; if not eb then return end
         local note = BNB.GetNote(id); if not note then return end
@@ -278,14 +314,14 @@ local function BuildWysiwygBar(parent, tsStrip)
     local _fontMenuDD  -- reusable invisible DropdownButton
     fontDDBtn:SetScript("OnClick", function()
         if not _fontMenuDD then
-            _fontMenuDD = CreateFrame("DropdownButton", "BNBWysiFontDD", UIParent,
+            _fontMenuDD = CreateFrame("DropdownButton", main and "BNBWysiFontDD" or nil, UIParent,
                 "WowStyle1DropdownTemplate")
             _fontMenuDD:SetSize(1, 1); _fontMenuDD:SetAlpha(0)
             _fontMenuDD:SetToplevel(true)
         end
         _fontMenuDD:ClearAllPoints()
         _fontMenuDD:SetPoint("TOPLEFT", fontDDBg, "BOTTOMLEFT", 0, 0)
-        _fontMenuDD:SetupMenu(function(_, root)
+        OpenPicker(_fontMenuDD, fontDDBg, function(root)
             -- "Default" entry clears per-note override
             -- An override that cannot be drawn under the active font set
             -- (ALL-14) shows as Default, which is what the note displays.
@@ -295,14 +331,14 @@ local function BuildWysiwygBar(parent, tsStrip)
             end)()
             root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
                 function() return curID == nil end,
-                function() ApplyFontOverride(nil); _fontMenuDD:GenerateMenu() end)
+                function() ApplyFontOverride(nil); Regen(_fontMenuDD) end)
             -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin
             for _, def in ipairs(BNB.FONTS or {}) do
                 if not def._isLSM and BNB.ResolveFontID(def.id) == def.id then
                     local fid = def.id; local lbl = def.label
                     root:CreateRadio(lbl,
                         function() return curID == fid end,
-                        function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
+                        function() ApplyFontOverride(fid); Regen(_fontMenuDD) end)
                 end
             end
             -- LSM fonts: only shown when db.lsmFonts is on and entries exist
@@ -319,13 +355,12 @@ local function BuildWysiwygBar(parent, tsStrip)
                             local fid = def.id; local lbl = def.label
                             root:CreateRadio(lbl,
                                 function() return curID == fid end,
-                                function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
+                                function() ApplyFontOverride(fid); Regen(_fontMenuDD) end)
                         end
                     end
                 end
             end
         end)
-        _fontMenuDD:OpenMenu()
     end)
     fontDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(fontDDBg, "ANCHOR_TOP")
@@ -393,6 +428,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         local id = BNB._currentNoteID; if not id then return end
         BNB.UpdateNote(id, {fontSize = sz})
         if BNB.SyncNoteConfig  then BNB.SyncNoteConfig(id) end
+        if ctx.applyFont then ctx.applyFont(BNB.GetNote(id)) end
         local eb = BNB._editorBody
         if eb then
             local path = select(1, eb:GetFont())
@@ -411,23 +447,22 @@ local function BuildWysiwygBar(parent, tsStrip)
     local _sizeMenuDD
     sizeDDBtn:SetScript("OnClick", function()
         if not _sizeMenuDD then
-            _sizeMenuDD = CreateFrame("DropdownButton", "BNBWysiSizeDD", UIParent,
+            _sizeMenuDD = CreateFrame("DropdownButton", main and "BNBWysiSizeDD" or nil, UIParent,
                 "WowStyle1DropdownTemplate")
             _sizeMenuDD:SetSize(1, 1); _sizeMenuDD:SetAlpha(0)
             _sizeMenuDD:SetToplevel(true)
         end
         _sizeMenuDD:ClearAllPoints()
         _sizeMenuDD:SetPoint("TOPLEFT", sizeBg, "BOTTOMLEFT", 0, 0)
-        _sizeMenuDD:SetupMenu(function(_, root)
+        OpenPicker(_sizeMenuDD, sizeBg, function(root)
             local curSz = GetCurrentFontSize()
             for _, sz in ipairs(WY_SIZE_PRESETS) do
                 local s = sz
                 root:CreateRadio(string.format(L["NE_FONT_SIZE_PT_FMT"], s),
                     function() return curSz == s end,
-                    function() ApplyFontSize(s); _sizeMenuDD:GenerateMenu() end)
+                    function() ApplyFontSize(s); Regen(_sizeMenuDD) end)
             end
         end)
-        _sizeMenuDD:OpenMenu()
     end)
     sizeDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(sizeBg, "ANCHOR_TOP")
@@ -442,7 +477,7 @@ local function BuildWysiwygBar(parent, tsStrip)
     bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", 6, 0)
     bulletBtn:SetIconEnabled(true)
     bulletBtn:SetScript("OnClick", function()
-        local eb = BNB._editorBody
+        local eb = Body()
         if not eb or BNB._editorLocked then return end
         local id = BNB._currentNoteID; if not id then return end
         local text   = eb:GetText() or ""
@@ -473,13 +508,13 @@ local function BuildWysiwygBar(parent, tsStrip)
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
         -- The button click took keyboard focus from the body; give it back.
         C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
-        BNB.MarkDirty()
+        ctx.markDirty()
     end)
 
     -- tb-timestamp: menu to insert the date, the time, or both at the cursor,
     -- in the Appearance timestamp format (ALL-66). One undo step, like the bullet.
     local function InsertAtCursor(snippet)
-        local eb = BNB._editorBody
+        local eb = Body()
         if not eb or BNB._editorLocked or not eb:IsVisible() then return end
         local id = BNB._currentNoteID; if not id then return end
         local text   = eb:GetText() or ""
@@ -497,7 +532,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         BNB.UndoPush(id, newText, newCursor)
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
         C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
-        BNB.MarkDirty()
+        ctx.markDirty()
     end
 
     local stampBtn = WyBtn("tb-timestamp", L["NE_INSERT_TIMESTAMP_TIP"])
@@ -505,16 +540,16 @@ local function BuildWysiwygBar(parent, tsStrip)
     stampBtn:SetIconEnabled(true)
     local _stampMenuDD
     stampBtn:SetScript("OnClick", function(self)
-        if not (BNB._editorBody and BNB._currentNoteID) or BNB._editorLocked then return end
+        if not (Body() and BNB._currentNoteID) or BNB._editorLocked then return end
         if not _stampMenuDD then
-            _stampMenuDD = CreateFrame("DropdownButton", "BNBWysiStampDD", UIParent,
+            _stampMenuDD = CreateFrame("DropdownButton", main and "BNBWysiStampDD" or nil, UIParent,
                 "WowStyle1DropdownTemplate")
             _stampMenuDD:SetSize(1, 1); _stampMenuDD:SetAlpha(0)
             _stampMenuDD:SetToplevel(true)
         end
         _stampMenuDD:ClearAllPoints()
         _stampMenuDD:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, 0)
-        _stampMenuDD:SetupMenu(function(_, root)
+        OpenPicker(_stampMenuDD, self, function(root)
             local now = time()
             local d, t = BNB.FmtDate(now), BNB.FmtClock(now)
             local items = {
@@ -528,7 +563,6 @@ local function BuildWysiwygBar(parent, tsStrip)
                     function() InsertAtCursor(value) end)
             end
         end)
-        _stampMenuDD:OpenMenu()
     end)
     stampBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -539,6 +573,9 @@ local function BuildWysiwygBar(parent, tsStrip)
 
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
     -- Anchored from RIGHT inward so they always hug the right edge.
+    -- Main editor only: Focus mode has the writing tools alone (ALL-163)
+    local cmDiv
+    if main then
 
     -- tb-notemap: waypoint at note creation coords (rightmost)
     local mapBtn = WyBtn("tb-notemap", L["NE_WP_OPEN_TIP_TITLE"])
@@ -639,7 +676,7 @@ local function BuildWysiwygBar(parent, tsStrip)
     BNB._wysiwygAlarmBtn = alarmBtn
 
     -- Divider: history | alarm
-    local cmDiv = bar:CreateTexture(nil, "ARTWORK")
+    cmDiv = bar:CreateTexture(nil, "ARTWORK")
     cmDiv:SetSize(1, 16)
     cmDiv:SetPoint("RIGHT", alarmBtn, "LEFT", -6, 0)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
@@ -678,10 +715,12 @@ local function BuildWysiwygBar(parent, tsStrip)
     end)
     BNB._wysiwygRestoreBtn = restoreBtn
 
+    end   -- main (right side)
+
     -- ── Public refresh callbacks ──────────────────────────────────────────────
 
-    -- Called by LoadNoteInEditor and NoteConfig when the note changes
-    BNB._refreshWysiwygFont = function()
+    -- BNB._refreshWysiwygFont: called by LoadNoteInEditor and NoteConfig when the note changes
+    _fontRefreshers[#_fontRefreshers + 1] = function()
         RefreshFontDDLabel()
         RefreshSizeLbl()
         -- Enable/disable dec/inc at bounds
@@ -689,7 +728,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         decBtn:SetIconEnabled(sz > 8)
         incBtn:SetIconEnabled(sz < 32)
         -- Highlight alarm button when current note has an active alarm
-        if BNB._wysiwygAlarmBtn then
+        if main and BNB._wysiwygAlarmBtn then
             local id    = BNB._currentNoteID
             local note  = id and BNB.GetNote and BNB.GetNote(id)
             local alarm = note and note.alarm
@@ -698,6 +737,7 @@ local function BuildWysiwygBar(parent, tsStrip)
         end
     end
 
+    if main then
     -- Copy/move button visibility. Always shown since ALL-265: Note Settings
     -- lost Note visibility, so this and the right-click menu are the ways to
     -- change a note's character, sidebar on or off. Kept as a function: the
@@ -752,8 +792,10 @@ local function BuildWysiwygBar(parent, tsStrip)
         }
     end
 
-    -- Respect initial visibility setting
-    if db and db.wysiwygBarVisible == false then
+    end   -- main (sidebar sync, restore popup)
+
+    -- Respect initial visibility setting (Focus mode places its own bar)
+    if main and db and db.wysiwygBarVisible == false then
         bar:Hide()
     end
 

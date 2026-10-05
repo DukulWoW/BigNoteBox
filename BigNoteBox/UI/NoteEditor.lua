@@ -299,6 +299,7 @@ local function BuildTitleField(parent)
         GameTooltip:Show()
     end)
     tsHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    BNB._editorTsHover = tsHover   -- hidden with the strip in a rich note's Note view (ALL-286)
 
     -- Word/char count label (M) — right-aligned in the same strip
     local statsStrip = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
@@ -616,8 +617,32 @@ function BNB.UpdateBodyTopAnchor()
     local ts   = BNB._editorTimestamp
     if not ts then return end
 
+    -- A rich note's Note view shows only the title, its rule and the note: no
+    -- timestamp / stats row and no formatting toolbar (Dukul, ALL-286). Back
+    -- in Markup view they return, the toolbar per its setting. Every mode
+    -- change and note load ends here, so this is the one place that decides.
+    local ul   = BNB._editorTitleUnderline
+    local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    local bare = note and note.richMode and BNB._editorInViewMode == true and ul
+    if note then
+        local stats, tsHover = BNB._editorStatsStrip, BNB._editorTsHover
+        if bare then
+            ts:Hide()
+            if stats   then stats:Hide()   end
+            if tsHover then tsHover:Hide() end
+            if bar     then bar:Hide()     end
+        else
+            ts:Show()
+            if stats   then stats:Show()   end
+            if tsHover then tsHover:Show() end
+            if bar then
+                if BigNoteBoxDB and BigNoteBoxDB.wysiwygBarVisible == false then bar:Hide() else bar:Show() end
+            end
+        end
+    end
+
     -- Build anchor chain: tsStrip -> wysiwygBar (if shown) -> markupBar (if shown)
-    local topAnchor = ts
+    local topAnchor = bare and ul or ts
     if bar  and bar:IsShown()  then topAnchor = bar  end
     if mbar and mbar:IsShown() then topAnchor = mbar end
     if mbar and mbar._sepT then
@@ -627,15 +652,18 @@ function BNB.UpdateBodyTopAnchor()
     local bottomOffset = TOOLBAR_H
         + (BNB._editorTagStrip and BNB._editorTagStrip:GetHeight() or TAG_STRIP_H)
         + PAD
+    -- The rule starts 2 px left of the strip (BuildTitleField): same text edge
+    local topX, topY = PAD, -4
+    if topAnchor == ul then topX, topY = PAD + 2, -6 end
 
     if sf then
         sf:ClearAllPoints()
-        sf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  PAD, -4)
+        sf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  topX, topY)
         sf:SetPoint("BOTTOMRIGHT", BNB.editorPane, "BOTTOMRIGHT", -22, bottomOffset)
     end
     if rsf then
         rsf:ClearAllPoints()
-        rsf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  PAD, -4)
+        rsf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  topX, topY)
         rsf:SetPoint("BOTTOMRIGHT", BNB.editorPane, "BOTTOMRIGHT", -22, bottomOffset)
     end
 end

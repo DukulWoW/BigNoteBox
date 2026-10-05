@@ -816,8 +816,8 @@ end
 -- GET NOTE
 --------------------------------------------------------------------------------
 function BNB.GetNote(id)
-    if not id or not NDB() then return nil end
-    return NDB().notes[id]
+    local ndb = id and NDB()
+    return ndb and ndb.notes and ndb.notes[id] or nil   -- notes nil: Factory Reset before its reload (ALL-284)
 end
 
 --------------------------------------------------------------------------------

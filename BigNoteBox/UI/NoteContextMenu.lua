@@ -131,7 +131,9 @@ end
 -- extraTop(root), optional: lets a caller elsewhere (Tag Manager note rows)
 -- put its own entries right under the header, before "Open note".
 -- after, optional: runs after any entry's click (Oracle results close the bar).
-function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
+-- extraBottom(root), optional: entries after the last one, below a divider
+-- (Focus mode's Close Focus Mode, ALL-163).
+function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
     local note = BNB.GetNote(noteID)
     if not note then return end
     local K = BNB._NoteListKit
@@ -328,6 +330,10 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after)
             root:CreateButton(L["NL_CTX_TRASH"], DoTrash, { icon = "trash" })
         end
         root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), DoDeletePerm, { icon = "danger" })
+        if extraBottom then
+            root:CreateDivider()
+            extraBottom(root)
+        end
     end, after)
 end
 

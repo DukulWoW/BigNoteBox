@@ -1740,7 +1740,7 @@ local function CreateStickyFrame(noteID)
     end)
     f._minBtn = minBtn
 
-    HdrBtn(3, "settings", L["STICKY_NOTE_SETTINGS_TIP"], function()
+    HdrBtn(3, "settings", L["STICKY_SETTINGS_MENU"], function()
         -- Do NOT close the ESC menu here — settings open alongside the sticky
         -- so the user can see their changes live (OpenStickySettings raises
         -- the settings panel strata above GameMenuFrame automatically).
@@ -1854,7 +1854,7 @@ local function CreateStickyFrame(noteID)
                 EndInlineEdit(f)
                 OpenInMainEditor(noteID)
             end)
-            root:CreateButton(L["STICKY_NOTE_SETTINGS_TIP"], function()
+            root:CreateButton(L["STICKY_SETTINGS_MENU"], function()
                 -- Same special case as the header settings button: minimized
                 -- just restores instead of opening settings on a hidden frame.
                 if f._minimized then SN.SetMinimized(noteID, false); return end
