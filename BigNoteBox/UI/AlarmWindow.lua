@@ -145,9 +145,7 @@ local function BuildWindow()
         tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -AW_PAD, -(SK_AW_TITLE_H + SK_AW_TAB_GAP))
         f._selectTab = function(idx) tabCtrl.Select(idx) end
     else
-        local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-            and "PanelTopTabButtonTemplate" or "PanelTabButtonTemplate"
+        local tpl = "PanelTopTabButtonTemplate"
 
         local tabBtns = {}
         local function SelectTab(idx)
@@ -167,11 +165,7 @@ local function BuildWindow()
             local btn = CreateFrame("Button","BNBAlarmWindowTab"..i, f, tpl)
             btn:SetText(text)
             pcall(function()
-                if tpl=="PanelTopTabButtonTemplate" then
-                    PanelTemplates_TabResize(btn,15,nil,70)
-                else
-                    PanelTemplates_TabResize(btn,0)
-                end
+                PanelTemplates_TabResize(btn,15,nil,70)
             end)
             btn:SetID(i)
             if lastBtn then btn:SetPoint("LEFT",lastBtn,"RIGHT",5,0)

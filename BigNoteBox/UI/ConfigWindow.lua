@@ -320,56 +320,28 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
     hdr:SetText(L["CFG_LSM_FONTS_OTHER"])
     y = y - 18
 
-    local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-    if useDD then
-        local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
-        dd:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-        dd:SetWidth(W)
-        dd:SetupMenu(function(_, root)
-            local cur = getChoice()
-            -- Reset option: clears any LSM override back to the bundled card selection
-            root:CreateRadio(L["CFG_LSM_FONTS_NONE"],
-                function()
-                    local choice = getChoice()
-                    if not choice then return true end
-                    local def = BNB.GetFontDef and BNB.GetFontDef(choice)
-                    return not (def and def._isLSM)
-                end,
-                function() setChoice(nil); dd:GenerateMenu() end)
-            root:CreateDivider()
-            for _, def in ipairs(lsmFonts) do
-                local path = def.id
-                root:CreateRadio(def.label,
-                    function() return getChoice() == path end,
-                    function() setChoice(path); dd:GenerateMenu() end)
-            end
-        end)
-        return y - 28, function() dd:GenerateMenu() end, hdr, dd
-    else
-        -- Fallback: show current LSM selection as plain text with a cycle button
-        local cur = getChoice()
-        local curDef = cur and BNB.GetFontDef and BNB.GetFontDef(cur)
-        local curLbl = (curDef and curDef._isLSM and curDef.label) or L["CFG_LSM_FONTS_NONE"]
-        local cycleBtn = BNB.CreateButton(nil, parent, curLbl, W, 22)
-        cycleBtn:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-        cycleBtn:SetScript("OnClick", function()
-            local curChoice = getChoice()
-            local idx = 0
-            for i, def in ipairs(lsmFonts) do
-                if def.id == curChoice then idx = i; break end
-            end
-            local next = lsmFonts[(idx % #lsmFonts) + 1]
-            if next then setChoice(next.id); cycleBtn:SetText(next.label) end
-        end)
-        local function refresh()
-            local c  = getChoice()
-            local cd = c and BNB.GetFontDef and BNB.GetFontDef(c)
-            cycleBtn:SetText((cd and cd._isLSM and cd.label) or L["CFG_LSM_FONTS_NONE"])
+    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
+    dd:SetWidth(W)
+    dd:SetupMenu(function(_, root)
+        -- Reset option: clears any LSM override back to the bundled card selection
+        root:CreateRadio(L["CFG_LSM_FONTS_NONE"],
+            function()
+                local choice = getChoice()
+                if not choice then return true end
+                local def = BNB.GetFontDef and BNB.GetFontDef(choice)
+                return not (def and def._isLSM)
+            end,
+            function() setChoice(nil); dd:GenerateMenu() end)
+        root:CreateDivider()
+        for _, def in ipairs(lsmFonts) do
+            local path = def.id
+            root:CreateRadio(def.label,
+                function() return getChoice() == path end,
+                function() setChoice(path); dd:GenerateMenu() end)
         end
-        return y - 28, refresh, hdr, cycleBtn
-    end
+    end)
+    return y - 28, function() dd:GenerateMenu() end, hdr, dd
 end
 
 -- Expose for NoteConfig.lua (local functions cannot cross file boundaries)
@@ -653,21 +625,14 @@ local function CreateConfigWindow()
     local f = BNB._CreateConfigShell(CFG_W)
 
     -- ── Tabs ──────────────────────────────────────────────────────────────────
-    local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-        and "PanelTopTabButtonTemplate"
-        or  "PanelTabButtonTemplate"
+    local tpl = "PanelTopTabButtonTemplate"
 
     local lastBtn = nil
     for i, tab in ipairs(TABS) do
         local btn = CreateFrame("Button", "BigNoteBoxCfgTab"..i, f, tpl)
         btn:SetText(tab.label())
         pcall(function()
-            if tpl == "PanelTopTabButtonTemplate" then
-                PanelTemplates_TabResize(btn, 15, nil, 70)
-            else
-                PanelTemplates_TabResize(btn, 0)
-            end
+            PanelTemplates_TabResize(btn, 15, nil, 70)
         end)
         btn:SetID(i)
         if lastBtn then btn:SetPoint("LEFT", lastBtn, "RIGHT", TAB_GAP, 0)

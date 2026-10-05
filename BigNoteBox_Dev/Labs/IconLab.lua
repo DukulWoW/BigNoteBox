@@ -1,4 +1,4 @@
--- BigNoteBox UI/IconLab.lua
+-- BigNoteBox_Dev Labs/IconLab.lua
 -- Developer Tools > Icon Lab (/bnb iconlab, debug mode). ALL-126.
 -- Measures game art for note icon frames: one cropped picture with a hole
 -- that is laid over a note icon. Three windows:
@@ -10,14 +10,19 @@
 --             shape (square / circle), layer (over / under) and tint
 -- Work in progress is kept in BNB.LabDB().devIconLab across reloads.
 --
--- Seed files and their atlas regions come from UI/IconLabData.lua, generated
+-- Seed files and their atlas regions come from Labs/IconLabData.lua, generated
 -- by _work/tools/iconlab-regions.py and loaded only in dev builds (#@debug@
 -- in the TOC); without it the Lab starts empty and takes pasted files.
 -- An entry is one file, or one file + atlas pair (a region picked from the
--- list), the same as the Background Lab. Shared pieces: UI/LabKit.lua and
--- the sheet, UI/LabSheet.lua (since 2026-10-02); the
+-- list), the same as the Background Lab. Shared pieces: Labs/LabKit.lua and
+-- the sheet, Labs/LabSheet.lua (since 2026-10-02); the
 -- preview draws through UI/IconFrameLayer.lua, as the note icons will.
 -- Button and mode names on the sheet and preview are dev-only English.
+
+-- Queued for BigNoteBox's Core/DevTools.lua, which runs it once BigNoteBox
+-- has loaded (this addon loads first, ARCH-04). The body is not indented.
+BigNoteBoxDevLabs = BigNoteBoxDevLabs or {}
+BigNoteBoxDevLabs[#BigNoteBoxDevLabs + 1] = function()
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -35,7 +40,7 @@ local REGIONS = {}       -- [file id] = { { name, w, h, l, r, t, b }, ... }
 
 local C_W, C_H = 340, 690
 local C_PAD    = 16
-local SHEET_BGS = K.SHEET_BGS   -- behind the sheet and the preview (UI/LabSheet.lua)
+local SHEET_BGS = K.SHEET_BGS   -- behind the sheet and the preview (Labs/LabSheet.lua)
 local COL_CROP  = { 1, 0.82, 0, 1 }
 local COL_HOLE  = { 0.30, 1, 0.40, 1 }
 
@@ -183,7 +188,7 @@ local function Append(g, id, path, atlas, variant)
     local key = K.EntryKey(id, path or "", atlas)
     if variant and variant > 1 then key = key .. "-" .. variant end
     LIST[#LIST + 1] = { g = g, id = id, path = path or "", atlas = atlas, variant = variant, key = key }
-    -- Any other file: the full atlas table (UI/IconLabAtlas.lua), keyed by
+    -- Any other file: the full atlas table (Labs/IconLabAtlas.lua), keyed by
     -- lower-case path without extension, or by file ID
     local A = BNB.IconLabAtlas
     if not REGIONS[id] and A then
@@ -259,7 +264,7 @@ local function RemoveCustom(i)
 end
 
 -- ── Regions ──────────────────────────────────────────────────────────────────
--- A region's rectangle in file pixels (UI/LabKit.lua): the live atlas wins
+-- A region's rectangle in file pixels (Labs/LabKit.lua): the live atlas wins
 -- when this client has it on the same file; otherwise the generated (Retail)
 -- coordinates.
 local RegionRect = K.NewRegionRects()
@@ -283,7 +288,7 @@ local function ApplyAtlasCrop(i)
     if x then st.cx, st.cy, st.cw, st.ch = x, y, w, h end
 end
 
--- ── Sheet window (UI/LabSheet.lua) ──────────────────────────────────────────
+-- ── Sheet window (Labs/LabSheet.lua) ──────────────────────────────────────────
 -- The shared lab sheet, with two boxes: the picture area (whole pixels) and
 -- the hole (may sit on a half pixel and outside the file, SetBox). Its view
 -- options (bg, grid, zoom, showRegions, guides, sw, sh) are kept on Store()
@@ -1097,4 +1102,6 @@ function BNB.OpenIconLab()
     _pv:Show()
     Go(Store().idx or _idx)
     ProbeAllSizes()
+end
+
 end

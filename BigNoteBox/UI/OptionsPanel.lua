@@ -37,16 +37,8 @@ local function CreateOptionsPanel()
     hint:SetPoint("TOP", author, "BOTTOM", 0, -10)
     hint:SetText(L["OPT_HINT"])
 
-    -- Button: try modern template first, fall back gracefully
+    -- Button: the large panel button (every client has the template, DEP-05)
     local tpl = "SharedButtonLargeTemplate"
-    if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo(tpl)) then
-        tpl = "UIPanelDynamicResizeButtonTemplate"
-    end
-    if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo(tpl)) then
-        tpl = "UIPanelButtonTemplate"
-    end
 
     local btn = CreateFrame("Button", nil, panel, tpl)
     btn:SetSize(300, 60)

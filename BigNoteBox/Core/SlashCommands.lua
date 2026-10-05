@@ -95,23 +95,23 @@ function BNB.RegisterSlashCommands()
                 BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
                 return
             end
-            if BNB.ToggleSearchLayoutTool then BNB.ToggleSearchLayoutTool() end
+            if BNB.ToggleSearchLayoutTool then BNB.ToggleSearchLayoutTool() else BNB.DevToolMissing() end
 
-        -- ── Developer: game background preview (ALL-110, UI/BackgroundLab.lua) ─
+        -- ── Developer: game background preview (ALL-110, BigNoteBox_Dev Labs/BackgroundLab.lua) ─
         elseif cmd == "bglab" then
             if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
                 BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
                 return
             end
-            if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() end
+            if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() else BNB.DevToolMissing() end
 
-        -- ── Developer: note icon frame measuring (ALL-126, UI/IconLab.lua) ────
+        -- ── Developer: note icon frame measuring (ALL-126, BigNoteBox_Dev Labs/IconLab.lua) ────
         elseif cmd == "iconlab" then
             if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
                 BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
                 return
             end
-            if BNB.OpenIconLab then BNB.OpenIconLab() end
+            if BNB.OpenIconLab then BNB.OpenIconLab() else BNB.DevToolMissing() end
 
         -- ── Developer: main window toolbar strip art (ALL-240, UI/MainWindow.lua) ─
         elseif cmd == "topbar" or cmd:sub(1, 7) == "topbar " then

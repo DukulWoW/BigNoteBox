@@ -884,11 +884,12 @@ function BNB.CheckContextualNotes()
                     if type(old) == "table" and TomTom.RemoveWaypoint then
                         pcall(function() TomTom:RemoveWaypoint(old) end)
                     end
+                    -- crazy = false: placed, but TomTom's arrow is not
+                    -- switched to it (note.wpNoTrack, SUG-10)
+                    local wpOpts = { title = wpTitle, from = "BigNoteBox" }
+                    if note.wpNoTrack then wpOpts.crazy = false end
                     local ok, uid = pcall(function()
-                        return TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, {
-                            title = wpTitle,
-                            from  = "BigNoteBox",
-                        })
+                        return TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, wpOpts)
                     end)
                     if ok and uid then BNB._autoWaypoints[id] = uid end
                 elseif C_Map and C_Map.SetUserWaypoint then
@@ -896,7 +897,8 @@ function BNB.CheckContextualNotes()
                         local pt = UiMapPoint.CreateFromCoordinates(
                             wp.mapID, wp.x / 100, wp.y / 100)
                         C_Map.SetUserWaypoint(pt)
-                        if C_SuperTrack and C_SuperTrack.SetSuperTrackedUserWaypoint then
+                        if not note.wpNoTrack and C_SuperTrack
+                           and C_SuperTrack.SetSuperTrackedUserWaypoint then
                             C_SuperTrack.SetSuperTrackedUserWaypoint(true)
                         end
                     end)

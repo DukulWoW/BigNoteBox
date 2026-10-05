@@ -479,55 +479,32 @@ local function BuildTasksPage(sf, ct, y, page)
             { key = "inline", label = L["CFG_TASK_POS_KEEP_SHORT"]  },
         }
 
-        local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-        if useDD then
-            local cpDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-            cpDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            cpDD:SetWidth(CONTENT_W)
-            cpDD:SetupMenu(function(_, root)
-                for _, item in ipairs(CP_ITEMS) do
-                    local iv = item.key
-                    root:CreateRadio(item.label,
-                        function()
-                            return (BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition) == iv
-                        end,
-                        function()
-                            if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = iv end
-                            cpDD:GenerateMenu()
-                            if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-                        end)
-                end
-            end)
-            cpDD:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:AddLine(L["CFG_TASK_COMPLETED_POS_TIP_TITLE"], 1, 1, 1)
-                GameTooltip:AddLine(L["CFG_TASK_POS_BOTTOM"], 0.8, 0.8, 0.8, true)
-                GameTooltip:AddLine(L["CFG_TASK_POS_KEEP"], 0.8, 0.8, 0.8, true)
-                GameTooltip:Show()
-            end)
-            cpDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            y = y - 32
-        else
-            -- Fallback: cycling button
-            local function GetCpLabel()
-                local v = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition
-                for _, item in ipairs(CP_ITEMS) do if item.key == v then return item.label end end
-                return CP_ITEMS[1].label
+        local cpDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        cpDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        cpDD:SetWidth(CONTENT_W)
+        cpDD:SetupMenu(function(_, root)
+            for _, item in ipairs(CP_ITEMS) do
+                local iv = item.key
+                root:CreateRadio(item.label,
+                    function()
+                        return (BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition) == iv
+                    end,
+                    function()
+                        if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = iv end
+                        cpDD:GenerateMenu()
+                        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+                    end)
             end
-            local cpBtn = BNB.CreateButton(nil, ct, GetCpLabel(), CONTENT_W, 24)
-            cpBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            cpBtn:SetScript("OnClick", function(self)
-                local cur = BigNoteBoxDB and BigNoteBoxDB.taskCompletedPosition or BNB.DEFAULTS.taskCompletedPosition
-                local next = cur == "bottom" and "inline" or "bottom"
-                if BigNoteBoxDB then BigNoteBoxDB.taskCompletedPosition = next end
-                local lbl = next == "bottom" and L["CFG_TASK_POS_BOTTOM_SHORT"] or L["CFG_TASK_POS_KEEP_SHORT"]
-                self:SetText(lbl)
-                if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
-            end)
-            y = y - 30
-        end
+        end)
+        cpDD:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_TASK_COMPLETED_POS_TIP_TITLE"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_TASK_POS_BOTTOM"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_TASK_POS_KEEP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        cpDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - 32
     end
 
     -- Task row spacing dropdown
@@ -558,55 +535,33 @@ local function BuildTasksPage(sf, ct, y, page)
             end
         end
 
-        local useDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-        if useDD then
-            local spDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-            spDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            spDD:SetWidth(CONTENT_W)
-            spDD:SetupMenu(function(_, root)
-                for _, item in ipairs(SP_ITEMS) do
-                    local iv = item.key
-                    root:CreateRadio(item.label,
-                        function()
-                            return (BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing) == iv
-                        end,
-                        function()
-                            if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = iv end
-                            spDD:GenerateMenu()
-                            OnSpacingChanged()
-                        end)
-                end
-            end)
-            spDD:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:AddLine(L["CFG_TASK_SPACING_TIP_TITLE"], 1, 1, 1)
-                GameTooltip:AddLine(L["CFG_TASK_SPACING_COMPACT"], 0.8, 0.8, 0.8, true)
-                GameTooltip:AddLine(L["CFG_TASK_SPACING_NORMAL"], 0.8, 0.8, 0.8, true)
-                GameTooltip:AddLine(L["CFG_TASK_SPACING_SPACIOUS"], 0.8, 0.8, 0.8, true)
-                GameTooltip:Show()
-            end)
-            spDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
-            y = y - 32
-        else
-            local function GetSpLabel()
-                local v = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
-                for _, item in ipairs(SP_ITEMS) do if item.key == v then return item.label end end
-                return L["CFG_SPACING_LABEL_NORMAL"]
+        local spDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        spDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        spDD:SetWidth(CONTENT_W)
+        spDD:SetupMenu(function(_, root)
+            for _, item in ipairs(SP_ITEMS) do
+                local iv = item.key
+                root:CreateRadio(item.label,
+                    function()
+                        return (BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing) == iv
+                    end,
+                    function()
+                        if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = iv end
+                        spDD:GenerateMenu()
+                        OnSpacingChanged()
+                    end)
             end
-            local spBtn = BNB.CreateButton(nil, ct, GetSpLabel(), CONTENT_W, 24)
-            spBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            spBtn:SetScript("OnClick", function(self)
-                local cur = BigNoteBoxDB and BigNoteBoxDB.taskSpacing or BNB.DEFAULTS.taskSpacing
-                local idx = 1
-                for i, item in ipairs(SP_ITEMS) do if item.key == cur then idx = i; break end end
-                idx = (idx % #SP_ITEMS) + 1
-                if BigNoteBoxDB then BigNoteBoxDB.taskSpacing = SP_ITEMS[idx].key end
-                self:SetText(SP_ITEMS[idx].label)
-                OnSpacingChanged()
-            end)
-            y = y - 30
-        end
+        end)
+        spDD:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_TASK_SPACING_TIP_TITLE"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_TASK_SPACING_COMPACT"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_TASK_SPACING_NORMAL"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(L["CFG_TASK_SPACING_SPACIOUS"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        spDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - 32
     end
 
     -- Default sticky view for notes with tasks

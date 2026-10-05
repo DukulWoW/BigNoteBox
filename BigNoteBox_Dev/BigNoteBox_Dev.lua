@@ -12,6 +12,10 @@
 -- Settings (BigNoteBoxDB) stay shared. All of the logic lives in BigNoteBox
 -- (Core/Database.lua, BNB.NotesDB / BNB.LabDB); this file only owns the
 -- SavedVariable. BigNoteBox lists this addon in OptionalDeps, so it loads first.
+--
+-- The labs (Labs\*.lua: Icon Lab, Background Lab, search layout tool) also
+-- live here, never in the release (ARCH-04). Each queues its body in
+-- BigNoteBoxDevLabs; BigNoteBox's Core/DevTools.lua runs them once it has loaded.
 
 -- Checked by BigNoteBox at its ADDON_LOADED
 BigNoteBoxDev_Loaded = true

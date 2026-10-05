@@ -8,7 +8,7 @@ _work/
 _reference/
 
 # Generated dev data (1.6 MB, never shipped): _work/tools/iconlab-regions.py
-BigNoteBox/UI/IconLabAtlas.lua
+BigNoteBox_Dev/Labs/IconLabAtlas.lua
 
 # Compiled Lua sources
 luac.out

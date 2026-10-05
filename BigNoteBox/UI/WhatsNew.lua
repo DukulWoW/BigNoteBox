@@ -168,14 +168,6 @@ local function BuildWindow()
         okBtn = BNB.CreateSkinButton(nil, okArea, BNB.RandomOkPhrase(), okArea:GetWidth() or (CFG_W - PAD * 2), OK_BTN_H, 16)
     else
         local tpl = "SharedButtonLargeTemplate"
-        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-                and C_XMLUtil.GetTemplateInfo(tpl)) then
-            tpl = "UIPanelDynamicResizeButtonTemplate"
-        end
-        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-                and C_XMLUtil.GetTemplateInfo(tpl)) then
-            tpl = "UIPanelButtonTemplate"
-        end
         okBtn = CreateFrame("Button", nil, okArea, tpl)
         okBtn:SetSize(okArea:GetWidth() or (CFG_W - PAD * 2), OK_BTN_H)
         pcall(function() DynamicResizeButton_Resize(okBtn) end)

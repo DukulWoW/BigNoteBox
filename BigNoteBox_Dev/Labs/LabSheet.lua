@@ -1,7 +1,7 @@
--- BigNoteBox UI/LabSheet.lua
+-- BigNoteBox_Dev Labs/LabSheet.lua
 -- The crop sheet shared by the developer labs: a window that shows one game
 -- file with boxes drawn on it in file pixels. Lifted from the Icon Lab's
--- sheet (UI/IconLab.lua, ALL-126) for the Background Lab (2026-10-02); the
+-- sheet (Labs/IconLab.lua, ALL-126) for the Background Lab (2026-10-02); the
 -- Icon Lab still has its own copy and moves onto this one later.
 --
 -- On the sheet: left-drag draws the active box, dragging a box edge or
@@ -35,6 +35,11 @@
 --   Whole(key)      optional: false lets Resize / Centre leave the box on a
 --                   half pixel (the Icon Lab's hole); default whole pixels
 -- Dev tools only; nothing here is translated.
+
+-- Queued for BigNoteBox's Core/DevTools.lua, which runs it once BigNoteBox
+-- has loaded (this addon loads first, ARCH-04). The body is not indented.
+BigNoteBoxDevLabs = BigNoteBoxDevLabs or {}
+BigNoteBoxDevLabs[#BigNoteBoxDevLabs + 1] = function()
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -846,4 +851,6 @@ function K.NewSheet(cfg)
     end
 
     return S
+end
+
 end

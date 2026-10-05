@@ -194,68 +194,39 @@ local function BuildAppearanceTab(sf, ct)
         SKIN_PRESETS[#SKIN_PRESETS + 1] = { key = key, label = BNB.SkinPresetLabel(key) }
     end
 
-    local function CurrentPresetLabel()
-        local cur = db.skinPreset or "obsidian"
-        for _, p in ipairs(SKIN_PRESETS) do
-            if p.key == cur then return p.label end
-        end
-        return SKIN_PRESETS[1].label
-    end
-
     local skinPresetLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     skinPresetLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinPresetLbl:SetHeight(ROW_H); skinPresetLbl:SetJustifyH("LEFT")
     skinPresetLbl:SetText(L["CFG_SKIN_PRESET"])
     y = y - (ROW_H + 2)
 
-    local useNativeSkinDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-    local skinPresetDD, skinPresetCycleBtn
+    local skinPresetDD
 
     -- Forward declaration so preset callbacks below can call it before it's defined
     local RefreshBrightnessVisibility
 
-    if useNativeSkinDrop then
-        skinPresetDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-        skinPresetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
-        skinPresetDD:SetWidth(CONTENT_W - 18)
-        local function RebuildSkinMenu()
-            skinPresetDD:SetupMenu(function(_, root)
-                for _, p in ipairs(SKIN_PRESETS) do
-                    local key = p.key
-                    root:CreateRadio(p.label,
-                        function() return (db.skinPreset or "obsidian") == key end,
-                        function()
-                            db.skinPreset = key
-                            skinPresetDD:GenerateMenu()
-                            if RefreshBrightnessVisibility then RefreshBrightnessVisibility() end
-                            if db.skinMode and BNB.ApplyMainWindowSkin then
-                                BNB.ApplyMainWindowSkin()
-                            end
-                        end)
-                end
-            end)
-        end
-        RebuildSkinMenu()
-        y = y - 32
-    else
-        skinPresetCycleBtn = BNB.CreateButton(nil, ct, CurrentPresetLabel(), CONTENT_W - 18, 24)
-        skinPresetCycleBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
-        skinPresetCycleBtn:SetScript("OnClick", function(self)
-            local cur = db.skinPreset or "obsidian"
-            local idx = 1
-            for i, p in ipairs(SKIN_PRESETS) do if p.key == cur then idx = i; break end end
-            idx = (idx % #SKIN_PRESETS) + 1
-            db.skinPreset = SKIN_PRESETS[idx].key
-            self:SetText(CurrentPresetLabel())
-            if RefreshBrightnessVisibility then RefreshBrightnessVisibility() end
-            if db.skinMode and BNB.ApplyMainWindowSkin then
-                BNB.ApplyMainWindowSkin()
+    skinPresetDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    skinPresetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
+    skinPresetDD:SetWidth(CONTENT_W - 18)
+    local function RebuildSkinMenu()
+        skinPresetDD:SetupMenu(function(_, root)
+            for _, p in ipairs(SKIN_PRESETS) do
+                local key = p.key
+                root:CreateRadio(p.label,
+                    function() return (db.skinPreset or "obsidian") == key end,
+                    function()
+                        db.skinPreset = key
+                        skinPresetDD:GenerateMenu()
+                        if RefreshBrightnessVisibility then RefreshBrightnessVisibility() end
+                        if db.skinMode and BNB.ApplyMainWindowSkin then
+                            BNB.ApplyMainWindowSkin()
+                        end
+                    end)
             end
         end)
-        y = y - 30
     end
+    RebuildSkinMenu()
+    y = y - 32
 
     -- Stacked sliders with Reset, as everywhere (ALL-121). Reset clears the
     -- saved value, so a later change of the built-in default still reaches it.
@@ -358,7 +329,6 @@ local function BuildAppearanceTab(sf, ct)
         local alpha = on and 1.0 or 0.4
         skinPresetLbl:SetTextColor(on and 1 or 0.45, on and 0.82 or 0.45, on and 0 or 0.45)
         if skinPresetDD        then skinPresetDD:SetEnabled(on);        skinPresetDD:SetAlpha(alpha)        end
-        if skinPresetCycleBtn  then skinPresetCycleBtn:SetEnabled(on);  skinPresetCycleBtn:SetAlpha(alpha)  end
         skinRandomizeCb:SetEnabled(on)
         skinRandomizeCb:SetAlpha(alpha)
         -- Nested brightness checkbox: only enabled when skin mode on AND parent randomize on
@@ -373,7 +343,6 @@ local function BuildAppearanceTab(sf, ct)
     -- update the config window's preset dropdown and brightness slider in real time.
     BNB._refreshSkinConfig = function()
         if skinPresetDD then skinPresetDD:GenerateMenu() end
-        if skinPresetCycleBtn then skinPresetCycleBtn:SetText(CurrentPresetLabel()) end
         if skinBrightnessSl then skinBrightnessSl:SetValue(db.skinBrightness or 1.0) end
         if skinOpacitySl    then skinOpacitySl:SetValue(db.skinBgAlpha or 0.97) end
         RefreshBrightnessVisibility()
@@ -479,7 +448,7 @@ local function BuildAppearanceTab(sf, ct)
 
     y = AddRule(ct, y) - 4
 
-    -- Note list display mode — WowStyle1DropdownTemplate or cycling button fallback
+    -- Note list display mode (WowStyle1DropdownTemplate)
     y = AddHeader(ct, y, L["CFG_HDR_LIST_DISPLAY_MODE"])
 
     local MODE_ITEMS = {
@@ -488,58 +457,33 @@ local function BuildAppearanceTab(sf, ct)
         { key = "spacious", label = L["CFG_LISTMODE_SPACIOUS"] },
     }
 
-    local useNativeDrop2 = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-    if useNativeDrop2 then
-        local curMode = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
-        local modeDD2 = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-        modeDD2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        modeDD2:SetWidth(CONTENT_W)
-        modeDD2:SetupMenu(function(_, root)
-            for _, m in ipairs(MODE_ITEMS) do
-                root:CreateRadio(m.label,
-                    function() return curMode == m.key end,
-                    function()
-                        curMode = m.key
-                        db.listEntryHeight = m.key
-                        modeDD2:GenerateMenu()
-                        if BNB.ApplyListMode   then BNB.ApplyListMode()   end
-                        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-                    end)
-            end
-        end)
-        modeDD2:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(L["CFG_ROWHEIGHT_TIP_TITLE"], 1, 1, 1)
-            GameTooltip:AddLine(L["CFG_ROWHEIGHT_NORMAL"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_ROWHEIGHT_COMPACT"], 0.8, 0.8, 0.8, true)
-            GameTooltip:AddLine(L["CFG_ROWHEIGHT_SPACIOUS"], 0.8, 0.8, 0.8, true)
-            GameTooltip:Show()
-        end)
-        modeDD2:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        y = y - 32
-    else
-        -- Fallback: cycling button
-        local function GetModeLabel()
-            local v = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
-            for _, m in ipairs(MODE_ITEMS) do if m.key == v then return m.label end end
-            return MODE_ITEMS[1].label
+    local curMode = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
+    local modeDD2 = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    modeDD2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    modeDD2:SetWidth(CONTENT_W)
+    modeDD2:SetupMenu(function(_, root)
+        for _, m in ipairs(MODE_ITEMS) do
+            root:CreateRadio(m.label,
+                function() return curMode == m.key end,
+                function()
+                    curMode = m.key
+                    db.listEntryHeight = m.key
+                    modeDD2:GenerateMenu()
+                    if BNB.ApplyListMode   then BNB.ApplyListMode()   end
+                    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                end)
         end
-        local modeBtn = BNB.CreateButton(nil, ct, GetModeLabel(), CONTENT_W, 24)
-        modeBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        modeBtn:SetScript("OnClick", function(self)
-            local cur = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
-            local idx = 1
-            for i, m in ipairs(MODE_ITEMS) do if m.key == cur then idx = i; break end end
-            idx = (idx % #MODE_ITEMS) + 1
-            db.listEntryHeight = MODE_ITEMS[idx].key
-            self:SetText(GetModeLabel())
-            if BNB.ApplyListMode   then BNB.ApplyListMode()   end
-            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
-        end)
-        y = y - 30
-    end
+    end)
+    modeDD2:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_ROWHEIGHT_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_ROWHEIGHT_NORMAL"], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["CFG_ROWHEIGHT_COMPACT"], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["CFG_ROWHEIGHT_SPACIOUS"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    modeDD2:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - 32
 
     y = AddRule(ct, y) - 4
 
@@ -552,55 +496,27 @@ local function BuildAppearanceTab(sf, ct)
         { key = "DD-MM-YYYY", label = L["CFG_DATEFMT_DMY"] },
         { key = "MM-DD-YYYY", label = L["CFG_DATEFMT_MDY"] },
     }
-    local function GetFmtLabel()
-        local cur = db.dateFormat or BNB.DEFAULTS.dateFormat
-        for _, f in ipairs(DATE_FORMATS) do
-            if f.key == cur then return f.label end
+    -- WowStyle1DropdownTemplate
+
+    local dd = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    dd:SetWidth(CONTENT_W)
+    local curFmt = db.dateFormat or BNB.DEFAULTS.dateFormat
+    dd:SetupMenu(function(_, root)
+        for _, fmtEntry in ipairs(DATE_FORMATS) do
+            root:CreateRadio(fmtEntry.label,
+                function() return curFmt == fmtEntry.key end,
+                function()
+                    curFmt = fmtEntry.key
+                    db.dateFormat = fmtEntry.key
+                    dd:GenerateMenu()
+                    if BNB._currentNoteID and BNB.LoadNoteInEditor then
+                        BNB.LoadNoteInEditor(BNB._currentNoteID)
+                    end
+                end)
         end
-        return DATE_FORMATS[1].label
-    end
-
-    -- Use WowStyle1DropdownTemplate, with simple button fallback
-    local useNativeDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-    if useNativeDrop then
-        local dd = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        dd:SetWidth(CONTENT_W)
-        local curFmt = db.dateFormat or BNB.DEFAULTS.dateFormat
-        dd:SetupMenu(function(_, root)
-            for _, fmtEntry in ipairs(DATE_FORMATS) do
-                root:CreateRadio(fmtEntry.label,
-                    function() return curFmt == fmtEntry.key end,
-                    function()
-                        curFmt = fmtEntry.key
-                        db.dateFormat = fmtEntry.key
-                        dd:GenerateMenu()
-                        if BNB._currentNoteID and BNB.LoadNoteInEditor then
-                            BNB.LoadNoteInEditor(BNB._currentNoteID)
-                        end
-                    end)
-            end
-        end)
-        y = y - 32
-    else
-        -- Fallback: simple cycling button
-        local fmtBtn = BNB.CreateButton(nil, ct, GetFmtLabel(), CONTENT_W, 24)
-        fmtBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        fmtBtn:SetScript("OnClick", function(self)
-            local cur = db.dateFormat or BNB.DEFAULTS.dateFormat
-            local idx = 1
-            for i, f in ipairs(DATE_FORMATS) do if f.key == cur then idx = i; break end end
-            idx = (idx % #DATE_FORMATS) + 1
-            db.dateFormat = DATE_FORMATS[idx].key
-            self:SetText(GetFmtLabel())
-            if BNB._currentNoteID and BNB.LoadNoteInEditor then
-                BNB.LoadNoteInEditor(BNB._currentNoteID)
-            end
-        end)
-        y = y - 30
-    end
+    end)
+    y = y - 32
 
     y = y - 4
     y = AddCheck(ct, y, L["CFG_CHK_24H_LABEL"],

@@ -53,6 +53,7 @@ local DONE_DELAY   = 1.5     -- seconds after the last chunk before "sent" (offl
 local MAX_CHUNKS   = 140     -- hard cap (~32 KB encoded); reject above this
 local MAX_INCOMING = 20      -- messages being reassembled at once; more are dropped
 local INCOMING_TTL = 180     -- seconds before a partial reassembly is purged
+local INCOMING_HINT = 12     -- a note this many messages long gets a chat line on arrival (SUG-10)
 local PROMPT_W     = 340
 local PROMPT_H     = 148
 local PAD          = 12
@@ -243,6 +244,30 @@ local function StartTicker()
 end
 
 --------------------------------------------------------------------------------
+-- The note as Direct Send puts it on the wire: the share payload serialized,
+-- compressed and encoded. Returns the string, or nil + an error text.
+--------------------------------------------------------------------------------
+local function EncodeNote(noteID, groups)
+    -- Same payload as a share string (ShareNote.lua)
+    local payload = BNB.ShareBuildPayload and BNB.ShareBuildPayload(noteID, groups)
+    if not payload then return nil, L["DS_ERR_NO_NOTE_DATA"] end
+    local ld = GetDeflate()
+    if not ld then return nil, L["DS_ERR_GENERIC"] end
+    local serialized = BNB.ShareSerialize(payload)
+    if not serialized then return nil, L["DS_ERR_NO_NOTE_DATA"] end
+    return ld:EncodeForWoWAddonChannel(ld:CompressDeflate(serialized))
+end
+
+-- How many messages a note takes with these groups, and the most one note may
+-- take; nil when it cannot be encoded. The Share window shows it before a
+-- send (SUG-10).
+function DS.MessageCount(noteID, groups)
+    local encoded = EncodeNote(noteID, groups)
+    if not encoded then return nil, MAX_CHUNKS end
+    return math.ceil(#encoded / MAX_CHUNK), MAX_CHUNKS
+end
+
+--------------------------------------------------------------------------------
 -- SEND NOTE
 -- noteID    : BNB note ID string
 -- groups    : share groups to include, { tags = true, ... } (BNB.GetShareGroups)
@@ -272,23 +297,11 @@ function DS.SendNote(noteID, groups, targetName, onSent, onFail, onProgress, onD
         return fail(L["DS_ERR_NO_TARGET"])
     end
 
-    -- Same payload as a share string (ShareNote.lua)
-    local payload = BNB.ShareBuildPayload and BNB.ShareBuildPayload(noteID, groups)
-    if not payload then
-        return fail(L["DS_ERR_NO_NOTE_DATA"])
-    end
-
     -- Serialize + compress + encode
-    local ld = GetDeflate()
-    if not ld then
-        return fail(L["DS_ERR_GENERIC"])
+    local encoded, encErr = EncodeNote(noteID, groups)
+    if not encoded then
+        return fail(encErr)
     end
-    local serialized = BNB.ShareSerialize(payload)
-    if not serialized then
-        return fail(L["DS_ERR_NO_NOTE_DATA"])
-    end
-    local compressed = ld:CompressDeflate(serialized)
-    local encoded    = ld:EncodeForWoWAddonChannel(compressed)
 
     -- Chunk count check
     local total = math.ceil(#encoded / MAX_CHUNK)
@@ -499,6 +512,11 @@ local function OnAddonMessage(prefix, msg, channel, sender)
         e = { total = total, chunks = {}, count = 0, t = time() }
         incoming[key] = e
         incomingCount = incomingCount + 1
+        -- Past the burst the sender's messages come one a second, so a big
+        -- note takes a while: say so on its first part (SUG-10)
+        if total >= INCOMING_HINT then
+            print(string.format(L["DS_INCOMING_PRINT"], sender or "?", total))
+        end
     end
     if total ~= e.total then return end
     if not e.chunks[idx] then

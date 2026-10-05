@@ -7,3 +7,7 @@ Enable it in the AddOn list and reload: BigNoteBox then uses a separate set of
 notes (a copy of your own notes, made once on the first dev-mode login) and keeps
 the developer labs' work in this addon's own saved variables. Disable it and
 reload to get your own notes back. Settings are shared between the two.
+
+The developer labs live here too (Labs\): the Icon Lab (/bnb iconlab), the
+Background Lab (/bnb bglab) and the search bar layout tool (/bnb searchlayout),
+all in debug mode. Without this addon those commands say so.

@@ -1,8 +1,13 @@
--- BigNoteBox UI/LabKit.lua
--- Pieces shared by the developer labs: Background Lab (UI/BackgroundLab.lua)
--- and Icon Lab (UI/IconLab.lua), ALL-126. File ID checks, atlas lookup, the
+-- BigNoteBox_Dev Labs/LabKit.lua
+-- Pieces shared by the developer labs: Background Lab (Labs/BackgroundLab.lua)
+-- and Icon Lab (Labs/IconLab.lua), ALL-126. File ID checks, atlas lookup, the
 -- native size probe, listfile parsing and the small controls both panels use.
 -- Dev tools only; nothing here is translated.
+
+-- Queued for BigNoteBox's Core/DevTools.lua, which runs it once BigNoteBox
+-- has loaded (this addon loads first, ARCH-04). The body is not indented.
+BigNoteBoxDevLabs = BigNoteBoxDevLabs or {}
+BigNoteBoxDevLabs[#BigNoteBoxDevLabs + 1] = function()
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -58,7 +63,7 @@ function K.EntryKey(id, path, atlas)
 end
 
 -- The atlas regions known for a file, from the full atlas table
--- (UI/IconLabAtlas.lua, dev builds only), keyed by file ID or by lower-case
+-- (Labs/IconLabAtlas.lua, dev builds only), keyed by file ID or by lower-case
 -- path without extension. Each region is { name, w, h, l, r, t, b }. nil
 -- when none are known or the table is not loaded.
 function K.AtlasRegions(id, path)
@@ -200,4 +205,6 @@ function K.TabChain(hosts)
             eb:HighlightText()
         end)
     end
+end
+
 end

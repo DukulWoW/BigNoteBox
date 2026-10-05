@@ -32,9 +32,7 @@ local function EnsureLoaded()
     if _list then return true end
     if _tried then return false end
     _tried = true
-    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
-    if not load then _failure = "UNAVAILABLE"; return false end
-    local ok, loaded, reason = pcall(load, ICON_ADDON)
+    local ok, loaded, reason = pcall(C_AddOns.LoadAddOn, ICON_ADDON)
     if not ok then
         _failure = "ERROR"          -- the addon raised an error while loading
     elseif not loaded then

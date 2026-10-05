@@ -13,7 +13,7 @@
 --   and hole are already in absolute file pixels, atlas regions resolved
 -- "none" is not listed here; a missing/empty note.iconFrame means no frame.
 --
--- Source: the Icon Lab (UI/IconLab.lua, /bnb iconlab), Dukul's Export.
+-- Source: the Icon Lab (BigNoteBox_Dev Labs/IconLab.lua, /bnb iconlab), Dukul's Export.
 -- Second batch (replaces the first): _work/iconlab-export-2026-09-28b.lua,
 -- 52 entries renamed and checked on Retail. Nope and Locked In were
 -- exported without a hole; they carry the Lab's stand-in (middle 70 % of

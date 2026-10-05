@@ -120,64 +120,28 @@ local function Rule(parent, y)
     return y - 10
 end
 
--- ── Dropdown helper (WowStyle1 with cycling button fallback) ────────────────────────────
+-- ── Dropdown helper (WowStyle1) ──────────────────────────────────────────────────
 local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
     local c = CreateFrame("Frame", nil, parent); c:SetHeight(44)
     local lb = c:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     lb:SetPoint("TOPLEFT", c, "TOPLEFT", 0, 0); lb:SetText(labelText)
 
-    local useNative = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-    if useNative then
-        local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-        dd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -18); dd:SetPoint("RIGHT", c, "RIGHT", 0, 0)
-        local curSel = selected or "None"
-        dd:SetupMenu(function(_, root)
-            local items = getEntries and getEntries() or {}
-            for _, name in ipairs(items) do
-                root:CreateRadio(name,
-                    function() return curSel == name end,
-                    function() curSel = name; dd:GenerateMenu(); if onChange then onChange(name) end end)
-            end
-            root:SetScrollMode(30 * 20)
-        end)
-        c.dropdown = dd
-        c.SetSelected = function(self, n)
-            curSel = n; dd:GenerateMenu()
-            if dd.Text then dd.Text:SetText((n or L["NC_DD_NONE"]):gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r","")) end
+    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -18); dd:SetPoint("RIGHT", c, "RIGHT", 0, 0)
+    local curSel = selected or "None"
+    dd:SetupMenu(function(_, root)
+        local items = getEntries and getEntries() or {}
+        for _, name in ipairs(items) do
+            root:CreateRadio(name,
+                function() return curSel == name end,
+                function() curSel = name; dd:GenerateMenu(); if onChange then onChange(name) end end)
         end
-    else
-        local btn = BNB.CreateBackdropFrame("Button", nil, c)
-        btn:SetHeight(22); btn:SetPoint("TOPLEFT",c,"TOPLEFT",0,-18); btn:SetPoint("RIGHT",c,"RIGHT",0,0)
-        if btn.SetBackdrop then
-            btn:SetBackdrop({bgFile="Interface\\Buttons\\White8x8",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",edgeSize=10,insets={left=2,right=2,top=2,bottom=2}})
-            btn:SetBackdropColor(0.08,0.08,0.10,0.95); btn:SetBackdropBorderColor(0.35,0.35,0.35,1)
-        end
-        local st = btn:CreateFontString(nil,"ARTWORK","GameFontNormalSmall")
-        st:SetPoint("LEFT",6,0); st:SetPoint("RIGHT",-20,0); st:SetJustifyH("LEFT"); st:SetText(selected or L["NC_DD_NONE"])
-        local ar = btn:CreateTexture(nil,"ARTWORK"); ar:SetSize(12,12); ar:SetPoint("RIGHT",-3,0)
-        ar:SetTexture("Interface\\ChatFrame\\UI-ChatIcon-ScrollDown-Up")
-        local pp = CreateFrame("Frame",nil,btn,"BackdropTemplate"); pp:SetFrameStrata("FULLSCREEN_DIALOG"); pp:SetFrameLevel(500); pp:SetClampedToScreen(true)
-        if pp.SetBackdrop then pp:SetBackdrop({bgFile="Interface\\Buttons\\White8x8",edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",edgeSize=10,insets={left=2,right=2,top=2,bottom=2}}); pp:SetBackdropColor(0.06,0.06,0.06,0.97); pp:SetBackdropBorderColor(0.5,0.5,0.5,1) end
-        pp:Hide(); pp:EnableMouse(true)
-        local psf=CreateFrame("ScrollFrame",nil,pp,"ScrollFrameTemplate"); psf:SetPoint("TOPLEFT",4,-4); psf:SetPoint("BOTTOMRIGHT",-4,4)
-        local psc=CreateFrame("Frame",nil,psf); psf:SetScrollChild(psc)
-        local function Pop()
-            for _,ch in ipairs({psc:GetChildren()}) do ch:Hide(); ch:SetParent(nil) end
-            local items=getEntries and getEntries() or {}; local rH,tH=20,0; psc:SetWidth(pp:GetWidth()-10)
-            for _,nm in ipairs(items) do
-                local row=CreateFrame("Button",nil,psc); row:SetHeight(rH); row:SetPoint("TOPLEFT",0,-tH); row:SetPoint("RIGHT")
-                local hl=row:CreateTexture(nil,"HIGHLIGHT"); hl:SetAllPoints(); hl:SetColorTexture(0.3,0.5,0.8,0.3)
-                local fs=row:CreateFontString(nil,"ARTWORK","GameFontNormalSmall"); fs:SetPoint("LEFT",6,0); fs:SetText(nm)
-                row:SetScript("OnClick",function() st:SetText(nm); pp:Hide(); if onChange then onChange(nm) end end)
-                tH=tH+rH
-            end
-            psc:SetHeight(math.max(tH,1)); pp:SetHeight(math.min(tH+10,260))
-        end
-        btn:SetScript("OnClick",function() if pp:IsShown() then pp:Hide(); return end; pp:SetWidth(btn:GetWidth()); Pop(); pp:ClearAllPoints()
-            if (btn:GetBottom() or 0)-260<0 then pp:SetPoint("BOTTOMLEFT",btn,"TOPLEFT",0,2) else pp:SetPoint("TOPLEFT",btn,"BOTTOMLEFT",0,-2) end; pp:Show() end)
-        c.SetSelected = function(self,n) st:SetText(n or L["NC_DD_NONE"]) end
+        root:SetScrollMode(30 * 20)
+    end)
+    c.dropdown = dd
+    c.SetSelected = function(self, n)
+        curSel = n; dd:GenerateMenu()
+        if dd.Text then dd.Text:SetText((n or L["NC_DD_NONE"]):gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r","")) end
     end
     return c
 end
@@ -534,10 +498,6 @@ local function BuildAppearanceTab(panel)
     local ALIGN_KEYS_NC   = { "LEFT", "CENTER", "RIGHT" }
     local ALIGN_LABELS_NC = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
 
-    local function GetNoteAlignLabel()
-        local note = GetNote()
-        return ALIGN_LABELS_NC[(note and note.textAlign) or "LEFT"] or ALIGN_LABELS_NC.LEFT
-    end
     local function ApplyNoteAlign(align)
         Save({textAlign = align})
         if BNB._editorBody then
@@ -545,43 +505,25 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local useNativeAlignNC = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-    if useNativeAlignNC then
-        local alignDD = CreateFrame("DropdownButton", "BNBNoteAlignDD", panel,
-            "WowStyle1DropdownTemplate")
-        alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        alignDD:SetWidth(CW)
-        alignDD:SetupMenu(function(_, root)
-            for _, key in ipairs(ALIGN_KEYS_NC) do
-                local k = key
-                root:CreateRadio(ALIGN_LABELS_NC[k],
-                    function()
-                        local note = GetNote()
-                        return ((note and note.textAlign) or "LEFT") == k
-                    end,
-                    function()
-                        ApplyNoteAlign(k)
-                        alignDD:GenerateMenu()
-                    end)
-            end
-        end)
-        y = y - 36
-    else
-        local alignBtn = BNB.CreateButton(nil, panel, GetNoteAlignLabel(), CW, 22)
-        alignBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        alignBtn:SetScript("OnClick", function(self)
-            local note = GetNote()
-            local cur = (note and note.textAlign) or "LEFT"
-            local idx = 1
-            for i, k in ipairs(ALIGN_KEYS_NC) do if k == cur then idx = i; break end end
-            idx = (idx % #ALIGN_KEYS_NC) + 1
-            local key = ALIGN_KEYS_NC[idx]
-            ApplyNoteAlign(key)
-            self:SetText(ALIGN_LABELS_NC[key])
-        end)
-        y = y - 28
-    end
+    local alignDD = CreateFrame("DropdownButton", "BNBNoteAlignDD", panel,
+        "WowStyle1DropdownTemplate")
+    alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    alignDD:SetWidth(CW)
+    alignDD:SetupMenu(function(_, root)
+        for _, key in ipairs(ALIGN_KEYS_NC) do
+            local k = key
+            root:CreateRadio(ALIGN_LABELS_NC[k],
+                function()
+                    local note = GetNote()
+                    return ((note and note.textAlign) or "LEFT") == k
+                end,
+                function()
+                    ApplyNoteAlign(k)
+                    alignDD:GenerateMenu()
+                end)
+        end
+    end)
+    y = y - 36
 
     -- F — Font outline (applies to main editor body)
     y = Rule(panel,y) - 4
@@ -618,39 +560,22 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local useNativeOutlineNC = useNativeAlignNC
-    if useNativeOutlineNC then
-        local outlineDD = CreateFrame("DropdownButton", "BNBNoteOutlineDD", panel,
-            "WowStyle1DropdownTemplate")
-        outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        outlineDD:SetWidth(CW)
-        outlineDD:SetupMenu(function(_, root)
-            for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
-                local o = opt
-                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
-                    function() return GetNoteOutlineLabel() == o end,
-                    function()
-                        ApplyNoteOutline(o)
-                        outlineDD:GenerateMenu()
-                    end)
-            end
-        end)
-        y = y - 36
-    else
-        local outlineBtn = BNB.CreateButton(nil, panel,
-            BNB.AdvancedMode.OutlineLabel(GetNoteOutlineLabel()), CW, 22)
-        outlineBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-        outlineBtn:SetScript("OnClick", function(self)
-            local cur = GetNoteOutlineLabel()
-            local idx = 1
-            for i, o in ipairs(OUTLINE_OPTIONS_NC) do if o == cur then idx = i; break end end
-            idx = (idx % #OUTLINE_OPTIONS_NC) + 1
-            local opt = OUTLINE_OPTIONS_NC[idx]
-            ApplyNoteOutline(opt)
-            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
-        end)
-        y = y - 28
-    end
+    local outlineDD = CreateFrame("DropdownButton", "BNBNoteOutlineDD", panel,
+        "WowStyle1DropdownTemplate")
+    outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    outlineDD:SetWidth(CW)
+    outlineDD:SetupMenu(function(_, root)
+        for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
+            local o = opt
+            root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
+                function() return GetNoteOutlineLabel() == o end,
+                function()
+                    ApplyNoteOutline(o)
+                    outlineDD:GenerateMenu()
+                end)
+        end
+    end)
+    y = y - 36
 
     -- Icon frame / edge border picker (ALL-127: replaces the old LSM border
     -- dropdown; a game-art frame and an LSM edge border are mutually
@@ -902,7 +827,7 @@ end
 local function BuildSituationTab(panel)
     local ed = BNB.CreateSituationEditor(panel, {
         padL = PAD, padR = PAD, ddR = 8, top = -PAD, bottom = PAD + 6,
-        width = CW, host = panel:GetParent(),
+        host = panel:GetParent(),
     })
     panel._loadCtx = function() ed:Load(_noteID) end
 end
@@ -946,17 +871,14 @@ local function CreateNoteConfigWindow()
         tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_NC_TITLE_H)
         f._skinTabCtrl = tabCtrl
     else
-        local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-            and "PanelTopTabButtonTemplate" or "PanelTabButtonTemplate"
+        local tpl = "PanelTopTabButtonTemplate"
 
         local lastBtn = nil
         for i, def in ipairs(tabDefs) do
             local btn = CreateFrame("Button", "BNBNoteConfigTab"..i, f, tpl)
             btn:SetText(def.label)
             pcall(function()
-                if tpl == "PanelTopTabButtonTemplate" then PanelTemplates_TabResize(btn, 15, nil, 70)
-                else PanelTemplates_TabResize(btn, 0) end
+                PanelTemplates_TabResize(btn, 15, nil, 70)
             end)
             btn:SetID(i)
             if lastBtn then btn:SetPoint("LEFT", lastBtn, "RIGHT", 5, 0)

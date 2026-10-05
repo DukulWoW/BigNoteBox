@@ -85,10 +85,8 @@ function BNB.OpenImgDialog(insertFn)
 
         -- ── UserImages dropdown (only if manifest has entries) ─────────────────
         local userImages = BNB.AdvancedMode and BNB.AdvancedMode.GetUserImages() or {}
-        local useNativeDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
-        local pickerDD, pickerCycle
+        local pickerDD
         local selImage = 0  -- 0 = nothing selected
 
         -- Extract the short display name from a full path
@@ -111,41 +109,25 @@ function BNB.OpenImgDialog(insertFn)
 
         if #userImages > 0 then
             Lbl(L["NE_PICK_USERIMAGES"])
-            if useNativeDD then
-                pickerDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
-                pickerDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
-                pickerDD:SetWidth(INNER_W)
-                pickerDD:SetupMenu(function(_, root)
-                    for i, label in ipairs(pickLabels) do
-                        local idx = i
-                        root:CreateRadio(label,
-                            function() return selImage == idx end,
-                            function()
-                                selImage = idx
-                                pickerDD:GenerateMenu()
-                                if fileEb then
-                                    fileEb:SetText(label)
-                                    if RefreshPreview then RefreshPreview() end
-                                end
-                            end)
-                    end
-                end)
-                curY = curY - 32
-            else
-                pickerCycle = BNB.CreateButton(nil, f,
-                    selImage > 0 and pickLabels[selImage] or L["NE_SELECT_IMAGE_PLACEHOLDER"],
-                    INNER_W, 22)
-                pickerCycle:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
-                pickerCycle:SetScript("OnClick", function(self)
-                    selImage = (selImage % #userImages) + 1
-                    self:SetText(pickLabels[selImage])
-                    if fileEb then
-                        fileEb:SetText(pickLabels[selImage])
-                        if RefreshPreview then RefreshPreview() end
-                    end
-                end)
-                curY = curY - 28
-            end
+            pickerDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+            pickerDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
+            pickerDD:SetWidth(INNER_W)
+            pickerDD:SetupMenu(function(_, root)
+                for i, label in ipairs(pickLabels) do
+                    local idx = i
+                    root:CreateRadio(label,
+                        function() return selImage == idx end,
+                        function()
+                            selImage = idx
+                            pickerDD:GenerateMenu()
+                            if fileEb then
+                                fileEb:SetText(label)
+                                if RefreshPreview then RefreshPreview() end
+                            end
+                        end)
+                end
+            end)
+            curY = curY - 32
             curY = curY - 6  -- gap before filename label
         end
 
@@ -162,34 +144,23 @@ function BNB.OpenImgDialog(insertFn)
         Lbl(L["NE_ALIGNMENT_LABEL"])
 
         local selAlign = 1  -- index into ALIGN_OPTS
-        local alignDD, alignCycle
-        local function GetAlignLabel() return ALIGN_LABELS[selAlign] end
+        local alignDD
 
-        if useNativeDD then
-            alignDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
-            alignDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
-            alignDD:SetWidth(INNER_W)
-            alignDD:SetupMenu(function(_, root)
-                for i, label in ipairs(ALIGN_LABELS) do
-                    local idx = i
-                    root:CreateRadio(label,
-                        function() return selAlign == idx end,
-                        function()
-                            selAlign = idx
-                            alignDD:GenerateMenu()
-                        end)
-                end
-            end)
-            curY = curY - 32
-        else
-            alignCycle = BNB.CreateButton(nil, f, GetAlignLabel(), INNER_W, 22)
-            alignCycle:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
-            alignCycle:SetScript("OnClick", function(self)
-                selAlign = (selAlign % #ALIGN_OPTS) + 1
-                self:SetText(GetAlignLabel())
-            end)
-            curY = curY - 28
-        end
+        alignDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+        alignDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
+        alignDD:SetWidth(INNER_W)
+        alignDD:SetupMenu(function(_, root)
+            for i, label in ipairs(ALIGN_LABELS) do
+                local idx = i
+                root:CreateRadio(label,
+                    function() return selAlign == idx end,
+                    function()
+                        selAlign = idx
+                        alignDD:GenerateMenu()
+                    end)
+            end
+        end)
+        curY = curY - 32
         curY = curY - 6  -- gap before width/height
 
         -- ── Width / Height (50/50 across full inner width) ────────────────────
@@ -310,14 +281,10 @@ function BNB.OpenImgDialog(insertFn)
         f._resetAlign   = function()
             selAlign = 1
             if alignDD and alignDD.GenerateMenu then alignDD:GenerateMenu() end
-            if alignCycle then alignCycle:SetText(GetAlignLabel()) end
         end
         f._resetPicker  = function()
             selImage = 0
             if pickerDD and pickerDD.GenerateMenu then pickerDD:GenerateMenu() end
-            if pickerCycle then
-                pickerCycle:SetText("-- select image --")
-            end
         end
         f._refreshPreview = RefreshPreview
 

@@ -2017,7 +2017,7 @@ local ROW_ONLY = {}
 for _, k in ipairs({ "title", "body", "richMode", "icon", "iconSource", "iconFrame",
     "titleColor", "borderOverride", "borderScale", "borderOffset", "borderBrightness",
     "locked", "alarm", "attachments", "fontOverride", "fontSize", "fontOutline",
-    "lineHeight", "textAlign", "waypoint", "wpClearOnLeave", "contextDisplay",
+    "lineHeight", "textAlign", "waypoint", "wpClearOnLeave", "wpNoTrack", "contextDisplay",
     "contextLeave", "contextTrigger", "contextFreq", "lastOpened" }) do ROW_ONLY[k] = true end
 
 local function RowOnly(fields)

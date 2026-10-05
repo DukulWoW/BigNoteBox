@@ -11,7 +11,7 @@
 --          optional -1..1, curated in the Lab (all UI/BgLayer.lua)
 -- "none" is always first (plain colour).
 --
--- The game backgrounds come from the Background Lab (UI/BackgroundLab.lua,
+-- The game backgrounds come from the Background Lab (BigNoteBox_Dev Labs/BackgroundLab.lua,
 -- /bnb bglab), Dukul 2026-09-27; its Export is the source for new lines here.
 -- The old bundled TGAs live in the load-on-demand addon BigNoteBox_BGs, which
 -- adds them with BigNoteBox.RegisterStickyBackgrounds when it loads. It is
@@ -164,8 +164,7 @@ local _tried = false
 function SBG.LoadClassic()
     if _tried then return end
     _tried = true
-    local load = (C_AddOns and C_AddOns.LoadAddOn) or LoadAddOn
-    if load then pcall(load, BGS_ADDON) end
+    pcall(C_AddOns.LoadAddOn, BGS_ADDON)
 end
 
 -- The entry for key; LIST[1] ("none") when it is unknown or unavailable

@@ -270,16 +270,13 @@ local function Build()
         ctrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -38)
         _tabVisual = function(idx) ctrl.SetVisual(idx) end
     else
-        local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-            and "PanelTopTabButtonTemplate" or "PanelTabButtonTemplate"
+        local tpl = "PanelTopTabButtonTemplate"
         local btns, last = {}, nil
         for i, text in ipairs(labels) do
             local btn = CreateFrame("Button", "BigNoteBoxIconFramePickerTab" .. i, f, tpl)
             btn:SetText(text)
             pcall(function()
-                if tpl == "PanelTopTabButtonTemplate" then PanelTemplates_TabResize(btn, 8, nil, 60)
-                else PanelTemplates_TabResize(btn, 0) end
+                PanelTemplates_TabResize(btn, 8, nil, 60)
             end)
             btn:SetID(i)
             if last then btn:SetPoint("LEFT", last, "RIGHT", 2, 0)

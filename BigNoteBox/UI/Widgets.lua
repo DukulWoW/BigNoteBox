@@ -773,71 +773,46 @@ function BNB.CreateSmallLabel(parent, text, y, width)
     return l
 end
 
-function BNB.HasWowStyle1()
-    return C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") ~= nil
-end
-
--- Compact value dropdown: WowStyle1DropdownTemplate where it exists, else a
--- button that cycles through the entries on click.
+-- Compact value dropdown on WowStyle1DropdownTemplate (every client has it, so
+-- there is no cycle-button fallback any more, DEP-05).
 -- entries = { { label = "...", value = v }, ... }
 -- onDirty() fires on every user pick, before onChange(value).
 -- Returns a container with :SetSelected(v) / :GetSelected(); ._dd is the
--- DropdownButton when there is one.
+-- DropdownButton.
 function BNB.CreateValueDropdown(parent, entries, initial, onChange, width, height, onDirty)
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(width, height)
 
-    if BNB.HasWowStyle1() then
-        local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-        dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(height)
-        dd:SetPoint("TOPLEFT")
-        dd._selected = initial
-        dd:SetupMenu(function(_, root)
-            for _, e in ipairs(entries) do
-                local ev = e.value
-                root:CreateRadio(e.label,
-                    function() return dd._selected == ev end,
-                    function()
-                        dd._selected = ev; dd:SetText(e.label)
-                        if onDirty then onDirty() end
-                        if onChange then onChange(ev) end
-                    end)
-            end
-            -- Long lists (LibSharedMedia media, ALL-69.5) scroll.
-            if #entries > 20 then root:SetScrollMode(20 * 20) end
-        end)
+    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+    dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(height)
+    dd:SetPoint("TOPLEFT")
+    dd._selected = initial
+    dd:SetupMenu(function(_, root)
         for _, e in ipairs(entries) do
-            if e.value == initial then dd:SetText(e.label); break end
+            local ev = e.value
+            root:CreateRadio(e.label,
+                function() return dd._selected == ev end,
+                function()
+                    dd._selected = ev; dd:SetText(e.label)
+                    if onDirty then onDirty() end
+                    if onChange then onChange(ev) end
+                end)
         end
-        function c:SetSelected(v)
-            dd._selected = v
-            for _, e in ipairs(entries) do
-                if e.value == v then dd:SetText(e.label); return end
-            end
-            dd:SetText("")
-        end
-        function c:GetSelected() return dd._selected end
-        c._dd = dd
-    else
-        local idx = 1
-        for i, e in ipairs(entries) do if e.value == initial then idx = i; break end end
-        local btn = BNB.CreateBackdropFrame("Button", nil, c)
-        btn:SetSize(width, height); btn:SetPoint("TOPLEFT")
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lbl:SetAllPoints(); lbl:SetJustifyH("CENTER")
-        local function Refresh() lbl:SetText(entries[idx] and entries[idx].label or "") end
-        Refresh()
-        btn:SetScript("OnClick", function()
-            idx = (idx % #entries) + 1; Refresh()
-            if onDirty then onDirty() end
-            if onChange then onChange(entries[idx].value) end
-        end)
-        function c:SetSelected(v)
-            for i, e in ipairs(entries) do if e.value == v then idx = i; Refresh(); return end end
-        end
-        function c:GetSelected() return entries[idx] and entries[idx].value end
+        -- Long lists (LibSharedMedia media, ALL-69.5) scroll.
+        if #entries > 20 then root:SetScrollMode(20 * 20) end
+    end)
+    for _, e in ipairs(entries) do
+        if e.value == initial then dd:SetText(e.label); break end
     end
+    function c:SetSelected(v)
+        dd._selected = v
+        for _, e in ipairs(entries) do
+            if e.value == v then dd:SetText(e.label); return end
+        end
+        dd:SetText("")
+    end
+    function c:GetSelected() return dd._selected end
+    c._dd = dd
     return c
 end
 
@@ -860,22 +835,14 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(width, height)
 
-    local dd, eb
-    if BNB.HasWowStyle1() then
-        dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-        dd:SetToplevel(true); dd:SetSize(width, height); dd:SetPoint("TOPLEFT")
-        -- The box shows the value; the template's own label stays empty
-        if dd.Text then dd.Text:SetAlpha(0) end
-        eb = CreateFrame("EditBox", nil, dd)
-        eb:SetPoint("TOPLEFT", dd, "TOPLEFT", 4, 0)
-        eb:SetPoint("BOTTOMRIGHT", dd, "BOTTOMRIGHT", -22, 0)  -- leave the arrow clickable
-        eb:SetFrameLevel(dd:GetFrameLevel() + 2)
-    else
-        local box = BNB.CreateBackdropFrame("Frame", nil, c)
-        box:SetAllPoints(); BNB.SetBackdropDark(box)
-        eb = CreateFrame("EditBox", nil, box)
-        eb:SetAllPoints()
-    end
+    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+    dd:SetToplevel(true); dd:SetSize(width, height); dd:SetPoint("TOPLEFT")
+    -- The box shows the value; the template's own label stays empty
+    if dd.Text then dd.Text:SetAlpha(0) end
+    local eb = CreateFrame("EditBox", nil, dd)
+    eb:SetPoint("TOPLEFT", dd, "TOPLEFT", 4, 0)
+    eb:SetPoint("BOTTOMRIGHT", dd, "BOTTOMRIGHT", -22, 0)  -- leave the arrow clickable
+    eb:SetFrameLevel(dd:GetFrameLevel() + 2)
     eb:SetAutoFocus(false); eb:SetMaxLetters(DIGITS + 1)
     eb:SetFontObject("GameFontHighlightSmall"); eb:SetJustifyH("CENTER")
     eb:SetTextInsets(6, 6, 0, 0)
@@ -888,11 +855,11 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     function c:SetValue(n)
         n = Clamp(n)
         eb:SetText(string.format(FMT, n))
-        if dd then dd._selected = n end
+        dd._selected = n
     end
     function c:GetValue()
         local t = eb:GetText():gsub("%D", "")
-        if t == "" then return dd and dd._selected or lo end
+        if t == "" then return dd._selected or lo end
         return Clamp(t)
     end
     c.eb = eb
@@ -900,14 +867,14 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     function c:SetRange(a, b) lo, hi = a, b; c:SetValue(c:GetValue()) end
     function c:SetFieldWidth(w)
         c:SetWidth(w)
-        if dd then dd:SetWidth(w) end
+        dd:SetWidth(w)
     end
     -- Greyed and untouchable while off (Insert image height under Keep ratio)
     function c:SetEnabled(on)
         on = on and true or false
         if not on then eb:ClearFocus() end
         eb:EnableMouse(on)
-        if dd then dd:SetEnabled(on) end
+        dd:SetEnabled(on)
         c:SetAlpha(on and 1 or 0.45)
     end
 
@@ -954,25 +921,23 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     end)
     eb:EnableMouseWheel(false)
 
-    if dd then
-        dd:SetupMenu(function(_, root)
-            local cur = c:GetValue()
-            local list = opts.values
-            if not list then
-                list = {}
-                for n = lo, hi do list[#list + 1] = n end
-            end
-            for _, n in ipairs(list) do
-                root:CreateRadio(string.format(FMT, n),
-                    function() return cur == n end,
-                    function()
-                        c:SetValue(n)
-                        if opts.onDirty then opts.onDirty() end
-                    end)
-            end
-            if #list > 20 then root:SetScrollMode(20 * 20) end
-        end)
-    end
+    dd:SetupMenu(function(_, root)
+        local cur = c:GetValue()
+        local list = opts.values
+        if not list then
+            list = {}
+            for n = lo, hi do list[#list + 1] = n end
+        end
+        for _, n in ipairs(list) do
+            root:CreateRadio(string.format(FMT, n),
+                function() return cur == n end,
+                function()
+                    c:SetValue(n)
+                    if opts.onDirty then opts.onDirty() end
+                end)
+        end
+        if #list > 20 then root:SetScrollMode(20 * 20) end
+    end)
 
     c:SetValue(initial or lo)
     return c
@@ -1058,50 +1023,30 @@ function BNB.CreateAutoScrollPanel(parent, cw, cwNoBar)
     return sf, ct
 end
 
--- Blizzard colour picker, both APIs. onDone(r, g, b) fires on every change
--- (swatchFunc runs while dragging, not just on OK); onCancel is optional.
+-- Blizzard colour picker. onDone(r, g, b) fires on every change (swatchFunc
+-- runs while dragging, not just on OK); onCancel is optional.
 -- a: optional opacity (0-1); given, the picker shows its opacity slider and
--- onDone gets (r, g, b, a) (current API only).
+-- onDone gets (r, g, b, a).
 function BNB.OpenColorPicker(r, g, b, onDone, onCancel, a)
-    local withAlpha = a ~= nil and ColorPickerFrame.SetupColorPickerAndShow ~= nil
+    local withAlpha = a ~= nil
     local function Swatch()
         local nr, ng, nb = ColorPickerFrame:GetColorRGB()
         if withAlpha then onDone(nr, ng, nb, ColorPickerFrame:GetColorAlpha())
         else onDone(nr, ng, nb) end
     end
     local function Cancel() if onCancel then onCancel() end end
-    if ColorPickerFrame.SetupColorPickerAndShow then
-        ColorPickerFrame:SetupColorPickerAndShow({
-            swatchFunc = Swatch, cancelFunc = Cancel,
-            opacityFunc = withAlpha and Swatch or nil,
-            hasOpacity = withAlpha, opacity = withAlpha and a or nil,
-            r = r, g = g, b = b,
-        })
-    else
-        ColorPickerFrame.func       = Swatch
-        ColorPickerFrame.cancelFunc = Cancel
-        ColorPickerFrame.hasOpacity = false
-        ColorPickerFrame:SetColorRGB(r, g, b); ShowUIPanel(ColorPickerFrame)
-    end
+    ColorPickerFrame:SetupColorPickerAndShow({
+        swatchFunc = Swatch, cancelFunc = Cancel,
+        opacityFunc = withAlpha and Swatch or nil,
+        hasOpacity = withAlpha, opacity = withAlpha and a or nil,
+        r = r, g = g, b = b,
+    })
 end
 
 --------------------------------------------------------------------------------
--- SLIDER  — matches BCB's Config.CreateSlider exactly.
---
--- Retail:  MinimalSliderWithSteppersTemplate (the modern look).
---
--- Usage:
---   local s = BNB.CreateSlider(parent, label, min, max, current, default,
---                               onChange, formatFn)
---   s:SetPoint(...)   -- caller anchors; widget is SetHeight(36)
---   s:SetWidth(...)   -- caller sets width
---
--- onChange(value)  fires only when the integer value actually changes.
--- formatFn(value)  optional; returns the display string for the value label.
--- default          optional; appended to label as "(Default: N)" hint.
---
--- Returns the container frame.  container.Slider is the raw Slider widget.
--- container:SetValue(n) — programmatic set.
+-- SLIDERS: every slider is BNB.CreateStackedSlider (below), on
+-- MinimalSliderWithSteppersTemplate. Its no-template fallbacks CreateSlider /
+-- CreateFloatSlider went with DEP-05 (every client has the template).
 --------------------------------------------------------------------------------
 -- No mouse wheel on a slider: the wheel scrolls the page (Dukul 2026-09-28).
 -- MinimalSliderWithSteppersTemplate takes the wheel itself (inner Slider and
@@ -1115,62 +1060,6 @@ local function NoSliderWheel(frame)
     for _, child in ipairs({ frame:GetChildren() }) do NoSliderWheel(child) end
 end
 
-function BNB.CreateSlider(parent, label, mn, mx, cur, def, onChange, fmt)
-    local h = CreateFrame("Frame", nil, parent)
-    h:SetHeight(36)
-
-    local displayLabel = label
-    if def ~= nil then
-        displayLabel = label .. "  |cff666666(Default: " .. tostring(def) .. ")|r"
-    end
-
-    local lbl = h:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    lbl:SetJustifyH("LEFT")
-    lbl:SetPoint("LEFT",  h, "LEFT",   0, 0)
-    lbl:SetPoint("RIGHT", h, "CENTER", -40, 0)
-    lbl:SetText(displayLabel)
-
-    local sl = CreateFrame("Slider", nil, h, "MinimalSliderWithSteppersTemplate")
-    sl:SetPoint("LEFT",  h, "CENTER", -40, 0)
-    sl:SetPoint("RIGHT", h, "RIGHT",   0, 0)
-    sl:SetHeight(20)
-
-    local fF = fmt or function(v) return tostring(math.floor(v)) end
-
-    sl:Init(cur, mn, mx, mx - mn, {
-        [MinimalSliderWithSteppersMixin.Label.Right] =
-            CreateMinimalSliderFormatter(
-                MinimalSliderWithSteppersMixin.Label.Right,
-                function(v)
-                    return WHITE_FONT_COLOR:WrapTextInColorCode(fF(v))
-                end),
-    })
-
-    local trackedVal = cur
-    sl:RegisterCallback(
-        MinimalSliderWithSteppersMixin.Event.OnValueChanged,
-        function(_, v)
-            trackedVal = math.floor(v)
-            if onChange then onChange(trackedVal) end
-        end)
-
-    NoSliderWheel(sl)
-
-    h.Slider = sl
-    function h:SetValue(v)
-        trackedVal = math.floor(v)
-        sl:SetValue(trackedVal)
-    end
-
-    return h
-end
-
---------------------------------------------------------------------------------
--- FLOAT SLIDER
--- Like CreateSlider but supports fractional step values (e.g. 0.05).
--- step     : snap increment (e.g. 0.05)
--- fmt      : optional display formatter, defaults to "%.2f"
---------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- STACKED SLIDER  (sticky settings' layout, with Reset; Dukul 2026-09-28)
 --
@@ -1188,8 +1077,7 @@ end
 -- tall: :SetValue(v, silent) (fires onChange unless silent), :GetValue(),
 -- :SetEnabled(on). The inner slider is ._slider, not .Slider, so greying
 -- code that looks for .Slider calls the container's SetEnabled instead.
--- Every slider in the addon is one of these (ALL-121). Without
--- MinimalSliderWithSteppersTemplate it falls back to CreateSlider.
+-- Every slider in the addon is one of these (ALL-121).
 --------------------------------------------------------------------------------
 BNB.STACKED_SLIDER_H = 40
 function BNB.CreateStackedSlider(parent, width, o)
@@ -1197,17 +1085,6 @@ function BNB.CreateStackedSlider(parent, width, o)
     local fmt = o.fmt or (step < 1
         and function(v) return string.format(step < 0.01 and "%.3f" or "%.2f", v) end
         or  function(v) return tostring(v) end)
-    local hasTpl = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("MinimalSliderWithSteppersTemplate")
-    if not hasTpl then
-        local sl = step < 1
-            and BNB.CreateFloatSlider(parent, o.label, o.min, o.max, o.value, step, o.default, o.onChange, fmt)
-            or  BNB.CreateSlider(parent, o.label, o.min, o.max, o.value, o.default, o.onChange, fmt)
-        sl:SetWidth(width - 30)
-        function sl:SetEnabled(on) if self.Slider then pcall(self.Slider.SetEnabled, self.Slider, on) end end
-        return sl
-    end
-
     local function Snap(v)
         v = math.max(o.min, math.min(o.max, v or o.min))
         if step == 1 then return math.floor(v + 0.5) end
@@ -1301,62 +1178,7 @@ function BNB.CreateStackedSlider(parent, width, o)
     return h
 end
 
-function BNB.CreateFloatSlider(parent, label, mn, mx, cur, step, def, onChange, fmt)
-    step = step or 0.05
-    local fF = fmt or function(v) return string.format("%.2f", v) end
-
-    local function Snap(v)
-        return math.floor(v / step + 0.5) * step
-    end
-
-    local h = CreateFrame("Frame", nil, parent)
-    h:SetHeight(36)
-
-    local displayLabel = label or ""
-    if def ~= nil then
-        displayLabel = displayLabel .. "  |cff666666(Default: " .. fF(def) .. ")|r"
-    end
-
-    local lbl = h:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
-    lbl:SetJustifyH("LEFT")
-    lbl:SetPoint("LEFT",  h, "LEFT",   0, 0)
-    lbl:SetPoint("RIGHT", h, "CENTER", -40, 0)
-    lbl:SetText(displayLabel)
-
-    local sl = CreateFrame("Slider", nil, h, "MinimalSliderWithSteppersTemplate")
-    sl:SetPoint("LEFT",  h, "CENTER", -40, 0)
-    sl:SetPoint("RIGHT", h, "RIGHT", -36, 0)  -- leave room for the right value label
-    sl:SetHeight(20)
-
-    sl:Init(cur, mn, mx, (mx - mn) / step, {
-        [MinimalSliderWithSteppersMixin.Label.Right] =
-            CreateMinimalSliderFormatter(
-                MinimalSliderWithSteppersMixin.Label.Right,
-                function(v) return WHITE_FONT_COLOR:WrapTextInColorCode(fF(Snap(v))) end),
-    })
-
-    local trackedVal = Snap(cur)
-    sl:RegisterCallback(
-        MinimalSliderWithSteppersMixin.Event.OnValueChanged,
-        function(_, v)
-            local newV = Snap(v)
-            if math.abs(newV - trackedVal) > 0.001 then
-                trackedVal = newV
-                if onChange then onChange(trackedVal) end
-            end
-        end)
-
-    NoSliderWheel(sl)
-
-    h.Slider = sl
-    h.Label  = lbl   -- for callers that re-lay the row (UI/Config/Appearance.lua)
-    function h:SetValue(v)
-        trackedVal = Snap(v)
-        sl:SetValue(trackedVal)
-    end
-
-    return h
-end
+--------------------------------------------------------------------------------
 -- 24-color grid: 8 columns × 3 rows, Dukul's named palette (ALL-259,
 -- 2026-10-05; it replaced class colours, several of which looked alike).
 -- Saved colours are RGB values, never an index here, so notes keep theirs.

@@ -1,4 +1,4 @@
--- BigNoteBox UI/BackgroundLab.lua
+-- BigNoteBox_Dev Labs/BackgroundLab.lua
 -- Developer Tools > Background Lab (/bnb bglab, debug mode). ALL-110.
 -- Previews the game's own background textures in a resizable, sticky-like
 -- window so each can be given a name, a fill mode and an anchor before it is
@@ -8,7 +8,7 @@
 --   control - picks the entry, name, fill, anchor, scale, exact numbers, Add
 --   sheet   - the file with the picture area (gold) and its atlas regions;
 --             draw the area by dragging, drag its edges, zoom, pan, aspect
---             lock (UI/LabSheet.lua, shared with the Icon Lab later)
+--             lock (Labs/LabSheet.lua, shared with the Icon Lab later)
 --   preview - sticky-like, shows what a sticky would
 --
 -- Fill modes and their maths live in UI/BgLayer.lua, shared with the
@@ -16,10 +16,15 @@
 -- puts the current entry on every open sticky (not saved).
 -- Mode and anchor names are dev-only and not translated.
 
+-- Queued for BigNoteBox's Core/DevTools.lua, which runs it once BigNoteBox
+-- has loaded (this addon loads first, ARCH-04). The body is not indented.
+BigNoteBoxDevLabs = BigNoteBoxDevLabs or {}
+BigNoteBoxDevLabs[#BigNoteBoxDevLabs + 1] = function()
+
 local BNB = BigNoteBox
 if not BNB then return end
 local L = BNB.L
-local K = BNB._LabKit   -- shared with the Icon Lab (UI/LabKit.lua, ALL-126)
+local K = BNB._LabKit   -- shared with the Icon Lab (Labs/LabKit.lua, ALL-126)
 
 -- ── The candidates (Dukul, 2026-09-27, picked in wow.export) ─────────────────
 -- g = the group Dukul sorted them into; it sets the starting mode/anchor.
@@ -165,14 +170,14 @@ local function State(i)
     return st
 end
 
--- The sheet's own view options (UI/LabSheet.lua)
+-- The sheet's own view options (Labs/LabSheet.lua)
 local function SheetView()
     local s = Store()
     s.sheet = s.sheet or {}
     return s.sheet
 end
 
--- ── Native size (UI/LabKit.lua probe) ────────────────────────────────────────
+-- ── Native size (Labs/LabKit.lua probe) ────────────────────────────────────────
 -- Sizes are saved once probed (Store().sizes), so Export and the list know
 -- them for entries not opened this session. A failed probe is not saved: the
 -- file may load another time. A manual W/H in the panel wins over both.
@@ -479,7 +484,7 @@ local function RemoveCustom(i)
     table.remove(LIST, i)
 end
 
--- ── Atlas regions (UI/IconLabAtlas.lua, dev builds) ──────────────────────────
+-- ── Atlas regions (Labs/IconLabAtlas.lua, dev builds) ──────────────────────────
 local RegionRect = K.NewRegionRects()
 
 -- The regions of entry e's file, looked up once per entry
@@ -1041,4 +1046,6 @@ function BNB.OpenBackgroundLab()
     _pv:Show()
     Go(Store().idx or _idx)
     ProbeAllSizes()
+end
+
 end

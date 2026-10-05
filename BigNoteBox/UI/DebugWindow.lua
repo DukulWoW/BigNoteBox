@@ -193,7 +193,7 @@ local function BuildWindow()
                 BNB.Migration.ShowPopup()
             end
         end)
-    -- The search bar theme layout tool (ALL-69, UI/SearchChrome.lua), same as
+    -- The search bar theme layout tool (ALL-69, BigNoteBox_Dev Labs/SearchLayoutTool.lua), same as
     -- /bnb searchlayout.
     local layoutBtn = MakeButton(L["CFG_DEV_SEARCHLAYOUT_BTN"], 170,
         L["CFG_DEV_SEARCHLAYOUT_BTN"], L["CFG_DEV_SEARCHLAYOUT_TIP_BODY"], function()
@@ -204,7 +204,7 @@ local function BuildWindow()
         L["CFG_DEV_CURSOR_BTN"], L["CFG_DEV_CURSOR_TIP_BODY"], function()
             if BNB.OpenCursorTest then BNB.OpenCursorTest() end
         end)
-    -- Game background preview for the sticky list (ALL-110, UI/BackgroundLab.lua)
+    -- Game background preview for the sticky list (ALL-110, BigNoteBox_Dev Labs/BackgroundLab.lua)
     local bgLabBtn = MakeButton(L["CFG_DEV_BGLAB_BTN"], 170,
         L["CFG_DEV_BGLAB_BTN"], L["CFG_DEV_BGLAB_TIP_BODY"], function()
             if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() end
@@ -213,7 +213,7 @@ local function BuildWindow()
     bgLabBtn:ClearAllPoints()
     bgLabBtn:SetPoint("LEFT", cursorBtn, "RIGHT", 8, 0)
     y = y + ROW_H
-    -- Note icon frame measuring (ALL-126, UI/IconLab.lua), beside Search layout
+    -- Note icon frame measuring (ALL-126, BigNoteBox_Dev Labs/IconLab.lua), beside Search layout
     local iconLabBtn = MakeButton(L["CFG_DEV_ICONLAB_BTN"], 170,
         L["CFG_DEV_ICONLAB_BTN"], L["CFG_DEV_ICONLAB_TIP_BODY"], function()
             if BNB.OpenIconLab then BNB.OpenIconLab() end
@@ -240,6 +240,10 @@ local function BuildWindow()
     tabsBtn:SetPoint("LEFT", migBtn, "RIGHT", 8, 0)
     y = y + ROW_H
     if not SlashCmdList.BNBTOPTABS then tabsBtn:Hide() end
+    -- The labs live in the dev addon too (ARCH-04)
+    if not BNB.ToggleSearchLayoutTool then layoutBtn:Hide() end
+    if not BNB.OpenBackgroundLab then bgLabBtn:Hide() end
+    if not BNB.OpenIconLab then iconLabBtn:Hide() end
     dependents[#dependents + 1] = { btn = tabsBtn }
     dependents[#dependents + 1] = { btn = ctxBtn }
     dependents[#dependents + 1] = { btn = iconLabBtn }

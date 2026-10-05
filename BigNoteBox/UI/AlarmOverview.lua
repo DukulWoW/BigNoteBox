@@ -99,36 +99,24 @@ local function BuildPopup()
 
     -- Snooze duration dropdown (right of snooze button)
     local snoozeDDW = math.floor(contentW * 0.5)
-    local snoozeDDContainer
-    if C_XMLUtil and C_XMLUtil.GetTemplateInfo
-       and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate") then
-        local dd = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
-        dd:SetToplevel(true)
-        dd:SetWidth(snoozeDDW)
-        dd:SetHeight(24)
-        dd:SetPoint("LEFT", snoozeBtn, "RIGHT", 8, 0)
-        dd._selected = 5
-        dd:SetText(string.format(L["AO_MIN_FMT"], 5))
-        dd:SetupMenu(function(_, root)
-            for _, e in ipairs(snoozeEntries) do
-                root:CreateRadio(e.label,
-                    function() return dd._selected == e.value end,
-                    function()
-                        dd._selected = e.value
-                        dd:SetText(e.label)
-                    end)
-            end
-        end)
-        snoozeDDContainer = dd
-    else
-        snoozeDDContainer = BNB.CreateBackdropFrame("Button", nil, f)
-        snoozeDDContainer:SetSize(snoozeDDW, 24)
-        snoozeDDContainer:SetPoint("LEFT", snoozeBtn, "RIGHT", 8, 0)
-        local l = snoozeDDContainer:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-        l:SetAllPoints(); l:SetText(string.format(L["AO_MIN_FMT"], 5)); l:SetJustifyH("CENTER")
-        snoozeDDContainer._selected = 5
-    end
-    f._snoozeDDContainer = snoozeDDContainer
+    local dd = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+    dd:SetToplevel(true)
+    dd:SetWidth(snoozeDDW)
+    dd:SetHeight(24)
+    dd:SetPoint("LEFT", snoozeBtn, "RIGHT", 8, 0)
+    dd._selected = 5
+    dd:SetText(string.format(L["AO_MIN_FMT"], 5))
+    dd:SetupMenu(function(_, root)
+        for _, e in ipairs(snoozeEntries) do
+            root:CreateRadio(e.label,
+                function() return dd._selected == e.value end,
+                function()
+                    dd._selected = e.value
+                    dd:SetText(e.label)
+                end)
+        end
+    end)
+    f._snoozeDDContainer = dd
 
     -- Dismiss button
     -- Bottom row: | Open Note | Dismiss |

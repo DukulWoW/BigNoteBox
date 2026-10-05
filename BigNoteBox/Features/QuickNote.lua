@@ -804,14 +804,12 @@ local function InjectQuestFrame()
         local title, body, icon, tags, rewardFn
         local questID = GetQuestID and GetQuestID() or 0
 
-        -- Midnight retail renamed QuestDetailFrame → QuestFrameDetailPanel
-        -- and QuestRewardFrame → QuestFrameCompletePanel.
-        -- Check both old and new names for forward/backward compatibility.
-        local detailShown = (QuestFrameDetailPanel and QuestFrameDetailPanel:IsShown())
-                         or (QuestDetailFrame and QuestDetailFrame:IsShown())
+        -- Midnight retail renamed QuestDetailFrame -> QuestFrameDetailPanel
+        -- and QuestRewardFrame -> QuestFrameCompletePanel; the old names are
+        -- gone on every client (DEP-05).
+        local detailShown = QuestFrameDetailPanel and QuestFrameDetailPanel:IsShown()
         local rewardShown = (QuestFrameCompletePanel and QuestFrameCompletePanel:IsShown())
                          or (QuestFrameRewardPanel and QuestFrameRewardPanel:IsShown())
-                         or (QuestRewardFrame and QuestRewardFrame:IsShown())
 
         if detailShown then
             -- Quest accept frame

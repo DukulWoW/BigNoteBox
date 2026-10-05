@@ -1024,6 +1024,7 @@ local function ParseMarkdownNotes(text)
                     elseif key == "iconFrame"        then note.iconFrame        = val
                     elseif key == "scope"            then note.scope            = val
                     elseif key == "wpClearOnLeave"   then note.wpClearOnLeave   = (val == "true") or nil
+                    elseif key == "wpNoTrack"        then note.wpNoTrack        = (val == "true") or nil
                     elseif key == "waypoint" and val ~= "" and val ~= "null" then
                         -- Format: mapID:x:y:label
                         local mid, wx, wy, wlbl = val:match("^(%d+):(%-?[%d.]+):(%-?[%d.]+):(.*)$")

@@ -487,6 +487,7 @@ local function BuildShareWindow()
         elseif f._shareEB then
             f._shareEB:SetText(err or L["SHARE_ERR_GENERATE"])
         end
+        if f._refreshDsCount then f._refreshDsCount() end
     end
 
     local COLS, ROW_H = 3, 24
@@ -662,6 +663,27 @@ local function BuildShareWindow()
     dsStatus:SetHeight(18)
     dsStatus:SetText("")
     f._dsStatus = dsStatus
+
+    -- How many messages the note takes, shown before a send (SUG-10). Above
+    -- the cap the line turns red and Send is greyed out.
+    local function RefreshDsCount()
+        local n, cap
+        if _shareNoteID and BNB.DS and BNB.DS.MessageCount then
+            n, cap = BNB.DS.MessageCount(_shareNoteID, BNB.GetShareGroups())
+        end
+        local tooBig = n ~= nil and n > cap
+        dsSendBtn:SetEnabled(not tooBig)
+        if not n then dsStatus:SetText(""); return end
+        if tooBig then
+            dsStatus:SetTextColor(1, 0.35, 0.35)
+            dsStatus:SetText(string.format(L["DS_ERR_TOO_LARGE"], n))
+        else
+            dsStatus:SetTextColor(0.55, 0.55, 0.55)
+            dsStatus:SetText(n == 1 and L["DS_STATUS_COUNT_ONE"]
+                or string.format(L["DS_STATUS_COUNT"], n))
+        end
+    end
+    f._refreshDsCount = RefreshDsCount
 
     -- Autocomplete frame (anchored below the editbox)
     local dsAcFrame = BNB.CreateBackdropFrame("Frame", nil, f)
@@ -905,6 +927,7 @@ function BNB.OpenShareWindow(noteID)
     else
         if f._shareEB then f._shareEB:SetText("") end
     end
+    if f._refreshDsCount then f._refreshDsCount() end
 
     -- Close preview if it's open from a previous session
     BNB.CloseSharePreview()

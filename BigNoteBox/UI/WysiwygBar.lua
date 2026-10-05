@@ -274,71 +274,58 @@ local function BuildWysiwygBar(parent, tsStrip)
     end
 
     -- Open font picker menu
-    local useNativeFontDD = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
     local _fontMenuDD  -- reusable invisible DropdownButton
     fontDDBtn:SetScript("OnClick", function()
-        if useNativeFontDD then
-            if not _fontMenuDD then
-                _fontMenuDD = CreateFrame("DropdownButton", "BNBWysiFontDD", UIParent,
-                    "WowStyle1DropdownTemplate")
-                _fontMenuDD:SetSize(1, 1); _fontMenuDD:SetAlpha(0)
-                _fontMenuDD:SetToplevel(true)
-            end
-            _fontMenuDD:ClearAllPoints()
-            _fontMenuDD:SetPoint("TOPLEFT", fontDDBg, "BOTTOMLEFT", 0, 0)
-            _fontMenuDD:SetupMenu(function(_, root)
-                -- "Default" entry clears per-note override
-                -- An override that cannot be drawn under the active font set
-                -- (ALL-14) shows as Default, which is what the note displays.
-                local curID = (function()
-                    local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-                    return n and BNB.ResolveFontID(n.fontOverride)
-                end)()
-                root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
-                    function() return curID == nil end,
-                    function() ApplyFontOverride(nil); _fontMenuDD:GenerateMenu() end)
-                -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin
-                for _, def in ipairs(BNB.FONTS or {}) do
-                    if not def._isLSM and BNB.ResolveFontID(def.id) == def.id then
-                        local fid = def.id; local lbl = def.label
-                        root:CreateRadio(lbl,
-                            function() return curID == fid end,
-                            function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
-                    end
+        if not _fontMenuDD then
+            _fontMenuDD = CreateFrame("DropdownButton", "BNBWysiFontDD", UIParent,
+                "WowStyle1DropdownTemplate")
+            _fontMenuDD:SetSize(1, 1); _fontMenuDD:SetAlpha(0)
+            _fontMenuDD:SetToplevel(true)
+        end
+        _fontMenuDD:ClearAllPoints()
+        _fontMenuDD:SetPoint("TOPLEFT", fontDDBg, "BOTTOMLEFT", 0, 0)
+        _fontMenuDD:SetupMenu(function(_, root)
+            -- "Default" entry clears per-note override
+            -- An override that cannot be drawn under the active font set
+            -- (ALL-14) shows as Default, which is what the note displays.
+            local curID = (function()
+                local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+                return n and BNB.ResolveFontID(n.fontOverride)
+            end)()
+            root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
+                function() return curID == nil end,
+                function() ApplyFontOverride(nil); _fontMenuDD:GenerateMenu() end)
+            -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin
+            for _, def in ipairs(BNB.FONTS or {}) do
+                if not def._isLSM and BNB.ResolveFontID(def.id) == def.id then
+                    local fid = def.id; local lbl = def.label
+                    root:CreateRadio(lbl,
+                        function() return curID == fid end,
+                        function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
                 end
-                -- LSM fonts: only shown when db.lsmFonts is on and entries exist
-                local db = BigNoteBoxDB
-                if db and db.lsmFonts then
-                    local hasLSM = false
+            end
+            -- LSM fonts: only shown when db.lsmFonts is on and entries exist
+            local db = BigNoteBoxDB
+            if db and db.lsmFonts then
+                local hasLSM = false
+                for _, def in ipairs(BNB.FONTS or {}) do
+                    if def._isLSM then hasLSM = true; break end
+                end
+                if hasLSM then
+                    root:CreateDivider()
                     for _, def in ipairs(BNB.FONTS or {}) do
-                        if def._isLSM then hasLSM = true; break end
-                    end
-                    if hasLSM then
-                        root:CreateDivider()
-                        for _, def in ipairs(BNB.FONTS or {}) do
-                            if def._isLSM then
-                                local fid = def.id; local lbl = def.label
-                                root:CreateRadio(lbl,
-                                    function() return curID == fid end,
-                                    function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
-                            end
+                        if def._isLSM then
+                            local fid = def.id; local lbl = def.label
+                            root:CreateRadio(lbl,
+                                function() return curID == fid end,
+                                function() ApplyFontOverride(fid); _fontMenuDD:GenerateMenu() end)
                         end
                     end
                 end
-            end)
-            _fontMenuDD:OpenMenu()
-        else
-            -- Fallback: cycle through fonts on click
-            local note  = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-            local curID = note and note.fontOverride
-            local fonts = BNB.GetPickerFonts(true)
-            local idx   = 0
-            for i, def in ipairs(fonts) do if def.id == curID then idx = i; break end end
-            idx = idx % #fonts + 1
-            ApplyFontOverride(fonts[idx] and fonts[idx].id)
-        end
+            end
+        end)
+        _fontMenuDD:OpenMenu()
     end)
     fontDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(fontDDBg, "ANCHOR_TOP")
@@ -423,34 +410,24 @@ local function BuildWysiwygBar(parent, tsStrip)
 
     local _sizeMenuDD
     sizeDDBtn:SetScript("OnClick", function()
-        if useNativeFontDD then
-            if not _sizeMenuDD then
-                _sizeMenuDD = CreateFrame("DropdownButton", "BNBWysiSizeDD", UIParent,
-                    "WowStyle1DropdownTemplate")
-                _sizeMenuDD:SetSize(1, 1); _sizeMenuDD:SetAlpha(0)
-                _sizeMenuDD:SetToplevel(true)
-            end
-            _sizeMenuDD:ClearAllPoints()
-            _sizeMenuDD:SetPoint("TOPLEFT", sizeBg, "BOTTOMLEFT", 0, 0)
-            _sizeMenuDD:SetupMenu(function(_, root)
-                local curSz = GetCurrentFontSize()
-                for _, sz in ipairs(WY_SIZE_PRESETS) do
-                    local s = sz
-                    root:CreateRadio(string.format(L["NE_FONT_SIZE_PT_FMT"], s),
-                        function() return curSz == s end,
-                        function() ApplyFontSize(s); _sizeMenuDD:GenerateMenu() end)
-                end
-            end)
-            _sizeMenuDD:OpenMenu()
-        else
-            -- Fallback: cycle to next preset
-            local cur = GetCurrentFontSize()
-            local next = WY_SIZE_PRESETS[1]
-            for i, s in ipairs(WY_SIZE_PRESETS) do
-                if s > cur then next = s; break end
-            end
-            ApplyFontSize(next)
+        if not _sizeMenuDD then
+            _sizeMenuDD = CreateFrame("DropdownButton", "BNBWysiSizeDD", UIParent,
+                "WowStyle1DropdownTemplate")
+            _sizeMenuDD:SetSize(1, 1); _sizeMenuDD:SetAlpha(0)
+            _sizeMenuDD:SetToplevel(true)
         end
+        _sizeMenuDD:ClearAllPoints()
+        _sizeMenuDD:SetPoint("TOPLEFT", sizeBg, "BOTTOMLEFT", 0, 0)
+        _sizeMenuDD:SetupMenu(function(_, root)
+            local curSz = GetCurrentFontSize()
+            for _, sz in ipairs(WY_SIZE_PRESETS) do
+                local s = sz
+                root:CreateRadio(string.format(L["NE_FONT_SIZE_PT_FMT"], s),
+                    function() return curSz == s end,
+                    function() ApplyFontSize(s); _sizeMenuDD:GenerateMenu() end)
+            end
+        end)
+        _sizeMenuDD:OpenMenu()
     end)
     sizeDDBtn:SetScript("OnEnter", function()
         GameTooltip:SetOwner(sizeBg, "ANCHOR_TOP")

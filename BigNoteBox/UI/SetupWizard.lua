@@ -67,30 +67,11 @@ local FadeTo = BNB.FadeTo
 -- Skin mode: a 16pt skin button instead (ALL-79). Choosing skin mode on page 2
 -- reloads, so the mode read at build time is always current.
 --------------------------------------------------------------------------------
-local _largeBtnTpl
-local function GetLargeBtnTpl()
-    if _largeBtnTpl then return _largeBtnTpl end
-    local candidates = {
-        "SharedButtonLargeTemplate",
-        "UIPanelDynamicResizeButtonTemplate",
-        "UIPanelButtonTemplate",
-    }
-    for _, tpl in ipairs(candidates) do
-        if not C_XMLUtil or not C_XMLUtil.GetTemplateInfo
-                or C_XMLUtil.GetTemplateInfo(tpl) then
-            _largeBtnTpl = tpl
-            return tpl
-        end
-    end
-    _largeBtnTpl = "UIPanelButtonTemplate"
-    return _largeBtnTpl
-end
-
 local function MakeLargeButton(parent, text, w, h)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         return BNB.CreateSkinButton(nil, parent, text, w or 220, h or 50, 16)
     end
-    local btn = CreateFrame("Button", nil, parent, GetLargeBtnTpl())
+    local btn = CreateFrame("Button", nil, parent, "SharedButtonLargeTemplate")
     btn:SetSize(w or 220, h or 50)
     btn:SetText(text or "")
     pcall(function() DynamicResizeButton_Resize(btn) end)
@@ -469,53 +450,32 @@ local function BuildPage1(content)
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 
-        local useNativeLangDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-        if useNativeLangDrop then
-            local langDD = CreateFrame("DropdownButton", nil, lb, "WowStyle1DropdownTemplate")
-            langDD:SetPoint("TOP", lb, "TOP", 0, ly)
-            langDD:SetWidth(CW - 40)
-            langDD:SetupMenu(function(_, root)
-                for _, entry in ipairs(LANG_LIST) do
-                    local lbl = MakeLangLabel(entry)
-                    if entry.available then
-                        root:CreateRadio(lbl,
-                            function() return curLangCode == entry.code end,
-                            function()
-                                if entry.code == curLangCode then return end
-                                BNB._pendingLangCode = entry.code
-                                StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
-                            end)
-                    else
-                        local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
-                            .. entry.label .. "|r  " .. COMING_SOON
-                        local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
-                        dummy:AddInitializer(function(button)
-                            if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
-                            button:SetEnabled(false)
-                            if button.highlight then button.highlight:SetAlpha(0) end
-                        end)
-                    end
-                end
-            end)
-        else
-            -- Fallback: only the available entries, as buttons in one row.
-            local avail = {}
+        local langDD = CreateFrame("DropdownButton", nil, lb, "WowStyle1DropdownTemplate")
+        langDD:SetPoint("TOP", lb, "TOP", 0, ly)
+        langDD:SetWidth(CW - 40)
+        langDD:SetupMenu(function(_, root)
             for _, entry in ipairs(LANG_LIST) do
-                if entry.available then avail[#avail + 1] = entry end
+                local lbl = MakeLangLabel(entry)
+                if entry.available then
+                    root:CreateRadio(lbl,
+                        function() return curLangCode == entry.code end,
+                        function()
+                            if entry.code == curLangCode then return end
+                            BNB._pendingLangCode = entry.code
+                            StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
+                        end)
+                else
+                    local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
+                        .. entry.label .. "|r  " .. COMING_SOON
+                    local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
+                    dummy:AddInitializer(function(button)
+                        if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
+                        button:SetEnabled(false)
+                        if button.highlight then button.highlight:SetAlpha(0) end
+                    end)
+                end
             end
-            local bw = math.floor((CW - 40 - (#avail - 1) * 4) / #avail)
-            for i, entry in ipairs(avail) do
-                local btn = BNB.CreateButton(nil, lb, MakeLangLabel(entry), bw, 22)
-                btn:SetPoint("TOPLEFT", lb, "TOP", -(CW - 40) / 2 + (i - 1) * (bw + 4), ly)
-                btn:SetScript("OnClick", function()
-                    if entry.code == curLangCode then return end
-                    BNB._pendingLangCode = entry.code
-                    StaticPopup_Show("BNB_WIZARD_CHANGE_LANGUAGE", entry.label)
-                end)
-            end
-        end
+        end)
     end
 
     ct:SetHeight(math.abs(y) + 16)

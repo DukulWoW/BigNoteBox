@@ -1143,7 +1143,7 @@ function Oracle.Open(text)
     end)
 end
 
--- Fake results for the search bar layout tool (UI/SearchChrome.lua), drawn
+-- Fake results for the search bar layout tool (BigNoteBox_Dev Labs/SearchLayoutTool.lua), drawn
 -- with the real row code so a theme is judged on what players see. Between
 -- them they show every badge. Developer tool only, so plain English.
 local PREVIEW = {

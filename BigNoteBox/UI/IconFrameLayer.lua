@@ -1,7 +1,7 @@
 -- BigNoteBox UI/IconFrameLayer.lua
 -- Draws an icon frame (ALL-126/127): one picture cut from a game file, with a
 -- hole, laid over or under a note icon. Shared by the Icon Lab preview
--- (UI/IconLab.lua) and the note icons, so the Lab shows what a note shows.
+-- (BigNoteBox_Dev Labs/IconLab.lua) and the note icons, so the Lab shows what a note shows.
 --
 -- A def is { file, w, h, crop = { x, y, w, h }, hole = { x, y, w, h },
 -- shape = "square" | "circle", layer = "over" | "under", tint = true|nil,

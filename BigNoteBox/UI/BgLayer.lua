@@ -3,7 +3,7 @@
 -- stretch; this draws the art as a texture of its own, so it can also cover,
 -- fit, tile along one axis or sit at native size, placed by a 3x3 anchor.
 -- Used by sticky notes (UI/StickyNote.lua) and the Background Lab
--- (UI/BackgroundLab.lua), so the Lab preview is exactly what a sticky shows.
+-- (BigNoteBox_Dev Labs/BackgroundLab.lua), so the Lab preview is exactly what a sticky shows.
 --
 -- A background def: { file = fileID or path, mode, anchor, scale, w, h, crop }.
 -- w / h = the file's native size; every mode but stretch needs them.

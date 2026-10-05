@@ -11,8 +11,8 @@
 -- SETTINGS: pressing "=" hides the front face via alpha crossfade (simulated
 -- flip) and shows a settings face at the same size. The settings face uses the
 -- same visual style as the main window (ButtonFrameTemplate colors, matching
--- header). "< Back" reverses the crossfade. Uses BNB.CreateSlider (retail
--- MinimalSliderWithSteppersTemplate) and WowStyle1DropdownTemplate for border.
+-- header). "< Back" reverses the crossfade. Uses BNB.CreateStackedSlider
+-- and WowStyle1DropdownTemplate for border.
 --
 -- HOVER: every child frame forwards OnEnter/OnLeave to the root so the full
 -- note surface responds to hover alpha.

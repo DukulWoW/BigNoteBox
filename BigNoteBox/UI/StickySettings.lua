@@ -133,21 +133,14 @@ local function BuildStickySettingsWindow()
         tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_SS_TITLE_H)
         f._skinTabCtrl = tabCtrl
     else
-        local tpl = (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("PanelTopTabButtonTemplate"))
-            and "PanelTopTabButtonTemplate"
-            or  "PanelTabButtonTemplate"
+        local tpl = "PanelTopTabButtonTemplate"
 
         local lastBtn = nil
         for i, label in ipairs(TAB_LABELS) do
             local btn = CreateFrame("Button", "BigNoteBoxStickySettingsTab"..i, f, tpl)
             btn:SetText(label)
             pcall(function()
-                if tpl == "PanelTopTabButtonTemplate" then
-                    PanelTemplates_TabResize(btn, 15, nil, 70)
-                else
-                    PanelTemplates_TabResize(btn, 0)
-                end
+                PanelTemplates_TabResize(btn, 15, nil, 70)
             end)
             btn:SetID(i)
             if lastBtn then btn:SetPoint("LEFT", lastBtn, "RIGHT", 5, 0)
@@ -196,7 +189,7 @@ local function BuildStickySettingsWindow()
     -- built once; PopulateStickySettings only loads the note into it
     f._sitEditor = BNB.CreateSituationEditor(ct3, {
         padL = 0, padR = 0, ddR = 0, top = -8, bottom = 6,
-        width = SETTINGS_CW, host = f,
+        host = f,
     })
 
     _stickySettingsFrame = f
@@ -621,49 +614,27 @@ local function PopulateStickySettings(noteID)
         {key="1.0",label="1.0 (default)"},{key="1.25",label="1.25"},
         {key="1.5",label="1.5"},{key="1.75",label="1.75"},{key="2.0",label="2.0"},
     }
-    local function StickyLHLabel()
-        local cur = cfg.lineHeight or "1.0"
-        for _,m in ipairs(LH_STICKY) do if m.key==cur then return m.label end end
-        return LH_STICKY[1].label
-    end
     local function ApplyStickyLH(val)
         cfg.lineHeight = val; SaveCfg(noteID, cfg)
     end
 
     SubLbl(ct1, L["STICKY_LINE_HEIGHT_LABEL"])
-    local useNativeLH = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-    if useNativeLH then
-        local lhSDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
-        lhSDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        lhSDD:SetWidth(SETTINGS_CW)
-        lhSDD:SetupMenu(function(_, root)
-            for _, m in ipairs(LH_STICKY) do
-                local key = m.key
-                root:CreateRadio(m.label,
-                    function() return (cfg.lineHeight or "1.0") == key end,
-                    function()
-                        lhSDD:GenerateMenu()
-                        ApplyStickyLH(key)
-                    end)
-            end
-        end)
-        ct1._y = ct1._y - 36
-        plainOnlyWidgets[#plainOnlyWidgets+1] = lhSDD
-    else
-        local lhSBtn = BNB.CreateButton(nil, ct1, StickyLHLabel(), SETTINGS_CW, 22)
-        lhSBtn:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        lhSBtn:SetScript("OnClick", function(self)
-            local cur = cfg.lineHeight or "1.0"
-            local idx = 1
-            for i, m in ipairs(LH_STICKY) do if m.key==cur then idx=i;break end end
-            idx = (idx % #LH_STICKY) + 1
-            ApplyStickyLH(LH_STICKY[idx].key)
-            self:SetText(StickyLHLabel())
-        end)
-        ct1._y = ct1._y - 28
-        plainOnlyWidgets[#plainOnlyWidgets+1] = lhSBtn
-    end
+    local lhSDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    lhSDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
+    lhSDD:SetWidth(SETTINGS_CW)
+    lhSDD:SetupMenu(function(_, root)
+        for _, m in ipairs(LH_STICKY) do
+            local key = m.key
+            root:CreateRadio(m.label,
+                function() return (cfg.lineHeight or "1.0") == key end,
+                function()
+                    lhSDD:GenerateMenu()
+                    ApplyStickyLH(key)
+                end)
+        end
+    end)
+    ct1._y = ct1._y - 36
+    plainOnlyWidgets[#plainOnlyWidgets+1] = lhSDD
 
     -- Text alignment
     SubLbl(ct1, L["STICKY_TEXT_ALIGN_LABEL"])
@@ -674,86 +645,46 @@ local function PopulateStickySettings(noteID)
     -- the saved value or the ALIGN_MAP lookup.
     local ALIGN_KEYS   = { "LEFT", "CENTER", "RIGHT" }
     local ALIGN_LABELS = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
-    local function GetAlignLabel() return ALIGN_LABELS[cfg.textAlign or "LEFT"] or ALIGN_LABELS.LEFT end
-    local useNativeAlign = useNativeLH
-    if useNativeAlign then
-        local alignDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
-        alignDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        alignDD:SetWidth(SETTINGS_CW)
-        alignDD:SetupMenu(function(_, root)
-            for _, key in ipairs(ALIGN_KEYS) do
-                local k = key
-                root:CreateRadio(ALIGN_LABELS[k],
-                    function() return (cfg.textAlign or "LEFT") == k end,
-                    function()
-                        cfg.textAlign = k; SaveCfg(noteID, cfg)
-                        alignDD:GenerateMenu()
-                        if stickyFrame and stickyFrame._bodyEb then
-                            pcall(function() stickyFrame._bodyEb:SetJustifyH(k) end)
-                        end
-                    end)
-            end
-        end)
-        ct1._y = ct1._y - 36
-        plainOnlyWidgets[#plainOnlyWidgets+1] = alignDD
-    else
-        local alignBtn = BNB.CreateButton(nil, ct1, GetAlignLabel(), SETTINGS_CW, 22)
-        alignBtn:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        alignBtn:SetScript("OnClick", function(self)
-            local cur = cfg.textAlign or "LEFT"
-            local idx = 1
-            for i, k in ipairs(ALIGN_KEYS) do if k == cur then idx = i; break end end
-            idx = (idx % #ALIGN_KEYS) + 1
-            local key = ALIGN_KEYS[idx]
-            cfg.textAlign = key; SaveCfg(noteID, cfg)
-            self:SetText(ALIGN_LABELS[key])
-            if stickyFrame and stickyFrame._bodyEb then
-                pcall(function() stickyFrame._bodyEb:SetJustifyH(key) end)
-            end
-        end)
-        ct1._y = ct1._y - 28
-        plainOnlyWidgets[#plainOnlyWidgets+1] = alignBtn
-    end
+    local alignDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    alignDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
+    alignDD:SetWidth(SETTINGS_CW)
+    alignDD:SetupMenu(function(_, root)
+        for _, key in ipairs(ALIGN_KEYS) do
+            local k = key
+            root:CreateRadio(ALIGN_LABELS[k],
+                function() return (cfg.textAlign or "LEFT") == k end,
+                function()
+                    cfg.textAlign = k; SaveCfg(noteID, cfg)
+                    alignDD:GenerateMenu()
+                    if stickyFrame and stickyFrame._bodyEb then
+                        pcall(function() stickyFrame._bodyEb:SetJustifyH(k) end)
+                    end
+                end)
+        end
+    end)
+    ct1._y = ct1._y - 36
+    plainOnlyWidgets[#plainOnlyWidgets+1] = alignDD
 
     -- Font outline
     SubLbl(ct1, L["STICKY_FONT_OUTLINE_LABEL"])
     local function GetOutlineLabel() return cfg.fontOutline or "None" end
-    local useNativeOutline = useNativeLH
-    if useNativeOutline then
-        local outlineDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
-        outlineDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        outlineDD:SetWidth(SETTINGS_CW)
-        outlineDD:SetupMenu(function(_, root)
-            for _, opt in ipairs(OUTLINE_OPTIONS) do
-                local o = opt
-                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
-                    function() return GetOutlineLabel() == o end,
-                    function()
-                        cfg.fontOutline = o; SaveCfg(noteID, cfg)
-                        outlineDD:GenerateMenu()
-                        if stickyFrame then ApplyOutlineToEditBox(stickyFrame._bodyEb, o) end
-                    end)
-            end
-        end)
-        ct1._y = ct1._y - 36
-        plainOnlyWidgets[#plainOnlyWidgets+1] = outlineDD
-    else
-        local outlineBtn = BNB.CreateButton(nil, ct1,
-            BNB.AdvancedMode.OutlineLabel(GetOutlineLabel()), SETTINGS_CW, 22)
-        outlineBtn:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
-        outlineBtn:SetScript("OnClick", function(self)
-            local cur = GetOutlineLabel()
-            local idx = 1
-            for i, o in ipairs(OUTLINE_OPTIONS) do if o == cur then idx = i; break end end
-            idx = (idx % #OUTLINE_OPTIONS) + 1
-            local opt = OUTLINE_OPTIONS[idx]
-            cfg.fontOutline = opt; SaveCfg(noteID, cfg)
-            self:SetText(BNB.AdvancedMode.OutlineLabel(opt))
-            if stickyFrame then ApplyOutlineToEditBox(stickyFrame._bodyEb, opt) end
-        end)
-        ct1._y = ct1._y - 28
-        plainOnlyWidgets[#plainOnlyWidgets+1] = outlineBtn
-    end
+    local outlineDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    outlineDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
+    outlineDD:SetWidth(SETTINGS_CW)
+    outlineDD:SetupMenu(function(_, root)
+        for _, opt in ipairs(OUTLINE_OPTIONS) do
+            local o = opt
+            root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
+                function() return GetOutlineLabel() == o end,
+                function()
+                    cfg.fontOutline = o; SaveCfg(noteID, cfg)
+                    outlineDD:GenerateMenu()
+                    if stickyFrame then ApplyOutlineToEditBox(stickyFrame._bodyEb, o) end
+                end)
+        end
+    end)
+    ct1._y = ct1._y - 36
+    plainOnlyWidgets[#plainOnlyWidgets+1] = outlineDD
 
     FinalisePanel(ct1, sf1)
 
@@ -967,47 +898,26 @@ local function PopulateStickySettings(noteID)
     -- Forward declaration so the dropdown/button closures below can reference it
     -- before the function body is assigned (Lua 5.1 upvalue capture fix).
     local SyncBorderSliders
-    local useNativeDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-    if useNativeDrop then
-        local curBorder = cfg.borderName or "None"
-        local bdd = CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate")
-        bdd:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
-        bdd:SetWidth(SETTINGS_CW)
-        bdd:SetupMenu(function(_, root)
-            for _, name in ipairs(GetBorderList()) do
-                local n = name
-                root:CreateRadio(n,
-                    function() return curBorder == n end,
-                    function()
-                        curBorder = n
-                        cfg.borderName = n
-                        SaveCfg(noteID, cfg)
-                        bdd:GenerateMenu()
-                        if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-                        SyncBorderSliders(n)
-                    end)
-            end
-        end)
-        ct2._y = ct2._y - 36
-    else
-        local curBorder = cfg.borderName or "None"
-        local bBtn = BNB.CreateButton(nil, ct2, curBorder, SETTINGS_CW, 22)
-        bBtn:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
-        bBtn:SetScript("OnClick", function(self)
-            local borders = GetBorderList()
-            local idx2 = 1
-            for i2, v2 in ipairs(borders) do if v2 == curBorder then idx2 = i2; break end end
-            idx2 = (idx2 % #borders) + 1
-            curBorder = borders[idx2]
-            self:SetText(curBorder)
-            cfg.borderName = curBorder
-            SaveCfg(noteID, cfg)
-            if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-            SyncBorderSliders(curBorder)
-        end)
-        ct2._y = ct2._y - 28
-    end
+    local curBorder = cfg.borderName or "None"
+    local bdd = CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate")
+    bdd:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
+    bdd:SetWidth(SETTINGS_CW)
+    bdd:SetupMenu(function(_, root)
+        for _, name in ipairs(GetBorderList()) do
+            local n = name
+            root:CreateRadio(n,
+                function() return curBorder == n end,
+                function()
+                    curBorder = n
+                    cfg.borderName = n
+                    SaveCfg(noteID, cfg)
+                    bdd:GenerateMenu()
+                    if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+                    SyncBorderSliders(n)
+                end)
+        end
+    end)
+    ct2._y = ct2._y - 36
 
     -- Border Thickness slider
     local slThickness = MakeSlider(ct2, L["STICKY_BORDER_THICKNESS"], 1, 200, cfg.borderScale or 100,

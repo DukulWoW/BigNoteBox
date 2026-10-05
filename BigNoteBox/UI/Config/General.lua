@@ -140,53 +140,34 @@ local function BuildGeneralTab(sf, ct)
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 
-        local useNativeLangDrop = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-            and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
-
-        if useNativeLangDrop then
-            local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
-            langDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            langDD:SetWidth(CONTENT_W)
-            langDD:SetupMenu(function(_, root)
-                for _, entry in ipairs(LANG_LIST) do
-                    local lbl = MakeLangLabel(entry)
-                    if entry.available then
-                        root:CreateRadio(lbl,
-                            function() return curLangCode == entry.code end,
-                            function()
-                                if entry.code == curLangCode then return end
-                                BNB._pendingLangCode = entry.code
-                                StaticPopup_Show("BNB_CHANGE_LANGUAGE")
-                            end)
-                    else
-                        local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
-                            .. entry.label .. "|r  " .. COMING_SOON
-                        local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
-                        dummy:AddInitializer(function(button)
-                            if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
-                            button:SetEnabled(false)
-                            if button.highlight then button.highlight:SetAlpha(0) end
-                        end)
-                    end
-                end
-                root:SetScrollMode(30 * 20)
-            end)
-            y = y - 32
-        else
-            -- Fallback: only the available entries, as plain stacked buttons.
+        local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        langDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        langDD:SetWidth(CONTENT_W)
+        langDD:SetupMenu(function(_, root)
             for _, entry in ipairs(LANG_LIST) do
+                local lbl = MakeLangLabel(entry)
                 if entry.available then
-                    local lb = BNB.CreateButton(nil, ct, MakeLangLabel(entry), CONTENT_W, 22)
-                    lb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-                    lb:SetScript("OnClick", function()
-                        if entry.code == curLangCode then return end
-                        BNB._pendingLangCode = entry.code
-                        StaticPopup_Show("BNB_CHANGE_LANGUAGE")
+                    root:CreateRadio(lbl,
+                        function() return curLangCode == entry.code end,
+                        function()
+                            if entry.code == curLangCode then return end
+                            BNB._pendingLangCode = entry.code
+                            StaticPopup_Show("BNB_CHANGE_LANGUAGE")
+                        end)
+                else
+                    local greyLbl = GREY .. (entry.flag and ("|T" .. entry.flag .. ":14:20:0:0:32:32|t ") or "")
+                        .. entry.label .. "|r  " .. COMING_SOON
+                    local dummy = root:CreateRadio(greyLbl, function() return false end, function() end)
+                    dummy:AddInitializer(function(button)
+                        if button.fontString then button.fontString:SetTextColor(0.5, 0.5, 0.5) end
+                        button:SetEnabled(false)
+                        if button.highlight then button.highlight:SetAlpha(0) end
                     end)
-                    y = y - 26
                 end
             end
-        end
+            root:SetScrollMode(30 * 20)
+        end)
+        y = y - 32
         y = y - 6
     end
 
@@ -276,14 +257,8 @@ local function BuildGeneralTab(sf, ct)
     -- More Features button (right of the BCB box)
     -- The button matches the height of the left cell. Since GetStringHeight()
     -- returns 0 at build time, we use a deferred resize via C_Timer.After(0).
-    -- More Features button — same template trychain as OptionsPanel and WhatsNew OK button
+    -- More Features button: same large template as OptionsPanel and the WhatsNew OK button
     local moreTpl = "SharedButtonLargeTemplate"
-    if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo(moreTpl)) then
-        moreTpl = "UIPanelDynamicResizeButtonTemplate"
-    end
-    if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo and C_XMLUtil.GetTemplateInfo(moreTpl)) then
-        moreTpl = "UIPanelButtonTemplate"
-    end
     local moreBtn
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         moreBtn = BNB.CreateSkinButton(nil, ct, L["CFG_MORE_FEATURES_BTN"], cellW, 38)

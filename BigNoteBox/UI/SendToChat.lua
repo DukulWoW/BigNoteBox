@@ -276,8 +276,6 @@ end
 
 -- ── Channel dropdown ───────────────────────────────────────────────────────────
 local function BuildChannelDropdown(parent, onChange)
-    local useNative = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
 
     local container = CreateFrame("Frame", nil, parent)
     container:SetHeight(26)
@@ -295,110 +293,41 @@ local function BuildChannelDropdown(parent, onChange)
     -- Pre-declare dd so UpdateText closure can reference it safely
     local dd
 
-    if useNative then
-        dd = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate")
-        dd:SetPoint("TOPLEFT",  container, "TOPLEFT",  0, 0)
-        dd:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
-        dd:SetHeight(26)
+    dd = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate")
+    dd:SetPoint("TOPLEFT",  container, "TOPLEFT",  0, 0)
+    dd:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
+    dd:SetHeight(26)
 
-        local function UpdateText()
-            local ch = CHANNELS[curIdx]
-            if dd.Text then
-                dd.Text:SetText(ch.label)
-                dd.Text:SetTextColor(ch.r, ch.g, ch.b)
-            end
+    local function UpdateText()
+        local ch = CHANNELS[curIdx]
+        if dd.Text then
+            dd.Text:SetText(ch.label)
+            dd.Text:SetTextColor(ch.r, ch.g, ch.b)
         end
+    end
 
-        dd:SetupMenu(function(_, root)
-            for _, ch in ipairs(CHANNELS) do
-                local entry = ChanColor(ch) .. ch.label .. "|r"
-                root:CreateRadio(entry,
-                    function() return curLabel == entry end,
-                    function()
-                        curLabel = entry
-                        curIdx   = labelToIdx(entry)
-                        dd:GenerateMenu()
-                        UpdateText()
-                        if onChange then onChange(curIdx) end
-                    end)
-            end
-        end)
-        UpdateText()
-
-        container.SetSelected = function(self, idx)
-            curIdx   = idx
-            curLabel = ChanColor(CHANNELS[idx]) .. CHANNELS[idx].label .. "|r"
-            dd:GenerateMenu()
-            local ch = CHANNELS[idx]
-            if dd.Text then dd.Text:SetText(ch.label); dd.Text:SetTextColor(ch.r, ch.g, ch.b) end
-        end
-    else
-        -- Fallback: cycling button
-        local btn = BNB.CreateBackdropFrame("Button", nil, container)
-        btn:SetHeight(26)
-        btn:SetPoint("TOPLEFT",  container, "TOPLEFT",  0, 0)
-        btn:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
-        if btn.SetBackdrop then
-            btn:SetBackdrop({ bgFile="Interface\\Buttons\\White8x8",
-                edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",
-                edgeSize=10, insets={left=2,right=2,top=2,bottom=2} })
-            btn:SetBackdropColor(0.08,0.08,0.10,0.95)
-            btn:SetBackdropBorderColor(0.35,0.35,0.35,1)
-        end
-        local st = btn:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-        st:SetPoint("LEFT", btn, "LEFT", 8, 0); st:SetPoint("RIGHT", btn, "RIGHT", -20, 0)
-        st:SetJustifyH("LEFT")
-        local ch0 = CHANNELS[1]; st:SetText(ch0.label); st:SetTextColor(ch0.r, ch0.g, ch0.b)
-        local ar = btn:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-        ar:SetPoint("RIGHT", btn, "RIGHT", -6, 0); ar:SetText("v"); ar:SetTextColor(0.65,0.65,0.65)
-
-        local pp = CreateFrame("Frame", nil, btn, "BackdropTemplate")
-        pp:SetFrameStrata("FULLSCREEN_DIALOG"); pp:SetFrameLevel(500); pp:SetClampedToScreen(true)
-        if pp.SetBackdrop then
-            pp:SetBackdrop({ bgFile="Interface\\Buttons\\White8x8",
-                edgeFile="Interface\\Tooltips\\UI-Tooltip-Border",
-                edgeSize=10, insets={left=2,right=2,top=2,bottom=2} })
-            pp:SetBackdropColor(0.06,0.06,0.08,0.97); pp:SetBackdropBorderColor(0.5,0.5,0.5,1)
-        end
-        pp:Hide(); pp:EnableMouse(true)
-
-        local function PopulateList()
-            for _, c in ipairs({pp:GetChildren()}) do c:Hide(); c:SetParent(nil) end
-            local rH, tH = 24, 0
-            for i, ch in ipairs(CHANNELS) do
-                local row = CreateFrame("Button", nil, pp)
-                row:SetHeight(rH)
-                row:SetPoint("TOPLEFT",  pp, "TOPLEFT",  2, -(tH+2))
-                row:SetPoint("TOPRIGHT", pp, "TOPRIGHT", -2, -(tH+2))
-                local hl = row:CreateTexture(nil, "HIGHLIGHT")
-                hl:SetAllPoints(); hl:SetColorTexture(1,1,1,0.10)
-                local lbl = row:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-                lbl:SetPoint("LEFT", row, "LEFT", 8, 0)
-                lbl:SetText(ch.label); lbl:SetTextColor(ch.r, ch.g, ch.b)
-                local idx = i
-                row:SetScript("OnClick", function()
-                    curIdx = idx; st:SetText(ch.label); st:SetTextColor(ch.r, ch.g, ch.b)
-                    pp:Hide(); if onChange then onChange(idx) end
+    dd:SetupMenu(function(_, root)
+        for _, ch in ipairs(CHANNELS) do
+            local entry = ChanColor(ch) .. ch.label .. "|r"
+            root:CreateRadio(entry,
+                function() return curLabel == entry end,
+                function()
+                    curLabel = entry
+                    curIdx   = labelToIdx(entry)
+                    dd:GenerateMenu()
+                    UpdateText()
+                    if onChange then onChange(curIdx) end
                 end)
-                tH = tH + rH
-            end
-            pp:SetHeight(tH + 4)
         end
-        btn:SetScript("OnClick", function()
-            if pp:IsShown() then pp:Hide(); return end
-            pp:SetWidth(btn:GetWidth()); PopulateList(); pp:ClearAllPoints()
-            if (btn:GetBottom() or 0) - pp:GetHeight() < 0 then
-                pp:SetPoint("BOTTOMLEFT", btn, "TOPLEFT", 0, 2)
-            else
-                pp:SetPoint("TOPLEFT", btn, "BOTTOMLEFT", 0, -2)
-            end
-            pp:Show()
-        end)
-        container.SetSelected = function(self, idx)
-            curIdx = idx; local ch = CHANNELS[idx]
-            st:SetText(ch.label); st:SetTextColor(ch.r, ch.g, ch.b)
-        end
-        container._popup = pp
+    end)
+    UpdateText()
+
+    container.SetSelected = function(self, idx)
+        curIdx   = idx
+        curLabel = ChanColor(CHANNELS[idx]) .. CHANNELS[idx].label .. "|r"
+        dd:GenerateMenu()
+        local ch = CHANNELS[idx]
+        if dd.Text then dd.Text:SetText(ch.label); dd.Text:SetTextColor(ch.r, ch.g, ch.b) end
     end
     container._dd = dd
     return container

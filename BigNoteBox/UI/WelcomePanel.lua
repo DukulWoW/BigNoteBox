@@ -359,14 +359,6 @@ local function BuildEmptyState(parent)
         newBtn = BNB.CreateSkinButton(nil, f, L["NE_CREATE_NEW_NOTE_BTN"], 200, 40, 16)
     else
         local tpl = "SharedButtonLargeTemplate"
-        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-                and C_XMLUtil.GetTemplateInfo(tpl)) then
-            tpl = "UIPanelDynamicResizeButtonTemplate"
-        end
-        if not (C_XMLUtil and C_XMLUtil.GetTemplateInfo
-                and C_XMLUtil.GetTemplateInfo(tpl)) then
-            tpl = "UIPanelButtonTemplate"
-        end
         newBtn = CreateFrame("Button", nil, f, tpl)
         newBtn:SetSize(200, 40)
         pcall(function() DynamicResizeButton_Resize(newBtn) end)

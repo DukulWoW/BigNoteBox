@@ -661,11 +661,7 @@ BNB.KNOWN_PACKS = {
 }
 
 local function IsAddOnLoadedSafe(name)
-    if not name then return false end
-    if C_AddOns and C_AddOns.IsAddOnLoaded then
-        return C_AddOns.IsAddOnLoaded(name) and true or false
-    end
-    return IsAddOnLoaded and IsAddOnLoaded(name) and true or false
+    return name ~= nil and C_AddOns.IsAddOnLoaded(name) and true or false
 end
 
 -- Returns installed (bool), version (string or nil).

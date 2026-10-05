@@ -753,9 +753,8 @@ function BNB.CreateMainWindow()
     end
 
     -- ── Sort + order dropdowns — top-left of the toolbar strip ───────────────
-    -- WowStyle1 dropdowns where the template exists, cycling buttons otherwise.
-    -- The order dropdown is disabled (greyed out) when sort is "custom" since
-    -- order has no meaning there.
+    -- WowStyle1 dropdowns. The order dropdown is disabled (greyed out) when
+    -- sort is "custom" since order has no meaning there.
     local SORT_MODES = {
         { key="custom",   label=L["SORT_MODE_CUSTOM"]   },
         { key="creation", label=L["SORT_MODE_CREATION"] },
@@ -767,108 +766,69 @@ function BNB.CreateMainWindow()
         { key="desc", label=L["DIR_MODE_DESC"] },
         { key="asc",  label=L["DIR_MODE_ASC"]  },
     }
-    local function CurrentSortLabel()
-        for _, m in ipairs(SORT_MODES) do
-            if m.key == (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) then return m.label end
-        end
-        return L["SORT_MODE_CREATION"]
-    end
     local function IsCustomSort()  return BigNoteBoxDB.sortBy == "custom" end
     local function CurrentDirKey() return BigNoteBoxDB.sortAsc and "asc" or "desc" end
-    local function CurrentDirLabel()
-        return BigNoteBoxDB.sortAsc and L["DIR_MODE_ASC"] or L["DIR_MODE_DESC"]
-    end
 
-    local sortDD, dirDD             -- WowStyle1 DropdownButtons (retail)
-    local sortCycleBtn, dirCycleBtn -- fallback cycling buttons
+    local sortDD, dirDD             -- WowStyle1 DropdownButtons
     local DD_W = 120
 
     local function UpdateDirEnabled()
         local custom = IsCustomSort()
-        if dirDD       then dirDD:SetEnabled(not custom);       dirDD:SetAlpha(custom and 0.4 or 1.0)       end
-        if dirCycleBtn then dirCycleBtn:SetEnabled(not custom); dirCycleBtn:SetAlpha(custom and 0.4 or 1.0) end
+        dirDD:SetEnabled(not custom); dirDD:SetAlpha(custom and 0.4 or 1.0)
     end
 
     -- Refreshes the list, then the order control (its state follows the sort key)
     local function ApplySort()
         if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         UpdateDirEnabled()
-        if dirDD and dirDD.GenerateMenu then dirDD:GenerateMenu() end
-        if dirCycleBtn then dirCycleBtn:SetText(CurrentDirLabel()) end
+        dirDD:GenerateMenu()
     end
 
-    local useNativeSort = C_XMLUtil and C_XMLUtil.GetTemplateInfo
-        and C_XMLUtil.GetTemplateInfo("WowStyle1DropdownTemplate")
+    sortDD = CreateFrame("DropdownButton", "BNBMainSortDD", f, "WowStyle1DropdownTemplate")
+    sortDD:SetSize(DD_W, SORT_BTN_H)
+    sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
+    sortDD:SetupMenu(function(_, root)
+        for _, m in ipairs(SORT_MODES) do
+            local key = m.key
+            root:CreateRadio(m.label,
+                function() return (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) == key end,
+                function() BigNoteBoxDB.sortBy = key; sortDD:GenerateMenu(); ApplySort() end)
+        end
+    end)
 
-    if useNativeSort then
-        sortDD = CreateFrame("DropdownButton", "BNBMainSortDD", f, "WowStyle1DropdownTemplate")
-        sortDD:SetSize(DD_W, SORT_BTN_H)
-        sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
-        sortDD:SetupMenu(function(_, root)
-            for _, m in ipairs(SORT_MODES) do
-                local key = m.key
-                root:CreateRadio(m.label,
-                    function() return (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) == key end,
-                    function() BigNoteBoxDB.sortBy = key; sortDD:GenerateMenu(); ApplySort() end)
-            end
-        end)
-
-        dirDD = CreateFrame("DropdownButton", "BNBMainDirDD", f, "WowStyle1DropdownTemplate")
-        dirDD:SetSize(DD_W, SORT_BTN_H)
-        dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
-        dirDD:SetupMenu(function(_, root)
-            for _, m in ipairs(DIR_MODES) do
-                local key = m.key
-                root:CreateRadio(m.label,
-                    function() return CurrentDirKey() == key end,
-                    function() BigNoteBoxDB.sortAsc = (key == "asc"); dirDD:GenerateMenu(); ApplySort() end)
-            end
-        end)
-    else
-        sortCycleBtn = BNB.CreateButton(nil, f, CurrentSortLabel(), DD_W, SORT_BTN_H)
-        sortCycleBtn:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
-        sortCycleBtn:SetScript("OnClick", function(self)
-            local cur = BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy
-            local idx = 1
-            for i, m in ipairs(SORT_MODES) do if m.key == cur then idx = i; break end end
-            idx = (idx % #SORT_MODES) + 1
-            BigNoteBoxDB.sortBy = SORT_MODES[idx].key
-            self:SetText(CurrentSortLabel())
-            ApplySort()
-        end)
-
-        dirCycleBtn = BNB.CreateButton(nil, f, CurrentDirLabel(), DD_W, SORT_BTN_H)
-        dirCycleBtn:SetPoint("LEFT", sortCycleBtn, "RIGHT", 4, 0)
-        dirCycleBtn:SetScript("OnClick", function(self)
-            BigNoteBoxDB.sortAsc = not BigNoteBoxDB.sortAsc
-            self:SetText(CurrentDirLabel())
-            ApplySort()
-        end)
-    end
+    dirDD = CreateFrame("DropdownButton", "BNBMainDirDD", f, "WowStyle1DropdownTemplate")
+    dirDD:SetSize(DD_W, SORT_BTN_H)
+    dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
+    dirDD:SetupMenu(function(_, root)
+        for _, m in ipairs(DIR_MODES) do
+            local key = m.key
+            root:CreateRadio(m.label,
+                function() return CurrentDirKey() == key end,
+                function() BigNoteBoxDB.sortAsc = (key == "asc"); dirDD:GenerateMenu(); ApplySort() end)
+        end
+    end)
 
     -- Exposed so TagTree can disable sorting while tree view is active.
     -- Also disables the direction control, which has no meaning without sort
     -- either; re-enabling defers to UpdateDirEnabled so "custom" sort still
     -- greys it out (BUG found ALL-65.9, 2026-09-25: it never touched direction).
     function BNB.SetSortEnabled(enabled)
-        local sortCtl = sortDD or sortCycleBtn
-        sortCtl:SetEnabled(enabled)
-        sortCtl:SetAlpha(enabled and 1.0 or 0.4)
+        sortDD:SetEnabled(enabled)
+        sortDD:SetAlpha(enabled and 1.0 or 0.4)
         if enabled then
             UpdateDirEnabled()
         else
-            local dirCtl = dirDD or dirCycleBtn
-            dirCtl:SetEnabled(false)
-            dirCtl:SetAlpha(0.4)
+            dirDD:SetEnabled(false)
+            dirDD:SetAlpha(0.4)
         end
     end
 
     -- ── Select-mode toggle + multi-select action buttons ─────────────────────
     local selBtn = MakeTipButton(f, L["MW_SELECT_BTN"], 52,
         L["MW_SELECT_TIP"], L["MW_SELECT_TIP_SUB"], nil)
-    selBtn:SetPoint("LEFT", dirDD or dirCycleBtn, "RIGHT", 6, 0)
+    selBtn:SetPoint("LEFT", dirDD, "RIGHT", 6, 0)
     selBtn:SetPoint("TOP", f, "TOP", 0, chrome.selY)
-    f._liftFrames = { sortDD or sortCycleBtn, selBtn }   -- /bnb topbar lift (ALL-240)
+    f._liftFrames = { sortDD, selBtn }   -- /bnb topbar lift (ALL-240)
     selBtn:SetScript("OnClick", function()
         -- Read the list's own state: popups, export and the sidebar leave multi
         -- mode through SetMultiMode, which a local flag here never saw (ALL-58)
@@ -969,9 +929,10 @@ function BNB.CreateMainWindow()
     end)
 
     -- The shared grip (UI/Widgets.lua, ALL-263): the damage meter's scale
-    -- handle, BNB.StartGripSizing, not StartSizing (ALL-97)
+    -- handle, BNB.StartGripSizing, not StartSizing (ALL-97). Retail sits 2 px
+    -- further left and down, art and click area together (RET-07, Dukul)
     local resizeHandle = BNB.CreateResizeGrip(f, {
-        x = -2, y = 2,
+        x = BNB.IsForever and -2 or -4, y = BNB.IsForever and 2 or 0,
         onStart = function()
             _resizing = true
             -- Seed the label with current size before first OnSizeChanged fires

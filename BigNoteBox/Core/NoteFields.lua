@@ -67,6 +67,8 @@ local FIELDS = {
     { "contextFreq",    "s", share = "situation" },
     { "waypoint",       "t", share = "situation" },
     { "wpClearOnLeave", "b", share = "situation" },
+    -- true = the situation waypoint is placed but not tracked (no arrow), SUG-10
+    { "wpNoTrack",      "b", share = "situation" },
     -- Unit: who a target or inspect note is about (model viewer, Oracle
     -- badges, the "note already exists" lookup)
     { "source",                     "s",  share = "unit" },
