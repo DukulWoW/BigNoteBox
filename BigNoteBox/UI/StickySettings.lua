@@ -900,8 +900,9 @@ local function PopulateStickySettings(noteID)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
         end, 2, function(v) return v .. " px" end)
 
-    -- Border Brightness slider
-    local slBrightness = MakeSlider(ct2, L["STICKY_BORDER_BRIGHTNESS"], 10, 500, cfg.borderBrightness or 100,
+    -- Border Brightness slider: the one 0..200 % scale (ALL-123)
+    local BB = BNB.BorderBright
+    local slBrightness = MakeSlider(ct2, L["STICKY_BORDER_BRIGHTNESS"], BB.MIN, BB.MAX, BB.Clamp(cfg.borderBrightness),
         function(v)
             cfg.borderBrightness = math.floor(v)
             SaveCfg(noteID, cfg)

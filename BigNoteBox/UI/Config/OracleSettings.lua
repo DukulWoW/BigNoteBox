@@ -343,14 +343,17 @@ local function BuildCustomBlock(ct)
     end
     -- scale: the slider shows stored * scale (a 0..1 value as 0..100).
     -- unit: after the value ("%", " px"). Stacked layout with Reset.
-    local function Slider(label, mn, mx, key, scale, list, unit)
+    -- shift: added to the saved value for display (border brightness is saved
+    -- -100..100 and shown 0..200 %, the one scale of ALL-123)
+    local function Slider(label, mn, mx, key, scale, list, unit, shift)
         scale = scale or 1
-        local function Shown() return math.floor(Style()[key] * scale + 0.5) end
+        shift = shift or 0
+        local function Shown() return math.floor(Style()[key] * scale + 0.5) + shift end
         local sl = BNB.CreateStackedSlider(blk, CONTENT_W, {
             label = label, min = mn, max = mx, value = Shown(),
-            default = math.floor(D[key] * scale + 0.5),
+            default = math.floor(D[key] * scale + 0.5) + shift,
             fmt = function(v) return v .. (unit or "") end,
-            onChange = function(v) Set(key, v / scale) end,
+            onChange = function(v) Set(key, (v - shift) / scale) end,
         })
         sl:SetPoint("TOPLEFT", blk, "TOPLEFT", 0, y)
         widgets[#widgets + 1] = sl
@@ -448,7 +451,7 @@ local function BuildCustomBlock(ct)
     Dropdown(L["CFG_ORACLE_BORDER_STYLE"], borders, "border", D.border)
     Slider(L["CFG_ORACLE_BORDER_THICK"], 1, 200, "borderScale", 1, greyBorder, "%")
     Slider(L["CFG_ORACLE_BORDER_OFFSET"], 0, 12, "borderOffset", 1, nil, " px")
-    Slider(L["CFG_ORACLE_BORDER_BRIGHT"], -100, 100, "borderLight", 1, greyBorder, "%")
+    Slider(L["CFG_ORACLE_BORDER_BRIGHT"], BNB.BorderBright.MIN, BNB.BorderBright.MAX, "borderLight", 1, greyBorder, "%", 100)
 
     -- ── Text and results ──────────────────────────────────────────────────────
     Header(L["CFG_ORACLE_HDR_TEXT"])

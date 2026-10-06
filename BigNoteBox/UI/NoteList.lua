@@ -1477,7 +1477,8 @@ BNB._createListEntry = function(parent) return CreateListEntry(parent) end
 -- Row icon border (PERF-01): the backdrop is set only when its file or size
 -- changed, since every list refresh re-populates every row.
 local ROW_BORDER_INSETS = { left = 0, right = 0, top = 0, bottom = 0 }
-local function SetRowBorder(bf, edgeFile, edgeSize, r, g, b, a)
+-- bright: the note's border brightness, 0..200 % (nil = 100; ALL-142)
+local function SetRowBorder(bf, edgeFile, edgeSize, r, g, b, a, bright)
     local sig = edgeFile .. "|" .. edgeSize
     if bf._sig ~= sig then
         local ok = pcall(bf.SetBackdrop, bf, {
@@ -1487,7 +1488,7 @@ local function SetRowBorder(bf, edgeFile, edgeSize, r, g, b, a)
         if not ok then return end
         bf:SetBackdropColor(0, 0, 0, 0)
     end
-    bf:SetBackdropBorderColor(r, g, b, a)
+    BNB.BorderBright.SetBackdropBorder(bf, bright, r, g, b, a)
 end
 
 -- Preview text per note (PERF-01), kept until the body, rich mode or source
@@ -1602,7 +1603,6 @@ local function PopulateEntry(btn, note, selected, collapsed)
     local bord = not hasIconFrame and note.borderOverride
     local bordScale = note.borderScale or 100
     local bordOffset = note.borderOffset or 2
-    local bordBright = (note.borderBrightness or 100) / 100
     if hasIconFrame then
         if btn._borderFrame then btn._borderFrame:Hide() end
     elseif bord and bord ~= "" then
@@ -1620,11 +1620,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
             bf:ClearAllPoints()
             bf:SetPoint("TOPLEFT",     btn._icon, "TOPLEFT",     -bordOffset,  bordOffset)
             bf:SetPoint("BOTTOMRIGHT", btn._icon, "BOTTOMRIGHT",  bordOffset, -bordOffset)
-            SetRowBorder(bf, path, es,
-                math.min(1, 0.70 * bordBright),
-                math.min(1, 0.70 * bordBright),
-                math.min(1, 0.75 * bordBright),
-                0.85)
+            SetRowBorder(bf, path, es, 0.70, 0.70, 0.75, 0.85, note.borderBrightness)
             bf:Show()
         end
     else

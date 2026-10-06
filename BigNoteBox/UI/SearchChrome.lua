@@ -536,82 +536,28 @@ end
 -- frame itself (its textures sit under every child, so the text and the rows
 -- draw over it) or the Window chrome; the text region is inset by the pad.
 
--- ── Brightness (-100..100, the sticky backgrounds' way, UI/BgLayer.lua) ──────
--- Below 0 darkens the pieces toward black (their colour times 1 + k).
--- Above 0 draws an ADD copy of each piece over it at k times its colour,
--- so light parts get brighter and dark lines stay dark (Dukul, 2026-09-28).
--- A copy lives on the piece's own frame, one sublevel up in the same draw
--- layer, and is re-synced on every draw and size change (tiled edges change
--- their texture coordinates with the size).
-local BOX_BORDER = { "TopLeftCorner", "TopRightCorner", "BottomLeftCorner", "BottomRightCorner",
-                     "TopEdge", "BottomEdge", "LeftEdge", "RightEdge" }
+-- ── Brightness ───────────────────────────────────────────────────────────────
+-- borderLight is saved -100..100 (0 = as drawn) and shown as 0..200 %, the
+-- one border brightness scale (ALL-123). The ADD copies above 100 % and their
+-- re-sync on size changes are BNB.BorderBright's (UI/BorderBright.lua).
+local BB = BNB.BorderBright
+local BOX_BORDER = BB.BOX_BORDER
 
-local function SyncCopy(add, src)
-    local ht, vt = src:GetHorizTile(), src:GetVertTile()
-    add:SetTexture(src:GetTexture(), ht and "REPEAT" or nil, vt and "REPEAT" or nil)
-    add:SetTexCoord(src:GetTexCoord())
-    add:SetHorizTile(ht)
-    add:SetVertTile(vt)
-    add:ClearAllPoints()
-    add:SetAllPoints(src)
-end
-
--- The ADD copies of sources (a list of regions) under f._searchAdds[key]:
--- shown at k (0..1) times r, g, b while k > 0 and the source is shown.
 local function SetAddCopies(f, key, sources, k, r, g, b)
-    f._searchAdds = f._searchAdds or {}
-    local list = f._searchAdds[key] or {}
-    f._searchAdds[key] = list
-    list.k, list.r, list.g, list.b = k, r, g, b
-    for i, src in ipairs(sources) do
-        local add = list[i]
-        if not add or add._src ~= src then
-            if add then add:Hide() end
-            local layer, sub = src:GetDrawLayer()
-            add = src:GetParent():CreateTexture(nil, layer, nil, math.min(7, (sub or 0) + 1))
-            add:SetBlendMode("ADD")
-            add._src = src
-            list[i] = add
-        end
-        if k > 0 and src:IsShown() then
-            SyncCopy(add, src)
-            add:SetVertexColor(r * k, g * k, b * k, 1)
-            add:Show()
-        else
-            add:Hide()
-        end
-    end
-    for i = #sources + 1, #list do list[i]:Hide() end
+    BB.SetCopies(f, key, sources, k, r, g, b, 1)
 end
 
 local function HideAddCopies(f, key)
-    local list = f._searchAdds and f._searchAdds[key]
-    if list then for _, add in ipairs(list) do add:Hide() end end
-end
-
--- Re-sync every shown copy (after a size change).
-local function ResyncAddCopies(f)
-    for _, list in pairs(f._searchAdds or {}) do
-        for _, add in ipairs(list) do
-            if add:IsShown() and add._src then SyncCopy(add, add._src) end
-        end
-    end
+    BB.HideCopies(f, key)
 end
 
 local function Pieces(owner, names)
-    local out = {}
-    for _, n in ipairs(names) do
-        local r = owner and owner[n]
-        if r and r.GetTexture then out[#out + 1] = r end
-    end
-    return out
+    return BB.Pieces(owner, names)
 end
 
 -- Brightness as (multiplier for the base colour, ADD strength).
 local function Bright(v)
-    local k = (v or 0) / 100
-    if k < 0 then return 1 + k, 0 end
-    return 1, k
+    return BB.Split((v or 0) + 100)
 end
 
 -- Size changes: the backdrop's tiled edges, then the ADD copies.
@@ -622,7 +568,7 @@ local function HookSize(f)
         if self._searchBackdrop and self.OnBackdropSizeChanged then
             pcall(self.OnBackdropSizeChanged, self)
         end
-        ResyncAddCopies(self)
+        BB.Resync(self)
     end)
 end
 

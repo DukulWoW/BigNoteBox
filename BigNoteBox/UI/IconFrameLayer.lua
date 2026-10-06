@@ -50,14 +50,21 @@ function IFL.Measure(def, size)
          (hole[2] + hole[4] / 2 - c[2]) * k
 end
 
+-- Hides a frame texture and its brightness copy (UI/BorderBright.lua)
+function IFL.HideTex(tex)
+    tex:Hide()
+    BNB.BorderBright.HideCopies(tex:GetParent(), tex)
+end
+
 -- Puts def's frame on tex around icon (both on the same parent frame).
--- nil def hides it and makes the icon square again. bright (default 1) is
--- applied only to a def with tint = true.
+-- nil def hides it and makes the icon square again. bright (0..2, default 1)
+-- is applied only to a def with tint = true; above 1 by an ADD copy, since
+-- the client clamps vertex colours at 1 (ALL-142).
 function IFL.Apply(icon, tex, def, size, bright)
     size = size or icon:GetWidth()
     local fw, fh, ox, oy = IFL.Measure(def, size)
     if not fw then
-        tex:Hide()
+        IFL.HideTex(tex)
         IFL.SetShape(icon, nil)
         return
     end
@@ -73,8 +80,8 @@ function IFL.Apply(icon, tex, def, size, bright)
     tex:SetPoint("TOPLEFT", icon, "CENTER", ox, oy)
     tex:SetDrawLayer(def.layer == "under" and "BORDER" or "OVERLAY", 1)
     local m = (def.tint and bright) or 1
-    tex:SetVertexColor(math.min(1, m), math.min(1, m), math.min(1, m), 1)
     tex:Show()
+    BNB.BorderBright.SetTexture(tex, m * 100)
     IFL.SetShape(icon, def.shape)
 end
 
@@ -91,7 +98,7 @@ function BNB.ApplyIconFrame(icon, note, size)
     local def = BNB.IconFrames and BNB.IconFrames.Get(note and note.iconFrame)
     if not icon:IsShown() then def = nil end
     if not def then
-        if icon._ifTex then icon._ifTex:Hide() end
+        if icon._ifTex then IFL.HideTex(icon._ifTex) end
         IFL.SetShape(icon, nil)
         return false
     end
@@ -99,7 +106,7 @@ function BNB.ApplyIconFrame(icon, note, size)
         icon._ifTex = icon:GetParent():CreateTexture(nil, "OVERLAY")
     end
     local scale  = (note.borderScale or 100) / 100
-    local bright = (note.borderBrightness or 100) / 100
+    local bright = BNB.BorderBright.Clamp(note.borderBrightness) / 100
     size = size or icon:GetWidth() or 0
     if size <= 0 then size = 20 end
     size = size * scale

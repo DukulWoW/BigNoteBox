@@ -67,14 +67,27 @@ local function HeaderRGB(cfg)
     return COL_HEADER[1], COL_HEADER[2], COL_HEADER[3]
 end
 
--- Returns border RGB scaled by cfg.borderBrightness (100 = default, 200 = double).
--- Base: the skin preset's border while the sticky follows it, else COL_BORDER.
-local function BorderRGB(cfg)
-    local m = ((cfg and cfg.borderBrightness) or 100) / 100
+-- The border's own colour: the skin preset's border while the sticky follows
+-- it, else COL_BORDER.
+local function BorderBase(cfg)
     local p = SkinFollowPreset(cfg)
-    local r, g, b = COL_BORDER[1], COL_BORDER[2], COL_BORDER[3]
-    if p then r, g, b = p.br, p.bg_, p.bb end
-    return math.min(1, r * m), math.min(1, g * m), math.min(1, b * m)
+    if p then return p.br, p.bg_, p.bb end
+    return COL_BORDER[1], COL_BORDER[2], COL_BORDER[3]
+end
+
+-- Border RGB at cfg.borderBrightness without the part above 100 % (for a
+-- backdrop drawn at alpha 0). A visible border goes through SetStickyBorder.
+local function BorderRGB(cfg)
+    local m = BNB.BorderBright.Split(cfg and cfg.borderBrightness)
+    local r, g, b = BorderBase(cfg)
+    return r * m, g * m, b * m
+end
+
+-- A backdrop's border at the sticky's brightness, 0..200 %: above 100 % by
+-- ADD copies, since the client clamps vertex colours at 1 (ALL-142)
+local function SetStickyBorder(target, cfg, a)
+    local r, g, b = BorderBase(cfg)
+    BNB.BorderBright.SetBackdropBorder(target, cfg and cfg.borderBrightness, r, g, b, a)
 end
 
 -- bgR/G/B are not in here: GetCfg fills them from DefaultBg while bgFollow is
@@ -427,11 +440,9 @@ local function ApplyBorderToFrame(target, borderName, borderScale, borderOffset,
                 edgeSize = 0,
                 insets = { left = 0, right = 0, top = 0, bottom = 0 },
             })
-            local br, bg2, bb = BorderRGB(cfg)
-            pcall(function() target:SetBackdropBorderColor(br, bg2, bb, 0) end)
+            SetStickyBorder(target, cfg, 0)
         else
             -- "Default" border — the standard BNB backdrop
-            local br, bg2, bb = BorderRGB(cfg)
             target._bgInset = 3
             if target.SetBackdrop then
                 target:SetBackdrop({
@@ -442,7 +453,7 @@ local function ApplyBorderToFrame(target, borderName, borderScale, borderOffset,
                 })
                 pcall(function()
                     target:SetBackdropColor(COL_BG[1], COL_BG[2], COL_BG[3], 0.97)
-                    target:SetBackdropBorderColor(br, bg2, bb, 1)
+                    SetStickyBorder(target, cfg, 1)
                 end)
             end
         end
@@ -469,7 +480,6 @@ local function ApplyIconBorder(target, borderName, borderScale, borderOffset, bo
         local bf = target._borderOverlay
         local es = math.max(1, math.floor(12 * (borderScale or 100) / 100 + 0.5))
         local pad = borderOffset or 2
-        local m = (borderBrightness or 100) / 100
         bf:ClearAllPoints()
         bf:SetPoint("TOPLEFT",     target, "TOPLEFT",     -pad,  pad)
         bf:SetPoint("BOTTOMRIGHT", target, "BOTTOMRIGHT",  pad, -pad)
@@ -479,11 +489,7 @@ local function ApplyIconBorder(target, borderName, borderScale, borderOffset, bo
                 insets = { left = 0, right = 0, top = 0, bottom = 0 },
             })
             bf:SetBackdropColor(0, 0, 0, 0)
-            bf:SetBackdropBorderColor(
-                math.min(1, 0.70 * m),
-                math.min(1, 0.70 * m),
-                math.min(1, 0.75 * m),
-                0.85)
+            BNB.BorderBright.SetBackdropBorder(bf, borderBrightness, 0.70, 0.70, 0.75, 0.85)
         end)
         bf:Show()
     else
@@ -565,7 +571,7 @@ local function ApplyBgAlpha(frame, bgAlpha, cfg)
             local tb = c.bgB or COL_BG[3]
             pcall(frame.SetBackdropColor, frame, tr, tg, tb, a)
         end
-        pcall(frame.SetBackdropBorderColor, frame, br, bg2, bb, borderA)
+        SetStickyBorder(frame, ec, borderA)
     end
     -- Method + arguments, not a closure: this runs every frame of a hover
     -- fade (PERF-08)
@@ -688,7 +694,6 @@ function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinCo
         or (note and note.borderOverride)
     local effectiveScale  = cfg.borderScale or 100
     local effectiveOffset = cfg.borderOffset or 4
-    local br, bg2, bb = BorderRGB(cfg)
     local focusMode = cfg.focusMode
     local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0 or 1
     if focusMode then borderA = 0 end  -- border hidden in focus mode (lerped in OnUpdate on hover)
@@ -696,7 +701,7 @@ function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinCo
         ApplyBorderToFrame(frame, effectiveBorder, effectiveScale, effectiveOffset, cfg)
         -- Colours: ApplyBgAlpha further down, which also covers the texture layer
         frame:SetBackdropColor(cfg.bgR, cfg.bgG, cfg.bgB, cfg.alpha or DEFAULT_CFG.alpha)
-        frame:SetBackdropBorderColor(br, bg2, bb, borderA)
+        SetStickyBorder(frame, cfg, borderA)
     end)
     pcall(ApplyBgLayer, frame, cfg)
 
@@ -911,8 +916,8 @@ local function CreateMiniTile(frame, noteID, note)
         local c = GetCfg(noteID)
         local hr, hg, hb = HeaderRGB(c)
         local br, bg2, bb = COL_BORDER[1], COL_BORDER[2], COL_BORDER[3]   -- normal mode: as before
-        if SkinFollowPreset(c) then br, bg2, bb = BorderRGB(c) end
         BNB.SetBackdrop(tile, hr, hg, hb, 0.95, br, bg2, bb, 1)
+        if SkinFollowPreset(c) then SetStickyBorder(tile, c, 1) end
     end
     tile._applyColours()
 
@@ -2153,8 +2158,7 @@ local function CreateStickyFrame(noteID)
                 local note = BNB.GetNote(f._noteID)
                 local effectiveBorder = cfg.borderName or (note and note.borderOverride)
                 if effectiveBorder and effectiveBorder ~= "" and effectiveBorder ~= "None" then
-                    local br, bg2, bb = BorderRGB(cfg)
-                    pcall(f.SetBackdropBorderColor, f, br, bg2, bb, _focusLerp)
+                    SetStickyBorder(f, cfg, _focusLerp)
                 end
             end
         end

@@ -538,7 +538,7 @@ local function BuildAppearanceTab(panel)
                 if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
             end,
             getBright = function()
-                local n = GetNote(); return ((n and n.borderBrightness) or 100) / 100
+                local n = GetNote(); return BNB.BorderBright.Clamp(n and n.borderBrightness) / 100
             end,
             getIcon = function()
                 local n = GetNote()
@@ -559,7 +559,7 @@ local function BuildAppearanceTab(panel)
         local n = GetNote(); return (n and n.borderOffset) or 2
     end
     local function GetBorderBrightness()
-        local n = GetNote(); return (n and n.borderBrightness) or 100
+        local n = GetNote(); return BNB.BorderBright.Clamp(n and n.borderBrightness)
     end
     local function BorderSlider(label, mn, mx, value, default, field, unit)
         local sl = BNB.CreateStackedSlider(panel, CW, {
@@ -576,7 +576,8 @@ local function BuildAppearanceTab(panel)
     end
     local bsSl = BorderSlider(L["NC_BORDER_THICKNESS_LABEL"], 1, 200, GetBorderScale(), 100, "borderScale", "%")
     local boSl = BorderSlider(L["NC_BORDER_OFFSET_LABEL"], 0, 12, GetBorderOffset(), 2, "borderOffset", "px")
-    local bbSl = BorderSlider(L["NC_BORDER_BRIGHTNESS_LABEL"], 10, 200, GetBorderBrightness(), 100, "borderBrightness", "%")
+    local bbSl = BorderSlider(L["NC_BORDER_BRIGHTNESS_LABEL"], BNB.BorderBright.MIN, BNB.BorderBright.MAX,
+        GetBorderBrightness(), BNB.BorderBright.DEFAULT, "borderBrightness", "%")
     -- An icon frame ignores the offset (only scale and brightness apply), so
     -- the slider is greyed while one is set
     ifBtn._syncOffset = function()
@@ -626,15 +627,13 @@ local function BuildAppearanceTab(panel)
         local path = LSM and LSM:Fetch("border", bord)
         if not path then return end
         local off    = n.borderOffset or 2
-        local bright = (n.borderBrightness or 100) / 100
         local es = math.max(1, math.floor(12 * (n.borderScale or 100) / 100 + 0.5))
         prevBorder:ClearAllPoints()
         prevBorder:SetPoint("TOPLEFT",     iconTex, "TOPLEFT",     -off,  off)
         prevBorder:SetPoint("BOTTOMRIGHT", iconTex, "BOTTOMRIGHT",  off, -off)
         pcall(function()
             prevBorder:SetBackdrop({ edgeFile = path, edgeSize = es })
-            prevBorder:SetBackdropBorderColor(math.min(1, 0.70 * bright),
-                math.min(1, 0.70 * bright), math.min(1, 0.75 * bright), 0.85)
+            BNB.BorderBright.SetBackdropBorder(prevBorder, n.borderBrightness, 0.70, 0.70, 0.75, 0.85)
         end)
         prevBorder:Show()
     end
@@ -728,7 +727,7 @@ local function BuildAppearanceTab(panel)
 
         local bs = (n and n.borderScale)      or 100
         local bo = (n and n.borderOffset)     or 2
-        local bb = (n and n.borderBrightness) or 100
+        local bb = BNB.BorderBright.Clamp(n and n.borderBrightness)
         -- silent: switching notes saves nothing
         bsSl:SetValue(bs, true)
         boSl:SetValue(bo, true)

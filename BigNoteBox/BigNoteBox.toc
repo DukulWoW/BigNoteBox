@@ -37,6 +37,7 @@ Core\Initialize.lua
 
 # UI
 UI\Widgets.lua
+UI\BorderBright.lua
 UI\Chrome.lua
 UI\Cursor.lua
 UI\GlowOverlay.lua

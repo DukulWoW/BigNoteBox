@@ -184,13 +184,13 @@ local function PaintFrame(t, entry)
         local bright = _h.getBright and _h.getBright() or 1
         BNB.IconFrameLayer.Apply(t.icon, t.icon._ifTex, def, ICON_SZ, bright)
     elseif t.icon._ifTex then
-        t.icon._ifTex:Hide()
+        BNB.IconFrameLayer.HideTex(t.icon._ifTex)
         BNB.IconFrameLayer.SetShape(t.icon, nil)
     end
 end
 
 local function PaintEdge(t, entry)
-    if t.icon._ifTex then t.icon._ifTex:Hide() end
+    if t.icon._ifTex then BNB.IconFrameLayer.HideTex(t.icon._ifTex) end
     if BNB.IconFrameLayer then BNB.IconFrameLayer.SetShape(t.icon, nil) end
     if entry.key == "None" then t.edge:Hide(); return end
     local LSM = GetLSM()
@@ -229,7 +229,7 @@ Render = function()
     for i = #list + 1, #_tiles do
         local t = _tiles[i]
         t:Hide()
-        if t.icon._ifTex then t.icon._ifTex:Hide() end
+        if t.icon._ifTex then BNB.IconFrameLayer.HideTex(t.icon._ifTex) end
         t.edge:Hide()
     end
     _sf:FinaliseHeight(math.ceil(#list / COLS) * ROW_H)

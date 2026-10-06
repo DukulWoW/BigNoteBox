@@ -47,7 +47,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 12  -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 19 -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 20 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -645,6 +645,18 @@ local function MigrateSettingsDB()
         Plain(db.oracleCustom)
         for _, s in pairs(db.oracleStyles or {}) do Plain(s) end
         v = 19
+    end
+
+    if v < 20 then
+        -- Border brightness has one scale, 0..200 % (ALL-123): a sticky's
+        -- border went up to 500 %, which now stops at 200
+        for _, rec in pairs(db.postits or {}) do
+            local c = type(rec) == "table" and rec.cfg
+            if type(c) == "table" and type(c.borderBrightness) == "number" and c.borderBrightness > 200 then
+                c.borderBrightness = 200
+            end
+        end
+        v = 20
     end
 
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)
