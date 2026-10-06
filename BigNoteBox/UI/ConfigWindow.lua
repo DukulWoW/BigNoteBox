@@ -653,23 +653,8 @@ local function CreateConfigWindow()
         lastBtn    = btn
     end
     -- ALL-229: keep the row inside the window, TAB_SIDE in from both edges (the
-    -- New note button's inset). Too wide: take the side padding off every tab a
-    -- pixel at a time, then share the width equally (long labels truncate).
-    pcall(function()
-        local free = CFG_W - 2 * TAB_SIDE - (#tabBtns - 1) * TAB_GAP
-        local function RowW()
-            local w = 0
-            for _, b in ipairs(tabBtns) do w = w + b:GetWidth() end
-            return w
-        end
-        if RowW() <= free then return end
-        for pad = 14, 0, -1 do
-            for _, b in ipairs(tabBtns) do PanelTemplates_TabResize(b, pad) end
-            if RowW() <= free then return end
-        end
-        local share = math.floor(free / #tabBtns)
-        for _, b in ipairs(tabBtns) do PanelTemplates_TabResize(b, 0, share) end
-    end)
+    -- New note button's inset); re-fitted on show and click (ALL-170, Classic)
+    BNB.FitTabRow(f, tabBtns, TAB_SIDE, TAB_GAP)
 
     -- Build the six scroll panels and their content (shared with skin chrome)
     BNB._BuildConfigTabPanels(f, CONTENT_TOP)

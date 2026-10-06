@@ -574,7 +574,7 @@ local function BuildWindow()
     xBtn:SetPoint("RIGHT", titleBar, "RIGHT", -4, 0)
 
     -- Scroll area between title bar and close button
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",   PAD, -(4 + TITLE_H + 8))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(PAD + 20), CLOSE_H + PAD)
 

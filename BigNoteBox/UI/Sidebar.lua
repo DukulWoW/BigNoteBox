@@ -834,7 +834,7 @@ local function BuildCopyMovePopup()
     })
     local cmTitleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(cmTitleH + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  -28, BTN_H + PAD + 8)
     if sf.ScrollBar then sf.ScrollBar:SetAlpha(0)

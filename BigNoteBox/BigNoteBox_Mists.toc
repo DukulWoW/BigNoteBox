@@ -1,0 +1,148 @@
+## Interface: 50504
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
+## Author: Dukul
+## Group: BigNoteBox
+## Version: 1.19.0
+## SavedVariables: BigNoteBoxDB
+# No BigNoteBoxLocale SavedVariable and no LoadSavedVariablesFirst here, as on
+# Forever (FOR-32) and in BigChatBox's Classic TOCs: a forced language cannot
+# survive the reload without them, so the language selector is hidden on Classic.
+## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB, BigNoteBox_Dev
+## AddonCompartmentFunc: BNB_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: BNB_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: BNB_OnAddonCompartmentLeave
+## X-Curse-Project-ID: 1492673
+## X-WoWI-ID: 27121
+## X-Wago-ID: n6VL4WGd
+
+# Bootstrap
+Init.lua
+UserImages\UserImages.lua
+
+# Libraries
+libs\libs.xml
+
+# Locales
+Locales\enUS.lua
+Locales\zhCN.lua
+
+# Core systems (order matters!)
+Core\Database.lua
+Core\Events.lua
+Core\SlashCommands.lua
+Core\Json.lua
+Core\NoteFields.lua
+Core\NoteManager.lua
+Core\Initialize.lua
+
+# UI
+UI\Widgets.lua
+UI\Chrome.lua
+UI\Cursor.lua
+UI\GlowOverlay.lua
+UI\Fonts.lua
+UI\SkinSystem.lua
+UI\IconButton.lua
+UI\ContextMenu.lua
+UI\MainWindow.lua
+UI\MainWindowSkin.lua
+UI\NoteList.lua
+UI\NoteContextMenu.lua
+UI\NoteEditor.lua
+UI\WelcomePanel.lua
+UI\WysiwygBar.lua
+UI\TagDialogs.lua
+UI\FocusEditor.lua
+UI\RichPreview.lua
+UI\BgLayer.lua
+UI\IconFrameLayer.lua
+UI\IconFrames.lua
+UI\StickyBackgrounds.lua
+UI\StickyNote.lua
+UI\SituationEditor.lua
+UI\StickySettings.lua
+UI\StickyBgPicker.lua
+UI\IconFramePicker.lua
+UI\IconPicker.lua
+UI\SendToChat.lua
+UI\ConfigWindow.lua
+UI\Config\General.lua
+UI\Config\Appearance.lua
+UI\Config\Modules.lua
+UI\Config\Notes.lua
+UI\Config\NotePages.lua
+UI\Config\Backup.lua
+UI\Config\Advanced.lua
+UI\Config\OracleSettings.lua
+UI\Config\ContextMenuSettings.lua
+UI\MainConfigSkin.lua
+UI\TrashWindow.lua
+UI\DangerZone.lua
+UI\DebugWindow.lua
+UI\SearchChrome.lua
+Assets\Search\Kilrogg\theme.lua
+Assets\Search\Alliance\theme.lua
+Assets\Search\Horde\theme.lua
+Assets\Search\The-Eye\theme.lua
+Assets\Search\Molten-Core\theme.lua
+UI\Oracle.lua
+UI\TagManager.lua
+UI\OptionsPanel.lua
+Assets\Icons\IconManifest.lua
+UI\BlizzardIconList.lua
+UI\NoteConfig.lua
+UI\ReferenceBox.lua
+UI\ReferenceBoxTasks.lua
+UI\Sidebar.lua
+UI\SidebarTabs.lua
+UI\CharacterRemove.lua
+UI\HistoryWindow.lua
+UI\NoteHistoryPanel.lua
+UI\HistoryCompareWindow.lua
+UI\ToolWindow.lua
+UI\AlarmWindow.lua
+UI\TaskEditWindow.lua
+UI\AlarmOverview.lua
+UI\OkPhrases.lua
+UI\WhatsNew.lua
+UI\BugReport.lua
+UI\WhatsNewData.lua
+UI\FeatureList.lua
+UI\FeatureListData.lua
+UI\SetupWizard.lua
+UI\NewNoteDialog.lua
+UI\RichNote.xml
+
+# Features
+Features\RandomQuotes.lua
+Features\UndoManager.lua
+Features\NoteHistory.lua
+Features\ContextNotes.lua
+Features\ChatCapture.lua
+Features\DragDrop.lua
+Features\InsertInfo.lua
+Features\PopupAnchor.lua
+Features\ZonePicker.lua
+Features\QuickNote.lua
+Features\AlarmManager.lua
+Features\TaskManager.lua
+Features\TagTree.lua
+Features\FocusOrbit.lua
+Features\AdvancedMode.lua
+Features\HtmlTemplate.lua
+Features\NoteExport.lua
+Features\ShareNote.lua
+Features\OracleSearch.lua
+Features\UnitNotes.lua
+Features\InspectNote.lua
+Features\TargetNote.lua
+Features\DirectSend.lua
+Features\MigrateNotes.lua
+
+# Minimap
+Minimap\Minimap.lua
+
+# Dev labs from BigNoteBox_Dev, run last (ARCH-04)
+Core\DevTools.lua

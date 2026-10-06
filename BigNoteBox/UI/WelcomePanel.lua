@@ -210,7 +210,7 @@ local function GetImportFrame()
     desc:SetText(L["IMPORT_POPUP_DESC"])
 
     -- Scroll frame + editbox
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      16, -58)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, 50)
 

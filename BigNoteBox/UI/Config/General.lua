@@ -101,7 +101,7 @@ local function BuildGeneralTab(sf, ct)
     y = y - HEADER_H
 
     -- ── Language section (ALL-14) — retail only, mirrors BigChatBox's selector ──
-    if not BNB.IsForever then
+    if not (BNB.IsForever or BNB.IsClassic) then   -- FOR-32, Classic the same (ALL-168)
         y = AddRule(ct, y) - 4
         y = AddHeader(ct, y, L["CFG_HDR_LANGUAGE"])
 

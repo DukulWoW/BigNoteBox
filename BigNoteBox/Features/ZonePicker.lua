@@ -326,7 +326,7 @@ local function BuildPicker()
     local LIST_TOP_OFFSET = PAD + TAB_H + 4 + SEARCH_H + 16
 
     -- ── Scroll frame ──────────────────────────────────────────────────────────
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    PAD,          -LIST_TOP_OFFSET)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(PAD + SCROLL_PAD - 2), PAD)
 

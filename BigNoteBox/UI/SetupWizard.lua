@@ -329,7 +329,7 @@ end
 
 -- Slim scroll frame for pages with lots of content
 local function MakeScrollContent(parent)
-    local sf = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, parent)
     sf:SetPoint("TOPLEFT",     parent, "TOPLEFT",     0, 0)
     sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -16, 0)
     local bar = sf.ScrollBar
@@ -412,7 +412,7 @@ local function BuildPage1(content)
     -- 2026-10-06): its TOC has no BigNoteBoxLocale / LoadSavedVariablesFirst,
     -- so the pick cannot survive the reload; back after FOR-08. Without the
     -- box the text keeps MakeScrollContent's full-height anchors.
-    if not BNB.IsForever then
+    if not (BNB.IsForever or BNB.IsClassic) then   -- Classic the same (ALL-168)
         local LANG_BOX_H = 56
         local lb = CreateFrame("Frame", nil, f)
         lb:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)

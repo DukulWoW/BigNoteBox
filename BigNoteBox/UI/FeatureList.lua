@@ -227,7 +227,7 @@ local function BuildWindow()
     -- ── Scroll area — between title and OK button ─────────────────────────────
     local BOTTOM_CHROME = OK_BTN_H + OK_BTN_PAD * 2 + PAD
 
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",  PAD,  -(titleH + PAD))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, BOTTOM_CHROME)
     f._sf = sf

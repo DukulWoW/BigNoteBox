@@ -317,7 +317,7 @@ local function BuildHistoryWindow()
     local list = f:AddPage("list", { onShow = function() BNB.PopulateHistoryWindow() end })
 
     -- Scroll frame
-    local sf = CreateFrame("ScrollFrame", nil, list, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, list)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf

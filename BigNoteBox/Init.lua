@@ -36,6 +36,9 @@ end
 local _, _, _, _tocVersion = GetBuildInfo()
 _tocVersion = _tocVersion or 0
 BNB.IsForever = _tocVersion >= 16000 and _tocVersion < 20000
+-- Classic clients (ALL-168, beta): Era (1xxxx below Forever), Anniversary and the
+-- progression client (2xxxx-9xxxx). Retail is 1xxxxx.
+BNB.IsClassic = _tocVersion > 0 and _tocVersion < 100000 and not BNB.IsForever
 
 -- Wowhead URL for this client (ALL-151): kind = "item" / "spell" / "quest".
 -- Retail www.wowhead.com/item=1, Forever /forever/, Classic Era /classic/,

@@ -379,7 +379,7 @@ local function BuildOverview()
     local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or OV_TITLE_H
 
     -- Scroll frame — bottom raised to leave room for footer strip
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     OV_PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28, OV_FOOT_H + OV_PAD)
 

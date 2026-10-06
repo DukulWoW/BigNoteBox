@@ -794,7 +794,7 @@ local function BuildPickerWindow()
     end)
     f._search = search
 
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    1,           -(top + 4 + SEARCH_H + 6))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
 
@@ -2070,7 +2070,7 @@ local function BuildReferenceBox()
     f._countLabel = countLabel
 
     local scrollTop = -(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",    0,           scrollTop)
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD)
 
@@ -3195,9 +3195,8 @@ do
     end
 
     -- Item tooltips: show ItemID + IconID
-    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+    local function OnItemTip(tooltip, id)
         if not ShouldShowIDs() then return end
-        local id = data and data.id
         if not id or id <= 0 then return end
         AddIDLine(tooltip, "ItemID", id)
         local icon = C_Item.GetItemIconByID and C_Item.GetItemIconByID(id)
@@ -3206,12 +3205,11 @@ do
             AddIDLine(tooltip, "IconID", icon)
         end
         Refresh(tooltip)
-    end)
+    end
 
     -- Spell tooltips: show SpellID + IconID
-    TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Spell, function(tooltip, data)
+    local function OnSpellTip(tooltip, id)
         if not ShouldShowIDs() then return end
-        local id = data and data.id
         if not id or id <= 0 then return end
         AddIDLine(tooltip, "SpellID", id)
         local icon = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
@@ -3219,10 +3217,39 @@ do
             AddIDLine(tooltip, "IconID", icon)
         end
         Refresh(tooltip)
-    end)
+    end
+
+    local hasTDP = TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall
+        and Enum and Enum.TooltipDataType
+    if hasTDP then
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
+            OnItemTip(tooltip, data and data.id)
+        end)
+        TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Spell, function(tooltip, data)
+            OnSpellTip(tooltip, data and data.id)
+        end)
+    else
+        -- Classic Era has no TooltipDataProcessor (ERA-01): the old per-tooltip
+        -- OnTooltipSetItem / OnTooltipSetSpell scripts instead
+        for _, tip in ipairs({ GameTooltip, ItemRefTooltip }) do
+            if tip and tip.HasScript and tip:HasScript("OnTooltipSetItem") then
+                tip:HookScript("OnTooltipSetItem", function(self)
+                    local _, link = self:GetItem()
+                    local id = link and tonumber(link:match("item:(%d+)"))
+                    OnItemTip(self, id)
+                end)
+            end
+            if tip and tip.HasScript and tip:HasScript("OnTooltipSetSpell") then
+                tip:HookScript("OnTooltipSetSpell", function(self)
+                    local _, id = self:GetSpell()
+                    OnSpellTip(self, id)
+                end)
+            end
+        end
+    end
 
     -- Quest tooltips via TooltipDataProcessor: show QuestID only (no icon)
-    if Enum and Enum.TooltipDataType and Enum.TooltipDataType.Quest then
+    if hasTDP and Enum.TooltipDataType.Quest then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Quest, function(tooltip, data)
             if not ShouldShowIDs() then return end
             local id = data and data.id
@@ -3251,7 +3278,7 @@ do
     -- Hook both GameTooltip and ItemRefTooltip to catch those.
     -- Skip quest links when TooltipDataProcessor.Quest is available — that hook
     -- already handles them, and firing both would show the ID line twice.
-    local _tdpHandlesQuest = Enum and Enum.TooltipDataType and Enum.TooltipDataType.Quest ~= nil
+    local _tdpHandlesQuest = hasTDP and Enum.TooltipDataType.Quest ~= nil
     local function OnSetHyperlink(tooltip, link)
         if not ShouldShowIDs() then return end
         if not link then return end

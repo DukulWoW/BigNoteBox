@@ -45,7 +45,7 @@ BNB.RichPreviewFocus = RPF
 --------------------------------------------------------------------------------
 local function BuildRenderPair(name, parent, titleH)
     local AM = BNB.AdvancedMode
-    local rsf = CreateFrame("ScrollFrame", name .. "Scroll", parent, "ScrollFrameTemplate")
+    local rsf = BNB.CreateScrollFrame(name .. "Scroll", parent)
     rsf:SetPoint("TOPLEFT",     parent, "TOPLEFT",  CONTENT_PAD, -(titleH + PAD))
     rsf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -(CONTENT_PAD + 16), PAD)
 

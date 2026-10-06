@@ -890,6 +890,11 @@ local function PositionQuestLogBtn()
 end
 
 local function InjectQuestLogFrame()
+    -- Classic Era and Anniversary have the old QuestLogFrame and none of these
+    -- hooks (ALL-169): no quest-log button there. MoP Classic has hooks 1 and 2.
+    local hasTitleHook = type(QuestMapLogTitleButton_OnClick) == "function"
+    local hasDetailsHook = type(QuestMapFrame_ShowQuestDetails) == "function"
+    if not hasTitleHook and not hasDetailsHook then return end
     -- Create one button, parented initially to UIParent (hidden).
     -- PositionQuestLogBtn() reparents it on each hook call.
     local btn = BNB.CreateIconButton(UIParent, QN_SZ, "createnote", {
@@ -937,20 +942,24 @@ local function InjectQuestLogFrame()
     _qlBtn = btn
 
     -- Hook 1: quest title clicked in the log list
-    hooksecurefunc("QuestMapLogTitleButton_OnClick", function(self)
-        if self and self.questID then
-            _questLogSelectedID = self.questID
-        end
-        PositionQuestLogBtn()
-    end)
+    if hasTitleHook then
+        hooksecurefunc("QuestMapLogTitleButton_OnClick", function(self)
+            if self and self.questID then
+                _questLogSelectedID = self.questID
+            end
+            PositionQuestLogBtn()
+        end)
+    end
 
     -- Hook 2: quest details shown via map frame (e.g. clicking from world map)
-    hooksecurefunc("QuestMapFrame_ShowQuestDetails", function(questID)
-        if questID and questID > 0 then
-            _questLogSelectedID = questID
-        end
-        PositionQuestLogBtn()
-    end)
+    if hasDetailsHook then
+        hooksecurefunc("QuestMapFrame_ShowQuestDetails", function(questID)
+            if questID and questID > 0 then
+                _questLogSelectedID = questID
+            end
+            PositionQuestLogBtn()
+        end)
+    end
 
     -- Hook 3: popup detail frame shown
     -- QuestLogPopupDetailFrame.questID is populated by Blizzard before this fires

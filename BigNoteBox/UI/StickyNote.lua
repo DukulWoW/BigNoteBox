@@ -2200,7 +2200,7 @@ local function CreateStickyFrame(noteID)
     -- Sibling to _bodyScroll; identical anchors. Shown only for rich notes.
     -- SimpleHTML must be in a proper Frame scroll child — parenting to an
     -- EditBox is unreliable and causes raw markup to show instead of rendering.
-    local richScroll = CreateFrame("ScrollFrame", nil, front, "ScrollFrameTemplate")
+    local richScroll = BNB.CreateScrollFrame(nil, front)
     richScroll:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     richScroll:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22),  PAD)
     richScroll:Hide()
@@ -2289,7 +2289,7 @@ local function CreateStickyFrame(noteID)
     -- ── Task scroll frame ─────────────────────────────────────────────────────
     -- Sibling to _bodyScroll and _richScroll. Shown only when task view is active.
     -- Anchored identically to _bodyScroll but bottom leaves room for the footer.
-    local taskScroll = CreateFrame("ScrollFrame", nil, front, "ScrollFrameTemplate")
+    local taskScroll = BNB.CreateScrollFrame(nil, front)
     taskScroll:SetPoint("TOPLEFT",     front, "TOPLEFT",    HEADER_BORDER_PAD + PAD, -(HEADER_BORDER_PAD + HEADER_H + PAD))
     taskScroll:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22), PAD + TASK_FOOTER_H + 2)
     taskScroll:Hide()

@@ -320,7 +320,7 @@ local function BuildTaskPanel(f)
 
     -- Inner scroll frame for task rows — top is offset by TASK_HDR_H so the
     -- fixed header above is not overlapped; TASK_FOOTER_H at bottom for footer.
-    local tsf = CreateFrame("ScrollFrame", nil, pnl, "ScrollFrameTemplate")
+    local tsf = BNB.CreateScrollFrame(nil, pnl)
     tsf:SetPoint("TOPLEFT",     pnl, "TOPLEFT",    3, -TASK_HDR_H)
     tsf:SetPoint("BOTTOMRIGHT", pnl, "BOTTOMRIGHT", -SCROLL_PAD, TASK_FOOTER_H)
     if tsf.ScrollBar then

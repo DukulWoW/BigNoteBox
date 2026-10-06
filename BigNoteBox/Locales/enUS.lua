@@ -130,6 +130,11 @@ L["FOREVER_TEST_NOTICE"] =
     "BigNoteBox is still being developed for WoW: Forever.\n\n" ..
     "Until Forever launches, we cannot guarantee that your notes will not suddenly disappear.\n\n" ..
     "Remember to take a backup now and then: Settings > Backup > Export Notes."
+L["CLASSIC_NOTICE_TITLE"] = "BigNoteBox on WoW Classic"
+L["CLASSIC_TEST_NOTICE"] =
+    "BigNoteBox is in beta on the Classic clients.\n\n" ..
+    "Some art may be missing, and we cannot yet guarantee that your notes will not suddenly disappear.\n\n" ..
+    "Remember to take a backup now and then: Settings > Backup > Export Notes."
 L["FOREVER_NOTICE_DONT_SHOW"] = "Don't show this again"
 L["FOREVER_NOTICE_BUGS"] = "Found a bug? Please report it, on GitHub if you can:"
 

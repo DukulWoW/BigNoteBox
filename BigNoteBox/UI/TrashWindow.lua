@@ -252,7 +252,7 @@ local function BuildViewPage(f, top)
         end,
     })
 
-    local sf = CreateFrame("ScrollFrame", nil, page, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, page)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(page.top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     if sf.ScrollBar then
@@ -495,7 +495,7 @@ local function BuildTrashWindow()
     local list = f:AddPage("list", { onShow = function() BNB.PopulateTrashWindow() end })
 
     -- Scroll frame (28px right clearance for scrollbar)
-    local sf = CreateFrame("ScrollFrame", nil, list, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, list)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     f._scrollFrame = sf

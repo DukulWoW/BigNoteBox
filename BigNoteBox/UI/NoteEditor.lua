@@ -2046,8 +2046,7 @@ function BNB.AM_EnterViewMode(id)
 
     -- Build render scroll frame + render frame lazily
     if not BNB._editorRenderScroll then
-        local rsf = CreateFrame("ScrollFrame", "BigNoteBoxRenderScroll",
-                                BNB.editorPane, "ScrollFrameTemplate")
+        local rsf = BNB.CreateScrollFrame("BigNoteBoxRenderScroll", BNB.editorPane)
         BNB._editorRenderScroll = rsf
 
         local scrollBar = rsf.ScrollBar

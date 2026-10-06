@@ -288,7 +288,7 @@ function BNB._BuildNoteHistoryPage(f, top)
     })
     _page = page
 
-    local sf = CreateFrame("ScrollFrame", nil, page, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, page)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(page.top + 4))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   BOTTOM_STRIP_H)
     page._scrollFrame = sf

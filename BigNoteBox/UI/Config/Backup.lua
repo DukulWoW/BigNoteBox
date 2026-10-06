@@ -122,7 +122,7 @@ local function BuildBackupTab(sf, ct)
     pasteFrame:SetWidth(CONTENT_W)
     pasteFrame:SetHeight(PASTE_H)
 
-    local pasteSF = CreateFrame("ScrollFrame", nil, pasteFrame, "ScrollFrameTemplate")
+    local pasteSF = BNB.CreateScrollFrame(nil, pasteFrame)
     pasteSF:SetPoint("TOPLEFT",     pasteFrame, "TOPLEFT",      4,  -4)
     pasteSF:SetPoint("BOTTOMRIGHT", pasteFrame, "BOTTOMRIGHT", -24,  4)
     if pasteSF.ScrollBar then
@@ -410,7 +410,7 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
         copyBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(f._eb:GetText()) end)
         f._copyBtn = copyBtn
 
-        local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+        local sf = BNB.CreateScrollFrame(nil, f)
         sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -(f._isSkin and (copyY + 24 + 6) or 90))
         sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 16)
         if sf.ScrollBar then

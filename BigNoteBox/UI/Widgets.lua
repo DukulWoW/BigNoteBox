@@ -471,6 +471,37 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
 end
 
 --------------------------------------------------------------------------------
+-- SCROLL FRAME  (ALL-171 / ALL-172)
+-- Every ScrollFrameTemplate frame is made here. Retail and Forever get the
+-- template's MinimalScrollBar. Classic's template builds the wide
+-- WoWClassicScrollBar (SCROLL_FRAME_SCROLL_BAR_TEMPLATE in the client's
+-- ScrollDefine.lua), which stuck out of our windows; the Classic clients ship
+-- MinimalScrollBar too, so it is swapped in with Retail's offsets and bound the
+-- way the template's ScrollFrame_OnLoad binds its own bar. Done before the caller
+-- sets any script: the bind SetScripts OnVerticalScroll, OnScrollRangeChanged and
+-- OnMouseWheel.
+--------------------------------------------------------------------------------
+function BNB.CreateScrollFrame(name, parent)
+    local sf = CreateFrame("ScrollFrame", name, parent, "ScrollFrameTemplate")
+    local old = sf.ScrollBar
+    if BNB.IsClassic and old and ScrollUtil and ScrollUtil.InitScrollFrameWithScrollBar then
+        local ok, bar = pcall(CreateFrame, "EventFrame", nil, sf, "MinimalScrollBar")
+        if ok and bar then
+            old:Hide()
+            old:ClearAllPoints()
+            bar:SetPoint("TOPLEFT", sf, "TOPRIGHT", 6, 2)
+            bar:SetPoint("BOTTOMLEFT", sf, "BOTTOMRIGHT", 6, 5)
+            if bar.SetHideIfUnscrollable then bar:SetHideIfUnscrollable(sf.scrollBarHideIfUnscrollable) end
+            sf.ScrollBar = bar
+            bar:Show()
+            ScrollUtil.InitScrollFrameWithScrollBar(sf, bar)
+            if bar.Update then bar:Update() end
+        end
+    end
+    return sf
+end
+
+--------------------------------------------------------------------------------
 -- SMART SCROLL FRAME  (mirrors BCB's CreateSmartScrollFrame)
 -- "ScrollFrameTemplate" — modern scrollbar inside frame bounds.
 -- Scrollbar auto-hides when content fits.
@@ -479,7 +510,7 @@ end
 -- Returns: scrollFrame, scrollChild
 --------------------------------------------------------------------------------
 function BNB.CreateSmartScrollFrame(name, parent)
-    local sf = CreateFrame("ScrollFrame", name, parent, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(name, parent)
 
     local scrollBar = sf.ScrollBar   -- exists on ScrollFrameTemplate
 
@@ -520,7 +551,7 @@ end
 -- Uses ScrollFrameTemplate.  Returns: scrollFrame, editBox
 --------------------------------------------------------------------------------
 function BNB.CreateScrolledEditBox(name, parent, fontSize)
-    local sf = CreateFrame("ScrollFrame", name, parent, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(name, parent)
 
     local eb = CreateFrame("EditBox", name and (name .. "EditBox") or nil, sf)
     eb:SetMultiLine(true)
@@ -727,6 +758,42 @@ function BNB.CreateNoteRule(parent)
         t:SetHeight(1)
     end
     return t
+end
+
+--------------------------------------------------------------------------------
+-- TOP TAB ROW FIT  (ALL-229, ALL-170)
+-- Normal-mode PanelTopTabButtonTemplate tabs, kept inside the host: the row
+-- starts `side` in from the left edge and ends `side` in from the right. Too
+-- wide: take the side padding off every tab a pixel at a time, then share the
+-- width equally (long labels truncate). Classic's tab font is wider, and its
+-- template sizes the tabs again when they show, so the fit is re-applied on the
+-- host's show and after every tab click (one frame later, after the template).
+--------------------------------------------------------------------------------
+function BNB.FitTabRow(host, tabs, side, gap)
+    if not (host and tabs and tabs[1]) then return end
+    local function Fit()
+        local w = host:GetWidth()
+        if not w or w <= 0 then return end
+        local free = w - 2 * side - (#tabs - 1) * gap
+        local function RowW()
+            local t = 0
+            for _, b in ipairs(tabs) do t = t + b:GetWidth() end
+            return t
+        end
+        for _, b in ipairs(tabs) do PanelTemplates_TabResize(b, 15, nil, 70) end
+        if RowW() <= free then return end
+        for pad = 14, 0, -1 do
+            for _, b in ipairs(tabs) do PanelTemplates_TabResize(b, pad) end
+            if RowW() <= free then return end
+        end
+        local share = math.floor(free / #tabs)
+        for _, b in ipairs(tabs) do PanelTemplates_TabResize(b, 0, share) end
+    end
+    local function SafeFit() pcall(Fit) end
+    local function Later() C_Timer.After(0, SafeFit) end
+    SafeFit()
+    host:HookScript("OnShow", function() SafeFit(); Later() end)
+    for _, b in ipairs(tabs) do b:HookScript("OnClick", Later) end
 end
 
 --------------------------------------------------------------------------------
@@ -983,7 +1050,7 @@ end
 -- by setting ct._contentH before the panel is shown.
 -- Returns: scrollFrame, contentFrame
 function BNB.CreateAutoScrollPanel(parent, cw, cwNoBar)
-    local sf  = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
+    local sf  = BNB.CreateScrollFrame(nil, parent)
     local bar = sf.ScrollBar
     if bar then bar:SetAlpha(0) end
 

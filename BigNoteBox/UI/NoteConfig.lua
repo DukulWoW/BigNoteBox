@@ -812,6 +812,8 @@ local function CreateNoteConfigWindow()
             tabBtns[i] = btn; lastBtn = btn
         end
         PanelTemplates_SetNumTabs(f, NUM_TABS); f.numTabs = NUM_TABS
+        -- Keep the row inside the window (ALL-170: Classic tabs ran outside)
+        BNB.FitTabRow(f, tabBtns, 7, 5)
     end
 
     for i, def in ipairs(tabDefs) do

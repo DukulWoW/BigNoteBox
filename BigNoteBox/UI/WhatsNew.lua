@@ -189,7 +189,7 @@ local function BuildWindow()
     -- ── Scroll area — fills between title bar and OK area ─────────────────────
     local BOTTOM_CHROME = OK_BTN_H + OK_BTN_PAD * 2 + PAD
 
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f,  "TOPLEFT",  PAD,  -(titleH + PAD))
     sf:SetPoint("BOTTOMRIGHT", f,  "BOTTOMRIGHT", -24, BOTTOM_CHROME)
     f._sf = sf
@@ -230,7 +230,8 @@ local function ClientEntries(entries)
         elseif type(entry) == "table" and type(entry[1]) == "string" then
             local show
             if entry.forever then show = BNB.IsForever
-            elseif entry.retail then show = not BNB.IsForever
+            elseif entry.classic then show = BNB.IsClassic   -- ALL-168
+            elseif entry.retail then show = not (BNB.IsForever or BNB.IsClassic)
             else show = true end
             if show then out[#out + 1] = entry[1] end
         end

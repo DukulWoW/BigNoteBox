@@ -266,7 +266,7 @@ local function BuildSharePreview()
     div:SetPoint("TOPRIGHT", divHost, "TOPRIGHT", 0, 0)
 
     -- Scrollable body
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",     f, "TOPLEFT",      PAD, -(titleH + 42))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -28,   FOOT_H)
     if sf.ScrollBar then

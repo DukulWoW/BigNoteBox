@@ -1,0 +1,23 @@
+## Interface: 50504
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r |cffff9900Dev|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: Developer mode for BigNoteBox: a separate set of notes and the labs' saved work. Not needed to play.
+## Author: Dukul
+## Group: BigNoteBox
+## Version: 1.0.0
+## SavedVariables: BigNoteBoxDevDB
+
+BigNoteBox_Dev.lua
+ButtonTest.lua
+IconProbe.lua
+SidebarTopTest.lua
+
+# The labs (ARCH-04): queued here, run by BigNoteBox's Core/DevTools.lua.
+# IconLabAtlas.lua is generated and git-ignored: _work/tools/iconlab-regions.py
+Labs\LabKit.lua
+Labs\LabSheet.lua
+Labs\BackgroundLab.lua
+Labs\IconLabData.lua
+Labs\IconLabAtlas.lua
+Labs\IconLab.lua
+Labs\SearchLayoutTool.lua

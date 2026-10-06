@@ -151,6 +151,8 @@ local function BuildStickySettingsWindow()
         end
         PanelTemplates_SetNumTabs(f, 3)
         f.numTabs = 3
+        -- Keep the row inside the window (ALL-170: Classic tabs ran outside)
+        BNB.FitTabRow(f, sTabBtns, 7, 5)
     end
 
     -- ── Two scroll panels (one per tab) ───────────────────────────────────────

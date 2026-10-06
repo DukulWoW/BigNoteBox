@@ -990,7 +990,7 @@ local function BuildPreviewWindow()
     local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
 
     -- Scroll area
-    local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame(nil, f)
     sf:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(titleH + 8))
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -(PAD + 20), PAD)
 

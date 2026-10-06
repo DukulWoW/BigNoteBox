@@ -5,7 +5,9 @@ local BNB = BigNoteBox
 local L = BNB.L
 
 --------------------------------------------------------------------------------
--- WoW: Forever beta notice (FOR-10). Blizzard fixed the SavedVariables loader on
+-- WoW: Forever beta notice (FOR-10), also shown on the Classic clients (ALL-168
+-- beta) with their own title and text. Each client has its own WTF folder, so the
+-- one saved flag serves both. Blizzard fixed the SavedVariables loader on
 -- 2026-09-25, so this is now a "still in development, keep backups" note with a
 -- "Don't show this again" box (BigNoteBoxDB.foreverNoticeHidden). Its own window
 -- rather than a StaticPopup, so the button is the new SharedButtonTemplate one.
@@ -83,12 +85,22 @@ local function BuildPlunderChrome(f)
     orn:SetPoint("TOP", f, "BOTTOM", 0, E + 3 * S)
 end
 
--- Forever only, until "Don't show this again" is ticked, and never while the setup
+-- Classic: the game's dialog box. The Plunderstorm sheet is Forever art.
+local function BuildClassicChrome(f)
+    f:SetBackdrop({
+        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
+        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
+        tile = true, tileSize = 32, edgeSize = 32,
+        insets = { left = 11, right = 12, top = 12, bottom = 11 },
+    })
+end
+
+-- Forever and Classic only, until "Don't show this again" is ticked, and never while the setup
 -- wizard is still to be done: its Finish reloads (so the next login shows it) and
 -- its Quit calls this directly (UI/SetupWizard.lua BNB_QUIT_SETUP).
 function BNB.ShowForeverNoticeIfDue()
     local db = BigNoteBoxDB
-    if not BNB.IsForever or not db then return end
+    if not (BNB.IsForever or BNB.IsClassic) or not db then return end
     if db.foreverNoticeHidden or db.setupComplete ~= true then return end
     pcall(BNB.ShowForeverNotice)
 end
@@ -96,7 +108,7 @@ function BNB.ShowForeverNotice()
     local f = _foreverNotice
     if not f then
         local W, PAD, TOP = 420, 30, 58
-        f = CreateFrame("Frame", "BNBForeverNoticeFrame", UIParent)
+        f = CreateFrame("Frame", "BNBForeverNoticeFrame", UIParent, "BackdropTemplate")
         f:SetWidth(W)
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
         f:SetFrameStrata("DIALOG")
@@ -115,7 +127,7 @@ function BNB.ShowForeverNotice()
 
         local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
         title:SetPoint("TOP", f, "TOP", 0, -26)
-        title:SetText(L["FOREVER_NOTICE_TITLE"])
+        title:SetText(L[BNB.IsClassic and "CLASSIC_NOTICE_TITLE" or "FOREVER_NOTICE_TITLE"])
         local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
         close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -14)
         close:SetFrameLevel(f:GetFrameLevel() + 5)   -- above the corner art
@@ -125,7 +137,7 @@ function BNB.ShowForeverNotice()
         body:SetWidth(W - PAD * 2)
         body:SetJustifyH("LEFT")
         body:SetSpacing(2)
-        body:SetText(L["FOREVER_TEST_NOTICE"])
+        body:SetText(L[BNB.IsClassic and "CLASSIC_TEST_NOTICE" or "FOREVER_TEST_NOTICE"])
 
         local ok = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
         ok:SetSize(120, 26)
@@ -170,7 +182,7 @@ function BNB.ShowForeverNotice()
         -- OnShow never fired and the template's default size stayed.
         f:SetHeight(TOP + body:GetStringHeight() + 16 + bugs:GetStringHeight() + 8
             + BNB.BUG_LINKS_H + 16 + 24 + 8 + 26 + 28)
-        BuildPlunderChrome(f)
+        if BNB.IsForever then BuildPlunderChrome(f) else BuildClassicChrome(f) end
         f._cb = cb
         _foreverNotice = f
     end

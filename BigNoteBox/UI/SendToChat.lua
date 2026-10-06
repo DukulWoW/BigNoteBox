@@ -496,7 +496,7 @@ local function CreateSendDialog()
     -- so we leave PAD on the left and PAD+16 on the right so the bar stays inside
     -- the dialog window.
     local PREVIEW_H = 220
-    local previewSF = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")
+    local previewSF = BNB.CreateScrollFrame(nil, f)
     previewSF:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD,       y)
     previewSF:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD+16), y)
     previewSF:SetHeight(PREVIEW_H)

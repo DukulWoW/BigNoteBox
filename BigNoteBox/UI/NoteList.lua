@@ -2328,7 +2328,7 @@ function BNB.BuildNoteList()
     _searchBar = searchBar
 
     local BTNS_H = NEWBTN_H + PAD_BOT + 2
-    local sf = CreateFrame("ScrollFrame", "BigNoteBoxListScroll", pane, "ScrollFrameTemplate")
+    local sf = BNB.CreateScrollFrame("BigNoteBoxListScroll", pane)
     -- In expanded mode: leave -22px right gap for scrollbar.
     -- In collapsed mode: span full width (scrollbar hidden, no gap needed).
     -- We update BOTTOMRIGHT in SetListCollapsed.
