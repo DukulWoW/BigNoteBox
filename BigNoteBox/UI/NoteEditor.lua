@@ -37,12 +37,10 @@ local function NoteIsLocked(note)
     return BigNoteBoxDB.lockNotes == true
 end
 
--- Whether the editor treats note id as locked right now (a session unlock
--- counts). Oracle search (ALL-69) asks before putting the cursor in a note.
+-- Whether the editor treats note id as locked right now. Oracle search
+-- (ALL-69) asks before putting the cursor in a note.
 function BNB.IsNoteLockedInEditor(id)
-    local note = id and BNB.GetNote(id)
-    local sessionUnlocked = BNB._sessionUnlocked and BNB._sessionUnlocked[id]
-    return (not sessionUnlocked) and NoteIsLocked(note) or false
+    return NoteIsLocked(id and BNB.GetNote(id))
 end
 
 --------------------------------------------------------------------------------
@@ -368,8 +366,9 @@ local function BuildTitleField(parent)
 
         -- Check where focus went. If it went to the body or to NoteConfig, leave
         -- the note alive — the user is still working on it.
-        local kf = GetCurrentKeyboardFocus and GetCurrentKeyboardFocus()
-        if kf == BNB._editorBody then return end
+        -- (GetCurrentKeyboardFocus does not exist on any client, so this
+        -- check never fired before batch 11: ask the box itself.)
+        if BNB._editorBody and BNB._editorBody:HasFocus() then return end
         local nc = _G["BigNoteBoxNoteConfigFrame"]
         if nc and nc:IsShown() then return end
 
@@ -1428,7 +1427,6 @@ function BNB.LoadNoteInEditor(id)
         if BNB._editorWysiwygBar then BNB._editorWysiwygBar:Hide() end
         BNB.Editor.SetCurrent(nil)
         BNB.Editor.SetDirty(false)
-        if BNB._sessionUnlocked and id then BNB._sessionUnlocked[id] = nil end
         BNB.UpdateSaveButtonState()
         if BNB.RichPreview then BNB.RichPreview.OnNoteCleared() end
         return
@@ -1572,10 +1570,8 @@ function BNB.LoadNoteInEditor(id)
     BNB.Editor.SetDirty(false)
     BNB.UpdateSaveButtonState()
 
-    -- Apply lock state (session unlock overrides)
-    local sessionUnlocked = BNB._sessionUnlocked and BNB._sessionUnlocked[id]
-    local locked = (not sessionUnlocked) and NoteIsLocked(note)
-    SetEditorLocked(locked)
+    -- Apply lock state
+    SetEditorLocked(NoteIsLocked(note))
     -- Sync note list lock icon and RefBox desaturation whenever editor state changes
     if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
@@ -1625,8 +1621,7 @@ function BNB.RefreshEditorLock()
     local id   = BNB._currentNoteID
     local note = id and BNB.GetNote(id)
     if not note then return end
-    local sessionUnlocked = BNB._sessionUnlocked and BNB._sessionUnlocked[id]
-    SetEditorLocked((not sessionUnlocked) and NoteIsLocked(note))
+    SetEditorLocked(NoteIsLocked(note))
     if BNB.RefreshNoteList     then BNB.RefreshNoteList()     end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
@@ -1642,7 +1637,6 @@ local function InsertTagPair(open, close)
     eb:SetFocus()
 
     local fullText = eb:GetText() or ""
-    local curEnd   = eb:GetCursorPosition() or #fullText
 
     -- Detect selection: Insert("") collapses it and deletes selected text.
     -- Compare text before/after to find what was selected.
@@ -1672,9 +1666,7 @@ local function InsertTag(tag)
     eb:SetFocus()
 
     -- If text is selected, replace it; otherwise insert at cursor
-    local before = eb:GetText() or ""
     eb:Insert("")
-    local after = eb:GetText() or ""
     local cursor = eb:GetCursorPosition() or 0
 
     eb:Insert(tag)
@@ -1683,7 +1675,7 @@ local function InsertTag(tag)
 end
 
 local function BuildMarkupBar(parent, wysiwygBar)
-    local bar = CreateFrame("Frame", "BigNoteBoxMarkupBar", parent)
+    local bar = CreateFrame("Frame", nil, parent)
     bar:SetPoint("TOPLEFT",  wysiwygBar, "BOTTOMLEFT",  0, 0)
     bar:SetPoint("TOPRIGHT", wysiwygBar, "BOTTOMRIGHT", 0, 0)
     bar:SetHeight(MARKUP_H)
@@ -1955,7 +1947,7 @@ local function BuildRichTabStrip()
     local mf = BNB.mainFrame
     if not mf then return nil end
 
-    local strip = CreateFrame("Frame", "BigNoteBoxRichTabStrip", mf)
+    local strip = CreateFrame("Frame", nil, mf)
     strip:SetHeight(TAB_H)
     -- Anchored below editorPane right portion; left edge at list/editor split
     local function ReAnchor()

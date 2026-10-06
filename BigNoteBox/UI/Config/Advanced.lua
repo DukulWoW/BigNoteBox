@@ -5,8 +5,8 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
-local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
+local CONTENT_W = K.CONTENT_W
+local AddRule, AddHeader, AddCheck = K.AddRule, K.AddHeader, K.AddCheck
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 4 — ADVANCED

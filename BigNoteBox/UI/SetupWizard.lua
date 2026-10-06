@@ -627,7 +627,7 @@ local function BuildPage3(content)
     f:SetAllPoints()
     f:Hide()
 
-    local sf, ct = MakeScrollContent(f)
+    local _, ct = MakeScrollContent(f)
     local y = -4
 
     y = MakeHeader(ct, y, L["SW_THEME_COLOR_HDR"])
@@ -683,7 +683,7 @@ local function BuildPage3(content)
     y = MakeRule(ct, y)
     y = MakeHeader(ct, y, L["SW_RANDOM_THEME_HDR"])
 
-    local _, cb = MakeCheck(ct, y,
+    MakeCheck(ct, y,
         L["SW_RANDOMIZE_CHECK"],
         function() return BigNoteBoxDB and BigNoteBoxDB.skinRandomize == true end,
         function(v) if BigNoteBoxDB then BigNoteBoxDB.skinRandomize = v end end)
@@ -706,7 +706,7 @@ local function BuildPage4(content)
     f:SetAllPoints()
     f:Hide()
 
-    local sf, ct = MakeScrollContent(f)
+    local _, ct = MakeScrollContent(f)
     local y = -4
 
     -- ── Font picker ──────────────────────────────────────────────────────────
@@ -1008,23 +1008,20 @@ local function BuildPage4(content)
     end)
     y = combatY - 4
 
-    -- ── LSM fonts ───────────────────────────────────────────────────────────
-    local lsmAvail = LibStub and LibStub("LibSharedMedia-3.0", true) ~= nil
-    if lsmAvail then
-        y = MakeRule(ct, y)
-        y = MakeHeader(ct, y, L["SW_LSM_HDR"])
+    -- ── LSM fonts (LSM is embedded in libs/, so always there) ──────────────
+    y = MakeRule(ct, y)
+    y = MakeHeader(ct, y, L["SW_LSM_HDR"])
 
-        local _, ny4 = MakeLabel(ct, y,
-            L["SW_LSM_DESC"],
-            nil, 0.65, 0.65, 0.65)
-        y = ny4
+    local _, ny4 = MakeLabel(ct, y,
+        L["SW_LSM_DESC"],
+        nil, 0.65, 0.65, 0.65)
+    y = ny4
 
-        local _, cb = MakeCheck(ct, y,
-            L["SW_LSM_CHECK"],
-            function() return BigNoteBoxDB and BigNoteBoxDB.lsmFonts == true end,
-            function(v) if BigNoteBoxDB then BigNoteBoxDB.lsmFonts = v end end)
-        y = y - 32
-    end
+    MakeCheck(ct, y,
+        L["SW_LSM_CHECK"],
+        function() return BigNoteBoxDB and BigNoteBoxDB.lsmFonts == true end,
+        function(v) if BigNoteBoxDB then BigNoteBoxDB.lsmFonts = v end end)
+    y = y - 32
 
     ct:SetHeight(math.abs(y) + PAD)
     return f
@@ -1038,7 +1035,7 @@ local function BuildPage5(content)
     f:SetAllPoints()
     f:Hide()
 
-    local sf, ct = MakeScrollContent(f)
+    local _, ct = MakeScrollContent(f)
     local y = -4
 
     local _, ny = MakeLabel(ct, y,
@@ -1449,12 +1446,9 @@ function BNB.ShowSetupWizard()
                 if sf and sf:IsShown() then sf:Hide() end
             end
         end
-        -- RefBox
-        local rbf = BigNoteBoxRefBox
-        if rbf and rbf:IsShown() then rbf:Hide() end
-        -- Inspect note window
-        local inf = BigNoteBoxInspectFrame
-        if inf and inf:IsShown() then inf:Hide() end
+        -- Reference Box (it read the frame names BigNoteBoxRefBox and
+        -- BigNoteBoxInspectFrame, which no window has had for a long time)
+        if BNB.CloseReferenceBox then BNB.CloseReferenceBox() end
     end)
 
     -- Resume page from a reload (e.g. after skin mode choice on page 2)

@@ -314,7 +314,6 @@ local function InitDevMode()
     -- Debug mode starts on in dev mode (Dukul, 2026-10-02). InitSettingsDB clears it
     -- on every load, so this re-arms it each reload; turning it off holds until then.
     BigNoteBoxDB.debugMode = true
-    BNB._debugMode = true
     if dev.notesDB == nil then
         local src = BigNoteBoxNotesDB_Loaded and BigNoteBoxNotesDB
         dev.notesDB = type(src) == "table" and DeepCopy(src) or {}
@@ -682,7 +681,6 @@ local function InitSettingsDB()
     -- Always clear it here so the user has to re-enable it each session.
     db.debugMode     = nil
     db.debugWaypoint = nil
-    BNB._debugMode        = nil
     BNB._debugImmersionPos = nil
 end
 

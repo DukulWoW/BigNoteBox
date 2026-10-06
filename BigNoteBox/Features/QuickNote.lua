@@ -260,6 +260,15 @@ local function QuestCompleteText()
     return title, body
 end
 
+-- Puts the player's quest-log selection back after we selected questID to read
+-- it (DEP-04: moving the selection from addon code and leaving it there moved
+-- the player's own pick and has been a taint source for quest-log actions).
+local function RestoreQuestSelection(prev, questID)
+    if prev and prev ~= 0 and prev ~= questID and C_QuestLog.SetSelectedQuest then
+        C_QuestLog.SetSelectedQuest(prev)
+    end
+end
+
 -- Returns title, body for a quest viewed from the quest log.
 -- Uses C_QuestLog.SetSelectedQuest + GetQuestLogQuestText (quest-log-specific
 -- APIs) which do NOT rely on the active quest accept/turn-in frame globals.
@@ -277,11 +286,9 @@ local function QuestLogText(questID)
     end
     if title == "" then title = string.format(BNB.L["QN_QUEST_TITLE_FMT"], questID) end
 
-    local desc, objText = "", ""
+    local desc = ""
     if GetQuestLogQuestText then
-        desc, objText = GetQuestLogQuestText()
-        desc    = desc    or ""
-        objText = objText or ""
+        desc = GetQuestLogQuestText() or ""
     end
 
     -- Double-space paragraphs for readability
@@ -389,19 +396,8 @@ local function FormatRewards(questID)
             end
         end
     end
-
-    -- Regular (non-major-faction) reputation -- older API, still works on Midnight
-    if GetNumQuestRewardFactions and GetQuestRewardFactionInfo then
-        local ok, numFac = pcall(GetNumQuestRewardFactions)
-        if ok and numFac and numFac > 0 then
-            for i = 1, numFac do
-                local ok2, factionName, reputationAmount = pcall(GetQuestRewardFactionInfo, i)
-                if ok2 and factionName and factionName ~= "" and reputationAmount and reputationAmount > 0 then
-                    lines[#lines + 1] = factionName .. ": +" .. reputationAmount .. " rep"
-                end
-            end
-        end
-    end
+    -- (A regular-reputation branch read GetNumQuestRewardFactions /
+    -- GetQuestRewardFactionInfo, which no client has: removed in batch 11.)
 
     if #lines == 0 then return nil end
     return table.concat(lines, "\n")
@@ -497,7 +493,7 @@ local function AttachQuestLogRewards(noteID, questID)
         local ok, numRewards = pcall(GetNumQuestLogRewards)
         if ok and numRewards and numRewards > 0 then
             for i = 1, numRewards do
-                local ok2, name, tex, cnt, qual, isUsable, itemID = pcall(GetQuestLogRewardInfo, i)
+                local ok2, _, _, _, _, _, itemID = pcall(GetQuestLogRewardInfo, i)
                 if ok2 then TryAttach(itemID) end
             end
         end
@@ -508,7 +504,7 @@ local function AttachQuestLogRewards(noteID, questID)
         local ok, numChoices = pcall(GetNumQuestLogChoices, questID)
         if ok and numChoices and numChoices > 0 then
             for i = 1, numChoices do
-                local ok2, name, tex, cnt, qual, isUsable, itemID = pcall(GetQuestLogChoiceInfo, i)
+                local ok2, _, _, _, _, _, itemID = pcall(GetQuestLogChoiceInfo, i)
                 if ok2 then TryAttach(itemID) end
             end
         end
@@ -526,7 +522,7 @@ local function QuestLogIcon(questID)
         local ok, numRewards = pcall(GetNumQuestLogRewards)
         if ok and numRewards and numRewards > 0 then
             for i = 1, numRewards do
-                local ok2, name, tex = pcall(GetQuestLogRewardInfo, i)
+                local ok2, _, tex = pcall(GetQuestLogRewardInfo, i)
                 if ok2 and tex then return tostring(tex) end
             end
         end
@@ -536,7 +532,7 @@ local function QuestLogIcon(questID)
         local ok, numChoices = pcall(GetNumQuestLogChoices, questID)
         if ok and numChoices and numChoices > 0 then
             for i = 1, numChoices do
-                local ok2, name, tex = pcall(GetQuestLogChoiceInfo, i)
+                local ok2, _, tex = pcall(GetQuestLogChoiceInfo, i)
                 if ok2 and tex then return tostring(tex) end
             end
         end
@@ -807,12 +803,11 @@ local function InjectQuestFrame()
         local title, body, icon, tags, rewardFn
         local questID = GetQuestID and GetQuestID() or 0
 
-        -- Midnight retail renamed QuestDetailFrame -> QuestFrameDetailPanel
-        -- and QuestRewardFrame -> QuestFrameCompletePanel; the old names are
-        -- gone on every client (DEP-05).
+        -- The quest frame's panels are QuestFrameDetailPanel and
+        -- QuestFrameRewardPanel on every client (the API dumps); the old
+        -- QuestDetailFrame / QuestRewardFrame names are gone (DEP-05).
         local detailShown = QuestFrameDetailPanel and QuestFrameDetailPanel:IsShown()
-        local rewardShown = (QuestFrameCompletePanel and QuestFrameCompletePanel:IsShown())
-                         or (QuestFrameRewardPanel and QuestFrameRewardPanel:IsShown())
+        local rewardShown = QuestFrameRewardPanel and QuestFrameRewardPanel:IsShown()
 
         if detailShown then
             -- Quest accept frame
@@ -914,7 +909,9 @@ local function InjectQuestLogFrame()
         end
 
         -- QuestLogText calls SetSelectedQuest internally, which primes all
-        -- quest-log APIs (GetQuestLogQuestText, GetQuestLogRewardMoney, etc.)
+        -- quest-log APIs (GetQuestLogQuestText, GetQuestLogRewardMoney, etc.).
+        -- The player's own selection is put back afterwards (DEP-04).
+        local prevSel = C_QuestLog.GetSelectedQuest and C_QuestLog.GetSelectedQuest()
         local title, body = QuestLogText(questID)
         body = AppendObjectives(body, questID)
 
@@ -924,9 +921,15 @@ local function InjectQuestLogFrame()
         end
 
         local icon = QuestLogIcon(questID)
+        RestoreQuestSelection(prevSel, questID)
         local rewardFn = function(noteID)
             AttachQuestID(noteID, questID)
+            -- Runs later (after the note exists): select the quest again for
+            -- the index-based reward reads, then put the selection back
+            local prev = C_QuestLog.GetSelectedQuest and C_QuestLog.GetSelectedQuest()
+            if C_QuestLog.SetSelectedQuest then C_QuestLog.SetSelectedQuest(questID) end
             AttachQuestLogRewards(noteID, questID)
+            RestoreQuestSelection(prev, questID)
         end
         CreateQuickNote(title, body, icon, { "Quest" }, rewardFn)
     end)
@@ -1135,15 +1138,15 @@ local function BuildImmersionButton()
             AttachQuestID(noteID, questID)
             AttachQuestRewards(noteID)
         end or nil
-        local immBody = NPCLocationHeader() .. body
+        local noteBody = NPCLocationHeader() .. body
         if questID > 0 then
-            immBody = AppendObjectives(immBody, questID)
+            noteBody = AppendObjectives(noteBody, questID)
         end
         if questID > 0 and BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
             local rewardStr = FormatRewards(questID)
-            if rewardStr then immBody = immBody .. "\n\n----------\n" .. rewardStr end
+            if rewardStr then noteBody = noteBody .. "\n\n----------\n" .. rewardStr end
         end
-        CreateQuickNote(title, immBody, RandomIcon(), { "Quest" }, rewardFn)
+        CreateQuickNote(title, noteBody, RandomIcon(), { "Quest" }, rewardFn)
         BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title or ""))
     end)
 
@@ -1444,10 +1447,11 @@ end)
 
 -- Also hook ImmersionFrame OnShow/OnHide if it exists at login time
 -- (Immersion may load after PLAYER_LOGIN if it's an optional dep)
+local _immHooked   -- our own flag, not a field on another addon's frame (GLB-04)
 local function HookImmersionFrame()
     local imm = _G["ImmersionFrame"]
-    if not imm or imm._bnbHooked then return end
-    imm._bnbHooked = true
+    if not imm or _immHooked then return end
+    _immHooked = true
     imm:HookScript("OnShow", function()
         BuildImmersionButton()
         if IsEnabled() then _immersionBtn:Show() end

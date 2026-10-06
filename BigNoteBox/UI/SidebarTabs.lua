@@ -437,7 +437,7 @@ function SB.RefreshTop(parent)
     local skin = IsSkin() and true or false
     local S = skin and SKIN or NORMAL
     if not _strip then
-        _strip = CreateFrame("Frame", "BigNoteBoxSidebarTopStrip", parent)
+        _strip = CreateFrame("Frame", nil, parent)
         if BNB.RegisterSkinButton then BNB.RegisterSkinButton(PaintAll) end
     end
     -- Skin tabs draw in the strata below the window, so its top border covers

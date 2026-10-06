@@ -458,7 +458,6 @@ local function BuildTaskPanel(f)
             local titleH = isSkin and SK_RB_TITLE_H or TITLE_H
             local contentTop = fTop -
                 math.abs(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
-            local hasModel  = HasModel(NoteID())
             local footerH   = BOTTOM_PAD
             local totalH    = contentTop - fBot - footerH
             if totalH < 1 then return end
@@ -990,7 +989,7 @@ local function DoRenderTaskPanel()
     local db           = BigNoteBoxDB
     local completedPos = (db and db.taskCompletedPosition) or BNB.DEFAULTS.taskCompletedPosition
     local T            = BNB.Task
-    local done, total  = T.GetCompletionCount(NoteID())
+    local done         = T.GetCompletionCount(NoteID())
 
     -- ── Header row ──────────────────────────────────────────────────────────
     -- "Tasks (done/total)" label + [GR] [GS] [+] buttons
@@ -1167,7 +1166,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
 
     BNB.ContextMenu.Open(anchor, function(root)
         -- Edit task...
-        root:CreateButton(L["TASK_CTX_EDIT"] or "Edit task...", function()
+        root:CreateButton(L["TASK_CTX_EDIT"], function()
             if BNB.TaskEditWindow and BNB.TaskEditWindow.Open then
                 BNB.TaskEditWindow.Open(noteID, taskID, anchor)
             end
@@ -1175,7 +1174,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
 
         -- Add sub-task (top-level only, one nesting level)
         if isTopLevel then
-            root:CreateButton(L["TASK_CTX_ADD_SUB"] or "Add sub-task", function()
+            root:CreateButton(L["TASK_CTX_ADD_SUB"], function()
                 local subID = T.AddTask(noteID, "", taskID)
                 if subID and RenderTaskPanel then
                     RenderTaskPanel()
@@ -1187,7 +1186,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         end
 
         -- Duplicate
-        root:CreateButton(L["TASK_CTX_DUPLICATE"] or "Duplicate", function()
+        root:CreateButton(L["TASK_CTX_DUPLICATE"], function()
             local newID = T.AddTask(noteID, task.text, task.parentID)
             if newID then
                 local changes = {}
@@ -1205,11 +1204,11 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         root:CreateDivider()
 
         -- Set reset (radio submenu)
-        local resetSub = root:CreateButton(L["TASK_CTX_RESET"] or "Set reset")
+        local resetSub = root:CreateButton(L["TASK_CTX_RESET"])
         local RESETS = {
             { label = L["TASK_CTX_RESET_NONE"]   or "None",   value = nil    },
             { label = L["TASK_CTX_RESET_DAILY"]  or "Daily",  value = "daily"  },
-            { label = L["TASK_CTX_RESET_WEEKLY"] or "Weekly", value = "weekly" },
+            { label = L["TASK_CTX_RESET_WEEKLY"], value = "weekly" },
         }
         for _, entry in ipairs(RESETS) do
             resetSub:CreateRadio(entry.label,
@@ -1224,8 +1223,8 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         end
 
         -- Set situation (radio submenu with live-detected values)
-        local sitSub = root:CreateButton(L["TASK_CTX_SITUATION"] or "Set situation")
-        sitSub:CreateRadio(L["TASK_CTX_SIT_NONE"] or "None (global)",
+        local sitSub = root:CreateButton(L["TASK_CTX_SITUATION"])
+        sitSub:CreateRadio(L["TASK_CTX_SIT_NONE"],
             function() return not task.situation end,
             function()
                 T.UpdateTask(noteID, taskID, { _clear = {"situation"} })
@@ -1271,7 +1270,7 @@ function BNB.ShowTaskContextMenu(anchor, noteID, taskID)
         root:CreateDivider()
 
         -- Delete
-        root:CreateButton(L["TASK_CTX_DELETE"] or "Delete", function()
+        root:CreateButton(L["TASK_CTX_DELETE"], function()
             T.DeleteTask(noteID, taskID)
             if RenderTaskPanel then
                 RenderTaskPanel()

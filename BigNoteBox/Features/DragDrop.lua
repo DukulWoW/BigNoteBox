@@ -10,7 +10,6 @@
 -- a custom tokeniser, so we don't attempt it; see note below.)
 --
 -- Public API:
---   BNB.SetupDragDrop()   — called once from Initialize.lua
 --   BNB.WireDropTarget(eb) — wire any EditBox as a drop target (called by
 --                            BuildBodyField and FocusEditor after creation)
 --
@@ -135,7 +134,7 @@ local function UpdateDragTooltip(eb)
     }
     if not supported[ctype] then return end
     GameTooltip:SetOwner(eb, "ANCHOR_CURSOR")
-    GameTooltip:AddLine(L["DROP_INSERT_TIP"] or "Drop to insert link", 0.6, 1, 0.6)
+    GameTooltip:AddLine(L["DROP_INSERT_TIP"], 0.6, 1, 0.6)
     GameTooltip:Show()
 end
 
@@ -164,18 +163,4 @@ function BNB.WireDropTarget(eb)
         if GetCursorInfo() then UpdateDragTooltip(self) end
     end)
     eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
-end
-
--- ── Setup: wire the already-created editor body boxes ────────────────────────
--- BuildBodyField and FocusEditor call BNB.WireDropTarget immediately after
--- creating their EditBoxes. This function wires anything that already exists
--- at setup time (in case of load order edge cases).
-function BNB.SetupDragDrop()
-    -- Main editor body (created by BuildNoteEditor → BuildBodyField)
-    if BNB._editorBody then
-        BNB.WireDropTarget(BNB._editorBody)
-    end
-    -- Focus editor body is module-local in FocusEditor.lua; it calls
-    -- BNB.WireDropTarget itself after creating the EditBox, so nothing to do
-    -- here unless it was already built before this function ran.
 end

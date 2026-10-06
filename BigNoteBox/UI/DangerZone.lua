@@ -232,8 +232,7 @@ local function MakeActionRow(ct, y, btnLabel, btnW, confirmLabel, confirmW, onCo
     -- The confirm button fills the rest of the row and never past it: a fixed
     -- 220 beside a 160 button ran 20 px under the scrollbar and hid the
     -- countdown "(5)" (ALL-177)
-    confirmW = CW - btnW - 8
-    local confirmBtn = MakeRedButton(ct, confirmLabel, confirmW, 24)
+    local confirmBtn = MakeRedButton(ct, confirmLabel, CW - btnW - 8, 24)
     confirmBtn:SetPoint("LEFT", btn, "RIGHT", 8, 0)
     confirmBtn:Hide()
 

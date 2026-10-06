@@ -426,7 +426,6 @@ local function FocusInsertTagPair(open, close)
     if not eb then return end
     eb:SetFocus()
     local before = eb:GetText() or ""
-    local curEnd = eb:GetCursorPosition() or #before
     eb:Insert("")
     local after  = eb:GetText() or ""
     local curStart = eb:GetCursorPosition() or 0
@@ -912,9 +911,8 @@ local SK_FOCUS_PAD     = PAD
 local function BuildFocusFrameSkin()
     if focusFrame then return end
 
-    local f = BNB.CreateSkinFrame(WorldFrame, false, nil, false)
+    local f = BNB.CreateSkinFrame(WorldFrame, false, "BigNoteBoxFocusFrame", false)
     f:SetFrameStrata("FULLSCREEN_DIALOG")
-    _G["BigNoteBoxFocusFrame"] = f
     f:SetSize(FOCUS_W, FOCUS_H)
     f:SetPoint("CENTER")
     f:SetToplevel(true)

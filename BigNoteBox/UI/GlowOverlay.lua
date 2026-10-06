@@ -85,7 +85,7 @@ end
 
 -- ── AutoCastGlow window border ────────────────────────────────────────────────
 -- key must be unique per window. pad = { l, t, r, b } for a frame that is not
--- a seated ButtonFrameTemplate (BNB.BasicFrameGlowPad()); omit for the normal
+-- a seated ButtonFrameTemplate; omit for the normal
 -- seated-window placement. color/n/freq/scale default to the BNB-green glow
 -- shared by WhatsNew and FeatureList; pass their own to use a different one
 -- (e.g. SetupWizard's skin-border colour).

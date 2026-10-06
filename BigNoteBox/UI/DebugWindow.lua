@@ -39,7 +39,6 @@ local function Commit()
     if not db then return end
 
     db.debugMode = staged.master and true or nil
-    BNB._debugMode = db.debugMode
     if not db.debugMode then
         -- Sub-options are meaningless with the master off (same as the old inline section)
         staged.wp, staged.pseudo, staged.imm, staged.ctxTrace = false, false, false, false

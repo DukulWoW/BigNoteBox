@@ -156,19 +156,9 @@ function BNB.PadWindowGlow(f, key, l, t, r, b)
     g:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT",  r, -b)
 end
 
--- ALL-71: BasicFrameTemplateWithInset (the small note-type dialogs) is never seated
--- and has its own border art, so neither the Forever pads in UI/WhatsNew.lua nor
--- RETAIL_GLOW_LEFT fit it. Outward pixels per side for a glow on one, normal mode
--- only (skin frames are plain: flush). Checked in game (Dukul, 2026-09-25);
--- retune with PadWindowGlow.
-local BASIC_GLOW_PAD = BNB.IsForever and { l = 3, t = 3, r = 3, b = 3 }
-                                      or { l = 0, t = 0, r = 0, b = 0 }
-local FLUSH_GLOW_PAD = { l = 0, t = 0, r = 0, b = 0 }
-
-function BNB.BasicFrameGlowPad()
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then return FLUSH_GLOW_PAD end
-    return BASIC_GLOW_PAD
-end
+-- (BNB.BasicFrameGlowPad, the glow pad for BasicFrameTemplateWithInset dialogs,
+-- ALL-71, went in batch 11: the last such dialog moved to CreateToolWindow in
+-- CMP-02 S5.)
 
 -- ALL-314: the template's close X is the game's graphic; every window gets our
 -- own close button (Assets\Buttons, symbol "close") in its place. The old button

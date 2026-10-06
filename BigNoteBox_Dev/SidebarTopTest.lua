@@ -530,7 +530,7 @@ local function Build()
 
     -- Toggles and cycles
     local tpl = BNB().PanelButtonTemplate and BNB().PanelButtonTemplate() or "UIPanelButtonTemplate"
-    local bx, by, row = PAD, -118, 0
+    local bx, by = PAD, -118
     local function Btn(w, label, onClick)
         local b = CreateFrame("Button", nil, panel, tpl)
         b:SetSize(w, 22)

@@ -77,12 +77,11 @@ function BNB.RegisterSlashCommands()
                     BNB:Print(string.format("|cff88bbffAuto-waypoints tracked: %d|r", count))
                 end)
             elseif sub == "leave" then
-                BNB:Print("|cff88bbffSimulating zone-leave (clearing matches, re-checking)...|r")
+                -- Re-checks with the current matches; it shows what a real leave
+                -- would clear only after the player has actually left the place.
+                BNB:Print("|cff88bbffRe-checking situations (leave logic)...|r")
                 local prev = BNB._contextMatches or {}
                 BNB:Print(string.format("|cff88bbffPrevious matches: %d|r", #prev))
-                -- Temporarily clear the match function so nothing re-matches
-                local oldMatches = BNB._contextMatches
-                BNB._contextMatches = oldMatches  -- keep prev for leave logic
                 if BNB.CheckContextualNotes then BNB.CheckContextualNotes() end
                 C_Timer.After(1.5, function()
                     local count = 0
@@ -304,7 +303,6 @@ local function BuildPopups()
             end
             if p.paste then p.paste:SetRealText("") end
             BNB._pendingImport = nil
-            BNB._pendingImportForeign = nil
         end,
         -- OnCancel(self, data, reason): reason is the THIRD argument. It read
         -- the second (data, nil), so "Keep original" imported nothing (D9, 2026-10-02)
@@ -327,7 +325,6 @@ local function BuildPopups()
             end
             -- ESC or button2 both clean up
             BNB._pendingImport = nil
-            BNB._pendingImportForeign = nil
         end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
         showAlert = true,

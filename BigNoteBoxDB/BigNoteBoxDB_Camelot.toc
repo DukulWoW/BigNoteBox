@@ -3,6 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: Notes database for BigNoteBox - stores all your notes safely.
 ## Author: Dukul
+## Group: BigNoteBox
 ## Version: 1.0.0
 ## SavedVariables: BigNoteBoxNotesDB
 

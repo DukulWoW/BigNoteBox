@@ -193,7 +193,7 @@ function ZP.GetMatches(text, kind, maxResults)
             if #results >= maxResults then break end
             local info = C_FriendList.GetFriendInfoByIndex(i)
             if info and info.name and info.name:lower():find(lower, 1, true) == 1 then
-                results[#results + 1] = { name = info.name, continent = "Friend", kind = "player" }
+                results[#results + 1] = { name = info.name, continent = FRIEND, kind = "player" }
             end
         end
         -- Guild roster
@@ -212,7 +212,7 @@ function ZP.GetMatches(text, kind, maxResults)
                     end
                     if not dup then
                         results[#results + 1] = {
-                            name = shortName, continent = "Guild", kind = "player"
+                            name = shortName, continent = GUILD, kind = "player"
                         }
                     end
                 end

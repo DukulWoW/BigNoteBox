@@ -68,6 +68,36 @@ comfortable with the command line.
 
 ====================================================================================================
 
+Keep your images through updates (recommended)
+
+Every BigNoteBox update replaces the whole BigNoteBox folder, this one and UserImages.lua
+included. To keep your images, put them in a tiny addon of your own instead:
+
+1. In Interface\AddOns\, make a folder called BigNoteBox_UserImages
+
+2. In it, make a file called BigNoteBox_UserImages.toc with these lines:
+
+    ## Interface: 120105
+    ## Title: BigNoteBox User Images
+    ## Dependencies: BigNoteBox
+    UserImages.lua
+
+   (WoW: Forever players use ## Interface: 16001 and name the file BigNoteBox_UserImages_Camelot.toc)
+
+3. Make a file called UserImages.lua next to it, listing your images:
+
+    BigNoteBox.RegisterUserImages("BigNoteBox_UserImages", {
+        "mymap.tga",
+        "Horde/emblem.tga",
+    })
+
+4. Put your image files in that folder (subfolders are fine), then /reload.
+
+The first word is your folder's name; the names in the list are relative to it, the same way
+as in UserImages.lua. Your images show up in the image picker together with any listed here.
+
+====================================================================================================
+
 Important notes
 
 - WoW cannot scan folders automatically, so every image must be listed manually in UserImages.lua

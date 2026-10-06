@@ -27,7 +27,11 @@ local SIZE_MAX     = 256
 local IMG_SIZE_MAX = 1024   -- images can be wider than a note's icons (Dukul)
 local IMG_SIZE_CHOICES = { 12, 16, 24, 32, 48, 64, 96, 128, 256 }   -- 256 = the default
 
+-- A typed name to a full path, through the same resolver as the picker
+-- (Features/AdvancedMode.lua: registered addons first, then UserImages/)
 local function ResolvePath(raw)
+    local AM = BNB.AdvancedMode
+    if AM and AM.ResolveUserImage then return AM.ResolveUserImage(raw) end
     local s = raw and raw:match("^%s*(.-)%s*$") or ""
     if s == "" then return nil end
     if s:sub(1, 9):lower() == "interface" then return s end
@@ -91,6 +95,8 @@ function BNB.OpenImgDialog(insertFn)
 
         -- Extract the short display name from a full path
         local function ShortName(fullPath)
+            local AM = BNB.AdvancedMode
+            if AM and AM.UserImageShortName then return AM.UserImageShortName(fullPath) end
             local prefix = USER_IMG_PREFIX_DIALOG:gsub("\\", "\\\\")
             local short = fullPath:match(prefix .. "(.+)$")
                        or fullPath:match("[/\\]([^/\\]+)$")

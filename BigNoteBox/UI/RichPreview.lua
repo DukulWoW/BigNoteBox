@@ -127,7 +127,6 @@ end
 local function BuildFrameSkin(frameName, onClose, frameParent)
     frameParent = frameParent or UIParent
     local f = BNB.CreateSkinFrame(frameParent, false, frameName, false)
-    _G[frameName] = f
     f:SetToplevel(true)
     f:EnableMouse(true)
     f:SetMovable(true)

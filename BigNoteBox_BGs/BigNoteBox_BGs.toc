@@ -3,6 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: The original BigNoteBox sticky note backgrounds. Loaded only when a sticky uses one.
 ## Author: Dukul
+## Group: BigNoteBox
 ## Version: 1.0.0
 ## Dependencies: BigNoteBox
 ## LoadOnDemand: 1

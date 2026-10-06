@@ -20,7 +20,6 @@
 --   inserting text.
 --
 -- Public API:
---   BNB.SetupInsertInfo()          — called once from Initialize.lua
 --   BNB.WireInsertInfoTarget(eb)   — wire any body EditBox (main + Focus)
 
 local BNB = BigNoteBox
@@ -76,7 +75,6 @@ local function SetTomTomWaypoint()
     if not mapID then return false end
     local x, y = GetPlayerCoords()
     if not x or not y then return false end
-    local zone = GetZoneName()
     -- TomTom.AddWaypoint(mapID, x_fraction, y_fraction, opts)
     pcall(function()
         TomTom:AddWaypoint(mapID, x / 100, y / 100, {
@@ -100,7 +98,7 @@ end
 
 local function GetTargetName()
     if not UnitExists("target") then
-        return L["INSERT_NO_TARGET"] or "No target"
+        return L["INSERT_NO_TARGET"]
     end
     return (BNB.UnitNameRealm("target")) or "Unknown"
 end
@@ -118,11 +116,11 @@ end
 
 local function ShowInsertInfoMenu(eb)
     BNB.ContextMenu.Open(eb, function(root)
-        root:CreateTitle(L["INSERT_INFO_TITLE"] or "Insert Info")
+        root:CreateTitle(L["INSERT_INFO_TITLE"])
 
         -- Location
         root:CreateButton(
-            L["INSERT_LOCATION"] or "Current location",
+            L["INSERT_LOCATION"],
             function()
                 InsertIntoEditBox(eb, BuildLocationString())
             end
@@ -133,10 +131,10 @@ local function ShowInsertInfoMenu(eb)
             local x, y = GetPlayerCoords()
             if x and y then
                 root:CreateButton(
-                    L["INSERT_TOMTOM"] or "Set TomTom waypoint",
+                    L["INSERT_TOMTOM"],
                     function()
                         if not SetTomTomWaypoint() then
-                            BNB:Print(L["INSERT_TOMTOM_FAIL"] or "Could not set TomTom waypoint.")
+                            BNB:Print(L["INSERT_TOMTOM_FAIL"])
                         end
                     end
                 )
@@ -147,7 +145,7 @@ local function ShowInsertInfoMenu(eb)
 
         -- Character name
         root:CreateButton(
-            L["INSERT_CHARNAME"] or "Character name",
+            L["INSERT_CHARNAME"],
             function()
                 InsertIntoEditBox(eb, GetCharacterName())
             end
@@ -155,7 +153,7 @@ local function ShowInsertInfoMenu(eb)
 
         -- Target name
         root:CreateButton(
-            L["INSERT_TARGET"] or "Target name",
+            L["INSERT_TARGET"],
             function()
                 InsertIntoEditBox(eb, GetTargetName())
             end
@@ -192,14 +190,4 @@ function BNB.WireInsertInfoTarget(eb)
             ShowInsertInfoMenu(self)
         end
     end)
-end
-
--- ── Setup ─────────────────────────────────────────────────────────────────────
-
-function BNB.SetupInsertInfo()
-    -- Wire the main editor body if it already exists
-    if BNB._editorBody then
-        BNB.WireInsertInfoTarget(BNB._editorBody)
-    end
-    -- Focus editor body wires itself via BNB.WireInsertInfoTarget after creation
 end

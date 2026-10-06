@@ -24,7 +24,6 @@ local ROW_H          = 56    -- as Note History's rows (ALL-299)
 local ROW_GAP        = 4
 local ICON_SZ        = 36
 local ICON_X         = 6    -- room for an icon frame's left edge: at 0 the scroll frame cut it (ALL-332)
-local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = TW_W - PAD * 2 - 30   -- 30px scrollbar clearance
 local BOTTOM_STRIP_H = 52
 
@@ -61,11 +60,8 @@ local function SetTrashMultiMode(enabled)
     _multiSel  = {}
     -- Normal-mode buttons: visible only when NOT selecting
     if _emptyBtn    then
-        local hasItems = false
         local ndb = BNB.NotesDB()
-        if ndb and ndb.trash then
-            for _ in pairs(ndb.trash) do hasItems = true; break end
-        end
+        local hasItems = ndb and ndb.trash and next(ndb.trash) ~= nil or false
         _emptyBtn:SetShown(not enabled)
         _emptyBtn:SetEnabled(not enabled and hasItems)
     end

@@ -724,7 +724,7 @@ function SB.Build(parent)
 
     -- The strip is a child of mainFrame. Initial anchor is placeholder;
     -- SB.Refresh() re-anchors based on db.sidebarSide every time it runs.
-    _strip = CreateFrame("Frame", "BigNoteBoxSidebarStrip", parent)
+    _strip = CreateFrame("Frame", nil, parent)
     _strip:SetWidth(BTN_SZ)
     _strip:SetPoint("TOPLEFT",    parent, "TOPRIGHT",    -2,  0)
     _strip:SetPoint("BOTTOMLEFT", parent, "BOTTOMRIGHT", -2,  0)

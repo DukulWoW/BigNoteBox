@@ -394,10 +394,10 @@ function BNB.OpenSharePreview(data)
                 local label
                 if a.type == "item" then
                     local name = C_Item.GetItemInfo(a.id)
-                    label = name and ("[" .. name .. "]") or ("Item:" .. a.id)
+                    label = name and ("[" .. name .. "]") or ("item:" .. a.id)
                 elseif a.type == "spell" then
                     local si = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(a.id)
-                    label = (si and si.name) and si.name or ("Spell:" .. a.id)
+                    label = (si and si.name) and si.name or ("spell:" .. a.id)
                 else
                     label = a.type .. ":" .. a.id
                 end
@@ -575,13 +575,11 @@ local function BuildShareWindow()
             end
         end)
     end)
-    -- Tint BCB button to match current skin preset (or green in normal mode).
-    -- Deferred one tick so template textures are initialized before tinting.
+    -- Tint the BCB button green in normal mode (a skin button already carries
+    -- the preset's look). Deferred one tick so template textures are initialized.
     C_Timer.After(0, function()
         local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
-        if skinMode then
-            BNB.TintButton(bcbShareBtn)
-        else
+        if not skinMode then
             pcall(function()
                 for _, region in ipairs({ bcbShareBtn:GetRegions() }) do
                     if region.IsObjectType and region:IsObjectType("Texture") then
@@ -966,7 +964,6 @@ local function BuildImportWindow()
     -- ESC chain: preview closes before import window (handled in MainWindow ESC block)
 
     local y   = -(titleH + 10)
-    local CW  = IMPORT_W - PAD * 2
 
     local instrLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     instrLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)

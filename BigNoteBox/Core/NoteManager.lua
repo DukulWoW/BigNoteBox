@@ -63,10 +63,7 @@ function BNB.SyncTrashBtnState()
     local btn = BNB._toolbarTrashBtn
     if not btn then return end
     local ndb = BNB.NotesDB()
-    local hasItems = false
-    if ndb and ndb.trash then
-        for _ in pairs(ndb.trash) do hasItems = true; break end
-    end
+    local hasItems = ndb and ndb.trash and next(ndb.trash) ~= nil or false
     btn:SetEnabled(hasItems)
     btn:SetAlpha(hasItems and 1.0 or 0.4)
     pcall(function() btn._tx:SetDesaturated(not hasItems) end)
@@ -141,9 +138,7 @@ function BNB.TagIndexRemove(id, tag)
     if idx[tag] then
         idx[tag][id] = nil
         -- Clean up empty sets
-        local empty = true
-        for _ in pairs(idx[tag]) do empty = false; break end
-        if empty then idx[tag] = nil end
+        if next(idx[tag]) == nil then idx[tag] = nil end
     end
 end
 
@@ -683,7 +678,6 @@ end
 function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
     if not NDB() then return {} end
     local results = {}
-    local curChar  = BNB.currentChar
     local lower    = filterText and filterText ~= "" and filterText:lower() or nil
     local lowerTag = tagFilter and tagFilter:lower() or nil
     local favOnly  = BNB._favFilterActive == true
@@ -795,17 +789,7 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
                 return (a.id or "") < (b.id or "")
             end
         end
-
-        -- Favorites mode: favorited notes float above non-favorited,
-        -- then fall back to creation date (newest first) as secondary sort.
-        if sortBy == "favorites" then
-            local af, bf = a.favorited and 1 or 0, b.favorited and 1 or 0
-            if af ~= bf then return af > bf end
-            -- secondary: newest created first
-            local ac, bc = a.created or 0, b.created or 0
-            if ac ~= bc then return ac > bc end
-            return (a.id or "") > (b.id or "")
-        end
+        -- (The "favorites" sort mode is gone: settings migration v3 resets it.)
 
         local av, bv
         if sortBy == "creation" then

@@ -3,6 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
 ## Author: Dukul
+## Group: BigNoteBox
 ## Version: 1.19.0
 ## SavedVariables: BigNoteBoxDB BigNoteBoxLocale
 ## LoadSavedVariablesFirst: 1
@@ -20,7 +21,6 @@ UserImages\UserImages.lua
 
 # Libraries
 libs\libs.xml
-libs\LibCustomGlow-1.0\LibCustomGlow-1.0.lua
 
 # Locales
 Locales\enUS.lua

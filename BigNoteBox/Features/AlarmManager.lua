@@ -378,7 +378,6 @@ function AM.GlowStart(noteID)
 
     local def      = Defaults()
     local mode     = alarm.glowMode or def.glowMode or BNB.DEFAULTS.alarmDefaults.glowMode
-    local targets  = _glowTargets[noteID] or {}
 
     -- Cancel any existing glow timers
     AM.GlowStop(noteID)

@@ -24,8 +24,6 @@ local HDR_H   = 22
 local COL_GAP = 8
 
 local _cmpFrame    = nil
-local _noteID      = nil
-local _snap        = nil
 local _exportFrame = nil
 local _overlays    = {}
 
@@ -180,7 +178,7 @@ local function OpenExportPopup(noteData, anchorFrame)
                     .. '}'
             else
                 local md = {}
-                md[#md+1] = "# " .. (nd.title or "(untitled)")
+                md[#md+1] = "# " .. (nd.title or L["HW_UNTITLED"])
                 if nd.tags and #nd.tags > 0 then
                     md[#md+1] = "*Tags: " .. table.concat(nd.tags, ", ") .. "*"
                 end
@@ -335,7 +333,6 @@ end
 
 function BNB.OpenHistoryCompare(noteID, snap)
     if InCombatLockdown() then return end
-    _noteID = noteID; _snap = snap
 
     local ndb  = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[noteID]
@@ -343,7 +340,7 @@ function BNB.OpenHistoryCompare(noteID, snap)
 
     local f = BuildCompareWindow()
 
-    local title = string.format(L["HISTORY_COMPARE_TITLE"], note.title or "(untitled)")
+    local title = string.format(L["HISTORY_COMPARE_TITLE"], note.title or L["HW_UNTITLED"])
     f:SetWindowTitle(title)
     if f._rHdr then
         f._rHdr:SetText(L["HISTORY_COMPARE_SNAPSHOT"] ..
@@ -382,6 +379,5 @@ end
 function BNB.CloseHistoryCompare()
     if _exportFrame and _exportFrame:IsShown() then _exportFrame:Hide() end
     if _cmpFrame then _cmpFrame:Hide() end
-    _noteID = nil; _snap = nil
     SetWindowsLocked(false)
 end

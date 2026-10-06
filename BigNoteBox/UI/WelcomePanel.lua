@@ -117,7 +117,6 @@ local function BuildNoteIconRow(parent, noteItems, yOffset)
 
     local count   = math.min(#noteItems, 10)
     local totalW  = count * ICON_BTN_SIZE + (count - 1) * ICON_BTN_PAD
-    local startX  = 0  -- centred via SetPoint offset calculated at layout
 
     for i = 1, count do
         local entry  = noteItems[i]
@@ -253,7 +252,8 @@ local function GetImportFrame()
         -- A share code (BNB2: / BNB1:) goes through the share preview, as from
         -- the Import shared note window (ALL-275); JSON as before
         if text:find("^BNB%d:") then
-            local data, err = BNB.ShareDecode and BNB.ShareDecode(text)
+            local data, err
+            if BNB.ShareDecode then data, err = BNB.ShareDecode(text) end
             if not data then
                 BNB:Print("|cffff4444" .. (err or L["SHARE_ERR_INVALID"]) .. "|r")
                 return
@@ -282,7 +282,6 @@ local function GetImportFrame()
         local foreignChar = BNB.ForeignScopeChar(noteList)
         if foreignChar and BNB.currentChar then
             BNB._pendingImport = { notes = noteList }
-            BNB._pendingImportForeign = foreignChar
             StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
         else
             BNB._DoImport(noteList, false)

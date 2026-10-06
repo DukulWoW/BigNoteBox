@@ -47,17 +47,15 @@ local DAY_NAME_KEYS = { "AW_DAY_MON", "AW_DAY_TUE", "AW_DAY_WED", "AW_DAY_THU",
 -- ---------------------------------------------------------------------------
 local _frame       = nil
 local _noteID      = nil
-local _stickyFrame = nil
-local _isDirty     = false   -- true once user has changed anything
 local _isPopulating = false  -- true while Populate() is running; suppresses MarkDirty
 
 -- Calendar upvalues
 local _calYear, _calMonth, _calSelDay
 
 -- Widget refs
-local _labelEB, _timeDDCont, _realSection, _realTimeRow, _igSection
+local _labelEB, _timeDDCont
 local _igTP, _realTP   -- hour/minute(/AM-PM) fields, see TimePair
-local _recurDD, _wdChecks, _wdRow, _ndaysEB, _ndaysRow
+local _recurDD, _wdChecks, _ndaysEB
 local _soundDD, _soundRepDD, _glowTypeDD, _glowModeDD, _fireModeDD
 local _snoozeEnableCB, _snoozeIntervalDD, _snoozeRepeatDD
 local _combatDD, _postDD
@@ -76,7 +74,6 @@ end
 -- Mark dirty and enable save button
 local function MarkDirty()
     if _isPopulating then return end
-    _isDirty = true
     if _saveBtn then _saveBtn:SetEnabled(true) end
 end
 
@@ -122,9 +119,8 @@ local function BuildWindow()
         btn1 = L["SAVE"], btn2 = L["AW_REMOVE_ALARM_BTN"],
         toplevel = true, escClose = true,
         onClose     = function() AW.Close() end,
-        onDragStart = function() _stickyFrame = nil end,   -- dragging detaches
         onHide      = function()
-            _noteID = nil; _stickyFrame = nil; _isDirty = false; _isPopulating = false
+            _noteID = nil; _isPopulating = false
         end,
     })
     saveBtn:SetEnabled(false)
@@ -829,16 +825,11 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     -- ── STORE REFS ────────────────────────────────────────────────────────────
     _labelEB         = labelEB
     _timeDDCont      = timeDDCont
-    _realSection     = realSection
-    _realTimeRow     = realTimeRow
-    _igSection       = igSection
     _igTP            = igTP
     _realTP          = realTP
     _recurDD         = recurDD
     _wdChecks        = wdChecks
-    _wdRow           = wdRow
     _ndaysEB         = ndEB
-    _ndaysRow        = ndRow
     _soundDD         = soundDD
     _soundRepDD      = soundRepDD
     _glowTypeDD      = glowTypeDD
@@ -1056,7 +1047,6 @@ local function Populate(noteID)
 
     -- Save button: enabled immediately for new alarms so user can save defaults.
     -- For existing alarms, start disabled until the user makes a change.
-    _isDirty = false
     if _saveBtn then _saveBtn:SetEnabled(not hasExisting) end
     _isPopulating = false
 end
@@ -1076,7 +1066,7 @@ local function DoOpen(noteID, anchorFrame, stickyFrame)
         else ss:Hide() end
     end
 
-    _noteID = noteID; _stickyFrame = stickyFrame or nil
+    _noteID = noteID
     Populate(noteID)
     if f._selectTab then f._selectTab(1) end  -- always open on General tab
     f:Show(); f:Raise()
@@ -1104,7 +1094,7 @@ end
 
 function AW.Close()
     if _frame then _frame:Hide() end
-    _noteID=nil; _stickyFrame=nil; _isDirty=false
+    _noteID = nil
 end
 
 function AW.IsOpen()    return _frame and _frame:IsShown() end

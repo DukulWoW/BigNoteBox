@@ -1189,7 +1189,6 @@ local function BuildFocusPage(sf, ct, y)
         L["CFG_CHK_FOCUS_HIDEUI_TIP"])
 
     -- Master orbit toggle
-    local orbitCheckY = y
     y = AddCheck(ct, y, L["CFG_FOCUS_ORBIT_ENABLE"],
         function() local db = BigNoteBoxDB; return db == nil or db.focusOrbitEnabled ~= false end,
         function(v)
@@ -1307,7 +1306,6 @@ local function BuildContextPopupPage(sf, ct, y, page)
 end
 
 local function BuildModulesTab(sf, ct)
-    local db = BigNoteBoxDB
     local y  = -8
 
     -- Optional 4th field: the page's key for BNB.OpenSettingsPage.

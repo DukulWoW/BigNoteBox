@@ -213,7 +213,6 @@ local function PopulateStickySettings(noteID)
 
     local stickyFrame = openFrames[noteID]
     local cfg = GetCfg(noteID)
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode
 
     -- ── Shared layout helpers (take ct as param) ──────────────────────────────
     local function Sec(ct, txt)
@@ -934,8 +933,8 @@ local function PopulateStickySettings(noteID)
 
     -- TAB 3: Situation (built once in BuildStickySettingsWindow)
     f._sitEditor:Load(noteID)
-    local note = BNB.GetNote(noteID)
-    local noteName = (note and note.title ~= "") and note.title or L["UNTITLED"]
+    local titleNote = BNB.GetNote(noteID)
+    local noteName = (titleNote and titleNote.title ~= "") and titleNote.title or L["UNTITLED"]
     f:SetWindowTitle(string.format(L["STICKY_SETTINGS_TITLE_FMT"], noteName))
 end
 

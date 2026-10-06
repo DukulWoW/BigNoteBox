@@ -11,7 +11,7 @@
 --
 -- Public API:
 --   BNB.OpenNoteHistoryPanel(noteID)   -- the History window on this note's page
---   BNB.CloseNoteHistoryPanel()        -- back to the list, if on the page
+--   BNB.ToggleNoteHistoryPanel(noteID) -- the toolbar's History button
 --   BNB.RefreshNoteHistoryPanel()
 
 local BNB = BigNoteBox
@@ -110,7 +110,7 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     prevLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -90,       -20)
     prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
     prevLbl:SetTextColor(0.60, 0.60, 0.60)
-    local title = snap.title and snap.title ~= "" and snap.title or "(untitled)"
+    local title = snap.title and snap.title ~= "" and snap.title or L["HW_UNTITLED"]
     prevLbl:SetText(title)
 
     -- Compare button
@@ -339,10 +339,6 @@ end)
 function BNB.OpenNoteHistoryPanel(noteID)
     if not noteID then return end
     BNB.ShowHistoryWindow("note", noteID)
-end
-
-function BNB.CloseNoteHistoryPanel()
-    if _page and _page:IsVisible() then _hwFrame:PageBack() end
 end
 
 -- The formatting toolbar's History button is a toggle (ALL-131): a second

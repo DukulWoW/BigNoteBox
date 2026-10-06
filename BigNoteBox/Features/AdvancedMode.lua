@@ -8,6 +8,8 @@
 --   AM.ApplyFontsToRenderFrame(f, bodySize)  -> wires font objects
 --   AM.ConvertToPlain(id, onDone)            -> strips tags, confirms first
 --   AM.GetUserImages()                       -> table of registered image paths
+--   AM.UserImageShortName(full) / AM.ResolveUserImage(typed)  -> picker name / full path
+--   BNB.RegisterUserImages(folder, names)    -> images from a player's own addon (SUG-09)
 
 local BNB = BigNoteBox
 BNB.AdvancedMode = BNB.AdvancedMode or {}
@@ -463,7 +465,7 @@ function AM.ConvertToPlain(id, onDone)
     if not StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] then
         StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] = {
             preferredIndex = 3,
-            text     = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?",
+            text     = BNB.L["ADV_CONVERT_PLAIN_CONFIRM"],
             button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
             button2  = BNB.L["CANCEL"],
             OnAccept = function(self, data)
@@ -511,22 +513,72 @@ end
 -- existing manifests with full paths continue to work without edits.
 --------------------------------------------------------------------------------
 local USER_IMG_PREFIX = "Interface\\AddOns\\BigNoteBox\\UserImages\\"
+AM.USER_IMG_PREFIX = USER_IMG_PREFIX
+
+-- Images registered by the player's own addon (SUG-09). The shipped
+-- UserImages.lua sits inside BigNoteBox/, so every update overwrote it; a tiny
+-- addon of the player's own (e.g. BigNoteBox_UserImages, with
+-- "## Dependencies: BigNoteBox") survives updates:
+--   BigNoteBox.RegisterUserImages("BigNoteBox_UserImages", { "mymap.tga", "Horde/emblem.tga" })
+-- Names are relative to that addon's folder. UserImages/README.txt explains it.
+local _userSets = {}   -- { prefix, names }
+function BNB.RegisterUserImages(folder, names)
+    if type(folder) ~= "string" or not folder:match("^[%w_%-%.]+$") or type(names) ~= "table" then
+        return false
+    end
+    _userSets[#_userSets + 1] = { prefix = "Interface\\AddOns\\" .. folder .. "\\", names = names }
+    return true
+end
+
+local function AddEntry(out, seen, prefix, entry)
+    if type(entry) ~= "string" or entry == "" then return end
+    local full
+    -- Already a full path? Pass through. Otherwise prepend the folder, with any
+    -- forward slashes the user typed turned into backslashes.
+    if entry:sub(1, 9):lower() == "interface" then
+        full = entry
+    else
+        full = prefix .. entry:gsub("/", "\\")
+    end
+    if not seen[full:lower()] then
+        seen[full:lower()] = true
+        out[#out + 1] = full
+    end
+end
 
 function AM.GetUserImages()
-    local raw = BNB_UserImageManifest
-    if not raw or #raw == 0 then return {} end
-    local out = {}
-    for _, entry in ipairs(raw) do
-        if type(entry) == "string" and entry ~= "" then
-            -- Already a full path? Pass through. Otherwise prepend prefix.
-            if entry:sub(1, 9):lower() == "interface" then
-                out[#out + 1] = entry
-            else
-                -- Normalise any forward slashes the user typed to backslashes
-                local normalised = entry:gsub("/", "\\")
-                out[#out + 1] = USER_IMG_PREFIX .. normalised
-            end
-        end
+    local out, seen = {}, {}
+    for _, entry in ipairs(BNB_UserImageManifest or {}) do
+        AddEntry(out, seen, USER_IMG_PREFIX, entry)
+    end
+    for _, set in ipairs(_userSets) do
+        for _, entry in ipairs(set.names) do AddEntry(out, seen, set.prefix, entry) end
     end
     return out
+end
+
+-- The short name the image picker shows for a full path ("Horde/emblem.tga"):
+-- the part after a registered folder, else the file name.
+function AM.UserImageShortName(full)
+    local low = full:lower()
+    local prefixes = { USER_IMG_PREFIX }
+    for _, set in ipairs(_userSets) do prefixes[#prefixes + 1] = set.prefix end
+    for _, p in ipairs(prefixes) do
+        if low:sub(1, #p) == p:lower() then return (full:sub(#p + 1):gsub("\\", "/")) end
+    end
+    return ((full:match("[/\\]([^/\\]+)$") or full):gsub("\\", "/"))
+end
+
+-- A typed image name to a full path: full paths pass through, a short name
+-- that a registered image has resolves to it, anything else is taken as a
+-- file in BigNoteBox/UserImages/ (as before).
+function AM.ResolveUserImage(raw)
+    local s = raw and raw:match("^%s*(.-)%s*$") or ""
+    if s == "" then return nil end
+    if s:sub(1, 9):lower() == "interface" then return s end
+    local want = s:gsub("\\", "/"):lower()
+    for _, full in ipairs(AM.GetUserImages()) do
+        if AM.UserImageShortName(full):lower() == want then return full end
+    end
+    return USER_IMG_PREFIX .. s:gsub("/", "\\")
 end

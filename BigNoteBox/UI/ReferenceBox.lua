@@ -648,6 +648,10 @@ end
 -- If BCB is installed: show BCB frame + call BigChatBox.InsertLinkIntoBCB directly
 -- (avoids the ChatFrame1EditBox pipeline delay that causes a one-step lag).
 -- If no BCB: activate the default Blizzard editbox + ChatEdit_InsertLink.
+-- (12.x moved these to ChatFrameUtil; the old globals still exist on every
+-- client per the API dumps, so they are used where ChatFrameUtil is missing.)
+local InsertLink   = (ChatFrameUtil and ChatFrameUtil.InsertLink) or ChatEdit_InsertLink
+local ActivateChat = (ChatFrameUtil and ChatFrameUtil.ActivateChat) or ChatEdit_ActivateChat
 local function SendAttachmentToChat(att)
     local link = BuildAttachmentLink(att)
     if not link then
@@ -666,17 +670,17 @@ local function SendAttachmentToChat(att)
         else
             -- Fallback if the function isn't exposed (future BCB version)
             _suppressShiftHook = true
-            ChatEdit_InsertLink(link)
+            InsertLink(link)
             C_Timer.After(0.1, function() _suppressShiftHook = false end)
         end
     else
         -- No BCB: activate the standard Blizzard chat editbox and insert directly.
         local editBox = DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.editBox
         if editBox then
-            ChatEdit_ActivateChat(editBox)
+            ActivateChat(editBox)
         end
         _suppressShiftHook = true
-        ChatEdit_InsertLink(link)
+        InsertLink(link)
         C_Timer.After(0.1, function() _suppressShiftHook = false end)
     end
 end
@@ -760,8 +764,6 @@ end
 
 -- ── Move/Copy picker window ───────────────────────────────────────────────────
 local _pickerFrame  = nil
-local _pickerNoteID = nil
-local _pickerAttIdx = nil
 
 -- On the shared window shell (UI/ToolWindow.lua, CMP-02 S5). The title (set
 -- in OpenPicker) carries the attachment's icon inline.
@@ -814,8 +816,6 @@ end
 
 local function OpenPicker(anchorFrame, noteID, attIndex)
     if not _pickerFrame then _pickerFrame = BuildPickerWindow() end
-    _pickerNoteID = noteID
-    _pickerAttIdx = attIndex
 
     -- Update title bar: icon + name of the attachment being moved/copied
     local att = (NDB() and NDB().notes and NDB().notes[noteID]
@@ -854,7 +854,7 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
     for _, entry in ipairs(notes) do
         if entry.id ~= noteID then
             local targetID = entry.id
-            local title    = (entry.title ~= "" and entry.title) or "(untitled)"
+            local title    = (entry.title ~= "" and entry.title) or L["HW_UNTITLED"]
 
             local row = CreateFrame("Frame", nil, sc)
             row:SetHeight(ROW_H)
@@ -1101,6 +1101,12 @@ local function InstallShiftHooks()
     if _shiftHookInstalled then return end
     _shiftHookInstalled = true
     hooksecurefunc("ChatEdit_InsertLink", function(link) TryAddLink(link) end)
+    -- 12.x chat code goes through ChatFrameUtil.InsertLink (on Retail and
+    -- Forever per the API dumps), which may not pass the old global (DEP-02).
+    -- TryAddLink drops the same link twice in a row, so both hooks are safe.
+    if ChatFrameUtil and ChatFrameUtil.InsertLink then
+        hooksecurefunc(ChatFrameUtil, "InsertLink", function(link) TryAddLink(link) end)
+    end
     if HandleModifiedItemClick then
         hooksecurefunc("HandleModifiedItemClick", function(link) TryAddLink(link) end)
     end
@@ -1567,7 +1573,6 @@ RenderList = function()
             row._isTmog    = isTmog
             SetupRow(row, att, data, nil, compact, false)
 
-            local cap = gearEntry    -- capture for closures
             local capList = listRef
             local capIdx  = listIdx
 
@@ -1758,7 +1763,7 @@ local function TintSideTab(btn)
 end
 
 local function BuildSideTabs(f)
-    local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeTabs", f)
+    local strip = CreateFrame("Frame", nil, f)
     strip:SetSize(TAB_SZ, TAB_SZ * 2 + TAB_GAP)
     strip:Hide()
     strip._sideTabs = true
@@ -1921,7 +1926,7 @@ local function BuildExternalModeStrip()
         return _modeStrip
     end
 
-    local strip = CreateFrame("Frame", "BigNoteBoxRefboxModeStrip", UIParent)
+    local strip = CreateFrame("Frame", nil, UIParent)
     strip:SetHeight(28)
     strip:Hide()
 
@@ -2132,7 +2137,6 @@ SyncRefBoxHeight = function()
         rbFrame:SetHeight(desired)
     end
 end
-BNB._SyncRefBoxHeight = SyncRefBoxHeight  -- exposed for RenderList hook
 
 -- ── Model Viewer (inspect notes only) ─────────────────────────────────────────
 -- Creates the model frame. Called by BuildReferenceBox (both modes)
@@ -2593,8 +2597,6 @@ ApplyModelLayout = function(f)
     local split = f._modelSplit or MODEL_SPLIT_DEFAULT
     local itemH = math.max(MODEL_SPLIT_MIN_PX, math.floor(totalH * split))
     local modelH = math.max(MODEL_MIN_H, totalH - itemH)
-    -- Recalculate itemH in case modelH was clamped
-    itemH = totalH - modelH
 
     -- Scroll frame: anchor top is unchanged, set bottom above the model
     sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SCROLL_PAD, BOTTOM_PAD + modelH)

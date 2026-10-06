@@ -40,7 +40,6 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local BASE        = "Interface\\AddOns\\BigNoteBox\\Assets\\Fonts\\"
-local DEFAULT_SIZE = BNB.DEFAULTS.fontSize
 
 -- Language -> font set. A language not listed here uses the Latin set. Add a line
 -- when a new CJK language ships (plus a SET_DEFAULT entry and its cards).
@@ -240,7 +239,7 @@ do
         local s = SetOf(def)
         if s == "latin" or s == active then list[#list + 1] = def end
     end
-    BNB._fontPreloadOK = PreloadFonts(list)
+    PreloadFonts(list)
 end
 
 -- Sets a TTF on a FontString and survives the not-yet-loaded case. SetFont's
@@ -439,38 +438,14 @@ end
 function BNB.GetUIFont()     return (ChromePaths()) end
 function BNB.GetUIBoldFont() return select(2, ChromePaths()) end
 
--- ── Deferred font object creation ─────────────────────────────────────────────
--- Called from Initialize.lua AFTER PLAYER_LOGIN so WoW's font renderer has
--- finished loading the .ttf files.  Safe to call multiple times (guarded).
+-- ── Deferred font setup ───────────────────────────────────────────────────────
+-- Called from Initialize.lua AFTER PLAYER_LOGIN.  Safe to call multiple times
+-- (guarded). It used to create 16 BNB_Body* / BNB_Title* font objects that
+-- nothing read; creating a font object loads nothing (PreloadFonts above does
+-- that by drawing strings), so they went in batch 11 (DEAD-02).
 function BNB.InitFonts()
     if BNB._fontsInitialised then return end
     BNB._fontsInitialised = true
-
-    local function Make(name, path, size)
-        local ok, obj = pcall(function()
-            local f = CreateFont(name)
-            f:SetFont(path, size, "")
-            return f
-        end)
-        return ok and obj or nil
-    end
-
-    BNB.FontBodyNotoSerif   = Make("BNB_BodyNotoSerif",   BASE.."NotoSerif-Regular.ttf",    DEFAULT_SIZE)
-    BNB.FontTitleNotoSerif  = Make("BNB_TitleNotoSerif",  BASE.."NotoSerif-Bold.ttf",        20)
-    BNB.FontBodyEBGaramond  = Make("BNB_BodyEBGaramond",  BASE.."EBGaramond-Regular.ttf",   DEFAULT_SIZE)
-    BNB.FontTitleEBGaramond = Make("BNB_TitleEBGaramond", BASE.."EBGaramond-Bold.ttf",       20)
-    BNB.FontBodyNotoSans    = Make("BNB_BodyNotoSans",    BASE.."NotoSans-Regular.ttf",      DEFAULT_SIZE)
-    BNB.FontTitleNotoSans   = Make("BNB_TitleNotoSans",   BASE.."NotoSans-Bold.ttf",         20)
-    BNB.FontBodyJetBrains   = Make("BNB_BodyJetBrains",  BASE.."JetBrainsMono-Regular.ttf", DEFAULT_SIZE)
-    BNB.FontTitleJetBrains  = Make("BNB_TitleJetBrains", BASE.."JetBrainsMono-Bold.ttf",    20)
-    BNB.FontBodyGloria      = Make("BNB_BodyGloria",      BASE.."GloriaHallelujah-Regular.ttf", DEFAULT_SIZE)
-    BNB.FontTitleGloria     = Make("BNB_TitleGloria",     BASE.."GloriaHallelujah-Regular.ttf", 20)
-    BNB.FontBodyDyslexic    = Make("BNB_BodyDyslexic",    BASE.."OpenDyslexic-Regular.ttf",     DEFAULT_SIZE)
-    BNB.FontTitleDyslexic   = Make("BNB_TitleDyslexic",   BASE.."OpenDyslexic-Regular.ttf",     20)
-    BNB.FontBodyFredoka     = Make("BNB_BodyFredoka",     BASE.."Fredoka-Regular.ttf",           DEFAULT_SIZE)
-    BNB.FontTitleFredoka    = Make("BNB_TitleFredoka",    BASE.."Fredoka-Bold.ttf",              20)
-    BNB.FontBodyPlaywrite   = Make("BNB_BodyPlaywrite",   BASE.."PlaywriteIE-Regular.ttf",       DEFAULT_SIZE)
-    BNB.FontTitlePlaywrite  = Make("BNB_TitlePlaywrite",  BASE.."PlaywriteIE-Regular.ttf",       20)
 
     -- ── WoW Default font path resolution ────────────────────────────────────────
     -- GameFontNormal:GetFont() returns the locale-appropriate path installed by WoW.

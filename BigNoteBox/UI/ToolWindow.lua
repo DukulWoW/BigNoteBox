@@ -87,8 +87,7 @@ local function BuildNormal(o)
 end
 
 local function BuildSkin(o)
-    local f = BNB.CreateSkinFrame(UIParent, false, o.name, false)
-    if o.name then _G[o.name] = f end   -- a window may have no global name
+    local f = BNB.CreateSkinFrame(UIParent, false, o.name, false)   -- o.name may be nil
     f:SetSize(o.w, o.h)
     f._isSkin = true
 

@@ -170,19 +170,9 @@ function BNB.Initialize()
     end
 
     -- 6. Main window — build always, show only if openOnLogin is enabled
-    if BNB.OpenMainWindow then
+    if BNB.CreateMainWindow then
         SafeCall("MainWindow", function()
             -- Build the frame without showing it (classic or skin chrome)
-            if not BNB.mainFrame then BNB.CreateMainWindow() end
-            local db = BigNoteBoxDB
-            local openOnce = db and db._openOnceAfterSetup
-            if openOnce then db._openOnceAfterSetup = nil end
-            if (db and db.openOnLogin) or openOnce then
-                BNB.mainFrame:Show()
-            end
-        end)
-    elseif BNB.CreateMainWindow then
-        SafeCall("MainWindow", function()
             if not BNB.mainFrame then BNB.CreateMainWindow() end
             local db = BigNoteBoxDB
             local openOnce = db and db._openOnceAfterSetup
@@ -223,15 +213,9 @@ function BNB.Initialize()
         SafeCall("ChatCapture", BNB.SetupChatCapture)
     end
 
-    -- 7b. Drag-and-drop support
-    if BNB.SetupDragDrop then
-        SafeCall("DragDrop", BNB.SetupDragDrop)
-    end
-
-    -- 7c. Insert game info (right-click menu on body)
-    if BNB.SetupInsertInfo then
-        SafeCall("InsertInfo", BNB.SetupInsertInfo)
-    end
+    -- (Drag-and-drop and Insert game info are wired when each body EditBox is
+    -- built: NoteEditor BuildBodyField and FocusEditor call WireDropTarget /
+    -- WireInsertInfoTarget, so there is no setup step here.)
 
     -- 8. Restore open post-its from last session (non-critical)
     if BNB.Sticky and BNB.Sticky.RestoreSession then
@@ -316,8 +300,6 @@ function BNB.Initialize()
             end
         end
     end
-
-    BNB._initialized = true
 end
 
 --------------------------------------------------------------------------------

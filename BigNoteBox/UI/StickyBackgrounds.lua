@@ -136,7 +136,7 @@ SBG.LIST = LIST
 
 local _byKey = {}
 local function Index(e)
-    e.label = L[e.label] or e.label
+    e.label = BNB.HasL(e.label) and L[e.label] or e.label
     _byKey[e.key] = e
 end
 for _, e in ipairs(LIST) do Index(e) end

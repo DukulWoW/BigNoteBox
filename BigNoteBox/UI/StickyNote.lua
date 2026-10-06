@@ -170,7 +170,7 @@ end
 
 local function GetESCOverlay()
     if _escOverlay then return _escOverlay end
-    local ov = CreateFrame("Frame", "BNBEscDimOverlay", UIParent)
+    local ov = CreateFrame("Frame", nil, UIParent)
     ov:SetAllPoints(UIParent)
     ov:SetFrameStrata("DIALOG")
     ov:SetFrameLevel(1)   -- just above OneWoW's dim (level 0) if present
@@ -2032,7 +2032,6 @@ local function CreateStickyFrame(noteID)
     local _focusLerp  = 1.0   -- 1.0 = full header visible, 0.0 = fully hidden
     local _focusTarget = 1.0  -- target for the lerp
     local FOCUS_SPEED  = 6.0  -- units per second (lower = slower)
-    local _lastTime    = 0
     -- Counter incremented by HookFocusHover on task row children so that
     -- IsMouseOver gaps between rows don't falsely signal "not hovered".
     f._focusHovered = 0

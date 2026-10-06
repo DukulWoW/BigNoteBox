@@ -9,9 +9,6 @@ local BNB = BigNoteBox
 BNB.ADDON_NAME = ADDON_NAME
 BNB.ADDON_VERSION = "1.19.0"
 
--- Version shorthand
-BNB.version = BNB.ADDON_VERSION
-
 -- Chat line prefixed with the addon name in colour. Lives here, in the first
 -- file, so every later file can print (moved from SlashCommands.lua, ARCH-06).
 function BNB:Print(msg)

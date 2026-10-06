@@ -35,13 +35,12 @@ local ASSETS = "Interface/AddOns/BigNoteBox/Assets/"
 local _frame        = nil
 local _noteID       = nil
 local _taskID       = nil
-local _isDirty      = false
 local _isPopulating = false
 local _isGlobal     = false  -- true when editing note-level task defaults
 
 -- Widget refs
 local _textEB, _resetDD, _sitTypeDD, _sitValueRow, _sitValueEb
-local _sitUseCurBtn, _sitBrowseBtn, _sitClearBtn
+local _sitBrowseBtn, _sitClearBtn
 local _saveBtn
 
 -- Situation state
@@ -53,7 +52,6 @@ local _pendingText = ""  -- backing store for task text label/editbox
 -- ---------------------------------------------------------------------------
 local function MarkDirty()
     if _isPopulating then return end
-    _isDirty = true
     if _saveBtn then _saveBtn:SetEnabled(true) end
 end
 
@@ -286,7 +284,6 @@ local function BuildContent(f, ct, saveBtn)
         if _sitValueEb then _sitValueEb:SetText(val) end
         MarkDirty()
     end)
-    _sitUseCurBtn = useCurBtn
 
     local clrCurBtn = BNB.CreateButton(nil, ct, L["TEW_CLEAR_BTN"], 60, 20)
     clrCurBtn:SetPoint("LEFT", useCurBtn, "RIGHT", 6, 0)
@@ -402,7 +399,7 @@ local function BuildWindow()
         btn1 = L["SAVE"], btn2 = L["CANCEL"],
         onClose = function() TW.Close() end,
         onHide  = function()
-            _noteID = nil; _taskID = nil; _isDirty = false; _isPopulating = false
+            _noteID = nil; _taskID = nil; _isPopulating = false
         end,
     })
     saveBtn:SetEnabled(false)
@@ -486,7 +483,6 @@ local function PopulateGlobal(noteID)
         _sitClearBtn:SetEnabled(sitType ~= "none" or sitVal ~= "")
     end
 
-    _isDirty = false
     if _saveBtn then _saveBtn:SetEnabled(true) end  -- always editable in global mode
     _isPopulating = false
 end
@@ -550,7 +546,6 @@ local function Populate(noteID, taskID)
         _sitClearBtn:SetEnabled(sitType ~= "none" or sitVal ~= "")
     end
 
-    _isDirty = false
     if _saveBtn then _saveBtn:SetEnabled(false) end
     _isPopulating = false
 end
@@ -591,5 +586,5 @@ end
 function TW.Close()
     if _frame then _frame:Hide() end
     if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
-    _noteID = nil; _taskID = nil; _isDirty = false; _pendingText = ""
+    _noteID = nil; _taskID = nil; _pendingText = ""
 end

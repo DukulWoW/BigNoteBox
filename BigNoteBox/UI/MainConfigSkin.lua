@@ -16,7 +16,6 @@
 --------------------------------------------------------------------------------
 
 local BNB = BigNoteBox
-local L   = BNB.L
 
 -- ── Layout constants ──────────────────────────────────────────────────────────
 -- Wider than the classic 480px so the 6 tab labels have comfortable widths.
@@ -40,7 +39,7 @@ function BNB.CreateConfigWindowSkin()
     -- ── Tab panels (built by shared helper) ───────────────────────────────────
     -- Must be built BEFORE the skin tab row so the tab onSelect can reference
     -- the panels array.
-    local panels, contents = BNB._BuildConfigTabPanels(f, SK_CFG_CHROME)
+    local panels = BNB._BuildConfigTabPanels(f, SK_CFG_CHROME)
 
     -- Local tab selector — hides all panels and shows the selected one.
     -- Does NOT touch PanelTemplates_SelectTab (no PanelTab buttons exist here);

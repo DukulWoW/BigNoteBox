@@ -225,9 +225,6 @@ eventFrame:SetScript("OnEvent", function(self, event, ...)
     end
 end)
 
--- Expose for modules that need direct access
-BNB.eventFrame = eventFrame
-
 --------------------------------------------------------------------------------
 -- MESSAGE BUS  (BNB's own messages, ARCH-02 / LIB-03)
 -- Game events go through RegisterEvent above; things that happen inside BNB go

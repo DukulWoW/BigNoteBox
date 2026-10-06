@@ -109,7 +109,7 @@ IF.LIST = LIST
 
 local _byKey = {}
 for _, e in ipairs(LIST) do
-    e.label = L[e.label] or e.label
+    e.label = BNB.HasL(e.label) and L[e.label] or e.label
     _byKey[e.key] = e
 end
 

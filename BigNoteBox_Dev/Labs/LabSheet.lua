@@ -535,7 +535,7 @@ function K.NewSheet(cfg)
     -- Equal gaps left/right and top/bottom inside the bounds, size kept
     function S.Centre()
         local which = Active()
-        local x, y, w, h = cfg.ToolBox(which)
+        local x, _, w, h = cfg.ToolBox(which)
         local bx, by, bw, bh = cfg.Bounds(which)
         if not (x and bx) then return end
         local nx, ny = Snap(which, bx + (bw - w) / 2, by + (bh - h) / 2)

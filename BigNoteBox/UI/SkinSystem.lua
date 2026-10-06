@@ -52,7 +52,8 @@ BNB.SKIN_PRESET_ORDER = {
 }
 
 function BNB.SkinPresetLabel(key, short)
-    return L[(short and "SW_PRESET_" or "CFG_SKIN_PRESET_") .. key:upper()] or key
+    local k = (short and "SW_PRESET_" or "CFG_SKIN_PRESET_") .. key:upper()
+    return BNB.HasL(k) and L[k] or key
 end
 
 -- Returns the active preset table, falling back to obsidian.
@@ -247,19 +248,7 @@ function BNB.ApplyMainWindowSkin()
     for _, fn in ipairs(_skinBackdrops) do
         pcall(fn)
     end
-
-    -- Recolour splitter grip dots.
-    if mf and mf._splitter then
-        local br, bg_, bb = BNB.SkinBorderOf(preset)
-        local dotR = math.min(1, br + 0.06)
-        local dotG = math.min(1, bg_ + 0.06)
-        local dotB = math.min(1, bb + 0.06)
-        for _, region in ipairs({mf._splitter:GetRegions()}) do
-            if region.SetColorTexture then
-                region:SetColorTexture(dotR, dotG, dotB, 0.9)
-            end
-        end
-    end
+    -- (The splitter grip colour is set by UI/MainWindowSkin.lua.)
 
     -- Stickies on the default colour follow the preset (UI/StickyNote.lua)
     if BNB.SendMessage then BNB.SendMessage("SkinChanged") end

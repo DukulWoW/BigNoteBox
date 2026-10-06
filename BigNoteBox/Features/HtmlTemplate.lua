@@ -1,6 +1,6 @@
 -- BigNoteBox Features/HtmlTemplate.lua
 -- Stylized HTML export template (book/tome design).
--- Lazy-loaded: the template string is built on first call to BNB.HtmlTemplate.Get().
+-- The template is one string constant, in memory from file load; BNB.HtmlTemplate.Get() returns it.
 --
 -- The template contains four placeholders replaced at export time:
 --   %%TITLE%%      -> note title (HTML-escaped, used in <title> tag)

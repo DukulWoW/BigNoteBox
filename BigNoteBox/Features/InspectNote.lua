@@ -12,7 +12,6 @@
 
 local BNB    = BigNoteBox
 local L      = BNB.L
-local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local UN     = BNB.UnitNotes   -- shared with TargetNote (Features/UnitNotes.lua)
 
 -- ── Button placement (adjust these to fine-tune position) ─────────────────────

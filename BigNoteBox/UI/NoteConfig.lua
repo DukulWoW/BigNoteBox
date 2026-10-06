@@ -55,7 +55,7 @@ local function RefreshTitle()
     local note = GetNote()
     local name = liveTitle
         or (note and note.title ~= "" and note.title)
-        or (L and L["UNTITLED"] or "Untitled")
+        or L["UNTITLED"]
     -- Truncate long titles so they don't overflow the window titlebar
     if #name > 23 then name = name:sub(1, 20) .. "..." end
     ncFrame:SetWindowTitle(name)
@@ -89,38 +89,9 @@ local function Rule(parent, y)
     return y - 10
 end
 
--- ── Dropdown helper (WowStyle1) ──────────────────────────────────────────────────
-local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
-    local c = CreateFrame("Frame", nil, parent); c:SetHeight(44)
-    local lb = c:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    lb:SetPoint("TOPLEFT", c, "TOPLEFT", 0, 0); lb:SetText(labelText)
-
-    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
-    dd:SetPoint("TOPLEFT", c, "TOPLEFT", 0, -18); dd:SetPoint("RIGHT", c, "RIGHT", 0, 0)
-    local curSel = selected or "None"
-    dd:SetupMenu(function(_, root)
-        local items = getEntries and getEntries() or {}
-        for _, name in ipairs(items) do
-            root:CreateRadio(name,
-                function() return curSel == name end,
-                function() curSel = name; dd:GenerateMenu(); if onChange then onChange(name) end end)
-        end
-        root:SetScrollMode(30 * 20)
-    end)
-    c.dropdown = dd
-    c.SetSelected = function(self, n)
-        curSel = n; dd:GenerateMenu()
-        if dd.Text then dd.Text:SetText((n or L["NC_DD_NONE"]):gsub("|c%x%x%x%x%x%x%x%x",""):gsub("|r","")) end
-    end
-    return c
-end
-
-
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL
 -- ─────────────────────────────────────────────────────────────────────────────
-local _hlFonts    -- forward ref, set inside BuildGeneralTab
-
 local function BuildGeneralTab(panel)
     local y = -4
 
@@ -223,7 +194,6 @@ local function BuildGeneralTab(panel)
         end
         if _wowCb_nc then _wowCb_nc:SetChecked(current == "wow") end
     end
-    _hlFonts = HLFonts
 
     -- LSM fonts appear in the dropdown below; WoW Default has its own checkbox
     -- below the grid. Both are excluded from the card grid, which shows the
@@ -456,7 +426,7 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local alignDD = CreateFrame("DropdownButton", "BNBNoteAlignDD", panel,
+    local alignDD = CreateFrame("DropdownButton", nil, panel,
         "WowStyle1DropdownTemplate")
     alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     alignDD:SetWidth(CW)
@@ -511,7 +481,7 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local outlineDD = CreateFrame("DropdownButton", "BNBNoteOutlineDD", panel,
+    local outlineDD = CreateFrame("DropdownButton", nil, panel,
         "WowStyle1DropdownTemplate")
     outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     outlineDD:SetWidth(CW)

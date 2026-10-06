@@ -57,7 +57,6 @@ BNB._configTabs = TABS
 local cfgFrame     = nil
 local tabBtns      = {}
 local tabPanels    = {}   -- scroll frames
-local tabContent   = {}   -- content frames (scroll children)
 
 -- ── Smart scroll panel ────────────────────────────────────────────────────────
 -- Mirrors BCB: scrollFrame always -24 on right, bar hidden when not needed,
@@ -589,7 +588,7 @@ BNB._RefreshConfigFonts = RefreshConfigFonts
 -- topOffset : distance from top of parent to top of scroll frames (pixels)
 --
 -- Returns (panels, contents) arrays — callers store these locally.
--- Also populates module-level tabPanels/tabContent so legacy code and the
+-- Also populates module-level tabPanels so legacy code and the
 -- SelectTab helper keep working for the classic chrome.
 --------------------------------------------------------------------------------
 function BNB._BuildConfigTabPanels(parent, topOffset)
@@ -601,7 +600,6 @@ function BNB._BuildConfigTabPanels(parent, topOffset)
         contents[i] = ct
         -- Mirror into module-level tables so the classic SelectTab still works.
         tabPanels[i]  = sf
-        tabContent[i] = ct
         local builder = BUILDERS[tab.key]
         buildOwner = { parent = parent, topOffset = topOffset, idx = i }
         if builder then builder(sf, ct) end

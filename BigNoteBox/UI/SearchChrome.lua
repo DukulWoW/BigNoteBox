@@ -256,7 +256,6 @@ end
 -- BigNoteBox.SearchStyleChanged() BigNoteBox.Oracle.RefreshPreview()
 local WINDOW = "Default"
 BNB.SEARCH_WINDOW = { layout = "Dialog", pad = 14 }
-function BNB.IsWindowStyle(s) return type(s) == "table" and s.border == WINDOW end
 
 -- The LSM edge file of a style, or nil (Default, None, unknown name).
 local function EdgeFile(s)
@@ -323,7 +322,6 @@ local function CleanStyle(t)
     end
     return out
 end
-BNB.CleanSearchStyle = CleanStyle
 
 function BNB.GetSearchStyleID()
     local id = (BigNoteBoxDB and BigNoteBoxDB.oracleStyle) or "builtin:default"

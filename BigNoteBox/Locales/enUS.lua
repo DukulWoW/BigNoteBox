@@ -14,6 +14,13 @@ local L_DATA = {}
 BigNoteBox.L = setmetatable({}, {
     __index = function(_, key)
         local v = L_DATA[key]
+        -- A missing key shows its own name ("!!KEY" in debug mode) instead of
+        -- nil, which crashed new-note creation once (FmtTime). Code that has
+        -- to know whether a key exists asks BigNoteBox.HasL(key) (SUG-05).
+        if v == nil then
+            if type(key) ~= "string" then return nil end
+            return (BigNoteBoxDB and BigNoteBoxDB.debugMode) and ("!!" .. key) or key
+        end
         -- Strings only: some keys hold tables (WELCOME_WEEKDAYS, WELCOME_MONTHS).
         if type(v) == "string" and BigNoteBoxDB and BigNoteBoxDB.debugPseudoLocale then
             return "@@" .. v
@@ -24,6 +31,8 @@ BigNoteBox.L = setmetatable({}, {
         L_DATA[key] = value
     end,
 })
+-- Whether a key exists at all (L[key] never returns nil for a string key)
+function BigNoteBox.HasL(key) return L_DATA[key] ~= nil end
 local L = BigNoteBox.L
 
 -- ── Addon identity ────────────────────────────────────────────────────────────
@@ -49,6 +58,7 @@ L["FONT_USE_WOW_DEFAULT_TIP"] = "Uses your WoW UI's font instead of a bundled on
 -- ── Main window ───────────────────────────────────────────────────────────────
 L["WINDOW_TITLE"]       = "BigNoteBox"
 L["NOTE_LIST_EMPTY"]    = "No notes yet.\nClick New Note to get started."
+L["NL_NO_MATCHES"]      = "No matches."
 L["SEARCH_PLACEHOLDER"] = "Search notes..."
 L["NOTE_BODY_HINT"]     = "Start typing your note here..."
 L["NOTE_TITLE_HINT"]    = "Note title"
@@ -154,7 +164,6 @@ L["TW_ROW_DELETE_BTN"]     = "|cffff4444Delete|r"
 L["TW_ROW_SURE_BTN"]       = "|cffff4444Sure?|r"
 L["TW_ROW_DELETED_FMT"]    = "Deleted %s"
 L["TW_UNTITLED"]           = "|cff666666(untitled)|r"
-L["TW_NO_CONTENT"]         = "|cff444444(no content)|r"
 L["TW_VIEW_UNTITLED"]      = "(Untitled)"
 L["TW_TITLE"]              = "Trash"
 L["TW_EMPTY_STATE"]        = "Trash is empty."
@@ -988,7 +997,6 @@ BINDING_NAME_BIGNOTEBOXSTICKIESFRONT  = "Bring Sticky Notes to Front"
 BINDING_NAME_BIGNOTEBOXTOGGLERV       = "Open Rich Note Editor"
 BINDING_NAME_BIGNOTEBOXNOTEONTARGET   = "Create Note from Target"
 BINDING_NAME_BIGNOTEBOXORACLE         = "Oracle Search"
-BINDING_HEADER_BIGNOTEBOXOPEN         = "BigNoteBox"
 
 -- ── Oracle search (ALL-69, UI/Oracle.lua) ─────────────────────────────────────
 L["ORACLE_PLACEHOLDER"]     = "Search all notes..."
@@ -1388,7 +1396,6 @@ L["CFG_LSM_FONTS_TIP"]      = "When enabled, fonts registered by other addons vi
 L["CFG_LSM_FONTS_RELOAD"]   = "Reload required"
 L["CFG_LSM_FONTS_OTHER"]    = "Other Installed Fonts"
 L["CFG_LSM_FONTS_NONE"]     = "None (use bundled font)"
-L["CFG_LSM_FONTS_MISSING"]  = "LibSharedMedia not found"
 
 -- Rich Notes heading size settings (Editor tab)
 L["CFG_RICH_SIZES_HEADER"]      = "Rich Notes"
@@ -1524,7 +1531,6 @@ L["CFG_TASK_SPACING_SPACIOUS"]      = "Spacious: roomier rows, easier to tap on 
 L["CFG_TOAST_ANCHOR_TIP"]           = "Opens a draggable anchor to position where context\npopup notifications appear on screen."
 L["CFG_TRASH_ENABLE_LABEL"]         = "Enable Trash (recover deleted notes)"
 L["CFG_TRASH_WARN_LABEL"]           = "Warn before deleting"
-L["CFG_ALARM_DESC"]                 = "Alarms are set per-note via the alarm button in the editor toolbar or the note list right-click menu. Alarm settings, glow animation and snooze options are configured in the Set Alarm window."
 L["CFG_REFBOX_ENABLE_TIP"]          = "Show the Reference Box panel.\nAttach items and spells to your notes for quick lookup, and view the model on player and NPC notes. Tasks keep working when this is off: they get the window to themselves."
 L["CFG_REFBOX_ENABLE_LABEL"]        = "Enable Reference Box (attachments and model)"
 L["CFG_TASKS_ENABLE_LABEL"]         = "Enable Tasks"
@@ -1903,7 +1909,6 @@ L["ICONLIST_DISABLED"]              = "Blizzard icon autocomplete needs the BigN
 L["ICONLIST_FAILED_FMT"]            = "Blizzard icon autocomplete could not load its icon list (%s)."
 
 L["CFG_KB_HINT_CTRL_H"]             = "(Default: Ctrl+H)"
-L["CFG_KB_HINT_UNBOUND"]            = "(Default: unbound)"
 L["CFG_KB_HINT_NONE"]               = "(No default)"
 L["CFG_KB_DESC_OPEN_BNB"]           = "Open / close BigNoteBox"
 L["CFG_KB_ORACLE"]                  = "Oracle search"
@@ -2259,22 +2264,14 @@ L["STICKY_CTX_CLOSE"]               = "Close sticky"
 -- NC_LOCK_FOLLOW_GLOBAL_TIP used "->" in place of the original's raw U+2192 arrow
 -- (plain ASCII only in Lua string literals -- fixed while converting, not a
 -- separate change).
-L["NC_LOCK_FOLLOW_GLOBAL_TIP"]      = "Follow the global lock setting (Config -> Features)."
-L["NC_LOCK_CURRENTLY_GLOBAL_IS"]    = "Currently global is: "
-L["NC_LOCK_LOCKED"]                 = "Locked"
-L["NC_LOCK_UNLOCKED"]               = "Unlocked"
 L["NC_LOCK_CLICK_UNLOCK_TIP"]       = "Click to unlock this note.\nIt will open in edit mode regardless of the global setting."
 L["NC_LOCK_CLICK_LOCK_TIP"]         = "Click to lock this note.\nIt will open in read-only mode regardless of the global setting."
 L["NC_LOCK_UNLOCK_BTN"]             = "Unlock"
 L["NC_LOCK_LOCK_BTN"]               = "Lock"
-L["NC_DEFAULT_BTN"]                 = "Default"
 L["NC_BORDER_THICKNESS_LABEL"]      = "Size / Thickness"   -- icon frame size or edge border thickness (ALL-139)
 L["NC_BORDER_OFFSET_LABEL"]         = "Border Offset"
 L["NC_BORDER_BRIGHTNESS_LABEL"]     = "Border Brightness"
 L["NC_CLEAR_X"]                     = "x"
-L["NC_ICON_NAME_PLACEHOLDER"]       = "Icon name..."
-L["NC_ICON_NAME_LABEL"]             = "Icon name (e.g. INV_Sword_01)"
-L["NC_ICON_NAME_INFO"]              = "Type an icon name and press Enter.\n\nFor icon names:\n|cff66bb6awowhead.com/icons|r"
 L["NC_USE_DEFAULT_BTN"]             = "Use Default"
 L["NC_RANDOM_BTN"]                  = "Random"
 L["NC_WP_LEAVE_REMOVE_TIP"]         = "When you leave the zone this note is bound to,\nautomatically remove the waypoint from the map."
@@ -2291,7 +2288,6 @@ L["NC_PIN_TOP_LABEL"]               = "Pin to top of note list"
 L["NC_PIN_TOP_TIP"]                 = "Pinned notes always appear at the top of the list regardless of sort order."
 L["NC_FAVORITE_LABEL"]              = "Mark as favorite"
 L["NC_FAVORITE_TIP"]                = "Favorite notes show a star overlay and can be sorted to the top."
-L["NC_HDR_NOTE_TYPE"]               = "Note type"
 L["NC_RICH_NOTE_LABEL"]             = "Rich note (markup formatting)"
 L["NC_RICH_NOTE_TIP"]               = "Rich notes support formatted markup: {h1} headers, {img} images,\n{icon} icons, {col} colours and {link} links.\n\nDisabling will remove all formatting tags from the note body."
 L["NC_HDR_TITLE_COLOR"]             = "Title color"
@@ -2334,7 +2330,6 @@ L["NE_INSERT_LINK_TITLE"]           = "Insert Link"
 L["NE_INSERT_ICON_TITLE"]           = "Insert Icon"
 L["NE_SIZE_LABEL"]                  = "Size"
 L["NE_PICK_USERIMAGES"]             = "Pick from UserImages"
-L["NE_SELECT_IMAGE_PLACEHOLDER"]    = "-- select image --"
 L["NE_ALIGNMENT_LABEL"]             = "Alignment"
 L["NE_URL_LABEL"]                   = "URL"
 L["NE_LINK_TEXT_LABEL"]             = "Link text  (leave blank to use the URL)"
@@ -2552,6 +2547,7 @@ L["INSPECT_TIP_EXISTS"]             = "A note already exists for %s."
 L["INSPECT_TIP_DUPE"]               = "Click to view or create a duplicate."
 L["INSPECT_TIP_FROM"]               = "from this player's inspect data."
 L["ADV_REMOVE_TAGS_BTN"]            = "Remove tags"
+L["ADV_CONVERT_PLAIN_CONFIRM"]      = "This will remove all formatting tags from this note. This cannot be undone.\n\nContinue?"
 L["QN_CONFIRM_TEXT"]                = "Create note - edit title if needed:"
 L["QN_CONFIRM_CREATE"]              = "Create"
 L["QN_QUEST_TITLE_FMT"]             = "Quest %d"
@@ -2613,7 +2609,6 @@ L["NC_WP_SET_MANUAL_MSG"]    = "Waypoint set manually: %s (%.1f, %.1f)"
 L["NC_WP_PINNED_MSG"]        = "Waypoint pinned: %s %.1f, %.1f"
 L["NC_WP_TOMTOM_MSG"]        = "TomTom waypoint: %s (%.1f, %.1f)"
 L["NC_WP_MAP_PIN_MSG"]       = "Map pin set: %s (%.1f, %.1f)"
-L["NC_DD_NONE"]              = "None"
 L["STICKY_HDR_BACKGROUND"]   = "Background"
 L["TAG_MGR_GOTO_BTN"]        = "Go to"
 L["TAG_MGR_SELECT_ALL_BTN"]  = "Select all"

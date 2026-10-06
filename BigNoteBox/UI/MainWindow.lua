@@ -670,7 +670,6 @@ function BNB.CreateMainWindow()
 
     local configBtn = TBIcon(TOPBAR .. "tp-cog", L["MW_CONFIG_TIP"], 1,
         function() if BNB.OpenConfig then BNB.OpenConfig() end end)
-    BNB._toolbarConfigBtn = configBtn
 
     local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 2,
         function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end)
@@ -698,7 +697,6 @@ function BNB.CreateMainWindow()
                 if BNB.OpenImportWindow then BNB.OpenImportWindow() end
             end
         end)
-    BNB._toolbarShareTopBtn = shareTopBtn
 
     -- Alarm overview button
     local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarm", L["MW_ALARM_TIP"], 6,
@@ -707,7 +705,6 @@ function BNB.CreateMainWindow()
                 BNB.AlarmOverview.Toggle()
             end
         end)
-    BNB._toolbarAlarmOvBtn = alarmOvBtn
 
     -- Send-to-BCB button. Icon: tp-bcb when BCB is installed, bcb-icon when
     -- absent. Always full colour.
@@ -786,7 +783,7 @@ function BNB.CreateMainWindow()
         dirDD:GenerateMenu()
     end
 
-    sortDD = CreateFrame("DropdownButton", "BNBMainSortDD", f, "WowStyle1DropdownTemplate")
+    sortDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
     sortDD:SetSize(DD_W, SORT_BTN_H)
     sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
     sortDD:SetupMenu(function(_, root)
@@ -798,7 +795,7 @@ function BNB.CreateMainWindow()
         end
     end)
 
-    dirDD = CreateFrame("DropdownButton", "BNBMainDirDD", f, "WowStyle1DropdownTemplate")
+    dirDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
     dirDD:SetSize(DD_W, SORT_BTN_H)
     dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
     dirDD:SetupMenu(function(_, root)
@@ -1390,7 +1387,6 @@ local function BuildBCBPromo()
     local ssW   = math.floor(PROMO_W * 0.80)   -- 288
     local halfW = math.floor(ssW / 2)          -- 144
     local ssH   = 144
-    local ssX   = -math.floor((PROMO_W - ssW) / 2)   -- offset from centre to left edge = -36
 
     local ssLeft = f:CreateTexture(nil, "ARTWORK")
     ssLeft:SetSize(halfW, ssH)

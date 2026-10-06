@@ -910,17 +910,25 @@ local function BuildMoveTip()
     fs:SetText(L["ORACLE_MOVE_TIP"])
 end
 
+-- Esc closes the bar through a proxy: a 1 px frame that is in UISpecialFrames
+-- for good and is shown only while the bar is up and not previewing. Esc hides
+-- the proxy, the proxy closes the bar. (It used to take the bar's own name out
+-- of UISpecialFrames with table.remove, which shifts other addons' entries,
+-- GLB-04.) While previewing, Esc goes to the settings page (back one page).
+local escProxy
+local function SyncEscProxy()
+    if not escProxy then return end
+    local want = bar and bar:IsShown() and not previewing
+    if want then escProxy:Show() else
+        escProxy._quiet = true; escProxy:Hide(); escProxy._quiet = nil
+    end
+end
+
 -- While previewing, the bar sits under dialogs (HIGH, not FULLSCREEN_DIALOG),
--- so the colour picker and the style popups open over it, and it leaves
--- UISpecialFrames, so Esc goes to the settings page (back one page) instead
--- of closing it.
-local ORACLE_NAME = "BigNoteBoxOracleFrame"
+-- so the colour picker and the style popups open over it.
 local function SetPreviewLayer(on)
     bar:SetFrameStrata(on and "HIGH" or "FULLSCREEN_DIALOG")
-    for i = #UISpecialFrames, 1, -1 do
-        if UISpecialFrames[i] == ORACLE_NAME then table.remove(UISpecialFrames, i) end
-    end
-    if not on then tinsert(UISpecialFrames, ORACLE_NAME) end
+    SyncEscProxy()
 end
 
 local function DrawPreviewRows()
@@ -1026,8 +1034,16 @@ local function Build()
     panel._pad = BNB.GetSearchPanelPad(drawnTheme, panel._size)
     drawnRev = BNB.SEARCH_STYLE_REV
     ApplyFonts(drawnTheme)
-    -- Esc still closes it if the box has lost focus to another window.
-    tinsert(UISpecialFrames, "BigNoteBoxOracleFrame")
+    -- Esc still closes it if the box has lost focus to another window
+    -- (through the proxy, see SyncEscProxy).
+    escProxy = CreateFrame("Frame", "BigNoteBoxOracleEscProxy", UIParent)
+    escProxy:SetSize(1, 1)
+    escProxy:Hide()
+    escProxy:SetScript("OnHide", function(self)
+        if self._quiet then return end
+        if bar:IsShown() and not previewing then bar:Hide() end
+    end)
+    tinsert(UISpecialFrames, "BigNoteBoxOracleEscProxy")
 
     emptyFS = panel:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     emptyFS:SetJustifyH("LEFT")
@@ -1075,11 +1091,15 @@ local function Build()
             Oracle.Close()
         end
     end)
-    bar:SetScript("OnShow", function(self) pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
+    bar:SetScript("OnShow", function(self)
+        pcall(self.RegisterEvent, self, "GLOBAL_MOUSE_DOWN")
+        SyncEscProxy()
+    end)
     bar:SetScript("OnHide", function(self)
         ClearPreview()
         self:UnregisterEvent("GLOBAL_MOUSE_DOWN")
         eb:ClearFocus()
+        SyncEscProxy()
     end)
 
     -- Dragging moves the bar in the preview only. SetUserPlaced(false)

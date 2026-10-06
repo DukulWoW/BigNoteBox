@@ -204,7 +204,6 @@ local function BuildBackupTab(sf, ct)
         if foreignChar and BNB.currentChar then
             -- Store pending data for the popup callbacks
             BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
-            BNB._pendingImportForeign = foreignChar
             StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
         else
             -- Same-character or scope-less path — confirm count before importing

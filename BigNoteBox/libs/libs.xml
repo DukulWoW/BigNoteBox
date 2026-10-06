@@ -8,5 +8,6 @@
     <Include file="LibSharedMedia-3.0\lib.xml"/>
     <Script file="LibSerialize\LibSerialize.lua"/>
     <Script file="LibDeflate\LibDeflate.lua"/>
+    <Script file="LibCustomGlow-1.0\LibCustomGlow-1.0.lua"/>
 
 </Ui>

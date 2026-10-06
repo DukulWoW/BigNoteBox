@@ -33,11 +33,10 @@
 --   BNB.UndoCanUndo(noteID) -> bool
 --   BNB.UndoCanRedo(noteID) -> bool
 --   BNB.UndoClearNote(noteID)             Called when a note is deleted
---   BNB.UndoClearAll()                    Called on factory reset / wipe
 
 local BNB = BigNoteBox
 
--- Runtime stacks (module-level, cleared on UndoClearAll)
+-- Runtime stacks (module-level, gone on reload)
 BNB._undoStack  = BNB._undoStack  or {}
 BNB._redoStack  = BNB._redoStack  or {}
 BNB._undoSnap   = BNB._undoSnap   or {}
@@ -174,14 +173,4 @@ function BNB.UndoClearNote(noteID)
     BNB._undoStack[noteID] = nil
     BNB._redoStack[noteID] = nil
     BNB._undoSnap[noteID]  = nil
-end
-
---------------------------------------------------------------------------------
--- UndoClearAll — called on factory reset
---------------------------------------------------------------------------------
-function BNB.UndoClearAll()
-    BNB._undoStack  = {}
-    BNB._redoStack  = {}
-    BNB._undoSnap   = {}
-    BNB._undoActive = false
 end

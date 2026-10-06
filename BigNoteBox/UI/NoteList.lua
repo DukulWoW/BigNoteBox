@@ -4,8 +4,6 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
-local ENTRY_H      = 52
-local ICON_SIZE    = 32
 local SEARCH_H     = 28
 local NEWBTN_H     = 26
 local PAD_L        = 8
@@ -71,7 +69,6 @@ local _dragNoteID   = nil   -- noteID being dragged
 local _dragGhost    = nil   -- semi-transparent overlay frame
 local _dragTargetID = nil   -- drop goes before this note id (after it when _dragAfter)
 local _dragAfter    = false
-local _dragTimer    = nil   -- hold-to-drag delay timer
 
 -- Multi-select state
 local _multiMode    = false          -- checkbox mode active
@@ -381,7 +378,6 @@ local function BuildSearchBar(parent)
         GameTooltip:Hide()
     end)
     BNB._tagTreeBtn        = treeBtn
-    BNB._applyTreeBtnState = ApplyTreeBtnState
     -- Called by SetTagTreeMode to sync the button visual with a programmatic change
     BNB._setTagTreeBtnActive = function(active)
         _treeActive = active
@@ -445,7 +441,6 @@ local function BuildSearchBar(parent)
     end)
 
     -- ── Favourite filter button (star icon, outside bar) ─────────────────────
-    local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
     local favBtn = CreateFrame("Button", nil, parent)
     favBtn:SetSize(OUTER_BTN, OUTER_BTN)
     favBtn:SetPoint("LEFT", bar, "RIGHT", OUTER_GAP, 0)
@@ -889,7 +884,6 @@ local function GetOrCreateDropLine()
 end
 
 local function EndDrag(commit)
-    _dragTimer = nil
     BNB.ClearCursor()   -- ALL-95
     local ghost = _dragGhost
     if ghost then ghost:Hide() end
@@ -963,7 +957,7 @@ end
 -- GLOBAL_MOUSE_DOWN is listened to only while Select mode is on.
 local _multiWatch
 local function MouseOnPopup()
-    for i = 1, (STATICPOPUP_NUMDIALOGS or 4) do
+    for i = 1, 4 do   -- StaticPopup1..4 on every client (no STATICPOPUP_NUMDIALOGS any more)
         local p = _G["StaticPopup" .. i]
         if p and p:IsShown() and p:IsMouseOver() then return true end
     end
@@ -2026,7 +2020,7 @@ local function RefreshNoteList()
             BNB._listEmptyLabel = lbl
         end
         BNB._listEmptyLabel:SetText(
-            currentFilter ~= "" and "No matches." or L["NOTE_LIST_EMPTY"])
+            currentFilter ~= "" and L["NL_NO_MATCHES"] or L["NOTE_LIST_EMPTY"])
         BNB._listEmptyLabel:Show()
         totalH = 80
     else
@@ -2254,7 +2248,6 @@ function BNB.SelectNote(id)
 
     BNB.Editor.SetCurrent(id); BigNoteBoxDB.selectedNoteID = id
     BNB.StampOpened(id)
-    local collapsed = BNB._listCollapsed
     for _, btn in ipairs(listEntries) do
         if btn:IsShown() then
             if btn._noteID == id and not _multiMode then   -- see PopulateEntry (ALL-58)

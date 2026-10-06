@@ -3,6 +3,7 @@
 ## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
 ## Notes: Developer mode for BigNoteBox: a separate set of notes and the labs' saved work. Not needed to play.
 ## Author: Dukul
+## Group: BigNoteBox
 ## Version: 1.0.0
 ## SavedVariables: BigNoteBoxDevDB
 

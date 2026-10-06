@@ -259,7 +259,7 @@ local function BuildAppearanceTab(sf, ct)
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     skinRandomizeCb.text:SetPoint("LEFT", skinRandomizeCb, "RIGHT", 2, 0)
-    skinRandomizeCb.text:SetText(L["CFG_SKIN_RANDOMIZE"] or "Randomize theme on login/reload")
+    skinRandomizeCb.text:SetText(L["CFG_SKIN_RANDOMIZE"])
     skinRandomizeCb:SetChecked(db.skinRandomize == true)
     -- Forward-declared so skinRandomizeCb's OnClick can reference it
     local skinRandomizeBrightnessCb
@@ -274,8 +274,8 @@ local function BuildAppearanceTab(sf, ct)
     skinRandomizeCb:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:ClearLines()
-        GameTooltip:AddLine(L["CFG_SKIN_RANDOMIZE"] or "Randomize theme on login/reload", 1, 0.82, 0)
-        GameTooltip:AddLine(L["CFG_SKIN_RANDOMIZE_TIP"] or "Randomly picks a different skin preset each time you log in or reload. Brightness is not affected.", 1, 1, 1, true)
+        GameTooltip:AddLine(L["CFG_SKIN_RANDOMIZE"], 1, 0.82, 0)
+        GameTooltip:AddLine(L["CFG_SKIN_RANDOMIZE_TIP"], 1, 1, 1, true)
         GameTooltip:Show()
     end)
     skinRandomizeCb:SetScript("OnLeave", GameTooltip_Hide)
@@ -377,9 +377,9 @@ local function BuildAppearanceTab(sf, ct)
     end
 
     -- Fonts from other addons (LibSharedMedia); moved from Advanced (ALL-84).
-    -- Needs a reload, so it offers one as soon as the value changes.
-    local lsmAvail = LibStub and LibStub("LibSharedMedia-3.0", true) ~= nil
-    if lsmAvail then
+    -- Needs a reload, so it offers one as soon as the value changes. LSM is
+    -- embedded in libs/, so it is always there (DEAD-05).
+    do
         local lsmWasOn = db.lsmFonts == true
         local lsmReloadLbl  -- shown after toggle
         y = AddCheck(ct, y, L["CFG_LSM_FONTS"],
@@ -410,15 +410,6 @@ local function BuildAppearanceTab(sf, ct)
         end)
 
         y = y - 26
-    else
-        -- LSM not present: show a greyed notice so the user knows why there's no checkbox
-        local lsmMissingLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lsmMissingLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        lsmMissingLbl:SetWidth(CONTENT_W)
-        lsmMissingLbl:SetJustifyH("LEFT")
-        lsmMissingLbl:SetTextColor(0.45, 0.45, 0.45)
-        lsmMissingLbl:SetText(L["CFG_LSM_FONTS_MISSING"] .. " -- install an addon that provides LibSharedMedia-3.0 to enable this option.")
-        y = y - 28
     end
     y = y - 4
 

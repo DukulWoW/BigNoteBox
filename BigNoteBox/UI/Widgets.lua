@@ -470,10 +470,6 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     return btn
 end
 
--- Legacy stub kept for any call sites that still reference TintButton.
--- In skin mode buttons should be created with CreateSkinButton instead.
-function BNB.TintButton(btn) end
-
 --------------------------------------------------------------------------------
 -- SMART SCROLL FRAME  (mirrors BCB's CreateSmartScrollFrame)
 -- "ScrollFrameTemplate" — modern scrollbar inside frame bounds.
@@ -1389,7 +1385,7 @@ local AC_ROW_H    = 22
 local function BuildTagAutocomplete()
     if _tagAC then return _tagAC end
 
-    local popup = CreateFrame("Frame", "BigNoteBoxTagAC", UIParent, "BackdropTemplate")
+    local popup = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
     popup:SetBackdrop({
         bgFile   = "Interface\\Buttons\\White8x8",
         edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
@@ -1668,9 +1664,6 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
 
         -- ── AutoCast glow (LibCustomGlow) in BNB green — started on show ──────
         -- LCG is loaded by the time ShowClipboardHint is first called (post-login).
-        local CLIP_GLOW_COLOR = { 0.400, 0.733, 0.416, 1.0 }  -- BNB green
-        local _clipGlowActive = false
-        -- glow started/stopped in Dismiss and show path below
 
         -- ── Keyboard icon ──────────────────────────────────────────────────────
         local icon = f:CreateTexture(nil, "ARTWORK")
@@ -1720,7 +1713,6 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
             -- Stop LCG AutoCast glow. LCG uses dot syntax: first arg is the frame, NOT self.
             local LCG2 = LibStub and LibStub("LibCustomGlow-1.0", true)
             if LCG2 then pcall(LCG2.AutoCastGlow_Stop, f, "bnb_clip") end
-            _clipGlowActive = false
             f:Hide()
             BNB._clipboardHelper:ClearFocus()
             BNB._clipboardHelper:Hide()

@@ -1,6 +1,10 @@
 -- BigNoteBox UserImages.lua
 -- Register your custom images here so they appear in the rich note image picker.
 --
+-- NOTE: every BigNoteBox update replaces this file. To keep your images through
+-- updates, use a small addon of your own with BigNoteBox.RegisterUserImages
+-- instead: README.txt in this folder shows how (four short steps).
+--
 -- Just add the filename (or subfolder/filename) — no need to write the full path.
 -- Place your image files in the BigNoteBox/UserImages/ folder alongside this file.
 --
