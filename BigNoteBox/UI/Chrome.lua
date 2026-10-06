@@ -170,6 +170,25 @@ function BNB.BasicFrameGlowPad()
     return BASIC_GLOW_PAD
 end
 
+-- ALL-314: the template's close X is the game's graphic; every window gets our
+-- own close button (Assets\Buttons, symbol "close") in its place. The old button
+-- stays, hidden, as the anchor (it moves with the chrome delta), and f.CloseButton
+-- now names ours, so a window's own SetScript("OnClick") / anchors land on it.
+-- It owns OnEnter / OnLeave: a tooltip is `f.CloseButton._tip = "text"`.
+local CLOSE_SIZE = 24
+
+local function ReplaceCloseButton(f)
+    local old = f.CloseButton
+    if not old or old._bnbClose or not BNB.CreateIconButton then return end
+    local btn = BNB.CreateIconButton(f, CLOSE_SIZE, "close", { skin = false,
+        onClick = function() f:Hide() end })
+    btn._bnbClose = true
+    btn:SetPoint("CENTER", old, "CENTER", 0, 0)
+    btn:SetFrameLevel(old:GetFrameLevel() + 1)
+    old:Hide()
+    f.CloseButton = btn
+end
+
 function BNB.SeatChrome(f)
     if not f or _seated[f] then return end
     BNB.AddTitleMoveCursor(f)   -- ALL-95: move cursor over the title band
@@ -178,6 +197,7 @@ function BNB.SeatChrome(f)
     if not ok then return end
     _seated[f] = pieces
     if not IsZero(BNB.CHROME_DELTA) then pcall(Apply, f, BNB.CHROME_DELTA) end
+    pcall(ReplaceCloseButton, f)
 end
 
 -- Re-seat every window built so far. d = nil restores the built-in delta.

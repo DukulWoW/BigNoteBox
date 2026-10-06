@@ -570,10 +570,9 @@ local function BuildWindow()
     titleLbl:SetText(L["DZ_WINDOW_TITLE"])
 
     -- X close button in title bar
-    local xBtn = CreateFrame("Button", nil, titleBar, "UIPanelCloseButton")
-    xBtn:SetSize(28, 28)
-    xBtn:SetPoint("RIGHT", titleBar, "RIGHT", 2, 0)
-    xBtn:SetScript("OnClick", function() DZ.Close() end)
+    local xBtn = BNB.CreateIconButton(titleBar, 22, "close", { skin = false,
+        onClick = function() DZ.Close() end })   -- ALL-314
+    xBtn:SetPoint("RIGHT", titleBar, "RIGHT", -4, 0)
 
     -- Scroll area between title bar and close button
     local sf = CreateFrame("ScrollFrame", nil, f, "ScrollFrameTemplate")

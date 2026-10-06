@@ -19,9 +19,8 @@ local NCW     = 290   -- same width as the Reference Box (Dukul 2026-10-01)
 -- 60 (TITLE_H) - 25 (tab y-offset from top) + 20 (tab height) + 8 (padding) = 63
 local TAB_CONTENT_Y = 63
 local PAD     = 12
--- Width: window minus left pad minus right margin (no scrollbar on most panels)
+-- Width: window minus left pad minus right margin (no tab scrolls, ALL-318)
 local CW      = NCW - PAD - 8
-local CW_SCROLL = NCW - PAD - 28  -- used only where a scrollbar IS present
 
 -- ── Module state ──────────────────────────────────────────────────────────────
 local ncFrame   = nil
@@ -78,36 +77,6 @@ local function MakePlainPanel(parent, tabContentY)
     return p
 end
 
--- Scrolling panel (General tab needs scrolling for its long content)
-local function MakeScrollPanel(parent, tabContentY)
-    tabContentY = tabContentY or TAB_CONTENT_Y
-    local sf  = CreateFrame("ScrollFrame", nil, parent, "ScrollFrameTemplate")
-    local bar = sf.ScrollBar
-    sf:SetPoint("TOPLEFT",     parent, "TOPLEFT",      PAD, -tabContentY)
-    sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -24,   4)
-
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(CW_SCROLL); ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-
-    local _contentH = 0
-    local function Apply()
-        local sfH = sf:GetHeight()
-        if sfH < 4 then return end
-        ct:SetHeight(math.max(_contentH, sfH))
-        if _contentH <= sfH + 2 then
-            if bar then bar:Hide() end
-        else
-            if bar then bar:Show() end
-        end
-    end
-    sf:SetScript("OnSizeChanged", Apply)
-    sf:HookScript("OnShow", function() C_Timer.After(0.05, Apply) end)
-    function sf:FinaliseHeight(h) _contentH = h; C_Timer.After(0.05, Apply) end
-    sf:Hide()
-    return sf, ct
-end
-
 -- Layout micro-helpers
 local function Hdr(parent, y, text)
     local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -154,10 +123,7 @@ local OpenColorPicker = BNB.OpenColorPicker
 -- ─────────────────────────────────────────────────────────────────────────────
 local _hlFonts    -- forward ref, set inside BuildGeneralTab
 
-local function BuildGeneralTab(sf, ct)
-    -- sf = ScrollFrame, ct = scroll child (content frame)
-    -- Use ct as the parent for all content; finalise scroll height at end.
-    local panel = ct   -- alias so existing code is unchanged
+local function BuildGeneralTab(panel)
     local y = -4
 
     -- Pin / Favorite / Lock / Rich note: state buttons, the label says what a
@@ -174,7 +140,7 @@ local function BuildGeneralTab(sf, ct)
         return n and K and K.NoteIsLocked(n) or false
     end
     local _refreshStates
-    y, _refreshStates = BNB.CreateStateButtonGrid(panel, y, CW_SCROLL, {
+    y, _refreshStates = BNB.CreateStateButtonGrid(panel, y, CW, {
         { text = function() local n = GetNote()
               return (n and n.pinned) and L["NC_STATE_UNPIN"] or L["NC_STATE_PIN"] end,
           tip  = function() return L["NC_PIN_TOP_LABEL"], L["NC_PIN_TOP_TIP"] end,
@@ -222,7 +188,7 @@ local function BuildGeneralTab(sf, ct)
     y = Rule(panel, y) - 4
     y = Hdr(panel, y, L["NC_HDR_TITLE_COLOR"])
 
-    y = BNB.BuildColorGrid(panel, y, CW_SCROLL, function(r, g, b)
+    y = BNB.BuildColorGrid(panel, y, CW, function(r, g, b)
         Save({titleColor = {r=r, g=g, b=b}})
     end)
 
@@ -252,7 +218,7 @@ local function BuildGeneralTab(sf, ct)
     local PH     = 38    -- card height
     local PG     = 4     -- vertical gap between rows
     local COL_GAP_F = 4  -- horizontal gap between columns
-    local CARD_W_F  = math.floor((CW_SCROLL - COL_GAP_F) / 2)
+    local CARD_W_F  = math.floor((CW - COL_GAP_F) / 2)
     local fontPickerBtns = {}
     local _wowCb_nc
 
@@ -323,7 +289,7 @@ local function BuildGeneralTab(sf, ct)
     local usedRows_nc = math.ceil(#fonts_nc / 2)
     local gridRows_nc = math.max(BNB.FONT_GRID_ROWS, usedRows_nc)
     BNB.AddFontPackHint(panel, panel, 0, y - usedRows_nc * (PH + PG),
-        CW_SCROLL, (gridRows_nc - usedRows_nc) * (PH + PG) - PG)
+        CW, (gridRows_nc - usedRows_nc) * (PH + PG) - PG)
     y = y - gridRows_nc * (PH + PG) + PG
 
     -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
@@ -375,7 +341,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on.
     -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua.
-    -- CW_SCROLL (NCW - PAD - 28) used instead of CONTENT_W to match NoteConfig panel width.
+    -- CW (NCW - PAD - 28) used instead of CONTENT_W to match NoteConfig panel width.
     if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
        and BNB._BuildLSMFontDropdown then
         y = BNB._BuildLSMFontDropdown(panel, y,
@@ -414,7 +380,7 @@ local function BuildGeneralTab(sf, ct)
                 HLFonts()
                 if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
             end,
-            CW_SCROLL)
+            CW)
         y = y - 4
     end
 
@@ -448,7 +414,7 @@ local function BuildGeneralTab(sf, ct)
         end
         if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
     end
-    local fsSl = BNB.CreateStackedSlider(panel, CW_SCROLL, {
+    local fsSl = BNB.CreateStackedSlider(panel, CW, {
         label = "", min = 8, max = 32, value = GetNoteFontSize(),
         default = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize,
         fmt = function(v) return v .. "pt" end,
@@ -471,15 +437,12 @@ local function BuildGeneralTab(sf, ct)
     end
 
     panel._hlFonts    = HLFonts
-    sf._hlFonts       = HLFonts
-    sf._reapplyFontPreviews = ReapplyFontPreviews
-    sf._refreshFontSize     = panel._refreshFontSize
+    -- (panel is the tab's own plain frame since ALL-318, no scroll frame)
+    panel._reapplyFontPreviews = ReapplyFontPreviews
     -- Refresh the state button labels when switching notes
-    -- (on sf: the refresh reads tabPanels[TAB_GEN], the scroll frame; the old
+    -- (on the panel: the refresh reads tabPanels[TAB_GEN]; the old
     -- checkboxes hung it on ct and never refreshed)
-    sf._refreshChecks = _refreshStates
-    -- Finalise scroll content height
-    sf:FinaliseHeight(math.abs(y) + 12)
+    panel._refreshChecks = _refreshStates
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -859,16 +822,17 @@ local function CreateNoteConfigWindow()
     end)
 
     local tabDefs = {
-        { label=L["CFG_TAB_GENERAL"],    useScroll=true,  builder=BuildGeneralTab    },
-        { label=L["CFG_TAB_APPEARANCE"], useScroll=false, builder=BuildAppearanceTab },
-        { label=L["NC_TAB_SITUATION"],  useScroll=false, builder=BuildSituationTab  },
+        { label=L["CFG_TAB_GENERAL"],    builder=BuildGeneralTab    },
+        { label=L["CFG_TAB_APPEARANCE"], builder=BuildAppearanceTab },
+        { label=L["NC_TAB_SITUATION"],  builder=BuildSituationTab  },
     }
 
     if skinMode then
         local tabCtrl = BNB.CreateSkinTabs(f, {L["CFG_TAB_GENERAL"], L["CFG_TAB_APPEARANCE"], L["NC_TAB_SITUATION"]},
             function(idx) BNB._NoteConfigSelectTab(idx) end)
-        tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -SK_NC_TITLE_H)
-        tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_NC_TITLE_H)
+        -- ALL-313: in from both edges like Settings' skin tabs (ALL-229)
+        tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  8, -SK_NC_TITLE_H)
+        tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -SK_NC_TITLE_H)
         f._skinTabCtrl = tabCtrl
     else
         local tpl = "PanelTopTabButtonTemplate"
@@ -890,15 +854,9 @@ local function CreateNoteConfigWindow()
     end
 
     for i, def in ipairs(tabDefs) do
-        if def.useScroll then
-            local sf, ct = MakeScrollPanel(f, tabContentY)
-            tabPanels[i] = sf
-            def.builder(sf, ct)
-        else
-            local p = MakePlainPanel(f, tabContentY)
-            tabPanels[i] = p
-            def.builder(p)
-        end
+        local p = MakePlainPanel(f, tabContentY)
+        tabPanels[i] = p
+        def.builder(p)
     end
 
     return f

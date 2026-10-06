@@ -144,6 +144,7 @@ local function LinkButton(f, text, url)
     local b = BNB.CreateButton(nil, f, text, 200, 22)
     b:SetScript("OnClick", function() BNB.ShowClipboardHint(url, b) end)
     b:SetScript("OnEnter", function(self)
+        if not self:IsEnabled() then return end   -- addon already installed (ALL-316)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 0.55, 0.85, 1)
         GameTooltip:Show()
@@ -154,7 +155,7 @@ end
 
 local function BuildPopup()
     local f = BNB.CreateBackdropFrame("Frame", "BNBWaypointInfoPopup", UIParent)
-    f:SetSize(310, 230)
+    f:SetSize(310, 210)   -- 20 px shorter (ALL-316)
     f:SetFrameStrata("DIALOG")
     f:SetClampedToScreen(true)
     f:EnableMouse(true); f:SetMovable(true)
@@ -168,14 +169,9 @@ local function BuildPopup()
     title:SetTextColor(1, 0.82, 0)
     title:SetText(L["STICKY_WP_SUPPORT_TITLE"])
 
-    local closeBtn = CreateFrame("Button", nil, f)
-    closeBtn:SetSize(20, 20)
+    -- Our close button (ALL-316); follows skin mode like the window's look
+    local closeBtn = BNB.CreateIconButton(f, 20, "close", { onClick = function() f:Hide() end })
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
-    local closeLbl = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    closeLbl:SetAllPoints(); closeLbl:SetText("|cffaaaaaax|r")
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
-    closeBtn:SetScript("OnEnter", function() closeLbl:SetText("|cffff4444x|r") end)
-    closeBtn:SetScript("OnLeave", function() closeLbl:SetText("|cffaaaaaax|r") end)
 
     f._statusLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     f._statusLbl:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
@@ -193,8 +189,11 @@ local function BuildPopup()
 
     local wpuiBtn = LinkButton(f, L["STICKY_WP_BTN_WAYPOINTUI"], "https://www.curseforge.com/wow/addons/waypointui")
     wpuiBtn:SetPoint("TOPLEFT", linksHdr, "BOTTOMLEFT", 0, -6)
+    wpuiBtn:SetPoint("RIGHT", f, "RIGHT", -14, 0)   -- the buttons fill the width (ALL-316)
     local ttBtn = LinkButton(f, L["STICKY_WP_BTN_TOMTOM"], "https://www.curseforge.com/wow/addons/tomtom")
     ttBtn:SetPoint("TOPLEFT", wpuiBtn, "BOTTOMLEFT", 0, -4)
+    ttBtn:SetPoint("RIGHT", f, "RIGHT", -14, 0)
+    f._wpuiBtn, f._ttBtn = wpuiBtn, ttBtn
 
     -- ESC closes one window at a time: copy box, then this popup, then the
     -- window behind it (ALL-21). A keyboard-enabled frame gets keys before the
@@ -229,6 +228,9 @@ local function TogglePopup(ed)
         f._statusLbl:SetText("|cffff5555" .. L["STICKY_WP_STATUS_NONE"] .. "|r")
         f._descLbl:SetText(L["NC_WP_NO_SUPPORT_DETAIL"])
     end
+    -- An addon that is installed has nothing to link to (ALL-316)
+    f._wpuiBtn:SetEnabled(not HasWaypointUI())
+    f._ttBtn:SetEnabled(not HasWPAddon())
     f:ClearAllPoints()
     if ed.host then
         f:SetPoint("TOPLEFT", ed.host, "TOPRIGHT", 4, 0)
@@ -711,6 +713,7 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpStatusTag = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpStatusTag:SetPoint("LEFT", wpHdr, "RIGHT", 6, 0)
 
+    local wpInfoLbl, wpInfoHit   -- built below; RefreshWPStatusTag shows / hides them
     local function RefreshWPStatusTag()
         if HasWPAddon() then
             wpStatusTag:SetText(HasRetailPin() and L["STICKY_WP_TAG_ENHANCED"] or L["STICKY_WP_TAG_ADDON"])
@@ -725,26 +728,32 @@ function BNB.CreateSituationEditor(panel, opts)
             wpStatusTag:SetText(L["STICKY_WP_TAG_REQUIRED"])
             wpStatusTag:SetTextColor(0.85, 0.30, 0.25)
         end
+        -- Both addons installed: nothing left to explain, no "?" (ALL-316)
+        local both = (HasWPAddon() and HasWaypointUI()) and true or false
+        wpInfoLbl:SetShown(not both)
+        wpInfoHit:SetShown(not both)
     end
 
-    -- "?" label (visual only; the hit frame below takes the click)
-    local wpInfoLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    -- "?" icon (visual only; the hit frame below takes the click, ALL-316)
+    wpInfoLbl = panel:CreateTexture(nil, "OVERLAY")
+    wpInfoLbl:SetSize(14, 14)
     wpInfoLbl:SetPoint("LEFT", wpStatusTag, "RIGHT", 4, 0)
-    wpInfoLbl:SetText("|cff88bbff?|r")
+    wpInfoLbl:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-mini-question-mark")
+    wpInfoLbl:SetAlpha(0.8)
 
-    local wpInfoHit = CreateFrame("Button", nil, panel)
+    wpInfoHit = CreateFrame("Button", nil, panel)
     wpInfoHit:SetPoint("LEFT",  wpStatusTag, "LEFT",  -2, 0)
     wpInfoHit:SetPoint("RIGHT", wpInfoLbl,   "RIGHT",  4, 0)
     wpInfoHit:SetHeight(18)
     wpInfoHit:SetScript("OnClick", function() TogglePopup(ed) end)
     wpInfoHit:SetScript("OnEnter", function(self)
-        wpInfoLbl:SetText("|cffbbddff?|r")
+        wpInfoLbl:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
         GameTooltip:Show()
     end)
     wpInfoHit:SetScript("OnLeave", function()
-        wpInfoLbl:SetText("|cff88bbff?|r")
+        wpInfoLbl:SetAlpha(0.8)
         GameTooltip:Hide()
     end)
 
@@ -1474,6 +1483,25 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     Tip(wpManualBtn, L["STICKY_WP_MANUAL_TIP"])
     wpSetBtn:SetScript("OnClick", CommitManualCoords)
+
+    -- ALL-317: a press outside the row closes it while nothing was typed (the
+    -- coordinates it starts with are pre-filled, not typed). Listens only
+    -- while the row shows; the Manual button toggles the row itself.
+    local manualTyped = false
+    for _, eb in ipairs({ wpXEb, wpYEb, wpNameEb }) do
+        eb:HookScript("OnTextChanged", function(_, user) if user then manualTyped = true end end)
+    end
+    local manualWatch = CreateFrame("Frame")
+    manualWatch:SetScript("OnEvent", function()
+        if not wpManualRow:IsShown() or manualTyped then return end
+        if wpManualRow:IsMouseOver() or wpManualBtn:IsMouseOver() then return end
+        wpManualRow:Hide()
+    end)
+    wpManualRow:HookScript("OnShow", function()
+        manualTyped = false
+        pcall(manualWatch.RegisterEvent, manualWatch, "GLOBAL_MOUSE_DOWN")
+    end)
+    wpManualRow:HookScript("OnHide", function() manualWatch:UnregisterEvent("GLOBAL_MOUSE_DOWN") end)
     BNB.TabChain({ wpXEb, wpYEb, wpNameEb })
     wpXEb:SetScript("OnEnterPressed", function() wpYEb:SetFocus() end)
     wpYEb:SetScript("OnEnterPressed", CommitManualCoords)

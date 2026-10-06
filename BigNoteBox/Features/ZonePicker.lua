@@ -493,13 +493,12 @@ local function BuildPicker()
     end)
 
     -- ── Close button (top-right) ─────────────────────────────────────────────
-    -- Normal mode: the client's UIPanelCloseButton (Retail / Forever look);
-    -- skin mode: the skin close icon button (ALL-297). Both are built, since
-    -- the picker is built once and skin mode can change; Open shows one.
-    local closeBtn = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-    closeBtn:SetSize(26, 26)
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
-    closeBtn:SetScript("OnClick", function() ZP.Close() end)
+    -- Normal mode: our close icon button in its normal look; skin mode: the skin
+    -- look (ALL-297, ALL-314). Both are built, since the picker is built once
+    -- and skin mode can change; Open shows one.
+    local closeBtn = BNB.CreateIconButton(f, 22, "close", { skin = false,
+        onClick = function() ZP.Close() end })
+    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
     local skinClose = BNB.CreateSkinCloseButton(f, function() ZP.Close() end)
     skinClose:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4)
     f._syncClose = function()

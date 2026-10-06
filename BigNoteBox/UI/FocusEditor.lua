@@ -637,12 +637,7 @@ local function BuildFocusFrame()
 
     if f.CloseButton then
         f.CloseButton:SetScript("OnClick", function() BNB.CloseFocusMode() end)   -- ALL-96: same as ESC
-        f.CloseButton:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-            GameTooltip:AddLine(L["FOCUS_RESTORE_TIP"], 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        f.CloseButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        f.CloseButton._tip = L["FOCUS_RESTORE_TIP"]   -- ALL-314: our icon button shows it on hover
     end
 
     local restoreBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())

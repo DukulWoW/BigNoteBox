@@ -129,8 +129,9 @@ local function BuildStickySettingsWindow()
         local tabCtrl = BNB.CreateSkinTabs(f, TAB_LABELS, function(idx)
             SelectStickyTab(idx)
         end)
-        tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, -SK_SS_TITLE_H)
-        tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, -SK_SS_TITLE_H)
+        -- ALL-313: in from both edges like Settings' skin tabs (ALL-229)
+        tabCtrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  8, -SK_SS_TITLE_H)
+        tabCtrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -SK_SS_TITLE_H)
         f._skinTabCtrl = tabCtrl
     else
         local tpl = "PanelTopTabButtonTemplate"
