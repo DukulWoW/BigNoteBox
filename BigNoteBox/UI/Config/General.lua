@@ -302,20 +302,8 @@ local function BuildGeneralTab(sf, ct)
         function(v) db.openOnLogin = v end,
         L["CFG_CHK_OPEN_LOGIN_TIP"])
 
-    -- Applied at login / reload (Core/Initialize.lua 5b, ALL-270); nil = off.
-    -- Also on Modules > Window placement (ALL-291): re-read on show
-    local cb
-    local function ResetPos() return db.resetWindowPosOnLoad == true end
-    y, cb = AddCheck(ct, y, L["CFG_CHK_RESET_WIN_POS_LABEL"], ResetPos,
-        function(v) db.resetWindowPosOnLoad = v or nil end,
-        L["CFG_CHK_RESET_WIN_POS_TIP"])
-    K.ReadOnShow(cb, ResetPos)
-
-    local function ResetSize() return db.resetWindowSizeOnLoad == true end
-    y, cb = AddCheck(ct, y, L["CFG_CHK_RESET_WIN_SIZE_LABEL"], ResetSize,
-        function(v) db.resetWindowSizeOnLoad = v or nil end,
-        L["CFG_CHK_RESET_WIN_SIZE_TIP"])
-    K.ReadOnShow(cb, ResetSize)
+    -- The two "reset main window placement on load" checkboxes live only on
+    -- Modules > Window placement (ALL-270, moved there by Dukul 2026-10-06)
 
     y = AddCheck(ct, y, L["CFG_CHK_CONFIRM_CLOSE_LABEL"],
         function() return db.confirmClose == true end,

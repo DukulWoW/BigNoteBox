@@ -354,7 +354,8 @@ function K.BuildPlacementPage(sf, ct, y)
     local db = BigNoteBoxDB
     local cb
 
-    -- Main window (also on General > Window)
+    -- Main window: applied at login / reload (Core/Initialize.lua 5b, ALL-270);
+    -- nil = off. Only here since 2026-10-06 (was also on General > Window)
     y = AddHeader(ct, y, L["CFG_PLACE_HDR_MAIN"])
     local function ResetPos() return db.resetWindowPosOnLoad == true end
     y, cb = AddCheck(ct, y, L["CFG_CHK_RESET_WIN_POS_LABEL"], ResetPos,

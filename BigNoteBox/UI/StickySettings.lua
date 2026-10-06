@@ -33,7 +33,7 @@ local SETTINGS_W = 290   -- matches NoteConfig NCW (the Reference Box width)
 -- Content starts just below the tab button bottoms (~y=-45 from frame top) + small pad
 local SETTINGS_TAB_CONTENT_Y = 62
 local SETTINGS_PAD = 12  -- matches NoteConfig PAD
-local SETTINGS_CW = SETTINGS_W - SETTINGS_PAD - 28  -- matches NoteConfig CW_SCROLL (NCW - PAD - 28)
+local SETTINGS_CW = SETTINGS_W - SETTINGS_PAD - 28  -- room for a scrollbar (NoteConfig had the same as CW_SCROLL until ALL-318)
 
 local _stickySettingsFrame = nil   -- single reusable settings window
 local _stickySettingsNoteID = nil  -- noteID it's currently editing

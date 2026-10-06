@@ -292,12 +292,64 @@ local function BuildGeneralTab(panel)
         CW, (gridRows_nc - usedRows_nc) * (PH + PG) - PG)
     y = y - gridRows_nc * (PH + PG) + PG
 
-    -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
-    -- its row is kept either way.
+    -- LSM font dropdown: below the grid's left column when lsmFonts is on, with
+    -- the WoW Default checkbox beside it in the right column (Dukul 2026-10-06:
+    -- one row instead of two, or the font size slider ran off the window).
+    -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua; nil dd
+    -- = nothing built (setting off or no LSM fonts), checkbox row as before.
+    local lsmDD
+    if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
+       and BNB._BuildLSMFontDropdown then
+        local lsmY, _, _, dd = BNB._BuildLSMFontDropdown(panel, y,
+            -- getter: current per-note fontOverride if it is an LSM font
+            function()
+                local note = GetNote()
+                local choice = note and note.fontOverride
+                local def = choice and BNB.GetFontDef and BNB.GetFontDef(choice)
+                return (def and def._isLSM) and choice or nil
+            end,
+            -- setter: nil clears the LSM override (bundled card takes effect);
+            --         path sets per-note override to this LSM font
+            function(path)
+                if path then
+                    Save({fontOverride = path})
+                else
+                    -- Use _clear to actually remove the key from the note table.
+                    -- Save({fontOverride = nil}) would leave a nil entry; _clear removes it.
+                    local id = _noteID; if id then
+                        BNB.UpdateNote(id, {_clear = {"fontOverride"}})
+                    end
+                end
+                -- Apply live to the open editor if this note is loaded
+                local note = GetNote()
+                local sz = (note and note.fontSize)
+                    or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+                local eb = BNB._editorBody
+                if eb and BNB._currentNoteID == _noteID then
+                    local def = path and BNB.GetFontDef and BNB.GetFontDef(path)
+                    if def then
+                        pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
+                    elseif BNB.ApplyFont then
+                        BNB.ApplyFont()
+                    end
+                end
+                HLFonts()
+                if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
+            end,
+            CARD_W_F)
+        if dd then lsmDD = dd; y = lsmY - 4 end
+    end
+
+    -- WoW Default checkbox, below the grid instead of a 9th card (beside the LSM
+    -- dropdown when there is one). Latin set only; its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         wowCb:SetSize(20, 20)
-        wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
+        if lsmDD then
+            wowCb:SetPoint("LEFT", lsmDD, "RIGHT", COL_GAP_F - 2, 0)
+        else
+            wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
+        end
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         local wowLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         wowLbl:SetPoint("LEFT",  wowCb,  "RIGHT", 4, 0)
@@ -336,52 +388,7 @@ local function BuildGeneralTab(panel)
             if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
         _wowCb_nc = wowCb
-        y = y - 24
-    end
-
-    -- LSM font dropdown: appears below the bundled card grid when lsmFonts is on.
-    -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua.
-    -- CW (NCW - PAD - 28) used instead of CONTENT_W to match NoteConfig panel width.
-    if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
-       and BNB._BuildLSMFontDropdown then
-        y = BNB._BuildLSMFontDropdown(panel, y,
-            -- getter: current per-note fontOverride if it is an LSM font
-            function()
-                local note = GetNote()
-                local choice = note and note.fontOverride
-                local def = choice and BNB.GetFontDef and BNB.GetFontDef(choice)
-                return (def and def._isLSM) and choice or nil
-            end,
-            -- setter: nil clears the LSM override (bundled card takes effect);
-            --         path sets per-note override to this LSM font
-            function(path)
-                if path then
-                    Save({fontOverride = path})
-                else
-                    -- Use _clear to actually remove the key from the note table.
-                    -- Save({fontOverride = nil}) would leave a nil entry; _clear removes it.
-                    local id = _noteID; if id then
-                        BNB.UpdateNote(id, {_clear = {"fontOverride"}})
-                    end
-                end
-                -- Apply live to the open editor if this note is loaded
-                local note = GetNote()
-                local sz = (note and note.fontSize)
-                    or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-                local eb = BNB._editorBody
-                if eb and BNB._currentNoteID == _noteID then
-                    local def = path and BNB.GetFontDef and BNB.GetFontDef(path)
-                    if def then
-                        pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
-                    elseif BNB.ApplyFont then
-                        BNB.ApplyFont()
-                    end
-                end
-                HLFonts()
-                if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
-            end,
-            CW)
-        y = y - 4
+        if not lsmDD then y = y - 24 end
     end
 
     -- Re-apply fonts one frame after the panel first becomes visible.
@@ -436,9 +443,9 @@ local function BuildGeneralTab(panel)
         fsSl:SetValue(GetNoteFontSize(), true)
     end
 
+    -- (panel is the tab's own plain frame since ALL-318, no scroll frame;
+    -- _reapplyFontPreviews is set above, after ReapplyFontPreviews)
     panel._hlFonts    = HLFonts
-    -- (panel is the tab's own plain frame since ALL-318, no scroll frame)
-    panel._reapplyFontPreviews = ReapplyFontPreviews
     -- Refresh the state button labels when switching notes
     -- (on the panel: the refresh reads tabPanels[TAB_GEN]; the old
     -- checkboxes hung it on ct and never refreshed)
