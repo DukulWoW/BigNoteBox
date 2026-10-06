@@ -369,7 +369,7 @@ function BNB.CreateNote(title, body)
     local now = time()
     local newScope = BNB.NewNoteScope()
     -- Capture creation coordinates and zone via C_Map if available.
-    local coordX, coordY, coordMapID, coordZone
+    local coordX, coordY, coordMapID, coordZone, coordSubzone
     if C_Map and C_Map.GetBestMapForUnit and C_Map.GetPlayerMapPosition then
         local mapID = C_Map.GetBestMapForUnit("player")
         if mapID then
@@ -380,6 +380,7 @@ function BNB.CreateNote(title, body)
                 coordMapID = mapID
                 local mapInfo = C_Map.GetMapInfo(mapID)
                 coordZone = mapInfo and mapInfo.name or nil
+                coordSubzone = BNB.CurrentSubzone()
             end
         end
     end
@@ -406,6 +407,7 @@ function BNB.CreateNote(title, body)
         coordY       = coordY,    -- map Y coord at creation time (0-100 scale), or nil
         coordMapID   = coordMapID, -- map ID at creation time, or nil
         coordZone    = coordZone,  -- zone name at creation time, or nil
+        coordSubzone = coordSubzone, -- sub-zone at creation time, or nil (ALL-354)
         richMode     = false,      -- true = rich note with markup/SimpleHTML rendering
         created      = now,
         updated      = now,

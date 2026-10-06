@@ -91,10 +91,11 @@ local function Tip(btn, title, body, wrap)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 end
 
--- The thin scroll bar of a list box showing `shown` of n rows from offset
-local function PlaceThumb(thumb, list, shown, n, offset)
+-- The thin scroll bar of a list box showing `shown` of n rows from offset;
+-- rowH = the list's row height (nil = LIST_ROW_H)
+local function PlaceThumb(thumb, list, shown, n, offset, rowH)
     if n <= shown then thumb:Hide(); return end
-    local inner = shown * LIST_ROW_H
+    local inner = shown * (rowH or LIST_ROW_H)
     local h = math.max(8, inner * shown / n)
     thumb:ClearAllPoints()
     thumb:SetPoint("TOPRIGHT", list, "TOPRIGHT", -2, -2 - (inner - h) * offset / (n - shown))
@@ -239,6 +240,121 @@ local function TogglePopup(ed)
     end
     f:Show()
     f:Raise()   -- Note Settings is DIALOG too since 2026-10-04: stay above it
+end
+
+-- ── Waypoint rows (ALL-354) ─────────────────────────────────────────────────
+-- Two lines per waypoint: Name | X, Y on top, Zone | Sub-zone below, a faint
+-- rule between waypoints. The list is the situation list plus two rows tall
+-- (Dukul, 2026-10-06), which holds four waypoints
+-- Note Settings' tabs do not scroll (ALL-318): these and the side-by-side
+-- checkboxes keep the section inside the 640 px window
+local WP_ROWS, WP_ROW_H  = 4, 32
+local WP_LINE_H          = 15
+local WP_HDR_LINE_H      = 11
+local WP_XY_W            = 92   -- room for the X and Y edit boxes over it
+
+-- The four columns inside a holder as wide as a row (a row, or the labels
+-- above the list); y1 / y2 = top of each line, h = line height
+local function PlaceWpCols(holder, nameFS, xyFS, zoneFS, subFS, y1, y2, h)
+    xyFS:SetPoint("TOPRIGHT", holder, "TOPRIGHT", -4, y1); xyFS:SetWidth(WP_XY_W)
+    nameFS:SetPoint("TOPLEFT",  holder, "TOPLEFT", 6, y1)
+    nameFS:SetPoint("TOPRIGHT", xyFS,   "TOPLEFT", -4, 0)
+    zoneFS:SetPoint("TOPLEFT",  holder, "TOPLEFT", 6, y2)
+    zoneFS:SetPoint("TOPRIGHT", holder, "TOP",    -2, y2)
+    subFS:SetPoint("TOPLEFT",   holder, "TOP",     2, y2)
+    subFS:SetPoint("TOPRIGHT",  holder, "TOPRIGHT", -4, y2)
+    for _, fs in ipairs({ nameFS, xyFS, zoneFS, subFS }) do
+        fs:SetHeight(h)
+        fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE"); fs:SetWordWrap(false)
+    end
+end
+
+-- One waypoint row's look: highlight, four columns, the rule under it and
+-- the two hover buttons, drawn over the text at the right end (arrow on the
+-- top line, X on the bottom one). The editor gives it its scripts
+local function NewWaypointRow(list, i)
+    local row = CreateFrame("Button", nil, list)
+    row:SetHeight(WP_ROW_H)
+    local top = -2 - (i - 1) * WP_ROW_H
+    row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, top)
+    row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, top)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row._hi = row:CreateTexture(nil, "BACKGROUND")
+    row._hi:SetAllPoints(); row._hi:SetColorTexture(1, 1, 1, 0.06); row._hi:Hide()
+    local function Col() return row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall") end
+    row._name, row._xy, row._zone, row._sub = Col(), Col(), Col(), Col()
+    PlaceWpCols(row, row._name, row._xy, row._zone, row._sub, -1, -1 - WP_LINE_H, WP_LINE_H)
+    -- The rule between this waypoint and the next; one screen pixel, snapping
+    -- off, or it can vanish (ALL-246)
+    local rule = row:CreateTexture(nil, "ARTWORK")
+    rule:SetColorTexture(1, 1, 1, 0.08)
+    rule:SetPoint("BOTTOMLEFT",  row, "BOTTOMLEFT",  4, 0)
+    rule:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
+    rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0)
+    PixelUtil.SetHeight(rule, 1)
+    rule:Hide()
+    row._rule = rule
+    -- X removes (no confirm, never on the creation row), the arrow navigates
+    -- to this row alone
+    row._nav = BNB.CreateIconButton(row, 16, "right",
+        { tip = L["WP_NAV_ROW_TIP"], tipAnchor = "ANCHOR_TOP" })
+    row._nav:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, 0)
+    row._del = BNB.CreateIconButton(row, 16, "close",
+        { tip = L["WP_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
+    row._del:SetPoint("TOPRIGHT", row, "TOPRIGHT", -2, -WP_LINE_H - 1)
+    row._del:Hide(); row._nav:Hide()
+    return row
+end
+
+-- Sub-zone suggestions under an edit box while typing (2+ letters), from the
+-- location browser's sub-zone list; a click puts the name in the box and
+-- keeps it focused. Returns the list frame (a press on it is not "outside")
+local AC_MAX, AC_ROW_H = 6, 18
+local function AttachSubzoneAC(eb)
+    local ac = BNB.CreateBackdropFrame("Frame", nil, eb)
+    BNB.SetBackdrop(ac, 0.08, 0.08, 0.10, 0.97, 0.35, 0.35, 0.38, 1)
+    ac:SetPoint("TOPLEFT",  eb, "BOTTOMLEFT",  0, -1)
+    ac:SetPoint("TOPRIGHT", eb, "BOTTOMRIGHT", 0, -1)
+    ac:SetFrameLevel(eb:GetFrameLevel() + 5)
+    ac:Hide()
+    local rows = {}
+    local function Update()
+        local text = eb:GetText() or ""
+        local ZP = BNB.ZonePicker
+        local m = (#text >= 2 and eb:HasFocus() and ZP and ZP.GetMatches) and ZP.GetMatches(text, "subzone", AC_MAX) or {}
+        local n = math.min(#m, AC_MAX)
+        if n == 0 then ac:Hide(); return end
+        for i = 1, n do
+            local r = rows[i]
+            if not r then
+                r = CreateFrame("Button", nil, ac)
+                r:SetHeight(AC_ROW_H)
+                r:SetPoint("TOPLEFT",  ac, "TOPLEFT",  2, -2 - (i - 1) * AC_ROW_H)
+                r:SetPoint("TOPRIGHT", ac, "TOPRIGHT", -2, -2 - (i - 1) * AC_ROW_H)
+                local hl = r:CreateTexture(nil, "HIGHLIGHT")
+                hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.10)
+                r._fs = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                r._fs:SetPoint("LEFT", r, "LEFT", 4, 0); r._fs:SetPoint("RIGHT", r, "RIGHT", -4, 0)
+                r._fs:SetJustifyH("LEFT"); r._fs:SetWordWrap(false)
+                r:SetScript("OnClick", function(self)
+                    eb:SetText(self._value); eb:SetCursorPosition(#self._value)
+                    ac:Hide(); eb:SetFocus()
+                end)
+                rows[i] = r
+            end
+            r._value = m[i].name
+            r._fs:SetText(m[i].name)
+            r:Show()
+        end
+        for i = n + 1, #rows do rows[i]:Hide() end
+        ac:SetHeight(n * AC_ROW_H + 4)
+        ac:Show()
+    end
+    eb:HookScript("OnTextChanged", function(_, user) if user then Update() end end)
+    eb:HookScript("OnEditFocusLost", function()
+        C_Timer.After(0.1, function() if not eb:HasFocus() then ac:Hide() end end)
+    end)
+    return ac
 end
 
 --------------------------------------------------------------------------------
@@ -770,38 +886,27 @@ function BNB.CreateSituationEditor(panel, opts)
         GameTooltip:Hide()
     end)
 
-    -- Name | Zone | X, Y inside a holder as wide as a row, room for the two
-    -- hover buttons on the right; the column labels above the list use it too
-    local WP_ROWS = LIST_ROWS               -- as tall as the situation list (Dukul, 2026-10-05)
-    local XY_W, ZONE_W, HOVER_W = 58, 74, 38
-    local function PlaceCols(holder, nameFS, zoneFS, xyFS)
-        xyFS:SetPoint("RIGHT", holder, "RIGHT", -HOVER_W, 0); xyFS:SetWidth(XY_W)
-        zoneFS:SetPoint("RIGHT", xyFS, "LEFT", -4, 0);        zoneFS:SetWidth(ZONE_W)
-        nameFS:SetPoint("LEFT",  holder, "LEFT", 6, 0)
-        nameFS:SetPoint("RIGHT", zoneFS, "LEFT", -4, 0)
-        for _, fs in ipairs({ nameFS, zoneFS, xyFS }) do
-            fs:SetJustifyH("LEFT"); fs:SetWordWrap(false)
-        end
-    end
-
-    local WP_LIST_H = WP_ROWS * LIST_ROW_H + 4
+    -- Two lines per waypoint (ALL-354): Name | X, Y over Zone | Sub-zone. The
+    -- column labels above the list use the same places (PlaceWpCols)
+    local WP_LIST_H = WP_ROWS * WP_ROW_H + 4
     local wpList = BNB.CreateBackdropFrame("Frame", nil, panel)
     BNB.SetBackdropDark(wpList)
-    wpList:SetPoint("TOPLEFT",  wpDiv, "BOTTOMLEFT",  0, -38)
-    wpList:SetPoint("TOPRIGHT", wpDiv, "BOTTOMRIGHT", 0, -38)
+    wpList:SetPoint("TOPLEFT",  wpDiv, "BOTTOMLEFT",  0, -47)
+    wpList:SetPoint("TOPRIGHT", wpDiv, "BOTTOMRIGHT", 0, -47)
     wpList:SetHeight(WP_LIST_H)
 
     local colHdr = CreateFrame("Frame", nil, panel)
     colHdr:SetPoint("BOTTOMLEFT",  wpList, "TOPLEFT",  2, 2)
     colHdr:SetPoint("BOTTOMRIGHT", wpList, "TOPRIGHT", -7, 2)
-    colHdr:SetHeight(12)
+    colHdr:SetHeight(2 * WP_HDR_LINE_H)
     local function ColLabel(key)
         local fs = colHdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         fs:SetText(L[key])
         fs:SetTextColor(0.60, 0.60, 0.60)
         return fs
     end
-    PlaceCols(colHdr, ColLabel("WP_COL_NAME"), ColLabel("WP_COL_ZONE"), ColLabel("WP_COL_XY"))
+    PlaceWpCols(colHdr, ColLabel("WP_COL_NAME"), ColLabel("WP_COL_XY"), ColLabel("WP_COL_ZONE"),
+        ColLabel("WP_COL_SUBZONE"), 0, -WP_HDR_LINE_H, WP_HDR_LINE_H)
 
     local wpEmpty = wpList:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     wpEmpty:SetPoint("LEFT",  wpList, "LEFT",  8, 0)
@@ -818,11 +923,12 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpOffset  = 0    -- rows scrolled past the top
     local wpEntries = {}   -- what the rows show: { created = true, wp } / { index, wp }
     local wpRows    = {}
-    local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartRename, StartCoordEdit, StartZonePick   -- below
+    local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartEdit, StartZonePick   -- below
+    local renameEb, wpEditX, wpEditY, subEb   -- the edit boxes, below
 
-    -- One press on the name, zone or X, Y toggles the row a moment later; a
-    -- second press inside that time edits that column instead (name = rename,
-    -- zone = location browser, X, Y = coordinates; Dukul 2026-10-06), so a
+    -- One press on a column toggles the row a moment later; a second press
+    -- inside that time edits that column instead (name, X, Y and sub-zone =
+    -- the edit boxes, zone = location browser; Dukul 2026-10-06), so a
     -- double-click never toggles first (two presses, as the sticky's inline
     -- edit counts them, ALL-47). Never on the creation row
     local DBL_SECS = 0.35
@@ -831,39 +937,27 @@ function BNB.CreateSituationEditor(panel, opts)
         if pendingTimer then pendingTimer:Cancel() end
         pendingRow, pendingTimer = nil, nil
     end
-    -- The column under the pointer, by x only (a FontString is only as tall
-    -- as its text, the row is taller)
+    -- The column under the pointer: the line by y, the column by x (a
+    -- FontString is only as wide as its column)
     local function ColumnAt(row)
-        local x = GetCursorPosition() / row:GetEffectiveScale()
+        local s = row:GetEffectiveScale()
+        local x, y = GetCursorPosition()
+        x, y = x / s, y / s
         local function In(fs, l) return x >= (l or fs:GetLeft() or 0) and x <= (fs:GetRight() or 0) end
-        if In(row._xy) then return "xy" end
-        if In(row._zone) then return "zone" end
-        if In(row._name, row:GetLeft()) then return "name" end
+        if y < (row:GetTop() or 0) - 1 - WP_LINE_H then
+            if In(row._sub) then return "sub" end
+            if In(row._zone, row:GetLeft()) then return "zone" end
+        else
+            if In(row._xy) then return "xy" end
+            if In(row._name, row:GetLeft()) then return "name" end
+        end
     end
 
     for i = 1, WP_ROWS do
-        local row = CreateFrame("Button", nil, wpList)
-        row:SetHeight(LIST_ROW_H)
-        row:SetPoint("TOPLEFT",  wpList, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
-        row:SetPoint("TOPRIGHT", wpList, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
-        row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-        local hi = row:CreateTexture(nil, "BACKGROUND")
-        hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.06); hi:Hide()
-        row._name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        row._zone = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        row._xy   = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-        PlaceCols(row, row._name, row._zone, row._xy)
-        -- Hover buttons, as on a situation row: X removes (no confirm, never
-        -- on the creation row), the arrow navigates to this row alone
-        row._del = BNB.CreateIconButton(row, 16, "close",
-            { tip = L["WP_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
-        row._del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        local row = NewWaypointRow(wpList, i)
+        local hi = row._hi
         row._del:SetScript("OnClick", function() GameTooltip:Hide(); WpRemove(row._entry) end)
-        row._nav = BNB.CreateIconButton(row, 16, "right",
-            { tip = L["WP_NAV_ROW_TIP"], tipAnchor = "ANCHOR_TOP" })
-        row._nav:SetPoint("RIGHT", row._del, "LEFT", -2, 0)
         row._nav:SetScript("OnClick", function() WpNavigate(row._entry) end)
-        row._del:Hide(); row._nav:Hide()
         local function HoverOff()
             if row:IsMouseOver() then return end   -- moved between the row and its buttons
             hi:Hide(); row._del:Hide(); row._nav:Hide()
@@ -881,8 +975,9 @@ function BNB.CreateSituationEditor(panel, opts)
             local e = self._entry; if not e then return end
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(self._name:GetText() or "", 1, 1, 1)
-            GameTooltip:AddLine(string.format("%s  %.1f, %.1f", BNB.WaypointZone(e.wp), e.wp.x, e.wp.y),
-                0.78, 0.78, 0.78)
+            local where = BNB.WaypointZone(e.wp)
+            if e.wp.subzone then where = where .. " - " .. e.wp.subzone end
+            GameTooltip:AddLine(string.format("%s  %.1f, %.1f", where, e.wp.x, e.wp.y), 0.78, 0.78, 0.78)
             if e.created then GameTooltip:AddLine(L["WP_ROW_TIP_CREATED"], 0.60, 0.60, 0.60, true) end
             GameTooltip:AddLine(e.wp.on and L["WP_ROW_TIP_ON"] or L["WP_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
             if not HasWPAddon() then GameTooltip:AddLine(L["WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
@@ -898,9 +993,10 @@ function BNB.CreateSituationEditor(panel, opts)
             if not col then CancelPending(); WpToggle(e); return end
             if pendingRow == self then
                 CancelPending()
-                if col == "xy" then StartCoordEdit(self)
+                if col == "xy" then StartEdit(self, wpEditX)
+                elseif col == "sub" then StartEdit(self, subEb)
                 elseif col == "zone" then StartZonePick(self)
-                else StartRename(self) end
+                else StartEdit(self, renameEb) end
                 return
             end
             CancelPending()
@@ -918,11 +1014,12 @@ function BNB.CreateSituationEditor(panel, opts)
         RefreshWaypoints()
     end)
 
-    -- Edit in place (ALL-329): three boxes laid over the row, Name over the
-    -- name, X and Y over the X, Y column; a double-click on the name or X, Y
-    -- opens all three with that one focused. Tab / Shift+Tab move between them;
-    -- Enter or a press outside the boxes saves (empty name = the note title
-    -- again), ESC leaves the row as it was
+    -- Edit in place (ALL-329, ALL-354): four boxes laid over the row, Name and
+    -- X, Y on the top line, Sub-zone below (with suggestions while typing); a
+    -- double-click on one of those columns opens all four with that one
+    -- focused. Tab / Shift+Tab move between them; Enter or a press outside the
+    -- boxes saves (empty name = the note title again, empty sub-zone = none),
+    -- ESC leaves the row as it was
     local function EditBoxOver()
         local eb = CreateFrame("EditBox", nil, wpList, "BackdropTemplate")
         BNB.EnsureBackdrop(eb)
@@ -935,11 +1032,13 @@ function BNB.CreateSituationEditor(panel, opts)
         eb:Hide()
         return eb
     end
-    local renameEb, wpEditX, wpEditY = EditBoxOver(), EditBoxOver(), EditBoxOver()
+    renameEb, wpEditX, wpEditY, subEb = EditBoxOver(), EditBoxOver(), EditBoxOver(), EditBoxOver()
     renameEb:SetMaxLetters(64)
     wpEditX:SetMaxLetters(16)
     wpEditY:SetMaxLetters(16)
-    local editBoxes = { renameEb, wpEditX, wpEditY }
+    subEb:SetMaxLetters(64)
+    local subAC = AttachSubzoneAC(subEb)
+    local editBoxes = { renameEb, wpEditX, wpEditY, subEb }
     BNB.TabChain(editBoxes)
     local renaming   -- index into note.waypoints of the row being edited
     local editWatch = CreateFrame("Frame")
@@ -960,11 +1059,12 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
     wpNavBtn:SetPoint("LEFT", wpManualBtn, "RIGHT", BTN_GAP, 0)
 
-    -- The two checkboxes, one under the other. One line each; a long
+    -- The two checkboxes side by side (room for the two-line waypoint rows,
+    -- ALL-354). One line each; a long
     -- translation is cut at the panel edge, the tooltips carry the full text.
     -- Greyed while the note has no situation: both act on the waypoints a
     -- situation places
-    local CHK_PITCH = 22
+    local CHK_COL_X = 134   -- the second checkbox: half the 266 px panel
     local function WpCheck(labelKey, tipKey, field)
         local chk = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         chk:SetSize(24, 24)
@@ -1000,14 +1100,15 @@ function BNB.CreateSituationEditor(panel, opts)
     -- "Don't track it" (note.wpNoTrack, SUG-10). Only the waypoint a situation
     -- places honours it; Navigate and waypoint links in the text always track.
     local wpNoTrackChk = WpCheck("STICKY_WP_NOTRACK_LABEL", "NC_WP_NOTRACK_TIP", "wpNoTrack")
-    wpNoTrackChk:SetPoint("TOPLEFT", wpLeaveChk, "TOPLEFT", 0, -CHK_PITCH)
+    wpNoTrackChk:SetPoint("TOPLEFT", wpLeaveChk, "TOPLEFT", CHK_COL_X, 0)
+    wpLeaveChk._lbl:SetPoint("RIGHT", wpNoTrackChk, "LEFT", -2, 0)
 
     -- Manual row (hidden until Manual is clicked) under the checkboxes:
     -- X, Y and an optional name; nothing else lives there, so nothing has to
     -- move (ALL-233)
     local wpManualRow = CreateFrame("Frame", nil, panel)
     wpManualRow:SetHeight(22)
-    wpManualRow:SetPoint("TOPLEFT",  wpPinBtn, "BOTTOMLEFT", 0, -(2 + CHK_PITCH + 24 + 4))
+    wpManualRow:SetPoint("TOPLEFT",  wpPinBtn, "BOTTOMLEFT", 0, -(2 + 24 + 4))
     wpManualRow:SetPoint("TOPRIGHT", panel,    "TOPRIGHT",  -padR, 0)
     wpManualRow:Hide()
 
@@ -1089,13 +1190,17 @@ function BNB.CreateSituationEditor(panel, opts)
             if e then
                 row._name:SetText(BNB.WaypointName(note, e.wp))
                 row._zone:SetText(BNB.WaypointZone(e.wp))
+                row._sub:SetText(e.wp.subzone or "")
                 row._xy:SetText(string.format("%.1f, %.1f", e.wp.x, e.wp.y))
                 -- Green = placed by the situation, grey = kept for Navigate;
                 -- the note title standing in for a name is dimmer
                 local r, g, b = 0.55, 0.55, 0.55
                 if e.wp.on then r, g, b = 0.40, 0.85, 0.40 end
                 row._zone:SetTextColor(r, g, b)
+                row._sub:SetTextColor(r, g, b)
                 row._xy:SetTextColor(r, g, b)
+                -- The rule only between two waypoints
+                row._rule:SetShown(wpEntries[wpOffset + i + 1] ~= nil and i < WP_ROWS)
                 local dim = e.wp.name and 1 or 0.7
                 row._name:SetTextColor(r * dim, g * dim, b * dim)
                 row:Show()
@@ -1103,12 +1208,12 @@ function BNB.CreateSituationEditor(panel, opts)
                 if row:IsMouseOver() then row:_showHover() else row._del:Hide(); row._nav:Hide() end
             else
                 row:Hide()
-                row._del:Hide(); row._nav:Hide()
+                row._del:Hide(); row._nav:Hide(); row._rule:Hide()
             end
         end
         if n == 0 then wpEmpty:Show() else wpEmpty:Hide() end
         wpList:EnableMouseWheel(n > WP_ROWS)   -- otherwise the wheel is the window's
-        PlaceThumb(wpThumb, wpList, WP_ROWS, n, wpOffset)
+        PlaceThumb(wpThumb, wpList, WP_ROWS, n, wpOffset, WP_ROW_H)
 
         RefreshWPStatusTag()
         local avail = WPAvailable() and note and true or false
@@ -1425,16 +1530,18 @@ function BNB.CreateSituationEditor(panel, opts)
         if v and v >= 0 and v <= 100 then return v end
     end
 
-    -- Saves the three boxes in one write. Name always; X, Y only when both
-    -- read as coordinates. Both numbers pasted into X ("20.1 23.2", "20,1;
-    -- 23,2") count too
-    local function WpSaveEdit(index, name, xText, yText)
+    -- Saves the four boxes in one write. Name and sub-zone always; X, Y only
+    -- when both read as coordinates. Both numbers pasted into X ("20.1 23.2",
+    -- "20,1; 23,2") count too
+    local function WpSaveEdit(index, name, xText, yText, subText)
         local id = NoteID(); local note = id and BNB.GetNote(id)
         if not note then return end
         local list = CopyWaypoints(note)
         if not list[index] then return end
         name = (name or ""):match("^%s*(.-)%s*$") or ""
         list[index].name = name ~= "" and name or nil
+        local sub = (subText or ""):match("^%s*(.-)%s*$") or ""
+        list[index].subzone = sub ~= "" and sub or nil
         local a, b = (xText or ""):match("^%s*([%d%.,]+)[%s;]+([%d%.,]+)%s*$")
         local x, y
         if a then x, y = WpCoord(a), WpCoord(b)
@@ -1446,15 +1553,16 @@ function BNB.CreateSituationEditor(panel, opts)
     local function CommitEdit()
         local index = renaming
         if not index then return end
-        local name, xt, yt = renameEb:GetText(), wpEditX:GetText(), wpEditY:GetText()
+        local name, xt, yt, st = renameEb:GetText(), wpEditX:GetText(), wpEditY:GetText(), subEb:GetText()
         EndRename()
-        WpSaveEdit(index, name, xt, yt)
+        WpSaveEdit(index, name, xt, yt, st)
     end
-    -- A press outside the three boxes saves (Dukul 2026-10-06)
+    -- A press outside the boxes (and the sub-zone suggestions) saves (Dukul 2026-10-06)
     editWatch:SetScript("OnEvent", function()
         if not renaming then return end
         if not renameEb:IsVisible() then EndRename() return end   -- window gone: nothing to save into
         for _, eb in ipairs(editBoxes) do if eb:IsMouseOver() then return end end
+        if subAC:IsShown() and subAC:IsMouseOver() then return end
         CommitEdit()
     end)
     for _, eb in ipairs(editBoxes) do eb:SetScript("OnEnterPressed", CommitEdit) end
@@ -1464,8 +1572,8 @@ function BNB.CreateSituationEditor(panel, opts)
         if note and e then BNB.NavigateWaypoints(note, { e.wp }) end
     end
 
-    -- Opens the three boxes over the row, focus on `focus` (one of them)
-    local function StartEdit(row, focus)
+    -- Opens the four boxes over the row, focus on `focus` (one of them)
+    StartEdit = function(row, focus)
         local e = row._entry
         if not e or e.created then return end
         renaming = e.index
@@ -1481,6 +1589,10 @@ function BNB.CreateSituationEditor(panel, opts)
         wpEditY:SetPoint("LEFT",  wpEditX, "RIGHT", 4, 0)
         wpEditY:SetPoint("RIGHT", row,     "RIGHT", 0, 0)   -- over the hover buttons too: room to type
         wpEditY:SetText(string.format("%.1f", e.wp.y))
+        subEb:ClearAllPoints()
+        subEb:SetPoint("LEFT",  row._sub, "LEFT", -3, 0)
+        subEb:SetPoint("RIGHT", row,      "RIGHT", 0, 0)
+        subEb:SetText(e.wp.subzone or "")
         for _, eb in ipairs(editBoxes) do eb:Show() end
         focus:SetFocus()
         focus:HighlightText()
@@ -1489,8 +1601,6 @@ function BNB.CreateSituationEditor(panel, opts)
             if renaming then pcall(editWatch.RegisterEvent, editWatch, "GLOBAL_MOUSE_DOWN") end
         end)
     end
-    StartRename    = function(row) StartEdit(row, renameEb) end
-    StartCoordEdit = function(row) StartEdit(row, wpEditX) end
 
     -- Zone: the location browser on its Zones tab, over the waypoint section.
     -- A zone moves the waypoint to that map (X, Y kept, label = the new name);
@@ -1520,7 +1630,7 @@ function BNB.CreateSituationEditor(panel, opts)
                 root:CreateButton(L["WP_MENU_RENAME"], function()
                     -- Still the same row (nothing reloaded the list meanwhile)
                     local now = row._entry
-                    if now and not now.created and now.index == e.index then StartRename(row) end
+                    if now and not now.created and now.index == e.index then StartEdit(row, renameEb) end
                 end)
             end
             root:CreateRadio(L["WP_MENU_AUTO"], function() return e.wp.on == true end,
@@ -1533,7 +1643,7 @@ function BNB.CreateSituationEditor(panel, opts)
     end
 
     -- Adds a waypoint at x, y (0-100) on mapID at the end of the list, green
-    local function AddWaypoint(mapID, x, y, name, msgKey)
+    local function AddWaypoint(mapID, x, y, name, msgKey, subzone)
         local id = NoteID(); local note = id and BNB.GetNote(id)
         if not (note and mapID) then return end
         local list = CopyWaypoints(note)
@@ -1545,7 +1655,7 @@ function BNB.CreateSituationEditor(panel, opts)
         local zone = BNB.WaypointZone({ mapID = mapID })
         if zone == "" then zone = GetRealZoneText() or GetZoneText() or "" end
         local wp = { mapID = mapID, x = x, y = y, label = zone ~= "" and zone or nil,
-                     name = name and name ~= "" and name or nil, on = true }
+                     name = name and name ~= "" and name or nil, on = true, subzone = subzone }
         list[#list + 1] = wp
         wpOffset = #list + 1   -- clamped by RefreshWaypoints: the new row shows at the bottom
         SaveWaypoints(id, list, createdOn)
@@ -1619,7 +1729,7 @@ function BNB.CreateSituationEditor(panel, opts)
         if not pos then BNB:Print("|cffff6666Cannot get map position.|r"); return end
         local px, py = pos:GetXY()
         AddWaypoint(mapID, math.floor(px * 1000 + 0.5) / 10,
-            math.floor(py * 1000 + 0.5) / 10, nil, "NC_WP_PINNED_MSG")
+            math.floor(py * 1000 + 0.5) / 10, nil, "NC_WP_PINNED_MSG", BNB.CurrentSubzone())
     end)
     Tip(wpPinBtn, L["STICKY_WP_PIN_TIP_TITLE"], L["STICKY_WP_PIN_TIP_BODY"], true)
 

@@ -9,6 +9,8 @@
 --   BNB.Alarm.Snooze(noteID, minutes)       -- snooze by N minutes
 --   BNB.Alarm.ResetFired(noteID)            -- re-arm a fired alarm
 --   BNB.Alarm.GetNextFireTime(noteID)       -- returns Unix timestamp or nil
+--   BNB.Alarm.ResetKind(alarm)              -- "daily" / "weekly" / nil (reset alarm types)
+--   BNB.Alarm.NextResetTime(kind)           -- next daily / weekly reset, Unix timestamp
 --   BNB.Alarm.GlowStart(noteID)             -- start glow on all targets for note
 --   BNB.Alarm.GlowStop(noteID)              -- stop glow on all targets for note
 --   BNB.Alarm.RegisterGlowTarget(noteID, frame)   -- called by NoteList / StickyNote
@@ -160,28 +162,55 @@ function AM.NextInGameTime(igTime, after)
     return candidate
 end
 
+-- Daily / Weekly reset alarms (ALL-342): the Type is timeType "dailyreset" /
+-- "weeklyreset" and they ring at the reset itself, every day / week. They
+-- also save recur = "daily" / "weekly", so an older build still repeats a
+-- weekly one. recur = "weekly" alone is the shape from before ALL-342 (a
+-- Repeat choice) and reads as a weekly reset alarm. Ask this, never timeType.
+function AM.ResetKind(alarm)
+    if not alarm then return nil end
+    if alarm.timeType == "dailyreset" then return "daily" end
+    if alarm.timeType == "weeklyreset" or alarm.recur == "weekly" then return "weekly" end
+    return nil
+end
+
+-- Next daily / weekly reset, from the client's own reset clock: the region's
+-- day and hour, no hard-coded Tuesday 07:00 (BUG-09). nil if the client
+-- cannot say.
+local RESET_PERIOD = { daily = 86400, weekly = 7 * 86400 }
+function AM.NextResetTime(kind)
+    if not C_DateAndTime or not RESET_PERIOD[kind] then return nil end
+    local fn = kind == "daily" and C_DateAndTime.GetSecondsUntilDailyReset
+               or C_DateAndTime.GetSecondsUntilWeeklyReset
+    local secs = fn and fn()
+    if not secs then return nil end
+    local now = time()
+    local nextReset = now + secs
+    -- Dismissed in the same minute as the reset: that one has fired, take the next
+    if nextReset <= now + 60 then nextReset = nextReset + RESET_PERIOD[kind] end
+    return nextReset
+end
+
 -- ---------------------------------------------------------------------------
 -- RECURRENCE: compute next fire time from a fired alarm
 -- Returns a new Unix timestamp, or nil if alarm should not recur.
 -- ---------------------------------------------------------------------------
 local function NextRecurTime(alarm)
+    local kind = AM.ResetKind(alarm)
+    if kind then return AM.NextResetTime(kind) end
+
+    -- An in-game alarm without a Repeat choice rings every day at its server
+    -- time, as its note in Set alarm says; Dismiss marked it fired (ALL-342)
+    if alarm.timeType == "ingame" and not alarm.recur then
+        return AM.NextInGameTime(alarm.igTime)
+    end
+
     local r = alarm.recur
     if not r then return nil end
 
     local now = time()
 
-    if r == "weekly" then
-        -- WoW weekly reset, from the client's own reset clock: the region's
-        -- day and hour, no hard-coded Tuesday 07:00 (BUG-09)
-        local secs = C_DateAndTime and C_DateAndTime.GetSecondsUntilWeeklyReset
-                     and C_DateAndTime.GetSecondsUntilWeeklyReset()
-        if not secs then return nil end
-        local nextReset = now + secs
-        -- Dismissed in the same minute as the reset: that one has fired, take the next
-        if nextReset <= now + 60 then nextReset = nextReset + 7 * 86400 end
-        return nextReset
-
-    elseif r == "weekdays" then
+    if r == "weekdays" then
         -- recurDays = {1,2,3,...} 1=Mon...7=Sun (mapped from Lua wday)
         local days = alarm.recurDays
         if not days or #days == 0 then return nil end
@@ -671,6 +700,11 @@ function AM.ResetFired(noteID)
     if alarm.timeType == "ingame" and (alarm.time or 0) <= time() then
         alarm.time = AM.NextInGameTime(alarm.igTime)
     end
+    -- A reset alarm re-arms for the next reset (ALL-342)
+    local kind = AM.ResetKind(alarm)
+    if kind and (alarm.time or 0) <= time() then
+        alarm.time = AM.NextResetTime(kind)
+    end
     SaveAlarm(noteID, alarm, true)
     if BNB.AlarmOverview and BNB.AlarmOverview.Refresh then BNB.AlarmOverview.Refresh() end
 end
@@ -710,6 +744,11 @@ function AM.GetNextFireTime(noteID)
         -- saved before ALL-136.3 have none yet: the next time the server
         -- clock reads igTime. Written directly: runtime state, not an edit.
         alarm.time = AM.NextInGameTime(alarm.igTime)
+    end
+    if not alarm.time then
+        -- A reset alarm without a due time yet (imported): the next reset
+        local kind = AM.ResetKind(alarm)
+        if kind then alarm.time = AM.NextResetTime(kind) end
     end
     return alarm.time
 end

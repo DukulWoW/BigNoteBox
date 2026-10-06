@@ -94,6 +94,10 @@ local function MdEncodeNote(note)
     for _, wp in ipairs(BNB.NoteWaypoints(note)) do
         lines[#lines + 1] = string.format("%s: %d:%s:%s:%s", wp.on and "waypoint" or "waypointOff",
             wp.mapID, tostring(wp.x), tostring(wp.y), wp.name or "")
+        -- Its own line, for the waypoint above it: the name runs to the end of
+        -- the waypoint line, so an older build would read a sub-zone there
+        -- as part of the name (ALL-354)
+        if wp.subzone then lines[#lines + 1] = "waypointSubzone: " .. wp.subzone end
     end
     if note.wpClearOnLeave then lines[#lines + 1] = "wpClearOnLeave: true" end
     if note.wpNoTrack      then lines[#lines + 1] = "wpNoTrack: true"      end
@@ -1047,6 +1051,9 @@ local function ParseMarkdownNotes(text)
                     elseif key == "scope"            then note.scope            = val
                     elseif key == "wpClearOnLeave"   then note.wpClearOnLeave   = (val == "true") or nil
                     elseif key == "wpNoTrack"        then note.wpNoTrack        = (val == "true") or nil
+                    elseif key == "waypointSubzone" and val ~= "" then
+                        local wps = note.waypoints
+                        if wps and wps[#wps] then wps[#wps].subzone = val end
                     elseif (key == "waypoint" or key == "waypointOff") and val ~= "" and val ~= "null" then
                         -- Format: mapID:x:y:name, one line per waypoint (ALL-282);
                         -- "waypointOff" = not placed by the situation. Before

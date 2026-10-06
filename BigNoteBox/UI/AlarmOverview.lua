@@ -297,8 +297,11 @@ local function FormatFireTime(noteID)
 end
 
 -- What kind of alarm and how it repeats, for the row's bottom line (ALL-303)
-local RECUR_KEYS = { weekly = "AW_RECUR_WEEKLY", weekdays = "AW_RECUR_WEEKDAYS", interval = "AW_RECUR_INTERVAL" }
+local RECUR_KEYS = { weekdays = "AW_RECUR_WEEKDAYS", interval = "AW_RECUR_INTERVAL" }
 local function AlarmInfo(alarm)
+    -- A reset alarm's type already says how often it rings (ALL-342)
+    local reset = BNB.Alarm and BNB.Alarm.ResetKind(alarm)
+    if reset then return L[reset == "daily" and "AW_TIME_DAILY_RESET" or "AW_TIME_WEEKLY_RESET"] end
     local kind = alarm.timeType == "ingame" and L["AW_TIME_INGAME"] or L["AW_TIME_REAL"]
     local rep
     if alarm.timeType == "ingame" then rep = L["AO_INFO_DAILY"]

@@ -106,6 +106,7 @@ local FIELDS = {
     { "coordY",     "n", nocopy = true },
     { "coordMapID", "n", nocopy = true },
     { "coordZone",  "s", nocopy = true },
+    { "coordSubzone", "s", nocopy = true },   -- sub-zone at creation, nil = none or older note (ALL-354)
     -- true = the creation spot above is placed when the situation matches,
     -- like a waypoint whose `on` is set (ALL-282). Not shared: the coords are not
     { "wpCreatedOn", "b", nocopy = true },
@@ -285,7 +286,8 @@ end
 
 --------------------------------------------------------------------------------
 -- WAYPOINTS (ALL-282)
--- note.waypoints = { { mapID, x, y, label, name, on }, ... }, x and y 0-100.
+-- note.waypoints = { { mapID, x, y, label, name, on, subzone }, ... }, x and y
+-- 0-100; subzone = typed or where the player stood, nil = blank (ALL-354).
 -- The spot where the note was made (coordMapID / coordX / coordY) is shown as a
 -- row above them and can be placed too (note.wpCreatedOn), never removed.
 -- Read them only through these.
@@ -302,6 +304,7 @@ function BNB.CleanWaypoint(v)
         label = type(v.label) == "string" and v.label ~= "" and v.label or nil,
         name  = type(v.name)  == "string" and v.name  ~= "" and v.name  or nil,
         on    = v.on == true or nil,
+        subzone = type(v.subzone) == "string" and v.subzone ~= "" and v.subzone or nil,
     }
 end
 
@@ -316,7 +319,8 @@ end
 function BNB.CreationWaypoint(note)
     if not (note and note.coordMapID and note.coordX and note.coordY) then return nil end
     return { mapID = note.coordMapID, x = note.coordX, y = note.coordY,
-             label = note.coordZone, on = note.wpCreatedOn == true or nil, created = true }
+             label = note.coordZone, subzone = note.coordSubzone,
+             on = note.wpCreatedOn == true or nil, created = true }
 end
 
 -- The name a waypoint shows on the map: its own, else the note title (read

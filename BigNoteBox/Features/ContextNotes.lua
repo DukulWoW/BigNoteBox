@@ -820,6 +820,15 @@ function BNB.WaypointZone(wp)
     return (info and info.name) or (wp and wp.label) or ""
 end
 
+-- The sub-zone the player stands in, nil when none (the game answers "" or
+-- the zone's own name there). Saved with a new note and a pinned waypoint
+-- (ALL-354)
+function BNB.CurrentSubzone()
+    local sub = GetSubZoneText and GetSubZoneText() or ""
+    if sub == "" or sub == (GetZoneText and GetZoneText() or "") then return nil end
+    return sub
+end
+
 -- Navigate: places the given waypoints and tracks them, whatever "Don't track
 -- it" says (only the situation's own placement honours it). TomTom takes them
 -- all, its arrow on the first; the game's pin takes the first; with neither, a

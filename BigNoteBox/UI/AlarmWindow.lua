@@ -186,37 +186,81 @@ local function BuildWindow()
 end
 
 -- ---------------------------------------------------------------------------
--- BUILD TAB CONTENT  (shared by both normal and skin builders)
--- Receives the outer frame and the three scroll content frames.
--- Builds all widgets for tabs 1/2/3 and wires save/delete buttons.
+-- TAB 1 PIECES: Time, Repeat and Sound, split out of BuildTabContent (CMP-07).
+-- Repeat and Sound are frames of their own, placed by the Type's relayout
+-- right under the Type's rows; Repeat is hidden for the reset types (ALL-342).
 -- ---------------------------------------------------------------------------
-local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
-    -- ================================================================
-    -- TAB 1: GENERAL
-    -- ================================================================
-    local y = -4
+-- Type value -> reset kind (BNB.Alarm.ResetKind's answer)
+local RESET_OF = { dailyreset = "daily", weeklyreset = "weekly" }
+local RESET_H  = 30 + AW_GAP   -- the reset types' two-line note
 
-    -- Section: Reminder
-    SectionHdr(ct1, L["AW_SECT_REMINDER"], y); y = y - AW_LBL - 2
-    local labelEB = BNB.CreateBackdropFrame("EditBox",nil,ct1)
-    labelEB:SetSize(AW_CW,AW_ROW); labelEB:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
-    labelEB:SetAutoFocus(false); labelEB:SetMaxLetters(80)
-    BNB.AddPlaceholder(labelEB,L["AW_REMINDER_PLACEHOLDER"])
-    labelEB:SetFontObject("GameFontNormalSmall")
-    labelEB:HookScript("OnTextChanged", function() MarkDirty() end)
-    y = y - AW_ROW - AW_SECT_GAP
-    Div(ct1,y); y = y - AW_GAP
+-- Hour and minute are typeable fields with a value list (ALL-136.3):
+-- Tab or ":" moves between them, Enter leaves the field, every minute
+-- 00-59. With a 12-hour clock (Appearance > Timestamp format) the hour
+-- runs 1-12 and an AM/PM field follows. tp:Set / tp:Get use 0-23 hours.
+local function TimePair(row)
+    local tp = {}
+    local hBox, mBox
+    hBox = BNB.CreateNumberCombo(row,0,23,9,100,AW_ROW,{ onDirty=MarkDirty,
+        onTab=function() mBox.eb:SetFocus() end })
+    mBox = BNB.CreateNumberCombo(row,0,59,0,100,AW_ROW,{ onDirty=MarkDirty,
+        onTab=function() hBox.eb:SetFocus() end })
+    local cln = row:CreateFontString(nil,"OVERLAY","GameFontNormal"); cln:SetText(":")
+    local apDD = MakeDD(row,{ {label=L["AW_AM"],value="am"}, {label=L["AW_PM"],value="pm"} },"am",nil,
+        math.floor((AW_CW-20)/3))
+    local use24 = true
+    function tp:Layout()
+        local db = BigNoteBoxDB
+        local h, m = tp:Get()   -- in the old mode, before use24 changes
+        use24 = db == nil or db.use24Hour ~= false
+        local w = use24 and (math.floor(AW_CW/2)-6) or math.floor((AW_CW-20)/3)
+        hBox:SetFieldWidth(w); mBox:SetFieldWidth(w)
+        hBox:ClearAllPoints(); hBox:SetPoint("LEFT",row,"LEFT",0,0)
+        cln:ClearAllPoints();  cln:SetPoint("LEFT",row,"LEFT",w+4,0)
+        mBox:ClearAllPoints(); mBox:SetPoint("LEFT",row,"LEFT",w+12,0)
+        apDD:ClearAllPoints(); apDD:SetPoint("LEFT",row,"LEFT",w*2+20,0)
+        apDD:SetShown(not use24)
+        if use24 then hBox:SetRange(0,23) else hBox:SetRange(1,12) end
+        tp:Set(h, m)
+    end
+    function tp:Set(h, m)
+        h = tonumber(h) or 9
+        if use24 then
+            hBox:SetValue(h)
+        else
+            apDD:SetSelected(h >= 12 and "pm" or "am")
+            local h12 = h % 12; if h12 == 0 then h12 = 12 end
+            hBox:SetValue(h12)
+        end
+        mBox:SetValue(m or 0)
+    end
+    function tp:Get()
+        local h = hBox:GetValue()
+        if not use24 then h = h % 12 + (apDD:GetSelected() == "pm" and 12 or 0) end
+        return h, mBox:GetValue()
+    end
+    return tp
+end
 
-    -- Section: Time
+-- Section: Time (Type dropdown + the Type's own rows). Returns a table:
+-- dd, realTP, igTP, setType(v), refreshCalendar, topY (where the Type's rows
+-- start), heights[real / ingame / reset]; the caller sets T.relayout(v).
+local function BuildTimeSection(ct1, y)
+    local T = {}
     SectionHdr(ct1,L["AW_SECT_TIME"],y); y = y - AW_LBL - 2
     Lbl(ct1,L["AW_LBL_TYPE"],y); y = y - AW_LBL
+    -- Daily / Weekly reset ring at the reset itself, every day / week: no
+    -- date, time or Repeat for them (ALL-342, Dukul 2026-10-06)
     local timeEntries = {
-        {label=L["AW_TIME_REAL"],value="real"},
-        {label=L["AW_TIME_INGAME"],   value="ingame"},
+        {label=L["AW_TIME_REAL"],         value="real"},
+        {label=L["AW_TIME_INGAME"],       value="ingame"},
+        {label=L["AW_TIME_DAILY_RESET"],  value="dailyreset"},
+        {label=L["AW_TIME_WEEKLY_RESET"], value="weeklyreset"},
     }
     local timeDDCont = MakeDD(ct1,timeEntries,"real",nil)
     timeDDCont:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
     y = y - AW_ROW - AW_GAP
+    local topY = y
 
     -- Calendar (real-world)
     local CAL_CELL = math.floor(AW_CW/7)
@@ -299,62 +343,12 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     -- Hour:Min (real-world)
     local realTimeRow = CreateFrame("Frame",nil,ct1)
     realTimeRow:SetSize(AW_CW,AW_ROW); realTimeRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
-    -- Hour and minute are typeable fields with a value list (ALL-136.3):
-    -- Tab or ":" moves between them, Enter leaves the field, every minute
-    -- 00-59. With a 12-hour clock (Appearance > Timestamp format) the hour
-    -- runs 1-12 and an AM/PM field follows. tp:Set / tp:Get use 0-23 hours.
-    local function TimePair(row)
-        local tp = {}
-        local hBox, mBox
-        hBox = BNB.CreateNumberCombo(row,0,23,9,100,AW_ROW,{ onDirty=MarkDirty,
-            onTab=function() mBox.eb:SetFocus() end })
-        mBox = BNB.CreateNumberCombo(row,0,59,0,100,AW_ROW,{ onDirty=MarkDirty,
-            onTab=function() hBox.eb:SetFocus() end })
-        local cln = row:CreateFontString(nil,"OVERLAY","GameFontNormal"); cln:SetText(":")
-        local apDD = MakeDD(row,{ {label=L["AW_AM"],value="am"}, {label=L["AW_PM"],value="pm"} },"am",nil,
-            math.floor((AW_CW-20)/3))
-        local use24 = true
-        function tp:Layout()
-            local db = BigNoteBoxDB
-            local h, m = tp:Get()   -- in the old mode, before use24 changes
-            use24 = db == nil or db.use24Hour ~= false
-            local w = use24 and (math.floor(AW_CW/2)-6) or math.floor((AW_CW-20)/3)
-            hBox:SetFieldWidth(w); mBox:SetFieldWidth(w)
-            hBox:ClearAllPoints(); hBox:SetPoint("LEFT",row,"LEFT",0,0)
-            cln:ClearAllPoints();  cln:SetPoint("LEFT",row,"LEFT",w+4,0)
-            mBox:ClearAllPoints(); mBox:SetPoint("LEFT",row,"LEFT",w+12,0)
-            apDD:ClearAllPoints(); apDD:SetPoint("LEFT",row,"LEFT",w*2+20,0)
-            apDD:SetShown(not use24)
-            if use24 then hBox:SetRange(0,23) else hBox:SetRange(1,12) end
-            tp:Set(h, m)
-        end
-        function tp:Set(h, m)
-            h = tonumber(h) or 9
-            if use24 then
-                hBox:SetValue(h)
-            else
-                apDD:SetSelected(h >= 12 and "pm" or "am")
-                local h12 = h % 12; if h12 == 0 then h12 = 12 end
-                hBox:SetValue(h12)
-            end
-            mBox:SetValue(m or 0)
-        end
-        function tp:Get()
-            local h = hBox:GetValue()
-            if not use24 then h = h % 12 + (apDD:GetSelected() == "pm" and 12 or 0) end
-            return h, mBox:GetValue()
-        end
-        return tp
-    end
     local realTP = TimePair(realTimeRow)
-    y = y - AW_ROW - AW_GAP
 
-    -- In-game time
+    -- In-game time, in the calendar's place
     local igSection = CreateFrame("Frame",nil,ct1)
     igSection:SetSize(AW_CW, AW_LBL+AW_ROW+AW_GAP)
-    -- position igSection at same y as realSection (before calendar)
-    local igTopY = y + AW_ROW + AW_GAP + CAL_TOTAL + AW_GAP
-    igSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,igTopY)
+    igSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,topY)
     igSection:Hide()
 
     local igNote = igSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
@@ -367,9 +361,31 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     igRow:SetSize(AW_CW,AW_ROW); igRow:SetPoint("TOPLEFT",igSection,"TOPLEFT",0,-AW_LBL)
     local igTP = TimePair(igRow)
 
+    -- Daily / Weekly reset: what it does and when it rings next (ALL-342)
+    local resetSection = CreateFrame("Frame",nil,ct1)
+    resetSection:SetSize(AW_CW, RESET_H)
+    resetSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,topY)
+    resetSection:Hide()
+    local resetNote = resetSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    resetNote:SetPoint("TOPLEFT",resetSection,"TOPLEFT",0,0)
+    resetNote:SetWidth(AW_CW); resetNote:SetJustifyH("LEFT"); resetNote:SetWordWrap(true)
+    resetNote:SetTextColor(0.55,0.55,0.55,1)
+
     local function SetTimeType(v)
-        local real=(v=="real" or not v)
-        realSection:SetShown(real); realTimeRow:SetShown(real); igSection:SetShown(not real)
+        v = v or "real"
+        local kind = RESET_OF[v]
+        realSection:SetShown(v=="real"); realTimeRow:SetShown(v=="real")
+        igSection:SetShown(v=="ingame"); resetSection:SetShown(kind ~= nil)
+        if kind then
+            local txt = L[kind=="daily" and "AW_RESET_NOTE_DAILY" or "AW_RESET_NOTE_WEEKLY"]
+            local nextT = BNB.Alarm and BNB.Alarm.NextResetTime and BNB.Alarm.NextResetTime(kind)
+            if nextT then
+                txt = txt .. "\n" .. string.format(L["AW_RESET_NEXT_FMT"],
+                    BNB.FmtDate(nextT) .. " " .. BNB.FmtClock(nextT))
+            end
+            resetNote:SetText(txt)
+        end
+        if T.relayout then T.relayout(v) end
     end
     if timeDDCont._dd then
         timeDDCont._dd:SetupMenu(function(_,root)
@@ -385,21 +401,36 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         end)
     end
 
-    Div(ct1,y); y = y - AW_GAP
-
-    -- Section: Repeat
-    SectionHdr(ct1,L["AW_SECT_REPEAT"],y); y = y - AW_LBL - 2
-    local recurEntries={
-        {label=L["AW_RECUR_NONE"],              value=nil        },
-        {label=L["AW_RECUR_WEEKLY"],  value="weekly"   },
-        {label=L["AW_RECUR_WEEKDAYS"], value="weekdays" },
-        {label=L["AW_RECUR_INTERVAL"],      value="interval" },
+    T.dd, T.realTP, T.igTP = timeDDCont, realTP, igTP
+    T.setType, T.refreshCalendar = SetTimeType, RefreshCalendar
+    T.topY = topY
+    T.heights = {
+        real   = CAL_TOTAL + AW_GAP + AW_ROW + AW_GAP,
+        ingame = AW_LBL + AW_ROW + AW_GAP,
+        reset  = RESET_H,
     }
-    local recurDD = MakeDD(ct1,recurEntries,nil,nil)
-    recurDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); y = y - AW_ROW - AW_GAP
+    return T
+end
 
-    local wdRow = CreateFrame("Frame",nil,ct1)
-    wdRow:SetSize(AW_CW,22); wdRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); wdRow:Hide()
+-- Section: Repeat, its own frame (hidden for the reset types). Returns
+-- { frame, h, dd, wdChecks, ndEB, setRecur }.
+local function BuildRepeatBlock(ct1)
+    local blk = CreateFrame("Frame",nil,ct1)
+    blk:SetWidth(AW_CW)
+    local y = 0
+    Div(blk,y); y = y - AW_GAP
+    SectionHdr(blk,L["AW_SECT_REPEAT"],y); y = y - AW_LBL - 2
+    -- The WoW weekly reset is a Type since ALL-342, no longer a Repeat choice
+    local recurEntries={
+        {label=L["AW_RECUR_NONE"],     value=nil        },
+        {label=L["AW_RECUR_WEEKDAYS"], value="weekdays" },
+        {label=L["AW_RECUR_INTERVAL"], value="interval" },
+    }
+    local recurDD = MakeDD(blk,recurEntries,nil,nil)
+    recurDD:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y); y = y - AW_ROW - AW_GAP
+
+    local wdRow = CreateFrame("Frame",nil,blk)
+    wdRow:SetSize(AW_CW,22); wdRow:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y); wdRow:Hide()
     local wdChecks={}; local wdCW=math.floor(AW_CW/7)
     for i,dnKey in ipairs(DAY_NAME_KEYS) do
         local dn = L[dnKey]
@@ -411,8 +442,8 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         dl:SetTextColor(0.72,0.72,0.72,1); cb._dayIndex=i; wdChecks[i]=cb
     end
 
-    local ndRow = CreateFrame("Frame",nil,ct1)
-    ndRow:SetSize(AW_CW,AW_ROW); ndRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); ndRow:Hide()
+    local ndRow = CreateFrame("Frame",nil,blk)
+    ndRow:SetSize(AW_CW,AW_ROW); ndRow:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y); ndRow:Hide()
     -- A plain number field: the dropdown above already says "Every N days",
     -- and the bare 7 between "Every" and "days" did not read as editable
     -- (ALL-347, Dukul 2026-10-06)
@@ -443,10 +474,17 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     end
 
     y = y - AW_ROW - AW_SECT_GAP
-    Div(ct1,y); y = y - AW_GAP
+    blk:SetHeight(-y)
+    return { frame = blk, h = -y, dd = recurDD, wdChecks = wdChecks, ndEB = ndEB, setRecur = SetRecur }
+end
 
-    -- Section: Sound
-    SectionHdr(ct1,L["AW_SECT_SOUND"],y); y = y - AW_LBL - 2
+-- Section: Sound, its own frame. Returns { frame, h, dd, repDD }.
+local function BuildSoundBlock(ct1)
+    local blk = CreateFrame("Frame",nil,ct1)
+    blk:SetWidth(AW_CW)
+    local y = 0
+    Div(blk,y); y = y - AW_GAP
+    SectionHdr(blk,L["AW_SECT_SOUND"],y); y = y - AW_LBL - 2
     -- Silent first, then Default, then custom sounds
     local sndEntries={
         {label=L["AW_SND_SILENT"],      value="silent"  },
@@ -463,10 +501,10 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         {label=L["AW_SND_SOFT_DINGS"],  value="sound10" },
     }
     local sDDW = AW_CW - 56
-    local soundDD = MakeDD(ct1,sndEntries,"default",nil,sDDW)
-    soundDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
-    local testSnd=BNB.CreateButton(nil,ct1,L["AW_TEST_BTN"],50,AW_ROW)
-    testSnd:SetPoint("TOPLEFT",ct1,"TOPLEFT",sDDW+6,y)
+    local soundDD = MakeDD(blk,sndEntries,"default",nil,sDDW)
+    soundDD:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y)
+    local testSnd=BNB.CreateButton(nil,blk,L["AW_TEST_BTN"],50,AW_ROW)
+    testSnd:SetPoint("TOPLEFT",blk,"TOPLEFT",sDDW+6,y)
     testSnd:SetScript("OnClick",function()
         local p=SoundPath(soundDD:GetSelected()); if p then PlaySoundFile(p,"Master") end
     end)
@@ -474,7 +512,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
 
     -- How often the sound repeats while the alarm rings (alarm.soundRepeat,
     -- seconds; 0 = once; nil = every 10 s, the behaviour before ALL-136.3)
-    Lbl(ct1,L["AW_LBL_SOUND_REPEAT"],y); y = y - AW_LBL
+    Lbl(blk,L["AW_LBL_SOUND_REPEAT"],y); y = y - AW_LBL
     local sndRepEntries={
         {label=L["AW_SNDREP_ONCE"], value=0  },
         {label=L["AW_SNDREP_10S"],  value=10 },
@@ -482,10 +520,108 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         {label=L["AW_SNDREP_1MIN"], value=60 },
         {label=L["AW_SNDREP_5MIN"], value=300},
     }
-    local soundRepDD = MakeDD(ct1,sndRepEntries,SOUND_REPEAT_DEFAULT,nil)
-    soundRepDD:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
+    local soundRepDD = MakeDD(blk,sndRepEntries,SOUND_REPEAT_DEFAULT,nil)
+    soundRepDD:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y)
     y = y - AW_ROW - 4
-    ct1._contentH = math.abs(y)
+    blk:SetHeight(-y)
+    return { frame = blk, h = -y, dd = soundDD, repDD = soundRepDD }
+end
+
+-- Save: the Type's time and the Repeat choice into alarm (ALL-342)
+local function SaveTimeAndRepeat(alarm)
+    local oldTT,oldTime,oldIg=alarm.timeType or "real",alarm.time,alarm.igTime
+    local tt=_timeDDCont:GetSelected() or "real"
+    local kind=RESET_OF[tt]
+    alarm.timeType=tt
+    if kind then
+        -- Rings at the reset: a due time only when it has none still ahead
+        -- (new, another type before, or past)
+        if tt~=oldTT or not oldTime or oldTime<=time() then
+            alarm.time=BNB.Alarm.NextResetTime(kind)
+        end
+        alarm.igTime=nil
+    elseif tt=="ingame" then
+        alarm.igTime=string.format("%02d:%02d",_igTP:Get())
+        -- A concrete due time, the next time the server clock reads igTime
+        -- (BUG-04). Kept when only other settings changed.
+        if alarm.igTime~=oldIg or oldTT~="ingame" or not oldTime then
+            alarm.time=BNB.Alarm.NextInGameTime(alarm.igTime)
+        end
+    else
+        -- Read as server time when the player chose it (ALL-104)
+        local rh,rm=_realTP:Get()
+        alarm.time=BNB.Time({
+            year=_calYear or 2026,month=_calMonth or 1,
+            day=_calSelDay or 1,
+            hour=rh,
+            min=rm,sec=0,
+        })
+        alarm.igTime=nil
+    end
+
+    if kind then
+        -- recur too, so an older build still repeats a weekly one
+        alarm.recur=kind; alarm.recurDays=nil; alarm.recurEvery=nil
+    else
+        local recur=_recurDD:GetSelected(); alarm.recur=recur
+        if recur=="weekdays" then
+            alarm.recurDays={}
+            for _,cb in ipairs(_wdChecks) do
+                if cb:GetChecked() then table.insert(alarm.recurDays,cb._dayIndex) end
+            end
+        elseif recur=="interval" then
+            alarm.recurEvery=tonumber(_ndaysEB:GetText()) or 7
+        else alarm.recurDays=nil; alarm.recurEvery=nil end
+    end
+    return tt, oldTT, oldTime, oldIg
+end
+
+-- ---------------------------------------------------------------------------
+-- BUILD TAB CONTENT  (shared by both normal and skin builders)
+-- Receives the outer frame and the three scroll content frames.
+-- Builds all widgets for tabs 1/2/3 and wires save/delete buttons.
+-- ---------------------------------------------------------------------------
+local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
+    -- ================================================================
+    -- TAB 1: GENERAL
+    -- ================================================================
+    local y = -4
+
+    -- Section: Reminder
+    SectionHdr(ct1, L["AW_SECT_REMINDER"], y); y = y - AW_LBL - 2
+    local labelEB = BNB.CreateBackdropFrame("EditBox",nil,ct1)
+    labelEB:SetSize(AW_CW,AW_ROW); labelEB:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
+    labelEB:SetAutoFocus(false); labelEB:SetMaxLetters(80)
+    BNB.AddPlaceholder(labelEB,L["AW_REMINDER_PLACEHOLDER"])
+    labelEB:SetFontObject("GameFontNormalSmall")
+    labelEB:HookScript("OnTextChanged", function() MarkDirty() end)
+    y = y - AW_ROW - AW_SECT_GAP
+    Div(ct1,y); y = y - AW_GAP
+
+    -- Time, Repeat and Sound: local builders above (CMP-07). Repeat and Sound
+    -- sit right under the Type's own rows, and Repeat is hidden for the reset
+    -- types (ALL-342)
+    local TS = BuildTimeSection(ct1, y)
+    local RB = BuildRepeatBlock(ct1)
+    local SB = BuildSoundBlock(ct1)
+    TS.relayout = function(tt)
+        local reset = RESET_OF[tt] ~= nil
+        local yy = TS.topY - (reset and TS.heights.reset or TS.heights[tt] or TS.heights.real)
+        RB.frame:SetShown(not reset)
+        if not reset then
+            RB.frame:ClearAllPoints(); RB.frame:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,yy)
+            yy = yy - RB.h
+        end
+        SB.frame:ClearAllPoints(); SB.frame:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,yy)
+        yy = yy - SB.h
+        ct1._contentH = math.abs(yy)
+        if sf1._applyScrollbar then sf1._applyScrollbar() end
+    end
+    TS.relayout("real")
+    local timeDDCont, realTP, igTP = TS.dd, TS.realTP, TS.igTP
+    local SetTimeType, RefreshCalendar = TS.setType, TS.refreshCalendar
+    local recurDD, wdChecks, ndEB, SetRecur = RB.dd, RB.wdChecks, RB.ndEB, RB.setRecur
+    local soundDD, soundRepDD = SB.dd, SB.repDD
 
     -- ================================================================
     -- TAB 2: ANIMATION
@@ -871,37 +1007,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
         alarm.label=labelEB:GetRealText()
         if alarm.label=="" then alarm.label=nil end
 
-        local oldTT,oldTime,oldIg=alarm.timeType or "real",alarm.time,alarm.igTime
-        local tt=timeDDCont:GetSelected() or "real"
-        alarm.timeType=tt
-        if tt=="ingame" then
-            alarm.igTime=string.format("%02d:%02d",igTP:Get())
-            -- A concrete due time, the next time the server clock reads igTime
-            -- (BUG-04). Kept when only other settings changed.
-            if alarm.igTime~=oldIg or oldTT~="ingame" or not oldTime then
-                alarm.time=BNB.Alarm.NextInGameTime(alarm.igTime)
-            end
-        else
-            -- Read as server time when the player chose it (ALL-104)
-            local rh,rm=realTP:Get()
-            alarm.time=BNB.Time({
-                year=_calYear or 2026,month=_calMonth or 1,
-                day=_calSelDay or 1,
-                hour=rh,
-                min=rm,sec=0,
-            })
-            alarm.igTime=nil
-        end
-
-        local recur=recurDD:GetSelected(); alarm.recur=recur
-        if recur=="weekdays" then
-            alarm.recurDays={}
-            for _,cb in ipairs(wdChecks) do
-                if cb:GetChecked() then table.insert(alarm.recurDays,cb._dayIndex) end
-            end
-        elseif recur=="interval" then
-            alarm.recurEvery=tonumber(ndEB:GetText()) or 7
-        else alarm.recurDays=nil; alarm.recurEvery=nil end
+        local tt, oldTT, oldTime, oldIg = SaveTimeAndRepeat(alarm)
 
         alarm.sound         = soundDD:GetSelected()
         local rep = soundRepDD:GetSelected()
@@ -977,7 +1083,9 @@ local function Populate(noteID)
     -- Reset label (always — stale text from a previous alarm must not carry over)
     _labelEB:SetRealText(alarm.label or "")
 
-    local tt=alarm.timeType or "real"
+    -- A reset alarm shows as its Type, also the old Repeat = weekly reset shape (ALL-342)
+    local resetKind = BNB.Alarm.ResetKind(alarm)
+    local tt = resetKind and (resetKind .. "reset") or alarm.timeType or "real"
     _timeDDCont:SetSelected(tt); f._setTimeType(tt)
 
     -- Always set calendar to today (or alarm date if editing)
@@ -1000,7 +1108,8 @@ local function Populate(noteID)
         _igTP:Set(sh or 9, sm or 0)
     end
 
-    _recurDD:SetSelected(alarm.recur); f._setRecur(alarm.recur)
+    local recur = (not resetKind) and alarm.recur or nil
+    _recurDD:SetSelected(recur); f._setRecur(recur)
     -- Always reset weekday checkboxes
     if alarm.recur=="weekdays" and alarm.recurDays then
         local ds={}; for _,d in ipairs(alarm.recurDays) do ds[d]=true end
