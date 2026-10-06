@@ -157,7 +157,7 @@ local function BuildNoteIconRow(parent, noteItems, yOffset)
         -- Clicks
         btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
         btn:SetScript("OnClick", function(self, mouseBtn)
-            if mouseBtn == "RightButton" then
+            if mouseBtn == "RightButton" and BNB.StickiesEnabled() then   -- ALL-343
                 if BNB.Sticky and BNB.Sticky.Open then
                     BNB.Sticky.Open(noteID)
                 end
@@ -174,7 +174,9 @@ local function BuildNoteIconRow(parent, noteItems, yOffset)
             self._iconTex:SetVertexColor(1.1, 1.1, 1.1)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(note.title or L["WELCOME_UNTITLED"], 1, 1, 1)
-            GameTooltip:AddLine(L["NE_CLICK_OPEN_STICKY_TIP"], 0.7, 0.7, 0.7)
+            if BNB.StickiesEnabled() then
+                GameTooltip:AddLine(L["NE_CLICK_OPEN_STICKY_TIP"], 0.7, 0.7, 0.7)
+            end
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function(self)

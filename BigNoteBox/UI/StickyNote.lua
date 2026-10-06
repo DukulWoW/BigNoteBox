@@ -2644,6 +2644,7 @@ end
 -- noESCOpen: when true, suppress ShowUIPanel(GameMenuFrame) — used by the
 -- login restore loop so reloading doesn't pop open the ESC menu.
 function SN.Open(noteID, noESCOpen)
+    if not BNB.StickiesEnabled() then return end   -- module off (ALL-343): catch-all
     if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
     if not BNB.GetNote(noteID) then return end
     -- noESCOpen is the login restore (RestoreSession), not an open.
@@ -2719,7 +2720,7 @@ end
 -- then uses the main window.
 function SN.OpenQuick(noteID)
     local note = BNB.GetNote(noteID)
-    if not note or InCombatLockdown() then return false end
+    if not note or InCombatLockdown() or not BNB.StickiesEnabled() then return false end
     local db = DB()
     if db and db.stickyInlineEdit == false then return false end
     if (BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)) or StickyNoteIsLocked(note) then
@@ -2759,7 +2760,10 @@ function SN.OpenQuick(noteID)
     return true
 end
 
-function SN.Close(noteID)
+-- keep: the Sticky Notes module was switched off (ALL-343). The sticky
+-- closes but stays "open" in the saved data (shown, escOnly), so switching
+-- the module back on reopens it as it was.
+function SN.Close(noteID, keep)
     local f = openFrames[noteID]; if not f then return end
     EndInlineEdit(f)   -- save before the frame fades out
     -- Clear per-note task collapse state
@@ -2771,7 +2775,7 @@ function SN.Close(noteID)
     --   true  = pinned to ESC screen
     --   false = explicitly normal (ignore global default)
     -- Persist immediately so the choice survives reload.
-    if f._escOnly then
+    if f._escOnly and not keep then
         f._escOnly = false
         local cfg = GetCfg(noteID)
         cfg.escOnly = false   -- explicit false, NOT nil
@@ -2780,6 +2784,7 @@ function SN.Close(noteID)
     end
     -- Dismiss alarm if it is active (fired but not yet dismissed) when sticky closes.
     -- Uses IsAlarmActive rather than IsGlowing so it works regardless of glow timing.
+    -- keep too: with no sticky left the ring would have nothing to stop it
     if BNB.Alarm and BNB.Alarm.IsAlarmActive and BNB.Alarm.IsAlarmActive(noteID) then
         BNB.Alarm.Dismiss(noteID)
     end
@@ -2797,7 +2802,7 @@ function SN.Close(noteID)
                                -- re-open during fade doesn't conflict
     if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end   -- ALL-237
     local db2 = DB()
-    if db2 and db2.postits and db2.postits[noteID] then
+    if not keep and db2 and db2.postits and db2.postits[noteID] then
         db2.postits[noteID].shown = false
     end
     FadeFrame(f, f:GetAlpha(), 0, FLIP_TIME, function()
@@ -2895,6 +2900,7 @@ function SN.BringAllToFront()
 end
 
 function SN.ToggleHidden()
+    if not BNB.StickiesEnabled() then return end   -- ALL-343
     local db = BigNoteBoxDB
     -- Nothing to hide: the key does nothing, as the greyed eye (ALL-237)
     if not (db and db.stickiesHidden) and SN.WorldCount() == 0 then return end
@@ -3199,6 +3205,7 @@ end
 
 function SN.RestoreSession()
     local db = DB(); if not db or not db.postits then return end
+    if not BNB.StickiesEnabled() then return end   -- ALL-343: kept for when it is back on
     -- If the player enabled "keep stickies hidden" and the hide flag is still
     -- set from last session, honour it — don't auto-show anything.
     local keepHidden = BigNoteBoxDB
@@ -3227,4 +3234,29 @@ function SN.RestoreSession()
     end
     -- ALL-101: say so when they come back hidden (after the 0.1s opens above)
     if keepHidden then C_Timer.After(1, function() SN.PrintHiddenNotice(true) end) end
+end
+
+-- The Sticky Notes module switch (Settings > Modules > Sticky Notes, ALL-343).
+-- Off closes every sticky and mini tile but keeps them marked open (SN.Close
+-- keep), hides every way to open one, and SN.Open / OpenQuick refuse (the
+-- quick-note key then uses the main window). Back on reopens the stickies
+-- that were open, as at login.
+function BNB.StickiesEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.stickiesEnabled ~= false
+end
+
+function SN.ApplyModule(on)
+    if on then
+        local db = BigNoteBoxDB
+        if db and not (db.stickiesHiddenPersist and db.stickiesHidden) then db.stickiesHidden = false end
+        SN.RestoreSession()
+    else
+        if SN.CloseSettings then SN.CloseSettings() end
+        local ids = {}
+        for id in pairs(openFrames) do ids[#ids + 1] = id end
+        for _, id in ipairs(ids) do SN.Close(id, true) end
+    end
+    if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
+    if BNB.ApplyFocusTitleBtn then BNB.ApplyFocusTitleBtn() end
+    if BNB.ApplyEditorStickyBtn then BNB.ApplyEditorStickyBtn() end
 end

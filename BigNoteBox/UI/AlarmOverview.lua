@@ -726,9 +726,11 @@ function AO.Refresh()
                         if BNB.mainFrame then BNB.mainFrame:Show() end
                         if BNB.SelectNote then BNB.SelectNote(nid) end
                     end)
-                    root:CreateButton(L["AO_CTX_OPEN_STICKY"], function()
-                        if BNB.Sticky and BNB.Sticky.Open then BNB.Sticky.Open(nid) end
-                    end)
+                    if BNB.StickiesEnabled() then   -- ALL-343
+                        root:CreateButton(L["AO_CTX_OPEN_STICKY"], function()
+                            if BNB.Sticky and BNB.Sticky.Open then BNB.Sticky.Open(nid) end
+                        end)
+                    end
                     if gone then
                         root:CreateButton(L["AO_CTX_DISMISS_ALARM"], function()
                             BNB.Alarm.Dismiss(nid)

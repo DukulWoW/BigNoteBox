@@ -1135,7 +1135,14 @@ local function Populate(noteID)
     if f._borderDurSL    then SetSliderVal(f._borderDurSL,    math.floor((alarm.glowDuration  or 0.7)*100))   end
     if f._procDurSL      then SetSliderVal(f._procDurSL,      math.floor((alarm.glowDuration  or 1.0)*100))   end
     if f._refreshGlowParams then f._refreshGlowParams(alarm.glowType) end
-    if _fireModeDD then _fireModeDD:SetSelected(alarm.fireMode or "popup") end
+    if _fireModeDD then
+        _fireModeDD:SetSelected(alarm.fireMode or "popup")
+        -- Sticky Notes off (ALL-343): every alarm rings as a popup, the
+        -- saved mode is kept for when the module is back on
+        local on = BNB.StickiesEnabled()
+        if _fireModeDD._dd then _fireModeDD._dd:SetEnabled(on) end
+        _fireModeDD:SetAlpha(on and 1 or 0.45)
+    end
 
     -- Advanced
     local snoozeOn = alarm.snoozeEnabled

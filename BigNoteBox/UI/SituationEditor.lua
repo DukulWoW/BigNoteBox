@@ -1775,6 +1775,13 @@ function BNB.CreateSituationEditor(panel, opts)
         disp:Set((cd == "sticky" or cd == "both") and cd or "popup")
         local lv = note and note.contextLeave
         leave:Set((lv == "minimize" or lv == "hide") and lv or "keep")
+        -- Sticky Notes off (ALL-343): the note shows as a popup and has no
+        -- sticky to close, so both pickers are greyed; the saved choice stays
+        local stickyOn = BNB.StickiesEnabled()
+        for _, c in ipairs({ disp, leave }) do
+            c.frame:SetEnabled(stickyOn); c.frame:SetAlpha(stickyOn and 1 or 0.45)
+        end
+        dispLabel:SetAlpha(stickyOn and 1 or 0.45); leaveLabel:SetAlpha(stickyOn and 1 or 0.45)
         local tr = note and note.contextTrigger
         trig:Set((tr == "leave" or tr == "both") and tr or "arrive")
         local fq = note and note.contextFreq

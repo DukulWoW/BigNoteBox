@@ -770,7 +770,7 @@ local function OnUnitMenuOpen(owner, rootDescription, contextData)
             UN.OpenNote(existingID)
         end)
         -- The same note as a sticky (ALL-204, Dukul 2026-10-02)
-        if BNB.Sticky and BNB.Sticky.OpenWorld then
+        if BNB.Sticky and BNB.Sticky.OpenWorld and BNB.StickiesEnabled() then   -- ALL-343
             rootDescription:CreateButton(L["TGT_MENU_OPEN_STICKY"], function()
                 BNB.Sticky.OpenWorld(existingID)
             end)

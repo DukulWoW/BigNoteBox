@@ -615,15 +615,20 @@ function BNB.CreateMainWindow()
             onClick = ToggleStickies, tip = L["MW_EYE_HIDE_TIP"], tipSub = L["MW_EYE_HIDE_SUB"] })
         local eyeClosed = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "eye-closed", {
             onClick = ToggleStickies, tip = L["MW_EYE_SHOW_TIP"] })
+        local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
         -- Focus Mode module off (ALL-343): no focus button, the eye moves up
-        -- to the close button
+        -- to the close button. Sticky Notes off: no eye (RefreshStickyEyeBtn),
+        -- the lock moves up the same way
         function BNB.ApplyFocusTitleBtn()
             local on = BNB.FocusEnabled()
             focusBtn:SetShown(on)
+            local right = on and focusBtn or chrome.closeBtn
             for _, eb in ipairs({ eyeOpen, eyeClosed }) do
                 eb:ClearAllPoints()
-                eb:SetPoint("RIGHT", on and focusBtn or chrome.closeBtn, "LEFT", -chrome.btnGap, 0)
+                eb:SetPoint("RIGHT", right, "LEFT", -chrome.btnGap, 0)
             end
+            lockBtn:ClearAllPoints()
+            lockBtn:SetPoint("RIGHT", BNB.StickiesEnabled() and eyeOpen or right, "LEFT", -chrome.btnGap, 0)
         end
         for _, eb in ipairs({ eyeOpen, eyeClosed }) do
             eb:HookScript("OnEnter", function(self)
@@ -640,17 +645,15 @@ function BNB.CreateMainWindow()
         -- by sticky open / close / hide / show and the ESC-screen toggle
         function BNB.RefreshStickyEyeBtn()
             local hidden = BigNoteBoxDB and BigNoteBoxDB.stickiesHidden == true
-            eyeOpen:SetShown(not hidden)
-            eyeClosed:SetShown(hidden)
+            local on = BNB.StickiesEnabled()   -- Sticky Notes module (ALL-343)
+            eyeOpen:SetShown(on and not hidden)
+            eyeClosed:SetShown(on and hidden)
             local any = BNB.Sticky and BNB.Sticky.WorldCount and BNB.Sticky.WorldCount() > 0
             eyeOpen:SetEnabled(any and true or false)
             eyeClosed:SetEnabled(any and true or false)
         end
         BNB.RefreshStickyEyeBtn()
         BNB.ApplyFocusTitleBtn()
-
-        local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
-        lockBtn:SetPoint("RIGHT", eyeOpen, "LEFT", -chrome.btnGap, 0)
 
         if chrome.AddTitleButtons then chrome.AddTitleButtons(lockBtn) end
     end

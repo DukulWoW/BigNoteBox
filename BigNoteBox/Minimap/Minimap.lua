@@ -32,7 +32,9 @@ end
 function BNB.AddMinimapClickLines(tooltip)
     tooltip:AddLine(L["MINIMAP_LEFT_CLICK"], 1, 1, 1)
     tooltip:AddLine(L["MINIMAP_RIGHT_CLICK"], 1, 1, 1)
-    tooltip:AddLine(L["MINIMAP_SHIFT_LEFT_CLICK"], 1, 1, 1)
+    if BNB.StickiesEnabled() then   -- Sticky Notes module (ALL-343)
+        tooltip:AddLine(L["MINIMAP_SHIFT_LEFT_CLICK"], 1, 1, 1)
+    end
     tooltip:AddLine(L["MINIMAP_SHIFT_RIGHT_CLICK"], 1, 1, 1)
 end
 

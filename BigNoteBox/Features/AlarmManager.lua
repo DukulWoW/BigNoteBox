@@ -556,6 +556,8 @@ local function Deliver(noteID, noPopup)
     -- Stickies live on UIParent: while it is hidden (Focus mode "hide UI",
     -- Alt+Z) use the popup, which AP.Show puts on WorldFrame (BUG-10)
     if fireMode ~= "popup" and not UIParent:IsShown() then fireMode = "popup" end
+    -- Sticky Notes module off (ALL-343): the popup, the alarm's mode is kept
+    if fireMode ~= "popup" and not BNB.StickiesEnabled() then fireMode = "popup" end
 
     if fireMode ~= "popup" and InCombatLockdown() then
         -- SN.Open refuses in combat (and printed STICKY_COMBAT every 10 s):

@@ -236,13 +236,17 @@ end
 
 -- The prefixes in use: no alarm filter while the Alarms module is off, no
 -- focus open-as while Focus Mode is off (ALL-343), so the letter is plain
--- search text and drops out of the help
+-- search text and drops out of the help; the same for the sticky open-as
+-- while Sticky Notes is off
 local function ActivePrefixes()
-    local alarmsOn, focusOn = BNB.AlarmsEnabled(), BNB.FocusEnabled()
-    if alarmsOn and focusOn then return PrefixMap() end
+    local alarmsOn, focusOn, stickyOn = BNB.AlarmsEnabled(), BNB.FocusEnabled(), BNB.StickiesEnabled()
+    if alarmsOn and focusOn and stickyOn then return PrefixMap() end
     local m = {}
     for letter, role in pairs(PrefixMap()) do
-        if (role ~= "alarm" or alarmsOn) and (role ~= "focus" or focusOn) then m[letter] = role end
+        if (role ~= "alarm" or alarmsOn) and (role ~= "focus" or focusOn)
+           and (role ~= "sticky" or stickyOn) then
+            m[letter] = role
+        end
     end
     return m
 end
@@ -533,7 +537,7 @@ local function OpenResult(i)
         return
     end
     local ok
-    if IsShiftKeyDown() then ok = OpenAsSticky(id)
+    if IsShiftKeyDown() and BNB.StickiesEnabled() then ok = OpenAsSticky(id)   -- ALL-343
     elseif IsControlKeyDown() then ok = OpenInFocus(id)
     elseif IsAltKeyDown() then ok = OpenInRefBox(id)
     elseif Oracle._openAs == "sticky" then ok = OpenAsSticky(id)
@@ -780,7 +784,10 @@ local function Layout()
     if showingHelp then
         for _, row in ipairs(rows) do row:Hide() end
         emptyFS:Hide()
-        if not helpFrame then BuildHelp() end
+        -- Built again when a module switch changed the prefixes (ALL-343)
+        local sig = tostring(BNB.AlarmsEnabled()) .. tostring(BNB.FocusEnabled()) .. tostring(BNB.StickiesEnabled())
+        if helpFrame and helpFrame._sig ~= sig then helpFrame:Hide(); helpFrame = nil end
+        if not helpFrame then BuildHelp(); helpFrame._sig = sig end
         helpFrame:ClearAllPoints()
         helpFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", pad.left + 6, y - 6)
         helpFrame:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -pad.right - 6, y - 6)

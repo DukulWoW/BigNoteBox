@@ -713,9 +713,10 @@ local function Stamp(note, which)
 end
 
 -- Sorts a note that is due to show into the sticky / popup lists by its
--- display mode
+-- display mode. Sticky Notes off (ALL-343): the popup, the mode is kept
 local function AddByDisplay(note, stickyIDs, popupIDs)
     local d = note.contextDisplay
+    if not BNB.StickiesEnabled() then d = nil end
     if d == "sticky" or d == "both" then stickyIDs[#stickyIDs + 1] = note.id end
     if d ~= "sticky" then popupIDs[#popupIDs + 1] = note.id end
 end

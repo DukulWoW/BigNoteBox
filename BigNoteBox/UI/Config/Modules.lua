@@ -192,6 +192,8 @@ local function BuildQuickNotePage(sf, ct, y, page)
             GameTooltip:Show()
         end)
         tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        -- Sticky Notes off (ALL-343): the key always uses the main window
+        if dd._dd then K.GreyWhileOff(dd._dd, BNB.StickiesEnabled, lbl) end
         y = y - (32 + ROW_GAP)
     end
     sf:FinaliseHeight(math.abs(y) + 12)
@@ -1098,8 +1100,20 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 4 — MODULES
 -- ─────────────────────────────────────────────────────────────────────────────
-local function BuildStickyPage(sf, ct, y)
+local function BuildStickyPage(sf, ct, y, page)
     local db = BigNoteBoxDB
+    -- Module switch (ALL-343). Applies live: off closes every sticky (they
+    -- reopen when it is switched back on) and hides every way to open one.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_STICKY_ENABLE_LABEL"],
+        function() return BNB.StickiesEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.stickiesEnabled = v
+            if BNB.Sticky and BNB.Sticky.ApplyModule then BNB.Sticky.ApplyModule(v) end
+        end,
+        L["CFG_STICKY_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
     do
         local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)

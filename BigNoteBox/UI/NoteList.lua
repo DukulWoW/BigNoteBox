@@ -761,8 +761,15 @@ BNB.OpenNoteInMain = NOTE_ACTIONS.open
 NOTE_ACTIONS.settings  = function(noteID)
     if BNB.OpenNoteConfig then BNB.OpenNoteConfig(noteID) end
 end
-NOTE_ACTIONS.sticky    = function(noteID) OpenAsSticky(noteID, false) end
-NOTE_ACTIONS.escSticky = function(noteID) OpenAsSticky(noteID, true) end
+-- Sticky Notes off (ALL-343): a double-click set to a sticky just opens the note
+NOTE_ACTIONS.sticky    = function(noteID)
+    if not BNB.StickiesEnabled() then NOTE_ACTIONS.open(noteID); return end
+    OpenAsSticky(noteID, false)
+end
+NOTE_ACTIONS.escSticky = function(noteID)
+    if not BNB.StickiesEnabled() then NOTE_ACTIONS.open(noteID); return end
+    OpenAsSticky(noteID, true)
+end
 NOTE_ACTIONS.alarm     = function(noteID)
     -- Alarms off (ALL-343): a double-click set to "Set alarm" just opens the note
     if not BNB.AlarmsEnabled() then NOTE_ACTIONS.open(noteID); return end

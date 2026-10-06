@@ -216,10 +216,15 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
 
         local locked = K.NoteIsLocked(note)
         local kind   = K.StickyOpenKind(noteID)
+        local stickiesOn = BNB.StickiesEnabled()
 
         -- Open note: the click opens (or closes) the sticky (Dukul)
         local stickyLabel = kind == "world" and L["NL_CTX_CLOSE_STICKY"] or L["NL_CTX_OPEN_STICKY"]
-        Parent(root, L["NL_CTX_OPEN"], "note", ClickKey("open"), {
+        -- The default click opens a sticky: with Sticky Notes off it opens the
+        -- note in the editor instead (ALL-343)
+        local openKey = ClickKey("open")
+        if not stickiesOn and (openKey == "sticky" or openKey == "escSticky") then openKey = "editor" end
+        Parent(root, L["NL_CTX_OPEN"], "note", openKey, {
             { key = "editor",   label = L["NL_CM_OPEN_EDITOR"], fn = function() A.open(noteID) end,
               opts = { icon = "editor" } },
             { key = "settings", label = BNB.NoteConfigOpenFor(noteID) and L["NL_CM_CLOSE_SETTINGS"]
@@ -236,12 +241,13 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
                 if RefBoxShows(noteID) then BNB.CloseReferenceBox()
                 elseif BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
               end, opts = { icon = "reference-box" } } or false,
-            DIV,
-            { key = "sticky",   label = stickyLabel, fn = function() A.sticky(noteID) end,
-              opts = { icon = "sticky-note" } },
-            { key = "escSticky", label = kind == "esc" and L["NL_CTX_CLOSE_ESC_STICKY"]
+            -- Sticky Notes module (ALL-343): both sticky entries and their divider
+            stickiesOn and DIV or false,
+            stickiesOn and { key = "sticky",   label = stickyLabel, fn = function() A.sticky(noteID) end,
+              opts = { icon = "sticky-note" } } or false,
+            stickiesOn and { key = "escSticky", label = kind == "esc" and L["NL_CTX_CLOSE_ESC_STICKY"]
                 or L["NL_CTX_OPEN_ESC_STICKY"], fn = function() A.escSticky(noteID) end,
-              opts = { icon = "esc-sticky-note" } },
+              opts = { icon = "esc-sticky-note" } } or false,
         })
 
         local alarmsOn = BNB.AlarmsEnabled()   -- ALL-343
@@ -497,8 +503,10 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         root:CreateTitle(total == 1 and L["MULTI_CM_TITLE_ONE"] or string.format(L["MULTI_CM_TITLE"], total))
         root:CreateDivider()
 
-        root:CreateButton(L["MULTI_CM_OPEN_STICKY"], OpenStickies, { icon = "sticky-note" })
-        root:CreateDivider()
+        if BNB.StickiesEnabled() then   -- Sticky Notes module (ALL-343)
+            root:CreateButton(L["MULTI_CM_OPEN_STICKY"], OpenStickies, { icon = "sticky-note" })
+            root:CreateDivider()
+        end
 
         if c.pinned < total then
             root:CreateButton(L["MULTI_CM_PIN_ALL"], function() SetAll("pinned", true) end, { icon = "pinned" })

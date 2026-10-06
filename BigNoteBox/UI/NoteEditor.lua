@@ -899,6 +899,12 @@ local function BuildToolbar(parent)
         self:SetSize(24 + AB_GROW, 24 + AB_GROW)
         GameTooltip:Hide()
     end)
+    -- Hidden while the Sticky Notes module is off (ALL-343); its slot stays
+    -- empty, as the Tasks button's does
+    function BNB.ApplyEditorStickyBtn()
+        pinBtn:SetShown(BNB.StickiesEnabled())
+    end
+    BNB.ApplyEditorStickyBtn()
     -- Send to Chat button (right side) — icon-only using send.tga
     local sendBtn, _ = MakeIconBtn(bar, BNB.AbIcon("send"), L["SEND_TITLE"], 28 + AB_GROW, 28 + AB_GROW)
     -- -26 keeps it clear of the main window's 16 px resize grip (BOTTOMRIGHT -2, 2)
