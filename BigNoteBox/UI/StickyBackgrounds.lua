@@ -13,11 +13,8 @@
 --
 -- The game backgrounds come from the Background Lab (BigNoteBox_Dev Labs/BackgroundLab.lua,
 -- /bnb bglab), Dukul 2026-09-27; its Export is the source for new lines here.
--- The old bundled TGAs live in the load-on-demand addon BigNoteBox_BGs, which
--- adds them with BigNoteBox.RegisterStickyBackgrounds when it loads. It is
--- loaded lazily: the first time a sticky asks for a key that is not here yet,
--- or when sticky settings open. A missing or disabled BigNoteBox_BGs means
--- those stickies draw plain colour; the saved key is never rewritten.
+-- The old bundled TGAs (the load-on-demand addon BigNoteBox_BGs) were removed
+-- in ALL-338; SETTINGS v19 set their saved keys back to "none".
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -25,7 +22,18 @@ local L   = BNB.L
 local SBG = {}
 BNB.StickyBG = SBG
 
-local BGS_ADDON = "BigNoteBox_BGs"
+-- The game's grey rock (file 374155), on every client
+local STONE_FILE = "Interface\\FrameGeneral\\UI-Background-Rock"
+
+-- The task panel's stone (UI/ReferenceBoxTasks.lua): the rock when the
+-- client has it, else a dark plain colour, never a missing file's green square
+function BNB.SetStoneTexture(tex)
+    if C_UIFileAsset and C_UIFileAsset.IsKnownFile and not C_UIFileAsset.IsKnownFile(374155) then
+        tex:SetColorTexture(0.10, 0.10, 0.11, 1)
+    else
+        tex:SetTexture(STONE_FILE)
+    end
+end
 
 local function E(key, label, cat, file, w, h, mode, anchor, scale, crop, flip, bright)
     return { key = key, label = label, cat = cat, file = file, w = w, h = h,
@@ -123,11 +131,13 @@ local ALL = {
     E("professionspecializationbackgroundartpoisons", "STICKY_BG_PROF_POISON",  "profession", 7744227, 1024, 1024, "cover", "TOP", 1, SPEC_CROP),
     E("professionbackgroundartskinning",       "STICKY_BG_PROF_SKINNING",       "profession", 4723308, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
     E("professionbackgroundarttailoring",      "STICKY_BG_PROF_TAILORING",      "profession", 4627497, 1024, 1024, "cover", "TOP", 1, PROF_CROP),
-    -- Classic: the one old texture that stays in BigNoteBox (the Reference
-    -- Box task panel uses it too); the rest come from BigNoteBox_BGs
-    E("bg-stone", "STICKY_BG_STONE", "classic",
-      "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-bg-stone.tga", 256, 256, "tile", "TOPLEFT"),
 }
+-- "Stone", the Reference Box task panel's background too. Our 768 KB TGA
+-- became the game's own rock (ALL-164); on Retail that is the Window entry
+-- already, so there the key resolves to it (below the index)
+if BNB.IsForever or BNB.IsClassic then
+    ALL[#ALL + 1] = E("bg-stone", "STICKY_BG_STONE", "classic", STONE_FILE, 256, 256, "tile", "TOPLEFT")
+end
 local LIST = {}
 for _, e in ipairs(ALL) do
     if OnThisClient(e.key) then LIST[#LIST + 1] = e end
@@ -140,48 +150,13 @@ local function Index(e)
     _byKey[e.key] = e
 end
 for _, e in ipairs(LIST) do Index(e) end
-
--- Called by BigNoteBox_BGs when it loads. Entries use the fields above
--- (label = an L key name, cat defaults to "classic"). A key already here is
--- skipped. LIST is extended in place, so every holder of it sees the new ones.
-local _hasClassic = false
-function BNB.RegisterStickyBackgrounds(defs)
-    if type(defs) ~= "table" then return end
-    _hasClassic = true
-    for _, d in ipairs(defs) do
-        if type(d) == "table" and d.key and d.file and not _byKey[d.key]
-                and OnThisClient(d.key) then
-            d.cat = d.cat or "classic"
-            d.scale = d.scale or 1
-            LIST[#LIST + 1] = d
-            Index(d)
-        end
-    end
-end
-
--- Loads BigNoteBox_BGs once per session. Safe to call often.
-local _tried = false
-function SBG.LoadClassic()
-    if _tried then return end
-    _tried = true
-    pcall(C_AddOns.LoadAddOn, BGS_ADDON)
-end
+-- Retail: "Stone" is the same rock as "Window" (ALL-164), one picker entry
+if not _byKey["bg-stone"] then _byKey["bg-stone"] = _byKey["windowbg"] end
 
 -- The entry for key; LIST[1] ("none") when it is unknown or unavailable
 function SBG.Get(key)
     if not key or key == "none" then return LIST[1] end
-    local e = _byKey[key]
-    if not e and not _tried then
-        SBG.LoadClassic()
-        e = _byKey[key]
-    end
-    return e or LIST[1]
-end
-
--- True once BigNoteBox_BGs has registered its textures (the picker's
--- Classic tab shows only then)
-function SBG.HasClassic()
-    return _hasClassic
+    return _byKey[key] or LIST[1]
 end
 
 function SBG.Label(key)

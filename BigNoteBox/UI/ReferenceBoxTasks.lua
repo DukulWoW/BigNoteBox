@@ -287,7 +287,7 @@ local function BuildTaskPanel(f)
     else
         -- Stone texture in normal mode — matches the ButtonFrameTemplate chrome
         -- and prevents attachment cards from bleeding through.
-        bg:SetTexture(ASSETS .. "UI\\ui-bg-stone")
+        BNB.SetStoneTexture(bg)
         -- Forever: the stone reads too light next to the wood grain; darken it
         -- (vertex colour survives the SetTexture in the skin callback below)
         if BNB.IsForever then bg:SetVertexColor(0.6, 0.6, 0.6) end
@@ -303,7 +303,7 @@ local function BuildTaskPanel(f)
                 local r, g, b = BNB.SkinColourOf(preset, false)
                 bg:SetColorTexture(r, g, b, BNB.GetSkinBgAlpha())
             else
-                bg:SetTexture(ASSETS .. "UI\\ui-bg-stone")
+                BNB.SetStoneTexture(bg)
             end
         end)
     end

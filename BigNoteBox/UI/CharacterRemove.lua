@@ -94,8 +94,9 @@ local function Build()
         name = "BNBCharRemoveFrame", w = W, h = 200, title = L["CHAR_REMOVE_TITLE"],
         pad = PAD, cw = W - 2 * PAD, footH = FOOT_H,
         btn1 = L["CHAR_REMOVE_BTN"], btn2 = L["CANCEL"],
-        -- Over Settings and the main window, which it is opened from
-        strata = "FULLSCREEN_DIALOG", toplevel = true, escClose = true, keyEsc = true,
+        -- Settings' strata, raised over it on open: at FULLSCREEN_DIALOG the
+        -- game's dropdown menu opened under the window (ALL-308)
+        strata = "DIALOG", toplevel = true, escClose = true, keyEsc = true,
         onHide = function() _key = nil end,
     })
     _f = f

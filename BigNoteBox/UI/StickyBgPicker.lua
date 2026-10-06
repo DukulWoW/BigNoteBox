@@ -34,7 +34,7 @@ local SK_TITLE_H  = 28
 local SK_TAB_GAP  = 10
 local COLS        = 4
 local CELL_W, CELL_H = 104, 72   -- the thumbnail box
-local LABEL_H     = 16
+local LABEL_H     =  0   -- no name under a tile, it is the tooltip (ALL-156)
 local GAP_X, GAP_Y = 8, 10
 local GRID_W      = COLS * CELL_W + (COLS - 1) * GAP_X
 local ROW_H       = CELL_H + LABEL_H + GAP_Y
@@ -49,9 +49,8 @@ local TABS = {
     { cat = "parchment",  label = "STICKY_BGP_TAB_PARCHMENT" },
     { cat = "scenery",    label = "STICKY_BGP_TAB_SCENERY" },
     { cat = "profession", label = "STICKY_BGP_TAB_PROFESSION" },
-    -- The old bundled TGAs; tab named "BNB", not Classic, which reads as
-    -- WoW Classic (Dukul 2026-09-27). Only with BigNoteBox_BGs
-    { cat = "classic",    label = "STICKY_BGP_TAB_BNB" },
+    -- The "BNB" tab of old bundled TGAs went with BigNoteBox_BGs (ALL-338);
+    -- the one left, bg-stone (cat "classic"), shows under All
 }
 
 local _f, _sf, _ct, _revertBtn
@@ -139,12 +138,13 @@ local function MakeTile()
     t.lbl:SetPoint("TOPRIGHT", t.box, "BOTTOMRIGHT", 0, -3)
     t.lbl:SetJustifyH("CENTER")
     t.lbl:SetWordWrap(false)
+    t.lbl:Hide()   -- the name is the tooltip below the tile (ALL-156)
     t:SetScript("OnClick", function(self) Pick(self.entry.key) end)
     -- Double-click = pick and close: the first click already picked (ALL-141)
     t:SetScript("OnDoubleClick", function(self) Pick(self.entry.key); SBP.Close() end)
     t:SetScript("OnEnter", function(self)
         self.hov:Show()
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText(self.entry.label, 1, 1, 1)
         GameTooltip:Show()
     end)
@@ -264,9 +264,7 @@ local function Build()
     closeBtn:SetScript("OnClick", function() SBP.Close() end)
 
     _tabs = {}
-    for _, t in ipairs(TABS) do
-        if t.cat ~= "classic" or BNB.StickyBG.HasClassic() then _tabs[#_tabs + 1] = t end
-    end
+    for _, t in ipairs(TABS) do _tabs[#_tabs + 1] = t end
     if _tabIdx > #_tabs then _tabIdx = 1 end
     local labels = {}
     for i, t in ipairs(_tabs) do labels[i] = L[t.label] end
@@ -332,7 +330,6 @@ end
 
 function SBP.Open(noteID, anchor, h)
     if SBP.IsOpenFor(noteID) then SBP.Close(); return end
-    BNB.StickyBG.LoadClassic()
     Build()
     _noteID, _h = noteID, h
     _origKey = h.get()

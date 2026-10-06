@@ -12,7 +12,8 @@
 --                                 vertical-center rule; pass the config
 --                                 window itself, not the button clicked).
 --                                 h = { getFrame, setFrame, getBorder,
---                                       setBorder, getBright, getIcon }
+--                                       setBorder, getBright, getIcon,
+--                                       strata }  strata nil = its own
 --                                 getBright -> 0..2, defaults to 1.
 --                                 getIcon -> the note's icon path/fileID.
 --                                 Toggles.
@@ -31,7 +32,7 @@ local CONTENT_Y  = 62
 local FOOT_H     = 38
 local COLS       = 5
 local CELL       = 68
-local LABEL_H    = 16
+local LABEL_H    =  0   -- no name under a tile, it is the tooltip (ALL-156)
 local GAP_X, GAP_Y = 8, 10
 local GRID_W     = COLS * CELL + (COLS - 1) * GAP_X
 local ROW_H      = CELL + LABEL_H + GAP_Y
@@ -158,12 +159,13 @@ local function MakeTile()
     t.lbl:SetPoint("TOPRIGHT", t.box, "BOTTOMRIGHT", 0, -3)
     t.lbl:SetJustifyH("CENTER")
     t.lbl:SetWordWrap(false)
+    t.lbl:Hide()   -- the name is the tooltip below the tile (ALL-156)
     t:SetScript("OnClick", function(self) Pick(self.entry) end)
     -- Double-click = pick and close: the first click already picked (ALL-141)
     t:SetScript("OnDoubleClick", function(self) Pick(self.entry); IFP.Close() end)
     t:SetScript("OnEnter", function(self)
         self.hov:Show()
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText(self.entry.label, 1, 1, 1)
         GameTooltip:Show()
     end)
@@ -254,6 +256,7 @@ local function Build()
         end,
     })
     _f, _revertBtn = f, revertBtn
+    f._defStrata = f:GetFrameStrata()
     revertBtn:SetScript("OnClick", function()
         if not _h then return end
         _h.setFrame(_origFrame)
@@ -326,6 +329,8 @@ function IFP.Open(noteID, anchor, h)
         _f:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
     end
     _f:SetAlpha(BNB.WindowAlpha(_f))
+    -- h.strata: the New note dialog sits over a FULLSCREEN_DIALOG dimmer (ALL-350)
+    _f:SetFrameStrata(h.strata or _f._defStrata)
     _f:Show()
     _f:Raise()
     SelectTab(_tabIdx)

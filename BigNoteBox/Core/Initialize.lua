@@ -273,6 +273,8 @@ function BNB.Initialize()
     if BNB.SyncTrashBtnState then BNB.SyncTrashBtnState() end
     -- Tag Manager button the same way, while no note has a tag (ALL-273)
     if BNB.SyncTagsBtnState then BNB.SyncTagsBtnState() end
+    -- Alarms button too, while no note has an alarm (ALL-352)
+    if BNB.SyncAlarmsBtnState then BNB.SyncAlarmsBtnState() end
 
     -- 11d. Sync history button state (grey + disabled when no history exists)
     if BNB.SyncHistoryBtnState then BNB.SyncHistoryBtnState() end

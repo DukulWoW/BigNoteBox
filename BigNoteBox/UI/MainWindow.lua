@@ -705,6 +705,8 @@ function BNB.CreateMainWindow()
                 BNB.AlarmOverview.Toggle()
             end
         end)
+    BNB._toolbarAlarmsBtn = alarmOvBtn   -- greyed while no note has an alarm (ALL-352)
+    if BNB.SyncAlarmsBtnState then BNB.SyncAlarmsBtnState() end
 
     -- Send-to-BCB button. Icon: tp-bcb when BCB is installed, bcb-icon when
     -- absent. Always full colour.

@@ -1163,6 +1163,8 @@ local function BuildStickyPage(sf, ct, y)
         { "alarm",    "CFG_STICKY_BTN_ALARM"    },
         { "edit",     "CFG_STICKY_BTN_EDIT"     },
         { "settings", "CFG_STICKY_BTN_SETTINGS" },
+        { "minimize", "CFG_STICKY_BTN_MINIMIZE" },   -- ALL-357
+        { "view",     "CFG_STICKY_BTN_VIEW"     },
     }) do
         local key = b[1]
         y = AddCheck(ct, y, L[b[2]],

@@ -906,7 +906,9 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         row:SetChecked(false)
         local lbl = row._lbl
         if not lbl then
-            lbl = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            -- The row's own child, so it hides with the row: on sc it stayed
+            -- when the list got shorter, a name with no checkbox (ALL-309)
+            lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
             lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
             lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)
@@ -1028,7 +1030,9 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         row:SetChecked(false)
         local lbl = row._lbl
         if not lbl then
-            lbl = sc:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            -- The row's own child, so it hides with the row: on sc it stayed
+            -- when the list got shorter, a name with no checkbox (ALL-309)
+            lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
             lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
             lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)
@@ -1111,13 +1115,11 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     f:Raise()
 end
 
--- "By notes" order (ALL-298): a note created, deleted, restored or moved to
--- another character can change the order, so the strip / tabs are redrawn,
--- once per burst. The other orders do not depend on notes.
+-- A note created, deleted, restored or moved to another character changes
+-- the (N) counts, and the "By notes" order (ALL-298), so the strip / tabs are
+-- redrawn once per burst (ALL-310: the counts only followed with "By notes")
 do
-    local function Resort()
-        if BigNoteBoxDB and BigNoteBoxDB.sidebarSort == "notes" then SB.Refresh() end
-    end
+    local function Resort() SB.Refresh() end
     local function Soon() BNB.Debounce("sidebarResort", 0.3, Resort) end
     BNB.RegisterMessage("Sidebar", "NoteCreated", Soon)
     BNB.RegisterMessage("Sidebar", "NoteDeleted", Soon)

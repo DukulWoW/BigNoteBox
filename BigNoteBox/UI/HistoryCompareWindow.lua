@@ -47,12 +47,36 @@ local function TasksToText(tasks)
     return table.concat(lines, "\n")
 end
 
-local function PaneText(data)
+-- The tags line above a pane (ALL-176). other = the other side: on the
+-- snapshot pane a tag the restore adds is green with +, one it removes red
+-- with -, so the restore's tag changes show. Nil when neither side has tags.
+local function TagsLine(data, other)
+    local mine, theirs = {}, {}
+    for _, t in ipairs(data.tags or {}) do mine[t] = true end
+    for _, t in ipairs(other and other.tags or {}) do theirs[t] = true end
+    local parts = {}
+    for _, t in ipairs(data.tags or {}) do
+        if other and not theirs[t] then
+            parts[#parts + 1] = "|cff66d966+" .. t .. "|r"
+        else
+            parts[#parts + 1] = t
+        end
+    end
+    for _, t in ipairs(other and other.tags or {}) do
+        if not mine[t] then parts[#parts + 1] = "|cffff6060-" .. t .. "|r" end
+    end
+    if #parts == 0 then return nil end
+    return string.format(L["HISTORY_COMPARE_TAGS"], table.concat(parts, ", "))
+end
+
+local function PaneText(data, other)
     local body = data.body or ""
     local taskText = TasksToText(data.tasks)
     if taskText then
         body = (body ~= "" and (body .. "\n\n") or "") .. taskText
     end
+    local tags = TagsLine(data, other)
+    if tags then body = tags .. "\n\n" .. body end
     return body
 end
 
@@ -359,7 +383,7 @@ function BNB.OpenHistoryCompare(noteID, snap)
     end)
 
     local rp = f._rightPane
-    rp._eb:SetText(PaneText(snap))
+    rp._eb:SetText(PaneText(snap, note))
     C_Timer.After(0, function() if rp._sf then rp._sf:SetVerticalScroll(0) end end)
     rp._makeBtn:SetScript("OnClick", function()
         BNB.HistoryRestoreNote(noteID, snap, true)

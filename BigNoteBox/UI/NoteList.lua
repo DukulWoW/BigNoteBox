@@ -1586,34 +1586,8 @@ local function PopulateEntry(btn, note, selected, collapsed)
     -- currently targeted, replace the icon with the actual unit portrait.
     -- SetPortraitTexture renders the live unit face/model into the texture widget.
     -- Players only get this live: a saved ID cannot carry their customizations.
-    if (note.source == "target" or note.source == "inspect") and UnitExists("target") then
-        local matched = false
-        if note.source == "inspect" then
-            if UnitIsPlayer("target") and note.inspectName then
-                local name, realm = BNB.UnitNameRealm("target")
-                matched = (name == note.inspectName) and
-                    (not note.inspectRealm or note.inspectRealm == "" or realm == note.inspectRealm)
-            end
-        elseif note.targetNpcID then
-            -- NPC match: compare stored creature ID against current target GUID
-            local guid = UnitGUID("target")
-            local curID = guid and (
-                guid:match("^Creature%-0%-%d+%-%d+%-%d+%-(%d+)") or
-                guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)") or
-                guid:match("^Pet%-0%-%d+%-%d+%-%d+%-(%d+)")
-            )
-            matched = (curID == note.targetNpcID)
-        elseif note.targetPlayerKey then
-            -- Player match: compare stored key against current target name+realm
-            local name, realm = BNB.UnitNameRealm("target")
-            realm = (realm and realm ~= "") and realm or
-                    GetNormalizedRealmName() or ""
-            local curKey = "player:" .. (name or "") .. (realm ~= "" and ("-" .. realm) or "")
-            matched = (curKey == note.targetPlayerKey)
-        end
-        if matched then
-            pcall(SetPortraitTexture, btn._icon, "target")
-        end
+    if BNB.NoteMatchesTarget(note) then
+        pcall(SetPortraitTexture, btn._icon, "target")
     end
 
     -- Icon border always hidden (user sets per-note border via LSM; WhiteIconFrame removed)
@@ -2463,6 +2437,39 @@ function BNB.BuildNoteList()
         sf:SetPoint("TOPLEFT",     pane, "TOPLEFT",     PAD_L, -4)
         sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -22,   NEWBTN_H + PAD_BOT + 2)
     end
+end
+
+-- True when note is a target or inspect note about the unit targeted now.
+-- The note list row and the sticky badge (ALL-208) draw its live portrait then.
+function BNB.NoteMatchesTarget(note)
+    if not note or not (note.source == "target" or note.source == "inspect")
+            or not UnitExists("target") then
+        return false
+    end
+    if note.source == "inspect" then
+        if UnitIsPlayer("target") and note.inspectName then
+            local name, realm = BNB.UnitNameRealm("target")
+            return (name == note.inspectName) and
+                (not note.inspectRealm or note.inspectRealm == "" or realm == note.inspectRealm)
+        end
+    elseif note.targetNpcID then
+        -- NPC match: compare stored creature ID against current target GUID
+        local guid = UnitGUID("target")
+        local curID = guid and (
+            guid:match("^Creature%-0%-%d+%-%d+%-%d+%-(%d+)") or
+            guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)") or
+            guid:match("^Pet%-0%-%d+%-%d+%-%d+%-(%d+)")
+        )
+        return curID == note.targetNpcID
+    elseif note.targetPlayerKey then
+        -- Player match: compare stored key against current target name+realm
+        local name, realm = BNB.UnitNameRealm("target")
+        realm = (realm and realm ~= "") and realm or
+                GetNormalizedRealmName() or ""
+        local curKey = "player:" .. (name or "") .. (realm ~= "" and ("-" .. realm) or "")
+        return curKey == note.targetPlayerKey
+    end
+    return false
 end
 
 -- Refresh note list icons when target changes so target note portraits update live.

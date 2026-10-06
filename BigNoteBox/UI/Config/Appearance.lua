@@ -315,9 +315,9 @@ local function BuildAppearanceTab(sf, ct)
 
         skinBrightnessSl:SetAlpha(alpha)
         skinBrightnessSl:SetEnabled(enabled)
-        -- Opacity slider follows same enabled state as brightness
-        skinOpacitySl:SetAlpha(alpha)
-        skinOpacitySl:SetEnabled(enabled)
+        -- Opacity works on OLED too, only brightness does not (ALL-356)
+        skinOpacitySl:SetAlpha(skinOn and 1.0 or 0.35)
+        skinOpacitySl:SetEnabled(skinOn)
     end
     RefreshBrightnessVisibility()
 

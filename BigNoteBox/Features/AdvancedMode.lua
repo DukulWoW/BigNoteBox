@@ -461,27 +461,41 @@ function AM.ConvertToPlain(id, onDone)
         return
     end
 
-    -- Register the confirm popup once
+    -- Register the confirm popups once. The third button keeps a manual
+    -- restore point first, so the rich version can be had back from Note
+    -- History (ALL-344); "Replace" when the note already has one.
     if not StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] then
-        StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] = {
-            preferredIndex = 3,
-            text     = BNB.L["ADV_CONVERT_PLAIN_CONFIRM"],
-            button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
-            button2  = BNB.L["CANCEL"],
-            OnAccept = function(self, data)
-                AM.StripToPlain(data.id)
-                if data.onDone then data.onDone(true) end
-            end,
-            OnCancel = function(self, data)
-                if data and data.onDone then data.onDone(false) end
-            end,
-            timeout      = 0,
-            whileDead    = true,
-            hideOnEscape = true,
-        }
+        for key, point in pairs({ BNB_RICH_CONVERT_PLAIN = "HISTORY_CTX_CREATE",
+                                  BNB_RICH_CONVERT_PLAIN_R = "NL_CM_REPLACE_RESTORE" }) do
+            StaticPopupDialogs[key] = {
+                preferredIndex = 3,
+                text     = BNB.L["ADV_CONVERT_PLAIN_CONFIRM"],
+                button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
+                button2  = BNB.L["CANCEL"],
+                button3  = BNB.L[point],
+                OnAccept = function(self, data)
+                    AM.StripToPlain(data.id)
+                    if data.onDone then data.onDone(true) end
+                end,
+                -- button3: restore point, then the same conversion
+                OnAlt = function(self, data)
+                    if BNB.HistoryCreateManual then BNB.HistoryCreateManual(data.id) end
+                    AM.StripToPlain(data.id)
+                    if data.onDone then data.onDone(true) end
+                end,
+                OnCancel = function(self, data)
+                    if data and data.onDone then data.onDone(false) end
+                end,
+                timeout      = 0,
+                whileDead    = true,
+                hideOnEscape = true,
+            }
+        end
     end
 
-    local popup = StaticPopup_Show("BNB_RICH_CONVERT_PLAIN")
+    local note = BNB.GetNote(id)
+    local popup = StaticPopup_Show((note and note.manualSnapshot)
+        and "BNB_RICH_CONVERT_PLAIN_R" or "BNB_RICH_CONVERT_PLAIN")
     if popup then
         popup.data = { id = id, onDone = onDone }
     end

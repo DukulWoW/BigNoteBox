@@ -60,6 +60,7 @@ local _soundDD, _soundRepDD, _glowTypeDD, _glowModeDD, _fireModeDD
 local _snoozeEnableCB, _snoozeIntervalDD, _snoozeRepeatDD
 local _combatDD, _postDD
 local _saveBtn   -- ref so Populate can enable/disable it
+local _delBtn    -- Remove Alarm, or Cancel while the alarm is not saved yet (ALL-346)
 
 -- ---------------------------------------------------------------------------
 -- HELPERS
@@ -124,8 +125,9 @@ local function BuildWindow()
         end,
     })
     saveBtn:SetEnabled(false)
-    delBtn:GetFontString():SetTextColor(0.9, 0.4, 0.4, 1)
+    delBtn._plainColor = { delBtn:GetFontString():GetTextColor() }
     _saveBtn = saveBtn
+    _delBtn  = delBtn
 
     -- ── TABS ─────────────────────────────────────────────────────────────────
     local tabNames = {L["AW_TAB_GENERAL"], L["AW_TAB_ANIMATION"], L["AW_TAB_ADVANCED"]}
@@ -411,15 +413,17 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
 
     local ndRow = CreateFrame("Frame",nil,ct1)
     ndRow:SetSize(AW_CW,AW_ROW); ndRow:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y); ndRow:Hide()
-    local ndL=ndRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    ndL:SetPoint("LEFT"); ndL:SetText(L["AW_EVERY_PREFIX"])
+    -- A plain number field: the dropdown above already says "Every N days",
+    -- and the bare 7 between "Every" and "days" did not read as editable
+    -- (ALL-347, Dukul 2026-10-06)
     local ndEB=BNB.CreateBackdropFrame("EditBox",nil,ndRow)
-    ndEB:SetSize(36,AW_ROW); ndEB:SetPoint("LEFT",ndRow,"LEFT",44,0)
+    ndEB:SetSize(60,AW_ROW); ndEB:SetPoint("LEFT",ndRow,"LEFT",0,0)
+    BNB.SetBackdropDark(ndEB); ndEB:SetTextInsets(6,6,0,0)
     ndEB:SetAutoFocus(false); ndEB:SetNumeric(true); ndEB:SetMaxLetters(3)
-    ndEB:SetFontObject("GameFontNormalSmall"); ndEB:SetText("7")
+    ndEB:SetFontObject("GameFontHighlightSmall"); ndEB:SetText("7")
+    ndEB:SetScript("OnEnterPressed",function(self) self:ClearFocus() end)
+    ndEB:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
     ndEB:HookScript("OnTextChanged",function() MarkDirty() end)
-    local ndS=ndRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
-    ndS:SetPoint("LEFT",ndEB,"RIGHT",4,0); ndS:SetText(L["AW_DAYS_SUFFIX"])
 
     local function SetRecur(v)
         wdRow:SetShown(v=="weekdays"); ndRow:SetShown(v=="interval")
@@ -1050,6 +1054,12 @@ local function Populate(noteID)
     -- Save button: enabled immediately for new alarms so user can save defaults.
     -- For existing alarms, start disabled until the user makes a change.
     if _saveBtn then _saveBtn:SetEnabled(not hasExisting) end
+    if _delBtn then
+        _delBtn:SetText(hasExisting and L["AW_REMOVE_ALARM_BTN"] or L["CANCEL"])
+        local fs = _delBtn:GetFontString()
+        if hasExisting then fs:SetTextColor(0.9, 0.4, 0.4, 1)
+        else fs:SetTextColor(unpack(_delBtn._plainColor)) end
+    end
     _isPopulating = false
 end
 

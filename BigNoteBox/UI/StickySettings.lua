@@ -348,13 +348,10 @@ local function PopulateStickySettings(noteID)
           end,
           enabled = function() return noteIsRich end,
           onClick = function()
-              cfg.richPlainText = (not cfg.richPlainText) and true or nil
-              SaveCfg(noteID, cfg)
+              -- Same path as the sticky's view button (ALL-357): saves,
+              -- re-renders the sticky and its button
+              SN.SetPlainView(noteID, not cfg.richPlainText)
               SyncPlainOnlyControls()
-              -- Re-render the sticky with the new mode
-              if BNB.Sticky and BNB.Sticky.RefreshNote then
-                  BNB.Sticky.RefreshNote(noteID)
-              end
           end },
         -- Lock sticky: position and size stay put (UI/StickyNote.lua StickyLocked)
         { text = function()
@@ -738,14 +735,13 @@ local function PopulateStickySettings(noteID)
     local SyncColorizeSlider
 
     SubLbl(ct2, L["STICKY_BG_TEXTURE_LABEL"])
-    BNB.StickyBG.LoadClassic()   -- lists BigNoteBox_BGs' old TGAs too (ALL-110)
     local curTexKey   = cfg.bgTexture or "none"
     local SBP = BNB.StickyBgPicker
 
     -- [<] [name] [>] (ALL-110 part 2b, Dukul 2026-09-27): the name opens the
     -- thumbnail grid (UI/StickyBgPicker.lua), the arrows step through the
     -- whole list and wrap. A saved key whose texture is unavailable
-    -- (BigNoteBox_BGs missing) reads "None"; the key stays saved until
+    -- (art of the other client) reads "None"; the key stays saved until
     -- another is picked.
     local TEX_ARW = 22
     local texPrev = BNB.CreateButton(nil, ct2, "<", TEX_ARW, 22)
@@ -830,7 +826,7 @@ local function PopulateStickySettings(noteID)
         end, 0, PCT)
 
     -- Greyed while the note draws no texture: None, or a saved key that is
-    -- unavailable here (BigNoteBox_BGs missing, art of the other client)
+    -- unavailable here (art of the other client)
     SyncColorizeSlider = function(texKey)
         local disabled = not BNB.StickyBG.Get(texKey).file
         -- SetTexKey may have reset Colorize; silent, so nothing is saved twice

@@ -46,7 +46,8 @@ end
 BNB.NOTE_MENU_CLICKS = {
     { "open", "NL_CTX_OPEN", "note", {
         { "editor", "NL_CM_OPEN_EDITOR", "editor" }, { "settings", "NL_CTX_OPEN_SETTINGS", "note-settings" },
-        { "focus", "CFG_DBL_FOCUS", "focus-mode" }, { "sticky", "NL_CTX_OPEN_STICKY", "sticky-note" },
+        { "focus", "CFG_DBL_FOCUS", "focus-mode" }, { "refBox", "NL_CM_OPEN_REFBOX", "reference-box" },
+        { "sticky", "NL_CTX_OPEN_STICKY", "sticky-note" },
         { "escSticky", "NL_CTX_OPEN_ESC_STICKY", "esc-sticky-note" } } },
     { "create", "NL_CM_CREATE", "create", {
         { "alarm", "NL_CTX_CREATE_ALARM", "create-alarm" }, { "task", "NL_CTX_CREATE_TASK", "create-task" },
@@ -116,6 +117,16 @@ StaticPopupDialogs["BNB_CM_CLEAR_HISTORY"] = {
 -- A main item with its sub-menu. entries: { key, label, fn, opts } or DIV;
 -- false (an entry left out on this note) is skipped. A disabled default
 -- falls back to the plain label and a sub-menu-only click.
+-- The Reference Box module is on, and it is open on this note (ALL-360)
+local function RefBoxOn()
+    return BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled ~= false
+end
+local function RefBoxShows(noteID)
+    local f = _G["BigNoteBoxReferenceBoxFrame"]
+    local K = BNB._RefBoxKit
+    return f and f:IsShown() and K and K.NoteID and K.NoteID() == noteID or false
+end
+
 local function Parent(root, label, icon, defaultKey, entries)
     local def
     for _, e in ipairs(entries) do
@@ -216,6 +227,14 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
               opts = { icon = "note-settings" } },
             { key = "focus",    label = L["CFG_DBL_FOCUS"], fn = function() A.focus(noteID) end,
               opts = { disabled = locked, icon = "focus-mode" } },
+            -- Reference Box (ALL-360): only while its module is on; closes it
+            -- when it already shows this note
+            RefBoxOn() and { key = "refBox",
+              label = RefBoxShows(noteID) and L["NL_CM_CLOSE_REFBOX"] or L["NL_CM_OPEN_REFBOX"],
+              fn = function()
+                if RefBoxShows(noteID) then BNB.CloseReferenceBox()
+                elseif BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end
+              end, opts = { icon = "reference-box" } } or false,
             DIV,
             { key = "sticky",   label = stickyLabel, fn = function() A.sticky(noteID) end,
               opts = { icon = "sticky-note" } },

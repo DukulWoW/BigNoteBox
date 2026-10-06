@@ -1537,25 +1537,57 @@ RenderList = function()
         local regItems    = note.inspectGearItems
         local showTmog    = (gearShow == "both" or gearShow == "transmog") and tmogItems and #tmogItems > 0
         local showReg     = (gearShow == "both" or gearShow == "regular")  and regItems  and #regItems  > 0
+        -- No transmog on the player: every transmog card is the item worn in
+        -- that slot, so the regular list alone is shown (FOR-26). The lists
+        -- differ in length anyway (rings, trinkets, neck have no transmog).
+        if showTmog and showReg then
+            local worn = {}
+            for _, g in ipairs(regItems) do worn[g.slotIdx or g.slot or 0] = g.id end
+            local same = true
+            for _, g in ipairs(tmogItems) do
+                if worn[g.slotIdx or g.slot or 0] ~= g.id then same = false; break end
+            end
+            if same then showTmog = false end
+        end
 
-        -- Helper: renders a header label at current y, returns new y.
-        local function RenderGearHeader(text)
+        -- Helper: renders a section title at current y, returns new y. A
+        -- right-click copies every Wowhead link of the section (ALL-167,
+        -- per client through BNB.WowheadURL); the title is the size of the
+        -- Attachments line, without the "-- --" around it.
+        local function RenderGearHeader(text, items)
             if not sc._gearHdrs then sc._gearHdrs = {} end
             local hdr = table.remove(sc._gearHdrs)
             if not hdr then
-                hdr = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-                hdr:SetHeight(16); hdr:SetJustifyH("LEFT")
-                hdr:SetTextColor(0.55, 0.55, 0.55)
+                hdr = CreateFrame("Button", nil, sc)
+                hdr:SetHeight(20)
+                hdr.fs = hdr:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                hdr.fs:SetAllPoints(); hdr.fs:SetJustifyH("LEFT")
+                hdr:RegisterForClicks("RightButtonUp")
+                hdr:SetScript("OnClick", function(self)
+                    if self._links and self._links ~= "" then BNB.ShowClipboardHint(self._links, self) end
+                end)
+                hdr:SetScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                    GameTooltip:AddLine(L["REFBOX_GEAR_COPY_LINKS_TIP"], 1, 1, 1)
+                    GameTooltip:Show()
+                end)
+                hdr:SetScript("OnLeave", function() GameTooltip:Hide() end)
             end
+            local links = {}
+            for _, g in ipairs(items or {}) do
+                local url = g.id and BNB.WowheadURL("item", g.id)
+                if url then links[#links + 1] = url end
+            end
+            hdr._links = table.concat(links, "\n")
             hdr:ClearAllPoints()
             hdr:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PAD, y)
             hdr:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PAD, y)
-            hdr:SetText(text)
+            hdr.fs:SetText(text)
             hdr:Show()
             -- Store so ReleaseAllRows can hide them next render.
             sc._activeGearHdrs = sc._activeGearHdrs or {}
             table.insert(sc._activeGearHdrs, hdr)
-            return y - 18
+            return y - 22
         end
 
         -- Helper: renders one gear card row. isTmog controls watermark + type label.
@@ -1601,13 +1633,13 @@ RenderList = function()
         end
 
         if showTmog then
-            y = RenderGearHeader("|cff888888-- " .. L["REFBOX_GEAR_HEADER_TMOG"] .. " --|r")
+            y = RenderGearHeader(L["REFBOX_GEAR_HEADER_TMOG"], tmogItems)
             for i, g in ipairs(tmogItems) do
                 y = RenderGearRow(g, tmogItems, i, true)
             end
         end
         if showReg then
-            y = RenderGearHeader("|cff888888-- " .. L["REFBOX_GEAR_HEADER_REG"] .. " --|r")
+            y = RenderGearHeader(L["REFBOX_GEAR_HEADER_REG"], regItems)
             for i, g in ipairs(regItems) do
                 y = RenderGearRow(g, regItems, i, false)
             end
@@ -2062,7 +2094,7 @@ local function BuildReferenceBox()
     end)
 
     local countY = -(titleH + 4 + MANUAL_H + MANUAL_GAP + 2)
-    local countLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local countLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")   -- bigger (ALL-167)
     countLabel:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, countY)
     countLabel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, countY)
     countLabel:SetJustifyH("LEFT"); countLabel:SetTextColor(0.50, 0.50, 0.55)
@@ -2894,6 +2926,21 @@ UpdateModelViewer = function()
         if creatureID then
             pcall(function()
                 mdl:SetCreature(creatureID)
+            end)
+            -- SetCreature draws nothing for a creature the client has no data
+            -- for (NPC 185669, ALL-340): the saved display ID, then the live
+            -- unit while it is targeted, fill the viewer instead
+            local dispID = tonumber(note.targetDisplayID)
+            local noteID = note.id
+            C_Timer.After(0.3, function()
+                if _noteID ~= noteID or not mdl:IsShown() then return end
+                local fid = mdl.GetModelFileID and mdl:GetModelFileID()
+                if fid and fid ~= 0 then return end
+                if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
+                    pcall(mdl.SetUnit, mdl, "target")
+                elseif dispID and dispID > 0 then
+                    pcall(mdl.SetDisplayInfo, mdl, dispID)
+                end
             end)
             mdl:SetPosition(0, 0, 0)
             mdl:SetModelScale(1)

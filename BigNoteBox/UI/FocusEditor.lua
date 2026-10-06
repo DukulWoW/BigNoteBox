@@ -400,9 +400,10 @@ function BNB.UpdateFocusSpinBtn(enabled)
     focusSpinBtn:SetSymbol(enabled and "spinon" or "spinoff")
 end
 
--- Spin (orbit) toggle, an icon button left of Restore in both builders.
--- skin: true in the skin builder, false in the normal one.
-local function MakeFocusSpinBtn(parent, restoreBtn, skin)
+-- Spin (orbit) toggle, an icon button left of the close X in both builders
+-- (the Restore button there went with ALL-353: X and ESC already return to
+-- the main window). skin: true in the skin builder, false in the normal one.
+local function MakeFocusSpinBtn(parent, closeBtn, skin)
     local db   = BigNoteBoxDB
     local isOn = db and db.focusOrbitEnabled ~= false
     local sb = BNB.CreateIconButton(parent, 18, isOn and "spinon" or "spinoff", { skin = skin,
@@ -412,7 +413,7 @@ local function MakeFocusSpinBtn(parent, restoreBtn, skin)
                 and L["CFG_FOCUS_ORBIT_TIP_OFF"] or L["CFG_FOCUS_ORBIT_TIP_ON"]
         end,
         onClick = function() if BNB.FocusOrbit then BNB.FocusOrbit.Toggle() end end })
-    sb:SetPoint("RIGHT", restoreBtn, "LEFT", -4, 0)
+    sb:SetPoint("RIGHT", closeBtn, "LEFT", -4, 0)
     focusSpinBtn = sb
     return sb
 end
@@ -639,23 +640,10 @@ local function BuildFocusFrame()
         f.CloseButton._tip = L["FOCUS_RESTORE_TIP"]   -- ALL-314: our icon button shows it on hover
     end
 
-    local restoreBtn = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
-    restoreBtn:SetSize(64, 22)
-    restoreBtn:SetPoint("RIGHT", f.CloseButton, "LEFT", -4, 0)
-    restoreBtn:SetFrameLevel(f.CloseButton:GetFrameLevel())
-    restoreBtn:SetText(L["FOCUS_RESTORE_BTN"])
-    restoreBtn:SetScript("OnClick", function() BNB.CloseFocusMode() end)
-    restoreBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["FOCUS_RESTORE_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    restoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Spin (orbit) toggle button — left of Restore
+    -- Spin (orbit) toggle button, left of the close X
     do
-        local sb = MakeFocusSpinBtn(f, restoreBtn, false)
-        sb:SetFrameLevel(restoreBtn:GetFrameLevel())
+        local sb = MakeFocusSpinBtn(f, f.CloseButton, false)
+        sb:SetFrameLevel(f.CloseButton:GetFrameLevel())
     end
 
     local content = CreateFrame("Frame", nil, f)
@@ -950,20 +938,9 @@ local function BuildFocusFrameSkin()
     end)
     closeBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
-    -- Restore button
-    local restoreBtn = BNB.CreateSkinButton(nil, titleBar, L["FOCUS_RESTORE_BTN"], 64, 22)
-    restoreBtn:SetPoint("RIGHT", closeBtn, "LEFT", -4, 0)
-    restoreBtn:SetScript("OnClick", function() BNB.CloseFocusMode() end)
-    restoreBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
-        GameTooltip:AddLine(L["FOCUS_RESTORE_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    restoreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- Spin (orbit) toggle button — left of Restore
+    -- Spin (orbit) toggle button, left of the close X
     do
-        MakeFocusSpinBtn(titleBar, restoreBtn, true)
+        MakeFocusSpinBtn(titleBar, closeBtn, true)
     end
 
     -- ── Content area ──────────────────────────────────────────────────────────

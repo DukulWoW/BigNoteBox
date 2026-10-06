@@ -303,6 +303,18 @@ end
 SN.IsLocked = StickyLocked
 
 -- Lock or unlock a sticky (Sticky settings button and the right-click menu)
+-- A rich note's sticky shown as plain text, or back to rich (ALL-357):
+-- the header's view button and the settings' Plain text state button
+function SN.SetPlainView(noteID, on)
+    local cfg = (SN._SettingsCfg and SN._SettingsCfg(noteID)) or GetCfg(noteID)
+    cfg.richPlainText = on and true or nil
+    SaveCfg(noteID, cfg)
+    if SN._RefreshSettingsStates then SN._RefreshSettingsStates(noteID) end
+    if SN.RefreshNote then SN.RefreshNote(noteID) end
+    local f = openFrames[noteID]
+    if f and f._syncViewBtn then f._syncViewBtn() end
+end
+
 function SN.SetLocked(noteID, on)
     local cfg = (SN._SettingsCfg and SN._SettingsCfg(noteID)) or GetCfg(noteID)
     cfg.locked = on and true or nil
@@ -346,7 +358,7 @@ end
 
 -- ── Background texture registry ───────────────────────────────────────────────
 -- Lives in UI/StickyBackgrounds.lua (BNB.StickyBG, ALL-110). BG_TEXTURES is
--- its LIST, extended in place when BigNoteBox_BGs registers the old TGAs.
+-- its LIST.
 local BG_TEXTURES     = BNB.StickyBG.LIST
 local GetBgTextureDef = BNB.StickyBG.Get
 local BgTextureLabel  = BNB.StickyBG.Label
@@ -651,6 +663,10 @@ local function SetStickyNoteIcon(tex, note)
     tex:SetTexture((icon and icon ~= "") and icon or STICKY_DEFAULT_ICON)
     tex:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     if note and BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+    -- Its unit targeted now: the live portrait, as the note list row (ALL-208)
+    if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
+        pcall(SetPortraitTexture, tex, "target")
+    end
 end
 
 -- A note's icon drawn as the sticky's badge draws it: icon or NPC portrait,
@@ -1798,6 +1814,7 @@ local function CreateStickyFrame(noteID)
     local function HdrBtn(slot, symbol, tip, onClick)
         local btn = BNB.CreateIconButton(btnOverlay, BTN_SZ, symbol, { onClick = onClick,
             tip = function(self)
+                if self._dynTip then return self._dynTip() end
                 if self == f._alarmHdrBtn then
                     local n = BNB.GetNote and BNB.GetNote(noteID)
                     return (n and n.alarm) and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]
@@ -1907,11 +1924,32 @@ local function CreateStickyFrame(noteID)
     end)
     f._tasksHdrBtn = tasksHdrBtn
 
-    -- Settings > Modules > Sticky Notes can hide four of the buttons
-    -- (stickyHideBtn, ALL-266); the right-click menu keeps them all.
-    -- Tasks also hides while the Tasks module is off (ALL-102).
+    -- slot 7 = view: a rich note shown as rich text or as plain text, the
+    -- sticky's own "Plain text" setting (cfg.richPlainText, ALL-357). The
+    -- symbol and tip say what a click gives. Rich notes only.
+    local function ShowsPlain()
+        local c = (SN._SettingsCfg and SN._SettingsCfg(noteID)) or GetCfg(noteID)
+        return c.richPlainText == true
+    end
+    local viewHdrBtn = HdrBtn(7, "normal", L["STICKY_VIEW_AS_NORMAL_TIP"], function()
+        SN.SetPlainView(noteID, not ShowsPlain())
+    end)
+    viewHdrBtn._dynTip = function()
+        return ShowsPlain() and L["STICKY_VIEW_AS_RICH_TIP"] or L["STICKY_VIEW_AS_NORMAL_TIP"]
+    end
+    f._syncViewBtn = function()
+        local plain = ShowsPlain()
+        viewHdrBtn:SetSymbol(plain and "rich" or "normal")
+    end
+    f._syncViewBtn()
+
+    -- Settings > Modules > Sticky Notes can hide every button but Close
+    -- (stickyHideBtn, ALL-266, minimize and view since ALL-357); the
+    -- right-click menu keeps them all. Tasks also hides while the Tasks
+    -- module is off (ALL-102), view on a note that is not rich.
     _hdrBtns[3]._hideKey, _hdrBtns[4]._hideKey = "settings", "edit"
     alarmHdrBtn._hideKey, tasksHdrBtn._hideKey = "alarm", "tasks"
+    minBtn._hideKey, viewHdrBtn._hideKey = "minimize", "view"
     -- Right-aligned, slot order, hidden buttons leave no gap. Single anchor
     -- so SetSize is respected (two anchors stretch the button).
     f._layoutHdrBtns = function()
@@ -1919,6 +1957,11 @@ local function CreateStickyFrame(noteID)
         for _, btn in ipairs(_hdrBtns) do
             local show = not (btn._hideKey and SN.HdrBtnHidden(btn._hideKey))
             if btn == tasksHdrBtn and not BNB.TasksEnabled() then show = false end
+            if btn == viewHdrBtn then
+                local n = BNB.GetNote(noteID)
+                if not (n and n.richMode == true) then show = false end
+                if show then f._syncViewBtn() end
+            end
             btn:ClearAllPoints()
             if show then
                 btn:SetPoint("BOTTOMRIGHT", header, "BOTTOMRIGHT",
@@ -3001,16 +3044,20 @@ end
 function SN.RefreshNpcPortraits()
     for id, f in pairs(openFrames) do
         local note = BNB.GetNote(id)
-        if note and note.source == "target" then
+        if note and (note.source == "target" or note.source == "inspect") then
             SetStickyNoteIcon(f._badgeTex, note)
             if f._miniTile then SetStickyNoteIcon(f._miniTile._iconTex, note) end
         end
     end
 end
+-- A target or inspect note's badge follows the target: live portrait while
+-- its unit is targeted, its icon again when the target goes (ALL-208)
+BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function() SN.RefreshNpcPortraits() end)
 
 -- Header buttons the player switched off on Settings > Modules > Sticky
 -- Notes (ALL-266): BigNoteBoxDB.stickyHideBtn[key] = true, key = "settings",
--- "edit", "alarm" or "tasks"; nil = shown. Close and Minimize always show.
+-- "edit", "alarm", "tasks", "minimize" or "view" (ALL-357); nil = shown.
+-- Close always shows.
 function SN.HdrBtnHidden(key)
     local h = BigNoteBoxDB and BigNoteBoxDB.stickyHideBtn
     return h ~= nil and h[key] == true

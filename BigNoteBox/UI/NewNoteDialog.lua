@@ -43,6 +43,9 @@ local PICKER_KEY   = "newNote"   -- BNB.IconPicker key + owner (ALL-238)
 local _selIcon  = nil
 local _selFont  = nil
 local _selColor = nil
+-- Icon frame / LSM edge border picked with a right-click on the icon
+-- (ALL-350); written to the note on Create, as Note Settings would
+local _selFrame, _selBorder = nil, nil
 local _selSize  = 12
 local _selRich  = false  -- whether "Rich note" checkbox is ticked
 
@@ -120,6 +123,25 @@ local function ShowSelIcon()
     if _iconBtn then
         _iconBtn._tex:SetTexture(_selIcon or "Interface\\Icons\\INV_Misc_Note_06")
     end
+end
+
+-- The picked icon frame drawn on the icon button (ALL-350)
+local function ShowSelFrame()
+    if _iconBtn and BNB.ApplyIconFrame then
+        BNB.ApplyIconFrame(_iconBtn._tex, { iconFrame = _selFrame }, ICON_SZ - 6)
+    end
+end
+
+local function FramePickHandlers()
+    return {
+        getFrame  = function() return _selFrame or "none" end,
+        setFrame  = function(k) _selFrame = (k ~= "none") and k or nil; ShowSelFrame() end,
+        getBorder = function() return _selBorder or "None" end,
+        setBorder = function(k) _selBorder = (k ~= "None" and k ~= "") and k or nil end,
+        getIcon   = function() return _selIcon end,
+        -- Over the main window's FULLSCREEN_DIALOG dimmer, as the icon picker
+        strata    = "FULLSCREEN_DIALOG",
+    }
 end
 
 local function IconPickHandlers()
@@ -204,6 +226,8 @@ local function RefreshColorHighlight()
     -- A colour from the picker tile rings the tile
     local tile = _swatchBtns.tile
     if tile and tile._ring then tile._ring:SetShown(_selColor ~= nil and not any) end
+    -- The title is typed in the picked colour (ALL-349)
+    if _titleEB and _titleEB.SetRealColor then _titleEB:SetRealColor(_selColor) end
 end
 
 -- Apply selected font bold at 20pt to title editbox (mirrors NoteEditor title field)
@@ -249,6 +273,9 @@ local function BuildDialog()
     f:HookScript("OnHide", function()
         ShowMainOverlay(false)
         BNB.IconPicker.Close(PICKER_KEY)
+        if BNB.IconFramePicker and BNB.IconFramePicker.IsOpenFor(PICKER_KEY) then
+            BNB.IconFramePicker.Close()
+        end
     end)
 
     -- ── TOP ROW: icon + title editbox ────────────────────────────────────────
@@ -269,11 +296,24 @@ local function BuildDialog()
     iconBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:AddLine(L["NND_ICON_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NND_ICON_FRAME_TIP"], 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     iconBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     -- Toggles the picker, top aligned beside the dialog
-    iconBtn:SetScript("OnClick", function()
+    -- Right-click: the icon frame picker (ALL-350)
+    iconBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    iconBtn:SetScript("OnClick", function(_, btn)
+        if btn == "RightButton" then
+            if BNB.IconFramePicker then
+                BNB.IconPicker.Close(PICKER_KEY)
+                BNB.IconFramePicker.Open(PICKER_KEY, f, FramePickHandlers())
+            end
+            return
+        end
+        if BNB.IconFramePicker and BNB.IconFramePicker.IsOpenFor(PICKER_KEY) then
+            BNB.IconFramePicker.Close()
+        end
         BNB.IconPicker.Open(PICKER_KEY, f, IconPickHandlers())
     end)
     _iconBtn = iconBtn
@@ -642,6 +682,7 @@ function NND.Open()
     _selIcon  = RandomNoteIcon()
     _selFont  = nil
     _selColor = nil
+    _selFrame, _selBorder = nil, nil
     _selSize  = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     _selRich  = (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
     if _richCheck then _richCheck:SetChecked(_selRich) end
@@ -654,11 +695,14 @@ function NND.Open()
 
     -- Apply icon
     ShowSelIcon()
+    ShowSelFrame()
 
     -- Reset title field and disable Create
     if _titleEB then
-        _titleEB:SetText("")
-        BNB.AddPlaceholder(_titleEB, L["NND_TITLE_PLACEHOLDER"], 0.40, 0.40, 0.40)
+        -- SetRealText, never AddPlaceholder again on a live box (it
+        -- SetScripts the focus handlers)
+        _titleEB:SetRealText("")
+        _titleEB:SetRealColor(nil)
     end
     if _createBtn then _createBtn:SetEnabled(false) end
 
@@ -730,6 +774,8 @@ function NND.Confirm()
     local updates = { icon = _selIcon }
     if _selFont  then updates.fontOverride = _selFont  end
     if _selColor then updates.titleColor   = _selColor end
+    if _selFrame  then updates.iconFrame      = _selFrame  end   -- ALL-350
+    if _selBorder then updates.borderOverride = _selBorder end
     local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     if _selSize ~= defaultSize then updates.fontSize = _selSize end
     if _selRich then updates.richMode = true end

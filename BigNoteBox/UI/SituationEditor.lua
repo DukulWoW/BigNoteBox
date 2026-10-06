@@ -731,7 +731,8 @@ function BNB.CreateSituationEditor(panel, opts)
         -- Both addons installed: nothing left to explain, no "?" (ALL-316)
         local both = (HasWPAddon() and HasWaypointUI()) and true or false
         wpInfoLbl:SetShown(not both)
-        wpInfoHit:SetShown(not both)
+        -- The hit frame stays: the tag's tooltip lists the addons (ALL-348)
+        wpInfoHit._both = both
     end
 
     -- "?" icon (visual only; the hit frame below takes the click, ALL-316)
@@ -745,11 +746,23 @@ function BNB.CreateSituationEditor(panel, opts)
     wpInfoHit:SetPoint("LEFT",  wpStatusTag, "LEFT",  -2, 0)
     wpInfoHit:SetPoint("RIGHT", wpInfoLbl,   "RIGHT",  4, 0)
     wpInfoHit:SetHeight(18)
-    wpInfoHit:SetScript("OnClick", function() TogglePopup(ed) end)
+    wpInfoHit:SetScript("OnClick", function(self)
+        if not self._both then TogglePopup(ed) end
+    end)
     wpInfoHit:SetScript("OnEnter", function(self)
         wpInfoLbl:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
+        -- Which waypoint addons are installed (ALL-348), then the "?" hint
+        for _, a in ipairs({ { "WaypointUI", HasWaypointUI() }, { "TomTom", HasWPAddon() } }) do
+            if a[2] then
+                GameTooltip:AddLine(string.format(L["WP_ADDON_INSTALLED_FMT"], a[1]), 0.4, 1, 0.4)
+            else
+                GameTooltip:AddLine(string.format(L["WP_ADDON_MISSING_FMT"], a[1]), 0.6, 0.6, 0.6)
+            end
+        end
+        if not self._both then
+            GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
+        end
         GameTooltip:Show()
     end)
     wpInfoHit:SetScript("OnLeave", function()

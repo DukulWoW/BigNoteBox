@@ -47,7 +47,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 12  -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 18  -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 19 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -184,8 +184,10 @@ BNB.DEFAULTS = {
     wysiwygBarVisible = true,
 
     -- When entering combat: "nothing" | "hide_all" (main window, companions,
-    -- stickies) | "hide_no_stickies"
-    combatAction = "nothing",
+    -- stickies) | "hide_no_stickies" | "hide_minimize" (stickies minimized).
+    -- "hide_minimize" since ALL-355 (Dukul 2026-10-06): reaches new installs
+    -- only, every existing one has its value saved
+    combatAction = "hide_minimize",
 
     -- Quick Note button in quest/gossip/book frames.
     -- quickNoteAction: "silent" = create in the background, "open" = create
@@ -625,6 +627,24 @@ local function MigrateSettingsDB()
             end
         end
         v = 18
+    end
+
+    if v < 19 then
+        -- The old bundled sticky backgrounds (BigNoteBox_BGs, keys
+        -- "bgtexture-NN") are gone (ALL-338): stickies and Oracle styles
+        -- that used one go back to plain colour
+        local function Plain(t)
+            if type(t) == "table" and type(t.bgTexture) == "string"
+                    and t.bgTexture:find("^bgtexture%-") then
+                t.bgTexture = "none"
+            end
+        end
+        for _, rec in pairs(db.postits or {}) do
+            if type(rec) == "table" then Plain(rec.cfg) end
+        end
+        Plain(db.oracleCustom)
+        for _, s in pairs(db.oracleStyles or {}) do Plain(s) end
+        v = 19
     end
 
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)

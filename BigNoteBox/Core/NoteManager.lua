@@ -88,6 +88,29 @@ BNB.RegisterMessage("TagsButton", "NoteDeleted",  function() BNB.SyncTagsBtnStat
 BNB.RegisterMessage("TagsButton", "NoteRestored", function() BNB.SyncTagsBtnState() end)
 BNB.RegisterMessage("TagsButton", "NoteChanged",  SyncTagsOnTagChange)
 
+-- The toolbar's Alarms button is greyed while no note has an alarm, like
+-- Trash and Tags (ALL-352). Every alarm write is an UpdateNote of the alarm
+-- field (SaveAlarm, Features/AlarmManager.lua), so NoteChanged covers it.
+function BNB.SyncAlarmsBtnState()
+    local btn = BNB._toolbarAlarmsBtn
+    if not btn then return end
+    local ndb = BNB.NotesDB()
+    local has = false
+    for _, n in pairs(ndb and ndb.notes or {}) do
+        if n.alarm then has = true; break end
+    end
+    btn:SetEnabled(has)
+    btn:SetAlpha(has and 1.0 or 0.4)
+    pcall(function() btn._tx:SetDesaturated(not has) end)
+end
+local function SyncAlarmsOnChange(_, _, fields)
+    if fields == nil or fields.alarm ~= nil or fields._clear then BNB.SyncAlarmsBtnState() end
+end
+BNB.RegisterMessage("AlarmsButton", "NoteCreated",  function() BNB.SyncAlarmsBtnState() end)
+BNB.RegisterMessage("AlarmsButton", "NoteDeleted",  function() BNB.SyncAlarmsBtnState() end)
+BNB.RegisterMessage("AlarmsButton", "NoteRestored", function() BNB.SyncAlarmsBtnState() end)
+BNB.RegisterMessage("AlarmsButton", "NoteChanged",  SyncAlarmsOnChange)
+
 --------------------------------------------------------------------------------
 -- TAG INDEX HELPERS
 -- BNB.TagIndex() maps tag → { [noteID] = true }.

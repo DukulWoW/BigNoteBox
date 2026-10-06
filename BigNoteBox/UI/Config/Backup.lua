@@ -188,6 +188,22 @@ local function BuildBackupTab(sf, ct)
             return
         end
 
+        -- A share code (BNB2: / BNB1:) goes to the share preview, as on the
+        -- Welcome panel (ALL-67): it is a note, not a broken backup
+        local code = raw:match("^%s*(.-)%s*$")
+        if code:find("^BNB%d:") then
+            local data, err
+            if BNB.ShareDecode then data, err = BNB.ShareDecode(code) end
+            if not data then
+                importStatus:SetTextColor(0.82, 0.55, 0.55)
+                importStatus:SetText(err or L["SHARE_ERR_INVALID"])
+                return
+            end
+            importStatus:SetText("")
+            BNB.OpenSharePreview(data)
+            return
+        end
+
         -- A damaged JSON file says where it breaks (ALL-294), never falls
         -- through to Markdown
         local notes, jsonErr = NE.ParseJsonNotes(raw)

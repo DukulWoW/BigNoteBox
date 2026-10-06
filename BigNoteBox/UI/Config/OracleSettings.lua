@@ -376,7 +376,6 @@ local function BuildCustomBlock(ct)
     Label(blk, y, L["STICKY_BG_TEXTURE_LABEL"])
     y = y - (ROW_H - 4)
     local SBG, SBP = BNB.StickyBG, BNB.StickyBgPicker
-    SBG.LoadClassic()
     local ARW = 22
     local texPrev = BNB.CreateButton(nil, blk, "<", ARW, DD_H)
     local texBtn  = BNB.CreateButton(nil, blk, "", CONTENT_W - 2 * (ARW + 4), DD_H)

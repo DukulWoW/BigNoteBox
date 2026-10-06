@@ -33,7 +33,7 @@ local function E(key, label, cat, file, w, h, crop, hole, shape, layer)
 end
 
 -- Art that exists on one client only draws as a green square on the other
--- (see BigNoteBox_BGs' FOREVER_ONLY for the pattern this follows). A note
+-- (see UI/StickyBackgrounds.lua's FOREVER_ONLY for the pattern this follows). A note
 -- with such a frame saved draws none on the other client (Get -> nil); the
 -- key is kept.
 local FOREVER_ONLY = {}

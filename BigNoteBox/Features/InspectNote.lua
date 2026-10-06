@@ -785,11 +785,34 @@ local function ComparisonBusy()
     return AchievementFrameComparison and AchievementFrameComparison:IsShown()
 end
 
+-- Once the player has opened the achievement window, its hidden comparison
+-- frame also gets our INSPECT_ACHIEVEMENT_READY and errors in Blizzard's own
+-- code (GetCategoryNumAchievements "summary", RET-08). It does not need our
+-- request, so it is taken off that event while one is out and put back after.
+local _muted = {}   -- frames we took off the event
+local function MuteComparison()
+    if next(_muted) or ComparisonBusy() then return end
+    for _, name in ipairs({ "AchievementFrameComparison", "AchievementFrame" }) do
+        local cf = _G[name]
+        if cf and cf.IsEventRegistered and cf:IsEventRegistered("INSPECT_ACHIEVEMENT_READY") then
+            cf:UnregisterEvent("INSPECT_ACHIEVEMENT_READY")
+            _muted[#_muted + 1] = cf
+        end
+    end
+end
+local function UnmuteComparison()
+    for i = #_muted, 1, -1 do
+        _muted[i]:RegisterEvent("INSPECT_ACHIEVEMENT_READY")
+        _muted[i] = nil
+    end
+end
+
 local function RequestAchievementPoints()
     if not SetAchievementComparisonUnit or ComparisonBusy() then return end
     local guid = InspectedGUID()
     if not guid or guid == _achieveGUID then return end
     _achieveGUID = nil
+    MuteComparison()
     _achieveSet = pcall(SetAchievementComparisonUnit, InspectUnit()) or _achieveSet
 end
 
@@ -799,6 +822,7 @@ local function ReleaseAchievementPoints()
         pcall(ClearAchievementComparisonUnit)
     end
     _achieveSet = false
+    UnmuteComparison()
 end
 
 local OnInspectReady   -- defined below, shared by INSPECT_READY and OnShow
@@ -838,6 +862,8 @@ evf:SetScript("OnEvent", function(_, event, arg1)
         end
     elseif event == "INSPECT_ACHIEVEMENT_READY" then
         if _achieveSet then _achieveGUID = arg1 end
+        -- Next frame: every frame has had this event by then
+        C_Timer.After(0, UnmuteComparison)
     end
 end)
 

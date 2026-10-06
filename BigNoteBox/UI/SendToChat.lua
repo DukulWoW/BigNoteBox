@@ -60,6 +60,22 @@ local _lineByLine  = true
 -- ── Core helpers ───────────────────────────────────────────────────────────────
 local SafeSend = C_ChatInfo.SendChatMessage
 
+-- The text that goes to chat: a rich note's markup is left out, a link keeps
+-- its text (ALL-345: the {h1} / {col} tags went to chat as typed)
+local function ChatBody(note)
+    if not note then return "" end
+    local body = note.body or ""
+    if note.richMode then
+        body = body:gsub("{link%*([^*}]+)%*([^}]*)}", function(url, text)
+            return text ~= "" and text or url
+        end)
+        body = body:gsub("{br}", "\n")
+        local AM = BNB.AdvancedMode
+        if AM and AM.StripMarkup then body = AM.StripMarkup(body) end
+    end
+    return body
+end
+
 -- Returns only non-empty trimmed lines. Empty lines always skipped.
 local function GetLines(body, lineByLine)
     if not body or body == "" then return {} end
@@ -435,7 +451,7 @@ local function CreateSendDialog()
         if f._targetRow then f._targetRow:SetShown(needsTarget == true) end
         if f._previewScrollChild then
             local note  = _noteID and BNB.GetNote(_noteID)
-            local lines = GetLines(note and note.body or "", _lineByLine)
+            local lines = GetLines(ChatBody(note), _lineByLine)
             RebuildPreview(f._previewScrollChild, lines, CHANNELS[idx])
         end
     end)
@@ -578,7 +594,7 @@ local function CreateSendDialog()
         end
         local note = _noteID and BNB.GetNote(_noteID)
         if not note then BNB.CloseSendToChat(); return end
-        local body = note.body or ""
+        local body = ChatBody(note)
         if body == "" then BNB:Print(L["SEND_EMPTY"]); return end
 
         local ch       = CHANNELS[_selChannel]
@@ -613,10 +629,11 @@ local function CreateSendDialog()
     bcbBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconRightX, ICON_BTN_Y)
     bcbBtn:SetScript("OnClick", function()
         local note = _noteID and BNB.GetNote(_noteID)
-        if not note or (note.body or "") == "" then
+        local body = ChatBody(note)
+        if body == "" then
             BNB:Print(L["SEND_EMPTY"]); return
         end
-        SendToBCB(note.body)
+        SendToBCB(body)
     end)
     if not (BigChatBox and BigChatBox.SendDirect) then bcbBtn:Hide() end
     f._bcbBtn = bcbBtn
@@ -658,7 +675,7 @@ end
 local function RefreshPreview()
     if not dlgFrame or not dlgFrame:IsShown() then return end
     local note  = _noteID and BNB.GetNote(_noteID)
-    local lines = GetLines(note and note.body or "", _lineByLine)
+    local lines = GetLines(ChatBody(note), _lineByLine)
     local ch    = CHANNELS[_selChannel]
 
     if dlgFrame._previewScrollChild then
