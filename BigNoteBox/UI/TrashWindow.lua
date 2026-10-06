@@ -23,6 +23,7 @@ local PAD            = 14
 local ROW_H          = 56    -- as Note History's rows (ALL-299)
 local ROW_GAP        = 4
 local ICON_SZ        = 36
+local ICON_X         = 6    -- room for an icon frame's left edge: at 0 the scroll frame cut it (ALL-332)
 local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = TW_W - PAD * 2 - 30   -- 30px scrollbar clearance
 local BOTTOM_STRIP_H = 52
@@ -181,11 +182,11 @@ local function GetRow(parent, index)
     -- Icon (its frame, if the note has one, comes from ApplyIconFrame)
     local icon = row:CreateTexture(nil, "ARTWORK", nil, 2)
     icon:SetSize(ICON_SZ, ICON_SZ)
-    icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    icon:SetPoint("LEFT", row, "LEFT", ICON_X, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     row._icon = icon
 
-    local textLeft = ICON_SZ + 10
+    local textLeft = ICON_X + ICON_SZ + 10
     -- Title
     local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  textLeft, -4)

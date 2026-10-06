@@ -34,6 +34,7 @@ local COL_GOLD   = { 1,    0.82, 0,    1 }
 local COL_WHITE  = { 1,    1,    1,    1 }
 local COL_GREY   = { 0.58, 0.58, 0.58, 1 }
 local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G/B (ALL-98)
+local HDR_GOLD   = { 1, 0.84, 0, 0.35 }   -- Pinned / Notes headers: text, then the rule's alpha (ALL-328)
 -- Normal mode row art, a test (Dukul 2026-10-03): stretched over the whole row.
 -- Skin mode keeps the colour fills above and below.
 local ROW_SEL_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-selection"
@@ -1922,25 +1923,43 @@ local function RefreshNoteList()
     for _, btn in ipairs(listEntries) do btn:Hide(); btn:ClearAllPoints() end
 
     -- ── Section header helper ────────────────────────────────────────────────
-    -- Reuse pre-built header FontStrings stored on child to avoid leaking.
+    -- Reuse pre-built headers stored on child to avoid leaking. A header is a
+    -- frame holding the label and a gold rule running from its right to the
+    -- edge, as the Reference Box "Done (N)" title (ALL-328, Dukul 2026-10-06);
+    -- hiding the frame hides both (TagTree hides them by these keys).
     local function GetSectionHeader(key, labelText)
-        if not child[key] then
-            local hdr = child:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local hdr = child[key]
+        if not hdr then
+            hdr = CreateFrame("Frame", nil, child)
             hdr:SetHeight(16)
-            hdr:SetJustifyH("LEFT")
-            hdr:SetTextColor(0.55, 0.55, 0.55)
+            local fs = hdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            fs:SetPoint("LEFT", hdr, "LEFT", 0, 0)
+            fs:SetJustifyH("LEFT")
+            fs:SetTextColor(HDR_GOLD[1], HDR_GOLD[2], HDR_GOLD[3])
+            local rule = hdr:CreateTexture(nil, "ARTWORK")
+            rule:SetColorTexture(HDR_GOLD[1], HDR_GOLD[2], HDR_GOLD[3], HDR_GOLD[4])
+            if rule.SetSnapToPixelGrid then   -- one exact pixel (ALL-246)
+                rule:SetSnapToPixelGrid(false)
+                rule:SetTexelSnappingBias(0)
+            end
+            if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(rule, 1, 1)
+            else rule:SetHeight(1) end
+            rule:SetPoint("LEFT",  fs,  "RIGHT", 6, 0)
+            rule:SetPoint("RIGHT", hdr, "RIGHT", 0, 0)
+            hdr._text = fs
             child[key] = hdr
         end
-        child[key]:SetText(labelText)
-        child[key]:ClearAllPoints()
-        return child[key]
+        hdr._text:SetText(labelText)
+        hdr:ClearAllPoints()
+        return hdr
     end
 
     -- ── Pinned section ────────────────────────────────────────────────────────
     local entryIdx = 0
     if #pinned > 0 then
         if not collapsed then
-            local hdr = GetSectionHeader("_pinnedHdr", L["NL_HDR_PINNED"])
+            local hdr = GetSectionHeader("_pinnedHdr",
+                string.format(L["NL_HDR_PINNED_FMT"], #pinned))
             hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -totalH)
             hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -totalH)
             hdr:Show()
@@ -1963,26 +1982,15 @@ local function RefreshNoteList()
             totalH = totalH + entryH
         end
 
-        -- Divider between pinned and regular (expanded mode only)
-        if not collapsed then
-            if not child._pinnedDiv then
-                child._pinnedDiv = BNB.CreateNoteRule(child)   -- the editor's rules match it
-            end
-            child._pinnedDiv:ClearAllPoints()
-            child._pinnedDiv:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -(totalH + 3))
-            child._pinnedDiv:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -(totalH + 3))
-            child._pinnedDiv:Show()
-            totalH = totalH + 8
-        else
-            if child._pinnedDiv then child._pinnedDiv:Hide() end
-        end
+        -- No divider between pinned and regular any more: the Notes header
+        -- carries its own rule (ALL-328), only a small gap above it
+        if not collapsed then totalH = totalH + 4 end
     else
         if child._pinnedHdr then child._pinnedHdr:Hide() end
-        if child._pinnedDiv  then child._pinnedDiv:Hide() end
     end
 
     -- ── Regular section ───────────────────────────────────────────────────────
-    -- Always show "— Notes (X) —" header
+    -- Always show the "Notes (X)" header
     if not collapsed then
         local hdr2 = GetSectionHeader("_regularHdr",
             string.format(L["NL_HDR_REGULAR_FMT"], #regular))

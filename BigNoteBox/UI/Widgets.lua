@@ -1259,13 +1259,55 @@ end
 -- contentW: available pixel width — swatch size is computed from it.
 -- onPick(r, g, b): called when a swatch is clicked or the picker changes.
 -- getColor() -> r, g, b: where the picker starts (the current colour).
+-- getCurrent() -> r, g, b or nil: the colour the ring marks (nil = no ring,
+-- e.g. a default nobody picked); nil = getColor. It is polled, so it must not
+-- change anything (the sticky background's getColor does).
+-- The current colour's swatch gets the selected mark; a colour that is not in
+-- the palette marks the picker tile (ALL-330, Dukul 2026-10-06). The grid follows
+-- getColor by itself (after a click, on show and by a light poll while shown),
+-- so a note switch or a Cancel needs no call from the window.
 -- Returns the new y below the grid.
 --------------------------------------------------------------------------------
-function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor)
+-- The selected-colour mark (Assets\UI\ui-color-picker-selected, Dukul
+-- 2026-10-06): a green diamond drawn over the whole swatch, its centre open
+-- so the colour shows; btn._selRing. The New note dialog's grid uses it too
+function BNB.AddColorSelRing(btn)
+    local t = btn:CreateTexture(nil, "OVERLAY")
+    t:SetAllPoints()
+    t:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-color-picker-selected")
+    t:Hide()
+    btn._selRing = t
+end
+
+local function SameColor(a, b) return a and b and math.abs(a - b) < 0.003 end
+
+local AddSelRing = BNB.AddColorSelRing
+
+function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor, getCurrent)
     local COLS = 8
     local ROWS = 3
     local GAP  = 3
     local SZ   = math.floor((contentW - (COLS - 1) * GAP) / COLS)
+    local swatches, tile = {}, nil
+
+    -- Ring the current colour's swatch, or the tile for any other colour
+    local function MarkCurrent()
+        local r, g, b
+        local cur = getCurrent or getColor
+        if cur then r, g, b = cur() end
+        local hit = false
+        for _, sw in ipairs(swatches) do
+            local on = r ~= nil and not hit
+                and SameColor(r, sw._r) and SameColor(g, sw._g) and SameColor(b, sw._b)
+            if on then hit = true end
+            sw._selRing:SetShown(on and true or false)
+        end
+        if tile then tile._selRing:SetShown(r ~= nil and not hit) end
+    end
+    local function Pick(r, g, b, cancel)
+        onPick(r, g, b, cancel)
+        MarkCurrent()
+    end
 
     for i, c in ipairs(BNB.COLOR_PALETTE) do
         local col = (i - 1) % COLS
@@ -1292,7 +1334,10 @@ function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor)
         bdr:EnableMouse(false)
 
         local cr, cg, cb, lbl = c.r, c.g, c.b, c.label
-        sw:SetScript("OnClick", function() onPick(cr, cg, cb) end)
+        sw._r, sw._g, sw._b = cr, cg, cb
+        AddSelRing(sw)
+        swatches[#swatches + 1] = sw
+        sw:SetScript("OnClick", function() Pick(cr, cg, cb) end)
         sw:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(string.format("%s (R:%d G:%d B:%d)",
@@ -1306,9 +1351,23 @@ function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor)
     end
 
     local n = #BNB.COLOR_PALETTE   -- the tile takes the next slot (the last one)
-    local tile = BNB.CreateColorPickerTile(ct, SZ, getColor, onPick)
+    tile = BNB.CreateColorPickerTile(ct, SZ, getColor, Pick)
     tile:SetPoint("TOPLEFT", ct, "TOPLEFT",
         (n % COLS) * (SZ + GAP), y - math.floor(n / COLS) * (SZ + GAP))
+    AddSelRing(tile)
+
+    -- Follow the colour while shown: a light poll (every 0.25 s, 24 compares)
+    -- catches note switches and changes made elsewhere without a hook per window
+    local watch = CreateFrame("Frame", nil, tile)
+    local acc = 0
+    watch:SetScript("OnShow", function() acc = 0; MarkCurrent() end)
+    watch:SetScript("OnUpdate", function(_, dt)
+        acc = acc + dt
+        if acc < 0.25 then return end
+        acc = 0
+        MarkCurrent()
+    end)
+    MarkCurrent()
 
     return y - (ROWS * (SZ + GAP)) - 4
 end

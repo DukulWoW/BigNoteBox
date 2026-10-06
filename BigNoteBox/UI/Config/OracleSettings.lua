@@ -623,7 +623,8 @@ local function BuildOraclePage(sf, ct, y, page)
         y, cb = AddCheck(ct, y, label,
             function() return db[s.show] ~= false end,
             function(v)
-                db[s.show] = (not v) and false or nil
+                -- Explicit if: "x and false or nil" is always nil in Lua (ALL-334)
+                if v then db[s.show] = nil else db[s.show] = false end
                 SyncResults()
                 Oracle.RefreshPreview()
             end, tip)

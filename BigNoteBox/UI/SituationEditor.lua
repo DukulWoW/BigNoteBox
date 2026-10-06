@@ -905,28 +905,38 @@ function BNB.CreateSituationEditor(panel, opts)
         RefreshWaypoints()
     end)
 
-    -- Rename in place: one box laid over the row's name. Enter saves (empty =
-    -- the note title again), ESC or a click elsewhere leaves it as it was
-    local renameEb = CreateFrame("EditBox", nil, wpList, "BackdropTemplate")
-    BNB.EnsureBackdrop(renameEb)
-    BNB.SetBackdropDark(renameEb)
-    renameEb:SetHeight(18)
-    renameEb:SetFontObject("GameFontHighlightSmall")
-    renameEb:SetAutoFocus(false)
-    renameEb:SetMaxLetters(64)
-    renameEb:SetTextInsets(3, 3, 0, 0)
-    renameEb:SetFrameLevel(wpList:GetFrameLevel() + 10)
-    renameEb:Hide()
-    -- The same box edits X, Y laid over that column (editField "xy")
-    local renaming   -- index into note.waypoints of the row being edited
-    local editField  -- "name" | "xy"
-    local function EndRename()
-        renaming, editField = nil, nil
-        renameEb:ClearFocus()
-        renameEb:Hide()
+    -- Edit in place (ALL-329): three boxes laid over the row, Name over the
+    -- name, X and Y over the X, Y column; a double-click on the name or X, Y
+    -- opens all three with that one focused. Tab / Shift+Tab move between them;
+    -- Enter or a press outside the boxes saves (empty name = the note title
+    -- again), ESC leaves the row as it was
+    local function EditBoxOver()
+        local eb = CreateFrame("EditBox", nil, wpList, "BackdropTemplate")
+        BNB.EnsureBackdrop(eb)
+        BNB.SetBackdropDark(eb)
+        eb:SetHeight(18)
+        eb:SetFontObject("GameFontHighlightSmall")
+        eb:SetAutoFocus(false)
+        eb:SetTextInsets(3, 3, 0, 0)
+        eb:SetFrameLevel(wpList:GetFrameLevel() + 10)
+        eb:Hide()
+        return eb
     end
-    renameEb:SetScript("OnEscapePressed", EndRename)
-    renameEb:SetScript("OnEditFocusLost", function() if renaming then EndRename() end end)
+    local renameEb, wpEditX, wpEditY = EditBoxOver(), EditBoxOver(), EditBoxOver()
+    renameEb:SetMaxLetters(64)
+    wpEditX:SetMaxLetters(16)
+    wpEditY:SetMaxLetters(16)
+    local editBoxes = { renameEb, wpEditX, wpEditY }
+    BNB.TabChain(editBoxes)
+    local renaming   -- index into note.waypoints of the row being edited
+    local editWatch = CreateFrame("Frame")
+    local function EndRename()
+        renaming = nil
+        editWatch:UnregisterEvent("GLOBAL_MOUSE_DOWN")
+        for _, eb in ipairs(editBoxes) do eb:ClearFocus(); eb:Hide() end
+    end
+    for _, eb in ipairs(editBoxes) do eb:SetScript("OnEscapePressed", EndRename) end
+    wpList:HookScript("OnHide", function() if renaming then EndRename() end end)
 
     -- [Pin Here] [Manual] [Navigate]
     local BTN_W, BTN_H, BTN_GAP = 72, 22, 6
@@ -1395,59 +1405,79 @@ function BNB.CreateSituationEditor(panel, opts)
         SaveWaypoints(id, list, note.wpCreatedOn == true)
     end
 
-    local function WpRename(index, text)
+    -- A coordinate typed in one box: 0-100, a decimal comma counts as a point
+    -- ("20,1" = "20.1"); anything else = nil
+    local function WpCoord(text)
+        local v = tonumber(((text or ""):gsub(",", ".")):match("^%s*(.-)%s*$"))
+        if v and v >= 0 and v <= 100 then return v end
+    end
+
+    -- Saves the three boxes in one write. Name always; X, Y only when both
+    -- read as coordinates. Both numbers pasted into X ("20.1 23.2", "20,1;
+    -- 23,2") count too
+    local function WpSaveEdit(index, name, xText, yText)
         local id = NoteID(); local note = id and BNB.GetNote(id)
         if not note then return end
         local list = CopyWaypoints(note)
         if not list[index] then return end
-        text = (text or ""):match("^%s*(.-)%s*$") or ""
-        list[index].name = text ~= "" and text or nil
+        name = (name or ""):match("^%s*(.-)%s*$") or ""
+        list[index].name = name ~= "" and name or nil
+        local a, b = (xText or ""):match("^%s*([%d%.,]+)[%s;]+([%d%.,]+)%s*$")
+        local x, y
+        if a then x, y = WpCoord(a), WpCoord(b)
+        else      x, y = WpCoord(xText), WpCoord(yText) end
+        if x and y then list[index].x, list[index].y = x, y end
         SaveWaypoints(id, list, note.wpCreatedOn == true)
     end
+
+    local function CommitEdit()
+        local index = renaming
+        if not index then return end
+        local name, xt, yt = renameEb:GetText(), wpEditX:GetText(), wpEditY:GetText()
+        EndRename()
+        WpSaveEdit(index, name, xt, yt)
+    end
+    -- A press outside the three boxes saves (Dukul 2026-10-06)
+    editWatch:SetScript("OnEvent", function()
+        if not renaming then return end
+        if not renameEb:IsVisible() then EndRename() return end   -- window gone: nothing to save into
+        for _, eb in ipairs(editBoxes) do if eb:IsMouseOver() then return end end
+        CommitEdit()
+    end)
+    for _, eb in ipairs(editBoxes) do eb:SetScript("OnEnterPressed", CommitEdit) end
 
     WpNavigate = function(e)
         local note = NoteID() and BNB.GetNote(NoteID())
         if note and e then BNB.NavigateWaypoints(note, { e.wp }) end
     end
 
-    StartRename = function(row)
+    -- Opens the three boxes over the row, focus on `focus` (one of them)
+    local function StartEdit(row, focus)
         local e = row._entry
         if not e or e.created then return end
-        renaming, editField = e.index, "name"
+        renaming = e.index
         renameEb:ClearAllPoints()
         renameEb:SetPoint("LEFT",  row._name, "LEFT",  -3, 0)
         renameEb:SetPoint("RIGHT", row._name, "RIGHT",  3, 0)
         renameEb:SetText(e.wp.name or "")
-        renameEb:Show()
-        renameEb:SetFocus()
-        renameEb:HighlightText()
+        wpEditX:ClearAllPoints()
+        wpEditX:SetPoint("LEFT", row._xy, "LEFT", -3, 0)
+        wpEditX:SetWidth(44)
+        wpEditX:SetText(string.format("%.1f", e.wp.x))
+        wpEditY:ClearAllPoints()
+        wpEditY:SetPoint("LEFT",  wpEditX, "RIGHT", 4, 0)
+        wpEditY:SetPoint("RIGHT", row,     "RIGHT", 0, 0)   -- over the hover buttons too: room to type
+        wpEditY:SetText(string.format("%.1f", e.wp.y))
+        for _, eb in ipairs(editBoxes) do eb:Show() end
+        focus:SetFocus()
+        focus:HighlightText()
+        -- From the next frame, so the press that opened it does not count
+        C_Timer.After(0, function()
+            if renaming then pcall(editWatch.RegisterEvent, editWatch, "GLOBAL_MOUSE_DOWN") end
+        end)
     end
-
-    -- X, Y: "50.8, 77.7" (comma and / or spaces between), each 0-100. Anything
-    -- else leaves the waypoint as it was
-    local function WpSetCoords(index, text)
-        local id = NoteID(); local note = id and BNB.GetNote(id)
-        if not note then return end
-        local list = CopyWaypoints(note)
-        if not list[index] then return end
-        local x, y = (text or ""):match("^%s*([%d%.]+)[%s,;]+([%d%.]+)%s*$")
-        x, y = tonumber(x), tonumber(y)
-        if not (x and y and x >= 0 and x <= 100 and y >= 0 and y <= 100) then return end
-        list[index].x, list[index].y = x, y
-        SaveWaypoints(id, list, note.wpCreatedOn == true)
-    end
-    StartCoordEdit = function(row)
-        local e = row._entry
-        if not e or e.created then return end
-        renaming, editField = e.index, "xy"
-        renameEb:ClearAllPoints()
-        renameEb:SetPoint("LEFT",  row._xy, "LEFT", -3, 0)
-        renameEb:SetPoint("RIGHT", row,     "RIGHT", 0, 0)   -- over the hover buttons too: room to type
-        renameEb:SetText(string.format("%.1f, %.1f", e.wp.x, e.wp.y))
-        renameEb:Show()
-        renameEb:SetFocus()
-        renameEb:HighlightText()
-    end
+    StartRename    = function(row) StartEdit(row, renameEb) end
+    StartCoordEdit = function(row) StartEdit(row, wpEditX) end
 
     -- Zone: the location browser on its Zones tab, over the waypoint section.
     -- A zone moves the waypoint to that map (X, Y kept, label = the new name);
@@ -1465,13 +1495,6 @@ function BNB.CreateSituationEditor(panel, opts)
             SaveWaypoints(id, list, note.wpCreatedOn == true)
         end, "zone")
     end
-
-    renameEb:SetScript("OnEnterPressed", function(self)
-        local index, field, text = renaming, editField, self:GetText()
-        EndRename()
-        if not index then return end
-        if field == "xy" then WpSetCoords(index, text) else WpRename(index, text) end
-    end)
 
     -- The same choices as the row's click, arrow and X (Dukul, 2026-10-05)
     WpMenu = function(row)
@@ -1519,8 +1542,9 @@ function BNB.CreateSituationEditor(panel, opts)
     local function CommitManualCoords()
         local id   = NoteID(); if not id then return end
         local note = BNB.GetNote(id); if not note then return end
-        local x = tonumber(wpXEb:GetText():match("^%s*(.-)%s*$") or "")
-        local y2 = tonumber(wpYEb:GetText():match("^%s*(.-)%s*$") or "")
+        -- A decimal comma counts as a point ("54,3"), as in the row edit (ALL-329)
+        local x = tonumber((wpXEb:GetText():gsub(",", ".")):match("^%s*(.-)%s*$") or "")
+        local y2 = tonumber((wpYEb:GetText():gsub(",", ".")):match("^%s*(.-)%s*$") or "")
         if not x or not y2 then
             BNB:Print("|cffff6666Invalid coordinates. Enter numbers like 54.3|r"); return
         end

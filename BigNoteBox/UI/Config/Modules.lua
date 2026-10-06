@@ -765,7 +765,8 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Start position and small icons mean nothing for the top tabs: greyed
     -- while Top is chosen (Dukul, ALL-248)
-    local posDD, posLbl, smallCb, smallLbl
+    -- "Tabs fill the width" is the other way round: top tabs only
+    local posDD, posLbl, smallCb, smallLbl, fillCb, fillLbl
     local function SyncTopGrey()
         local top = (db.sidebarSide or BNB.DEFAULTS.sidebarSide) == "top"
         local v = top and 0.5 or 1
@@ -773,6 +774,8 @@ local function BuildSidebarPage(sf, ct, y, page)
         if smallCb then smallCb:SetEnabled(not top) end
         if posLbl then posLbl:SetAlpha(v) end
         if smallLbl then smallLbl:SetAlpha(v) end
+        if fillCb then fillCb:SetEnabled(top) end
+        if fillLbl then fillLbl:SetAlpha(top and 1 or 0.5) end
     end
 
     -- Side dropdown (Top / Right / Left)
@@ -845,6 +848,33 @@ local function BuildSidebarPage(sf, ct, y, page)
         end)
         tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
         subY = subY - (32 + ROW_GAP)
+    end
+
+    -- Top tabs share the whole width of the main window, normal and skin
+    -- (ALL-333, Dukul 2026-10-06): nil = on
+    do
+        fillCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
+        fillCb:SetSize(24, 24)
+        fillCb:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", -2, subY + 2)
+        fillCb:SetChecked(db.sidebarTabsFill ~= false)
+        fillCb:SetScript("OnClick", function(self)
+            -- Explicit if: "x and false or nil" is always nil in Lua
+            if self:GetChecked() then db.sidebarTabsFill = nil else db.sidebarTabsFill = false end
+            if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
+        end)
+        fillCb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_SIDEBAR_TABFILL_LABEL"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_SIDEBAR_TABFILL_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        fillCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        fillLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fillLbl:SetPoint("LEFT",  fillCb, "RIGHT", 4, 0)
+        fillLbl:SetPoint("RIGHT", sidebarSub, "RIGHT", 0, 0)
+        fillLbl:SetJustifyH("LEFT"); fillLbl:SetHeight(ROW_H)
+        fillLbl:SetText(L["CFG_SIDEBAR_TABFILL_LABEL"])
+        subY = subY - (ROW_H + ROW_GAP)
     end
 
     -- Position dropdown (Top / Bottom)
@@ -1299,31 +1329,19 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
     }
+    -- Alphabetical by the shown title, in the active language (Dukul 2026-10-06,
+    -- ALL-331); colour codes left out of the compare
+    local function SortKey(t)
+        return ((t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")):lower()
+    end
+    table.sort(MODULES, function(a, b) return SortKey(a[1]) < SortKey(b[1]) end)
     for _, m in ipairs(MODULES) do
         local page = K.NewSubPage(m[1], m[3], m[4])
         y = K.AddOverviewRow(ct, sf, y, page, m[1], m[2])
     end
 
-    -- Toggle-only module, no settings page: the Blizzard icon list lives in its
-    -- own load-on-demand addon, BigNoteBox_Icons (ALL-62). Moved from Advanced (ALL-84).
-    y = K.AddOverviewRow(ct, sf, y, {
-        get = function() return db.blizzardIconComplete == true end,
-        set = function(v)
-            db.blizzardIconComplete = v
-            if v then
-                -- Enable: load BigNoteBox_Icons now so the autocomplete works
-                -- without a reload; says in chat why if it cannot (ALL-62).
-                if BNB.InitBlizzardIconList then BNB.InitBlizzardIconList(true) end
-            else
-                -- Disable: stop using the list at once. It stays in memory
-                -- until a reload, which unloads BigNoteBox_Icons.
-                BNB.BlizzardIconList = nil
-                StaticPopup_Show("BNB_BLZICON_AC_DISABLE")
-            end
-        end,
-        tip = L["CFG_CHK_BLZICON_TIP"],
-    }, L["CFG_HDR_ICONS"], L["CFG_SUB_ICONS_DESC"])
-
+    -- The "Icons" row (all game icons on / off) went (ALL-331): the icon
+    -- picker's "All game icons" box sets the same blizzardIconComplete.
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end

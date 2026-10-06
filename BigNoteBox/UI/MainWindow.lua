@@ -931,10 +931,13 @@ function BNB.CreateMainWindow()
     end)
 
     -- The shared grip (UI/Widgets.lua, ALL-263): the damage meter's scale
-    -- handle, BNB.StartGripSizing, not StartSizing (ALL-97). Retail sits 2 px
-    -- further left and down, art and click area together (RET-07, Dukul).
+    -- handle, BNB.StartGripSizing, not StartSizing (ALL-97). Art and click area
+    -- move together. Retail normal: as far from the right edge as from the
+    -- bottom (RET-07: x 1, set by Dukul in game 2026-10-06); Retail skin
+    -- keeps -4.
     -- Forever: normal mode 3 px further down-right, skin mode 2 px (FOR-29)
     local gripX, gripY = -4, 0
+    if not BNB.IsForever and not BigNoteBoxDB.skinMode then gripX = 1 end
     if BNB.IsForever then
         if BigNoteBoxDB.skinMode then gripX, gripY = 0, 0 else gripX, gripY = 1, -1 end
     end

@@ -264,8 +264,8 @@ local function PopulateStickySettings(noteID)
 
     -- Palette + the colour picker tile in its last slot (the "Click to pick
     -- color" swatch above the grid went, Dukul 2026-10-06)
-    local function ColorGrid(ct, swatchOnPick, getColor)
-        ct._y = BNB.BuildColorGrid(ct, ct._y or -8, SETTINGS_CW, swatchOnPick, getColor)
+    local function ColorGrid(ct, swatchOnPick, getColor, getCurrent)
+        ct._y = BNB.BuildColorGrid(ct, ct._y or -8, SETTINGS_CW, swatchOnPick, getColor, getCurrent)
     end
 
     local function FinalisePanel(ct, sf)
@@ -384,7 +384,10 @@ local function PopulateStickySettings(noteID)
         if stickyFrame and stickyFrame._bodyEb then
             pcall(function() stickyFrame._bodyEb:SetTextColor(r, g, b) end)
         end
-    end, function() return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88 end)
+    end, function() return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88 end,
+    function()   -- ring: none while the text colour was never picked (ALL-330)
+        if cfg.textR then return cfg.textR, cfg.textG, cfg.textB end
+    end)
 
     -- Collect everything ColorGrid added into textColorWidgets
     for _, c in ipairs({ct1:GetChildren()}) do
@@ -724,6 +727,8 @@ local function PopulateStickySettings(noteID)
     end, function()
         followAtOpen = cfg.bgFollow
         return cfg.bgR, cfg.bgG, cfg.bgB
+    end, function()   -- ring: none while the sticky follows the default colour (ALL-330)
+        if not cfg.bgFollow then return cfg.bgR, cfg.bgG, cfg.bgB end
     end)
 
     -- ── Background texture picker ─────────────────────────────────────────────

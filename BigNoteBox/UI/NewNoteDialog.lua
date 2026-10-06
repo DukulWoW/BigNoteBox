@@ -483,11 +483,9 @@ local function BuildDialog()
             local hi = sw:CreateTexture(nil, "HIGHLIGHT")
             hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.35)
 
-            local ring = sw:CreateTexture(nil, "OVERLAY")
-            ring:SetPoint("TOPLEFT",     sw, "TOPLEFT",     -2,  2)
-            ring:SetPoint("BOTTOMRIGHT", sw, "BOTTOMRIGHT",  2, -2)
-            ring:SetColorTexture(1, 1, 1, 0.7); ring:Hide()
-            sw._ring = ring
+            -- The same selected mark as every colour grid (ALL-330), not a fill
+            BNB.AddColorSelRing(sw)
+            sw._ring = sw._selRing
 
             local bdr = BNB.CreateBackdropFrame("Frame", nil, sw)
             bdr:SetAllPoints(); bdr:SetFrameLevel(sw:GetFrameLevel() - 1)
@@ -523,11 +521,8 @@ local function BuildDialog()
         end)
         tile:SetPoint("TOPLEFT", colR, "TOPLEFT",
             (n % COLS) * (SZ + GAP), rightY - math.floor(n / COLS) * (SZ + GAP))
-        local tring = tile:CreateTexture(nil, "OVERLAY")
-        tring:SetPoint("TOPLEFT",     tile, "TOPLEFT",     -2,  2)
-        tring:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT",  2, -2)
-        tring:SetColorTexture(1, 1, 1, 0.7); tring:Hide()
-        tile._ring = tring
+        BNB.AddColorSelRing(tile)
+        tile._ring = tile._selRing
         _swatchBtns.tile = tile
         local ROWS = math.ceil((#pal + 1) / COLS)
         rightY = rightY - ROWS * (SZ + GAP) - 10

@@ -22,6 +22,7 @@ local PAD            = 14
 local ROW_H          = 64
 local ROW_GAP        = 4
 local ICON_SZ        = 36
+local ICON_X         = 6    -- room for an icon frame's left edge: at 0 the scroll frame cut it (ALL-332)
 local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = HW_W - PAD * 2 - 30
 local BOTTOM_STRIP_H = 44
@@ -74,7 +75,7 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     -- note's current one
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SZ, ICON_SZ)
-    icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    icon:SetPoint("LEFT", row, "LEFT", ICON_X, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     local live    = BNB.GetNote and BNB.GetNote(noteID)
     local iconTex = snap.icon or (live and live.icon) or DEFAULT_ICON

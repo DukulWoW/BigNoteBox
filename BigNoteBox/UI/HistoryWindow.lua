@@ -26,6 +26,7 @@ local PAD            = 14
 local ROW_H          = 56    -- compact: icon + title + date
 local ROW_GAP        = 4
 local ICON_SZ        = 36
+local ICON_X         = 6    -- room for an icon frame's left edge: at 0 the scroll frame cut it (ALL-332)
 local TEXT_LEFT      = PAD + ICON_SZ + 10
 local CONTENT_W      = HW_W - PAD * 2 - 30
 local BOTTOM_STRIP_H = 44
@@ -84,7 +85,7 @@ local function BuildRow(parent, note, id, yOff)
     -- Icon
     local icon = row:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SZ, ICON_SZ)
-    icon:SetPoint("LEFT", row, "LEFT", 0, 0)
+    icon:SetPoint("LEFT", row, "LEFT", ICON_X, 0)
     icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     local iconTex = note.icon or DEFAULT_ICON
     if type(iconTex) == "number" or iconTex:find("^Interface") or iconTex:find("^%d+$") then

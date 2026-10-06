@@ -162,10 +162,10 @@ function BNB.RefreshTagTree()
     if not child or not entries then return end
 
     -- Hide list-mode persistent section headers (pinned, regular, divider)
-    -- These are FontStrings stored on child by RefreshNoteList; they are not
+    -- These are header frames stored on child by RefreshNoteList; they are not
     -- cleared when we delegate to RefreshTagTree, so we hide them explicitly.
     if child._pinnedHdr  then child._pinnedHdr:Hide()  end
-    if child._pinnedDiv  then child._pinnedDiv:Hide()   end
+    -- (_pinnedDiv is gone since ALL-328: the headers carry their own rule)
     if child._regularHdr then child._regularHdr:Hide()  end
 
     -- Hide all existing list entries first
