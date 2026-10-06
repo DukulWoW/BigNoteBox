@@ -187,7 +187,20 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 -- NOTE HISTORY: session snapshots (undo / redo stays on the Notes tab)
 -- ─────────────────────────────────────────────────────────────────────────────
-function K.BuildHistoryPage(sf, ct, y)
+function K.BuildHistoryPage(sf, ct, y, page)
+    -- Module switch (ALL-343). Applies live: off hides every way in and takes
+    -- no logout snapshots; the snapshots already taken stay on their notes.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_HISTORY_ENABLE_LABEL"],
+        function() return BNB.HistoryEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.historyEnabled = v
+            if BNB.ApplyHistoryModule then BNB.ApplyHistoryModule(v) end
+        end,
+        L["CFG_HISTORY_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
     local histDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     histDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     histDesc:SetWidth(CONTENT_W); histDesc:SetJustifyH("LEFT")
@@ -333,12 +346,32 @@ function K.BuildTrashPage(sf, ct, y, page)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- ALARMS: only the window side for now; defaults for new alarms come with
--- ALL-292 (BigNoteBoxDB.alarmDefaults has no settings yet)
+-- ALARMS: the module switch and the window side; defaults for new alarms
+-- come with ALL-292 (BigNoteBoxDB.alarmDefaults has no settings yet)
 -- ─────────────────────────────────────────────────────────────────────────────
-function K.BuildAlarmsPage(sf, ct, y)
+function K.BuildAlarmsPage(sf, ct, y, page)
+    -- Module switch (ALL-343). Applies live: off hides every way in and no
+    -- alarm rings; the alarms stay on their notes (BNB.Alarm.ApplyModule).
+    local enableCb, sideDD
+    local function ApplyAlarmsSection(on)
+        local a = on and 1 or 0.35
+        sideDD:SetAlpha(a); sideDD._lbl:SetAlpha(a)
+        if sideDD._dd then sideDD._dd:SetEnabled(on) end
+    end
+    y, enableCb = AddCheck(ct, y, L["CFG_ALARMS_ENABLE_LABEL"],
+        function() return BNB.AlarmsEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.alarmsEnabled = v
+            if BNB.Alarm and BNB.Alarm.ApplyModule then BNB.Alarm.ApplyModule(v) end
+            ApplyAlarmsSection(v)
+        end,
+        L["CFG_ALARMS_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
     -- Which side the Alarms window opens on (ALL-269)
-    y = K.AddSideRow(ct, y, L["CFG_SIDE_ALARMS"], "alarmsSide", "BNBAlarmOverviewFrame")
+    y, sideDD = K.AddSideRow(ct, y, L["CFG_SIDE_ALARMS"], "alarmsSide", "BNBAlarmOverviewFrame")
+    ApplyAlarmsSection(BNB.AlarmsEnabled())
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 

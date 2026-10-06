@@ -162,6 +162,20 @@ local function ReadOnShow(cb, getter)
     return cb
 end
 
+-- A setting that only matters while a module is on (ALL-343): greyed out,
+-- not hidden, while isOn() is false. Re-checked whenever its page shows, as
+-- the module may have been switched on another page. lbl: optional label
+-- (an AddCheck checkbox brings its own, cb._lbl).
+local function GreyWhileOff(w, isOn, lbl)
+    lbl = lbl or w._lbl
+    w:HookScript("OnShow", function(self)
+        local on = isOn()
+        self:SetEnabled(on); self:SetAlpha(on and 1 or 0.35)
+        if lbl then lbl:SetAlpha(on and 1 or 0.35) end
+    end)
+    return w
+end
+
 -- Stacked slider with Reset (ALL-121). Width is CONTENT_W, the narrower of
 -- the two content widths, so the row clears the scrollbar whether or not it
 -- shows. default = the value Reset puts back; fmt = the value text.
@@ -539,6 +553,7 @@ local K = {
     AddHeader            = AddHeader,
     AddCheck             = AddCheck,
     ReadOnShow           = ReadOnShow,
+    GreyWhileOff         = GreyWhileOff,
     AddSlider            = AddSlider,
     AddSideRow           = AddSideRow,
     MakeKeybindRow       = MakeKeybindRow,

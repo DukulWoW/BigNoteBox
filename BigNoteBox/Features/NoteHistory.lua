@@ -391,7 +391,25 @@ end
 -- PLAYER_LOGOUT hook — registered in Events.lua via BNB.RegisterEvent
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
-    if BNB.HistorySnapshotAll then
+    if BNB.HistorySnapshotAll and BNB.HistoryEnabled() then
         BNB.HistorySnapshotAll()
     end
 end)
+
+--------------------------------------------------------------------------------
+-- MODULE SWITCH (Settings > Modules > Note History, ALL-343)
+-- Off: no logout snapshots and every way in hidden; the snapshots already
+-- taken stay on their notes and come back with the module.
+--------------------------------------------------------------------------------
+function BNB.HistoryEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.historyEnabled ~= false
+end
+
+function BNB.ApplyHistoryModule(on)
+    if not on then
+        if BNB.CloseHistoryCompare then BNB.CloseHistoryCompare() end
+        if BNB.CloseHistoryWindow then BNB.CloseHistoryWindow() end   -- list and per-note pages
+    end
+    if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end              -- toolbar History icon
+    if BNB.ApplyWysiwygModuleBtns then BNB.ApplyWysiwygModuleBtns() end    -- history / restore buttons
+end

@@ -1197,14 +1197,16 @@ end
 -- ---------------------------------------------------------------------------
 -- PUBLIC API
 -- ---------------------------------------------------------------------------
+-- Both refuse while the Alarms module is off (ALL-343): a way in that was
+-- missed when the module was gated still opens nothing
 function AW.Open(noteID, anchorFrame, stickyFrame)
-    if not noteID then return end
+    if not noteID or not BNB.AlarmsEnabled() then return end
     local f = DoOpen(noteID, anchorFrame, stickyFrame)
     BNB.PlaceBeside(f, stickyFrame or anchorFrame, AW_W)
 end
 
 function AW.OpenLeftOfMain(noteID)
-    if not noteID then return end
+    if not noteID or not BNB.AlarmsEnabled() then return end
     local f = DoOpen(noteID, nil, nil)
     f:ClearAllPoints()
     local mf = BNB.mainFrame

@@ -356,7 +356,7 @@ local function BuildCompareWindow()
 end
 
 function BNB.OpenHistoryCompare(noteID, snap)
-    if InCombatLockdown() then return end
+    if InCombatLockdown() or not BNB.HistoryEnabled() then return end   -- ALL-343
 
     local ndb  = BNB.NotesDB()
     local note = ndb and ndb.notes and ndb.notes[noteID]

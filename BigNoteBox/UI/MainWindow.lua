@@ -615,8 +615,17 @@ function BNB.CreateMainWindow()
             onClick = ToggleStickies, tip = L["MW_EYE_HIDE_TIP"], tipSub = L["MW_EYE_HIDE_SUB"] })
         local eyeClosed = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "eye-closed", {
             onClick = ToggleStickies, tip = L["MW_EYE_SHOW_TIP"] })
+        -- Focus Mode module off (ALL-343): no focus button, the eye moves up
+        -- to the close button
+        function BNB.ApplyFocusTitleBtn()
+            local on = BNB.FocusEnabled()
+            focusBtn:SetShown(on)
+            for _, eb in ipairs({ eyeOpen, eyeClosed }) do
+                eb:ClearAllPoints()
+                eb:SetPoint("RIGHT", on and focusBtn or chrome.closeBtn, "LEFT", -chrome.btnGap, 0)
+            end
+        end
         for _, eb in ipairs({ eyeOpen, eyeClosed }) do
-            eb:SetPoint("RIGHT", focusBtn, "LEFT", -chrome.btnGap, 0)
             eb:HookScript("OnEnter", function(self)
                 local SN = BNB.Sticky
                 if self == eyeClosed and SN and SN.HiddenCount then
@@ -638,6 +647,7 @@ function BNB.CreateMainWindow()
             eyeClosed:SetEnabled(any and true or false)
         end
         BNB.RefreshStickyEyeBtn()
+        BNB.ApplyFocusTitleBtn()
 
         local lockBtn = MakeLockBtn(f, chrome.btnParent, chrome.btnSize)
         lockBtn:SetPoint("RIGHT", eyeOpen, "LEFT", -chrome.btnGap, 0)
@@ -1166,7 +1176,8 @@ end
 --        slot. Their anchors are recorded as the slot positions; visible icons
 --        are packed into the first slots, so a hidden icon leaves no gap.
 -- Visibility: everything hides in multi-select (the action buttons use that
--- space); the trash icon also hides while Trash is off in Settings.
+-- space); the trash icon also hides while Trash is off in Settings, the
+-- alarms and history icons while their modules are off.
 --------------------------------------------------------------------------------
 -- _tbRow, _tbSlots are declared with the toolbar strip art above (live lift)
 
@@ -1182,9 +1193,13 @@ function BNB.ApplyToolbarIcons()
     if not _tbRow then return end
     local multi   = BNB.IsMultiMode and BNB.IsMultiMode() or false
     local trashOn = not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false
+    local alarmsOn = BNB.AlarmsEnabled()    -- Alarms module (ALL-343)
+    local histOn   = BNB.HistoryEnabled()   -- Note History module (ALL-343)
     local slot = 0
     for _, btn in ipairs(_tbRow) do
         local show = not multi and (btn ~= BNB._toolbarTrashBtn or trashOn)
+                     and (btn ~= BNB._toolbarAlarmsBtn or alarmsOn)
+                     and (btn ~= BNB._toolbarHistoryBtn or histOn)
         btn:SetShown(show)
         if show then
             slot = slot + 1

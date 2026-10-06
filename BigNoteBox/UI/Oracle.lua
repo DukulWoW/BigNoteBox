@@ -96,8 +96,9 @@ local BADGES = {
     -- A situation (the note settings Situation tab: zone, instance, player...)
     { file = "s-icon-situation", tip = "ORACLE_BADGE_SITUATION", show = function(note)
         return BNB.HasSituation(note) end },
+    -- Only while the Alarms module is on (ALL-343)
     { file = "s-icon-alarm",    tip = "ORACLE_BADGE_ALARM",
-      show = function(note) return note.alarm ~= nil end },
+      show = function(note) return BNB.AlarmsEnabled() and note.alarm ~= nil end },
     -- Only while the Tasks module is on (ALL-102)
     { file = "s-icon-tasks",    tip = "ORACLE_BADGE_TASKS", show = function(note)
         return BNB.Task ~= nil and BNB.Task.Shows(note.id) end },
@@ -233,6 +234,19 @@ local function PrefixMap()
     return prefixMap
 end
 
+-- The prefixes in use: no alarm filter while the Alarms module is off, no
+-- focus open-as while Focus Mode is off (ALL-343), so the letter is plain
+-- search text and drops out of the help
+local function ActivePrefixes()
+    local alarmsOn, focusOn = BNB.AlarmsEnabled(), BNB.FocusEnabled()
+    if alarmsOn and focusOn then return PrefixMap() end
+    local m = {}
+    for letter, role in pairs(PrefixMap()) do
+        if (role ~= "alarm" or alarmsOn) and (role ~= "focus" or focusOn) then m[letter] = role end
+    end
+    return m
+end
+
 local function DateWordMap()
     if dateWordMap then return dateWordMap end
     local OS = BNB.OracleSearch
@@ -246,7 +260,7 @@ end
 
 -- role -> localized letter, for the help listing (reverse of PrefixMap()).
 local function RoleLetter(role)
-    for letter, r in pairs(PrefixMap()) do
+    for letter, r in pairs(ActivePrefixes()) do
         if r == role then return letter end
     end
 end
@@ -826,12 +840,22 @@ local function TargetCtx()
     return ok and t or nil
 end
 
+-- The saved weights, with the alarm boost off while the Alarms module is
+-- off (ALL-343). A copy: the saved table is never changed.
+local function AlarmlessWeights(w)
+    if BNB.AlarmsEnabled() then return w end
+    local c = {}
+    for k, v in pairs(w or {}) do c[k] = v end
+    c.alarm = "off"
+    return c
+end
+
 local function Refresh()
     if previewing then return end   -- the preview draws its own rows
     local text = eb:GetText() or ""
     if text == "" then placeholder:Show() else placeholder:Hide() end
 
-    local parsed = BNB.OracleSearch.ParseQuery(text, { prefixes = PrefixMap(), dateWords = DateWordMap() })
+    local parsed = BNB.OracleSearch.ParseQuery(text, { prefixes = ActivePrefixes(), dateWords = DateWordMap() })
     Oracle._openAs = parsed.openAs
     showingHelp = parsed.help
     if showingHelp then
@@ -846,7 +870,7 @@ local function Refresh()
         -- Reference Box items store only an id; nil while the item is uncached.
         itemName = function(itemID) return (C_Item.GetItemInfo(itemID)) end,
         -- Weights (ALL-69.3): levels per boost, nil = the defaults.
-        weights = BigNoteBoxDB and BigNoteBoxDB.oracleWeights,
+        weights = AlarmlessWeights(BigNoteBoxDB and BigNoteBoxDB.oracleWeights),
         zone = ZoneCtx(), target = TargetCtx(),
     }
     results = BNB.OracleSearch.SearchParsed(notes, parsed, { max = MaxRows(), ctx = ctx })

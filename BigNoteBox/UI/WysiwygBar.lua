@@ -715,6 +715,19 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
     BNB._wysiwygRestoreBtn = restoreBtn
 
+    -- Modules off (ALL-343): Alarms off = no alarm button, the divider moves
+    -- up to Copy/Move; Note History off = no history / restore buttons and no
+    -- divider (nothing left of it)
+    function BNB.ApplyWysiwygModuleBtns()
+        local alarmsOn, histOn = BNB.AlarmsEnabled(), BNB.HistoryEnabled()
+        alarmBtn:SetShown(alarmsOn)
+        histBtn:SetShown(histOn); restoreBtn:SetShown(histOn)
+        cmDiv:SetShown(histOn)
+        cmDiv:ClearAllPoints()
+        cmDiv:SetPoint("RIGHT", alarmsOn and alarmBtn or copyMoveBtn, "LEFT", -6, 0)
+    end
+    BNB.ApplyWysiwygModuleBtns()
+
     end   -- main (right side)
 
     -- ── Public refresh callbacks ──────────────────────────────────────────────
@@ -745,7 +758,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     function BNB.SyncSidebarWysiwygBtns()
         local enabled = true
         if BNB._wysiwygCopyMoveBtn then BNB._wysiwygCopyMoveBtn:SetShown(enabled) end
-        if cmDiv                   then cmDiv:SetShown(enabled)                   end
+        -- The divider follows the Note History module (ALL-343)
+        if BNB.ApplyWysiwygModuleBtns then BNB.ApplyWysiwygModuleBtns() end
     end
     BNB.SyncSidebarWysiwygBtns()
 

@@ -1191,7 +1191,20 @@ end
 --------------------------------------------------------------------------------
 -- PUBLIC: OPEN FOCUS MODE
 --------------------------------------------------------------------------------
+-- The Focus Mode module switch (Settings > Modules > Focus Mode, ALL-343).
+-- Off hides every way in (title-bar button, right-click Open > Focus mode,
+-- the double-click choice, the Oracle's f prefix) and OpenFocusMode refuses.
+function BNB.FocusEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.focusEnabled ~= false
+end
+
+function BNB.ApplyFocusModule(on)
+    if not on and BNB.IsFocusModeOpen() then BNB.CloseFocusMode() end
+    if BNB.ApplyFocusTitleBtn then BNB.ApplyFocusTitleBtn() end
+end
+
 function BNB.OpenFocusMode()
+    if not BNB.FocusEnabled() then return end
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     -- Focus mode does not honour the note lock, so a locked note stays out
     -- (the title-bar button is greyed; this covers Oracle and anything else)

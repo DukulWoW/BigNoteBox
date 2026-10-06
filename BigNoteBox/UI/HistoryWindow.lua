@@ -459,6 +459,7 @@ end
 -- Opens the window on a page: "list", or "note" with the note id
 -- (BNB.OpenNoteHistoryPanel). Extra arguments go to the page's onShow.
 function BNB.ShowHistoryWindow(pageKey, ...)
+    if not BNB.HistoryEnabled() then return end   -- Note History module off (ALL-343)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local f = BuildHistoryWindow()
     -- Close Trash if open (per ESC-chain rules)

@@ -1167,7 +1167,8 @@ local function BuildStickyPage(sf, ct, y)
         { "view",     "CFG_STICKY_BTN_VIEW"     },
     }) do
         local key = b[1]
-        y = AddCheck(ct, y, L[b[2]],
+        local cb
+        y, cb = AddCheck(ct, y, L[b[2]],
             function() return not (BNB.Sticky and BNB.Sticky.HdrBtnHidden(key)) end,
             function(v)
                 local h = db.stickyHideBtn or {}
@@ -1176,11 +1177,27 @@ local function BuildStickyPage(sf, ct, y)
                 if BNB.Sticky and BNB.Sticky.ApplyHeaderButtons then BNB.Sticky.ApplyHeaderButtons() end
             end,
             L["CFG_STICKY_BTN_TIP"])
+        -- Greyed while its module is off (ALL-343)
+        if key == "alarm" then K.GreyWhileOff(cb, BNB.AlarmsEnabled) end
+        if key == "tasks" then K.GreyWhileOff(cb, BNB.TasksEnabled) end
     end
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
-local function BuildFocusPage(sf, ct, y)
+local function BuildFocusPage(sf, ct, y, page)
+    -- Module switch (ALL-343). Applies live: off hides every way in and
+    -- closes Focus mode if it is open.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_FOCUS_ENABLE_LABEL"],
+        function() return BNB.FocusEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.focusEnabled = v
+            if BNB.ApplyFocusModule then BNB.ApplyFocusModule(v) end
+        end,
+        L["CFG_FOCUS_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
     -- Hide entire WoW UI
     y = AddCheck(ct, y,
         L["CFG_CHK_FOCUS_HIDEUI_LABEL"],

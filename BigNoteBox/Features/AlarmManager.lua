@@ -757,6 +757,7 @@ end
 -- TICK — checks all notes for due alarms
 -- ---------------------------------------------------------------------------
 local function Tick()
+    if not BNB.AlarmsEnabled() then return end   -- module off: silent, kept (ALL-343)
     local now = time()
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
@@ -872,6 +873,61 @@ function BNB.Alarm.Init()
         end
     end)
 
-    -- Login scan for missed alarms
-    LoginScan()
+    -- Login scan for missed alarms; with the module off they wait for
+    -- AM.ApplyModule(true), which lists them without popups (ALL-343)
+    if BNB.AlarmsEnabled() then LoginScan() end
+end
+
+-- ---------------------------------------------------------------------------
+-- MODULE SWITCH (Settings > Modules > Alarms, ALL-343)
+-- Off: nothing rings, no popups, no glow; the alarms stay on their notes.
+-- Back on: an alarm whose time passed while off does not ring. A repeating
+-- one moves on to its next time, a one-off one is marked fired and listed
+-- once in the Alarms window (Dukul, 2026-10-06).
+-- ---------------------------------------------------------------------------
+function BNB.AlarmsEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.alarmsEnabled ~= false
+end
+
+local function CatchUp()
+    local ndb = BNB.NotesDB()
+    if not ndb or not ndb.notes then return end
+    local now, missed = time(), {}
+    for noteID, note in pairs(ndb.notes) do
+        local alarm = note.alarm
+        if alarm and not alarm.fired then
+            local fireAt = AM.GetNextFireTime(noteID)
+            if fireAt and now >= fireAt then
+                alarm.snoozedUntil = nil
+                local nextT = NextRecurTime(alarm)
+                if nextT and nextT > now then
+                    alarm.time = nextT
+                else
+                    alarm.fired = true
+                    missed[#missed + 1] = noteID
+                end
+                SaveAlarm(noteID, alarm, true)
+            end
+        end
+    end
+    if #missed > 0 and BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
+        BNB.AlarmOverview.ShowMissed(missed, "AO_MISSED_OFF_FMT")
+    end
+end
+
+function AM.ApplyModule(on)
+    if on then
+        CatchUp()
+    else
+        for id in pairs(_ringing) do StopRinging(id) end
+        _popupQueue, _combatQueue, _stickyAfterCombat = {}, {}, {}
+        for id in pairs(_glowState) do AM.GlowStop(id) end
+        if BNB.AlarmWindow and BNB.AlarmWindow.Close then BNB.AlarmWindow.Close() end
+        local ov = _G["BNBAlarmOverviewFrame"]
+        if ov and ov:IsShown() then ov:Hide() end
+    end
+    if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end            -- toolbar Alarms icon
+    if BNB.ApplyWysiwygModuleBtns then BNB.ApplyWysiwygModuleBtns() end  -- formatting bar
+    if BNB.Sticky and BNB.Sticky.ApplyHeaderButtons then BNB.Sticky.ApplyHeaderButtons() end
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end   -- row bells
 end

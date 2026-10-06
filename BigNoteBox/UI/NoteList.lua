@@ -764,6 +764,8 @@ end
 NOTE_ACTIONS.sticky    = function(noteID) OpenAsSticky(noteID, false) end
 NOTE_ACTIONS.escSticky = function(noteID) OpenAsSticky(noteID, true) end
 NOTE_ACTIONS.alarm     = function(noteID)
+    -- Alarms off (ALL-343): a double-click set to "Set alarm" just opens the note
+    if not BNB.AlarmsEnabled() then NOTE_ACTIONS.open(noteID); return end
     if BNB.SelectNote then BNB.SelectNote(noteID) end
     C_Timer.After(0.05, function()
         if BNB.AlarmWindow and BNB.AlarmWindow.OpenLeftOfMain then
@@ -790,6 +792,8 @@ NOTE_ACTIONS.task      = function(noteID)
 end
 -- OpenFocusMode refuses a locked note itself (FOCUS_LOCKED)
 NOTE_ACTIONS.focus     = function(noteID)
+    -- Focus Mode off (ALL-343): a double-click set to Focus mode just opens the note
+    if not BNB.FocusEnabled() then NOTE_ACTIONS.open(noteID); return end
     BNB.SaveCurrentNote(); BNB.SelectNote(noteID)
     if BNB._currentNoteID == noteID and BNB.OpenFocusMode then BNB.OpenFocusMode() end
 end
@@ -1675,7 +1679,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
 
     -- Alarm indicator: colour when pending, desaturated when fired, hidden while actively firing
     if btn._alarmTex then
-        local alarm = note.alarm
+        local alarm = BNB.AlarmsEnabled() and note.alarm   -- none while the module is off (ALL-343)
         if not alarm then
             btn._alarmTex:Hide()
         else

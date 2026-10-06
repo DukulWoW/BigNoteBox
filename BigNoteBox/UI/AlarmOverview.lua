@@ -792,6 +792,7 @@ end
 
 function AO.Toggle()
     local f = GetOrBuildOverview()
+    if not f:IsShown() and not BNB.AlarmsEnabled() then return end   -- ALL-343
     if f:IsShown() then
         f:Hide()
     else
@@ -812,7 +813,6 @@ function AO.Place(f)
     end
 end
 
--- Called by AlarmManager when missed alarms are detected on login
 -- StaticPopup for alarm delete confirmation
 StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
     preferredIndex = 3,
@@ -829,11 +829,13 @@ StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
 
-function AO.ShowMissed(noteIDs)
+-- Called by AlarmManager when missed alarms are detected on login, and when
+-- the Alarms module comes back on (fmtKey = AO_MISSED_OFF_FMT, ALL-343)
+function AO.ShowMissed(noteIDs, fmtKey)
     local f = GetOrBuildOverview()
     AO.Refresh()
     AO.Place(f)
     f:Show()
     f:Raise()
-    BNB:Print(string.format(L["AO_MISSED_FMT"], #noteIDs))
+    BNB:Print(string.format(L[fmtKey or "AO_MISSED_FMT"], #noteIDs))
 end

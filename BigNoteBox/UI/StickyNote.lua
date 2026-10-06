@@ -1951,7 +1951,8 @@ local function CreateStickyFrame(noteID)
     -- Settings > Modules > Sticky Notes can hide every button but Close
     -- (stickyHideBtn, ALL-266, minimize and view since ALL-357); the
     -- right-click menu keeps them all. Tasks also hides while the Tasks
-    -- module is off (ALL-102), view on a note that is not rich.
+    -- module is off (ALL-102), Alarm while the Alarms module is off
+    -- (ALL-343), view on a note that is not rich.
     _hdrBtns[3]._hideKey, _hdrBtns[4]._hideKey = "settings", "edit"
     alarmHdrBtn._hideKey, tasksHdrBtn._hideKey = "alarm", "tasks"
     minBtn._hideKey, viewHdrBtn._hideKey = "minimize", "view"
@@ -1962,6 +1963,7 @@ local function CreateStickyFrame(noteID)
         for _, btn in ipairs(_hdrBtns) do
             local show = not (btn._hideKey and SN.HdrBtnHidden(btn._hideKey))
             if btn == tasksHdrBtn and not BNB.TasksEnabled() then show = false end
+            if btn == alarmHdrBtn and not BNB.AlarmsEnabled() then show = false end   -- ALL-343
             if btn == viewHdrBtn then
                 local n = BNB.GetNote(noteID)
                 if not (n and n.richMode == true) then show = false end
@@ -2005,7 +2007,7 @@ local function CreateStickyFrame(noteID)
                     SN._OpenSettings(f, noteID)
                 end
             end)
-            do
+            if BNB.AlarmsEnabled() then   -- ALL-343
                 local n = BNB.GetNote and BNB.GetNote(noteID)
                 local alarm = n and n.alarm
                 local label = alarm and L["STICKY_EDIT_ALARM_TIP"] or L["STICKY_SET_ALARM_TIP"]

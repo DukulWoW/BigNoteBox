@@ -123,6 +123,9 @@ BNB.DEFAULTS = {
     -- Reference Box and Tasks (ALL-102)
     referenceBoxEnabled = true,
     tasksEnabled        = true,
+    alarmsEnabled       = true,    -- module switches (ALL-343): Alarms,
+    historyEnabled      = true,    -- Note History,
+    focusEnabled        = true,    -- Focus Mode
     refboxDisplayStyle  = "normal",
     refboxMaxItems      = 50,
     refboxAutoOpen      = true,

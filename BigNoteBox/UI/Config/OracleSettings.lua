@@ -729,6 +729,7 @@ local function BuildOraclePage(sf, ct, y, page)
         levels[#levels + 1] = { label = L[LEVEL_KEY[lvl]], value = lvl }
     end
     local weightDDs = {}
+    local alarmRow   -- { dd, lbl }: greyed while the Alarms module is off
     for _, w in ipairs(WEIGHTS) do
         local key = w.key
         local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -746,6 +747,9 @@ local function BuildOraclePage(sf, ct, y, page)
         dd:SetPoint("TOPLEFT", ct, "TOPLEFT", CONTENT_W - WEIGHT_W, y)
         widgets[#widgets + 1] = dd
         weightDDs[key] = dd
+        if key == "alarm" then   -- no effect while the Alarms module is off (ALL-343)
+            alarmRow = { dd = dd, lbl = lbl }
+        end
         y = y - (DD_H + 4)
     end
     y = y - 4
@@ -766,8 +770,16 @@ local function BuildOraclePage(sf, ct, y, page)
             local t = w._dd or w.Slider or w   -- value dropdown, slider, button
             if t.SetEnabled then t:SetEnabled(on) end
         end
+        if alarmRow then
+            local aOn = on and BNB.AlarmsEnabled()
+            alarmRow.dd:SetAlpha(aOn and 1 or 0.35); alarmRow.lbl:SetAlpha(aOn and 1 or 0.35)
+            local t = alarmRow.dd._dd or alarmRow.dd
+            if t.SetEnabled then t:SetEnabled(aOn) end
+        end
         SyncResults()
     end
+    -- The Alarms switch may have changed on its own page since
+    sf:HookScript("OnShow", function() ApplyEnabled(db.oracleEnabled ~= false) end)
     enableCb:SetScript("OnClick", function(self)
         if self:GetChecked() then
             db.oracleEnabled = nil

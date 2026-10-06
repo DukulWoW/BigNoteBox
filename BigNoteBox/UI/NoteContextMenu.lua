@@ -225,8 +225,9 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             { key = "settings", label = BNB.NoteConfigOpenFor(noteID) and L["NL_CM_CLOSE_SETTINGS"]
                 or L["NL_CTX_OPEN_SETTINGS"], fn = function() A.settings(noteID) end,
               opts = { icon = "note-settings" } },
-            { key = "focus",    label = L["CFG_DBL_FOCUS"], fn = function() A.focus(noteID) end,
-              opts = { disabled = locked, icon = "focus-mode" } },
+            BNB.FocusEnabled() and {   -- Focus Mode module (ALL-343)
+              key = "focus",    label = L["CFG_DBL_FOCUS"], fn = function() A.focus(noteID) end,
+              opts = { disabled = locked, icon = "focus-mode" } } or false,
             -- Reference Box (ALL-360): only while its module is on; closes it
             -- when it already shows this note
             RefBoxOn() and { key = "refBox",
@@ -243,15 +244,16 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
               opts = { icon = "esc-sticky-note" } },
         })
 
-        local hasAlarm = note.alarm ~= nil
+        local alarmsOn = BNB.AlarmsEnabled()   -- ALL-343
+        local hasAlarm = alarmsOn and note.alarm ~= nil
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         local hasSituation = BNB.HasSituation(note)
         -- "Create / Edit" once the note has something to edit here, plain
         -- "Create" only while every entry is a Create (Dukul, 2026-10-03)
         local canEdit = hasAlarm or hasSituation or (BNB.TasksEnabled() and hasTasks)
         Parent(root, canEdit and L["NL_CM_CREATE_EDIT"] or L["NL_CM_CREATE"], "create", ClickKey("create"), {
-            { key = "alarm", label = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"],
-              fn = function() A.alarm(noteID) end, opts = { icon = "create-alarm" } },
+            alarmsOn and { key = "alarm", label = hasAlarm and L["NL_CTX_EDIT_ALARM"] or L["NL_CTX_CREATE_ALARM"],
+              fn = function() A.alarm(noteID) end, opts = { icon = "create-alarm" } } or false,
             hasAlarm and { label = Plain(L["NL_CTX_REMOVE_ALARM"]), opts = { danger = true, icon = "remove-alarm" },
               fn = function()
                 if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(noteID) end
@@ -313,7 +315,9 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         })
 
         -- History: Dukul's sketch plus the restore point on top, which reads
-        -- Replace once one exists (2026-10-03)
+        -- Replace once one exists (2026-10-03). Only while the Note History
+        -- module is on (ALL-343)
+        if BNB.HistoryEnabled() then
         local slots = BNB.HistoryGetSlots and BNB.HistoryGetSlots(noteID) or { auto = {} }
         local hasAuto = #slots.auto > 0
         local hasAny  = hasAuto or slots.manual ~= nil
@@ -349,6 +353,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             prev:CreateDivider()
             prev:CreateButton(L["NL_CM_VIEW_ALL"], ViewHistory, { icon = "view-all" })
         end
+        end   -- HistoryEnabled
 
         root:CreateDivider()
         if BNB.TrashEnabled and BNB.TrashEnabled() then
@@ -540,6 +545,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         act:CreateButton(L["NL_CM_EXPORT_MD"], function() BNB.ExportMultiMD(ids) end, { icon = "export-markdown" })
         act:CreateButton(L["NL_CM_EXPORT_HTML"], function() BNB.ExportMultiHTML(ids) end, { icon = "export-html" })
 
+        if BNB.HistoryEnabled() then   -- ALL-343
         local hist = root:CreateButton(L["NL_CM_HISTORY"], nil, { icon = "history" })
         hist:CreateButton(L["MULTI_CM_RESTORE"], function()
             Confirm("MULTI_CONFIRM_RESTORE", total, function()
@@ -556,15 +562,18 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
                 if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
             end)
         end, { icon = "clear-note-history", danger = true, disabled = c.history == 0 })
+        end   -- HistoryEnabled
 
         local rem = root:CreateButton(L["MULTI_CM_REMOVE"], nil, { icon = "danger" })
-        rem:CreateButton(L["MULTI_CM_CLEAR_ALARMS"], function()
-            Confirm("MULTI_CONFIRM_CLEAR_ALARMS", c.alarms, function()
-                Each(function(id, n)
-                    if n.alarm and BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(id) end
+        if BNB.AlarmsEnabled() then   -- ALL-343
+            rem:CreateButton(L["MULTI_CM_CLEAR_ALARMS"], function()
+                Confirm("MULTI_CONFIRM_CLEAR_ALARMS", c.alarms, function()
+                    Each(function(id, n)
+                        if n.alarm and BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(id) end
+                    end)
                 end)
-            end)
-        end, { icon = "remove-alarm", danger = true, disabled = c.alarms == 0 })
+            end, { icon = "remove-alarm", danger = true, disabled = c.alarms == 0 })
+        end
         if BNB.TasksEnabled() then
             rem:CreateButton(L["NL_CM_REMOVE_TASKS"], function()
                 Confirm("MULTI_CONFIRM_REMOVE_TASKS", c.tasks, function()
