@@ -194,11 +194,16 @@ local function RefreshFontHighlight()
 end
 
 local function RefreshColorHighlight()
+    local any = false
     for _, sw in ipairs(_swatchBtns) do
         local match = _selColor and
             sw._r == _selColor.r and sw._g == _selColor.g and sw._b == _selColor.b
+        if match then any = true end
         if sw._ring then sw._ring:SetShown(match == true) end
     end
+    -- A colour from the picker tile rings the tile
+    local tile = _swatchBtns.tile
+    if tile and tile._ring then tile._ring:SetShown(_selColor ~= nil and not any) end
 end
 
 -- Apply selected font bold at 20pt to title editbox (mirrors NoteEditor title field)
@@ -507,7 +512,24 @@ local function BuildDialog()
             sw:SetScript("OnLeave", function() GameTooltip:Hide() end)
             _swatchBtns[#_swatchBtns + 1] = sw
         end
-        local ROWS = math.ceil(#pal / COLS)
+        -- The colour picker tile in the last slot, as every colour grid (Dukul 2026-10-06)
+        local n = #pal
+        local tile = BNB.CreateColorPickerTile(f, SZ, function()
+            if _selColor then return _selColor.r, _selColor.g, _selColor.b end
+        end, function(r, g, b, cancelled)
+            if cancelled and not _selColor then return end
+            _selColor = { r = r, g = g, b = b }
+            RefreshColorHighlight()
+        end)
+        tile:SetPoint("TOPLEFT", colR, "TOPLEFT",
+            (n % COLS) * (SZ + GAP), rightY - math.floor(n / COLS) * (SZ + GAP))
+        local tring = tile:CreateTexture(nil, "OVERLAY")
+        tring:SetPoint("TOPLEFT",     tile, "TOPLEFT",     -2,  2)
+        tring:SetPoint("BOTTOMRIGHT", tile, "BOTTOMRIGHT",  2, -2)
+        tring:SetColorTexture(1, 1, 1, 0.7); tring:Hide()
+        tile._ring = tring
+        _swatchBtns.tile = tile
+        local ROWS = math.ceil((#pal + 1) / COLS)
         rightY = rightY - ROWS * (SZ + GAP) - 10
     end
 

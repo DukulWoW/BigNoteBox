@@ -362,20 +362,13 @@ local function BuildCustomBlock(ct)
 
     -- ── Background ────────────────────────────────────────────────────────────
     Header(L["CFG_ORACLE_BACKGROUND"])
-    local bgSw = ColourSwatch(blk, 0, y, L["STICKY_CLICK_PICK_COLOR"], function()
-        local s = Style()
-        return { s.bgR, s.bgG, s.bgB, 1 }
-    end, function(r, g, b)
-        SetMany({ bgR = r, bgG = g, bgB = b })
-    end, true)
-    widgets[#widgets + 1] = bgSw
-    refresh[#refresh + 1] = function() bgSw:Update() end
-    y = y - (SWATCH + 8)
-    local qp = BNB.CreateSmallLabel(blk, L["STICKY_QUICK_PICK_LABEL"], y, CONTENT_W)
-    y = y - qp:GetStringHeight() - 4
+    -- Palette + the colour picker tile in its last slot (the swatch above the
+    -- grid went, Dukul 2026-10-06)
     y = BNB.BuildColorGrid(blk, y, CONTENT_W, function(r, g, b)
         SetMany({ bgR = r, bgG = g, bgB = b })
-        bgSw:Update()
+    end, function()
+        local s = Style()
+        return s.bgR, s.bgG, s.bgB
     end)
     y = y - 6
 

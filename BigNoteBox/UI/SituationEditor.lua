@@ -805,16 +805,27 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpOffset  = 0    -- rows scrolled past the top
     local wpEntries = {}   -- what the rows show: { created = true, wp } / { index, wp }
     local wpRows    = {}
-    local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartRename   -- below
+    local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartRename, StartCoordEdit, StartZonePick   -- below
 
-    -- One press on the name toggles the row a moment later; a second press
-    -- inside that time renames it instead, so a double-click never toggles
-    -- first (two presses, as the sticky's inline edit counts them, ALL-47)
+    -- One press on the name, zone or X, Y toggles the row a moment later; a
+    -- second press inside that time edits that column instead (name = rename,
+    -- zone = location browser, X, Y = coordinates; Dukul 2026-10-06), so a
+    -- double-click never toggles first (two presses, as the sticky's inline
+    -- edit counts them, ALL-47). Never on the creation row
     local DBL_SECS = 0.35
     local pendingRow, pendingTimer
     local function CancelPending()
         if pendingTimer then pendingTimer:Cancel() end
         pendingRow, pendingTimer = nil, nil
+    end
+    -- The column under the pointer, by x only (a FontString is only as tall
+    -- as its text, the row is taller)
+    local function ColumnAt(row)
+        local x = GetCursorPosition() / row:GetEffectiveScale()
+        local function In(fs, l) return x >= (l or fs:GetLeft() or 0) and x <= (fs:GetRight() or 0) end
+        if In(row._xy) then return "xy" end
+        if In(row._zone) then return "zone" end
+        if In(row._name, row:GetLeft()) then return "name" end
     end
 
     for i = 1, WP_ROWS do
@@ -870,8 +881,15 @@ function BNB.CreateSituationEditor(panel, opts)
             local e = self._entry; if not e then return end
             GameTooltip:Hide()
             if button == "RightButton" then CancelPending(); WpMenu(self); return end
-            if e.created or not self._name:IsMouseOver() then CancelPending(); WpToggle(e); return end
-            if pendingRow == self then CancelPending(); StartRename(self); return end
+            local col = not e.created and ColumnAt(self)
+            if not col then CancelPending(); WpToggle(e); return end
+            if pendingRow == self then
+                CancelPending()
+                if col == "xy" then StartCoordEdit(self)
+                elseif col == "zone" then StartZonePick(self)
+                else StartRename(self) end
+                return
+            end
             CancelPending()
             pendingRow = self
             pendingTimer = C_Timer.NewTimer(DBL_SECS, function()
@@ -899,9 +917,11 @@ function BNB.CreateSituationEditor(panel, opts)
     renameEb:SetTextInsets(3, 3, 0, 0)
     renameEb:SetFrameLevel(wpList:GetFrameLevel() + 10)
     renameEb:Hide()
-    local renaming   -- index into note.waypoints of the row being renamed
+    -- The same box edits X, Y laid over that column (editField "xy")
+    local renaming   -- index into note.waypoints of the row being edited
+    local editField  -- "name" | "xy"
     local function EndRename()
-        renaming = nil
+        renaming, editField = nil, nil
         renameEb:ClearFocus()
         renameEb:Hide()
     end
@@ -1393,7 +1413,7 @@ function BNB.CreateSituationEditor(panel, opts)
     StartRename = function(row)
         local e = row._entry
         if not e or e.created then return end
-        renaming = e.index
+        renaming, editField = e.index, "name"
         renameEb:ClearAllPoints()
         renameEb:SetPoint("LEFT",  row._name, "LEFT",  -3, 0)
         renameEb:SetPoint("RIGHT", row._name, "RIGHT",  3, 0)
@@ -1402,10 +1422,55 @@ function BNB.CreateSituationEditor(panel, opts)
         renameEb:SetFocus()
         renameEb:HighlightText()
     end
+
+    -- X, Y: "50.8, 77.7" (comma and / or spaces between), each 0-100. Anything
+    -- else leaves the waypoint as it was
+    local function WpSetCoords(index, text)
+        local id = NoteID(); local note = id and BNB.GetNote(id)
+        if not note then return end
+        local list = CopyWaypoints(note)
+        if not list[index] then return end
+        local x, y = (text or ""):match("^%s*([%d%.]+)[%s,;]+([%d%.]+)%s*$")
+        x, y = tonumber(x), tonumber(y)
+        if not (x and y and x >= 0 and x <= 100 and y >= 0 and y <= 100) then return end
+        list[index].x, list[index].y = x, y
+        SaveWaypoints(id, list, note.wpCreatedOn == true)
+    end
+    StartCoordEdit = function(row)
+        local e = row._entry
+        if not e or e.created then return end
+        renaming, editField = e.index, "xy"
+        renameEb:ClearAllPoints()
+        renameEb:SetPoint("LEFT",  row._xy, "LEFT", -3, 0)
+        renameEb:SetPoint("RIGHT", row,     "RIGHT", 0, 0)   -- over the hover buttons too: room to type
+        renameEb:SetText(string.format("%.1f, %.1f", e.wp.x, e.wp.y))
+        renameEb:Show()
+        renameEb:SetFocus()
+        renameEb:HighlightText()
+    end
+
+    -- Zone: the location browser on its Zones tab, over the waypoint section.
+    -- A zone moves the waypoint to that map (X, Y kept, label = the new name);
+    -- an instance has no map to move to and changes nothing
+    StartZonePick = function(row)
+        local e = row._entry
+        if not e or e.created then return end
+        local index = e.index
+        BNB.ZonePicker.Open(wpDiv, function(name, _, mapID)
+            local id = NoteID(); local note = id and BNB.GetNote(id)
+            if not (note and mapID) then return end
+            local list = CopyWaypoints(note)
+            if not list[index] then return end
+            list[index].mapID, list[index].label = mapID, name
+            SaveWaypoints(id, list, note.wpCreatedOn == true)
+        end, "zone")
+    end
+
     renameEb:SetScript("OnEnterPressed", function(self)
-        local index, text = renaming, self:GetText()
+        local index, field, text = renaming, editField, self:GetText()
         EndRename()
-        if index then WpRename(index, text) end
+        if not index then return end
+        if field == "xy" then WpSetCoords(index, text) else WpRename(index, text) end
     end)
 
     -- The same choices as the row's click, arrow and X (Dukul, 2026-10-05)

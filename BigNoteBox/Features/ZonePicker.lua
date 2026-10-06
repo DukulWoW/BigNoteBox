@@ -9,7 +9,8 @@
 --   BNB.ZonePicker.Open(anchorFrame, onSelect, filterType)
 --     Opens the picker window anchored below anchorFrame.
 --     filterType: "zone" | "instance" | nil (both)
---     onSelect(name, kind) called when player picks an entry.
+--     onSelect(name, kind, mapID) called when player picks an entry; mapID is
+--     set for zones only (instances have none).
 --
 --   BNB.ZonePicker.Close()
 --
@@ -71,7 +72,8 @@ local function BuildZones()
             for _, m in ipairs(kids) do
                 if m.mapID and m.name and m.name ~= "" and not seen[m.mapID] then
                     seen[m.mapID] = true
-                    zones[#zones + 1] = { name = m.name, continent = GetContinentName(m.mapID) or "?" }
+                    zones[#zones + 1] = { name = m.name, continent = GetContinentName(m.mapID) or "?",
+                                          mapID = m.mapID }   -- for moving a waypoint (onSelect's 3rd arg)
                 end
             end
             break
@@ -423,7 +425,7 @@ local function BuildPicker()
             local capturedEntry = entry
             row:SetScript("OnClick", function()
                 if _onSelect then
-                    _onSelect(capturedEntry.name, _activeKind)
+                    _onSelect(capturedEntry.name, _activeKind, capturedEntry.mapID)
                 end
                 ZP.Close()
             end)
@@ -512,7 +514,7 @@ end
 
 -- ── Public: Open ──────────────────────────────────────────────────────────────
 -- anchorFrame: the valueRow frame in NoteConfig (used for positioning)
--- onSelect(name, kind): callback when player picks an entry
+-- onSelect(name, kind, mapID): callback when player picks an entry (mapID: zones only)
 -- filterType: "zone" | "instance" | nil
 --   When "zone" is passed, the picker opens on the Zones tab.
 --   When "instance", opens on Instances tab.

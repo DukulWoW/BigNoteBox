@@ -1203,7 +1203,8 @@ BNB.COLOR_PALETTE = {
     { r=0.600, g=0.851, b=0.918, label=L["COLOR_OVER_THE_SKY"] },  -- #99d9ea
     { r=0.247, g=0.282, b=0.800, label=L["COLOR_WARM_BLUE"] },  -- #3f48cc
     { r=0.439, g=0.573, b=0.745, label=L["COLOR_KING_NEPTUNE"] },  -- #7092be
-    { r=0.639, g=0.286, b=0.643, label=L["COLOR_FUCHSIA_PHEROMONE"] },  -- #a349a4
+    -- (Fuchsia Pheromone #a349a4 removed, too close to Epic; its last slot in
+    -- the grid is the colour picker tile, Dukul 2026-10-06)
     -- Row 3: light purple, then the item quality colours (names from the game)
     { r=0.784, g=0.749, b=0.906, label=L["COLOR_LIGHT_PURPLE"] },  -- #c8bfe7
     { r=0.616, g=0.616, b=0.616, label=_G["ITEM_QUALITY0_DESC"] or "Poor" },  -- #9d9d9d
@@ -1216,13 +1217,51 @@ BNB.COLOR_PALETTE = {
 }
 
 --------------------------------------------------------------------------------
+-- Colour picker tile: the square after the palette (Assets\UI\ui-color-picker)
+-- that opens the colour picker. getColor() -> r, g, b to start from (nil =
+-- white); onPick(r, g, b) on every change, and onPick(r, g, b, true) with the
+-- start colour again on Cancel. Every colour grid ends with one (Dukul 2026-10-06), which replaced
+-- the "Click to pick color" swatches and the Custom color button.
+--------------------------------------------------------------------------------
+function BNB.CreateColorPickerTile(parent, size, getColor, onPick)
+    local sw = CreateFrame("Button", nil, parent)
+    sw:SetSize(size, size)
+    local tx = sw:CreateTexture(nil, "ARTWORK")
+    tx:SetAllPoints()
+    tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-color-picker")
+    local hi = sw:CreateTexture(nil, "HIGHLIGHT")
+    hi:SetAllPoints()
+    hi:SetColorTexture(1, 1, 1, 0.25)
+    local bdr = BNB.CreateBackdropFrame("Frame", nil, sw)
+    bdr:SetAllPoints()
+    bdr:SetFrameLevel(sw:GetFrameLevel() - 1)
+    BNB.SetBackdrop(bdr, 0, 0, 0, 0, 0.30, 0.30, 0.32, 0.9)
+    bdr:EnableMouse(false)
+    sw:SetScript("OnClick", function()
+        local r, g, b
+        if getColor then r, g, b = getColor() end
+        r, g, b = r or 1, g or 1, b or 1
+        BNB.OpenColorPicker(r, g, b, onPick, function() onPick(r, g, b, true) end)
+    end)
+    sw:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["STICKY_CLICK_PICK_COLOR"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    sw:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return sw
+end
+
+--------------------------------------------------------------------------------
 -- BuildColorGrid
--- Renders BNB.COLOR_PALETTE as an 8×3 swatch grid on `ct` starting at y.
+-- Renders BNB.COLOR_PALETTE as an 8×3 swatch grid on `ct` starting at y, the
+-- colour picker tile in the last slot (BNB.CreateColorPickerTile).
 -- contentW: available pixel width — swatch size is computed from it.
--- onPick(r, g, b): called when a swatch is clicked.
+-- onPick(r, g, b): called when a swatch is clicked or the picker changes.
+-- getColor() -> r, g, b: where the picker starts (the current colour).
 -- Returns the new y below the grid.
 --------------------------------------------------------------------------------
-function BNB.BuildColorGrid(ct, y, contentW, onPick)
+function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor)
     local COLS = 8
     local ROWS = 3
     local GAP  = 3
@@ -1265,6 +1304,11 @@ function BNB.BuildColorGrid(ct, y, contentW, onPick)
         end)
         sw:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
+
+    local n = #BNB.COLOR_PALETTE   -- the tile takes the next slot (the last one)
+    local tile = BNB.CreateColorPickerTile(ct, SZ, getColor, onPick)
+    tile:SetPoint("TOPLEFT", ct, "TOPLEFT",
+        (n % COLS) * (SZ + GAP), y - math.floor(n / COLS) * (SZ + GAP))
 
     return y - (ROWS * (SZ + GAP)) - 4
 end

@@ -260,6 +260,9 @@ BNB.eventFrame = eventFrame
 --   NoteListRefreshed ()           UI/NoteList.lua, end of RefreshNoteList
 --   EditorDirty ()                 UI/NoteEditor.lua MarkDirty, every edit
 --   EditorViewMode (id)            AM_EnterViewMode (rich note view tab)
+--   SkinChanged ()                 UI/SkinSystem.lua, end of ApplyMainWindowSkin
+--                                  (preset / brightness); default-coloured
+--                                  stickies re-colour
 --   EditorEditMode ()              AM_EnterEditMode, at its end
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
 -- Every way a note is created, edited or removed sends one of the Note*

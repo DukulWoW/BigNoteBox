@@ -662,12 +662,12 @@ local function BuildPage3(content)
         nil, 0.65, 0.65, 0.65)
     y = ny2
 
-    -- Brightness slider — float 0.5–3.0, step 0.05, default 1.0
+    -- Brightness slider — float 0.5–3.0, step 0.05, default BNB.DEFAULTS.skinBrightness (1.5)
     -- Matches main config → Appearance → Skins → Skin brightness exactly.
-    local curBrt = (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or 1.0
+    local curBrt = (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or BNB.DEFAULTS.skinBrightness
     local sl = BNB.CreateStackedSlider(ct, CW - 36, {
         label = L["SW_BRIGHTNESS_SLIDER"], min = 0.5, max = 3.0, step = 0.05,
-        value = curBrt, default = 1.0,
+        value = curBrt, default = BNB.DEFAULTS.skinBrightness,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.skinBrightness = v end
             if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end

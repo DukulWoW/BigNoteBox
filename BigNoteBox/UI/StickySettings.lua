@@ -50,7 +50,6 @@ local function GetBorderList()
     return list
 end
 
-local OpenColorPicker = BNB.OpenColorPicker   -- UI/Widgets.lua
 
 -- Close the detached settings window and restore the sticky note
 local function CloseStickySettings()
@@ -263,38 +262,10 @@ local function PopulateStickySettings(noteID)
         return sl
     end
 
-    local function ColorBtn(ct, r, g, b, labelTxt, onPick)
-        local y = ct._y or -8
-        local sw = CreateFrame("Button", nil, ct)
-        sw:SetSize(26, 26)
-        sw:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        local tx = sw:CreateTexture(nil, "ARTWORK"); tx:SetAllPoints()
-        tx:SetColorTexture(r, g, b)
-        local hi = sw:CreateTexture(nil, "HIGHLIGHT"); hi:SetAllPoints()
-        hi:SetColorTexture(1, 1, 1, 0.25)
-        local bdr = BNB.CreateBackdropFrame("Frame", nil, sw)
-        bdr:SetAllPoints(); bdr:SetFrameLevel(sw:GetFrameLevel() - 1)
-        BNB.SetBackdrop(bdr, 0,0,0,0, 0.45, 0.45, 0.48, 1)
-        bdr:EnableMouse(false)
-        local ll = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        ll:SetPoint("LEFT", sw, "RIGHT", 6, 0)
-        ll:SetTextColor(0.78, 0.78, 0.78); ll:SetText(labelTxt)
-        sw._tx = tx
-        local cR, cG, cB = r, g, b
-        sw:SetScript("OnClick", function()
-            local oR, oG, oB = cR, cG, cB
-            OpenColorPicker(cR, cG, cB, function(nr, ng, nb)
-                cR, cG, cB = nr, ng, nb
-                sw._tx:SetColorTexture(nr, ng, nb)
-                onPick(nr, ng, nb)
-            end)
-        end)
-        ct._y = y - 34
-        return sw
-    end
-
-    local function ColorGrid(ct, swatchOnPick)
-        ct._y = BNB.BuildColorGrid(ct, ct._y or -8, SETTINGS_CW, swatchOnPick)
+    -- Palette + the colour picker tile in its last slot (the "Click to pick
+    -- color" swatch above the grid went, Dukul 2026-10-06)
+    local function ColorGrid(ct, swatchOnPick, getColor)
+        ct._y = BNB.BuildColorGrid(ct, ct._y or -8, SETTINGS_CW, swatchOnPick, getColor)
     end
 
     local function FinalisePanel(ct, sf)
@@ -402,18 +373,8 @@ local function PopulateStickySettings(noteID)
     local textColorWidgets = {}  -- collect for alpha/mouse toggling
     local plainOnlyWidgets = {}  -- font, font-size, text-style, text-opacity: inactive for rich notes
 
-    local tcBtn = ColorBtn(ct1, cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88,
-        L["STICKY_CLICK_PICK_COLOR"], function(r, g, b)
-            cfg.textR, cfg.textG, cfg.textB = r, g, b
-            SaveCfg(noteID, cfg)
-            if stickyFrame and stickyFrame._bodyEb then
-                pcall(function() stickyFrame._bodyEb:SetTextColor(r, g, b) end)
-            end
-        end)
-    textColorWidgets[#textColorWidgets+1] = tcBtn
-
-    SubLbl(ct1, L["STICKY_QUICK_PICK_LABEL"])
     -- Snapshot children before ColorGrid so we can collect only what it adds
+    -- (the swatches and the picker tile)
     local beforeChildren = {}
     for _, c in ipairs({ct1:GetChildren()}) do beforeChildren[c] = true end
 
@@ -423,7 +384,7 @@ local function PopulateStickySettings(noteID)
         if stickyFrame and stickyFrame._bodyEb then
             pcall(function() stickyFrame._bodyEb:SetTextColor(r, g, b) end)
         end
-    end)
+    end, function() return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88 end)
 
     -- Collect everything ColorGrid added into textColorWidgets
     for _, c in ipairs({ct1:GetChildren()}) do
@@ -735,6 +696,7 @@ local function PopulateStickySettings(noteID)
             tb = math.random(60, 80) / 100
         end
         cfg.bgR, cfg.bgG, cfg.bgB = br, bg2, bb
+        cfg.bgFollow = nil   -- a picked colour: no longer the default (skin) colour
         cfg.textR, cfg.textG, cfg.textB = tr, tg, tb
         SaveCfg(noteID, cfg)
         if stickyFrame then
@@ -751,17 +713,17 @@ local function PopulateStickySettings(noteID)
 
     Rule(ct2)
     Sec(ct2, L["STICKY_HDR_BACKGROUND"])
-    local bgSwatch = ColorBtn(ct2, cfg.bgR, cfg.bgG, cfg.bgB, L["STICKY_CLICK_PICK_COLOR"], function(r,g,b)
+    -- A picked colour ends bgFollow (the default colour that follows the skin
+    -- preset, StickyNote.lua GetCfg); Cancel in the picker puts it back
+    local followAtOpen
+    ColorGrid(ct2, function(r, g, b, cancelled)
         cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
+        if cancelled then cfg.bgFollow = followAtOpen else cfg.bgFollow = nil end
         SaveCfg(noteID, cfg)
         if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-    end)
-    SubLbl(ct2, L["STICKY_QUICK_PICK_LABEL"])
-    ColorGrid(ct2, function(r,g,b)
-        cfg.bgR, cfg.bgG, cfg.bgB = r, g, b
-        SaveCfg(noteID, cfg)
-        if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-        if bgSwatch and bgSwatch._tx then bgSwatch._tx:SetColorTexture(r, g, b) end
+    end, function()
+        followAtOpen = cfg.bgFollow
+        return cfg.bgR, cfg.bgG, cfg.bgB
     end)
 
     -- ── Background texture picker ─────────────────────────────────────────────
@@ -888,11 +850,11 @@ local function PopulateStickySettings(noteID)
         end, 100, PCT)
     plainOnlyWidgets[#plainOnlyWidgets+1] = textOpacitySl
     MakeSlider(ct2, L["STICKY_BG_OPACITY"], 0, 100,
-        math.floor((cfg.alpha or 0.96) * 100),
+        math.floor((cfg.alpha or 0.90) * 100 + 0.5),
         function(v)
             cfg.alpha = v/100; SaveCfg(noteID, cfg)
             if stickyFrame then ApplyBgAlpha(stickyFrame, cfg.alpha) end
-        end, 96, PCT)
+        end, 90, PCT)   -- default 90% (was 96%, Dukul 2026-10-06; StickyNote.lua DEFAULT_CFG)
 
     Rule(ct2)
     Sec(ct2, L["NC_HDR_BORDER"])

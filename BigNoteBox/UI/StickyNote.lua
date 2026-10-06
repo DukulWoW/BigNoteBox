@@ -42,17 +42,45 @@ local COL_BG     = { 0.07, 0.07, 0.09 }
 local COL_BORDER = { 0.35, 0.35, 0.38 }
 local COL_GOLD   = { 1, 0.82, 0, 1 }
 
--- Returns border RGB scaled by cfg.borderBrightness (100 = default, 200 = double).
-local function BorderRGB(cfg)
-    local m = ((cfg and cfg.borderBrightness) or 100) / 100
-    return math.min(1, COL_BORDER[1] * m),
-           math.min(1, COL_BORDER[2] * m),
-           math.min(1, COL_BORDER[3] * m)
+-- The default sticky colours (Dukul 2026-10-06): in skin mode the skin preset's
+-- own colour and border at brightness 1.00, so a sticky stays fairly dark
+-- whatever the Skin brightness slider says; in normal mode the old dark grey.
+-- A sticky uses them while cfg.bgFollow is set (no colour ever picked).
+local function SkinFollowPreset(cfg)
+    local db = BigNoteBoxDB
+    if cfg and cfg.bgFollow and db and db.skinMode and BNB.GetSkinPreset then
+        return BNB.GetSkinPreset()
+    end
+end
+local function DefaultBg(cfg)
+    local p = SkinFollowPreset(cfg)
+    if p then return p.r, p.g, p.b end
+    return COL_BG[1], COL_BG[2], COL_BG[3]
+end
+-- The header bar: the preset's lifted colour (as skin title strips), else COL_HEADER
+local function HeaderRGB(cfg)
+    local p = SkinFollowPreset(cfg)
+    if p then
+        local lift = p.lift or 0
+        return math.min(1, p.r + lift), math.min(1, p.g + lift), math.min(1, p.b + lift)
+    end
+    return COL_HEADER[1], COL_HEADER[2], COL_HEADER[3]
 end
 
+-- Returns border RGB scaled by cfg.borderBrightness (100 = default, 200 = double).
+-- Base: the skin preset's border while the sticky follows it, else COL_BORDER.
+local function BorderRGB(cfg)
+    local m = ((cfg and cfg.borderBrightness) or 100) / 100
+    local p = SkinFollowPreset(cfg)
+    local r, g, b = COL_BORDER[1], COL_BORDER[2], COL_BORDER[3]
+    if p then r, g, b = p.br, p.bg_, p.bb end
+    return math.min(1, r * m), math.min(1, g * m), math.min(1, b * m)
+end
+
+-- bgR/G/B are not in here: GetCfg fills them from DefaultBg while bgFollow is
+-- set, so a default sticky follows the skin preset live
 local DEFAULT_CFG = {
-    bgR = 0.07, bgG = 0.07, bgB = 0.09,
-    alpha      = 0.96,
+    alpha      = 0.90,   -- was 0.96 (Dukul 2026-10-06)
     fontSize   = nil,
     fontID     = nil,
     textR = 0.88, textG = 0.88, textB = 0.88,
@@ -93,6 +121,20 @@ function SN.ApplyStrata()
     end
 end
 BNB._stickyFrames = openFrames
+
+-- Open stickies on the default colour follow a skin preset change (SkinChanged,
+-- sent by ApplyMainWindowSkin). ApplyConfig re-reads GetCfg, which fills the
+-- colour from the preset while cfg.bgFollow is set
+local ApplyConfig   -- below
+function SN.ApplySkinColours()
+    for noteID, f in pairs(openFrames) do
+        pcall(ApplyConfig, f, noteID)
+        if f._miniTile and f._miniTile._applyColours then pcall(f._miniTile._applyColours) end
+    end
+end
+if BNB.RegisterMessage then
+    BNB.RegisterMessage("StickyNote.Skin", "SkinChanged", function() SN.ApplySkinColours() end)
+end
 
 -- Per-note collapse state for sticky task rows: _stickyCollapsed[noteID][taskID] = true
 -- Persists across re-renders; cleared when the sticky is closed.
@@ -219,12 +261,29 @@ local function CountOpen()
     local n = 0; for _ in pairs(openFrames) do n = n + 1 end; return n
 end
 
+-- Close enough to a saved literal (SavedVariables round-trip)
+local function Near(a, b) return a ~= nil and math.abs(a - b) < 0.001 end
+
 local function GetCfg(noteID)
     local rec = noteID and StickyDB()[noteID]
     local cfg = (rec and rec.cfg) and rec.cfg or {}
+    -- Once per sticky (cfgV 2, Dukul 2026-10-06): the old defaults were saved
+    -- in full, so a colour that is still exactly the old default counts as
+    -- never picked and follows the new default (skin colour), and an opacity
+    -- still at the old 96% moves to the new 90%
+    if (cfg.cfgV or 1) < 2 then
+        if cfg.bgFollow == nil and (cfg.bgR == nil
+           or (Near(cfg.bgR, COL_BG[1]) and Near(cfg.bgG, COL_BG[2]) and Near(cfg.bgB, COL_BG[3]))) then
+            cfg.bgFollow = true
+        end
+        if Near(cfg.alpha, 0.96) then cfg.alpha = nil end
+        cfg.cfgV = 2
+    end
     for k, v in pairs(DEFAULT_CFG) do
         if cfg[k] == nil then cfg[k] = v end
     end
+    if cfg.bgFollow then cfg.bgR, cfg.bgG, cfg.bgB = DefaultBg(cfg) end
+    if cfg.bgR == nil then cfg.bgR, cfg.bgG, cfg.bgB = COL_BG[1], COL_BG[2], COL_BG[3] end
     return cfg
 end
 
@@ -469,7 +528,7 @@ end
 -- Apply background opacity via backdrop alpha only — never frame:SetAlpha.
 -- This keeps text opacity (bodyEb:SetAlpha) independent of background opacity.
 local function ApplyBgAlpha(frame, bgAlpha, cfg)
-    local a = bgAlpha or 0.96
+    local a = bgAlpha or DEFAULT_CFG.alpha
     frame._bgA = a   -- where a hover fade starts from
     local c = frame._cfg
     local ec = cfg or c
@@ -500,7 +559,8 @@ local function ApplyBgAlpha(frame, bgAlpha, cfg)
     -- fade (PERF-08)
     local hb = frame._headerBar
     if hb and hb.SetBackdropColor then
-        pcall(hb.SetBackdropColor, hb, COL_HEADER[1], COL_HEADER[2], COL_HEADER[3], a)
+        local hr, hg, hbl = HeaderRGB(ec)   -- the skin preset's while the sticky follows it
+        pcall(hb.SetBackdropColor, hb, hr, hg, hbl, a)
         pcall(hb.SetBackdropBorderColor, hb, br, bg2, bb, 0)
     end
 end
@@ -544,7 +604,7 @@ end
 -- hovered = true eases to full opacity, false back to the note's own levels
 local function HoverBgAlpha(frame, hovered)
     local c = frame._cfg
-    local to     = hovered and 1 or (c and c.alpha or 0.96)
+    local to     = hovered and 1 or (c and c.alpha or DEFAULT_CFG.alpha)
     local textTo = hovered and 1 or (c and c.textAlpha or 1.0)
     local from     = frame._bgA or to
     local textFrom = frame._bodyEb and frame._bodyEb:GetAlpha() or textTo
@@ -602,7 +662,7 @@ function SN.DrawNoteIcon(target, tex, note)
         note.borderScale or 100, note.borderOffset or 2, note.borderBrightness or 100)
 end
 
-local function ApplyConfig(frame, noteID)
+function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinColours
     local cfg  = GetCfg(noteID)
     local note = BNB.GetNote(noteID)
     frame._cfg = cfg
@@ -619,7 +679,7 @@ local function ApplyConfig(frame, noteID)
     pcall(function()
         ApplyBorderToFrame(frame, effectiveBorder, effectiveScale, effectiveOffset, cfg)
         -- Colours: ApplyBgAlpha further down, which also covers the texture layer
-        frame:SetBackdropColor(cfg.bgR, cfg.bgG, cfg.bgB, cfg.alpha or 0.96)
+        frame:SetBackdropColor(cfg.bgR, cfg.bgG, cfg.bgB, cfg.alpha or DEFAULT_CFG.alpha)
         frame:SetBackdropBorderColor(br, bg2, bb, borderA)
     end)
     pcall(ApplyBgLayer, frame, cfg)
@@ -702,7 +762,7 @@ local function ApplyConfig(frame, noteID)
     -- Apply background opacity via backdrop, keep frame alpha at 1.0
     frame:SetAlpha(1.0)
     StopHoverFade(frame)
-    ApplyBgAlpha(frame, cfg.alpha or 0.96, cfg)
+    ApplyBgAlpha(frame, cfg.alpha or DEFAULT_CFG.alpha, cfg)
     if frame._bodyEb then
         local r, g, b = cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88
         pcall(function() frame._bodyEb:SetTextColor(r, g, b) end)
@@ -757,7 +817,7 @@ function SN.SetBgOverride(def)
         if c then
             pcall(ApplyBgLayer, f, c)
             StopHoverFade(f)
-            ApplyBgAlpha(f, c.alpha or 0.96, c)
+            ApplyBgAlpha(f, c.alpha or DEFAULT_CFG.alpha, c)
         end
     end
 end
@@ -829,8 +889,16 @@ local function CreateMiniTile(frame, noteID, note)
     tile:SetMovable(true)
     tile:SetClampedToScreen(true)
     tile:EnableMouse(true)
-    BNB.SetBackdrop(tile, COL_HEADER[1], COL_HEADER[2], COL_HEADER[3], 0.95,
-        COL_BORDER[1], COL_BORDER[2], COL_BORDER[3], 1)
+    -- Same colours as the sticky's header and border (the skin preset's while
+    -- it follows it); re-applied by SN.ApplySkinColours
+    function tile._applyColours()
+        local c = GetCfg(noteID)
+        local hr, hg, hb = HeaderRGB(c)
+        local br, bg2, bb = COL_BORDER[1], COL_BORDER[2], COL_BORDER[3]   -- normal mode: as before
+        if SkinFollowPreset(c) then br, bg2, bb = BorderRGB(c) end
+        BNB.SetBackdrop(tile, hr, hg, hb, 0.95, br, bg2, bb, 1)
+    end
+    tile._applyColours()
 
     local iconTex = tile:CreateTexture(nil, "ARTWORK")
     iconTex:SetSize(MINI_SIZE - 8, MINI_SIZE - 8)
@@ -850,7 +918,7 @@ local function CreateMiniTile(frame, noteID, note)
     end)
     tile:SetScript("OnLeave", function()
         local c = frame._cfg
-        ApplyBgAlpha(frame, c and c.alpha or 0.96, c)
+        ApplyBgAlpha(frame, c and c.alpha or DEFAULT_CFG.alpha, c)
         GameTooltip:Hide()
     end)
 

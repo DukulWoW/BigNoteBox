@@ -61,12 +61,12 @@ function BNB.GetSkinPreset()
     return BNB.SKIN_PRESETS[key] or BNB.SKIN_PRESETS.obsidian
 end
 
--- Returns the current brightness multiplier (0.5 - 2.0, default 1.0).
+-- Returns the current brightness multiplier (0.5 - 3.0, default BNB.DEFAULTS.skinBrightness = 1.5).
 -- Always returns 1.0 for the OLED preset (pure black must stay pure black).
 function BNB.GetSkinBrightness()
     local key = BigNoteBoxDB and BigNoteBoxDB.skinPreset or "obsidian"
     if key == "oled" then return 1.0 end
-    return (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or 1.0
+    return (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or BNB.DEFAULTS.skinBrightness
 end
 
 -- Returns the window background opacity (0.0 - 1.0, default 0.97).
@@ -260,6 +260,9 @@ function BNB.ApplyMainWindowSkin()
             end
         end
     end
+
+    -- Stickies on the default colour follow the preset (UI/StickyNote.lua)
+    if BNB.SendMessage then BNB.SendMessage("SkinChanged") end
 end
 
 --------------------------------------------------------------------------------

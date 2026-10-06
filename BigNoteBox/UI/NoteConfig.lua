@@ -115,8 +115,6 @@ local function CreateDropdown(parent, labelText, getEntries, selected, onChange)
     return c
 end
 
--- ── Color picker ── BNB.OpenColorPicker (UI/Widgets.lua)
-local OpenColorPicker = BNB.OpenColorPicker
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL
@@ -188,27 +186,14 @@ local function BuildGeneralTab(panel)
     y = Rule(panel, y) - 4
     y = Hdr(panel, y, L["NC_HDR_TITLE_COLOR"])
 
+    -- The grid's last tile opens the colour picker; the Custom color and Reset
+    -- buttons went (Dukul 2026-10-06)
     y = BNB.BuildColorGrid(panel, y, CW, function(r, g, b)
         Save({titleColor = {r=r, g=g, b=b}})
+    end, function()
+        local c = GetNote() and GetNote().titleColor
+        if c then return c.r, c.g, c.b end
     end)
-
-    local cpBtn = BNB.CreateButton(nil, panel, L["NC_CUSTOM_COLOR_BTN"], 96, 22)
-    cpBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
-    cpBtn:SetScript("OnClick", function()
-        local note = GetNote()
-        local cr = (note and note.titleColor and note.titleColor.r) or 1
-        local cg = (note and note.titleColor and note.titleColor.g) or 1
-        local cb = (note and note.titleColor and note.titleColor.b) or 1
-        OpenColorPicker(cr, cg, cb, function(r, g, b) Save({titleColor = {r=r, g=g, b=b}}) end)
-    end)
-    local resetClr = BNB.CreateButton(nil, panel, L["RESET"], 60, 22)
-    resetClr:SetPoint("LEFT", cpBtn, "RIGHT", 6, 0)
-    resetClr:SetScript("OnClick", function()
-        if not _noteID then return end
-        BNB.UpdateNote(_noteID, {_clear = {"titleColor"}})
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(_noteID) end
-    end)
-    y = y - 30
 
     -- Font ─────────────────────────────────────────────────────────────────────
     y = Rule(panel,y) - 4
@@ -292,15 +277,15 @@ local function BuildGeneralTab(panel)
         CW, (gridRows_nc - usedRows_nc) * (PH + PG) - PG)
     y = y - gridRows_nc * (PH + PG) + PG
 
-    -- LSM font dropdown: below the grid's left column when lsmFonts is on, with
-    -- the WoW Default checkbox beside it in the right column (Dukul 2026-10-06:
-    -- one row instead of two, or the font size slider ran off the window).
-    -- Uses the shared BuildLSMFontDropdown helper from ConfigWindow.lua; nil dd
-    -- = nothing built (setting off or no LSM fonts), checkbox row as before.
-    local lsmDD
+    -- LSM font dropdown, full width under the grid when lsmFonts is on, then the
+    -- WoW Default checkbox on its own row (Dukul 2026-10-06; the colour grid
+    -- lost its button row, so both fit again). Shared BuildLSMFontDropdown
+    -- helper from ConfigWindow.lua; it builds nothing with the setting off or
+    -- no LSM fonts installed.
     if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
        and BNB._BuildLSMFontDropdown then
-        local lsmY, _, _, dd = BNB._BuildLSMFontDropdown(panel, y,
+        -- 10 px gap above its header, under the grid (Dukul 2026-10-06)
+        local lsmY, _, _, dd = BNB._BuildLSMFontDropdown(panel, y - 10,
             -- getter: current per-note fontOverride if it is an LSM font
             function()
                 local note = GetNote()
@@ -336,20 +321,16 @@ local function BuildGeneralTab(panel)
                 HLFonts()
                 if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
             end,
-            CARD_W_F)
-        if dd then lsmDD = dd; y = lsmY - 4 end
+            CW)
+        if dd then y = lsmY - 4 end
     end
 
-    -- WoW Default checkbox, below the grid instead of a 9th card (beside the LSM
-    -- dropdown when there is one). Latin set only; its row is kept either way.
+    -- WoW Default checkbox, below the grid (and the LSM dropdown) instead of a
+    -- 9th card. Latin set only; its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         wowCb:SetSize(20, 20)
-        if lsmDD then
-            wowCb:SetPoint("LEFT", lsmDD, "RIGHT", COL_GAP_F - 2, 0)
-        else
-            wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
-        end
+        wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         local wowLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         wowLbl:SetPoint("LEFT",  wowCb,  "RIGHT", 4, 0)
@@ -388,7 +369,7 @@ local function BuildGeneralTab(panel)
             if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
         _wowCb_nc = wowCb
-        if not lsmDD then y = y - 24 end
+        y = y - 24
     end
 
     -- Re-apply fonts one frame after the panel first becomes visible.
@@ -796,7 +777,10 @@ end
 --------------------------------------------------------------------------------
 local function BuildSituationTab(panel)
     local ed = BNB.CreateSituationEditor(panel, {
-        padL = PAD, padR = PAD, ddR = 8, top = -PAD,
+        -- The panel is already PAD in from the window (MakePlainPanel): no
+        -- second pad. Rules end at the panel edge and dropdowns 4 px past it,
+        -- top at -4, as on General / Appearance (Dukul 2026-10-06)
+        padL = 0, padR = 0, ddR = -4, top = -4,
         host = panel:GetParent(),
     })
     panel._loadCtx = function() ed:Load(_noteID) end

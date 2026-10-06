@@ -238,7 +238,7 @@ local function BuildAppearanceTab(sf, ct)
     -- Hidden when OLED preset is selected (brightness is meaningless on pure black)
     local skinBrightnessSl = BNB.CreateStackedSlider(ct, CONTENT_W - 18, {
         label = L["CFG_SKIN_BRIGHTNESS"], min = 0.5, max = 3.0, step = 0.05,
-        value = db.skinBrightness or 1.0, default = 1.0,
+        value = db.skinBrightness or BNB.DEFAULTS.skinBrightness, default = BNB.DEFAULTS.skinBrightness,
         onChange = function(v) db.skinBrightness = v; ApplySkin() end,
         onReset  = function() db.skinBrightness = nil; ApplySkin() end,
     })
@@ -343,7 +343,7 @@ local function BuildAppearanceTab(sf, ct)
     -- update the config window's preset dropdown and brightness slider in real time.
     BNB._refreshSkinConfig = function()
         if skinPresetDD then skinPresetDD:GenerateMenu() end
-        if skinBrightnessSl then skinBrightnessSl:SetValue(db.skinBrightness or 1.0) end
+        if skinBrightnessSl then skinBrightnessSl:SetValue(db.skinBrightness or BNB.DEFAULTS.skinBrightness) end
         if skinOpacitySl    then skinOpacitySl:SetValue(db.skinBgAlpha or 0.97) end
         RefreshBrightnessVisibility()
     end

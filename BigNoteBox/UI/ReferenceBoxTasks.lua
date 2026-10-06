@@ -1049,11 +1049,20 @@ local function DoRenderTaskPanel()
     end
 
     -- Divider and a gap between active and completed tasks (ALL-219): one
-    -- reused rule per scroll child, never a row; sub-tasks stay with their parent
+    -- reused rule per scroll child, never a row; sub-tasks stay with their parent.
+    -- A small "Done (N)" title sits at its left, the rule runs on to the right
+    -- of it (Dukul 2026-10-06)
     local DONE_GAP = 6
     local doneRule = tsc._doneRule
     if not doneRule then doneRule = BNB.CreateNoteRule(tsc); tsc._doneRule = doneRule end
     doneRule:Hide()
+    local doneLbl = tsc._doneLbl
+    if not doneLbl then
+        doneLbl = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        doneLbl:SetTextColor(0.6, 0.6, 0.6)
+        tsc._doneLbl = doneLbl
+    end
+    doneLbl:Hide()
 
     local used = 0
     local function RenderTaskRow(task, isSubTask)
@@ -1075,12 +1084,16 @@ local function DoRenderTaskPanel()
 
     for i, task in ipairs(topLevel) do
         if i == firstDone then
-            y = y - DONE_GAP
+            y = y - DONE_GAP - 2
+            doneLbl:SetText(string.format(L["REFBOX_TASK_DONE_HDR"], #topLevel - firstDone + 1))
+            doneLbl:ClearAllPoints()
+            doneLbl:SetPoint("LEFT", tsc, "TOPLEFT", PAD, y)   -- in line with the checkboxes
+            doneLbl:Show()
             doneRule:ClearAllPoints()
-            doneRule:SetPoint("TOPLEFT",  tsc, "TOPLEFT",  4, y)
-            doneRule:SetPoint("TOPRIGHT", tsc, "TOPRIGHT", -4, y)
+            doneRule:SetPoint("TOPLEFT",  doneLbl, "RIGHT",    6, 0)   -- both tops at y
+            doneRule:SetPoint("TOPRIGHT", tsc,     "TOPRIGHT", -4, y)
             doneRule:Show()
-            y = y - DONE_GAP
+            y = y - DONE_GAP - 2
         end
         RenderTaskRow(task, false)
     end
