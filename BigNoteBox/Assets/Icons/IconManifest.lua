@@ -21,9 +21,35 @@ local FOREVER_RACES = { Human = true, Dwarf = true, Nightelf = true, Gnome = tru
                         Orc = true, Undead = true, Tauren = true, Troll = true }
 local FOREVER_ONLY  = { race_skyborne_female = true, race_skyborne_male = true }
 
+-- Races playable on the Classic clients (Dukul, 2026-10-07, ALL-364): Era the
+-- original eight, Anniversary (TBC) adds Draenei and Blood Elf, MoP Goblin,
+-- Worgen and Pandaren. By interface number, as BNB.IsClassic (Init.lua).
+local CLASSIC_RACES
+if BNB.IsClassic then
+    local _, _, _, iface = GetBuildInfo()
+    CLASSIC_RACES = { human = true, dwarf = true, nightelf = true, gnome = true,
+                      orc = true, undead = true, tauren = true, troll = true }
+    if (iface or 0) >= 20000 then CLASSIC_RACES.draenei, CLASSIC_RACES.bloodelf = true, true end
+    if (iface or 0) >= 50000 then
+        CLASSIC_RACES.goblin, CLASSIC_RACES.worgen, CLASSIC_RACES.pandaren = true, true, true
+    end
+end
+
+-- The race a portrait name shows, lower case: Achievement_Character_<race>_*,
+-- race_<race>_*, achievement_(Female)Goblinhead
+local function RaceWord(name)
+    local r = name:match("^Achievement_Character_(%a+)_") or name:match("^race_(%a+)_")
+    if not r and name:lower():find("goblinhead", 1, true) then r = "goblin" end
+    return r and r:lower()
+end
+
 -- Whether a race portrait belongs on this client (BNB.IsForever, Init.lua)
 local function RaceOnThisClient(name)
     if FOREVER_ONLY[name] then return BNB.IsForever end
+    if CLASSIC_RACES then
+        local race = RaceWord(name)
+        return race ~= nil and CLASSIC_RACES[race] == true
+    end
     if not BNB.IsForever then return true end
     local race = name:match("^Achievement_Character_(%a+)_")
     return race ~= nil and FOREVER_RACES[race] == true
@@ -382,12 +408,32 @@ local CATS = {
     } },
 }
 
+-- The Classic clients (Era, Anniversary, MoP) lack many of these icons. There
+-- each game icon is looked up by path as the catalog is built and a missing one
+-- is left out, so no per-client list has to be kept by hand (ALL-364). Should
+-- the lookup find none at all, it is not working and every icon stays.
+local function ClassicHas()
+    if not (BNB.IsClassic and GetFileIDFromPath) then return nil end
+    local has, found = {}, false
+    for _, c in ipairs(CATS) do
+        if not c.own then
+            for _, name in ipairs(c.names) do
+                local ok, id = pcall(GetFileIDFromPath, GAME .. name)
+                if ok and id then has[name] = true; found = true end
+            end
+        end
+    end
+    return found and has or nil
+end
+local _classicHas = ClassicHas()
+
 BNB.ICON_CATALOG, BNB.ICON_MANIFEST, BNB.ICON_CATEGORY = {}, {}, {}
 for _, c in ipairs(CATS) do
     local base = c.own and (OWN .. c.own .. "\\") or GAME
     local list = {}
     for _, name in ipairs(c.names) do
-        if not c.races or RaceOnThisClient(name) then
+        if (not c.races or RaceOnThisClient(name))
+           and (c.own or not _classicHas or _classicHas[name]) then
             local path = base .. name
             list[#list + 1] = path
             BNB.ICON_MANIFEST[#BNB.ICON_MANIFEST + 1] = path

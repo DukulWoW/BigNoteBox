@@ -48,20 +48,31 @@ local GAME = "Interface/CURSOR/"
 -- Forever, silver = Retail; the hands and the lock use the gold cell on both
 -- (Dukul: "use the one used in Forever on retail too"), and so does Size,
 -- whose silver cell is the dark "inactive" look. Splitters use Size.
+-- classic = the Classic clients (Era, Anniversary, MoP), whose cursor files
+-- are the old single ones (Dukul, 2026-10-07, ALL-369): Resize left is
+-- UI-Cursor-Size there, so Size uses it too; the hands are the quest ones.
 local CURSORS = {
     move      = { gold = GAME .. "UI-Cursor-Move",
-                  silver = GAME .. "UnableUI-Cursor-Move" },
+                  silver = GAME .. "UnableUI-Cursor-Move",
+                  classic = GAME .. "UI-Cursor-Move" },
     resize    = { gold = GAME .. "UI-Cursor-SizeRight.crosshair",
-                  silver = GAME .. "UnableUI-Cursor-UI-Cursor-SizeRight.crosshair" },
+                  silver = GAME .. "UnableUI-Cursor-UI-Cursor-SizeRight.crosshair",
+                  classic = GAME .. "UI-Cursor-SizeRight" },
     resizeL   = { gold = GAME .. "UI-Cursor-SizeLeft",
-                  silver = GAME .. "UnableUI-Cursor-SizeLeft" },
+                  silver = GAME .. "UnableUI-Cursor-SizeLeft",
+                  classic = GAME .. "UI-Cursor-Size" },
     size      = { gold = GAME .. "UI-Cursor-Size.crosshair",
-                  silver = GAME .. "UI-Cursor-Size.crosshair" },
-    grab      = { gold = GAME .. "GrabbingHand", silver = GAME .. "GrabbingHand" },
+                  silver = GAME .. "UI-Cursor-Size.crosshair",
+                  classic = GAME .. "UI-Cursor-Size" },
+    grab      = { gold = GAME .. "GrabbingHand", silver = GAME .. "GrabbingHand",
+                  classic = GAME .. "QuestInteract" },
     hold      = { gold = GAME .. "HoldingHand.crosshair",
-                  silver = GAME .. "HoldingHand.crosshair" },
-    open      = { gold = GAME .. "OpenHand.crosshair", silver = GAME .. "OpenHand.crosshair" },
-    lock      = { gold = GAME .. "Lock", silver = GAME .. "Lock" },
+                  silver = GAME .. "HoldingHand.crosshair",
+                  classic = GAME .. "UnableQuestInteract" },
+    open      = { gold = GAME .. "OpenHand.crosshair", silver = GAME .. "OpenHand.crosshair",
+                  classic = GAME .. "OpenHand" },
+    lock      = { gold = GAME .. "Lock", silver = GAME .. "Lock",
+                  classic = GAME .. "PickLock" },
 }
 BNB.CURSORS = CURSORS
 
@@ -70,6 +81,7 @@ function BNB.CursorPath(kind)
     local c = type(kind) == "table" and kind or CURSORS[kind]
     if not c then return nil end
     if BNB.IsForever then return c.gold end
+    if BNB.IsClassic and c.classic then return c.classic end
     return c.silver
 end
 

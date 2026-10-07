@@ -566,14 +566,8 @@ local function BuildShareWindow()
         end
         local str = f._shareEB and f._shareEB:GetText() or ""
         if str == "" then return end
-        if BCB_OpenMultiline then BCB_OpenMultiline() end
-        C_Timer.After(0.05, function()
-            if BigChatBox.mlEditBox then
-                BigChatBox.mlEditBox:SetText(str)
-                BigChatBox.mlEditBox:SetFocus()
-                BigChatBox.mlEditBox:SetCursorPosition(#str)
-            end
-        end)
+        -- No multi-line box in this BCB (Classic, ALL-367): Copy is the way
+        if not BNB.OpenInBCB(str) then BNB:Print(L["BCB_NO_MULTILINE"]) end
     end)
     -- Tint the BCB button green in normal mode (a skin button already carries
     -- the preset's look). Deferred one tick so template textures are initialized.

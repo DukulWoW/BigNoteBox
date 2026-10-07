@@ -195,19 +195,10 @@ local function StartJob(lines, chanType, target)
 end
 
 local function SendToBCB(body)
-    if not (BigChatBox and BCB_OpenMultiline) then
+    if not BNB.OpenInBCB(body) then
         BNB:Print(L["STC_NO_BCB"])
         return
     end
-    BCB_OpenMultiline()
-    -- Set text after a tick so the frame has fully initialized
-    C_Timer.After(0, function()
-        if BigChatBox.mlEditBox then
-            BigChatBox.mlEditBox:SetText(body)
-            BigChatBox.mlEditBox:SetFocus()
-            BigChatBox.mlEditBox:SetCursorPosition(#body)
-        end
-    end)
     BNB.CloseSendToChat()
 end
 
@@ -635,7 +626,9 @@ local function CreateSendDialog()
         end
         SendToBCB(body)
     end)
-    if not (BigChatBox and BigChatBox.SendDirect) then bcbBtn:Hide() end
+    -- Only while BCB has its multi-line box (none on Classic, ALL-367); Send
+    -- still goes through BCB then
+    if not BNB.BCBHasMultiline() then bcbBtn:Hide() end
     f._bcbBtn = bcbBtn
 
     -- "Get BCB" promo button — shown when BigChatBox is NOT installed (same slot as bcbBtn)
@@ -737,7 +730,7 @@ function BNB.OpenSendToChat(noteID)
     dlgFrame:Show(); dlgFrame:Raise()
     -- Refresh BCB / Get BCB buttons: BCB may have loaded after the dialog was first built
     local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
-    if dlgFrame._bcbBtn    then dlgFrame._bcbBtn:SetShown(hasBCB)    end
+    if dlgFrame._bcbBtn    then dlgFrame._bcbBtn:SetShown(BNB.BCBHasMultiline()) end
     if dlgFrame._getBCBBtn then dlgFrame._getBCBBtn:SetShown(not hasBCB) end
     RefreshPreview()
 end

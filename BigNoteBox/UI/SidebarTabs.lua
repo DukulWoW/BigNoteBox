@@ -36,34 +36,21 @@ local CAP, ORN_L, ORN_R = 24, 114, 142
 -- retail_normal Export (Dukul, 2026-10-06): minW 90, textY -1, rightPad 18.
 -- Whether the tabs share the whole width is the player's setting now
 -- (sidebarTabsFill, ALL-333), not a field here
-local NORMAL = { h = 32, w = 150, minW = 90, gap = 0, x = 8, y = BNB.IsForever and 6 or -4,
-    iconSz = 18, iconX = 20, iconY = -0.5, border = 1, textGap = 5, textY = -1,
-    rightPad = 18, activeA = 1, hoverA = 0.5, dim = 0.5, font = "GameFontNormal",
-    pinSz = 14, pinX = -16, pinY = -6 }
--- Forever normal (Dukul's /bnbtabs Export, 2026-10-05): wider tabs with a gap,
--- white text, and under = drawn in the strata below the window, so its top
--- border covers their lower end (as the skin tabs are); Retail leaves it off
-if BNB.IsForever then
-    for k, v in pairs({ w = 170, minW = 90, gap = 5, y = 6.5, iconX = 18, textY = -1,
-        rightPad = 18, font = "GameFontHighlight", under = true }) do
-        NORMAL[k] = v
-    end
-end
--- Skin: icon and text centred on the whole tab, the tucked part included
--- (the test's -4 offsets + half the tuck)
-local SKIN = { h = 30, tuck = 8, w = 150, minW = 80, gap = 0, x = 8,
-    iconSz = 18, iconX = 13, iconY = 0, border = 1, textGap = 5, textY = 0,
-    rightPad = 14, dim = 0.5, font = "GameFontHighlight",
+-- Dukul's /bnbtabs Exports (2026-10-07, ALL-368), on every client: Forever
+-- keeps its own normal y. under = drawn in the strata below the window, so its
+-- top border covers their lower end (as the skin tabs are). Whether the tabs
+-- share the whole width stays the sidebarTabsFill setting (ALL-333).
+local NORMAL = { h = 32, w = 170, minW = 90, gap = 0, x = 8, y = BNB.IsForever and 6.5 or -0.5,
+    iconSz = 18, iconX = 18, iconY = -0.5, border = 1, textGap = 5, textY = -0.5,
+    rightPad = 18, activeA = 1, hoverA = 0.5, dim = 0.6, font = "GameFontHighlight",
+    under = true, pinSz = 14, pinX = -16, pinY = -6 }
+-- Skin: icon and text centred on the whole tab, the tucked part included.
+-- The test adds half the tuck to iconY / textY; these are the results
+-- (-2.5 + 3 for both)
+local SKIN = { h = 32, tuck = 6, w = 170, minW = 90, gap = 5, x = 8,
+    iconSz = 16, iconX = 13, iconY = 0.5, border = 1, textGap = 5, textY = 0.5,
+    rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.6, font = "GameFontNormalSmall",
     pinSz = 14, pinX = -7, pinY = -6 }
--- Forever skin (Dukul's /bnbtabs Export, 2026-10-04): taller, wider tabs with
--- a gap between them, a smaller icon and small text. The test adds half the
--- tuck to iconY / textY; these are the results (-2.5 + 3, -3 + 3)
-if BNB.IsForever then
-    for k, v in pairs({ h = 32, tuck = 6, w = 190, minW = 90, gap = 5,
-        iconSz = 16, iconY = 0.5, textY = 0, font = "GameFontHighlightSmall" }) do
-        SKIN[k] = v
-    end
-end
 -- More tabs than fit at w: they share the width, and icon, spacing and text
 -- shrink with it (Dukul, 2026-10-04): icon and spacing by w / S.w down to
 -- MIN_SCALE, the text down to MIN_TEXT_SCALE. Below minW the last tabs drop out.

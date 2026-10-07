@@ -20,7 +20,11 @@ local results  -- { { cat, name, path, id }, ... }
 
 local function ClientKey()
     local _, _, _, iface = GetBuildInfo()
-    if iface and iface >= 16000 and iface < 20000 then return "forever" end
+    iface = iface or 0
+    if iface >= 16000 and iface < 20000 then return "forever" end
+    if iface < 20000 then return "era" end
+    if iface < 30000 then return "anniversary" end
+    if iface < 100000 then return "mop" end
     return "retail"
 end
 
@@ -117,7 +121,7 @@ end
 local function Refresh()
     local total, missing = Probe()
     header:SetText(("%s  |  %d bundled icons  |  |cff66dd66%d in the game|r  |  |cffff5555%d missing|r  |  saved to BigNoteBoxDevDB.iconProbe.%s")
-        :format(ClientKey() == "forever" and "WoW Forever" or "Retail", total, total - missing, missing, ClientKey()))
+        :format(ClientKey(), total, total - missing, missing, ClientKey()))
     Layout()
 end
 

@@ -105,27 +105,7 @@ function BNB.SetupChatCapture()
     C_Timer.After(0, function()
         local btn = BNB._toolbarImportBtn
         if btn and btn.SetScript then
-            btn:SetScript("OnClick", function()
-                if not (BigChatBox and BigChatBox.SendDirect) then
-                    if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
-                    return
-                end
-                local id   = BNB._currentNoteID
-                local note = id and BNB.GetNote(id)
-                local body = note and (note.body or "") or ""
-                if body == "" then
-                    BNB:Print("|cffff8800BigNoteBox:|r This note is empty.")
-                    return
-                end
-                if BCB_OpenMultiline then BCB_OpenMultiline() end
-                C_Timer.After(0.05, function()
-                    if BigChatBox.mlEditBox then
-                        BigChatBox.mlEditBox:SetText(body)
-                        BigChatBox.mlEditBox:SetFocus()
-                        BigChatBox.mlEditBox:SetCursorPosition(#body)
-                    end
-                end)
-            end)
+            btn:SetScript("OnClick", function() BNB.SendCurrentNoteToBCB() end)   -- UI/MainWindow.lua
         end
     end)
 

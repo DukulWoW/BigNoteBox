@@ -41,8 +41,25 @@ local RETAIL_ONLY = {
     commoninsideframe2x = true,   -- Ornate Corners, file 8033663 (Dukul, Forever, 2026-10-04)
 }
 
+-- Missing on the Classic clients: one list for Era, Anniversary and MoP
+-- (Dukul, Classic beta, 2026-10-07, ALL-365)
+local CLASSIC_HIDE = {
+    combatassistanthighlightsingleframe = true,   -- Blue Glow
+    housingitemwoodiconframe            = true,   -- Tin Frame
+    commoninsideframe2x                 = true,   -- Ornate Corners
+    ["Adventure-Mission-Gold-Dragon"]   = true,   -- Elite Dragon
+    ["Adventure-Mission-Silver-Dragon"] = true,   -- Rare Silver Dragon
+    ["Adventures-Buff-Heal-Burst"]      = true,   -- Light Burst
+    ["Adventurers-Frame-Soulbind-Necrolord"] = true,   -- Stone
+    ["Adventures-EndCombat-Fail"]       = true,   -- Two Swords
+    explosiona_32frames512_nature       = true,   -- Poisonous Cloud
+    explosiona_32frames512_shadow       = true,   -- Shadow Mist
+    explosiona_32frames512_wind         = true,   -- Airy Mist
+}
+
 local function OnThisClient(key)
     if BNB.IsForever then return not RETAIL_ONLY[key] end
+    if BNB.IsClassic then return not CLASSIC_HIDE[key] and not FOREVER_ONLY[key] end
     return not FOREVER_ONLY[key]
 end
 

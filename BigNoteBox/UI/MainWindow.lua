@@ -722,32 +722,12 @@ function BNB.CreateMainWindow()
     if BNB.SyncAlarmsBtnState then BNB.SyncAlarmsBtnState() end
 
     -- Send-to-BCB button. Icon: tp-bcb when BCB is installed, bcb-icon when
-    -- absent. Always full colour.
+    -- absent. Always full colour. Click: BNB.SendCurrentNoteToBCB (below the
+    -- window builder; ChatCapture wires the same function).
     local importBtn = TBIcon(
         (BigChatBox and BigChatBox.SendDirect) and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON,
         L["MW_BCB_SEND_TIP"], 7,
-        function()
-            if not (BigChatBox and BigChatBox.SendDirect) then
-                -- BCB absent: show promo popup
-                if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
-                return
-            end
-            local id   = BNB._currentNoteID
-            local note = id and BNB.GetNote(id)
-            local body = note and (note.body or "") or ""
-            if body == "" then
-                BNB:Print(L["MW_NOTE_EMPTY"])
-                return
-            end
-            if BCB_OpenMultiline then BCB_OpenMultiline() end
-            C_Timer.After(0.05, function()
-                if BigChatBox.mlEditBox then
-                    BigChatBox.mlEditBox:SetText(body)
-                    BigChatBox.mlEditBox:SetFocus()
-                    BigChatBox.mlEditBox:SetCursorPosition(#body)
-                end
-            end)
-        end)
+        function() BNB.SendCurrentNoteToBCB() end)
     -- Re-evaluates BCB presence and swaps icon; called after BCB loads late.
     local function RefreshImportBtn()
         local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
@@ -1429,6 +1409,24 @@ local function BuildBCBPromo()
 
     f:Hide()
     return f
+end
+
+-- The toolbar's Send to BCB: the note into BCB's multi-line box. A BCB with no
+-- box (Classic, or switched off in BCB) gets the Send to Chat window instead,
+-- which sends line by line through BCB (ALL-367); no BCB = the promo.
+function BNB.SendCurrentNoteToBCB()
+    if not (BigChatBox and BigChatBox.SendDirect) then
+        if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
+        return
+    end
+    local id   = BNB._currentNoteID
+    local note = id and BNB.GetNote(id)
+    local body = note and (note.body or "") or ""
+    if body == "" then
+        BNB:Print(L["MW_NOTE_EMPTY"])
+        return
+    end
+    if not BNB.OpenInBCB(body) and BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
 end
 
 function BNB.ShowBCBPromo()

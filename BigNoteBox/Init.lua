@@ -25,6 +25,34 @@ function BNB.DeepCopy(v)
     return out
 end
 
+-- BigChatBox's multi-line box, the target of every "Send to BCB" (toolbar,
+-- Send to Chat, Share). BCB on the Classic clients has none: its
+-- BCB_OpenMultiline is an empty stub there, and a player can switch the box
+-- off in BCB, so the old hand-off silently did nothing (ALL-367).
+function BNB.BCBHasMultiline()
+    return BigChatBox ~= nil and BigChatBox.SendDirect ~= nil and not BigChatBox.IsClassic
+        and BCB_OpenMultiline ~= nil
+        and not (BigChatBoxDB and BigChatBoxDB.multilineEnabled == false)
+end
+
+-- Opens BCB's multi-line box with text in it. False (nothing done) when this
+-- BCB has no box; the caller falls back (Send to Chat sends line by line
+-- through BigChatBox.SendDirect, which every BCB has).
+function BNB.OpenInBCB(text)
+    if not BNB.BCBHasMultiline() then return false end
+    BCB_OpenMultiline()
+    -- Set the text a tick later, once the box is built and shown
+    C_Timer.After(0.05, function()
+        local eb = BigChatBox.mlEditBox
+        if eb then
+            eb:SetText(text)
+            eb:SetFocus()
+            eb:SetCursorPosition(#text)
+        end
+    end)
+    return true
+end
+
 -- WoW: Forever reports a 1.x interface number (16001, client 1.60.x). It used to be
 -- told apart by WOW_PROJECT_ID == WOW_PROJECT_MAINLINE as well, but build 70170
 -- (2026-10-01) gave Forever its own project id (18; MAINLINE is 1), and every

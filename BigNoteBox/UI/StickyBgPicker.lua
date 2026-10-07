@@ -49,6 +49,7 @@ local TABS = {
     { cat = "parchment",  label = "STICKY_BGP_TAB_PARCHMENT" },
     { cat = "scenery",    label = "STICKY_BGP_TAB_SCENERY" },
     { cat = "profession", label = "STICKY_BGP_TAB_PROFESSION" },
+    { cat = "event",      label = "STICKY_BGP_TAB_EVENT" },
     -- The "BNB" tab of old bundled TGAs went with BigNoteBox_BGs (ALL-338);
     -- the one left, bg-stone (cat "classic"), shows under All
 }
@@ -263,8 +264,12 @@ local function Build()
     revertBtn:SetScript("OnClick", function() if _origKey then Pick(_origKey) end end)
     closeBtn:SetScript("OnClick", function() SBP.Close() end)
 
+    -- A tab with no entries on this client is left out (Classic has no
+    -- profession art, ALL-366)
     _tabs = {}
-    for _, t in ipairs(TABS) do _tabs[#_tabs + 1] = t end
+    for _, t in ipairs(TABS) do
+        if t.cat == "all" or #EntriesFor(t.cat) > 1 then _tabs[#_tabs + 1] = t end
+    end
     if _tabIdx > #_tabs then _tabIdx = 1 end
     local labels = {}
     for i, t in ipairs(_tabs) do labels[i] = L[t.label] end
