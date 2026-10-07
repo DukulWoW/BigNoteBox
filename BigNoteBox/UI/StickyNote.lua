@@ -2277,8 +2277,12 @@ local function CreateStickyFrame(noteID)
 
     -- Keep render frame width synced with scroll frame so SimpleHTML reflows.
     -- Also re-renders on resize so content wraps correctly at the new width.
-    richScroll:SetScript("OnSizeChanged", function(self)
-        local w = self:GetWidth()
+    -- FOR-30: reflow on the next frame, never inside OnSizeChanged (it runs
+    -- in the client's layout pass, and a SetText there frees the SimpleHTML's
+    -- lines while that pass still walks them: Forever ACCESS_VIOLATION)
+    local function Reflow()
+        f._richReflowPending = nil
+        local w = richScroll:GetWidth()
         if not w or w <= 0 then return end
         richRender:SetWidth(w)
         -- Re-render if a rich note is currently loaded (handles window resize)
@@ -2293,6 +2297,11 @@ local function CreateStickyFrame(noteID)
                 richRender:SetHeight(richRender:GetContentHeight())
             end
         end
+    end
+    richScroll:SetScript("OnSizeChanged", function()
+        if f._richReflowPending then return end
+        f._richReflowPending = true
+        C_Timer.After(0, Reflow)
     end)
 
     ForwardHover(richScroll, f)

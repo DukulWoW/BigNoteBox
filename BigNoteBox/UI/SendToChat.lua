@@ -477,6 +477,7 @@ local function CreateSendDialog()
 
     -- Line-by-line toggle
     local lineCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    BNB.LabelHit(lineCheck)   -- the tooltip and click reach over its label too
     lineCheck:SetSize(20, 20); lineCheck:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     lineCheck:SetChecked(_lineByLine)
     local lineLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

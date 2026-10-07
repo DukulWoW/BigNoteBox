@@ -915,6 +915,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
             row._lbl = lbl
         end
         lbl:SetText(dest.label)
+        BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
         row._destKey = dest.key
         row:Show()
         checks[#checks + 1] = row
@@ -1039,6 +1040,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
             row._lbl = lbl
         end
         lbl:SetText(dest.label)
+        BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
         row._destKey = dest.key
         row:Show()
         checks[#checks + 1] = row

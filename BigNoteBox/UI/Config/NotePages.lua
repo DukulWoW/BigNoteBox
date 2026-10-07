@@ -75,6 +75,7 @@ function K.BuildRichNotesPage(sf, ct, y, page)
 
     -- Checkbox first so it sits above the sliders in the layout flow.
     local indepCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(indepCb)   -- the tooltip and click reach over its label too
     indepCb:SetSize(24, 24)
     indepCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     indepCb:SetChecked(indepActive)
@@ -281,6 +282,7 @@ function K.BuildTrashPage(sf, ct, y, page)
     -- ── Trash enable/disable checkbox ─────────────────────────────────────────
     -- Capture all child widget refs so we can grey them out when disabled.
     local trashEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(trashEnableCb)   -- the tooltip and click reach over its label too
     trashEnableCb:SetSize(24, 24)
     trashEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     trashEnableCb:SetChecked(db.trashFeature ~= false)
@@ -294,6 +296,7 @@ function K.BuildTrashPage(sf, ct, y, page)
 
     -- ── Warn before deleting checkbox ─────────────────────────────────────────
     local warnCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(warnCb)   -- the tooltip and click reach over its label too
     warnCb:SetSize(24, 24)
     warnCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     warnCb:SetChecked(db.warnBeforeDelete ~= false)

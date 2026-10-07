@@ -103,6 +103,7 @@ local function BuildWindow()
 
     local function MakeCheck(indent, label, key, tipTitle, tipBody, tipExtra)
         local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetSize(24, 24)
         cb:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + indent - 2, y + 2)
         local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")

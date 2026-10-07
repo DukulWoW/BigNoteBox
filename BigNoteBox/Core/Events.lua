@@ -159,6 +159,7 @@ function BNB.ShowForeverNotice()
         row:SetHeight(24)
         row:SetPoint("BOTTOM", ok, "TOP", 0, 8)
         local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
+        BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetSize(24, 24)
         cb:SetPoint("LEFT", row, "LEFT", 0, 0)
         local cbLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")

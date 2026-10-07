@@ -124,6 +124,21 @@ function BNB.TasksEnabled()
     return not BigNoteBoxDB or BigNoteBoxDB.tasksEnabled ~= false
 end
 
+-- A switch (Settings > Modules > Tasks, the setup wizard, ALL-358) saves it
+-- and relays out everything that shows tasks
+function BNB.ApplyTasksModule(on)
+    if not BigNoteBoxDB then return end
+    BigNoteBoxDB.tasksEnabled = on
+    if not on and BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
+        BNB.TaskEditWindow.Close()
+    end
+    if BNB.ApplySaveMode         then BNB.ApplySaveMode()         end   -- editor bar button
+    if BNB.ApplyTaskFilterButton then BNB.ApplyTaskFilterButton() end   -- note list filter
+    if BNB.ApplyRefBoxModules    then BNB.ApplyRefBoxModules()    end   -- Reference Box / tasks window
+    if BNB.Sticky and BNB.Sticky.ApplyTasksModule then BNB.Sticky.ApplyTasksModule() end
+    if BNB.RefreshNoteList       then BNB.RefreshNoteList()       end   -- row task icons
+end
+
 -- HasTasks for anything that draws tasks: false while the module is off.
 function T.Shows(noteID)
     return BNB.TasksEnabled() and T.HasTasks(noteID) or false

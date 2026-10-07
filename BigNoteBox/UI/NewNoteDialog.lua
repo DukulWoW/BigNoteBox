@@ -444,6 +444,7 @@ local function BuildDialog()
     -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
     -- its row is kept either way so the dialog does not change size.
     local wowCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    BNB.LabelHit(wowCheck)   -- the tooltip and click reach over its label too
     wowCheck:SetShown(BNB.ShowWoWFontCheckbox())
     wowCheck:SetSize(18, 18)
     wowCheck:SetPoint("TOPLEFT", colL, "TOPLEFT", 0,
@@ -623,6 +624,7 @@ local function BuildDialog()
     local colMaxH = math.max(math.abs(leftColH or 0), math.abs(rightY))
     local chromeTopH = skinMode and (BNB.TOOL_SKIN_TITLE_H + 8) or 36
     local richCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    BNB.LabelHit(richCheck)   -- the tooltip and click reach over its label too
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
         -chromeTopH - ICON_SZ - 10 - colMaxH - 4)

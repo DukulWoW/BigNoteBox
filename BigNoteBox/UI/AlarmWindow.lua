@@ -435,6 +435,7 @@ local function BuildRepeatBlock(ct1)
     for i,dnKey in ipairs(DAY_NAME_KEYS) do
         local dn = L[dnKey]
         local cb=CreateFrame("CheckButton",nil,wdRow,"UICheckButtonTemplate")
+        BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetSize(20,20); cb:SetPoint("LEFT",wdRow,"LEFT",(i-1)*wdCW,0)
         cb:HookScript("OnClick",function() MarkDirty() end)
         local dl=wdRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
@@ -889,6 +890,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     SectionHdr(ct3,L["AW_SECT_SNOOZE"],y3); y3 = y3 - AW_LBL - 2
 
     local snoozeEnableCB=CreateFrame("CheckButton",nil,ct3,"UICheckButtonTemplate")
+    BNB.LabelHit(snoozeEnableCB)   -- the tooltip and click reach over its label too
     snoozeEnableCB:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3+2)
     snoozeEnableCB:SetChecked(true)
     snoozeEnableCB:HookScript("OnClick",function() MarkDirty() end)

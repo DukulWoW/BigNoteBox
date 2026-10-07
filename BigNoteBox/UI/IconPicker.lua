@@ -510,6 +510,7 @@ local function Build()
 
     -- The opt-in to the whole game list, under the side list
     local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
     cb:SetSize(22, 22)
     cb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD - 2, FOOT_H + 8)
     local cbLbl = cb:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")

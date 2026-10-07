@@ -300,6 +300,7 @@ local function BuildGeneralTab(panel)
     -- 9th card. Latin set only; its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
         wowCb:SetSize(20, 20)
         wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())

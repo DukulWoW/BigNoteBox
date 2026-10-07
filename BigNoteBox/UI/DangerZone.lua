@@ -278,6 +278,7 @@ local function PopulateContent(ct, sf)
                 if db then
                     db.setupComplete = false
                     db.setupPage     = nil
+                    db.setupUsage    = nil
                 end
                 C_UI.Reload()
             end,

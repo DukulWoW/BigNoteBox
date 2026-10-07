@@ -500,6 +500,7 @@ local function PopulateStickySettings(noteID)
     -- its row is kept either way.
     do
         local wowCb = CreateFrame("CheckButton", nil, ct1, "UICheckButtonTemplate")
+        BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
         wowCb:SetSize(20, 20)
         wowCb:SetPoint("TOPLEFT", ct1, "TOPLEFT", -2, ct1._y)
         local wowLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

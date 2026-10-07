@@ -124,6 +124,7 @@ local function BuildFontPicker(ct, y)
         return y
     end
     local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
     wowCb:SetSize(24, 24)
     wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     wowCb:SetScript("OnEnter", function(self)
@@ -168,6 +169,7 @@ local function BuildAppearanceTab(sf, ct)
 
     -- Enable skin mode checkbox
     local skinCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(skinCb)   -- the tooltip and click reach over its label too
     skinCb:SetSize(24, 24)
     skinCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     skinCb:SetChecked(db.skinMode == true)
@@ -256,6 +258,7 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (SLIDER_H + ROW_GAP)
 
     local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(skinRandomizeCb)   -- the tooltip and click reach over its label too
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     skinRandomizeCb.text:SetPoint("LEFT", skinRandomizeCb, "RIGHT", 2, 0)
@@ -283,6 +286,7 @@ local function BuildAppearanceTab(sf, ct)
 
     -- Nested: randomize brightness too
     skinRandomizeBrightnessCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(skinRandomizeBrightnessCb)   -- the tooltip and click reach over its label too
     skinRandomizeBrightnessCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 30, y)
     skinRandomizeBrightnessCb.text = skinRandomizeBrightnessCb.text
         or skinRandomizeBrightnessCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")

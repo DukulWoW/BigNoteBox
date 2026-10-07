@@ -203,6 +203,7 @@ function BNB.OpenImgDialog(insertFn)
         curY = curY - 28
 
         local ratioCb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        BNB.LabelHit(ratioCb)   -- the tooltip and click reach over its label too
         ratioCb:SetSize(22, 22)
         ratioCb:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD - 3, curY)
         local ratioLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

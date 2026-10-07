@@ -136,6 +136,7 @@ end
 
 local function AddCheck(ct, y, text, getter, setter, tip)
     local cb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
     cb:SetSize(24, 24)
     cb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     cb:SetChecked(getter())
@@ -255,8 +256,9 @@ end
 local function AddOverviewRow(ct, sf, y, page, title, desc)
     local TEXT_X = 26
     local cb = page.enableCb
+    local tg, ov
     if page.get then
-        local tg = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        tg = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         tg:SetSize(24, 24)
         tg:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
         tg:SetChecked(page.get())
@@ -269,7 +271,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
             tg:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
     elseif cb then
-        local ov = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        ov = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         ov:SetSize(24, 24)
         ov:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
         ov:SetChecked(cb:GetChecked())
@@ -281,6 +283,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
         ov:SetScript("OnEnter", cb:GetScript("OnEnter"))
         ov:SetScript("OnLeave", cb:GetScript("OnLeave"))
         sf:HookScript("OnShow", function() ov:SetChecked(cb:GetChecked()) end)
+        page._ov = ov   -- the Modules tab's mode badges set it after a preset (ALL-358)
     end
 
     local open
@@ -296,6 +299,9 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
     else         lbl:SetPoint("RIGHT", ct,   "TOPRIGHT", 0, y - 10) end
     lbl:SetJustifyH("LEFT")
     lbl:SetText(title)
+    -- The row's checkbox reaches over its title (tooltip and click)
+    local rowCb = page.get and tg or (cb and ov) or nil
+    if rowCb then BNB.LabelHit(rowCb, lbl) end
 
     local d = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     d:SetPoint("TOPLEFT", ct, "TOPLEFT", TEXT_X, y - 24)

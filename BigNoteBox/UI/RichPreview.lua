@@ -62,9 +62,18 @@ local function BuildRenderPair(name, parent, titleH)
     rf:SetHeight(1)
     rsf:SetScrollChild(rf)
 
-    rsf:HookScript("OnSizeChanged", function(self)
-        local w = self:GetWidth()
-        if w and w > 0 then rf:SetWidth(w) end
+    -- FOR-30: a SimpleHTML's width is set on the next frame, never inside
+    -- OnSizeChanged (the client's layout pass; a reflow there frees lines
+    -- that pass still walks)
+    local pending = false
+    rsf:HookScript("OnSizeChanged", function()
+        if pending then return end
+        pending = true
+        C_Timer.After(0, function()
+            pending = false
+            local w = rsf:GetWidth()
+            if w and w > 0 then rf:SetWidth(w) end
+        end)
     end)
 
     return rsf, rf

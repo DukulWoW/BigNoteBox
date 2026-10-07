@@ -1134,6 +1134,7 @@ function M.ShowAddonPopup(key)
     local catCb
     if key == "TakeANote" then
         catCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(catCb)   -- the tooltip and click reach over its label too
         catCb:SetSize(24, 24)
         catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD - 2, y + 2)
         catCb:SetChecked(false)
@@ -1310,6 +1311,7 @@ function M.ShowPopup()
         sel[k] = false
 
         local cb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetSize(24, 24)
         cb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, y + 2)
         cb:SetChecked(false)
@@ -1336,6 +1338,7 @@ function M.ShowPopup()
         if k == "TakeANote" then
             sel.takeANoteCategoryTags = false
             catCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+            BNB.LabelHit(catCb)   -- the tooltip and click reach over its label too
             catCb:SetSize(20, 20)
             catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 + 18, y + 2)
             catCb:SetChecked(false)
@@ -1389,6 +1392,7 @@ function M.ShowPopup()
 
     for _, k in ipairs(available) do
         local daaCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(daaCb)   -- the tooltip and click reach over its label too
         daaCb:SetSize(20, 20)
         daaCb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, daaY + 2)
         daaCb:SetChecked(false)

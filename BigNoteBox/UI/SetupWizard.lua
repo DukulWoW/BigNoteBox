@@ -1,15 +1,19 @@
 -- BigNoteBox UI/SetupWizard.lua
--- First-time setup wizard. 6 pages:
+-- First-time setup wizard. 9 pages (P_* below):
 --   1: Welcome
---   2: Skin mode choice (normal vs skin) — may reload into page 3
---   3: Skin colour / brightness (skin mode only)
---   4: Notes behaviour (font, list mode, sidebar, combat, LSM)
---   5: Keybinds
---   6: Done
+--   2: How do you want to use BNB: Minimal / Everything / Custom (ALL-358)
+--   3: Custom module picks (only after Custom)
+--   4: Skin mode choice (normal vs skin) — may reload into page 5
+--   5: Skin colour / brightness (skin mode only)
+--   6: Notes behaviour (font, list mode, sidebar, combat, LSM)
+--   7: Keybinds
+--   8: Migration notice (only when migratable addons are installed)
+--   9: Done
 --
 -- DB flags:
 --   BigNoteBoxDB.setupComplete  (bool)   — wizard has been finished
 --   BigNoteBoxDB.setupPage      (number) — resume page after reload
+--   BigNoteBoxDB.setupUsage     (string) — page 2's pick, so a reload mid-wizard keeps Custom
 --
 -- Entry point: BNB.ShowSetupWizard()
 -- Called from Initialize.lua after all systems are built.
@@ -29,7 +33,9 @@ local TITLE_H   = 28
 local NAV_H     = 44                     -- bottom nav bar height
 local BNB_URL   = "https://www.curseforge.com/wow/addons/bignotebox"
 
-local NUM_PAGES = 7
+local NUM_PAGES = 9
+-- Pages referred to by number (the full list is in the header)
+local P_USAGE, P_MODULES, P_THEME, P_NOTES, P_MIGRATE = 2, 3, 5, 6, 8
 
 -- Whether any migratable note addons are installed (evaluated once at build time)
 local _hasMigration = false
@@ -56,6 +62,7 @@ local _pageCounter = nil
 local _prevBtn     = nil
 local _nextBtn     = nil
 local _getStartedBtn = nil
+local _usage       = nil   -- page 2's pick: "minimal" / "everything" / "custom"
 
 -- FadeTo and the LibCustomGlow lookup are shared with WhatsNew/FeatureList/
 -- DangerZone/FocusEditor in UI/GlowOverlay.lua (ALL-65.4).
@@ -64,7 +71,7 @@ local FadeTo = BNB.FadeTo
 --------------------------------------------------------------------------------
 -- LARGE BUTTON FACTORY  (matches OptionsPanel.lua's SharedButtonLargeTemplate)
 -- Used for primary CTA buttons: Get Started, Finish, Finish & Open.
--- Skin mode: a 16pt skin button instead (ALL-79). Choosing skin mode on page 2
+-- Skin mode: a 16pt skin button instead (ALL-79). Choosing skin mode on page 4
 -- reloads, so the mode read at build time is always current.
 --------------------------------------------------------------------------------
 local function MakeLargeButton(parent, text, w, h)
@@ -190,7 +197,7 @@ local function RegisterQuitDialog()
         timeout = 0, whileDead = true, hideOnEscape = true,
         OnAccept = function()
             local db = BigNoteBoxDB
-            if db then db.setupComplete = true; db.setupPage = nil end
+            if db then db.setupComplete = true; db.setupPage = nil; db.setupUsage = nil end
             if _frame then
                 _frame._quitting = true
                 _frame:Hide()
@@ -235,6 +242,8 @@ end
 -- each key through L at display time instead (UpdateNavigation).
 local PAGE_TITLE_KEYS = {
     "SW_PAGE_TITLE_1",
+    "SW_PAGE_TITLE_USAGE",
+    "SW_PAGE_TITLE_MODULES",
     "SW_PAGE_TITLE_2",
     "SW_PAGE_TITLE_3",
     "SW_PAGE_TITLE_4",
@@ -243,19 +252,35 @@ local PAGE_TITLE_KEYS = {
     "SW_PAGE_TITLE_7",
 }
 
+-- The pages Prev / Next step over: module picks unless Custom, the skin
+-- colour page in normal mode, the migration notice without migratable addons
+local function PageSkipped(n)
+    if n == P_MODULES then return _usage ~= "custom" end
+    if n == P_THEME   then return not (BigNoteBoxDB and BigNoteBoxDB.skinMode) end
+    if n == P_MIGRATE then return not _hasMigration end
+    return false
+end
+
+local function StepFrom(n, dir)
+    local t = n + dir
+    while t > 1 and t < NUM_PAGES and PageSkipped(t) do t = t + dir end
+    return t
+end
+
 local function UpdateNavigation()
     if not _frame then return end
     local key = PAGE_TITLE_KEYS[_curPage]
     _pageTitle:SetText((key and L[key]) or "")
 
-    -- Effective total: skip page 6 if no migration addons
-    local effectiveTotal = _hasMigration and NUM_PAGES or (NUM_PAGES - 1)
-    -- Effective current: pages after skipped page 6 count one less for display
-    local effectiveCur = _curPage
-    if not _hasMigration and _curPage >= 6 then
-        effectiveCur = _curPage - 1
+    -- Counter over the pages that are not skipped
+    local total, cur = 0, 0
+    for i = 1, NUM_PAGES do
+        if not PageSkipped(i) then
+            total = total + 1
+            if i <= _curPage then cur = total end
+        end
     end
-    _pageCounter:SetText(string.format(L["SW_PAGE_COUNTER_FMT"], effectiveCur, effectiveTotal))
+    _pageCounter:SetText(string.format(L["SW_PAGE_COUNTER_FMT"], cur, total))
 
     for i, pg in ipairs(_pages) do
         if i == _curPage then pg:Show() else pg:Hide() end
@@ -318,6 +343,7 @@ end
 -- Checkbox helper
 local function MakeCheck(parent, y, text, getter, setter)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
+    BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
     cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     cb:SetChecked(getter())
     cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -489,7 +515,336 @@ local function BuildPage1(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 2 — SKIN MODE CHOICE
+-- MODULE SWITCHES (ALL-358) — what pages 2 and 3 turn on and off
+--------------------------------------------------------------------------------
+-- One entry per switchable module, the same switch as its Settings > Modules
+-- checkbox: label = that page's title, tip = what the module is and does
+-- (the Custom page's tooltip, written for a new player), get reads
+-- the saved switch, set saves it and applies it live (Finish reloads anyway,
+-- but Quit does not).
+local function SetDB(key, v) if BigNoteBoxDB then BigNoteBoxDB[key] = v end end
+
+local MODULES = {
+    { key = "alarms", label = "CFG_HDR_ALARMS", tip = "SW_MOD_ALARMS_TIP",
+      get = function() return BNB.AlarmsEnabled() end,
+      set = function(v)
+          SetDB("alarmsEnabled", v)
+          if BNB.Alarm and BNB.Alarm.ApplyModule then BNB.Alarm.ApplyModule(v) end
+      end },
+    { key = "sidebar", label = "CFG_HDR_SIDEBAR", tip = "SW_MOD_SIDEBAR_TIP",
+      get = function() return BigNoteBoxDB and BigNoteBoxDB.sidebarEnabled == true end,
+      set = function(v)
+          SetDB("sidebarEnabled", v)
+          local SB = BNB.Sidebar
+          if not v and SB and SB.SetActive then SB.SetActive("all") end
+          if SB and SB.Refresh then SB.Refresh() end
+          if BNB.SyncSidebarWysiwygBtns then BNB.SyncSidebarWysiwygBtns() end
+      end },
+    { key = "context", label = "CFG_HDR_CONTEXT_POPUP", tip = "SW_MOD_CONTEXT_TIP",
+      get = function() return not BigNoteBoxDB or BigNoteBoxDB.contextSurface ~= false end,
+      set = function(v) SetDB("contextSurface", v) end },
+    { key = "focus", label = "CFG_FOCUS_ORBIT_HEADER", tip = "SW_MOD_FOCUS_TIP",
+      get = function() return BNB.FocusEnabled() end,
+      set = function(v)
+          SetDB("focusEnabled", v)
+          if BNB.ApplyFocusModule then BNB.ApplyFocusModule(v) end
+      end },
+    { key = "history", label = "CFG_HDR_NOTE_HISTORY", tip = "SW_MOD_HISTORY_TIP",
+      get = function() return BNB.HistoryEnabled() end,
+      set = function(v)
+          SetDB("historyEnabled", v)
+          if BNB.ApplyHistoryModule then BNB.ApplyHistoryModule(v) end
+      end },
+    { key = "oracle", label = "CFG_HDR_ORACLE", tip = "SW_MOD_ORACLE_TIP",
+      get = function() return not BigNoteBoxDB or BigNoteBoxDB.oracleEnabled ~= false end,
+      set = function(v)
+          if v then SetDB("oracleEnabled", nil)   -- nil = on (UI/Oracle.lua)
+          else
+              SetDB("oracleEnabled", false)
+              if BNB.Oracle and BNB.Oracle.Close then BNB.Oracle.Close() end
+          end
+      end },
+    { key = "unitNotes", label = "CFG_SUB_PLAYER_NPC", tip = "SW_MOD_UNIT_TIP",
+      get = function() return BNB.UnitNotesEnabled() end,
+      set = function(v)
+          SetDB("unitNotesEnabled", v)
+          if BNB.ApplyUnitNotesModule then BNB.ApplyUnitNotesModule(v) end
+      end },
+    { key = "quickNote", label = "CFG_HDR_QUICK_NOTE", tip = "SW_MOD_QN_TIP",
+      get = function() return not BigNoteBoxDB or BigNoteBoxDB.quickNoteEnabled ~= false end,
+      set = function(v) SetDB("quickNoteEnabled", v) end },
+    { key = "refBox", label = "CFG_HDR_REFBOX", tip = "SW_MOD_REFBOX_TIP",
+      get = function() return not BigNoteBoxDB or BigNoteBoxDB.referenceBoxEnabled ~= false end,
+      set = function(v)
+          SetDB("referenceBoxEnabled", v)
+          if BNB.ApplySaveMode      then BNB.ApplySaveMode()      end   -- editor bar button
+          if BNB.ApplyRefBoxModules then BNB.ApplyRefBoxModules() end
+      end },
+    { key = "rich", label = "CFG_RICH_SIZES_HEADER", tip = "SW_MOD_RICH_TIP",
+      get = function() return BNB.RichEnabled() end,
+      set = function(v)
+          SetDB("richEnabled", v)
+          if BNB.ApplyRichModule then BNB.ApplyRichModule(v) end
+      end },
+    { key = "stickies", label = "CFG_CELL_STICKY_HDR", tip = "SW_MOD_STICKY_TIP",
+      get = function() return BNB.StickiesEnabled() end,
+      set = function(v)
+          SetDB("stickiesEnabled", v)
+          if BNB.Sticky and BNB.Sticky.ApplyModule then BNB.Sticky.ApplyModule(v) end
+      end },
+    { key = "tasks", label = "CFG_HDR_TASKS", tip = "SW_MOD_TASKS_TIP",
+      get = function() return BNB.TasksEnabled() end,
+      set = function(v) BNB.ApplyTasksModule(v) end },
+    { key = "trash", label = "CFG_HDR_TRASH", tip = "SW_MOD_TRASH_TIP",
+      get = function() return not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false end,
+      set = function(v)
+          SetDB("trashFeature", v)
+          if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
+          local tf = _G["BigNoteBoxTrashFrame"]
+          if not v and tf and tf:IsShown() then tf:Hide() end
+      end },
+}
+
+-- Minimal = only what writing notes needs (Dukul, 2026-10-07)
+local MINIMAL_ON = { trash = true, quickNote = true }
+
+local function PresetWants(usage)
+    local want = {}
+    for _, m in ipairs(MODULES) do
+        want[m.key] = usage == "everything" or (usage == "minimal" and MINIMAL_ON[m.key] == true)
+    end
+    return want
+end
+
+local function ApplyModules(want)
+    for _, m in ipairs(MODULES) do
+        local v = want[m.key] == true
+        if m.get() ~= v then xpcall(m.set, geterrorhandler(), v) end
+    end
+end
+
+-- The preset the saved switches match exactly, or nil
+local function MatchUsage()
+    local all, min = true, true
+    for _, m in ipairs(MODULES) do
+        local on = m.get() == true
+        if not on then all = false end
+        if on ~= (MINIMAL_ON[m.key] == true) then min = false end
+    end
+    return (all and "everything") or (min and "minimal") or nil
+end
+
+-- Where page 2 starts: Custom kept across a reload mid-wizard, else the
+-- preset the switches match; a first run starts on Everything, a re-run
+-- that matches neither on Custom with the switches as they are
+local function InitialUsage()
+    local db = BigNoteBoxDB or {}
+    if db.setupUsage == "custom" and not db.setupComplete then return "custom" end
+    return MatchUsage() or (not db.setupComplete and "everything") or "custom"
+end
+
+-- Mode badges (Dukul's art, Assets/UI/ui-mode-*.tga): the picture,
+-- desaturated while not selected, a tooltip with what the mode means;
+-- extraTip is a line under it (nil = none). The caller sets OnClick.
+local MODE_ART   = { minimal = "ui-mode-minimal", everything = "ui-mode-full", custom = "ui-mode-custom" }
+local MODE_TITLE = { minimal = "SW_USAGE_MINIMAL", everything = "SW_USAGE_EVERYTHING", custom = "SW_USAGE_CUSTOM" }
+local MODE_TIP   = { minimal = "MODE_TIP_MINIMAL", everything = "MODE_TIP_FULL", custom = "MODE_TIP_CUSTOM" }
+
+local function CreateModeBadge(parent, size, mode, extraTip)
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(size, size)
+    local t = b:CreateTexture(nil, "ARTWORK")
+    t:SetAllPoints()
+    t:SetTexture(ASSETS .. "UI\\" .. MODE_ART[mode])
+    b._mode = mode
+    function b:SetSelected(on) t:SetDesaturated(not on) end
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L[MODE_TITLE[mode]], 1, 1, 1)
+        GameTooltip:AddLine(L[MODE_TIP[mode]], 0.8, 0.8, 0.8, true)
+        local extra = type(extraTip) == "function" and extraTip() or extraTip
+        if extra then GameTooltip:AddLine(extra, 0.4, 0.8, 0.4, true) end
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+
+-- Shared with Settings > Modules (UI/Config/Modules.lua): the switches, the
+-- presets and the badges, so both places use one list
+BNB.ModuleUsage = {
+    list        = MODULES,
+    Match       = MatchUsage,     -- "minimal" / "everything" / nil
+    Wants       = PresetWants,    -- usage -> { [key] = bool }
+    CreateBadge = CreateModeBadge,
+    TitleKey    = MODE_TITLE,
+}
+
+--------------------------------------------------------------------------------
+-- PAGE 2 — HOW DO YOU WANT TO USE BNB (ALL-358)
+--------------------------------------------------------------------------------
+local USAGE_CHOICES = {
+    { key = "minimal",    title = "SW_USAGE_MINIMAL",    desc = "SW_USAGE_MINIMAL_DESC"    },
+    { key = "everything", title = "SW_USAGE_EVERYTHING", desc = "SW_USAGE_EVERYTHING_DESC" },
+    { key = "custom",     title = "SW_USAGE_CUSTOM",     desc = "SW_USAGE_CUSTOM_DESC"     },
+}
+
+local function BuildUsagePage(content)
+    local f = CreateFrame("Frame", nil, content)
+    f:SetAllPoints()
+    f:Hide()
+
+    local _, y = MakeLabel(f, -4, L["SW_USAGE_LBL"], nil, 0.75, 0.75, 0.75)
+    y = y - 4
+
+    -- The mode badges stacked down the left, one per card (Settings shows
+    -- them in a row); the one not picked is desaturated
+    local BADGE, CARD_GAP = 96, 8
+    local CARD_H = BADGE + 8
+    local cards = {}
+    local function Highlight()
+        for _, c in ipairs(cards) do
+            c._badge:SetSelected(_usage == c._key)
+            if _usage == c._key then
+                c:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
+                c:SetBackdropBorderColor(0.35, 0.80, 0.35, 1)
+                c._title:SetTextColor(1, 0.82, 0)
+            else
+                c:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
+                c:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
+                c._title:SetTextColor(0.85, 0.85, 0.85)
+            end
+        end
+    end
+
+    for _, ch in ipairs(USAGE_CHOICES) do
+        local c = BNB.CreateBackdropFrame("Button", nil, f)
+        c:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
+        c:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
+        c:SetHeight(CARD_H)
+        BNB.SetBackdrop(c, 0.06, 0.06, 0.08, 0.95, 0.28, 0.28, 0.30, 1)
+        c._key = ch.key
+
+        c._badge = CreateModeBadge(c, BADGE, ch.key)
+        c._badge:SetPoint("LEFT", c, "LEFT", 4, 0)
+        c._badge:SetScript("OnClick", function() c:Click() end)
+
+        c._title = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        c._title:SetPoint("TOPLEFT", c._badge, "TOPRIGHT", 10, -14)
+        c._title:SetText(L[ch.title])
+
+        local d = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        d:SetPoint("TOPLEFT",  c._badge, "TOPRIGHT", 10, -38)
+        d:SetPoint("RIGHT",    c, "RIGHT", -14, 0)
+        d:SetJustifyH("LEFT"); d:SetJustifyV("TOP"); d:SetWordWrap(true); d:SetSpacing(2)
+        d:SetTextColor(0.75, 0.75, 0.75)
+        d:SetText(L[ch.desc])
+
+        c:SetScript("OnEnter", function(self)
+            if _usage ~= self._key then self:SetBackdropBorderColor(0.45, 0.65, 0.45, 1) end
+        end)
+        c:SetScript("OnLeave", Highlight)
+        c:SetScript("OnClick", function(self)
+            _usage = self._key
+            Highlight()
+            UpdateNavigation()   -- the counter gains or loses the Custom page
+        end)
+        cards[#cards + 1] = c
+        y = y - CARD_H - CARD_GAP
+    end
+
+    f:SetScript("OnShow", Highlight)
+
+    -- Minimal / Everything apply here; Custom applies on its own page's Next
+    f.OnNext = function()
+        if BigNoteBoxDB then BigNoteBoxDB.setupUsage = _usage end
+        if _usage ~= "custom" then ApplyModules(PresetWants(_usage)) end
+        GoToPage(StepFrom(P_USAGE, 1))
+    end
+
+    return f
+end
+
+--------------------------------------------------------------------------------
+-- PAGE 3 — CUSTOM MODULE PICKS (only after Custom; ALL-358)
+--------------------------------------------------------------------------------
+local function BuildModulesPage(content)
+    local f = CreateFrame("Frame", nil, content)
+    f:SetAllPoints()
+    f:Hide()
+
+    local _, y = MakeLabel(f, -4, L["SW_MODULES_LBL"], nil, 0.75, 0.75, 0.75)
+    y = y - 2
+
+    -- Two columns, alphabetical by the shown name, down the left column first
+    local list = {}
+    for _, m in ipairs(MODULES) do list[#list + 1] = m end
+    table.sort(list, function(a, b) return L[a.label]:lower() < L[b.label]:lower() end)
+
+    local ROW_H = 30
+    local COL_W = CW / 2
+    local perCol = math.ceil(#list / 2)
+    local _pick = {}
+    local boxes = {}
+
+    for i, m in ipairs(list) do
+        local col, row = (i > perCol) and 1 or 0, (i - 1) % perCol
+        local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+        BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
+        cb:SetPoint("TOPLEFT", f, "TOPLEFT", col * COL_W - 2, y - row * ROW_H)
+        cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
+        cb.text:SetWidth(COL_W - 34)
+        cb.text:SetJustifyH("LEFT"); cb.text:SetWordWrap(false)
+        cb.text:SetText(L[m.label])
+        cb:SetScript("OnClick", function(self) _pick[m.key] = self:GetChecked() and true or false end)
+        cb:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L[m.label], 1, 1, 1)
+            GameTooltip:AddLine(L[m.tip], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        cb._key = m.key
+        boxes[#boxes + 1] = cb
+    end
+    y = y - perCol * ROW_H - 10
+
+    local function Sync()
+        for _, cb in ipairs(boxes) do cb:SetChecked(_pick[cb._key] == true) end
+    end
+    local function SetAll(on)
+        for _, m in ipairs(MODULES) do _pick[m.key] = on end
+        Sync()
+    end
+
+    local allOn = BNB.CreateButton(nil, f, L["SW_MODULES_ALL_ON"], 120, 24)
+    allOn:SetPoint("TOPLEFT", f, "TOPLEFT", 0, y)
+    allOn:SetScript("OnClick", function() SetAll(true) end)
+    local allOff = BNB.CreateButton(nil, f, L["SW_MODULES_ALL_OFF"], 120, 24)
+    allOff:SetPoint("LEFT", allOn, "RIGHT", 8, 0)
+    allOff:SetScript("OnClick", function() SetAll(false) end)
+    y = y - 24 - 14
+
+    MakeLabel(f, y, L["SW_MODULES_LATER"], nil, 0.55, 0.55, 0.55)
+
+    -- Every show starts from the saved switches, so Prev and back never
+    -- shows picks that were not applied
+    f:SetScript("OnShow", function()
+        for _, m in ipairs(MODULES) do _pick[m.key] = m.get() == true end
+        Sync()
+    end)
+
+    f.OnNext = function()
+        ApplyModules(_pick)
+        GoToPage(StepFrom(P_MODULES, 1))
+    end
+
+    return f
+end
+
+--------------------------------------------------------------------------------
+-- PAGE 4 — SKIN MODE CHOICE (BuildPage2: the builders keep their old numbers)
 --------------------------------------------------------------------------------
 local function BuildPage2(content)
     local f = CreateFrame("Frame", nil, content)
@@ -564,7 +919,7 @@ local function BuildPage2(content)
     y = y - (IMG_H + 28 + 12)
 
     -- Skin theme, shown while skin mode is picked (ALL-223). Saved on Next,
-    -- which reloads into page 3 already in that theme.
+    -- which reloads into page 5 already in that theme.
     local _theme = (BigNoteBoxDB and BigNoteBoxDB.skinPreset) or "obsidian"
     do
         local row = CreateFrame("Frame", nil, f)
@@ -597,22 +952,22 @@ local function BuildPage2(content)
     -- Store getter for Next handler
     f.GetChoice = function() return _selected end
 
-    -- Wire Next button override: page 2 may reload
+    -- Wire Next button override: the skin choice may reload
     f.OnNext = function()
         local db = BigNoteBoxDB
         if not db then return end
         local choice = _selected
         if choice == "skin" then
             db.skinMode  = true
-            db.skinPreset = _theme   -- page 2's theme dropdown (ALL-223)
-            db.setupPage = 3
+            db.skinPreset = _theme   -- the skin page theme dropdown (ALL-223)
+            db.setupPage = P_THEME
             db.setupComplete = false
             C_UI.Reload()
         else
             db.skinMode  = false
-            db.setupPage = 4
-            -- No reload — jump straight to page 4
-            GoToPage(4)
+            db.setupPage = P_NOTES
+            -- No reload — straight on, past the skin colour page
+            GoToPage(P_NOTES)
         end
     end
 
@@ -620,7 +975,7 @@ local function BuildPage2(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 3 — SKIN COLOUR / BRIGHTNESS  (skin mode only)
+-- PAGE 5 — SKIN COLOUR / BRIGHTNESS  (skin mode only; BuildPage3)
 --------------------------------------------------------------------------------
 local function BuildPage3(content)
     local f = CreateFrame("Frame", nil, content)
@@ -699,7 +1054,7 @@ local function BuildPage3(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 4 — NOTES BEHAVIOUR
+-- PAGE 6 — NOTES BEHAVIOUR (BuildPage4)
 --------------------------------------------------------------------------------
 local function BuildPage4(content)
     local f = CreateFrame("Frame", nil, content)
@@ -805,6 +1160,7 @@ local function BuildPage4(content)
         -- WoW Default checkbox, below the grid instead of a 9th card. Latin set
         -- only; the row is kept either way so the page layout does not shift.
         local wowCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         wowCb.text = wowCb.text or wowCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
@@ -1028,7 +1384,7 @@ local function BuildPage4(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 5 — KEYBINDS
+-- PAGE 7 — KEYBINDS (BuildPage5)
 --------------------------------------------------------------------------------
 local function BuildPage5(content)
     local f = CreateFrame("Frame", nil, content)
@@ -1125,7 +1481,7 @@ local function BuildPage5(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 6 — MIGRATION NOTICE (conditional — only shown when migratable addons detected)
+-- PAGE 8 — MIGRATION NOTICE (conditional — only shown when migratable addons detected; BuildPage6)
 --------------------------------------------------------------------------------
 local function BuildPage6(content)
     local f = CreateFrame("Frame", nil, content)
@@ -1172,7 +1528,7 @@ local function BuildPage6(content)
 end
 
 --------------------------------------------------------------------------------
--- PAGE 7 — DONE
+-- PAGE 9 — DONE (BuildPage7)
 --------------------------------------------------------------------------------
 local function BuildPage7(content)
     local f = CreateFrame("Frame", nil, content)
@@ -1264,6 +1620,7 @@ local function BuildPage7(content)
         if db then
             db.setupComplete       = true
             db.setupPage           = nil
+            db.setupUsage          = nil
             db._openOnceAfterSetup = true
         end
         StopCamera(); StopGlow(); HideOverlay()
@@ -1278,6 +1635,7 @@ local function BuildPage7(content)
         if db then
             db.setupComplete = true
             db.setupPage     = nil
+            db.setupUsage    = nil
         end
         StopCamera(); StopGlow(); HideOverlay()
         C_UI.Reload()
@@ -1327,18 +1685,7 @@ local function BuildWizardFrame()
 
     _prevBtn = BNB.CreateButton(nil, navStrip, L["SW_PREV_BTN"], 120, 28)
     _prevBtn:SetPoint("LEFT", navStrip, "LEFT", 12, 0)
-    _prevBtn:SetScript("OnClick", function()
-        local target = _curPage - 1
-        -- Skip page 3 (skin colour) when in normal mode
-        if target == 3 and not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then
-            target = 2
-        end
-        -- Skip page 6 (migration notice) when no migratable addons detected
-        if target == 6 and not _hasMigration then
-            target = 5
-        end
-        GoToPage(target)
-    end)
+    _prevBtn:SetScript("OnClick", function() GoToPage(StepFrom(_curPage, -1)) end)
 
     _nextBtn = BNB.CreateButton(nil, navStrip, L["SW_NEXT_BTN"], 120, 28)
     _nextBtn:SetPoint("RIGHT", navStrip, "RIGHT", -12, 0)
@@ -1347,16 +1694,7 @@ local function BuildWizardFrame()
         if pg and pg.OnNext then
             pg.OnNext()
         else
-            local target = _curPage + 1
-            -- Skip page 3 (skin colour) when in normal mode
-            if target == 3 and not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then
-                target = 4
-            end
-            -- Skip page 6 (migration notice) when no migratable addons detected
-            if target == 6 and not _hasMigration then
-                target = 7
-            end
-            GoToPage(target)
+            GoToPage(StepFrom(_curPage, 1))
         end
     end)
 
@@ -1367,7 +1705,7 @@ local function BuildWizardFrame()
     -- and untextured underneath it).
     _getStartedBtn = MakeLargeButton(navStrip, L["SW_GET_STARTED_BTN"], 200, NAV_H - 8)
     _getStartedBtn:SetPoint("CENTER", navStrip, "CENTER", 0, 0)
-    _getStartedBtn:SetScript("OnClick", function() GoToPage(2) end)
+    _getStartedBtn:SetScript("OnClick", function() GoToPage(P_USAGE) end)
 
     -- Content area
     local content = CreateFrame("Frame", nil, f)
@@ -1380,12 +1718,14 @@ local function BuildWizardFrame()
     -- Build pages
     _pages = {
         BuildPage1(content),
-        BuildPage2(content),
-        BuildPage3(content),
-        BuildPage4(content),
-        BuildPage5(content),
-        BuildPage6(content),   -- migration notice (skipped if _hasMigration == false)
-        BuildPage7(content),   -- done
+        BuildUsagePage(content),     -- Minimal / Everything / Custom (ALL-358)
+        BuildModulesPage(content),   -- Custom picks (skipped unless Custom)
+        BuildPage2(content),         -- skin mode choice
+        BuildPage3(content),         -- skin colour (skin mode only)
+        BuildPage4(content),         -- notes behaviour
+        BuildPage5(content),         -- keybinds
+        BuildPage6(content),         -- migration notice (skipped if _hasMigration == false)
+        BuildPage7(content),         -- done
     }
 
     -- Combat: hide wizard
@@ -1451,9 +1791,10 @@ function BNB.ShowSetupWizard()
         if BNB.CloseReferenceBox then BNB.CloseReferenceBox() end
     end)
 
-    -- Resume page from a reload (e.g. after skin mode choice on page 2)
+    -- Resume page from a reload (e.g. after skin mode choice on page 4)
     local db = BigNoteBoxDB
     local resumePage = db and db.setupPage
+    _usage = InitialUsage()
     if resumePage and resumePage >= 1 and resumePage <= NUM_PAGES then
         _curPage = resumePage
         db.setupPage = nil  -- consume the resume flag

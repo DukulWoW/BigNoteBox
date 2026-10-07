@@ -737,6 +737,62 @@ end
 -- following preset changes (ALL-262, Dukul 2026-10-05: "The dividers in skin
 -- mode should all be tinted, not grey."). Focus mode uses it too.
 BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
+--------------------------------------------------------------------------------
+-- CHECKBOX LABEL HIT  (Dukul, 2026-10-07: the tooltip shows over the text too,
+-- everywhere)
+-- Stretches a checkbox's hit area over its label, so hovering the text shows
+-- the checkbox's tooltip and clicking it ticks the box. lbl nil = found on
+-- show: the template's own text, else a FontString in the parent anchored to
+-- the checkbox. Re-measured on every show (text can change), only over the
+-- visible text, never past the label's own width.
+--------------------------------------------------------------------------------
+local function FindCheckLabel(cb)
+    for _, fs in ipairs({ cb.text, cb.Text }) do
+        if fs and fs.GetText and (fs:GetText() or "") ~= "" then return fs end
+    end
+    local parent = cb:GetParent()
+    for _, holder in ipairs({ cb, parent }) do
+        for _, r in ipairs({ holder:GetRegions() }) do
+            if r:GetObjectType() == "FontString" then
+                for i = 1, r:GetNumPoints() do
+                    local _, rel = r:GetPoint(i)
+                    if rel == cb then return r end
+                end
+            end
+        end
+    end
+end
+
+local function FitCheckHit(cb)
+    local lbl = cb._hitLbl or FindCheckLabel(cb)
+    cb._hitLbl = lbl
+    if not (lbl and lbl:IsShown()) then cb:SetHitRectInsets(0, 0, 0, 0); return end
+    local w = lbl:GetStringWidth() or 0
+    local lw = lbl:GetWidth() or 0
+    if lw > 0 and lw < w then w = lw end
+    local gap = (lbl:GetLeft() and cb:GetRight()) and (lbl:GetLeft() - cb:GetRight()) or 4
+    if w <= 0 then return end
+    local scale = cb:GetEffectiveScale() / lbl:GetEffectiveScale()
+    cb:SetHitRectInsets(0, -math.floor((gap + w) / scale + 0.5), 0, 0)
+end
+
+function BNB.LabelHit(cb, lbl)
+    if not cb then return end
+    if cb._labelHit then   -- a pooled row with new text: measure again
+        if lbl then cb._hitLbl = lbl end
+        C_Timer.After(0, function() if cb:IsShown() then FitCheckHit(cb) end end)
+        return
+    end
+    cb._labelHit = true
+    cb._hitLbl = lbl
+    cb:HookScript("OnShow", function(self)
+        FitCheckHit(self)
+        -- Anchored labels have no size until the next frame
+        C_Timer.After(0, function() if self:IsShown() then FitCheckHit(self) end end)
+    end)
+    if cb:IsVisible() then C_Timer.After(0, function() FitCheckHit(cb) end) end
+end
+
 function BNB.CreateNoteRule(parent)
     local t = parent:CreateTexture(nil, "ARTWORK")
     local c = BNB.NOTE_RULE_RGBA

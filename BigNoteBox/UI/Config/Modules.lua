@@ -24,6 +24,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
         local qnWidgets = {}
 
         local qnEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(qnEnableCb)   -- the tooltip and click reach over its label too
         qnEnableCb:SetSize(24, 24)
         qnEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
         qnEnableCb:SetChecked(db.quickNoteEnabled ~= false)
@@ -459,18 +460,7 @@ local function BuildTasksPage(sf, ct, y, page)
     local enableCb
     y, enableCb = AddCheck(ct, y, L["CFG_TASKS_ENABLE_LABEL"],
         function() return BNB.TasksEnabled() end,
-        function(v)
-            if not BigNoteBoxDB then return end
-            BigNoteBoxDB.tasksEnabled = v
-            if not v and BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
-                BNB.TaskEditWindow.Close()
-            end
-            if BNB.ApplySaveMode         then BNB.ApplySaveMode()         end   -- editor bar button
-            if BNB.ApplyTaskFilterButton then BNB.ApplyTaskFilterButton() end   -- note list filter
-            if BNB.ApplyRefBoxModules    then BNB.ApplyRefBoxModules()    end   -- Reference Box / tasks window
-            if BNB.Sticky and BNB.Sticky.ApplyTasksModule then BNB.Sticky.ApplyTasksModule() end
-            if BNB.RefreshNoteList       then BNB.RefreshNoteList()       end   -- row task icons
-        end,
+        function(v) BNB.ApplyTasksModule(v) end,   -- Features/TaskManager.lua
         L["CFG_TASKS_ENABLE_TIP"])
     page.enableCb = enableCb   -- twin on the Modules overview row
 
@@ -609,6 +599,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
         local rbWidgets = {}
 
         local rbEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(rbEnableCb)   -- the tooltip and click reach over its label too
         rbEnableCb:SetSize(24, 24)
         rbEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
         rbEnableCb:SetChecked(db.referenceBoxEnabled ~= false)
@@ -738,6 +729,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     -- Sidebar
     -- Master enable checkbox (manual build to retain widget ref for greying)
     local sidebarEnableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(sidebarEnableCb)   -- the tooltip and click reach over its label too
     sidebarEnableCb:SetSize(24, 24)
     sidebarEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     sidebarEnableCb:SetChecked(db.sidebarEnabled == true)
@@ -759,6 +751,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Auto-switch checkbox
     local autoSwCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
+    BNB.LabelHit(autoSwCb)   -- the tooltip and click reach over its label too
     autoSwCb:SetSize(24, 24)
     autoSwCb:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", -2, subY + 2)
     autoSwCb:SetChecked(db.sidebarAutoSwitch == true)
@@ -869,6 +862,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     -- (ALL-333, Dukul 2026-10-06): nil = on
     do
         fillCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
+        BNB.LabelHit(fillCb)   -- the tooltip and click reach over its label too
         fillCb:SetSize(24, 24)
         fillCb:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", -2, subY + 2)
         fillCb:SetChecked(db.sidebarTabsFill ~= false)
@@ -933,6 +927,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     -- Small icons toggle
     do
         smallCb = CreateFrame("CheckButton", nil, sidebarSub, "UICheckButtonTemplate")
+        BNB.LabelHit(smallCb)   -- the tooltip and click reach over its label too
         smallCb:SetSize(24, 24)
         smallCb:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", -2, subY + 2)
         smallCb:SetChecked(db.sidebarSmallIcons == true)
@@ -1354,22 +1349,24 @@ end
 local function BuildModulesTab(sf, ct)
     local y  = -8
 
-    -- Optional 4th field: the page's key for BNB.OpenSettingsPage.
+    -- Optional 4th field: the page's key for BNB.OpenSettingsPage. 5th: the
+    -- module switch's key in BNB.ModuleUsage.list (UI/SetupWizard.lua), for the
+    -- mode badges at the top (ALL-358).
     local MODULES = {
-        { L["CFG_HDR_ORACLE"],         L["CFG_SUB_ORACLE_DESC"],     K.BuildOraclePage, "oracle" },   -- UI/Config/OracleSettings.lua
-        { L["CFG_CELL_STICKY_HDR"],    L["CFG_SUB_STICKY_DESC"],     BuildStickyPage       },
-        { L["CFG_HDR_TASKS"],          L["CFG_SUB_TASKS_DESC"],      BuildTasksPage        },
-        { L["CFG_HDR_REFBOX"],         L["CFG_SUB_REFBOX_DESC"],     BuildRefBoxPage       },
-        { L["CFG_HDR_SIDEBAR"],        L["CFG_SUB_SIDEBAR_DESC"],    BuildSidebarPage      },
-        { L["CFG_FOCUS_ORBIT_HEADER"], L["CFG_SUB_FOCUS_DESC"],      BuildFocusPage        },
+        { L["CFG_HDR_ORACLE"],         L["CFG_SUB_ORACLE_DESC"],     K.BuildOraclePage, "oracle", "oracle" },   -- UI/Config/OracleSettings.lua
+        { L["CFG_CELL_STICKY_HDR"],    L["CFG_SUB_STICKY_DESC"],     BuildStickyPage,   nil, "stickies"  },
+        { L["CFG_HDR_TASKS"],          L["CFG_SUB_TASKS_DESC"],      BuildTasksPage,    nil, "tasks"     },
+        { L["CFG_HDR_REFBOX"],         L["CFG_SUB_REFBOX_DESC"],     BuildRefBoxPage,   nil, "refBox"    },
+        { L["CFG_HDR_SIDEBAR"],        L["CFG_SUB_SIDEBAR_DESC"],    BuildSidebarPage,  nil, "sidebar"   },
+        { L["CFG_FOCUS_ORBIT_HEADER"], L["CFG_SUB_FOCUS_DESC"],      BuildFocusPage,    nil, "focus"     },
         -- UI/Config/NotePages.lua (ALL-290)
-        { L["CFG_RICH_SIZES_HEADER"],  L["CFG_SUB_RICH_DESC"],       K.BuildRichNotesPage, "richNotes" },
-        { L["CFG_HDR_NOTE_HISTORY"],   L["CFG_SUB_HISTORY_DESC"],    K.BuildHistoryPage,   "history"   },
-        { L["CFG_HDR_TRASH"],          L["CFG_SUB_TRASH_DESC"],      K.BuildTrashPage,     "trash"     },
-        { L["CFG_HDR_ALARMS"],         L["CFG_SUB_ALARMS_DESC"],     K.BuildAlarmsPage,    "alarms"    },
-        { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage    },
-        { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage    },
-        { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage },
+        { L["CFG_RICH_SIZES_HEADER"],  L["CFG_SUB_RICH_DESC"],       K.BuildRichNotesPage, "richNotes", "rich"    },
+        { L["CFG_HDR_NOTE_HISTORY"],   L["CFG_SUB_HISTORY_DESC"],    K.BuildHistoryPage,   "history",   "history" },
+        { L["CFG_HDR_TRASH"],          L["CFG_SUB_TRASH_DESC"],      K.BuildTrashPage,     "trash",     "trash"   },
+        { L["CFG_HDR_ALARMS"],         L["CFG_SUB_ALARMS_DESC"],     K.BuildAlarmsPage,    "alarms",    "alarms"  },
+        { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage,    nil, "quickNote" },
+        { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage,    nil, "unitNotes" },
+        { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage, nil, "context"   },
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
     }
@@ -1378,11 +1375,87 @@ local function BuildModulesTab(sf, ct)
     local function SortKey(t)
         return ((t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")):lower()
     end
-    table.sort(MODULES, function(a, b) return SortKey(a[1]) < SortKey(b[1]) end)
+    -- Modules with an on/off switch first; pages with settings only (no
+    -- switch: Right-click menu, Window placement) after them under their own
+    -- heading (Dukul 2026-10-07)
+    table.sort(MODULES, function(a, b)
+        if (a[5] ~= nil) ~= (b[5] ~= nil) then return a[5] ~= nil end
+        return SortKey(a[1]) < SortKey(b[1])
+    end)
+    -- Mode badges (ALL-358): Minimal / Full / Custom, the set the module
+    -- switches match now; Custom = neither. Built first, filled after the rows.
+    local MU = BNB.ModuleUsage
+    local pages, badges = {}, {}
+    local function RefreshModes()
+        local cur = MU.Match() or "custom"
+        for _, b in ipairs(badges) do b:SetSelected(b._mode == cur) end
+    end
+    -- A preset presses each changed module's own checkbox, so its page greys
+    -- and applies exactly as a click there would
+    local function ApplyPreset(mode)
+        local want = MU.Wants(mode)
+        for _, m in ipairs(MU.list) do
+            local page = pages[m.key]
+            local cb = page and page.enableCb
+            if m.get() ~= want[m.key] then
+                if cb then
+                    cb:SetChecked(want[m.key])
+                    local fn = cb:GetScript("OnClick")
+                    if fn then fn(cb, "LeftButton") end
+                    if page._ov then page._ov:SetChecked(want[m.key]) end
+                else
+                    m.set(want[m.key])
+                end
+            end
+        end
+        RefreshModes()
+    end
+    local BADGE, BADGE_GAP = 96, 28
+    local bx = math.floor((CONTENT_W - BADGE * 3 - BADGE_GAP * 2) / 2)
+    for i, mode in ipairs({ "minimal", "everything", "custom" }) do
+        local extra
+        if mode == "custom" then
+            extra = L["CFG_MODE_CUSTOM_TIP"]
+        else
+            extra = function()
+                return (MU.Match() == mode) and L["CFG_MODE_CURRENT_TIP"] or L["CFG_MODE_CLICK_TIP"]
+            end
+        end
+        local b = MU.CreateBadge(ct, BADGE, mode, extra)
+        b:SetPoint("TOPLEFT", ct, "TOPLEFT", bx + (i - 1) * (BADGE + BADGE_GAP), y)
+        if mode ~= "custom" then
+            b:SetScript("OnClick", function()
+                if MU.Match() == mode then return end
+                local n = 0
+                local want = MU.Wants(mode)
+                for _, m in ipairs(MU.list) do if m.get() ~= want[m.key] then n = n + 1 end end
+                StaticPopup_Show("BNB_MULTI_CONFIRM",
+                    string.format(L["CFG_MODE_CONFIRM_FMT"], L[MU.TitleKey[mode]], n), nil,
+                    function() ApplyPreset(mode) end)
+            end)
+        end
+        badges[#badges + 1] = b
+    end
+    y = AddRule(ct, y - BADGE - 10) - 4
+
+    local otherHdr = false
     for _, m in ipairs(MODULES) do
+        if not m[5] and not otherHdr then
+            otherHdr = true
+            y = AddRule(ct, y - 4) - 6
+            y = AddHeader(ct, y, L["CFG_MODULES_OTHER_HDR"])
+        end
         local page = K.NewSubPage(m[1], m[3], m[4])
         y = K.AddOverviewRow(ct, sf, y, page, m[1], m[2])
+        if m[5] then
+            pages[m[5]] = page
+            -- Any switch by hand moves the selected badge
+            if page.enableCb then page.enableCb:HookScript("OnClick", RefreshModes) end
+            if page._ov then page._ov:HookScript("OnClick", RefreshModes) end
+        end
     end
+    sf:HookScript("OnShow", RefreshModes)
+    RefreshModes()
 
     -- The "Icons" row (all game icons on / off) went (ALL-331): the icon
     -- picker's "All game icons" box sets the same blizzardIconComplete.

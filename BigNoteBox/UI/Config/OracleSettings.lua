@@ -524,6 +524,7 @@ local function BuildOraclePage(sf, ct, y, page)
 
     -- ── On / off ──────────────────────────────────────────────────────────────
     local enableCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    BNB.LabelHit(enableCb)   -- the tooltip and click reach over its label too
     enableCb:SetSize(24, 24)
     enableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     enableCb:SetChecked(db.oracleEnabled ~= false)

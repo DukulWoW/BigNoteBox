@@ -2072,14 +2072,18 @@ function BNB.AM_EnterViewMode(id)
 
         -- Keep render frame width in sync with scroll frame.
         -- Also re-renders on resize (window drag) so content reflows at new width.
-        rsf:SetScript("OnSizeChanged", function(self)
-            local w = self:GetWidth()
+        -- FOR-30: never inside OnSizeChanged. It fires in the client's layout
+        -- pass; a SetText there frees the SimpleHTML's lines while that pass is
+        -- still walking them (Forever ACCESS_VIOLATION on a freed FontString,
+        -- 2026-10-07: rich note -> click a plain note). Reflow on the next frame.
+        local function Reflow()
+            local w = rsf:GetWidth()
             if not w or w <= 0 then return end
             rf:SetWidth(w)
-            -- Re-render if view mode is currently active
+            -- Re-render if view mode is currently active on a rich note
             if BNB._editorInViewMode and BNB._currentNoteID then
                 local rn = BNB.GetNote(BNB._currentNoteID)
-                if rn then
+                if rn and BNB.AdvancedMode.IsRich(rn) then
                     local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                     local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                     BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
@@ -2088,6 +2092,9 @@ function BNB.AM_EnterViewMode(id)
                     rf:SetHeight(rf:GetContentHeight())
                 end
             end
+        end
+        rsf:SetScript("OnSizeChanged", function()
+            BNB.Debounce("editorRichReflow", 0, Reflow)
         end)
 
         -- Double-click the rendered text (or the empty area below it) opens the

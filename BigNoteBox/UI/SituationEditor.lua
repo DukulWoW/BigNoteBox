@@ -284,14 +284,12 @@ local function NewWaypointRow(list, i)
     local function Col() return row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall") end
     row._name, row._xy, row._zone, row._sub = Col(), Col(), Col(), Col()
     PlaceWpCols(row, row._name, row._xy, row._zone, row._sub, -1, -1 - WP_LINE_H, WP_LINE_H)
-    -- The rule between this waypoint and the next; one screen pixel, snapping
-    -- off, or it can vanish (ALL-246)
-    local rule = row:CreateTexture(nil, "ARTWORK")
-    rule:SetColorTexture(1, 1, 1, 0.08)
+    -- The rule between this waypoint and the next: the editor's 1 px rule,
+    -- grey in normal mode, the preset's border tint in skin mode (ALL-246;
+    -- it was white at 8% and could not be seen, Dukul 2026-10-07)
+    local rule = BNB.CreateNoteRule(row)
     rule:SetPoint("BOTTOMLEFT",  row, "BOTTOMLEFT",  4, 0)
     rule:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 0)
-    rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0)
-    PixelUtil.SetHeight(rule, 1)
     rule:Hide()
     row._rule = rule
     -- X removes (no confirm, never on the creation row), the arrow navigates
@@ -1067,6 +1065,7 @@ function BNB.CreateSituationEditor(panel, opts)
     local CHK_COL_X = 134   -- the second checkbox: half the 266 px panel
     local function WpCheck(labelKey, tipKey, field)
         local chk = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        BNB.LabelHit(chk)   -- the tooltip and click reach over its label too
         chk:SetSize(24, 24)
         local lbl = chk:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         lbl:SetPoint("LEFT", chk, "RIGHT", 2, 0)
@@ -1646,6 +1645,17 @@ function BNB.CreateSituationEditor(panel, opts)
     local function AddWaypoint(mapID, x, y, name, msgKey, subzone)
         local id = NoteID(); local note = id and BNB.GetNote(id)
         if not (note and mapID) then return end
+        -- One waypoint per spot: the same map and X, Y to one decimal as a row
+        -- or the creation spot is refused (Dukul, 2026-10-07)
+        local function Same(wp)
+            return wp and wp.mapID == mapID and wp.x and wp.y
+               and math.abs(wp.x - x) < 0.05 and math.abs(wp.y - y) < 0.05
+        end
+        local dup = Same(BNB.CreationWaypoint(note))
+        for _, wp in ipairs(BNB.NoteWaypoints(note)) do dup = dup or Same(wp) end
+        if dup then
+            BNB:Print(string.format(L["NC_WP_DUPLICATE_MSG"], x, y)); return
+        end
         local list = CopyWaypoints(note)
         local createdOn = note.wpCreatedOn == true
         if SinglePin() then

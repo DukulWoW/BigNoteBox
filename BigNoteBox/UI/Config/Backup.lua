@@ -34,6 +34,7 @@ local function BuildBackupTab(sf, ct)
 
     local function MakeRadio(label, fmt, xOff)
         local rb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+        BNB.LabelHit(rb)   -- the tooltip and click reach over its label too
         rb:SetSize(20, 20)
         rb:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, y + 2)
         rb:SetChecked(_exportFmt == fmt)

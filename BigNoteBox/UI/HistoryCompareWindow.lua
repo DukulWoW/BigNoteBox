@@ -154,6 +154,7 @@ local function OpenExportPopup(noteData, anchorFrame)
         ey = ey - 20
 
         local jsonRb = CreateFrame("CheckButton", nil, ef, "UICheckButtonTemplate")
+        BNB.LabelHit(jsonRb)   -- the tooltip and click reach over its label too
         jsonRb:SetSize(22, 22)
         jsonRb:SetPoint("TOPLEFT", ef, "TOPLEFT", EPAD - 2, ey + 2)
         jsonRb:SetChecked(true)
@@ -163,6 +164,7 @@ local function OpenExportPopup(noteData, anchorFrame)
         ey = ey - 28
 
         local mdRb = CreateFrame("CheckButton", nil, ef, "UICheckButtonTemplate")
+        BNB.LabelHit(mdRb)   -- the tooltip and click reach over its label too
         mdRb:SetSize(22, 22)
         mdRb:SetPoint("TOPLEFT", ef, "TOPLEFT", EPAD - 2, ey + 2)
         mdRb:SetChecked(false)
