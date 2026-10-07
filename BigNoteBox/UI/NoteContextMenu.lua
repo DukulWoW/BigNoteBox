@@ -253,7 +253,8 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         local alarmsOn = BNB.AlarmsEnabled()   -- ALL-343
         local hasAlarm = alarmsOn and note.alarm ~= nil
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
-        local hasSituation = BNB.HasSituation(note)
+        local sitOn = BNB.SituationsEnabled()   -- ALL-375
+        local hasSituation = sitOn and BNB.HasSituation(note)
         -- "Create / Edit" once the note has something to edit here, plain
         -- "Create" only while every entry is a Create (Dukul, 2026-10-03)
         local canEdit = hasAlarm or hasSituation or (BNB.TasksEnabled() and hasTasks)
@@ -270,8 +271,8 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             (BNB.TasksEnabled() and hasTasks) and {
               label = L["NL_CM_REMOVE_TASKS"], opts = { danger = true, icon = "remove-task" },
               fn = function() StaticPopup_Show("BNB_CM_REMOVE_TASKS", title, nil, noteID) end } or false,
-            { key = "situation", label = hasSituation and L["NL_CM_EDIT_SITUATION"] or L["NL_CM_CREATE_SITUATION"],
-              fn = function() BNB.OpenNoteConfig(noteID, "situation") end, opts = { icon = "create-situation" } },
+            sitOn and { key = "situation", label = hasSituation and L["NL_CM_EDIT_SITUATION"] or L["NL_CM_CREATE_SITUATION"],
+              fn = function() BNB.OpenNoteConfig(noteID, "situation") end, opts = { icon = "create-situation" } } or false,
         })
 
         root:CreateDivider()

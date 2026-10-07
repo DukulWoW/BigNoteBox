@@ -1815,5 +1815,30 @@ function BNB.CreateSituationEditor(panel, opts)
     SelectType("zone")
     ShowTypedControls(false)
     RefreshWaypoints()
+
+    -- Situations module off (ALL-375): the tab stays, covered by a line that
+    -- says so and a way to the switch; the note's situations are kept
+    local off = CreateFrame("Frame", nil, panel)
+    off:SetAllPoints(panel)
+    off:SetFrameLevel(panel:GetFrameLevel() + 50)
+    off:EnableMouse(true)
+    off:EnableMouseWheel(true)
+    off:SetScript("OnMouseWheel", function() end)
+    local offBg = off:CreateTexture(nil, "BACKGROUND")
+    offBg:SetAllPoints(); offBg:SetColorTexture(0, 0, 0, 0.85)
+    local offTxt = off:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    offTxt:SetPoint("LEFT",  off, "LEFT",  16, 24)
+    offTxt:SetPoint("RIGHT", off, "RIGHT", -16, 24)
+    offTxt:SetJustifyH("CENTER"); offTxt:SetWordWrap(true)
+    offTxt:SetText(L["SIT_MODULE_OFF"])
+    local offBtn = BNB.CreateButton(nil, off, L["SIT_MODULE_OFF_BTN"], 160, 24)
+    offBtn:SetPoint("TOP", offTxt, "BOTTOM", 0, -12)
+    offBtn:SetScript("OnClick", function() BNB.OpenSettingsPage("modules", "situations") end)
+    local function SyncOff()
+        if BNB.SituationsEnabled() then off:Hide() else off:Show() end
+    end
+    SyncOff()
+    panel:HookScript("OnShow", SyncOff)
+    BNB.RegisterMessage("SituationEditorOff" .. #_editors, "SituationsModule", SyncOff)
     return ed
 end

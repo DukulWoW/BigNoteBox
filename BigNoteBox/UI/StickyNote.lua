@@ -1008,7 +1008,7 @@ local ICON_PAD   = 2
 local function UpdateStickyMarkers(iconFrame, note)
     if not (iconFrame and note) then return end
     if iconFrame._situTex then
-        if BNB.HasSituation(note) then iconFrame._situTex:Show()
+        if BNB.SituationsEnabled() and BNB.HasSituation(note) then iconFrame._situTex:Show()   -- ALL-375
         else iconFrame._situTex:Hide() end
     end
     if iconFrame._scopeTex then

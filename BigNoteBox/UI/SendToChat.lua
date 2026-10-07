@@ -483,6 +483,7 @@ local function CreateSendDialog()
     local lineLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     lineLbl:SetPoint("LEFT", lineCheck, "RIGHT", 4, 0)
     lineLbl:SetTextColor(0.88, 0.88, 0.88); lineLbl:SetText(L["SEND_LINE_BY_LINE"])
+    BNB.CheckTip(lineCheck, L["SEND_LINE_BY_LINE_TIP"])
     f._lineCheck = lineCheck
     y = y - 28
 

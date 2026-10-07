@@ -916,6 +916,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         end
         lbl:SetText(dest.label)
         BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
+        BNB.CheckTip(row, L["SB_COPY_MOVE_DEST_TIP"])
         row._destKey = dest.key
         row:Show()
         checks[#checks + 1] = row
@@ -1041,6 +1042,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         end
         lbl:SetText(dest.label)
         BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
+        BNB.CheckTip(row, L["SB_COPY_MOVE_DEST_TIP"])
         row._destKey = dest.key
         row:Show()
         checks[#checks + 1] = row

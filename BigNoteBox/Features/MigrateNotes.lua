@@ -1141,6 +1141,7 @@ function M.ShowAddonPopup(key)
         local catLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
         catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
+        BNB.CheckTip(catCb, L["MIG_USE_CATEGORY_TAGS_TIP"])
         catCb:SetScript("OnClick", function(self)
             sel.takeANoteCategoryTags = self:GetChecked() and true or false
         end)
@@ -1318,6 +1319,8 @@ function M.ShowPopup()
         local cbLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         cbLbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
         cbLbl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], (ADDON_NAMES[k] or k)))
+        local aName = ADDON_NAMES[k] or k
+        BNB.CheckTip(cb, string.format(L["MIG_MIGRATE_ADDON_TIP_FMT"], aName, aName))
         addonCbs[k] = cb
         y = y - 30
 
@@ -1348,6 +1351,7 @@ function M.ShowPopup()
             catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
             catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
             catLbl:SetTextColor(0.5, 0.5, 0.5)
+            BNB.CheckTip(catCb, L["MIG_USE_CATEGORY_TAGS_TIP"])
             catCb:SetScript("OnClick", function(self)
                 sel.takeANoteCategoryTags = self:GetChecked() and true or false
             end)
@@ -1400,6 +1404,7 @@ function M.ShowPopup()
         daaItemLbl:SetPoint("LEFT", daaCb, "RIGHT", 4, 0)
         daaItemLbl:SetText(ADDON_NAMES[k] or k)
         daaItemLbl:SetTextColor(0.55, 0.55, 0.55)
+        BNB.CheckTip(daaCb, string.format(L["MIG_DONT_ASK_TIP_FMT"], ADDON_NAMES[k] or k))
         declinedCbs[k] = daaCb
         daaY = daaY - 24
     end

@@ -32,7 +32,7 @@ local function BuildBackupTab(sf, ct)
     -- Format radio buttons
     local _exportFmt = NE.FMT_JSON   -- local state for this tab instance; JSON by default (ALL-220)
 
-    local function MakeRadio(label, fmt, xOff)
+    local function MakeRadio(label, fmt, xOff, tip)
         local rb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
         BNB.LabelHit(rb)   -- the tooltip and click reach over its label too
         rb:SetSize(20, 20)
@@ -41,11 +41,12 @@ local function BuildBackupTab(sf, ct)
         local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         lbl:SetPoint("LEFT", rb, "RIGHT", 4, 0)
         lbl:SetText(label)
+        BNB.CheckTip(rb, tip)
         return rb
     end
 
-    local rbMd   = MakeRadio(L["BACKUP_FORMAT_MARKDOWN"], NE.FMT_MARKDOWN, 0)
-    local rbJson = MakeRadio(L["BACKUP_FORMAT_JSON"],     NE.FMT_JSON,     CONTENT_W / 2)
+    local rbMd   = MakeRadio(L["BACKUP_FORMAT_MARKDOWN"], NE.FMT_MARKDOWN, 0, L["BACKUP_FMT_DESC_MARKDOWN"])
+    local rbJson = MakeRadio(L["BACKUP_FORMAT_JSON"],     NE.FMT_JSON,     CONTENT_W / 2, L["BACKUP_FMT_DESC_JSON"])
     -- Explicitly sync state after both buttons exist so neither is stuck visually checked
     rbJson:SetChecked(true); rbMd:SetChecked(false)
 

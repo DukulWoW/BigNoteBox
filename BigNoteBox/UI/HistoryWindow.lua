@@ -68,18 +68,13 @@ local function BuildRow(parent, note, id, yOff)
     row:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0,         yOff)
     row:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0,         yOff)
 
-    -- Hover highlight
-    local hl = row:CreateTexture(nil, "BACKGROUND")
-    hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.05)
-    hl:Hide()
+    -- Hover highlight (row art in normal mode)
+    local hl = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.05 })
     row:SetScript("OnEnter", function() hl:Show() end)
     row:SetScript("OnLeave", function() hl:Hide() end)
 
     -- Selection highlight (Select mode, ALL-301)
-    local selHi = row:CreateTexture(nil, "BACKGROUND", nil, 1)
-    selHi:SetAllPoints()
-    selHi:SetColorTexture(0.20, 0.40, 0.20, 0.25)
+    local selHi = BNB.CreateListRowArt(row, "multi-selection", { 0.20, 0.40, 0.20, 0.25 })
     selHi:SetShown(_multiMode and _multiSel[id] == true)
 
     -- Icon

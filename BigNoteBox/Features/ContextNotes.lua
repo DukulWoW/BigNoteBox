@@ -34,6 +34,18 @@ BNB._contextMatches = BNB._contextMatches or {}
 BNB._contextMatchedBy = BNB._contextMatchedBy or {}
 -- noteID -> list of TomTom uids placed for it, or true for the game's own pin
 BNB._autoWaypoints  = BNB._autoWaypoints  or {}
+-- The next check only takes in where the player is, showing nothing: set when
+-- the Situations module is switched back on (ALL-375)
+local _quietCheck = false
+
+-- The Situations module (ALL-375): the old Context Popup switch,
+-- `contextSurface`, widened to every situation surface. Off = no checks, no
+-- popups, no automatic waypoints, the Situation tabs covered, menu entries and
+-- list / sticky / Oracle markers hidden; notes keep their situations and
+-- waypoints, and Navigate still works (Dukul 2026-10-07)
+function BNB.SituationsEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.contextSurface ~= false
+end
 -- noteID -> signature of the waypoints last placed for it while it matched
 -- (WaypointSig). They are placed again only when the note newly matches or
 -- its waypoints changed, not on every check (every target change stole quest
@@ -516,7 +528,7 @@ local function ShowToast(matchIDs, locationName, leftBy)
         if k == "state" then return L["CONTEXT_NOT_RESTED"] end
         return string.format(L["CONTEXT_LEFT"], BNB.SituationValueLabel(k, v))
     end
-    if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then return end
+    if not BNB.SituationsEnabled() then return end
     local count = #matchIDs
     if count == 0 then return end
 
@@ -874,7 +886,7 @@ function BNB.RemoveNoteWaypoints(id)
 end
 
 function BNB.CheckContextualNotes()
-    if not BigNoteBoxDB or BigNoteBoxDB.contextSurface == false then
+    if not BNB.SituationsEnabled() then
         UpdateMinimapBadge(0)
         return
     end
@@ -899,6 +911,12 @@ function BNB.CheckContextualNotes()
 
     local prev    = BNB._contextMatches or {}
     local prevBy  = BNB._contextMatchedBy or {}
+    -- Back on after the module was off: nothing arrived or was left, the
+    -- player was simply somewhere (only the waypoints are placed)
+    if _quietCheck then
+        _quietCheck = false
+        prev, prevBy = matches, matchedBy
+    end
     local prevSet = {}
     for _, id in ipairs(prev) do prevSet[id] = true end
 
@@ -1018,6 +1036,34 @@ function BNB.CheckContextualNotes()
     C_Timer.After(1.0, function()
         for _, id in ipairs(BNB._contextMatches or {}) do PlaceNoteWaypoints(id) end
     end)
+end
+
+-- Switching the Situations module (Settings > Modules, setup wizard). Off:
+-- the popup closes, every automatic waypoint comes off the map and the
+-- matches are forgotten (on again must not "leave" a place left while off).
+-- On: one quiet check. Then every place that shows a situation redraws.
+function BNB.ApplySituationsModule(on)
+    if on then
+        _quietCheck = true
+        BNB.CheckContextualNotes()
+    else
+        if _toast then
+            _countdown.running = false
+            _toast:SetScript("OnUpdate", nil)
+            _toast:Hide()
+        end
+        local ids = {}
+        for id in pairs(BNB._autoWaypoints) do ids[#ids + 1] = id end
+        for _, id in ipairs(ids) do BNB.RemoveNoteWaypoints(id) end
+        BNB._contextMatches, BNB._contextMatchedBy = {}, {}
+        UpdateMinimapBadge(0)
+    end
+    BNB.SendMessage("SituationsModule", on)
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end              -- row markers
+    local ndb = BNB.NotesDB()
+    if BNB.Sticky and BNB.Sticky.RefreshMarkers and ndb and ndb.notes then   -- icon badge markers
+        for id in pairs(ndb.notes) do BNB.Sticky.RefreshMarkers(id) end
+    end
 end
 
 -- A note's matching waypoints changed (a row turned on or off, added,

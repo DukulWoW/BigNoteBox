@@ -229,6 +229,10 @@ local function MakeButton(name, parent, onClickFn)
     btn:SetPoint("TOPLEFT", parent, "TOPLEFT", QN_X, QN_Y)
     btn:SetFrameStrata("HIGH")
     btn:SetFrameLevel((parent:GetFrameLevel() or 0) + 10)
+    -- Quick Note module off: no button at all, rather than one whose click
+    -- does nothing (ALL-380, Dukul 2026-10-07). Read each time the window opens
+    btn:SetShown(IsEnabled())
+    parent:HookScript("OnShow", function() btn:SetShown(IsEnabled()) end)
     return btn
 end
 
@@ -866,6 +870,7 @@ local _qlBtn               = nil  -- our single reusable button
 
 local function PositionQuestLogBtn()
     if not _qlBtn then return end
+    if not IsEnabled() then _qlBtn:Hide(); return end   -- module off (ALL-380)
     -- QuestLogPopupDetailFrame (popup): anchor LEFT of the ShowMapButton
     if QuestLogPopupDetailFrame and QuestLogPopupDetailFrame:IsVisible() then
         _qlBtn:SetParent(QuestLogPopupDetailFrame)

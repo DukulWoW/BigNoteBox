@@ -165,6 +165,7 @@ function BNB.ShowForeverNotice()
         local cbLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         cbLabel:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         cbLabel:SetText(L["FOREVER_NOTICE_DONT_SHOW"])
+        BNB.CheckTip(cb, L["FOREVER_NOTICE_DONT_SHOW_TIP"])
         row:SetWidth(24 + 2 + cbLabel:GetStringWidth())
         -- Label clicks toggle the box too
         local hit = CreateFrame("Button", nil, f)
@@ -270,6 +271,8 @@ end)
 --   NoteListRefreshed ()           UI/NoteList.lua, end of RefreshNoteList
 --   EditorDirty ()                 UI/NoteEditor.lua MarkDirty, every edit
 --   EditorViewMode (id)            AM_EnterViewMode (rich note view tab)
+--   SituationsModule (on)          Features/ContextNotes.lua ApplySituationsModule
+--                                  (the Situation tabs cover / uncover)
 --   SkinChanged ()                 UI/SkinSystem.lua, end of ApplyMainWindowSkin
 --                                  (preset / brightness); default-coloured
 --                                  stickies re-colour

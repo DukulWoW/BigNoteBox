@@ -496,16 +496,15 @@ local function MakeRow(parent)
     row:SetPoint("LEFT",  parent, "LEFT", 0, 0)
     row:SetWidth(OV_CONTENT_W)
 
-    -- Hover highlight
-    local hl = row:CreateTexture(nil, "BACKGROUND")
-    hl:SetAllPoints(); hl:SetColorTexture(1,1,1,0.05); hl:Hide()
+    -- Hover highlight (row art in normal mode)
+    local hl = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.05 })
+    row._hl = hl   -- the fill's tooltip OnEnter / OnLeave show it too
     row:SetScript("OnEnter", function(self) hl:Show() end)
     row:SetScript("OnLeave", function(self) hl:Hide() end)
+    row:SetScript("OnHide",  function(self) hl:Hide() end)   -- a pooled row reused under the pointer
 
     -- Selection highlight (multi-select mode)
-    local selHi = row:CreateTexture(nil, "BACKGROUND")
-    selHi:SetAllPoints(); selHi:SetColorTexture(0.4, 0.7, 0.4, 0.18); selHi:Hide()
-    row._selHi = selHi
+    row._selHi = BNB.CreateListRowArt(row, "multi-selection", { 0.4, 0.7, 0.4, 0.18 })
 
     -- Icon (36x36 matching HistoryWindow)
     local iconTx = row:CreateTexture(nil, "ARTWORK")
@@ -751,6 +750,7 @@ function AO.Refresh()
         end)
 
         row:SetScript("OnEnter", function()
+            row._hl:Show()
             GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
             GameTooltip:AddLine(t, 1,1,1)
             if lbl ~= "" then GameTooltip:AddLine(lbl, 0.8,0.8,0.8) end
@@ -758,7 +758,7 @@ function AO.Refresh()
             GameTooltip:AddLine(fullTime, 0.6, 0.9, 0.6)
             GameTooltip:Show()
         end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        row:SetScript("OnLeave", function() row._hl:Hide(); GameTooltip:Hide() end)
     end
 
     -- Unregister glow frames for notes no longer in the list

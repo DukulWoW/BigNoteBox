@@ -162,18 +162,13 @@ local function GetRow(parent, index)
     sep:SetColorTexture(0.22, 0.22, 0.25, 1)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
-    -- Hover highlight
-    local hl = row:CreateTexture(nil, "ARTWORK", nil, 0)
-    hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.05); hl:Hide()
+    -- Hover, Select mode and focus-flash backgrounds (row art in normal mode)
+    local hl = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.05 })
     row:SetScript("OnEnter", function() hl:Show() end)
     row:SetScript("OnLeave", function() hl:Hide() end)
-
-    -- Selection highlight
-    local selHi = row:CreateTexture(nil, "ARTWORK", nil, 1)
-    selHi:SetAllPoints()
-    selHi:SetColorTexture(0.20, 0.40, 0.20, 0.25)
-    selHi:Hide()
-    row._selHi = selHi
+    row:SetScript("OnHide",  function() hl:Hide() end)   -- a pooled row reused under the pointer
+    row._selHi   = BNB.CreateListRowArt(row, "multi-selection", { 0.20, 0.40, 0.20, 0.25 })
+    row._flashHi = BNB.CreateListRowArt(row, "selection",       { 0.20, 0.40, 0.20, 0.25 })
 
     -- Icon (its frame, if the note has one, comes from ApplyIconFrame)
     local icon = row:CreateTexture(nil, "ARTWORK", nil, 2)
@@ -687,11 +682,9 @@ local function FocusTrashItem(id)
         local want = (idx - 1) * (ROW_H + ROW_GAP)
         sf:SetVerticalScroll(math.min(want, sf:GetVerticalScrollRange() or 0))
     end)
-    if row and row._selHi and not _multiMode then
-        row._selHi:Show()
-        C_Timer.After(2.5, function()
-            if not _multiMode then row._selHi:Hide() end
-        end)
+    if row and row._flashHi and not _multiMode then
+        row._flashHi:Show()
+        C_Timer.After(2.5, function() row._flashHi:Hide() end)
     end
 end
 

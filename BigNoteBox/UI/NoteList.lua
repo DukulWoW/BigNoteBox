@@ -1733,9 +1733,10 @@ local function PopulateEntry(btn, note, selected, collapsed)
         if note.favorited then btn._favTex:Show() else btn._favTex:Hide() end
     end
 
-    -- Situation marker: show ! on notes that have a situation
+    -- Situation marker: show ! on notes that have a situation, while the
+    -- Situations module is on (ALL-375)
     if btn._situTex then
-        if BNB.HasSituation(note) then
+        if BNB.SituationsEnabled() and BNB.HasSituation(note) then
             btn._situTex:Show()
         else
             btn._situTex:Hide()

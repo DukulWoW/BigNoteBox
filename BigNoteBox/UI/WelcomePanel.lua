@@ -62,6 +62,7 @@ end
 -- Collect up to `max` notes whose context matches the current zone/instance.
 -- Uses the same matching logic as ContextNotes.lua.
 local function GetLocationNotes(max)
+    if not BNB.SituationsEnabled() then return {} end   -- Situations module off (ALL-375)
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return {} end
     local inInst, instType = IsInInstance()

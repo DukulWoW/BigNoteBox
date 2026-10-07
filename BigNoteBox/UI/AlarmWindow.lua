@@ -441,6 +441,7 @@ local function BuildRepeatBlock(ct1)
         local dl=wdRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
         dl:SetPoint("LEFT",cb,"RIGHT",1,0); dl:SetText(dn:sub(1,1))
         dl:SetTextColor(0.72,0.72,0.72,1); cb._dayIndex=i; wdChecks[i]=cb
+        BNB.CheckTip(cb, string.format(L["AW_WEEKDAY_TIP_FMT"], dn))   -- the label is one letter
     end
 
     local ndRow = CreateFrame("Frame",nil,blk)
@@ -898,6 +899,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     snoozeEnableLbl:SetPoint("LEFT",snoozeEnableCB,"RIGHT",2,0)
     snoozeEnableLbl:SetText(L["AW_ENABLE_SNOOZE"])
     snoozeEnableLbl:SetTextColor(0.85,0.85,0.85,1)
+    BNB.CheckTip(snoozeEnableCB, L["AW_ENABLE_SNOOZE_TIP"])
     y3 = y3 - 28 - AW_GAP
 
     Lbl(ct3,L["AW_LBL_INTERVAL"],y3); y3 = y3 - AW_LBL

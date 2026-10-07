@@ -739,6 +739,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     sidebarEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
     sidebarEnableLbl:SetJustifyH("LEFT"); sidebarEnableLbl:SetHeight(ROW_H)
     sidebarEnableLbl:SetText(L["CFG_SIDEBAR_ENABLE_LABEL"])
+    BNB.CheckTip(sidebarEnableCb, L["CFG_SIDEBAR_ENABLE_TIP"])
     y = y - (ROW_H + ROW_GAP)
 
     -- Sub-frame: groups all dependent controls so alpha-greying works as one unit.
@@ -1315,12 +1316,23 @@ local function BuildFocusPage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- The Situations module (ALL-375; was Context Popup, same saved switch
+-- `contextSurface`). Applies live; the popup settings grey while it is off.
 local function BuildContextPopupPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     local cb
+    local offWidgets = {}
+    local function GreyOff()
+        local on = BNB.SituationsEnabled()
+        for _, w in ipairs(offWidgets) do w:SetEnabled(on); w:SetAlpha(on and 1 or 0.35) end
+    end
     y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
-        function() return db.contextSurface ~= false end,
-        function(v) db.contextSurface = v end,
+        function() return BNB.SituationsEnabled() end,
+        function(v)
+            db.contextSurface = v
+            if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
+            GreyOff()
+        end,
         L["CFG_CHK_CONTEXT_SURFACE_TIP"])
 
     -- "Set Popup Position" button
@@ -1338,10 +1350,14 @@ local function BuildContextPopupPage(sf, ct, y, page)
     y = y - (22 + 6)
 
     -- Popup hold time slider
-    y = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
+    local holdSl
+    y, holdSl = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
         function() return db.popupHoldTime or BNB.DEFAULTS.popupHoldTime end,
         function(v) db.popupHoldTime = v end,
         L["CFG_SLIDER_ALERT_SECONDS_TIP"], BNB.DEFAULTS.popupHoldTime)
+    offWidgets[1], offWidgets[2] = anchorBtn, holdSl
+    GreyOff()
+    sf:HookScript("OnShow", GreyOff)   -- switched from the overview row or a mode badge
     page.enableCb = cb   -- twin on the Features overview row
     sf:FinaliseHeight(math.abs(y) + 12)
 end
@@ -1366,7 +1382,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_ALARMS"],         L["CFG_SUB_ALARMS_DESC"],     K.BuildAlarmsPage,    "alarms",    "alarms"  },
         { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage,    nil, "quickNote" },
         { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage,    nil, "unitNotes" },
-        { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage, nil, "context"   },
+        { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage, "situations", "context" },
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
     }

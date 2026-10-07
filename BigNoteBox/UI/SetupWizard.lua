@@ -341,7 +341,7 @@ local function MakeDropdown(parent, y, w, setupMenu)
 end
 
 -- Checkbox helper
-local function MakeCheck(parent, y, text, getter, setter)
+local function MakeCheck(parent, y, text, getter, setter, tip)
     local cb = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
     BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
     cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
@@ -350,6 +350,7 @@ local function MakeCheck(parent, y, text, getter, setter)
     cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     cb.text:SetText(text)
     cb:SetScript("OnClick", function(self) setter(self:GetChecked()) end)
+    if tip then BNB.CheckTip(cb, tip) end
     return cb, y - 30
 end
 
@@ -541,8 +542,11 @@ local MODULES = {
           if BNB.SyncSidebarWysiwygBtns then BNB.SyncSidebarWysiwygBtns() end
       end },
     { key = "context", label = "CFG_HDR_CONTEXT_POPUP", tip = "SW_MOD_CONTEXT_TIP",
-      get = function() return not BigNoteBoxDB or BigNoteBoxDB.contextSurface ~= false end,
-      set = function(v) SetDB("contextSurface", v) end },
+      get = function() return BNB.SituationsEnabled() end,
+      set = function(v)
+          SetDB("contextSurface", v)
+          if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
+      end },
     { key = "focus", label = "CFG_FOCUS_ORBIT_HEADER", tip = "SW_MOD_FOCUS_TIP",
       get = function() return BNB.FocusEnabled() end,
       set = function(v)
@@ -606,7 +610,7 @@ local MODULES = {
 }
 
 -- Minimal = only what writing notes needs (Dukul, 2026-10-07)
-local MINIMAL_ON = { trash = true, quickNote = true }
+local MINIMAL_ON = { trash = true, quickNote = true, context = true }   -- Situations on (Dukul 2026-10-07, ALL-375)
 
 local function PresetWants(usage)
     local want = {}
@@ -1041,7 +1045,8 @@ local function BuildPage3(content)
     MakeCheck(ct, y,
         L["SW_RANDOMIZE_CHECK"],
         function() return BigNoteBoxDB and BigNoteBoxDB.skinRandomize == true end,
-        function(v) if BigNoteBoxDB then BigNoteBoxDB.skinRandomize = v end end)
+        function(v) if BigNoteBoxDB then BigNoteBoxDB.skinRandomize = v end end,
+        L["CFG_SKIN_RANDOMIZE_TIP"])
     y = y - 32
 
     local _, ny3 = MakeLabel(ct, y,
@@ -1376,7 +1381,8 @@ local function BuildPage4(content)
     MakeCheck(ct, y,
         L["SW_LSM_CHECK"],
         function() return BigNoteBoxDB and BigNoteBoxDB.lsmFonts == true end,
-        function(v) if BigNoteBoxDB then BigNoteBoxDB.lsmFonts = v end end)
+        function(v) if BigNoteBoxDB then BigNoteBoxDB.lsmFonts = v end end,
+        L["CFG_LSM_FONTS_TIP"])
     y = y - 32
 
     ct:SetHeight(math.abs(y) + PAD)

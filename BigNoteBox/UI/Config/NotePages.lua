@@ -291,6 +291,7 @@ function K.BuildTrashPage(sf, ct, y, page)
     trashEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
     trashEnableLbl:SetJustifyH("LEFT"); trashEnableLbl:SetHeight(ROW_H)
     trashEnableLbl:SetText(L["CFG_TRASH_ENABLE_LABEL"])
+    BNB.CheckTip(trashEnableCb, L["CFG_TRASH_ENABLE_TIP"])
     page.enableCb = trashEnableCb   -- twin on the Modules overview row
     y = y - (ROW_H + ROW_GAP)
 

@@ -291,6 +291,16 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
         open = BNB.CreateButton(nil, ct, L["CFG_SUBPAGE_OPEN"], 90, 22)
         open:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
         open:SetScript("OnClick", page.Open)
+        -- A module that is off has nothing to set: its Settings button greys
+        -- with the row's checkbox (Dukul 2026-10-07). The twin follows the page
+        -- box through SetChecked (tab show, mode badges), a click on it directly
+        local rowBox = tg or ov
+        if rowBox then
+            local function SyncOpen() open:SetEnabled(rowBox:GetChecked() and true or false) end
+            hooksecurefunc(rowBox, "SetChecked", SyncOpen)
+            rowBox:HookScript("OnClick", SyncOpen)
+            SyncOpen()
+        end
     end
 
     local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")

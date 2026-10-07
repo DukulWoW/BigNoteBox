@@ -776,6 +776,20 @@ local function FitCheckHit(cb)
     cb:SetHitRectInsets(0, -math.floor((gap + w) / scale + 0.5), 0, 0)
 end
 
+-- A checkbox's tooltip (ALL-373): one wrapped grey line, as Settings' AddCheck
+-- draws it. text may be a function (read on every hover). Call LabelHit too, so
+-- the tooltip shows over the label.
+function BNB.CheckTip(cb, text)
+    cb:SetScript("OnEnter", function(self)
+        local t = type(text) == "function" and text() or text
+        if not t or t == "" then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(t, 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
+end
+
 function BNB.LabelHit(cb, lbl)
     if not cb then return end
     if cb._labelHit then   -- a pooled row with new text: measure again
@@ -814,6 +828,28 @@ function BNB.CreateNoteRule(parent)
         t:SetHeight(1)
     end
     return t
+end
+
+-- List window rows (Trash, Note History, Alarms): hover, selection and Select
+-- mode backgrounds. Normal mode = Dukul's greyscale ui-window-* art stretched
+-- over the whole row and tinted the BNB green, as the note list's row art
+-- (2026-10-07); skin mode = the flat `fill` colour. kind = "hover" |
+-- "selection" | "multi-selection"; drawn on BACKGROUND (sublevel 1 / 2 / 3),
+-- under the icon and text. Built hidden. Skin mode is read at build time: a
+-- switch reloads the UI.
+local ROW_ART_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-window-"
+local ROW_ART_SUB  = { selection = 1, ["multi-selection"] = 2, hover = 3 }
+function BNB.CreateListRowArt(row, kind, fill)
+    local tex = row:CreateTexture(nil, "BACKGROUND", nil, ROW_ART_SUB[kind] or 1)
+    tex:SetAllPoints()
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        tex:SetColorTexture(fill[1], fill[2], fill[3], fill[4])
+    else
+        tex:SetTexture(ROW_ART_PATH .. kind)
+        tex:SetVertexColor(0.40, 0.85, 0.40)   -- NoteList COL_SEL_BG
+    end
+    tex:Hide()
+    return tex
 end
 
 --------------------------------------------------------------------------------

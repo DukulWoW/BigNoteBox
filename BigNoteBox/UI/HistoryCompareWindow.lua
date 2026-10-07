@@ -161,6 +161,7 @@ local function OpenExportPopup(noteData, anchorFrame)
         local jsonLbl = ef:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         jsonLbl:SetPoint("LEFT", jsonRb, "RIGHT", 2, 0)
         jsonLbl:SetText(L["HISTORY_EXPORT_JSON"])
+        BNB.CheckTip(jsonRb, L["HISTORY_EXPORT_JSON_TIP"])
         ey = ey - 28
 
         local mdRb = CreateFrame("CheckButton", nil, ef, "UICheckButtonTemplate")
@@ -171,6 +172,7 @@ local function OpenExportPopup(noteData, anchorFrame)
         local mdLbl = ef:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         mdLbl:SetPoint("LEFT", mdRb, "RIGHT", 2, 0)
         mdLbl:SetText(L["HISTORY_EXPORT_MARKDOWN"])
+        BNB.CheckTip(mdRb, L["HISTORY_EXPORT_MARKDOWN_TIP"])
         ey = ey - 30
 
         jsonRb:SetScript("OnClick", function(self)
