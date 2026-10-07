@@ -16,8 +16,22 @@ local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.A
 -- ─────────────────────────────────────────────────────────────────────────────
 -- RICH NOTES: new-note default, open in editor, heading sizes, live preview
 -- ─────────────────────────────────────────────────────────────────────────────
-function K.BuildRichNotesPage(sf, ct, y)
+function K.BuildRichNotesPage(sf, ct, y, page)
     local db = BigNoteBoxDB
+
+    -- Module switch (ALL-343). Applies live: off shows every note as plain
+    -- text with its markup visible and hides every way to make a rich note;
+    -- the notes stay rich and render again when it is switched back on.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_RICH_ENABLE_LABEL"],
+        function() return BNB.RichEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.richEnabled = v
+            if BNB.ApplyRichModule then BNB.ApplyRichModule(v) end
+        end,
+        L["CFG_RICH_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
 
     -- Moved from Features tab: new-note default + open-in-editor behaviours
     y = AddCheck(ct, y, L["CFG_RICH_NOTES_DEFAULT"],

@@ -81,7 +81,7 @@ end
 -- the rendered output so the user's editing area stays visible.
 --------------------------------------------------------------------------------
 local function RenderNote(note, rsf, rf, gen, liveBody, cursorRatio)
-    if not note or not note.richMode then return end
+    if not BNB.AdvancedMode.IsRich(note) then return end
     local AM = BNB.AdvancedMode
     if not AM then return end
 
@@ -291,6 +291,7 @@ function RP.RenderNote(note)
 end
 
 function RP.Open()
+    if not BNB.RichEnabled() then return end   -- Rich Notes module off (ALL-343)
     BuildMainFrame()
     SyncMainHeight()
 
@@ -335,7 +336,7 @@ end
 
 -- Called after a note is selected. Opens/renders only in editor mode.
 function RP.OnNoteSelected(note)
-    if not note or not note.richMode then
+    if not BNB.AdvancedMode.IsRich(note) then   -- Rich Notes off = plain (ALL-343)
         if RP.IsOpen() then RP.Close() end
         return
     end
@@ -408,7 +409,7 @@ function RPF.Open(focusFrame, simultaneous)
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
     -- Focus preview: only for rich notes; focus mode has no view mode so no
     -- _editorInViewMode check needed here
-    if not note or not note.richMode then return end
+    if not BNB.AdvancedMode.IsRich(note) then return end
 
     local fw = focusFrame:GetWidth()
     local fh = focusFrame:GetHeight()
@@ -505,7 +506,7 @@ end)
 -- Entering edit mode: re-show preview if appropriate
 BNB.RegisterMessage("RichPreview", "EditorEditMode", function()
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    if not note or not note.richMode then return end
+    if not BNB.AdvancedMode.IsRich(note) then return end
 
     -- Main preview
     local db = BigNoteBoxDB

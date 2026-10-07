@@ -190,7 +190,7 @@ local RICH_BADGE_SIZE = 22
 local function RefreshRichBadge(note)
     local badge, eb = BNB._editorRichBadge, BNB._editorTitle
     if not (badge and eb) then return end
-    local rich = note ~= nil and note.richMode == true
+    local rich = BNB.AdvancedMode.IsRich(note)   -- false while Rich Notes is off (ALL-343)
     badge:SetShown(rich)
     eb:SetPoint("BOTTOMRIGHT", eb:GetParent(), "BOTTOMRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, 0)
 end
@@ -622,7 +622,7 @@ function BNB.UpdateBodyTopAnchor()
     -- change and note load ends here, so this is the one place that decides.
     local ul   = BNB._editorTitleUnderline
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    local bare = note and note.richMode and BNB._editorInViewMode == true and ul
+    local bare = BNB.AdvancedMode.IsRich(note) and BNB._editorInViewMode == true and ul
     if note then
         local stats, tsHover = BNB._editorStatsStrip, BNB._editorTsHover
         if bare then
@@ -2024,7 +2024,7 @@ function BNB.AM_RefreshTabs()
     local strip = BNB._editorRichTabs or _richTabStrip
     if not strip then return end
     local note  = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    if not (note and note.richMode) then
+    if not BNB.AdvancedMode.IsRich(note) then
         strip:Hide()
         return
     end
@@ -2172,7 +2172,7 @@ function BNB.AM_EnterEditMode()
     if BNB._editorBodyScroll   then BNB._editorBodyScroll:Show()   end
 
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    if note and note.richMode and BNB._editorMarkupBar then
+    if BNB.AdvancedMode.IsRich(note) and BNB._editorMarkupBar then
         BNB._editorMarkupBar:Show()
     end
 
@@ -2187,7 +2187,7 @@ end
 -- by other systems that want to flip modes programmatically.
 function BNB.ToggleRichViewEdit()
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    if not note or not note.richMode then return end
+    if not BNB.AdvancedMode.IsRich(note) then return end
     if BNB._editorInViewMode then
         if BNB.AM_EnterEditMode then BNB.AM_EnterEditMode() end
     else

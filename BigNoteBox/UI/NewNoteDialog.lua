@@ -649,6 +649,7 @@ local function BuildDialog()
     richCheck:SetChecked(richDefault)
     _selRich = richDefault
     _richCheck = richCheck
+    richCheck._lbl = richLbl
 
     -- Adjust dialog height to fit the extra checkbox row (+8px cushion, Dukul 2026-09-23:
     -- "the window needs to be made a tiny bit taller (20px or so)" -- the real fix is
@@ -686,6 +687,9 @@ function NND.Open()
     _selSize  = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     _selRich  = (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
     if _richCheck then _richCheck:SetChecked(_selRich) end
+    -- Rich Notes off (ALL-343): no rich choice, every new note is plain
+    if _richCheck then _richCheck:SetShown(BNB.RichEnabled()); _richCheck._lbl:SetShown(BNB.RichEnabled()) end
+    if not BNB.RichEnabled() then _selRich = false end
     if _wowCheck  then _wowCheck:SetChecked(false) end
     -- Character: starts on "New notes belong to" (Settings > Notes, ALL-267)
     if _scopeDD then

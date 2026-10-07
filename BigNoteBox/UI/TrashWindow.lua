@@ -279,7 +279,7 @@ local function BuildViewPage(f, top)
     toggleBtn:Hide()
     page._showBody = function()
         local note = page._note or {}
-        local rich = note.richMode and AM and AM.ToHTML and true or false
+        local rich = AM and AM.ToHTML and AM.IsRich(note) and true or false   -- Rich Notes off = plain (ALL-343)
         local html = rich and not page._markup
         if html and not rf then
             rf = AM.CreateRenderFrame(nil, ct)

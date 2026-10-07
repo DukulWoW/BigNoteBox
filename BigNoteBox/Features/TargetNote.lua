@@ -700,6 +700,7 @@ local function StartTargetNoteFlow(data)
     elseif noteType == "always_normal" then
         richMode = false
     end
+    if not BNB.RichEnabled() then richMode = false end   -- Rich Notes off: no type choice (ALL-343)
 
     if existingID then
         ShowWarningDialog(existingID, data.name, function()

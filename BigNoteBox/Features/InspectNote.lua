@@ -662,7 +662,7 @@ local function StartInspectNoteFlow(isAutomatic)
     local noteType = GetType()
 
     if isAutomatic then
-        richMode = (mode == "auto_rich")
+        richMode = (mode == "auto_rich") and BNB.RichEnabled()   -- Rich Notes off = plain (ALL-343)
         -- Automatic mode: create silently, skip if note already exists
         if existingID then return end
         CreateInspectNote(richMode, true)
@@ -675,6 +675,7 @@ local function StartInspectNoteFlow(isAutomatic)
     elseif noteType == "always_normal" then
         richMode = false
     end
+    if not BNB.RichEnabled() then richMode = false end   -- Rich Notes off: no type choice (ALL-343)
 
     if existingID then
         -- Pass richMode so "Update gear and note" knows which body format to use.

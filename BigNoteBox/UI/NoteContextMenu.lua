@@ -295,7 +295,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             end, opts = { icon = "copy-move" } },
             { key = "clipboard", label = L["NL_CM_COPY_CLIPBOARD"], fn = CopyBody,
               opts = { icon = "copy-clipboard" } },
-            BNB.AdvancedMode and {
+            BNB.AdvancedMode and BNB.RichEnabled() and {   -- Rich Notes module (ALL-343)
               key = "convert", label = rich and L["NL_CM_CONVERT_PLAIN"] or L["NL_CTX_CONVERT_RICH"],
               fn = function()
                 if rich then BNB.AdvancedMode.ConvertToPlain(noteID) else BNB.AdvancedMode.ConvertToRich(noteID) end
@@ -533,7 +533,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             act:CreateButton(L["NL_CTX_COPY_MOVE"], function() BNB.OpenCopyMovePopupMulti(ids) end,
                 { icon = "copy-move" })
         end
-        if AM then
+        if AM and BNB.RichEnabled() then   -- Rich Notes module (ALL-343)
             if c.rich < total then
                 act:CreateButton(L["MULTI_CM_TO_RICH"], function()
                     Each(function(id, n) if not AM.IsRich(n) then AM.ConvertToRich(id) end end)

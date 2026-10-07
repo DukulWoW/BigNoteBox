@@ -1966,7 +1966,7 @@ local function CreateStickyFrame(noteID)
             if btn == alarmHdrBtn and not BNB.AlarmsEnabled() then show = false end   -- ALL-343
             if btn == viewHdrBtn then
                 local n = BNB.GetNote(noteID)
-                if not (n and n.richMode == true) then show = false end
+                if not BNB.AdvancedMode.IsRich(n) then show = false end   -- incl. Rich Notes off (ALL-343)
                 if show then f._syncViewBtn() end
             end
             btn:ClearAllPoints()

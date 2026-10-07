@@ -92,7 +92,7 @@ local BADGES = {
     { file = "s-icon-items",    tip = "ORACLE_BADGE_ITEM",
       show = function(note) return BNB.OracleSearch.HasItem(note) end },
     { file = "s-icon-rich",     tip = "ORACLE_BADGE_RICH",
-      show = function(note) return note.richMode == true end },
+      show = function(note) return BNB.AdvancedMode.IsRich(note) end },
     -- A situation (the note settings Situation tab: zone, instance, player...)
     { file = "s-icon-situation", tip = "ORACLE_BADGE_SITUATION", show = function(note)
         return BNB.HasSituation(note) end },
@@ -240,11 +240,13 @@ end
 -- while Sticky Notes is off
 local function ActivePrefixes()
     local alarmsOn, focusOn, stickyOn = BNB.AlarmsEnabled(), BNB.FocusEnabled(), BNB.StickiesEnabled()
-    if alarmsOn and focusOn and stickyOn then return PrefixMap() end
+    local richOn = BNB.RichEnabled()
+    if alarmsOn and focusOn and stickyOn and richOn then return PrefixMap() end
     local m = {}
     for letter, role in pairs(PrefixMap()) do
         if (role ~= "alarm" or alarmsOn) and (role ~= "focus" or focusOn)
-           and (role ~= "sticky" or stickyOn) then
+           and (role ~= "sticky" or stickyOn)
+           and ((role ~= "rich" and role ~= "plain") or richOn) then
             m[letter] = role
         end
     end
@@ -786,6 +788,7 @@ local function Layout()
         emptyFS:Hide()
         -- Built again when a module switch changed the prefixes (ALL-343)
         local sig = tostring(BNB.AlarmsEnabled()) .. tostring(BNB.FocusEnabled()) .. tostring(BNB.StickiesEnabled())
+            .. tostring(BNB.RichEnabled())
         if helpFrame and helpFrame._sig ~= sig then helpFrame:Hide(); helpFrame = nil end
         if not helpFrame then BuildHelp(); helpFrame._sig = sig end
         helpFrame:ClearAllPoints()

@@ -408,8 +408,37 @@ end
 --------------------------------------------------------------------------------
 -- IS RICH
 --------------------------------------------------------------------------------
+-- Rich Notes module (ALL-343). Off = every note shows and edits as plain
+-- text with its markup visible; note.richMode is kept, so switching back on
+-- renders them again. AM.IsRich is the one test for "draw this as rich":
+-- data code (export, history, search, share) reads note.richMode itself.
+function BNB.RichEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.richEnabled ~= false
+end
+
 function AM.IsRich(note)
-    return note ~= nil and note.richMode == true
+    return note ~= nil and note.richMode == true and BNB.RichEnabled()
+end
+
+-- A switch redraws everything that shows a note: editor, list, open stickies,
+-- the rich previews (closed while off)
+function BNB.ApplyRichModule(on)
+    if not on then
+        if BNB.RichPreview then BNB.RichPreview.Close() end
+        if BNB.RichPreviewFocus and BNB.RichPreviewFocus.IsOpen() then BNB.RichPreviewFocus.Close() end
+    end
+    if BNB._currentNoteID and BNB.LoadNoteInEditor then
+        if BNB._dirty and BNB.SaveCurrentNoteQuiet then BNB.SaveCurrentNoteQuiet() end
+        BNB.LoadNoteInEditor(BNB._currentNoteID)
+    end
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    local SN = BNB.Sticky
+    if SN and SN.RefreshNote and SN.IsOpen then
+        for id in pairs(BNB.NotesDB().notes or {}) do
+            if SN.IsOpen(id) then SN.RefreshNote(id) end
+        end
+        if SN.ApplyHeaderButtons then SN.ApplyHeaderButtons() end   -- the rich view button
+    end
 end
 
 --------------------------------------------------------------------------------

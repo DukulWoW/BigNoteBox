@@ -129,6 +129,7 @@ local function BuildGeneralTab(panel)
         { text = function() local n = GetNote()
               return (n and n.richMode) and L["NC_STATE_NORMAL"] or L["NC_STATE_RICH"] end,
           tip  = function() return L["NC_RICH_NOTE_LABEL"], L["NC_RICH_NOTE_TIP"] end,
+          enabled = function() return BNB.RichEnabled() end,   -- Rich Notes module (ALL-343)
           onClick = function()
               local n = GetNote(); if not n then return end
               if not n.richMode then

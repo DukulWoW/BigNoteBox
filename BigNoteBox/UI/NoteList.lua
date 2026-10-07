@@ -1510,12 +1510,13 @@ local _previewCache = setmetatable({}, { __mode = "k" })
 local function PreviewText(note)
     local c = _previewCache[note]
     local raw = note.body or ""
-    if c and c.body == raw and c.rich == note.richMode and c.src == note.source then
+    local rich = BNB.AdvancedMode.IsRich(note)   -- Rich Notes off: markup shows (ALL-343)
+    if c and c.body == raw and c.rich == rich and c.src == note.source then
         return c.text
     end
     local body = raw:sub(1, PREVIEW_CHARS):match("^%s*(.-)%s*$")
     -- Strip rich note markup tags so preview shows plain text only
-    if note.richMode then
+    if rich then
         -- For inspect/target notes, skip the first {h1} block (player/target
         -- name) since it duplicates the note title shown above the preview.
         if note.source == "inspect" or note.source == "target" then
@@ -1533,7 +1534,7 @@ local function PreviewText(note)
         body = body:gsub("\n%s*\n+", "\n")
         body = body:match("^%s*(.-)%s*$") or body
     end
-    _previewCache[note] = { body = raw, rich = note.richMode, src = note.source, text = body }
+    _previewCache[note] = { body = raw, rich = rich, src = note.source, text = body }
     return body
 end
 
