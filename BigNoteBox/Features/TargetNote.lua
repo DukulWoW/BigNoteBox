@@ -661,6 +661,12 @@ local function ShowTypeDialog(data)
     _typeDialog:Open(function(richMode) CreateTargetNote(richMode, data) end)
 end
 
+-- Player & NPC Notes switched off (ALL-343, Features/UnitNotes.lua)
+UN._closers[#UN._closers + 1] = function()
+    if _typeDialog then _typeDialog:Hide() end
+    if _warnDialog then _warnDialog:Hide() end
+end
+
 local function ShowWarningDialog(existingNoteID, targetName, onDuplicate)
     if not _warnDialog then
         _warnDialog = UN.WarnDialog("BNBTargetNoteWarnDialog", 320, 130, 14, 110)
@@ -674,7 +680,7 @@ end
 -- data is optional — if nil, GatherTargetData() is called internally.
 --------------------------------------------------------------------------------
 local function StartTargetNoteFlow(data)
-    if not UnitExists("target") then return end
+    if not UnitExists("target") or not BNB.UnitNotesEnabled() then return end   -- ALL-343
     data = data or GatherTargetData()
 
     -- Player targets redirect to the full InspectNote system (gear, model, attachments).
@@ -753,6 +759,7 @@ local MENU_TAGS = {
 }
 
 local function OnUnitMenuOpen(owner, rootDescription, contextData)
+    if not BNB.UnitNotesEnabled() then return end   -- Player & NPC Notes off (ALL-343)
     local unit = contextData and contextData.unit
     if not unit then return end
     if not UnitExists(unit) then return end

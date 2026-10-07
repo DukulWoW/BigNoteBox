@@ -2450,6 +2450,7 @@ end
 -- True when note is a target or inspect note about the unit targeted now.
 -- The note list row and the sticky badge (ALL-208) draw its live portrait then.
 function BNB.NoteMatchesTarget(note)
+    if not BNB.UnitNotesEnabled() then return false end   -- Player & NPC Notes off (ALL-343)
     if not note or not (note.source == "target" or note.source == "inspect")
             or not UnitExists("target") then
         return false

@@ -129,9 +129,10 @@ local function TasksOnly() return not RBOn() end   -- only ever open with Tasks 
 K.RBOn, K.TasksOnly = RBOn, TasksOnly
 
 -- Returns true if the note has model viewer data (inspect notes or target notes with npcID).
--- The model belongs to the Reference Box: false for every note while it is off.
+-- The model belongs to the Reference Box: false for every note while it is off,
+-- and while Player & NPC Notes is off (ALL-343: they are ordinary notes then).
 local function IsInspectNote(id)
-    if not RBOn() then return false end
+    if not RBOn() or not BNB.UnitNotesEnabled() then return false end
     local note = id and NDB() and NDB().notes and NDB().notes[id]
     if not note then return false end
     if note.source == "inspect" and note.inspectRaceID ~= nil then return true end
@@ -1898,6 +1899,7 @@ end
 -- NPC is the current target, show its live portrait instead, as the note list
 -- does (NoteList.lua PopulateEntry).
 local function TargetMatchesNpcNote()
+    if not BNB.UnitNotesEnabled() then return false end   -- ALL-343
     local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
     if not (note and note.source == "target" and note.targetNpcID) then return false end
     if not UnitExists("target") or UnitIsPlayer("target") then return false end
@@ -1912,6 +1914,7 @@ end
 
 -- Inspect note whose player is the current target (live portrait, ALL-46)
 local function TargetMatchesInspectNote()
+    if not BNB.UnitNotesEnabled() then return false end   -- ALL-343
     local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
     if not (note and note.source == "inspect" and note.inspectName) then return false end
     if not (UnitExists("target") and UnitIsPlayer("target")) then return false end

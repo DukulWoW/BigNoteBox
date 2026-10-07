@@ -21,6 +21,38 @@ BNB.UnitNotes = BNB.UnitNotes or {}
 local UN = BNB.UnitNotes
 
 --------------------------------------------------------------------------------
+-- MODULE SWITCH (ALL-343): Player & NPC Notes. Off = the notes stay in the
+-- list as ordinary notes: no way to make or update one (Inspect frame button,
+-- automatic mode, unit menu, target note key), and none of the live bits
+-- (the target's live portrait on a row / sticky / Reference Box tab, the
+-- Reference Box Model tab). Saved fields, portraits and tags are kept.
+--------------------------------------------------------------------------------
+function BNB.UnitNotesEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.unitNotesEnabled ~= false
+end
+
+-- Each feature adds a function that hides its type / "note exists" dialogs
+UN._closers = {}
+function UN.CloseDialogs()
+    for _, fn in ipairs(UN._closers) do fn() end
+end
+
+function BNB.ApplyUnitNotesModule(on)
+    if UN.ApplyInspectBtn then UN.ApplyInspectBtn(on) end
+    if not on and UN.CloseDialogs then UN.CloseDialogs() end
+    if BNB.ApplyRefBoxModules then BNB.ApplyRefBoxModules() end   -- Model tab
+    if BNB.RefreshNoteList then BNB.RefreshNoteList() end         -- live portraits
+    local SN = BNB.Sticky
+    if SN and SN.RefreshNote and SN.IsOpen then
+        for id, n in pairs(BNB.NotesDB().notes or {}) do
+            if (n.source == "inspect" or n.source == "target") and SN.IsOpen(id) then
+                SN.RefreshNote(id)
+            end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
 -- DIALOG FRAME
 -- The shared window shell (UI/ToolWindow.lua, CMP-02 S5): skin mode decides
 -- the chrome once, when the dialog is first built. Returned hidden.

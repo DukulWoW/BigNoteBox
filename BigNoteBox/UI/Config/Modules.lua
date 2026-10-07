@@ -199,8 +199,21 @@ local function BuildQuickNotePage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
-local function BuildPlayerNpcPage(sf, ct, y)
+local function BuildPlayerNpcPage(sf, ct, y, page)
     local db = BigNoteBoxDB
+
+    -- Module switch (ALL-343). Applies live: off keeps every player / NPC note
+    -- as an ordinary note and hides every way to make or update one.
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_UNIT_ENABLE_LABEL"],
+        function() return BNB.UnitNotesEnabled() end,
+        function(v)
+            if not BigNoteBoxDB then return end
+            BigNoteBoxDB.unitNotesEnabled = v
+            if BNB.ApplyUnitNotesModule then BNB.ApplyUnitNotesModule(v) end
+        end,
+        L["CFG_UNIT_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
     -- ── Inspect Note ──────────────────────────────────────────────────────────
     do
         y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])

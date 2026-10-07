@@ -648,7 +648,7 @@ end
 -- MASTER FLOW
 --------------------------------------------------------------------------------
 local function StartInspectNoteFlow(isAutomatic)
-    if not _inspectReady then return end
+    if not _inspectReady or not BNB.UnitNotesEnabled() then return end   -- ALL-343
 
     local name, realm = BNB.UnitNameRealm(InspectUnit())
     if not name then return end
@@ -743,8 +743,18 @@ local function CreateInspectButton()
     end)
 
     btn:SetEnabled(false)
+    btn:SetShown(BNB.UnitNotesEnabled())   -- Player & NPC Notes off (ALL-343)
 
     _inspectBtn = btn
+end
+
+-- Player & NPC Notes switched on / off (ALL-343, Features/UnitNotes.lua)
+function UN.ApplyInspectBtn(on)
+    if _inspectBtn then _inspectBtn:SetShown(on) end
+end
+UN._closers[#UN._closers + 1] = function()
+    if _typeDialog then _typeDialog:Hide() end
+    if _warnDialog then _warnDialog:Hide() end
 end
 
 local function EnableInspectBtn()
@@ -884,6 +894,7 @@ OnInspectReady = function()
         return
     end
     local mode = GetMode()
+    if not BNB.UnitNotesEnabled() then return end   -- no automatic notes (ALL-343)
     if not _autoCreatedThisInspect and (mode == "auto_rich" or mode == "auto_normal") then
         _autoCreatedThisInspect = true
         C_Timer.After(0.1, function()
