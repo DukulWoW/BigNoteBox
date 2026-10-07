@@ -1440,7 +1440,8 @@ local function BuildContextPopupPage(sf, ct, y, page)
     y, scaleSl = AddSlider(ct, y, L["CFG_TOAST_SCALE"], 50, 150,
         function() return math.floor((db.toastScale or BNB.DEFAULTS.toastScale) * 100 + 0.5) end,
         function(v) db.toastScale = v / 100; BNB.Toast.Restyle() end,
-        L["CFG_TOAST_SCALE_TIP"], BNB.DEFAULTS.toastScale * 100, "%d%%")
+        L["CFG_TOAST_SCALE_TIP"], BNB.DEFAULTS.toastScale * 100,
+        function(v) return string.format("%d%%", v) end)
     offWidgets[#offWidgets + 1] = scaleSl
 
     AddDrop("CFG_TOAST_LAYOUT", "CFG_TOAST_LAYOUT_TIP", {

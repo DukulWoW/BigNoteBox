@@ -375,16 +375,21 @@ end
 
 -- Why a note showed: what was left; else who is here, what is open, the
 -- place it matched by; else the zone
-local function WhyText(id, leftBy, locationName)
-    local left = LeftTextFor(leftBy, id)
-    if left then return left end
-    local k, v = (BNB._contextMatchedBy[id] or ""):match("^(%w+):(.+)$")
-    if not v then return locationName end
+-- What one matching situation string says on a toast (nil = not a situation)
+local function SituationWhy(sit)
+    local k, v = (sit or ""):match("^(%w+):(.+)$")
+    if not v then return nil end
     if k == "player" or k == "npc" then return string.format(L["CONTEXT_HERE"], v:match("^([^-]+)") or v) end
     if k == "guild" then return string.format(L["CONTEXT_GUILD_HERE"], v) end
     if k == "open" then return string.format(L["CONTEXT_OPEN"], BNB.SituationValueLabel(k, v)) end
     if k == "state" then return L["CONTEXT_RESTED"] end
     return BNB.SituationValueLabel(k, v)
+end
+
+local function WhyText(id, leftBy, locationName)
+    local left = LeftTextFor(leftBy, id)
+    if left then return left end
+    return SituationWhy(BNB._contextMatchedBy[id]) or locationName
 end
 
 -- The note's tl;dr (ALL-372), else the first line of its text with any rich
@@ -406,11 +411,12 @@ local function NoteTitle(note)
 end
 
 -- The note's own look on its icon: an NPC note's portrait, its icon frame
--- (true = a frame was drawn, which replaces the style's)
+-- (true = a frame was drawn, which replaces the style's). ownFrame = the
+-- toast style keeps its own border, so the note's frame is left off
 local function NoteIconSetup(note)
-    return function(tex)
+    return function(tex, _, ownFrame)
         if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
-        if note.iconFrame and BNB.ApplyIconFrame then
+        if note.iconFrame and not ownFrame and BNB.ApplyIconFrame then
             return BNB.ApplyIconFrame(tex, note, tex:GetWidth())
         end
     end
@@ -556,6 +562,199 @@ local function ShowSituationToasts(matchIDs, locationName, leftBy, demo)
     end
 end
 
+-- ── Task toasts (ALL-376 S4, ALL-202) ───────────────────────────────────────
+-- A task with a situation (its own task.situation, else its list's
+-- taskList.situation) shows when that situation newly matches: one toast per
+-- note, a row per matching task that is not done and not quiet today. The
+-- note's own situations do not count: the note has its own toast (Dukul,
+-- 2026-10-07). Only tasks with a situation are looked at, from a list kept
+-- until a task or note changes, so a check stays cheap (PERF-05).
+local TASK_ROWS = 8
+local _taskSits     = nil   -- { { noteID, task, situation }, ... }; nil = build again
+local _taskMatchSet = {}    -- "noteID\ttaskID" -> situation, as of the last check
+local _taskQuietNext = false   -- the next pass only remembers (a module back on)
+
+local function TaskSituations()
+    if _taskSits then return _taskSits end
+    _taskSits = {}
+    local ndb = BNB.NotesDB()
+    for id, note in pairs(ndb and ndb.notes or {}) do
+        if note.tasks and #note.tasks > 0 then
+            local listSit = note.taskList and note.taskList.situation
+            if listSit == "" then listSit = nil end
+            for _, task in ipairs(note.tasks) do
+                local sit = (task.situation and task.situation ~= "") and task.situation or listSit
+                if sit then _taskSits[#_taskSits + 1] = { id, task, sit } end
+            end
+        end
+    end
+    return _taskSits
+end
+local function TaskSitsChanged() _taskSits = nil end
+for _, msg in ipairs({ "TasksChanged", "NoteChanged", "NoteCreated", "NoteDeleted", "NoteRestored" }) do
+    BNB.RegisterMessage("TaskToasts", msg, TaskSitsChanged)
+end
+
+local function TaskKey(noteID, taskID) return noteID .. "\t" .. tostring(taskID) end
+
+-- "Not again today" for one task: in the note's contextSeen record (internal,
+-- not an edit), today's date per task id; older days are dropped on write
+local function Today() return BNB.Date("%Y-%m-%d", time()) end
+local function TaskQuiet(note, taskID)
+    local rec = BNB.currentChar and note.contextSeen and note.contextSeen[BNB.currentChar]
+    return rec and rec.tq and rec.tq[taskID] == Today() or false
+end
+local function TaskQuietToday(note, taskID)
+    if not BNB.currentChar then return end
+    note.contextSeen = note.contextSeen or {}
+    local rec = note.contextSeen[BNB.currentChar] or {}
+    note.contextSeen[BNB.currentChar] = rec
+    local today, keep = Today(), {}
+    for k, d in pairs(rec.tq or {}) do if d == today then keep[k] = d end end
+    keep[taskID] = today
+    rec.tq = keep
+end
+
+-- Left click on a task toast or row: the note in the main window with its
+-- task list beside it (the Reference Box, or its tasks-only layout)
+local function OpenTasks(id)
+    if not BNB.GetNote(id) then return end
+    OpenNote(id)
+    if BNB.OpenReferenceBox then BNB.OpenReferenceBox(id) end
+end
+
+local ShowTaskToast   -- forward: the row menu redraws the toast
+
+-- Right click on a task row: Open tasks, Mark done, Not again today, Dismiss
+local function TaskRowMenu(id, taskID, owner, key)
+    local note = BNB.GetNote(id)
+    local task = note and BNB.Task and BNB.Task.FindTask(id, taskID)
+    local CM = BNB.ContextMenu
+    if not (task and CM) then return end
+    CM.Open(owner, function(root)
+        root:CreateTitle(task.text or "", { badge = true,
+            icon = (note.icon and note.icon ~= "") and note.icon or nil })
+        root:CreateButton(L["TOAST_CM_OPEN_TASKS"], function() OpenTasks(id); BNB.Toast.Dismiss(key) end,
+            { icon = "reference-box" })
+        root:CreateButton(L["TOAST_CM_TASK_DONE"], function()
+            if not task.completed then BNB.Task.ToggleTask(id, taskID) end
+            ShowTaskToast(id)
+        end, { icon = "action" })
+        root:CreateDivider()
+        root:CreateButton(L["TOAST_CM_QUIET"], function()
+            TaskQuietToday(note, taskID)
+            ShowTaskToast(id)
+        end, { icon = "remove-situation", tip = L["TOAST_CM_TASK_QUIET_TIP"] })
+        root:CreateDivider()
+        root:CreateButton(L["TOAST_CM_DISMISS"], function() BNB.Toast.Dismiss(key) end)
+    end)
+end
+
+-- Right click on the toast itself: the note's tasks or the note
+local function TaskToastMenu(id, owner, key)
+    local note = BNB.GetNote(id)
+    local CM = BNB.ContextMenu
+    if not (note and CM) then return end
+    CM.Open(owner, function(root)
+        root:CreateTitle(NoteTitle(note), { badge = true,
+            icon = (note.icon and note.icon ~= "") and note.icon or nil,
+            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+        root:CreateButton(L["TOAST_CM_OPEN_TASKS"], function() OpenTasks(id); BNB.Toast.Dismiss(key) end,
+            { icon = "reference-box" })
+        root:CreateButton(L["TOAST_CM_OPEN"], function() OpenNote(id); BNB.Toast.Dismiss(key) end,
+            { icon = "editor" })
+        root:CreateDivider()
+        root:CreateButton(L["TOAST_CM_DISMISS"], function() BNB.Toast.Dismiss(key) end)
+    end)
+end
+
+-- The note's matching tasks in list order (a sub-task under its parent),
+-- not done, not quiet today
+local function MatchingTasks(note)
+    local T, out = BNB.Task, {}
+    local function Take(task, sub)
+        local sit = _taskMatchSet[TaskKey(note.id, task.id)]
+        if sit and not task.completed and not TaskQuiet(note, task.id) then
+            out[#out + 1] = { task = task, sub = sub, sit = sit }
+        end
+    end
+    for _, top in ipairs(T.GetTopLevel(note.id)) do
+        Take(top, false)
+        for _, sub in ipairs(T.GetSubTasks(note.id, top.id)) do Take(sub, true) end
+    end
+    return out
+end
+
+-- (Re)draws a note's task toast from what matches now; nothing left = the
+-- toast goes. Rows list every matching task of the note, so a task that
+-- matched earlier stays beside the new one
+ShowTaskToast = function(id)
+    local key  = "tasks:" .. id
+    local note = BNB.GetNote(id)
+    local list = note and BNB.TasksEnabled() and MatchingTasks(note) or {}
+    if #list == 0 then BNB.Toast.Dismiss(key); return end
+    local rows = {}
+    for i, m in ipairs(list) do
+        if #list > TASK_ROWS and i == TASK_ROWS then
+            rows[#rows + 1] = { title = string.format(L["TOAST_MORE"], #list - TASK_ROWS + 1),
+                                onClick = function() OpenTasks(id) end }
+            break
+        end
+        local taskID = m.task.id
+        rows[#rows + 1] = {
+            title = (m.sub and "      " or "") .. "|cffffd100-|r  " .. (m.task.text or ""),
+            onClick = function() OpenTasks(id) end,
+            onRightClick = function(r) TaskRowMenu(id, taskID, r, key) end,
+        }
+    end
+    local why = SituationWhy(list[1].sit)
+    local spec = {
+        key = key, source = "tasks",
+        style = note.toastStyle, hold = note.toastHold,
+        icon = (note.icon and note.icon ~= "") and note.icon or nil,
+        noIcon = Setting("toastShowIcon") == false,
+        iconSetup = NoteIconSetup(note),
+        title = NoteTitle(note), titleColor = note.titleColor,
+        text = (Setting("toastShowWhy") ~= false and why) and string.format(L["TOAST_TASKS_WHY"], why) or nil,
+        rows = rows,
+        onClick = function() OpenTasks(id) end,
+    }
+    spec.onRightClick = function(_, f) TaskToastMenu(id, f, key) end
+    BNB.Toast.Show(spec)
+end
+
+-- One pass over the tasks with a situation: the new match set, and the notes
+-- with a task that matches now and did not before (quiet = remember, show
+-- nothing: Situations back on). Returns those note ids
+local function CheckTaskSituations(env, quiet)
+    local now, newBy, newIDs = {}, {}, {}
+    if BNB.TasksEnabled() and BNB.Task then
+        for _, e in ipairs(TaskSituations()) do
+            local noteID, task, sit = e[1], e[2], e[3]
+            if not task.completed and ContextMatches(sit, env) then
+                local k = TaskKey(noteID, task.id)
+                now[k] = sit
+                if not _taskMatchSet[k] and not newBy[noteID] then
+                    newBy[noteID] = true
+                    newIDs[#newIDs + 1] = noteID
+                end
+            end
+        end
+    end
+    _taskMatchSet = now
+    if quiet or _taskQuietNext then _taskQuietNext = false; return {} end
+    return newIDs
+end
+
+-- Situations or Tasks switched off: every task toast goes and the matches
+-- are forgotten; the next pass (back on) only remembers where the player
+-- is, so not every task here shows as new
+function BNB.ResetTaskToasts()
+    _taskMatchSet = {}
+    _taskQuietNext = true
+    BNB.Toast.DismissAll("tasks")
+end
+
 -- Settings > Modules > Situations > Test: three demo notes in the chosen
 -- layout. Their ids are not notes, so a click on one opens nothing
 local DEMO = {
@@ -572,6 +771,19 @@ function BNB.TestSituationToasts()
     end
     local _, locName = GetCurrentZone()
     ShowSituationToasts(ids, locName, nil, true)
+    -- A task toast too while Tasks is on (ALL-376 S4): demo rows, no clicks
+    if BNB.TasksEnabled() then
+        local rows = {}
+        for _, k in ipairs({ "TOAST_TEST_TASK_1", "TOAST_TEST_TASK_2", "TOAST_TEST_TASK_3" }) do
+            rows[#rows + 1] = { title = "|cffffd100-|r  " .. L[k] }
+        end
+        BNB.Toast.Show({
+            key = "tasks:demo", source = "test", force = true,
+            icon = "Interface\\Icons\\INV_Misc_Note_02", title = L["TOAST_TEST_TASKS"],
+            text = (Setting("toastShowWhy") ~= false and locName) and string.format(L["TOAST_TASKS_WHY"], locName) or nil,
+            noIcon = Setting("toastShowIcon") == false, rows = rows,
+        })
+    end
 end
 
 -- ── When and how often (ALL-232 S2) ──────────────────────────────────────────
@@ -823,6 +1035,8 @@ function BNB.CheckContextualNotes()
 
     local prev    = BNB._contextMatches or {}
     local prevBy  = BNB._contextMatchedBy or {}
+    -- Tasks whose situation newly matches (ALL-376 S4), quiet as the notes
+    local newTaskNotes = CheckTaskSituations(env, _quietCheck)
     -- Back on after the module was off: nothing arrived or was left, the
     -- player was simply somewhere (only the waypoints are placed)
     if _quietCheck then
@@ -940,6 +1154,12 @@ function BNB.CheckContextualNotes()
         end)
     end
 
+    if #newTaskNotes > 0 then
+        C_Timer.After(0.5, function()
+            for _, id in ipairs(newTaskNotes) do ShowTaskToast(id) end
+        end)
+    end
+
     -- ── Waypoint dispatch on zone entry ───────────────────────────────────────
     -- Placed for every matching note whose waypoints were not placed yet while
     -- it has been matching: a new match, or waypoints changed since (also
@@ -960,6 +1180,7 @@ function BNB.ApplySituationsModule(on)
         BNB.CheckContextualNotes()
     else
         BNB.Toast.DismissAll("situation")
+        BNB.ResetTaskToasts()
         local ids = {}
         for id in pairs(BNB._autoWaypoints) do ids[#ids + 1] = id end
         for _, id in ipairs(ids) do BNB.RemoveNoteWaypoints(id) end

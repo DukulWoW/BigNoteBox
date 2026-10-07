@@ -60,7 +60,7 @@ local SLIDE_PX     = 40     -- a new toast slides in from this far out
 local SLIDE_RATE   = 12     -- approach speed (fraction of the gap per second)
 local ARROW        = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\Symbols\\bt-%s-normal"
 local ANCHOR_ART   = 6940170   -- interface/shop/catalogshopfxtoastmask: a white blank toast
-T.GAP = GAP
+T.GAP, T.FADE, T.SLIDE_PX, T.SLIDE_RATE = GAP, FADE, SLIDE_PX, SLIDE_RATE   -- the Toast Lab stacks with these
 
 local GROW = {
     down  = {  0, -1 },
@@ -112,16 +112,29 @@ local function Extent(w, h)
     return (GrowDir()[1] ~= 0) and w or h
 end
 
+-- The gap after a toast drawn in a style (screen units): the style's own
+-- gap, else GAP, sized with the toasts
+local function GapOf(def)
+    return ((def and def.gap) or GAP) * Scale()
+end
+
 -- Centre offsets from the anchor for a list of extents: the first toast on
--- the anchor, each next one past the last by half of each plus the gap
-local function Offsets(extents)
-    local d, out, pos = GrowDir(), {}, 0
+-- the anchor, each next one past the last by half of each plus the larger
+-- of the two toasts' gaps (gaps nil = GAP). d = a GROW entry (nil = the
+-- player's). The Toast Lab stacks its preview with this too.
+local function Offsets(extents, gaps, d)
+    d = d or GrowDir()
+    local out, pos = {}, 0
     for i, e in ipairs(extents) do
-        if i > 1 then pos = pos + extents[i - 1] / 2 + GAP + e / 2 end
+        if i > 1 then
+            local g = gaps and math.max(gaps[i - 1] or GAP, gaps[i] or GAP) or GAP
+            pos = pos + extents[i - 1] / 2 + g + e / 2
+        end
         out[i] = { d[1] * pos, d[2] * pos }
     end
     return out
 end
+T.Offsets, T.GROW = Offsets, GROW
 
 -- ── Toast frames ────────────────────────────────────────────────────────────
 -- _x / _y are screen units from the anchor; the frame is scaled, so its
@@ -252,13 +265,14 @@ end
 
 -- Every toast's slot; with Slide in off (or now) they jump there
 local function Retarget(now)
-    local ext = {}
+    local ext, gaps = {}, {}
     for i, f in ipairs(_shown) do
         local w, h = f:GetWidth() * f:GetScale(), f:GetHeight() * f:GetScale()
         ext[i] = Extent(w, h + (f._rowsH or 0))
+        gaps[i] = GapOf(f._style)
     end
     local slide = Setting("toastSlide") and not now
-    for i, o in ipairs(Offsets(ext)) do
+    for i, o in ipairs(Offsets(ext, gaps)) do
         local f = _shown[i]
         f._tx, f._ty = o[1], o[2]
         if not slide or f._x == nil then f._x, f._y = f._tx, f._ty; Place(f) end
@@ -501,13 +515,15 @@ end
 function T.RefreshAnchor()
     local f = _anchor
     if not f then return end
-    local w, h = StyleSize(BNB.ToastStyles.Resolve(BNB.ToastStyles.Current()))
+    local def  = BNB.ToastStyles.Resolve(BNB.ToastStyles.Current())
+    local w, h = StyleSize(def)
     f:SetSize(w, h)
     DressBox(f, 0.9)
     local key = Setting("toastGrow")
     if not GROW[key] then key = "down" end
     f._arrow:SetTexture(string.format(ARROW, key))
-    local offs = Offsets({ Extent(w, h), Extent(w, h), Extent(w, h) })
+    local g = GapOf(def)
+    local offs = Offsets({ Extent(w, h), Extent(w, h), Extent(w, h) }, { g, g, g })
     for i, g in ipairs(f._ghosts) do
         g:SetSize(w, h)
         DressBox(g, 0.45 - i * 0.12)

@@ -132,6 +132,7 @@ function BNB.ApplyTasksModule(on)
     if not on and BNB.TaskEditWindow and BNB.TaskEditWindow.Close then
         BNB.TaskEditWindow.Close()
     end
+    if not on and BNB.ResetTaskToasts then BNB.ResetTaskToasts() end   -- task toasts (ALL-376 S4)
     if BNB.ApplySaveMode         then BNB.ApplySaveMode()         end   -- editor bar button
     if BNB.ApplyTaskFilterButton then BNB.ApplyTaskFilterButton() end   -- note list filter
     if BNB.ApplyRefBoxModules    then BNB.ApplyRefBoxModules()    end   -- Reference Box / tasks window

@@ -5,8 +5,14 @@
 -- and "+N more" into place on the preview. Export hands back one Lua entry
 -- per named style for TS STYLES. Work in progress is kept in
 -- BNB.LabDB().devToastLab across reloads.
--- Three windows, as the Background Lab:
---   control - the entry, name, look, size, the selected part's numbers, Export
+-- Four windows:
+--   control - the entry, name, Done / Skip, look, size, the selected part's
+--             numbers (a text's font and size), Export
+--   stack   - left of the control: four made-up note toasts stacked as in
+--             game (the player's Toast size, the lab's own grow direction),
+--             with random icons, icon frames, title colours, places and
+--             tl;dr lines (Random); Fire plays them in as they arrive; Gap
+--             (or the wheel) sets the style's space between toasts
 --   preview - the toast at 1x / 2x / 3x, drawn by BNB.ToastStyles.Apply (what
 --             a toast shows); drag a part to move it, its right or bottom
 --             edge to size it; arrows nudge the selected part 1 px (Shift 10,
@@ -14,6 +20,9 @@
 --   sheet   - the file with the art area (Labs/LabSheet.lua), for art
 --             without an atlas or a different crop; a click on an atlas
 --             region adds that region as an entry
+-- Both previews take the sheet's backgrounds (Bg). Done = finished, left out
+-- of Export; Skip = rejected. A style's icon Frame / Border is the default:
+-- a note with its own icon frame draws that instead (the stack shows both).
 -- "Try on toasts" draws every toast and the anchor in the current entry
 -- (BNB.ToastStyles.SetOverride) and fires the Test toasts; not saved.
 -- Dev tools only; nothing here is translated.
@@ -112,23 +121,38 @@ local function Store()
 end
 
 local LIST, _idx = {}, 1
-local _ctl, _pv, _sheet
+local _ctl, _pv, _sheet, _st
 local _sel = "icon"       -- the part the tools act on
 local Refresh             -- forward
 
+-- A lab entry that has been pasted into STYLES shares its key with the
+-- style: it is listed once, as the entry (atlas / file for the sheet), and
+-- carries the style so a fresh lab starts from the shipped numbers
 local function BuildList()
     LIST = {}
+    local styleOf, entries = {}, {}
     for _, def in ipairs(TS.STYLES) do
-        if not def.faction then LIST[#LIST + 1] = { g = "built", key = def.key, style = def } end
+        if not def.faction then styleOf[def.key] = def end
     end
     for _, e in ipairs(SEED) do
         e.key = e.key or K.EntryKey(e.id, e.path, e.atlas)
-        LIST[#LIST + 1] = e
+        entries[#entries + 1] = e
     end
     for _, a in ipairs(Store().added) do
-        LIST[#LIST + 1] = { g = "added", id = a.id, path = a.path, atlas = a.atlas,
-                            key = K.EntryKey(a.id, a.path, a.atlas) }
+        entries[#entries + 1] = { g = "added", id = a.id, path = a.path, atlas = a.atlas,
+                                  key = K.EntryKey(a.id, a.path, a.atlas) }
     end
+    local taken = {}
+    for _, e in ipairs(entries) do
+        e.style = styleOf[e.key]
+        if e.style then taken[e.key] = true end
+    end
+    for _, def in ipairs(TS.STYLES) do
+        if not def.faction and not taken[def.key] then
+            LIST[#LIST + 1] = { g = "built", key = def.key, style = def }
+        end
+    end
+    for _, e in ipairs(entries) do LIST[#LIST + 1] = e end
 end
 
 local function AtlasSize(name)
@@ -138,8 +162,21 @@ end
 
 local function AtlasHere(name) return AtlasSize(name) ~= nil end
 
--- A first layout for art of size w x h: icon at the left, texts beside it,
--- the bar under them
+-- The layout every new entry starts from: Dukul's Dragon Riding toast
+-- (2026-10-07), so working through the list starts close to done
+local DEFAULT_LAYOUT = {
+    w = 281, h = 115,
+    icon  = { x = 26, y = 36, size = 48, shape = "square" },
+    title = { x = 85, y = 31, w = 174, scale = 1 },
+    text  = { x = 86, y = 54, w = 167, scale = 1 },
+    line2 = { x = 86, y = 71, w = 167, scale = 1 },
+    bar   = { x = 20, y = 89, w = 240, h = 2 },
+    more  = { x = 265, y = 100 },
+}
+local function DefaultLayout() return CopyTable(DEFAULT_LAYOUT) end
+
+-- The old first layout, worked out from the art size: only used to find
+-- entries that were opened but never changed, which then take the default
 local function StartLayout(w, h)
     local isz = math.max(16, math.min(48, h - 16))
     local ix  = math.max(8, R(h * 0.15))
@@ -158,25 +195,44 @@ end
 
 local function Copy(t) return t and CopyTable(t) or nil end
 
+local LAYOUT_PARTS = { "icon", "title", "text", "line2", "bar", "more" }
+
+local function SameBox(a, b)
+    if type(a) ~= "table" or type(b) ~= "table" then return a == b end
+    for k, v in pairs(b) do if a[k] ~= v then return false end end
+    for k in pairs(a) do if b[k] == nil then return false end end
+    return true
+end
+
+-- An unnamed entry whose parts are still exactly the old first layout
+local function UntouchedOld(st)
+    if st.styleKey or (st.name and st.name ~= "") or not (st.w and st.h) then return false end
+    local o = StartLayout(st.w, st.h)
+    for _, p in ipairs(LAYOUT_PARTS) do
+        if not SameBox(st[p], o[p]) then return false end
+    end
+    return true
+end
+
 -- The saved settings for entry i, made on first use
 local function State(i)
     local e = LIST[i]
     local s = Store().e
     local st = s[e.key]
-    if st then return st end
+    if st then
+        if UntouchedOld(st) then
+            for k, v in pairs(DefaultLayout()) do st[k] = v end
+        end
+        return st
+    end
     if e.style then
         local d = e.style
         st = { name = TS.Label(d), back = d.back, atlas = d.atlas, file = d.file, fw = d.fw, fh = d.fh,
                crop = Copy(d.crop), flip = d.flip, w = d.w, h = d.h, icon = Copy(d.icon),
                title = Copy(d.title), text = Copy(d.text), line2 = Copy(d.line2), bar = Copy(d.bar), more = Copy(d.more),
-               styleKey = d.key }
+               gap = d.gap, styleKey = d.key }
     else
-        local w, h = 260, 60
-        if e.atlas then
-            local aw, ah = AtlasSize(e.atlas)
-            if aw then w, h = R(aw), R(ah) end
-        end
-        st = StartLayout(w, h)
+        st = DefaultLayout()
         st.atlas, st.file = e.atlas, e.id
     end
     s[e.key] = st
@@ -208,7 +264,7 @@ end
 local function Def(i)
     local st = State(i or _idx)
     local e  = LIST[i or _idx]
-    local d = { key = st.styleKey or e.key, name = st.name, w = st.w, h = st.h, flip = st.flip,
+    local d = { key = st.styleKey or e.key, name = st.name, w = st.w, h = st.h, flip = st.flip, gap = st.gap,
                 icon = st.icon, title = st.title, text = st.text, line2 = st.line2, bar = st.bar, more = st.more }
     if st.back then
         d.back = st.back
@@ -232,6 +288,7 @@ local function Tbl(t, order)
         local v = t[k]
         if v ~= nil then
             if type(v) == "number" then parts[#parts + 1] = k .. " = " .. Num(v)
+            elseif type(v) == "boolean" then parts[#parts + 1] = k .. " = " .. tostring(v)
             elseif type(v) == "table" then
                 parts[#parts + 1] = k .. " = { " .. (v.atlas and ("atlas = " .. Q(v.atlas)) or ("file = " .. tostring(v.file)))
                     .. ", pad = " .. Num(v.pad or 0) .. " }"
@@ -241,11 +298,18 @@ local function Tbl(t, order)
     return "{ " .. table.concat(parts, ", ") .. " }"
 end
 
+local TEXT_ORDER = { "x", "y", "w", "font", "size", "scale", "justify" }
+
 local function ExportText()
-    local out = { "-- Toast Lab export (BigNoteBox_Dev Labs/ToastLab.lua): paste into STYLES in UI/ToastStyles.lua" }
+    local out, n, done, skipped = {}, 0, 0, 0
     for i, e in ipairs(LIST) do
         local st = Store().e[e.key]
-        if st and st.name and st.name ~= "" and not st.skip then
+        if st and st.done then
+            done = done + 1
+        elseif st and st.skip then
+            skipped = skipped + 1
+        elseif st and st.name and st.name ~= "" then
+            n = n + 1
             local d = Def(i)
             local src
             if d.back then src = "back = " .. Q(d.back)
@@ -257,15 +321,20 @@ local function ExportText()
             end
             out[#out + 1] = string.format("    { key = %s, name = %s, %s,%s",
                 Q(d.key), Q(st.name), src, d.flip and (" flip = " .. Q(d.flip) .. ",") or "")
-            out[#out + 1] = string.format("      w = %s, h = %s,", Num(d.w), Num(d.h))
-            out[#out + 1] = "      icon  = " .. Tbl(d.icon, { "x", "y", "size", "shape", "frame", "border" }) .. ","
-            out[#out + 1] = "      title = " .. Tbl(d.title, { "x", "y", "w", "scale", "justify" }) .. ","
-            out[#out + 1] = "      text  = " .. Tbl(d.text, { "x", "y", "w", "scale", "justify" }) .. ","
-            out[#out + 1] = "      line2 = " .. Tbl(d.line2, { "x", "y", "w", "scale", "justify" }) .. ","
+            out[#out + 1] = string.format("      w = %s, h = %s,%s", Num(d.w), Num(d.h),
+                d.gap and (" gap = " .. Num(d.gap) .. ",") or "")
+            -- frame / border: the style's default, replaced by a note's own frame
+            out[#out + 1] = "      icon  = " .. Tbl(d.icon, { "x", "y", "size", "shape", "frame", "border", "ownFrame" }) .. ","
+            out[#out + 1] = "      title = " .. Tbl(d.title, TEXT_ORDER) .. ","
+            out[#out + 1] = "      text  = " .. Tbl(d.text, TEXT_ORDER) .. ","
+            out[#out + 1] = "      line2 = " .. Tbl(d.line2, TEXT_ORDER) .. ","
             out[#out + 1] = "      bar   = " .. Tbl(d.bar, { "x", "y", "w", "h" }) .. ","
             out[#out + 1] = "      more  = " .. Tbl(d.more, { "x", "y" }) .. " },"
         end
     end
+    table.insert(out, 1, string.format(
+        "-- Toast Lab export: %d named, left out: %d done, %d skipped. Paste into STYLES in UI/ToastStyles.lua",
+        n, done, skipped))
     return table.concat(out, "\n")
 end
 
@@ -288,7 +357,7 @@ local function PartRect(st, p)
     if p == "icon" then return b.x, b.y, b.size, b.size end
     if p == "bar" then return b.x, b.y, b.w, math.max(3, b.h) end
     if p == "more" then return b.x - 50, b.y, 50, 12 end
-    return b.x, b.y, b.w, R(14 * (b.scale or 1))
+    return b.x, b.y, b.w, R(TS.TextSize(p, b) + 2)
 end
 
 -- Moves (resize false) or sizes a part by dx, dy from its start values
@@ -310,7 +379,45 @@ end
 
 -- ── The preview ──────────────────────────────────────────────────────────────
 local PV_PAD = 24
-local BGS = { { 0.08, 0.08, 0.10 }, { 0.55, 0.55, 0.58 }, { 0.85, 0.20, 0.75 }, { 0.15, 0.30, 0.15 } }
+local BGS = K.SHEET_BGS   -- the sheet's backgrounds, as the Icon Lab preview
+
+-- A lab window's Bg: a colour, or a picture over the whole window
+local function DrawBg(f, key)
+    local b = BGS[Store()[key] or 1] or BGS[1]
+    f.base:SetColorTexture(b[1], b[2], b[3], K.DrawPictureBg(f, b) and 0 or 1)
+end
+
+local function BgLayers(f)
+    f.base = f:CreateTexture(nil, "BACKGROUND", nil, 1)
+    f.base:SetPoint("TOPLEFT", 4, -4)
+    f.base:SetPoint("BOTTOMRIGHT", -4, 4)
+    f.pic = f:CreateTexture(nil, "BACKGROUND", nil, 7)
+    f.pic:SetPoint("TOPLEFT", 4, -4)
+    f.pic:SetPoint("BOTTOMRIGHT", -4, 4)
+    f.pic:Hide()
+end
+
+-- A movable lab window with a border and the Bg layers
+local function LabWindow(name)
+    local f = BNB.CreateBackdropFrame("Frame", name, UIParent)
+    f:SetFrameStrata("MEDIUM")
+    f:SetClampedToScreen(true)
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 } })
+    f:SetBackdropColor(0.05, 0.05, 0.06, 1)
+    f:SetBackdropBorderColor(0.5, 0.5, 0.55, 1)
+    BgLayers(f)
+    f:Hide()
+    return f
+end
+
+local LayoutStack   -- forward: the stack follows every change
 
 local function LayoutPreview()
     if not (_pv and _pv:IsShown()) then return end
@@ -340,8 +447,13 @@ local function LayoutPreview()
             hnd:Hide()
         end
     end
-    local bg = BGS[Store().pvBg or 1] or BGS[1]
-    _pv:SetBackdropColor(bg[1], bg[2], bg[3], 1)
+    DrawBg(_pv, "pvBg")
+end
+
+-- Both previews, while a part is dragged
+local function Redraw()
+    LayoutPreview()
+    LayoutStack()
 end
 
 local function NewHandle(parent, p)
@@ -369,7 +481,7 @@ local function NewHandle(parent, p)
         self:SetScript("OnUpdate", function()
             local nx, ny = GetCursorPosition()
             ApplyDrag(st, p, start, nx / s - cx, cy - ny / s, resize)
-            LayoutPreview()
+            Redraw()
         end)
         Refresh()
     end)
@@ -394,19 +506,7 @@ local function Nudge(key)
 end
 
 local function BuildPreview()
-    local f = BNB.CreateBackdropFrame("Frame", "BigNoteBoxToastLabPreview", UIParent)
-    f:SetFrameStrata("MEDIUM")
-    f:SetClampedToScreen(true)
-    f:SetMovable(true)
-    f:EnableMouse(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    f:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", edgeSize = 14,
-        insets = { left = 3, right = 3, top = 3, bottom = 3 } })
-    f:SetBackdropBorderColor(0.5, 0.5, 0.55, 1)
-    f:Hide()
+    local f = LabWindow("BigNoteBoxToastLabPreview")
 
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -8)
@@ -439,6 +539,315 @@ local function BuildPreview()
     end)
     f:SetScript("OnKeyDown", function(self, key)
         BNB.SetPropagate(self, not Nudge(key))
+    end)
+    return f
+end
+
+-- ── The stack: four made-up note toasts, as they stack in game ──────────────
+-- Toasts draw the note's own icon frame and title colour, so the stack makes
+-- those up (Random) to show the style with what players will put on it
+local ST_PAD, ST_HEAD = 16, 84
+local ZOOM_MIN, ZOOM_MAX, ZOOM_STEP = 0.5, 2, 0.25
+
+-- The window's own zoom, on top of the Toast size (lab only, saved)
+local function StackZoom()
+    return math.max(ZOOM_MIN, math.min(ZOOM_MAX, Store().stZoom or 1))
+end
+local ST_COUNT = 4
+local GROW_ORDER = { "down", "up", "left", "right" }
+
+local FAKE_TITLES = {
+    "The bank", "Flight master", "A letter for Kalia", "Dailies in Thaldraszus", "Cooking vendor",
+    "Raid night", "Herbs for my alt", "Rare: Shadeisethal", "Darkmoon Faire tickets", "Fishing spot",
+    "Ask Thrall about the quest", "Guild bank tab 3",
+}
+local FAKE_WHERE = {
+    "Orgrimmar", "Stormwind City", "Valdrakken", "Dornogal", "The Waking Shores", "Silvermoon City",
+    "Thrall is here", "A vendor is open", "Rested", "You left Ironforge",
+}
+local FAKE_LINES = {
+    L["TOAST_TEST_BODY_1"], L["TOAST_TEST_BODY_2"], L["TOAST_TEST_BODY_3"],
+    "Buy 20 Shimmering Clams before the weekly reset.",
+    "Turn in the quest to the guard by the bridge.",
+    "Bring flasks, food and a repair hammer.",
+    "The portal room is up the stairs on the right.",
+}
+local FAKE_COLORS = {
+    false, false, { r = 1, g = 1, b = 1 }, { r = 0.45, g = 0.75, b = 1 }, { r = 0.40, g = 0.90, b = 0.45 },
+    { r = 1, g = 0.55, b = 0.20 }, { r = 0.95, g = 0.45, b = 0.80 }, { r = 0.70, g = 0.50, b = 1 },
+}
+local FAKE_ICONS = {   -- when the icon catalog is empty
+    "INV_Misc_Note_01", "INV_Misc_Book_09", "INV_Misc_Map_01", "INV_Potion_54",
+    "INV_Misc_Coin_01", "Ability_Mount_RidingHorse", "INV_Misc_Head_Dragon_01", "Spell_Holy_HolyBolt",
+}
+
+local _fake = {}
+local function Pick(t) return t[math.random(#t)] end
+
+-- New icons, icon frames (one in three without), titles, colours, places
+local function ShuffleFake()
+    local icons  = BNB.ICON_MANIFEST
+    local frames = BNB.IconFrames and BNB.IconFrames.LIST or {}
+    for i = 1, ST_COUNT do
+        _fake[i] = {
+            icon  = (icons and #icons > 0) and Pick(icons) or ("Interface\\Icons\\" .. Pick(FAKE_ICONS)),
+            note  = { iconFrame = (#frames > 0 and math.random(3) > 1) and Pick(frames).key or nil },
+            title = Pick(FAKE_TITLES),
+            color = Pick(FAKE_COLORS) or nil,
+            where = Pick(FAKE_WHERE),
+            line2 = Pick(FAKE_LINES),
+            pin   = math.random(3) == 1,
+            frac  = 0.15 + math.random() * 0.85,
+        }
+    end
+end
+
+local function StackGrow()
+    local k = Store().stGrow or (BigNoteBoxDB and BigNoteBoxDB.toastGrow) or "down"
+    return BNB.Toast.GROW[k] and k or "down"
+end
+
+local function ToastScale()
+    local v = (BigNoteBoxDB and BigNoteBoxDB.toastScale) or BNB.DEFAULTS.toastScale or 1
+    return math.max(0.5, math.min(1.5, v))
+end
+
+local function PlaceStackToast(tf)
+    tf:ClearAllPoints()
+    tf:SetPoint("CENTER", _st.holder, "BOTTOMLEFT", tf._x, tf._y)
+end
+
+-- The timer bar's colour, as the engine draws it at that much time left
+local function BarColour(bar, frac)
+    if frac > 0.5 then     bar:SetColorTexture(0.3, 0.75, 0.3, 0.9)
+    elseif frac > 0.2 then bar:SetColorTexture(0.85, 0.70, 0.2, 0.9)
+    else                   bar:SetColorTexture(0.85, 0.25, 0.2, 0.9) end
+end
+
+LayoutStack = function()
+    if not (_st and _st:IsShown() and LIST[_idx]) then return end
+    if #_fake < ST_COUNT then ShuffleFake() end
+    local T, d = BNB.Toast, Def(_idx)
+    local ts  = ToastScale()
+    local s   = ts * StackZoom()
+    local dir = T.GROW[StackGrow()]
+    local ext, gaps = {}, {}
+    for i, tf in ipairs(_st.toasts) do
+        local fk = _fake[i]
+        TS.Apply(tf, d)
+        TS.Fill(tf, {
+            icon = fk.icon, title = fk.title, titleColor = fk.color, text = fk.where,
+            line2 = fk.line2, pin = fk.pin,
+            -- As ContextNotes' NoteIconSetup: only a note with a frame
+            iconSetup = fk.note.iconFrame and function(tex, _, ownFrame)
+                if ownFrame then return end
+                return BNB.ApplyIconFrame(tex, fk.note, tex:GetWidth())
+            end or nil,
+        })
+        if tf._barW then
+            -- The last toast's bar runs (the ticker in BuildStack)
+            local frac = (i == ST_COUNT) and (_st._liveFrac or 1) or fk.frac
+            tf._bar:SetWidth(math.max(0.01, tf._barW * frac))
+            BarColour(tf._bar, frac)
+            tf._bar:Show()
+        end
+        if i == ST_COUNT then
+            tf._more:SetText(string.format(L["TOAST_MORE"], 2)); tf._more:Show()
+        else
+            tf._more:Hide()
+        end
+        -- Toast pixels: the holder carries the Toast size, as the engine's
+        -- screen units carry it
+        ext[i]  = (dir[1] ~= 0) and d.w or d.h
+        gaps[i] = d.gap or T.GAP
+    end
+    local offs = T.Offsets(ext, gaps, dir)
+    local minX, maxX, minY, maxY = math.huge, -math.huge, math.huge, -math.huge
+    for _, o in ipairs(offs) do
+        minX, maxX = math.min(minX, o[1] - d.w / 2), math.max(maxX, o[1] + d.w / 2)
+        minY, maxY = math.min(minY, o[2] - d.h / 2), math.max(maxY, o[2] + d.h / 2)
+    end
+    local W, H = maxX - minX, maxY - minY
+    local holder = _st.holder
+    holder:SetScale(s)
+    holder:SetSize(math.max(1, W), math.max(1, H))
+    holder:ClearAllPoints()
+    holder:SetPoint("TOP", _st, "TOP", 0, -(ST_HEAD + ST_PAD) / s)
+    _st:SetSize(math.max(400, W * s + ST_PAD * 2), H * s + ST_PAD * 2 + ST_HEAD)
+    for i, tf in ipairs(_st.toasts) do
+        tf._tx, tf._ty = offs[i][1] - minX, offs[i][2] - minY
+        if not _st._firing then tf._x, tf._y = tf._tx, tf._ty end
+        PlaceStackToast(tf)
+    end
+
+    local st = State(_idx)
+    _st.growBtn:SetText("Grow: " .. StackGrow())
+    if not _st.gapBox.eb:HasFocus() then _st.gapBox.eb:SetText(tostring(st.gap or T.GAP)) end
+    _st.gapNote:SetText(st.gap and "" or "(engine default)")
+    _st.title:SetText(string.format("In game  (Toast size %d%%)", R(ts * 100)))
+    _st.zoomLbl:SetText(string.format("%d%%", R(StackZoom() * 100)))
+    DrawBg(_st, "stBg")
+end
+
+-- Ends a Fire run: every toast in its slot and shown
+local function StopFire()
+    if not _st then return end
+    _st._firing = nil
+    _st:SetScript("OnUpdate", nil)
+    for _, tf in ipairs(_st.toasts) do
+        tf._at = nil
+        if BNB.StopFade then BNB.StopFade(tf) end
+        tf:SetAlpha(1); tf:Show()
+    end
+end
+
+-- The four toasts arrive one after another and slide into their slots, as
+-- the engine's Slide in does
+local FIRE_STEP = 0.45
+local function Fire()
+    local T = BNB.Toast
+    local now = GetTime()
+    _st._firing = true
+    for i, tf in ipairs(_st.toasts) do
+        if BNB.StopFade then BNB.StopFade(tf) end
+        tf:Hide(); tf:SetAlpha(0)
+        tf._at = now + (i - 1) * FIRE_STEP
+    end
+    LayoutStack()
+    _st:SetScript("OnUpdate", function(self, dt)
+        local t, busy = GetTime(), false
+        local k   = math.min(1, dt * T.SLIDE_RATE)
+        local dir = T.GROW[StackGrow()]
+        local out = T.SLIDE_PX / ToastScale()
+        for _, tf in ipairs(self.toasts) do
+            if tf._at then
+                busy = true
+                if t >= tf._at then
+                    tf._at = nil
+                    tf._x, tf._y = tf._tx + dir[1] * out, tf._ty + dir[2] * out
+                    PlaceStackToast(tf)
+                    tf:Show()
+                    BNB.FadeTo(tf, 0, 1, T.FADE)
+                end
+            elseif tf._x ~= tf._tx or tf._y ~= tf._ty then
+                busy = true
+                tf._x = tf._x + (tf._tx - tf._x) * k
+                tf._y = tf._y + (tf._ty - tf._y) * k
+                if math.abs(tf._tx - tf._x) < 0.5 and math.abs(tf._ty - tf._y) < 0.5 then
+                    tf._x, tf._y = tf._tx, tf._ty
+                end
+                PlaceStackToast(tf)
+            end
+        end
+        if not busy then self._firing = nil; self:SetScript("OnUpdate", nil) end
+    end)
+end
+
+local function SetGap(v)
+    local st = State(_idx)
+    st.gap = v and R(v) or nil
+    Refresh()
+end
+
+local function BuildStack()
+    local f = LabWindow("BigNoteBoxToastLabStack")
+    _st = f
+
+    f.title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f.title:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -9)
+    local bgB = K.SmallBtn(f, "Bg", 32, function()
+        local s = Store(); s.stBg = (s.stBg or 1) % #BGS + 1; Refresh()
+    end)
+    bgB:SetPoint("TOPRIGHT", f, "TOPRIGHT", -8, -6)
+    f.growBtn = K.SmallBtn(f, "Grow: down", 90, function()
+        local cur = 1
+        for n, k in ipairs(GROW_ORDER) do if k == StackGrow() then cur = n end end
+        Store().stGrow = GROW_ORDER[cur % #GROW_ORDER + 1]
+        StopFire()
+        Refresh()
+    end)
+    f.growBtn:SetPoint("RIGHT", bgB, "LEFT", -4, 0)
+    local fire = K.SmallBtn(f, "Fire", 50, function() Fire() end)
+    fire:SetPoint("RIGHT", f.growBtn, "LEFT", -4, 0)
+    local rnd = K.SmallBtn(f, "Random", 66, function() ShuffleFake(); Refresh() end)
+    rnd:SetPoint("RIGHT", fire, "LEFT", -4, 0)
+
+    -- Gap: the style's space between toasts (nil = the engine's GAP)
+    local gl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    gl:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -38)
+    gl:SetText("Gap")
+    local minus = K.SmallBtn(f, "-", 22, function()
+        SetGap((State(_idx).gap or BNB.Toast.GAP) - (IsShiftKeyDown() and 5 or 1))
+    end)
+    minus:SetPoint("LEFT", gl, "RIGHT", 8, 0)
+    f.gapBox = K.NumBox(f, 44, function(v) SetGap(v) end, function() Refresh() end)
+    f.gapBox:SetPoint("LEFT", minus, "RIGHT", 4, 0)
+    local plus = K.SmallBtn(f, "+", 22, function()
+        SetGap((State(_idx).gap or BNB.Toast.GAP) + (IsShiftKeyDown() and 5 or 1))
+    end)
+    plus:SetPoint("LEFT", f.gapBox, "RIGHT", 4, 0)
+    local def = K.SmallBtn(f, "Default", 60, function() SetGap(nil) end)
+    def:SetPoint("LEFT", plus, "RIGHT", 6, 0)
+    f.gapNote = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    f.gapNote:SetPoint("LEFT", def, "RIGHT", 8, 0)
+    local hint = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hint:SetPoint("TOPRIGHT", f, "TOPRIGHT", -12, -66)
+    hint:SetText("Wheel: gap (Shift 5)")
+
+    -- Zoom: the window only, on top of the Toast size
+    local zl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    zl:SetPoint("TOPLEFT", f, "TOPLEFT", 12, -64)
+    zl:SetText("Zoom")
+    local function SetZoom(d)
+        local z = math.max(ZOOM_MIN, math.min(ZOOM_MAX, StackZoom() + d))
+        Store().stZoom = (z ~= 1) and z or nil
+        Refresh()
+    end
+    local zMinus = K.SmallBtn(f, "-", 22, function() SetZoom(-ZOOM_STEP) end)
+    zMinus:SetPoint("LEFT", zl, "RIGHT", 8, 0)
+    f.zoomLbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.zoomLbl:SetPoint("LEFT", zMinus, "RIGHT", 4, 0)
+    f.zoomLbl:SetWidth(44)
+    local zPlus = K.SmallBtn(f, "+", 22, function() SetZoom(ZOOM_STEP) end)
+    zPlus:SetPoint("LEFT", f.zoomLbl, "RIGHT", 4, 0)
+    local z100 = K.SmallBtn(f, "100%", 50, function() Store().stZoom = nil; Refresh() end)
+    z100:SetPoint("LEFT", zPlus, "RIGHT", 6, 0)
+
+    -- The wheel over the stack sets the gap; it can go below 0 for art
+    -- with empty edges
+    f:EnableMouseWheel(true)
+    f:SetScript("OnMouseWheel", function(_, delta)
+        SetGap((State(_idx).gap or BNB.Toast.GAP) + delta * (IsShiftKeyDown() and 5 or 1))
+    end)
+
+    local holder = CreateFrame("Frame", nil, f)
+    f.holder = holder
+    f.toasts = {}
+    for i = 1, ST_COUNT do
+        local tf = BNB.CreateBackdropFrame("Frame", nil, holder)
+        TS.Build(tf)
+        f.toasts[i] = tf
+    end
+    f:HookScript("OnHide", StopFire)
+
+    -- The last toast counts down over and over, at the player's hold time
+    -- (Until clicked = 5 s here), and pauses while the pointer is on a toast,
+    -- as the engine does. Its own frame: Fire owns the window's OnUpdate
+    local ticker = CreateFrame("Frame", nil, f)
+    local elapsed = 0
+    ticker:SetScript("OnUpdate", function(_, dt)
+        local tf = f.toasts[ST_COUNT]
+        if not (tf and tf._barW) then return end
+        for _, t in ipairs(f.toasts) do
+            if t:IsShown() and t:IsMouseOver() then return end
+        end
+        local hold = (BigNoteBoxDB and BigNoteBoxDB.popupHoldTime) or BNB.DEFAULTS.popupHoldTime or 5
+        if hold <= 0 then hold = 5 end
+        elapsed = (elapsed + dt) % hold
+        local frac = 1 - elapsed / hold
+        f._liveFrac = frac
+        tf._bar:SetWidth(math.max(0.01, tf._barW * frac))
+        BarColour(tf._bar, frac)
     end)
     return f
 end
@@ -523,6 +932,7 @@ local function EntryLabel(i)
     local st = Store().e[e.key]
     local lbl = (st and st.name and st.name ~= "") and st.name or (e.atlas or e.key)
     if e.atlas and not AtlasHere(e.atlas) and e.g ~= "built" then lbl = "|cffff5555" .. lbl .. " (not on this client)|r"
+    elseif st and st.done then lbl = "|cff888888" .. lbl .. " (done)|r"
     elseif st and st.skip then lbl = "|cff888888" .. lbl .. " (skip)|r"
     elseif st and st.name and st.name ~= "" and e.g ~= "built" then lbl = "|cff66bb6a" .. lbl .. "|r" end
     return lbl
@@ -541,6 +951,7 @@ local function BuildControl()
     f:HookScript("OnHide", function()
         if _sheet and _sheet.frame then _sheet.frame:Hide() end
         if _pv then _pv:Hide() end
+        if _st then _st:Hide() end
         TS.SetOverride(nil)
     end)
     _ctl = f
@@ -567,6 +978,7 @@ local function BuildControl()
         fs:SetText(label)
         BNB.LabelHit(cb, fs)
         cb:SetScript("OnClick", onClick)
+        cb._lbl = fs   -- a body FontString: hide it with the box
         return cb
     end
     -- A number box writing st[part][field] (part nil = st itself)
@@ -575,7 +987,10 @@ local function BuildControl()
         host = K.NumBox(body, w, function(v)
             local st = State(_idx)
             local t = part and st[part == "sel" and _sel or part] or st
-            if v and t then t[host._field] = v end
+            if v and t then
+                t[host._field] = v
+                if host._text then t.scale = nil end
+            end
             Refresh()
         end, function() Refresh() end)
         host:SetPoint("TOPLEFT", body, "TOPLEFT", x, yy)
@@ -584,11 +999,34 @@ local function BuildControl()
         return host
     end
 
-    -- Navigation
-    local prev = K.SmallBtn(body, "<", 30, function() Go(_idx - 1) end)
+    -- Navigation. < > step over done entries while Hide done is on (as the
+    -- Icon Lab); Hide done is a list filter, so it sits on this row
+    local function Hidden(i)
+        local st = Store().e[LIST[i].key]
+        return Store().hideDone and st and st.done and i ~= _idx
+    end
+    local function Step(d)
+        local i = _idx
+        for _ = 1, #LIST do
+            i = ((i + d - 1) % #LIST) + 1
+            if not Hidden(i) then break end
+        end
+        Go(i)
+    end
+    local prev = K.SmallBtn(body, "<", 30, function() Step(-1) end)
     prev:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
-    local nextB = K.SmallBtn(body, ">", 30, function() Go(_idx + 1) end)
-    nextB:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y)
+    local hideCb = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
+    hideCb:SetSize(24, 24)
+    local hideLbl = body:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    hideLbl:SetPoint("LEFT", hideCb, "RIGHT", 0, 0)
+    hideLbl:SetText("Hide done")
+    hideCb:SetPoint("TOPLEFT", body, "TOPLEFT", cw - hideLbl:GetStringWidth() - 24, y + 2)
+    BNB.LabelHit(hideCb, hideLbl)
+    BNB.CheckTip(hideCb, "Keeps done entries out of the list and out of < >.")
+    hideCb:SetScript("OnClick", function(self) Store().hideDone = self:GetChecked() or nil end)
+    f.hideDoneCb = hideCb
+    local nextB = K.SmallBtn(body, ">", 30, function() Step(1) end)
+    nextB:SetPoint("TOPRIGHT", hideCb, "TOPLEFT", -4, -2)
     local dd = CreateFrame("DropdownButton", nil, body, "WowStyle1DropdownTemplate")
     dd:SetPoint("LEFT", prev, "RIGHT", 6, 0)
     dd:SetPoint("RIGHT", nextB, "LEFT", -6, 0)
@@ -597,7 +1035,7 @@ local function BuildControl()
         for _, gk in ipairs(GROUP_ORDER) do
             local titled
             for i, e in ipairs(LIST) do
-                if e.g == gk then
+                if e.g == gk and not Hidden(i) then
                     if not titled then root:CreateTitle(GROUPS[gk]); titled = true end
                     root:CreateRadio(EntryLabel(i), function() return _idx == i end, function() Go(i) end)
                 end
@@ -607,9 +1045,9 @@ local function BuildControl()
     f.dd = dd
     y = y - 28
 
-    -- Name, Skip
+    -- Name, Done (finished: left out of Export), Skip (rejected)
     Label("Name", 0, y)
-    local name = K.PlainBox(body, 200)
+    local name = K.PlainBox(body, 150)
     name:SetPoint("TOPLEFT", body, "TOPLEFT", 48, y)
     name.eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)
     name.eb:SetScript("OnEditFocusLost", function(self)
@@ -619,7 +1057,10 @@ local function BuildControl()
     end)
     hosts[#hosts + 1] = name
     f.nameEb = name.eb
-    f.skipCb = Check("Skip", 262, y, function(self) State(_idx).skip = self:GetChecked() or nil; Refresh() end)
+    f.doneCb = Check("Done", 214, y, function(self) State(_idx).done = self:GetChecked() or nil; Refresh() end)
+    BNB.CheckTip(f.doneCb, "Finished: left out of Export (Hide done keeps it out of the list).")
+    f.skipCb = Check("Skip", 284, y, function(self) State(_idx).skip = self:GetChecked() or nil; Refresh() end)
+    BNB.CheckTip(f.skipCb, "Rejected: not a toast style, left out of Export.")
     y = y - 26
     f.src = Label("", 0, y)
     f.src:SetWidth(cw); f.src:SetJustifyH("LEFT"); f.src:SetWordWrap(false)
@@ -687,7 +1128,7 @@ local function BuildControl()
     f.onCb = Check("On", 290, y, function(self)
         local st = State(_idx)
         if self:GetChecked() then
-            st[_sel] = st[_sel] or StartLayout(st.w, st.h)[_sel]
+            st[_sel] = st[_sel] or DefaultLayout()[_sel]
         else
             st[_sel] = (_sel == "bar") and false or nil
         end
@@ -695,8 +1136,11 @@ local function BuildControl()
     end)
     y = y - 28
 
-    -- Text parts: scale, justify. Icon: shape, frame, border
-    f.scaleLbl = Label("Scale", 0, y); f.scaleBox = Num(40, y, 46, "sel", "scale")
+    -- Text parts: size, justify, font. Icon: shape, then its default frame
+    -- and border below
+    f.sizeLbl = Label("Size", 0, y)
+    f.tsizeBox = Num(40, y, 46, "sel", "size")
+    f.tsizeBox._text = true   -- a font size replaces the older scale
     local JUST = { "LEFT", "CENTER", "RIGHT" }
     f.justBtn = K.SmallBtn(body, "LEFT", 70, function()
         local b = State(_idx)[_sel]
@@ -713,13 +1157,67 @@ local function BuildControl()
         if b then b.shape = (b.shape == "circle") and "square" or "circle"; Refresh() end
     end)
     f.shapeBtn:SetPoint("TOPLEFT", body, "TOPLEFT", 100, y)
+    -- Art with its own socket or ring: the note's icon frame stays off
+    f.ownFrameCb = Check("Toast's border only", 184, y, function(self)
+        local b = State(_idx).icon
+        if b then b.ownFrame = self:GetChecked() or nil end
+        Refresh()
+    end)
+    BNB.CheckTip(f.ownFrameCb, "Only this toast's own border (its Frame / Border below, or a socket in the art). A note's own icon frame is not drawn on this style.")
     y = y - 28
 
-    f.frameLbl = Label("Frame", 0, y)
+    -- A text's font: the game's font object (keeps its fallback for every
+    -- alphabet), the game's own fonts, ours, and installed font packs
+    f.fontLbl = Label("Font", 0, y)
     local fdd = CreateFrame("DropdownButton", nil, body, "WowStyle1DropdownTemplate")
     fdd:SetPoint("TOPLEFT", body, "TOPLEFT", 48, y + 2)
     fdd:SetWidth(cw - 48)
     fdd:SetupMenu(function(_, root)
+        pcall(function() root:SetScrollMode(400) end)
+        local function Cur() local b = State(_idx)[_sel]; return b and b.font end
+        local function Set(k) local b = State(_idx)[_sel]; if b then b.font = k; Refresh() end end
+        local function Radio(label, key)
+            root:CreateRadio(label, function() return Cur() == key end, function() Set(key) end)
+        end
+        Radio("Game font (default)", nil)
+        root:CreateTitle("Blizzard fonts")
+        for _, g in ipairs(TS.GAME_FONTS) do Radio(g.label, g.key) end
+        local ours, packs = {}, {}
+        for _, def in ipairs(BNB.FONTS or {}) do
+            if def._pack then packs[#packs + 1] = def
+            elseif not (def._isWoW or def._isLSM) and (def.set or "latin") == "latin" then ours[#ours + 1] = def end
+        end
+        root:CreateTitle("BigNoteBox fonts")
+        for _, def in ipairs(ours) do Radio(def.label, def.id) end
+        if #packs > 0 then
+            root:CreateTitle("Font packs")
+            for _, def in ipairs(packs) do Radio(def.label, def.id) end
+        end
+    end)
+    f.fontDd = fdd
+
+    -- Icon: the style's default frame and border, drawn only for a note
+    -- that has no icon frame of its own (Dukul, 2026-10-07)
+    f.frameLbl = Label("Frame", 0, y)
+    -- < > step through None + every frame, as the entry row does
+    local function StepFrame(d)
+        local b = State(_idx).icon
+        if not b then return end
+        local keys = { false }
+        for _, e in ipairs(BNB.IconFrames and BNB.IconFrames.LIST or {}) do keys[#keys + 1] = e.key end
+        local cur = 1
+        for n, k in ipairs(keys) do if k == (b.frame or false) then cur = n end end
+        b.frame = keys[((cur - 1 + d) % #keys) + 1] or nil
+        Refresh()
+    end
+    f.framePrev = K.SmallBtn(body, "<", 24, function() StepFrame(-1) end)
+    f.framePrev:SetPoint("TOPLEFT", body, "TOPLEFT", 48, y)
+    f.frameNext = K.SmallBtn(body, ">", 24, function() StepFrame(1) end)
+    f.frameNext:SetPoint("TOPRIGHT", body, "TOPRIGHT", 0, y)
+    local idd = CreateFrame("DropdownButton", nil, body, "WowStyle1DropdownTemplate")
+    idd:SetPoint("LEFT", f.framePrev, "RIGHT", 4, 0)
+    idd:SetPoint("RIGHT", f.frameNext, "LEFT", -4, 0)
+    idd:SetupMenu(function(_, root)
         pcall(function() root:SetScrollMode(400) end)
         local function Set(k) local b = State(_idx).icon; if b then b.frame = k; Refresh() end end
         root:CreateRadio("None", function() local b = State(_idx).icon; return not (b and b.frame) end, function() Set(nil) end)
@@ -728,7 +1226,7 @@ local function BuildControl()
                 function() Set(e.key) end)
         end
     end)
-    f.frameDd = fdd
+    f.frameDd = idd
     y = y - 28
     f.borderLbl = Label("Border", 0, y)
     local bord = K.PlainBox(body, 200)
@@ -755,8 +1253,11 @@ local function BuildControl()
     end, function() Refresh() end)
     f.borderPad:SetPoint("TOPLEFT", body, "TOPLEFT", 256, y)
     hosts[#hosts + 1] = f.borderPad
-    Label("pad", 300, y)
-    y = y - 34
+    f.padLbl = Label("pad", 300, y)
+    y = y - 22
+    f.iconNote = Label("Default only: a note's own icon frame replaces both.", 0, y)
+    f.iconNote:SetFontObject("GameFontDisableSmall")
+    y = y - 22
     K.TabChain(hosts)
 
     -- Try it on the real toasts
@@ -771,7 +1272,12 @@ local function BuildControl()
     local help = body:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     help:SetPoint("TOPLEFT", body, "TOPLEFT", 0, y)
     help:SetWidth(cw); help:SetJustifyH("LEFT")
-    help:SetText("Export takes every named entry that is not skipped. Built-in styles export under their own key.")
+    help:SetText("Export takes every named entry that is not done or skipped. Built-in styles export under their own key.")
+end
+
+-- FontStrings show with Show / Hide, never SetShown
+local function Vis(fs, on)
+    if on then fs:Show() else fs:Hide() end
 end
 
 local function SetBox(host, v)
@@ -784,7 +1290,9 @@ Refresh = function()
     local f, e, st = _ctl, LIST[_idx], State(_idx)
     f.dd:SetText(EntryLabel(_idx))
     if not f.nameEb:HasFocus() then f.nameEb:SetText(st.name or "") end
+    f.doneCb:SetChecked(st.done and true or false)
     f.skipCb:SetChecked(st.skip and true or false)
+    f.hideDoneCb:SetChecked(Store().hideDone and true or false)
     local src = e.atlas and ("atlas " .. e.atlas) or (e.path and (e.path .. " (" .. tostring(e.id) .. ")")) or ("style " .. e.key)
     if st.crop then src = src .. "  crop " .. table.concat(st.crop, ", ") end
     f.src:SetText(src)
@@ -802,16 +1310,18 @@ Refresh = function()
     f.wLbl:SetText(isIcon and "Size" or "W")
     SetBox(f.pwBox, b and (isIcon and b.size or b.w))
     local hasW = _sel ~= "more"
-    f.pwBox:SetShown(hasW); f.wLbl:SetShown(hasW)
-    f.phBox:SetShown(_sel == "bar"); f.hLbl:SetShown(_sel == "bar")
+    f.pwBox:SetShown(hasW); Vis(f.wLbl, hasW)
+    f.phBox:SetShown(_sel == "bar"); Vis(f.hLbl, _sel == "bar")
     SetBox(f.phBox, b and b.h)
-    f.scaleLbl:SetShown(isText); f.scaleBox:SetShown(isText); f.justBtn:SetShown(isText)
-    SetBox(f.scaleBox, b and (b.scale or 1))
+    Vis(f.sizeLbl, isText); f.tsizeBox:SetShown(isText); f.justBtn:SetShown(isText)
+    -- A text with only the older scale shows the px it draws at
+    SetBox(f.tsizeBox, isText and b and Num(R(TS.TextSize(_sel, b) * 100) / 100) or nil)
     f.justBtn:SetText(b and b.justify or "LEFT")
-    f.shapeBtn:SetShown(isIcon)
-    f.shapeBtn:SetText((st.icon and st.icon.shape == "circle") and "Circle" or "Square")
-    f.frameLbl:SetShown(isIcon); f.frameDd:SetShown(isIcon)
-    f.borderLbl:SetShown(isIcon); f.borderEb:GetParent():SetShown(isIcon); f.borderPad:SetShown(isIcon)
+    Vis(f.fontLbl, isText); f.fontDd:SetShown(isText)
+    Vis(f.frameLbl, isIcon); f.frameDd:SetShown(isIcon)
+    f.framePrev:SetShown(isIcon); f.frameNext:SetShown(isIcon)
+    Vis(f.borderLbl, isIcon); f.borderEb:GetParent():SetShown(isIcon); f.borderPad:SetShown(isIcon)
+    Vis(f.padLbl, isIcon); Vis(f.iconNote, isIcon)
     local ic = st.icon
     f.frameDd:SetText((ic and ic.frame and BNB.IconFrames.Label(ic.frame)) or "None")
     if not f.borderEb:HasFocus() then
@@ -819,7 +1329,16 @@ Refresh = function()
         f.borderEb:SetText(bd and (bd.atlas or tostring(bd.file)) or "")
     end
     SetBox(f.borderPad, ic and ic.border and ic.border.pad)
+    f.fontDd:SetText((b and b.font and TS.FontLabel(b.font)) or "Game font (default)")
+    f.shapeBtn:SetShown(isIcon)
+    f.ownFrameCb:SetShown(isIcon); Vis(f.ownFrameCb._lbl, isIcon)
+    f.iconNote:SetText((st.icon and st.icon.ownFrame)
+        and "Always drawn: a note's own icon frame is left off on this style."
+        or "Default only: a note's own icon frame replaces both.")
+    f.ownFrameCb:SetChecked(st.icon and st.icon.ownFrame and true or false)
+    f.shapeBtn:SetText((st.icon and st.icon.shape == "circle") and "Circle" or "Square")
     LayoutPreview()
+    LayoutStack()
     if _sheet and _sheet.frame and _sheet.frame:IsShown() then _sheet.Layout() end
 end
 
@@ -830,10 +1349,13 @@ function BNB.OpenToastLab()
     if not _sheet then BuildSheet() end
     _pv = _pv or BuildPreview()
     if not _pv:GetPoint() then _pv:SetPoint("TOPLEFT", _ctl, "TOPRIGHT", 12, 0) end
+    if not _st then BuildStack() end
+    if not _st:GetPoint() then _st:SetPoint("TOPRIGHT", _ctl, "TOPLEFT", -12, 0) end
     local sh = _sheet.frame
     if not sh:GetPoint() then sh:SetPoint("TOPLEFT", _pv, "BOTTOMLEFT", 0, -12) end
     _ctl:Show(); _ctl:Raise()
     _pv:Show()
+    _st:Show()
     Go(Store().idx or 1)
 end
 
