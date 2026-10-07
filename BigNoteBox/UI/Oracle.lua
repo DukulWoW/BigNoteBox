@@ -333,18 +333,21 @@ local function HelpColumns()
     }
     -- Example queries are format strings filled with this locale's letters
     -- (and date word), so they always show what really works.
-    local function example(fmtKey, ...)
-        for i = 1, select("#", ...) do
-            if not (select(i, ...)) then return end   -- a letter the locale left out
+    -- n = how many letters the example needs: a role whose module is off
+    -- returns no value at all, so select("#") alone cannot see it was left out
+    -- (ALL-379, BUGS.md BUG-001: Sticky Notes off broke the whole help)
+    local function example(fmtKey, n, ...)
+        for i = 1, n do
+            if not (select(i, ...)) then return end   -- a letter the locale or a module left out
         end
         right[#right + 1] = { ex = L[fmtKey]:format(...) }
         right[#right + 1] = { sub = L[fmtKey .. "_DESC"] }
     end
-    example("ORACLE_EX_1", RoleLetter("sticky"))
-    example("ORACLE_EX_2", RoleLetter("player"), RoleLetter("tasks"))
-    example("ORACLE_EX_3", d, DateWord("week"))
-    example("ORACLE_EX_4", d)
-    example("ORACLE_EX_5", RoleLetter("npc"))
+    example("ORACLE_EX_1", 1, RoleLetter("sticky"))
+    example("ORACLE_EX_2", 2, RoleLetter("player"), RoleLetter("tasks"))
+    example("ORACLE_EX_3", 2, d, DateWord("week"))
+    example("ORACLE_EX_4", 1, d)
+    example("ORACLE_EX_5", 1, RoleLetter("npc"))
     return left, right
 end
 
