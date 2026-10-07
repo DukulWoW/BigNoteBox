@@ -3,7 +3,8 @@
 -- Matches a note's situations against the player's current environment and
 -- surfaces matching notes via:
 --   1. Minimap badge (a count overlay on the minimap button)
---   2. Toast notification (a small slide-in frame, auto-dismissed after 6s)
+--   2. Toasts through the toast engine (UI/Toast.lua, ALL-376): one per
+--      note, or one with a row per note (toastLayout "group")
 --
 -- note.situations: a list of situation strings, read through
 -- BNB.NoteSituations (Core/NoteFields.lua); the note matches while any one
@@ -314,196 +315,20 @@ local function UpdateMinimapBadge(count)
     end
 end
 
--- ── Toast notification ────────────────────────────────────────────────────────
-local _toast        = nil
-local _toastRows    = {}
-local TOAST_W       = 260
-local TOAST_H_BASE  = 48
-local TOAST_ROW_H   = 22
-local TOAST_MAX_ROWS = 6
-local TOAST_FADE    = 0.5
-local TOAST_BAR_H   = 2
+-- ── Toasts (UI/Toast.lua, ALL-376) ──────────────────────────────────────────
+-- One toast per note (toastLayout "each", the default), or one toast with a
+-- row per note ("group", when more than one note shows at once). A note toast
+-- shows the note's icon (its own icon frame, an NPC note's portrait), why it
+-- showed, its tl;dr or first line and a pin when the situation places a
+-- waypoint; each part is a setting (toastShowIcon / Why / Summary / Pin).
+-- A note may carry its own style (note.toastStyle) and time on screen
+-- (note.toastHold), set from the toast's right-click menu.
 
-local function GetHoldTime()
+local function Setting(key)
     local db = BigNoteBoxDB
-    return (db and db.popupHoldTime) or BNB.DEFAULTS.popupHoldTime
-end
-
--- Countdown state (managed via OnUpdate, not C_Timer — gives us the bar)
-local _countdown = {
-    running  = false,
-    paused   = false,
-    elapsed  = 0,
-    duration = 5,
-}
-
-local function DismissToast()
-    local f = _toast; if not f then return end
-    _countdown.running = false
-    f:SetScript("OnUpdate", nil)
-    -- BNB.FadeTo, not UIFrameFadeOut + a timed Hide (CMP-05): a toast shown
-    -- again inside the fade-out starts a new fade, which drops this Hide
-    BNB.FadeTo(f, f:GetAlpha(), 0, TOAST_FADE, function() f:Hide() end)
-end
-
-local function IsMouseOverToast()
-    local f = _toast; if not f or not f:IsVisible() then return false end
-    if f:IsMouseOver() then return true end
-    for _, row in ipairs(_toastRows) do
-        if row:IsVisible() and row:IsMouseOver() then return true end
-    end
-    return false
-end
-
-local function StartCountdown(f)
-    local ht = GetHoldTime()
-    if ht <= 0 then
-        -- 0 = stay forever, hide bar
-        _countdown.running = false
-        if f._bar then f._bar:Hide() end
-        f:SetScript("OnUpdate", nil)
-        return
-    end
-    _countdown.running  = true
-    _countdown.paused   = IsMouseOverToast()
-    _countdown.elapsed  = 0
-    _countdown.duration = ht
-    if f._bar then
-        f._bar:SetWidth(f:GetWidth())
-        f._bar:Show()
-    end
-    f:SetScript("OnUpdate", function(self, dt)
-        if not _countdown.running then self:SetScript("OnUpdate", nil); return end
-        if _countdown.paused then return end
-        _countdown.elapsed = _countdown.elapsed + dt
-        -- Update bar width
-        local frac = 1 - math.min(_countdown.elapsed / _countdown.duration, 1)
-        if self._bar then
-            local bw = math.max(0, self:GetWidth() * frac)
-            self._bar:SetWidth(bw)
-            -- Colour shift: green → yellow → red
-            if frac > 0.5 then
-                self._bar:SetColorTexture(0.3, 0.75, 0.3, 0.9)
-            elseif frac > 0.2 then
-                self._bar:SetColorTexture(0.85, 0.70, 0.2, 0.9)
-            else
-                self._bar:SetColorTexture(0.85, 0.25, 0.2, 0.9)
-            end
-        end
-        if _countdown.elapsed >= _countdown.duration then
-            DismissToast()
-        end
-    end)
-end
-
-local function PauseCountdown()
-    _countdown.paused = true
-end
-
-local function ResumeCountdown()
-    if not _countdown.running then return end
-    _countdown.paused = false
-end
-
-local function GetOrCreateToast()
-    if _toast then return _toast end
-
-    local f = BNB.CreateBackdropFrame("Frame", "BigNoteBoxContextToast", UIParent)
-    f:SetSize(TOAST_W, TOAST_H_BASE)
-    f:SetFrameStrata("DIALOG")
-    f:SetClampedToScreen(true)
-    if BNB.GetPopupAnchorPoint then
-        f:SetPoint(BNB.GetPopupAnchorPoint())
-    else
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
-    end
-    BNB.SetBackdrop(f, 0.06, 0.06, 0.09, 0.94, 0.40, 0.40, 0.42, 1)
-    f:SetAlpha(0)
-    f:Hide()
-
-    -- Countdown bar (anchored to bottom of the full toast including rows)
-    local bar = f:CreateTexture(nil, "OVERLAY")
-    bar:SetHeight(TOAST_BAR_H)
-    bar:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 0, 0)
-    bar:SetColorTexture(0.3, 0.75, 0.3, 0.9)
-    bar:SetWidth(TOAST_W)
-    bar:Hide()
-    f._bar = bar
-
-    -- Icon
-    local icon = f:CreateTexture(nil, "ARTWORK")
-    icon:SetSize(32, 32)
-    icon:SetPoint("LEFT", f, "LEFT", 8, 0)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    f._icon = icon
-
-    -- Main label (gold)
-    local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    lbl:SetPoint("LEFT",  icon, "RIGHT",  8, 4)
-    lbl:SetPoint("RIGHT", f,    "RIGHT", -8, 0)
-    lbl:SetJustifyH("LEFT")
-    lbl:SetWordWrap(true)
-    lbl:SetMaxLines(1)
-    lbl:SetTextColor(1, 0.82, 0, 1)
-    f._lbl = lbl
-
-    -- Sub label (grey)
-    local sub = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    sub:SetPoint("LEFT",   icon,  "RIGHT",   8, -6)
-    sub:SetPoint("RIGHT",  f,     "RIGHT",  -8,  0)
-    sub:SetPoint("BOTTOM", f,     "BOTTOM",  0,  6)
-    sub:SetJustifyH("LEFT")
-    sub:SetWordWrap(false)
-    sub:SetMaxLines(1)
-    sub:SetTextColor(0.65, 0.65, 0.65)
-    f._sub = sub
-
-    f:EnableMouse(true)
-    f:SetScript("OnEnter", PauseCountdown)
-    f:SetScript("OnLeave", function()
-        -- Only resume if mouse truly left the entire toast area
-        if not IsMouseOverToast() then ResumeCountdown() end
-    end)
-
-    -- If the toast appears under the cursor, OnEnter never fires.
-    -- Check on first frame after show.
-    f:SetScript("OnShow", function()
-        C_Timer.After(0, function()
-            if IsMouseOverToast() then PauseCountdown() end
-        end)
-    end)
-
-    _toast = f
-    return f
-end
-
-local function GetToastRow(parent, index)
-    if _toastRows[index] then return _toastRows[index] end
-    local row = CreateFrame("Button", nil, parent)
-    row:SetHeight(TOAST_ROW_H)
-    local bg = row:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(); bg:SetColorTexture(0.10, 0.10, 0.13, 0.8)
-    local hi = row:CreateTexture(nil, "ARTWORK")
-    hi:SetAllPoints(); hi:SetColorTexture(0.25, 0.40, 0.25, 0.4)
-    hi:Hide()
-    row._hi = hi
-
-    -- Right-aligned sub-zone tag (created first so title can anchor to it)
-    local ctx = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    ctx:SetPoint("RIGHT", row, "RIGHT", -8, 0)
-    ctx:SetJustifyH("RIGHT"); ctx:SetWordWrap(false); ctx:SetMaxLines(1)
-    ctx:SetTextColor(0.50, 0.50, 0.50)
-    row._ctx = ctx
-
-    local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    lbl:SetPoint("LEFT",  row, "LEFT",  8, 0)
-    lbl:SetPoint("RIGHT", ctx, "LEFT", -4, 0)
-    lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false); lbl:SetMaxLines(1)
-    lbl:SetTextColor(0.85, 0.85, 0.85)
-    row._lbl = lbl
-
-    _toastRows[index] = row
-    return row
+    local v  = db and db[key]
+    if v == nil then v = BNB.DEFAULTS[key] end
+    return v
 end
 
 -- A click on the toast opens the note in the main window: through the note
@@ -514,154 +339,239 @@ local function OpenNote(id)
     if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id) end
 end
 
+-- Left click follows the note's Show as: a note shown as toast and sticky
+-- whose sticky was closed since opens it again; anything else opens in the
+-- main window
+local function ClickNote(id)
+    local note = BNB.GetNote(id)
+    if not note then return end
+    if note.contextDisplay == "both" and BNB.StickiesEnabled() and BNB.Sticky
+       and not BNB.Sticky.IsOpen(id) then
+        BNB.Sticky.Open(id)
+        return
+    end
+    OpenNote(id)
+end
+
+-- The demo notes of the Test button (TestSituationToasts), by id; nil while
+-- no test ran. Looked up before the real notes, so the toasts need no fakes
+local _demo = nil
+local function ToastNote(id)
+    return (_demo and _demo[id]) or BNB.GetNote(id)
+end
+
 -- leftBy: noteID -> the situation string it was left by, for notes shown on
 -- leaving (ALL-232); the line under the title / the row tag says so
-local function ShowToast(matchIDs, locationName, leftBy)
-    leftBy = leftBy or {}
-    local function LeftText(id)
-        local k, v = (leftBy[id] or ""):match("^(%w+):(.+)$")
-        if not v then return nil end
-        -- A player is not left but gone: "Thrall is gone", name without realm
-        if k == "player" or k == "npc" or k == "guild" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
-        -- A window is closed, not left: "Vendor closed" (ALL-232 S4)
-        if k == "open" then return string.format(L["CONTEXT_CLOSED"], BNB.SituationValueLabel(k, v)) end
-        if k == "state" then return L["CONTEXT_NOT_RESTED"] end
-        return string.format(L["CONTEXT_LEFT"], BNB.SituationValueLabel(k, v))
+local function LeftTextFor(leftBy, id)
+    local k, v = (leftBy[id] or ""):match("^(%w+):(.+)$")
+    if not v then return nil end
+    -- A player is not left but gone: "Thrall is gone", name without realm
+    if k == "player" or k == "npc" or k == "guild" then return string.format(L["CONTEXT_GONE"], v:match("^([^-]+)") or v) end
+    -- A window is closed, not left: "Vendor closed" (ALL-232 S4)
+    if k == "open" then return string.format(L["CONTEXT_CLOSED"], BNB.SituationValueLabel(k, v)) end
+    if k == "state" then return L["CONTEXT_NOT_RESTED"] end
+    return string.format(L["CONTEXT_LEFT"], BNB.SituationValueLabel(k, v))
+end
+
+-- Why a note showed: what was left; else who is here, what is open, the
+-- place it matched by; else the zone
+local function WhyText(id, leftBy, locationName)
+    local left = LeftTextFor(leftBy, id)
+    if left then return left end
+    local k, v = (BNB._contextMatchedBy[id] or ""):match("^(%w+):(.+)$")
+    if not v then return locationName end
+    if k == "player" or k == "npc" then return string.format(L["CONTEXT_HERE"], v:match("^([^-]+)") or v) end
+    if k == "guild" then return string.format(L["CONTEXT_GUILD_HERE"], v) end
+    if k == "open" then return string.format(L["CONTEXT_OPEN"], BNB.SituationValueLabel(k, v)) end
+    if k == "state" then return L["CONTEXT_RESTED"] end
+    return BNB.SituationValueLabel(k, v)
+end
+
+-- The note's tl;dr (ALL-372), else the first line of its text with any rich
+-- markup taken out. The toast cuts it at its width
+local function Summary(note)
+    local t = note.tldr
+    if type(t) == "string" and t:find("%S") then return t end
+    local body = note.body or ""
+    local AMode = BNB.AdvancedMode
+    if note.richMode and AMode and AMode.StripMarkup then body = AMode.StripMarkup(body) end
+    for line in body:gmatch("[^\n]+") do
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if line ~= "" then return line end
     end
-    if not BNB.SituationsEnabled() then return end
-    local count = #matchIDs
-    if count == 0 then return end
+end
 
-    local f = GetOrCreateToast()
-    if not f then return end
+local function NoteTitle(note)
+    return (note.title and note.title ~= "") and note.title or L["UNTITLED"]
+end
 
-    -- Stop any running countdown
-    _countdown.running = false
-    f:SetScript("OnUpdate", nil)
-
-    -- Reposition
-    f:ClearAllPoints()
-    if BNB.GetPopupAnchorPoint then
-        f:SetPoint(BNB.GetPopupAnchorPoint())
-    else
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 200)
-    end
-
-    -- Hide all existing rows
-    for _, row in ipairs(_toastRows) do row:Hide() end
-
-    if count == 1 then
-        local note = BNB.GetNote(matchIDs[1])
-        local title = (note and note.title and note.title ~= "") and note.title or L["UNTITLED"]
-        local noteIcon = (note and note.icon and note.icon ~= "") and note.icon
-            or "Interface\\AddOns\\BigNoteBox\\Assets\\icon"
-        f._icon:SetTexture(noteIcon)
-        f._lbl:SetText(title)
-        local tc = note and note.titleColor
-        if tc then f._lbl:SetTextColor(tc.r, tc.g, tc.b, 1)
-        else       f._lbl:SetTextColor(1, 0.82, 0, 1) end
-        f._sub:SetText(LeftText(matchIDs[1]) or locationName or "")
-
-        f:SetScript("OnMouseDown", function(_, btn)
-            if btn == "RightButton" then
-                _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-                return
-            end
-            OpenNote(matchIDs[1])
-            _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-        end)
-
-        f:SetSize(TOAST_W, TOAST_H_BASE)
-        f._rowCount = 0
-    else
-        f._icon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\icon")
-        f._lbl:SetText(string.format(L["CONTEXT_BADGE"], count))
-        f._sub:SetText(locationName or "")
-
-        f:SetScript("OnMouseDown", function(_, btn)
-            if btn == "RightButton" then
-                _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-                return
-            end
-            OpenNote(matchIDs[1])   -- the first one listed (the rows open each)
-            _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-        end)
-
-        local rowCount = math.min(count, TOAST_MAX_ROWS)
-        for i = 1, rowCount do
-            local row = GetToastRow(f, i)
-            row:SetParent(f)
-            row:ClearAllPoints()
-            row:SetPoint("TOPLEFT",  f, "BOTTOMLEFT",  0, -(i - 1) * TOAST_ROW_H)
-            row:SetPoint("TOPRIGHT", f, "BOTTOMRIGHT", 0, -(i - 1) * TOAST_ROW_H)
-
-            local note = BNB.GetNote(matchIDs[i])
-            local title = (note and note.title and note.title ~= "") and note.title or L["UNTITLED"]
-            local tc = note and note.titleColor
-            if tc then
-                row._lbl:SetText("|cffffd100-|r  " .. title)
-                row._lbl:SetTextColor(tc.r, tc.g, tc.b, 1)
-            else
-                row._lbl:SetText("|cffffd100-|r  " .. title)
-                row._lbl:SetTextColor(0.85, 0.85, 0.85)
-            end
-
-            -- Show sub-zone tag if this note matched by a sub-zone, or
-            -- "(Left X)" for a note shown on leaving
-            local ctx = BNB._contextMatchedBy[matchIDs[i]] or ""
-            local ctxKind, ctxVal = ctx:match("^(%w+):(.+)$")
-            local left = LeftText(matchIDs[i])
-            if left then
-                row._ctx:SetText("(" .. left .. ")")
-                row._ctx:Show()
-            elseif ctxKind == "subzone" and ctxVal and ctxVal ~= "" then
-                row._ctx:SetText("(" .. ctxVal .. ")")
-                row._ctx:Show()
-            else
-                row._ctx:SetText("")
-                row._ctx:Hide()
-            end
-
-            local noteID = matchIDs[i]
-            row:SetScript("OnMouseDown", function(_, btn)
-                if btn == "RightButton" then
-                    _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-                    return
-                end
-                OpenNote(noteID)
-                _countdown.running = false; f:SetScript("OnUpdate", nil); f:Hide()
-            end)
-            row:SetScript("OnEnter", function()
-                if row._hi then row._hi:Show() end
-                PauseCountdown()
-            end)
-            row:SetScript("OnLeave", function()
-                if row._hi then row._hi:Hide() end
-                if not IsMouseOverToast() then ResumeCountdown() end
-            end)
-            row:Show()
+-- The note's own look on its icon: an NPC note's portrait, its icon frame
+-- (true = a frame was drawn, which replaces the style's)
+local function NoteIconSetup(note)
+    return function(tex)
+        if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+        if note.iconFrame and BNB.ApplyIconFrame then
+            return BNB.ApplyIconFrame(tex, note, tex:GetWidth())
         end
-
-        -- Header stays fixed size; rows hang below
-        f:SetSize(TOAST_W, TOAST_H_BASE)
-        f._rowCount = rowCount
     end
+end
 
-    -- Anchor countdown bar: left-anchored only so SetWidth controls shrinking
-    local totalRowH = (f._rowCount or 0) * TOAST_ROW_H
-    if f._bar then
-        f._bar:ClearAllPoints()
-        f._bar:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -totalRowH)
-        f._bar:SetWidth(TOAST_W)
+-- "Not again today": the note stays quiet for this character until the
+-- date changes. Written onto the note like Stamp: not an edit
+local function QuietToday(note)
+    if not BNB.currentChar then return end
+    note.contextSeen = note.contextSeen or {}
+    local rec = note.contextSeen[BNB.currentChar] or {}
+    note.contextSeen[BNB.currentChar] = rec
+    rec.q = BNB.Date("%Y-%m-%d", time())
+end
+
+local HOLD_CHOICES = { 5, 10, 30, 60 }
+local NoteSpec   -- forward: the menu redraws the toast with the note's new style
+
+-- The right-click menu of a note toast or a grouped toast's row. owner = the
+-- toast or row (the menu closes with it); key = the toast to close after an
+-- entry; why = the toast's why line, kept when it redraws
+local function NoteMenu(id, owner, key, why)
+    local note = BNB.GetNote(id)
+    local CM = BNB.ContextMenu
+    if not (note and CM) then return end
+    local function Close() BNB.Toast.Dismiss(key) end
+    local function Redraw()
+        if key == "note:" .. id then BNB.Toast.Show(NoteSpec(note, why)) end
     end
-
-    f:Show()
-    BNB.FadeTo(f, 0, 1, TOAST_FADE)
-
-    -- Start countdown after fade-in completes
-    C_Timer.After(TOAST_FADE, function()
-        if f:IsVisible() then StartCountdown(f) end
+    CM.Open(owner, function(root)
+        root:CreateTitle(NoteTitle(note), { badge = true,
+            icon = (note.icon and note.icon ~= "") and note.icon or nil,
+            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+        root:CreateButton(L["TOAST_CM_OPEN"], function() OpenNote(id); Close() end, { icon = "editor" })
+        if BNB.StickiesEnabled() and BNB.Sticky then
+            root:CreateButton(L["TOAST_CM_STICKY"], function()
+                if not BNB.Sticky.IsOpen(id) then BNB.Sticky.Open(id) end
+                Close()
+            end, { icon = "sticky-note" })
+        end
+        local wps = BNB.ActiveWaypoints(note)
+        if not wps[1] then wps = BNB.NoteWaypoints(note) end
+        if wps[1] then
+            root:CreateButton(L["TOAST_CM_NAVIGATE"], function() BNB.NavigateWaypoints(note, wps) end,
+                { icon = "create-situation" })
+        end
+        root:CreateDivider()
+        root:CreateButton(L["TOAST_CM_QUIET"], function() QuietToday(note); Close() end,
+            { icon = "remove-situation", tip = L["TOAST_CM_QUIET_TIP"] })
+        -- This note's own style and time on screen (nil = Settings)
+        local st = root:CreateButton(L["TOAST_CM_STYLE"], nil, { icon = "note-settings" })
+        st:CreateRadio(L["TOAST_CM_DEFAULT"], function() return note.toastStyle == nil end, function()
+            BNB.UpdateNote(id, { _clear = { "toastStyle" } }); Redraw()
+        end)
+        for _, e in ipairs(BNB.ToastStyles.List()) do
+            st:CreateRadio(e.label, function() return note.toastStyle == e.key end, function()
+                BNB.UpdateNote(id, { toastStyle = e.key }); Redraw()
+            end)
+        end
+        local hold = root:CreateButton(L["TOAST_CM_HOLD"], nil, { icon = "history" })
+        hold:CreateRadio(L["TOAST_CM_DEFAULT"], function() return note.toastHold == nil end, function()
+            BNB.UpdateNote(id, { _clear = { "toastHold" } }); Redraw()
+        end)
+        for _, secs in ipairs(HOLD_CHOICES) do
+            hold:CreateRadio(string.format(L["TOAST_CM_SECONDS"], secs),
+                function() return note.toastHold == secs end,
+                function() BNB.UpdateNote(id, { toastHold = secs }); Redraw() end)
+        end
+        hold:CreateRadio(L["TOAST_CM_UNTIL_CLICKED"], function() return note.toastHold == 0 end,
+            function() BNB.UpdateNote(id, { toastHold = 0 }); Redraw() end)
+        root:CreateDivider()
+        root:CreateButton(L["TOAST_CM_DISMISS"], Close)
     end)
+end
+
+-- The engine's spec for one note toast
+NoteSpec = function(note, why)
+    local id, demo = note.id, note._demo
+    local pin = false
+    if Setting("toastShowPin") ~= false then
+        if demo then pin = note._pin and true or false else pin = BNB.HasActiveWaypoint(note) end
+    end
+    local spec = {
+        key       = "note:" .. id,
+        source    = demo and "test" or "situation",
+        force     = demo,
+        style     = note.toastStyle,
+        hold      = note.toastHold,
+        icon      = (note.icon and note.icon ~= "") and note.icon or nil,
+        noIcon    = Setting("toastShowIcon") == false,
+        title     = NoteTitle(note),
+        titleColor = note.titleColor,
+        text      = (Setting("toastShowWhy") ~= false) and why or nil,
+        line2     = (Setting("toastShowSummary") ~= false) and Summary(note) or nil,
+        pin       = pin,
+        onClick   = function() ClickNote(id) end,
+    }
+    if not demo then
+        spec.iconSetup = NoteIconSetup(note)
+        spec.onRightClick = function(_, f) NoteMenu(id, f, spec.key, why) end
+    end
+    return spec
+end
+
+-- Grouped: one toast, a row per note (the last row says how many more)
+local GROUP_ROWS = 8
+local function ShowGrouped(ids, locationName, leftBy, demo)
+    local rows = {}
+    for i, id in ipairs(ids) do
+        if #ids > GROUP_ROWS and i == GROUP_ROWS then
+            rows[#rows + 1] = { title = string.format(L["TOAST_MORE"], #ids - GROUP_ROWS + 1) }
+            break
+        end
+        local note = ToastNote(id)
+        if note then
+            local why = WhyText(id, leftBy, locationName)
+            local row = { title = "|cffffd100-|r  " .. NoteTitle(note), titleColor = note.titleColor,
+                          tag = (why ~= locationName) and why or nil }
+            if not demo then
+                row.onClick = function() ClickNote(id) end
+                row.onRightClick = function(r) NoteMenu(id, r, "situation:group", nil) end
+            end
+            rows[#rows + 1] = row
+        end
+    end
+    BNB.Toast.Show({
+        key = "situation:group", source = demo and "test" or "situation", force = demo,
+        title = string.format(L["CONTEXT_BADGE"], #ids), text = locationName, rows = rows,
+        onClick = (not demo) and function() ClickNote(ids[1]) end or nil,
+    })
+end
+
+local function ShowSituationToasts(matchIDs, locationName, leftBy, demo)
+    if not BNB.SituationsEnabled() or #matchIDs == 0 then return end
+    leftBy = leftBy or {}
+    if Setting("toastLayout") == "group" and #matchIDs > 1 then
+        ShowGrouped(matchIDs, locationName, leftBy, demo)
+        return
+    end
+    for _, id in ipairs(matchIDs) do
+        local note = ToastNote(id)
+        if note then BNB.Toast.Show(NoteSpec(note, WhyText(id, leftBy, locationName))) end
+    end
+end
+
+-- Settings > Modules > Situations > Test: three demo notes in the chosen
+-- layout. Their ids are not notes, so a click on one opens nothing
+local DEMO = {
+    { id = "demo:1", icon = "Interface\\Icons\\INV_Misc_Note_01", key = "TOAST_TEST_1", body = "TOAST_TEST_BODY_1", pin = true },
+    { id = "demo:2", icon = "Interface\\Icons\\INV_Misc_Map_01",  key = "TOAST_TEST_2", body = "TOAST_TEST_BODY_2" },
+    { id = "demo:3", icon = "Interface\\Icons\\INV_Letter_15",    key = "TOAST_TEST_3", body = "TOAST_TEST_BODY_3" },
+}
+function BNB.TestSituationToasts()
+    _demo = {}
+    local ids = {}
+    for _, d in ipairs(DEMO) do
+        _demo[d.id] = { id = d.id, icon = d.icon, title = L[d.key], body = L[d.body], _demo = true, _pin = d.pin }
+        ids[#ids + 1] = d.id
+    end
+    local _, locName = GetCurrentZone()
+    ShowSituationToasts(ids, locName, nil, true)
 end
 
 -- ── When and how often (ALL-232 S2) ──────────────────────────────────────────
@@ -698,9 +608,11 @@ local function LastReset(kind, now)
 end
 
 local function Due(note, which)
+    local rec  = note.contextSeen and note.contextSeen[BNB.currentChar]
+    -- "Not again today" from the toast's menu (ALL-376)
+    if rec and rec.q and rec.q == BNB.Date("%Y-%m-%d", time()) then return false end
     local freq = note.contextFreq
     if not freq then return true end
-    local rec  = note.contextSeen and note.contextSeen[BNB.currentChar]
     local last = rec and rec[which]
     if not last then return true end
     if freq == "once" then return false end
@@ -1013,8 +925,8 @@ function BNB.CheckContextualNotes()
                 end
             end
             if #newPopupIDs > 0 then
-                ShowToast(newPopupIDs, locName, leftBy)
-                Trace("toast shown: visible=%s uiParentShown=%s", tostring(_toast and _toast:IsVisible()),
+                ShowSituationToasts(newPopupIDs, locName, leftBy)
+                Trace("toasts shown: %s uiParentShown=%s", tostring((BNB.Toast.Count())),
                     tostring(UIParent:IsShown()))
             end
             C_Timer.After(3, function()
@@ -1022,8 +934,8 @@ function BNB.CheckContextualNotes()
                 for _, noteID in ipairs(newStickyIDs) do
                     if BNB.Sticky.IsOpen and BNB.Sticky.IsOpen(noteID) then open = open + 1 end
                 end
-                Trace("3 s later: toast visible=%s, stickies open=%d of %d",
-                    tostring(_toast and _toast:IsVisible()), open, #newStickyIDs)
+                Trace("3 s later: toasts shown=%s, stickies open=%d of %d",
+                    tostring((BNB.Toast.Count())), open, #newStickyIDs)
             end)
         end)
     end
@@ -1047,11 +959,7 @@ function BNB.ApplySituationsModule(on)
         _quietCheck = true
         BNB.CheckContextualNotes()
     else
-        if _toast then
-            _countdown.running = false
-            _toast:SetScript("OnUpdate", nil)
-            _toast:Hide()
-        end
+        BNB.Toast.DismissAll("situation")
         local ids = {}
         for id in pairs(BNB._autoWaypoints) do ids[#ids + 1] = id end
         for _, id in ipairs(ids) do BNB.RemoveNoteWaypoints(id) end

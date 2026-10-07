@@ -240,6 +240,16 @@ local function BuildWindow()
     tabsBtn:SetPoint("LEFT", migBtn, "RIGHT", 8, 0)
     y = y + ROW_H
     if not SlashCmdList.BNBTOPTABS then tabsBtn:Hide() end
+    -- Toast styles (ALL-376, BigNoteBox_Dev Labs/ToastLab.lua), beside Fire Test Toast
+    local toastLabBtn = MakeButton(L["CFG_DEV_TOASTLAB_BTN"], 170,
+        L["CFG_DEV_TOASTLAB_BTN"], L["CFG_DEV_TOASTLAB_TIP_BODY"], function()
+            if BNB.OpenToastLab then BNB.OpenToastLab() end
+        end)
+    toastLabBtn:ClearAllPoints()
+    toastLabBtn:SetPoint("LEFT", toastBtn, "RIGHT", 8, 0)
+    y = y + ROW_H
+    if not BNB.OpenToastLab then toastLabBtn:Hide() end
+    dependents[#dependents + 1] = { btn = toastLabBtn }
     -- The labs live in the dev addon too (ARCH-04)
     if not BNB.ToggleSearchLayoutTool then layoutBtn:Hide() end
     if not BNB.OpenBackgroundLab then bgLabBtn:Hide() end

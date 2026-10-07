@@ -65,6 +65,10 @@ local FIELDS = {
     -- every time, "session", "day", "daily", "weekly", "once"), ALL-232 S2
     { "contextTrigger", "s", share = "situation" },
     { "contextFreq",    "s", share = "situation" },
+    -- The note's own toast style key and seconds on screen (0 = until
+    -- clicked); nil = Settings (ALL-376, set from the toast's menu)
+    { "toastStyle",     "s", share = "situation" },
+    { "toastHold",      "n", share = "situation" },
     -- The note's waypoints, { { mapID, x, y, label, name, on }, ... } (ALL-282,
     -- NOTES v12): label = zone name when saved, name = the player's own (nil =
     -- the note title, read live), on = placed when the situation matches. The

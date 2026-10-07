@@ -1317,14 +1317,45 @@ local function BuildFocusPage(sf, ct, y, page)
 end
 
 -- The Situations module (ALL-375; was Context Popup, same saved switch
--- `contextSurface`). Applies live; the popup settings grey while it is off.
+-- `contextSurface`). Applies live; the toast settings grey while it is off.
+-- The Toasts section drives the toast engine (UI/Toast.lua, ALL-376); it
+-- moves to a page of its own once a second module uses toasts.
 local function BuildContextPopupPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     local cb
-    local offWidgets = {}
+    local offWidgets, offLabels = {}, {}
     local function GreyOff()
         local on = BNB.SituationsEnabled()
         for _, w in ipairs(offWidgets) do w:SetEnabled(on); w:SetAlpha(on and 1 or 0.35) end
+        for _, l in ipairs(offLabels) do l:SetAlpha(on and 1 or 0.35) end
+    end
+    local function ToastChanged()
+        BNB.Toast.Relayout()
+        BNB.Toast.RefreshAnchor()
+    end
+    local function Tip(owner, title, tip)
+        owner:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(title, 1, 1, 1)
+            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        owner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    -- Label above a full-width value dropdown (as Quick Note's key mode)
+    local function AddDrop(labelKey, tipKey, entries, key, apply)
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L[labelKey])
+        y = y - (ROW_H + 2)
+        local dd = BNB.CreateValueDropdown(ct, entries, db[key] or BNB.DEFAULTS[key],
+            function(v) db[key] = v; if apply then apply() end end, CONTENT_W, 26)
+        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        Tip(dd._dd or dd, L[labelKey], L[tipKey])
+        offWidgets[#offWidgets + 1] = dd._dd or dd
+        offLabels[#offLabels + 1]   = lbl
+        y = y - (32 + ROW_GAP)
     end
     y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
         function() return BNB.SituationsEnabled() end,
@@ -1335,27 +1366,185 @@ local function BuildContextPopupPage(sf, ct, y, page)
         end,
         L["CFG_CHK_CONTEXT_SURFACE_TIP"])
 
-    -- "Set Popup Position" button
+    y = AddHeader(ct, y - 6, L["CFG_TOAST_HDR"])
+
+    -- Position + Test, side by side
     local anchorBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_ANCHOR_BTN"], 150, 22)
     anchorBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    anchorBtn:SetScript("OnClick", function()
-        if BNB.TogglePopupAnchor then BNB.TogglePopupAnchor() end
+    anchorBtn:SetScript("OnClick", function() BNB.Toast.ToggleAnchor() end)
+    Tip(anchorBtn, L["CFG_TOAST_ANCHOR_BTN"], L["CFG_TOAST_ANCHOR_TIP"])
+    local testBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_TEST_BTN"], 80, 22)
+    testBtn:SetPoint("LEFT", anchorBtn, "RIGHT", 6, 0)
+    testBtn:SetScript("OnClick", function()
+        if BNB.TestSituationToasts then BNB.TestSituationToasts() end
     end)
-    anchorBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["CFG_TOAST_ANCHOR_TIP"], 0.8, 0.8, 0.8, true)
-        GameTooltip:Show()
-    end)
-    anchorBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    y = y - (22 + 6)
+    Tip(testBtn, L["CFG_TOAST_TEST_BTN"], L["CFG_TOAST_TEST_TIP"])
+    offWidgets[#offWidgets + 1] = anchorBtn
+    offWidgets[#offWidgets + 1] = testBtn
+    y = y - (22 + 10)
 
-    -- Popup hold time slider
+    -- Style (ALL-376 S2): the faction loot toast by default (toastStyle nil);
+    -- unticked, the dropdown picks one. Skin colour only while skin mode is on.
+    local TS = BNB.ToastStyles
+    local styleEntries = {}
+    local function FillStyles()
+        wipe(styleEntries)
+        for _, e in ipairs(TS.List()) do
+            if e.key ~= "faction" then styleEntries[#styleEntries + 1] = { label = e.label, value = e.key } end
+        end
+    end
+    FillStyles()
+    local styleDd
+    local facCb
+    y, facCb = AddCheck(ct, y, L["CFG_TOAST_FACTION"],
+        function() return db.toastStyle == nil or db.toastStyle == "faction" end,
+        function(v)
+            if v then
+                db.toastStyle = nil
+            else
+                -- Off: start from the toast this character sees now
+                local cur = TS.Resolve(nil)
+                db.toastStyle = cur and cur.key or "plain"
+            end
+            if styleDd then
+                styleDd:SetSelected(db.toastStyle or TS.Resolve(nil).key)
+                if styleDd._dd then styleDd._dd:SetEnabled(not v) end
+            end
+            BNB.Toast.Restyle()
+        end,
+        L["CFG_TOAST_FACTION_TIP"])
+    offWidgets[#offWidgets + 1] = facCb
+    offLabels[#offLabels + 1]   = facCb._lbl
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_TOAST_STYLE"])
+        y = y - (ROW_H + 2)
+        styleDd = BNB.CreateValueDropdown(ct, styleEntries, db.toastStyle or TS.Resolve(nil).key,
+            function(v) db.toastStyle = v; BNB.Toast.Restyle() end, CONTENT_W, 26)
+        styleDd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        Tip(styleDd._dd or styleDd, L["CFG_TOAST_STYLE"], L["CFG_TOAST_STYLE_TIP"])
+        offLabels[#offLabels + 1] = lbl
+        y = y - (32 + ROW_GAP)
+        -- Skin mode may have changed since: the list and the greying follow
+        sf:HookScript("OnShow", function()
+            FillStyles()
+            local follow = db.toastStyle == nil or db.toastStyle == "faction"
+            styleDd:SetSelected(db.toastStyle or TS.Resolve(nil).key)
+            if styleDd._dd then styleDd._dd:SetEnabled(follow == false and BNB.SituationsEnabled()) end
+        end)
+    end
+
+    local scaleSl
+    y, scaleSl = AddSlider(ct, y, L["CFG_TOAST_SCALE"], 50, 150,
+        function() return math.floor((db.toastScale or BNB.DEFAULTS.toastScale) * 100 + 0.5) end,
+        function(v) db.toastScale = v / 100; BNB.Toast.Restyle() end,
+        L["CFG_TOAST_SCALE_TIP"], BNB.DEFAULTS.toastScale * 100, "%d%%")
+    offWidgets[#offWidgets + 1] = scaleSl
+
+    AddDrop("CFG_TOAST_LAYOUT", "CFG_TOAST_LAYOUT_TIP", {
+        { label = L["CFG_TOAST_LAYOUT_EACH"],  value = "each" },
+        { label = L["CFG_TOAST_LAYOUT_GROUP"], value = "group" },
+    }, "toastLayout", function() BNB.Toast.DismissAll("test") end)
+    AddDrop("CFG_TOAST_GROW", "CFG_TOAST_GROW_TIP", {
+        { label = L["CFG_TOAST_GROW_DOWN"],  value = "down" },
+        { label = L["CFG_TOAST_GROW_UP"],    value = "up" },
+        { label = L["CFG_TOAST_GROW_LEFT"],  value = "left" },
+        { label = L["CFG_TOAST_GROW_RIGHT"], value = "right" },
+    }, "toastGrow", ToastChanged)
+    AddDrop("CFG_TOAST_COMBAT", "CFG_TOAST_COMBAT_TIP", {
+        { label = L["CFG_TOAST_COMBAT_SHOW"], value = "show" },
+        { label = L["CFG_TOAST_COMBAT_WAIT"], value = "wait" },
+        { label = L["CFG_TOAST_COMBAT_DROP"], value = "drop" },
+    }, "toastCombat")
+
+    local maxSl
+    y, maxSl = AddSlider(ct, y, L["CFG_TOAST_MAX"], 1, 10,
+        function() return db.toastMax or BNB.DEFAULTS.toastMax end,
+        function(v) db.toastMax = v; ToastChanged() end,
+        L["CFG_TOAST_MAX_TIP"], BNB.DEFAULTS.toastMax)
+    offWidgets[#offWidgets + 1] = maxSl
+
+    -- Hold time slider
     local holdSl
     y, holdSl = AddSlider(ct, y, L["CFG_SLIDER_ALERT_SECONDS"], 0, 60,
         function() return db.popupHoldTime or BNB.DEFAULTS.popupHoldTime end,
         function(v) db.popupHoldTime = v end,
         L["CFG_SLIDER_ALERT_SECONDS_TIP"], BNB.DEFAULTS.popupHoldTime)
-    offWidgets[1], offWidgets[2] = anchorBtn, holdSl
+    offWidgets[#offWidgets + 1] = holdSl
+
+    local slideCb
+    y, slideCb = AddCheck(ct, y, L["CFG_TOAST_SLIDE"],
+        function() return db.toastSlide ~= false end,
+        function(v) db.toastSlide = v; ToastChanged() end,
+        L["CFG_TOAST_SLIDE_TIP"])
+    offWidgets[#offWidgets + 1] = slideCb
+    offLabels[#offLabels + 1]   = slideCb._lbl
+
+    -- Sound (S3): nil = none; the alarm sounds, played once per burst
+    do
+        local entries = {
+            { label = L["AW_SND_SILENT"],      value = "silent" },
+            { label = L["AW_SND_DEFAULT"],     value = "default" },
+            { label = L["AW_SND_DOUBLE_HIT"],  value = "sound01" },
+            { label = L["AW_SND_LONG_POP"],    value = "sound02" },
+            { label = L["AW_SND_MAGIC"],       value = "sound03" },
+            { label = L["AW_SND_SCREAM"],      value = "sound04" },
+            { label = L["AW_SND_YELL"],        value = "sound05" },
+            { label = L["AW_SND_TRIPLE_HIT"],  value = "sound06" },
+            { label = L["AW_SND_DRUM_DING"],   value = "sound07" },
+            { label = L["AW_SND_XYLOPHONE"],   value = "sound08" },
+            { label = L["AW_SND_TADA"],        value = "sound09" },
+            { label = L["AW_SND_SOFT_DINGS"],  value = "sound10" },
+        }
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(L["CFG_TOAST_SOUND"])
+        y = y - (ROW_H + 2)
+        local ddW = CONTENT_W - 66
+        local dd = BNB.CreateValueDropdown(ct, entries, db.toastSound or "silent",
+            function(v) db.toastSound = (v ~= "silent") and v or nil end, ddW, 26)
+        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        Tip(dd._dd or dd, L["CFG_TOAST_SOUND"], L["CFG_TOAST_SOUND_TIP"])
+        local play = BNB.CreateButton(nil, ct, L["CFG_TOAST_SOUND_TEST"], 60, 24)
+        play:SetPoint("LEFT", dd, "RIGHT", 6, 0)
+        play:SetScript("OnClick", function()
+            local key = dd:GetSelected()
+            local path = key ~= "silent" and BNB.Alarm and BNB.Alarm.SoundPath(key)
+            if path then PlaySoundFile(path, "Master") end
+        end)
+        offWidgets[#offWidgets + 1] = dd._dd or dd
+        offWidgets[#offWidgets + 1] = play
+        offLabels[#offLabels + 1]   = lbl
+        y = y - (32 + ROW_GAP)
+    end
+
+    -- What each note toast shows (S3)
+    do
+        local hdr = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        hdr:SetHeight(ROW_H); hdr:SetJustifyH("LEFT")
+        hdr:SetText(L["CFG_TOAST_SHOW_HDR"])
+        offLabels[#offLabels + 1] = hdr
+        y = y - (ROW_H + 2)
+        for _, part in ipairs({
+            { "toastShowIcon",    L["CFG_TOAST_SHOW_ICON"],    L["CFG_TOAST_SHOW_ICON_TIP"] },
+            { "toastShowWhy",     L["CFG_TOAST_SHOW_WHY"],     L["CFG_TOAST_SHOW_WHY_TIP"] },
+            { "toastShowSummary", L["CFG_TOAST_SHOW_SUMMARY"], L["CFG_TOAST_SHOW_SUMMARY_TIP"] },
+            { "toastShowPin",     L["CFG_TOAST_SHOW_PIN"],     L["CFG_TOAST_SHOW_PIN_TIP"] },
+        }) do
+            local key = part[1]
+            local cb
+            y, cb = AddCheck(ct, y, part[2],
+                function() return db[key] ~= false end,
+                function(v) db[key] = v end,
+                part[3])
+            offWidgets[#offWidgets + 1] = cb
+            offLabels[#offLabels + 1]   = cb._lbl
+        end
+    end
     GreyOff()
     sf:HookScript("OnShow", GreyOff)   -- switched from the overview row or a mode badge
     page.enableCb = cb   -- twin on the Features overview row

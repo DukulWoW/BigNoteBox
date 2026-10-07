@@ -445,9 +445,9 @@ function K.BuildPlacementPage(sf, ct, y)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         y = y - (22 + 6)
     end
-    -- Situation popups (Modules > Situation popups)
+    -- Situation toasts (Modules > Situations)
     PlaceButton(L["CFG_TOAST_ANCHOR_BTN"], L["CFG_TOAST_ANCHOR_TIP"], function()
-        if BNB.TogglePopupAnchor then BNB.TogglePopupAnchor() end
+        BNB.Toast.ToggleAnchor()
     end)
     -- The search bar (Modules > Oracle Search)
     PlaceButton(L["CFG_PLACE_ORACLE_RESET"], L["CFG_ORACLE_RESET_TIP"], function()

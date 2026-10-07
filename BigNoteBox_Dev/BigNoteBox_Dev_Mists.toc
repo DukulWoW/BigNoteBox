@@ -17,6 +17,7 @@ SidebarTopTest.lua
 Labs\LabKit.lua
 Labs\LabSheet.lua
 Labs\BackgroundLab.lua
+Labs\ToastLab.lua
 Labs\IconLabData.lua
 Labs\IconLabAtlas.lua
 Labs\IconLab.lua

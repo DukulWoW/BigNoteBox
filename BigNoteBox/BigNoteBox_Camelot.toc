@@ -125,7 +125,8 @@ Features\ContextNotes.lua
 Features\ChatCapture.lua
 Features\DragDrop.lua
 Features\InsertInfo.lua
-Features\PopupAnchor.lua
+UI\ToastStyles.lua
+UI\Toast.lua
 Features\ZonePicker.lua
 Features\QuickNote.lua
 Features\AlarmManager.lua

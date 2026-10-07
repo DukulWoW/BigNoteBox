@@ -118,6 +118,14 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() else BNB.DevToolMissing() end
 
+        -- ── Developer: toast styles (ALL-376, BigNoteBox_Dev Labs/ToastLab.lua) ─────────────
+        elseif cmd == "toastlab" then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            if BNB.OpenToastLab then BNB.OpenToastLab() else BNB.DevToolMissing() end
+
         -- ── Developer: note icon frame measuring (ALL-126, BigNoteBox_Dev Labs/IconLab.lua) ────
         elseif cmd == "iconlab" then
             if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then

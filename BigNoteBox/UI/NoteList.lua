@@ -2096,7 +2096,7 @@ for _, k in ipairs({ "title", "body", "richMode", "icon", "iconSource", "iconFra
     "titleColor", "borderOverride", "borderScale", "borderOffset", "borderBrightness",
     "locked", "alarm", "attachments", "fontOverride", "fontSize", "fontOutline",
     "lineHeight", "textAlign", "waypoints", "wpCreatedOn", "wpClearOnLeave", "wpNoTrack", "contextDisplay",
-    "contextLeave", "contextTrigger", "contextFreq", "lastOpened" }) do ROW_ONLY[k] = true end
+    "contextLeave", "contextTrigger", "contextFreq", "lastOpened", "toastStyle", "toastHold" }) do ROW_ONLY[k] = true end
 
 local function RowOnly(fields)
     if not fields then return false end

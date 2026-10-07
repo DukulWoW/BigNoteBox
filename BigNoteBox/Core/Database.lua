@@ -160,11 +160,25 @@ BNB.DEFAULTS = {
     sortBy  = "creation",
     sortAsc = false,
 
-    -- Context popup anchor position (CENTER-relative) and hold time
+    -- Toast anchor position (the first toast's centre, CENTER-relative) and hold time
     -- (seconds; 0 = stay until manually closed)
     popupAnchorX  = 0,
     popupAnchorY  = 200,
     popupHoldTime = 5,
+    -- Toasts (UI/Toast.lua, ALL-376): "each" = one toast per note, "group" =
+    -- one grouped toast; grow "down" / "up" / "left" / "right"; Max shown
+    -- 1-10; combat "show" / "wait" (until combat ends) / "drop"
+    toastLayout = "each",
+    toastGrow   = "down",
+    toastMax    = 5,
+    toastSlide  = true,
+    toastCombat = "wait",
+    toastScale  = 1,       -- 0.5-1.5; toastStyle stays out: nil = the faction loot toast
+    -- What a note toast shows (S3); toastSound stays out: nil = no sound
+    toastShowIcon    = true,
+    toastShowWhy     = true,
+    toastShowSummary = true,
+    toastShowPin     = true,
 
     -- Known characters registry, built on each login.
     -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.
