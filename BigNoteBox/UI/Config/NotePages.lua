@@ -444,11 +444,12 @@ function K.BuildPlacementPage(sf, ct, y)
         end)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         y = y - (22 + 6)
+        return btn
     end
-    -- Situation toasts (Modules > Situations)
-    PlaceButton(L["CFG_TOAST_ANCHOR_BTN"], L["CFG_TOAST_ANCHOR_TIP"], function()
+    -- Toasts (Modules > Toasts, ALL-384): greyed while the module is off
+    K.GreyWhileOff(PlaceButton(L["CFG_TOAST_ANCHOR_BTN"], L["CFG_TOAST_ANCHOR_TIP"], function()
         BNB.Toast.ToggleAnchor()
-    end)
+    end), function() return BNB.ToastsEnabled() end)
     -- The search bar (Modules > Oracle Search)
     PlaceButton(L["CFG_PLACE_ORACLE_RESET"], L["CFG_ORACLE_RESET_TIP"], function()
         if BNB.Oracle and BNB.Oracle.ResetPosition then BNB.Oracle.ResetPosition() end

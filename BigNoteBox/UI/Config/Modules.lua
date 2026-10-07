@@ -1317,17 +1317,55 @@ local function BuildFocusPage(sf, ct, y, page)
 end
 
 -- The Situations module (ALL-375; was Context Popup, same saved switch
--- `contextSurface`). Applies live; the toast settings grey while it is off.
--- The Toasts section drives the toast engine (UI/Toast.lua, ALL-376); it
--- moves to a page of its own once a second module uses toasts.
+-- `contextSurface`). Applies live. Its toasts are set on the Toasts page
+-- (ALL-384), linked from here.
 local function BuildContextPopupPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     local cb
+    y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
+        function() return BNB.SituationsEnabled() end,
+        function(v)
+            db.contextSurface = v
+            if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
+        end,
+        L["CFG_CHK_CONTEXT_SURFACE_TIP"])
+
+    -- How situation notes look when they show: the Toasts page
+    y = y - 6
+    local toastsBtn = BNB.CreateButton(nil, ct, L["CFG_TOAST_SETTINGS_BTN"], 150, 22)
+    toastsBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    toastsBtn:SetScript("OnClick", function() BNB.OpenSettingsPage("modules", "toasts") end)
+    toastsBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_TOAST_SETTINGS_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_TOAST_SETTINGS_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    toastsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (22 + 10)
+
+    page.enableCb = cb   -- twin on the Features overview row
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+-- The Toasts module (ALL-384): the toast engine's switch (`toastsEnabled`),
+-- a checkbox per sender (`toastSources`) and every toast setting (UI/Toast.lua,
+-- ALL-376). Applies live; the settings grey while it is off.
+local function BuildToastsPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
+    local cb
     local offWidgets, offLabels = {}, {}
+    local srcBoxes = {}
     local function GreyOff()
-        local on = BNB.SituationsEnabled()
+        local on = BNB.ToastsEnabled()
         for _, w in ipairs(offWidgets) do w:SetEnabled(on); w:SetAlpha(on and 1 or 0.35) end
         for _, l in ipairs(offLabels) do l:SetAlpha(on and 1 or 0.35) end
+        -- A sender's box also needs its own module(s) on
+        for _, s in ipairs(srcBoxes) do
+            local ok = on and s.need()
+            s.cb:SetEnabled(ok); s.cb:SetAlpha(ok and 1 or 0.35)
+            if s.cb._lbl then s.cb._lbl:SetAlpha(ok and 1 or 0.35) end
+        end
     end
     local function ToastChanged()
         BNB.Toast.Relayout()
@@ -1357,14 +1395,35 @@ local function BuildContextPopupPage(sf, ct, y, page)
         offLabels[#offLabels + 1]   = lbl
         y = y - (32 + ROW_GAP)
     end
-    y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
-        function() return BNB.SituationsEnabled() end,
+    y, cb = AddCheck(ct, y, L["CFG_CHK_TOASTS"],
+        function() return BNB.ToastsEnabled() end,
         function(v)
-            db.contextSurface = v
-            if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
+            db.toastsEnabled = v
+            if BNB.ApplyToastsModule then BNB.ApplyToastsModule(v) end
             GreyOff()
         end,
-        L["CFG_CHK_CONTEXT_SURFACE_TIP"])
+        L["CFG_CHK_TOASTS_TIP"])
+
+    -- Who may show a toast (Alarms later, ALL-385)
+    y = AddHeader(ct, y - 6, L["CFG_TOAST_SOURCES_HDR"])
+    for _, src in ipairs({
+        { "situation", "CFG_TOAST_SRC_SITUATION", "CFG_TOAST_SRC_SITUATION_TIP",
+          function() return BNB.SituationsEnabled() end },
+        { "tasks", "CFG_TOAST_SRC_TASKS", "CFG_TOAST_SRC_TASKS_TIP",
+          function() return BNB.SituationsEnabled() and BNB.TasksEnabled() end },
+    }) do
+        local key = src[1]
+        local box
+        y, box = AddCheck(ct, y, L[src[2]],
+            function() return BNB.ToastSourceOn(key) end,
+            function(v)
+                db.toastSources = db.toastSources or {}
+                db.toastSources[key] = v
+                if BNB.ApplyToastSource then BNB.ApplyToastSource(key, v) end
+            end,
+            L[src[3]])
+        srcBoxes[#srcBoxes + 1] = { cb = box, need = src[4] }
+    end
 
     y = AddHeader(ct, y - 6, L["CFG_TOAST_HDR"])
 
@@ -1432,7 +1491,7 @@ local function BuildContextPopupPage(sf, ct, y, page)
             FillStyles()
             local follow = db.toastStyle == nil or db.toastStyle == "faction"
             styleDd:SetSelected(db.toastStyle or TS.Resolve(nil).key)
-            if styleDd._dd then styleDd._dd:SetEnabled(follow == false and BNB.SituationsEnabled()) end
+            if styleDd._dd then styleDd._dd:SetEnabled(follow == false and BNB.ToastsEnabled()) end
         end)
     end
 
@@ -1573,6 +1632,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage,    nil, "quickNote" },
         { L["CFG_SUB_PLAYER_NPC"],     L["CFG_SUB_PLAYER_NPC_DESC"], BuildPlayerNpcPage,    nil, "unitNotes" },
         { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage, "situations", "context" },
+        { L["CFG_HDR_TOASTS"],         L["CFG_SUB_TOASTS_DESC"],     BuildToastsPage,       "toasts",     "toasts"  },
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
     }

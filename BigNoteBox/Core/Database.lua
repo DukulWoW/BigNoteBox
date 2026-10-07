@@ -129,6 +129,7 @@ BNB.DEFAULTS = {
     stickiesEnabled     = true,    -- Sticky Notes,
     richEnabled         = true,    -- Rich Notes,
     unitNotesEnabled    = true,    -- Player & NPC Notes
+    toastsEnabled       = true,    -- Toasts (ALL-384)
     refboxDisplayStyle  = "normal",
     refboxMaxItems      = 50,
     refboxAutoOpen      = true,
@@ -179,6 +180,9 @@ BNB.DEFAULTS = {
     toastShowWhy     = true,
     toastShowSummary = true,
     toastShowPin     = true,
+    -- Which senders may show a toast (ALL-384): situation notes, task
+    -- situations; a sender not listed is always on
+    toastSources = { situation = true, tasks = true },
 
     -- Known characters registry, built on each login.
     -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.

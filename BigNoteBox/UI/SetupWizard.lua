@@ -599,6 +599,12 @@ local MODULES = {
     { key = "tasks", label = "CFG_HDR_TASKS", tip = "SW_MOD_TASKS_TIP",
       get = function() return BNB.TasksEnabled() end,
       set = function(v) BNB.ApplyTasksModule(v) end },
+    { key = "toasts", label = "CFG_HDR_TOASTS", tip = "SW_MOD_TOASTS_TIP",
+      get = function() return BNB.ToastsEnabled() end,
+      set = function(v)
+          SetDB("toastsEnabled", v)
+          if BNB.ApplyToastsModule then BNB.ApplyToastsModule(v) end
+      end },
     { key = "trash", label = "CFG_HDR_TRASH", tip = "SW_MOD_TRASH_TIP",
       get = function() return not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false end,
       set = function(v)
@@ -610,7 +616,8 @@ local MODULES = {
 }
 
 -- Minimal = only what writing notes needs (Dukul, 2026-10-07)
-local MINIMAL_ON = { trash = true, quickNote = true, context = true }   -- Situations on (Dukul 2026-10-07, ALL-375)
+local MINIMAL_ON = { trash = true, quickNote = true, context = true,    -- Situations on (Dukul 2026-10-07, ALL-375)
+                     toasts = true }                                     -- and their toasts (ALL-384)
 
 local function PresetWants(usage)
     local want = {}

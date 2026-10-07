@@ -37,6 +37,11 @@
 --     }
 --   BNB.Toast.Dismiss(key) / DismissAll(source) / Relayout() / Restyle()
 --   BNB.Toast.AnchorPoint()  -> point, relativeTo, relativePoint, x, y
+--
+-- The Toasts module (ALL-384): BNB.ToastsEnabled() (toastsEnabled) and a
+-- switch per sender, BNB.ToastSourceOn(source) (toastSources[source], a
+-- sender not listed is always on; "test" is never listed). Show refuses while
+-- either is off, so every sender is covered in one place.
 --   BNB.Toast.ToggleAnchor() / LockAnchor() / ResetAnchor() / RefreshAnchor()
 --
 -- Settings (BNB.DEFAULTS): popupAnchorX / popupAnchorY (the first toast's
@@ -82,6 +87,16 @@ local function Setting(key)
     local v  = db and db[key]
     if v == nil then v = BNB.DEFAULTS[key] end
     return v
+end
+
+-- ── The Toasts module (ALL-384) ─────────────────────────────────────────────
+function BNB.ToastsEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.toastsEnabled ~= false
+end
+
+function BNB.ToastSourceOn(source)
+    local t = BigNoteBoxDB and BigNoteBoxDB.toastSources
+    return not (source and t and t[source] == false)
 end
 
 local function MaxShown() return math.max(1, math.min(10, Setting("toastMax") or 5)) end
@@ -391,6 +406,7 @@ end
 
 function T.Show(spec)
     if not spec then return end
+    if not (BNB.ToastsEnabled() and BNB.ToastSourceOn(spec.source)) then return end
     if spec.key then
         -- Already on screen: same toast, new content, timer from the start
         for _, f in ipairs(_shown) do
@@ -595,6 +611,7 @@ local function CreateAnchor()
 end
 
 function T.ToggleAnchor()
+    if not BNB.ToastsEnabled() then return end
     local f = CreateAnchor()
     if f:IsShown() then T.LockAnchor(); return end
     f:ClearAllPoints()
@@ -621,4 +638,18 @@ function T.ResetAnchor()
         _anchor:SetPoint(T.AnchorPoint())
     end
     T.Relayout()
+end
+
+-- Switched off: every toast goes, queued and combat-held ones too, and an
+-- open anchor saves where it is and closes. On: nothing to do, the next
+-- toast shows as usual
+function BNB.ApplyToastsModule(on)
+    if on then return end
+    T.DismissAll()
+    if _anchor and _anchor:IsShown() then SaveAnchor(_anchor); _anchor:Hide() end
+end
+
+-- One sender switched (Settings > Modules > Toasts): its toasts go
+function BNB.ApplyToastSource(source, on)
+    if not on then T.DismissAll(source) end
 end

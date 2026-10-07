@@ -755,7 +755,7 @@ function BNB.ResetTaskToasts()
     BNB.Toast.DismissAll("tasks")
 end
 
--- Settings > Modules > Situations > Test: three demo notes in the chosen
+-- Settings > Modules > Toasts > Test: three demo notes in the chosen
 -- layout. Their ids are not notes, so a click on one opens nothing
 local DEMO = {
     { id = "demo:1", icon = "Interface\\Icons\\INV_Misc_Note_01", key = "TOAST_TEST_1", body = "TOAST_TEST_BODY_1", pin = true },
@@ -848,13 +848,29 @@ local function Stamp(note, which)
     rec[which] = time()
 end
 
--- Sorts a note that is due to show into the sticky / popup lists by its
--- display mode. Sticky Notes off (ALL-343): the popup, the mode is kept
-local function AddByDisplay(note, stickyIDs, popupIDs)
+-- Where a note that is due goes, by its display mode: a sticky, a toast.
+-- Sticky Notes off (ALL-343): the toast, the mode is kept. Toasts off, or
+-- situation toasts off (ALL-384): no toast
+local function Destinations(note)
     local d = note.contextDisplay
     if not BNB.StickiesEnabled() then d = nil end
-    if d == "sticky" or d == "both" then stickyIDs[#stickyIDs + 1] = note.id end
-    if d ~= "sticky" then popupIDs[#popupIDs + 1] = note.id end
+    local sticky = d == "sticky" or d == "both"
+    local toast  = d ~= "sticky" and BNB.ToastsEnabled() and BNB.ToastSourceOn("situation")
+    return sticky, toast
+end
+
+-- A note that would show nowhere is not counted as shown, so its how-often
+-- is not used up while toasts are off
+local function ShowsAnywhere(note)
+    local sticky, toast = Destinations(note)
+    return sticky or toast
+end
+
+-- Sorts a note that is due to show into the sticky / popup lists
+local function AddByDisplay(note, stickyIDs, popupIDs)
+    local sticky, toast = Destinations(note)
+    if sticky then stickyIDs[#stickyIDs + 1] = note.id end
+    if toast  then popupIDs[#popupIDs + 1] = note.id end
 end
 
 -- ── Main check ────────────────────────────────────────────────────────────────
@@ -1055,7 +1071,8 @@ function BNB.CheckContextualNotes()
     local arrived, left = 0, 0
     for _, id in ipairs(matches) do
         local note = BNB.GetNote(id)
-        if not prevSet[id] and note and ShowsOn(note, "a") and Due(note, "a") then
+        if not prevSet[id] and note and ShowsOn(note, "a") and Due(note, "a")
+           and ShowsAnywhere(note) then
             Stamp(note, "a")
             AddByDisplay(note, newStickyIDs, newPopupIDs)
             arrived = arrived + 1
@@ -1067,7 +1084,7 @@ function BNB.CheckContextualNotes()
         -- Only a real departure: a note whose situation was just removed or
         -- changed in the editor also stops matching, and must not pop up
         if note and ShowsOn(note, "l") and by and BNB.NoteHasSituation(note, by)
-           and Due(note, "l") then
+           and Due(note, "l") and ShowsAnywhere(note) then
             Stamp(note, "l")
             AddByDisplay(note, newStickyIDs, newPopupIDs)
             leftBy[id] = by
