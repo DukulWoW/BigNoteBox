@@ -388,9 +388,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     local function ApplyPreset()
         local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
-        local r = math.min(1, p.r + p.lift * 1.5)
-        local g = math.min(1, p.g + p.lift * 1.5)
-        local b = math.min(1, p.b + p.lift * 1.5)
+        local r, g, b = BNB.SkinButtonOf(p)
         local br, bg_, bb = BNB.SkinBorderOf(p)
         BNB.SetBackdrop(btn, r, g, b, 0.92, br, bg_, bb, 1)
         btn._br, btn._bg_, btn._bb = r, g, b

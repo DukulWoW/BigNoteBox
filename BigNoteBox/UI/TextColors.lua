@@ -16,8 +16,8 @@
 --     into the header colour (wizard and help texts).
 --
 -- White (labels, checkbox labels, dropdown titles, body text): white on every
--- preset but one with a muted `text` value in BNB.SKIN_PRESETS (OLED, 0.80:
--- pure white on black was too sharp).
+-- preset but one with a muted `text` colour in BNB.SKIN_PRESETS (OLED, 0.80:
+-- pure white on black was too sharp; read through BNB.SkinTextOf).
 --   * Font objects BNBFontNormal / Small (the game's gold GameFontNormal*, as
 --     white labels) and BNBFontHighlight / Small / Large.
 --   * BNB.TextWhite(v) for a white or light grey set by hand (v = the grey it
@@ -38,21 +38,24 @@ local WHITE_OBJECTS  = { "BNBFontNormal", "BNBFontNormalSmall",
 
 local function Same(x, y) return x and y and math.abs(x - y) < 0.01 end
 
--- The brightest white text may be on the current preset (skin mode only)
-local function TextMax()
-    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset) then return 1 end
-    return BNB.GetSkinPreset().text or 1
+-- The brightest white text on the current preset (skin mode only):
+-- BNB.SkinTextOf, an exact colour or one grey
+local function TextCap()
+    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.SkinTextOf) then return 1, 1, 1 end
+    return BNB.SkinTextOf(BNB.GetSkinPreset())
 end
 
--- v = the white / light grey the text would have (nil = 1); returns r, g, b
+-- v = the white / light grey the text would have (nil = 1); returns r, g, b,
+-- each capped by the preset's text colour
 function BNB.TextWhite(v)
-    v = math.min(v or 1, TextMax())
-    return v, v, v
+    v = v or 1
+    local cr, cg, cb = TextCap()
+    return math.min(v, cr), math.min(v, cg), math.min(v, cb)
 end
 
 function BNB.HeaderColor()
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.SkinAccentOf then
-        return BNB.SkinAccentOf(BNB.GetSkinPreset())
+        return BNB.SkinHeaderOf(BNB.GetSkinPreset())
     end
     local c = BNB.HEADER_COLOR_NORMAL
     return c[1], c[2], c[3]
@@ -75,7 +78,7 @@ end
 -- a string's frame is never freed, but a dropped reference costs nothing
 local _hand  = setmetatable({}, { __mode = "k" })   -- header: [fs] = alpha
 local _white = setmetatable({}, { __mode = "k" })   -- white:  [fs] = { v, alpha }
-local _lastR, _lastG, _lastB, _lastMax
+local _lastR, _lastG, _lastB
 
 function BNB.SetHeaderColor(fs, a)
     if not fs or not fs.SetTextColor then return end
@@ -107,28 +110,34 @@ function BNB.UseLabelFont(fs)
     fs._bnbLabelFont = true
     local r, g, b, a = fs:GetTextColor()
     local hr, hg, hb = BNB.HeaderColor()
-    local own = not (IsGold(r, g, b) or (Same(r, hr) and Same(g, hg) and Same(b, hb))
-        or (Same(r, g) and Same(g, b) and r >= TextMax() - 0.01))
+    local wr, wg, wb = TextCap()
+    local own = not (IsGold(r, g, b)
+        or (Same(r, hr) and Same(g, hg) and Same(b, hb))     -- header colour
+        or (Same(r, wr) and Same(g, wg) and Same(b, wb))     -- already our white
+        or (r > 0.99 and g > 0.99 and b > 0.99))             -- plain white
     if fo ~= _G[to] then fs:SetFontObject(to) end
     if own then fs:SetTextColor(r, g, b, a) else BNB.SetTextWhite(fs, nil, a) end
 end
 
+local _lastCap   -- { r, g, b } the white strings were last drawn with
 local function ApplyTextWhite()
-    local m = TextMax()
-    if Same(m, _lastMax) then return end
+    local cr, cg, cb = TextCap()
+    local last = _lastCap
+    if last and Same(cr, last[1]) and Same(cg, last[2]) and Same(cb, last[3]) then return end
     for _, name in ipairs(WHITE_OBJECTS) do
         local fo = _G[name]
-        if fo and fo.SetTextColor then fo:SetTextColor(m, m, m) end
+        if fo and fo.SetTextColor then fo:SetTextColor(cr, cg, cb) end
     end
     for fs, e in pairs(_white) do
         -- Only a string still showing its white (not greyed or hovered)
-        local cr = fs:GetTextColor()
-        if not _lastMax or Same(cr, math.min(e[1], _lastMax)) then
+        local r0, g0, b0 = fs:GetTextColor()
+        if not last or (Same(r0, math.min(e[1], last[1])) and Same(g0, math.min(e[1], last[2]))
+           and Same(b0, math.min(e[1], last[3]))) then
             local r, g, b = BNB.TextWhite(e[1])
             fs:SetTextColor(r, g, b, e[2])
         end
     end
-    _lastMax = m
+    _lastCap = { cr, cg, cb }
 end
 
 -- Recolour the font objects and the hand-coloured strings. Called at login

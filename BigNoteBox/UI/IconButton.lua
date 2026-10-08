@@ -108,9 +108,7 @@ end
 -- Skin look -----------------------------------------------------------------
 local function SkinColours()
     local p = BNB.GetSkinPreset()
-    local r = math.min(1, p.r + p.lift * 1.5)
-    local g = math.min(1, p.g + p.lift * 1.5)
-    local b = math.min(1, p.b + p.lift * 1.5)
+    local r, g, b = BNB.SkinButtonOf(p)
     return p, r, g, b
 end
 

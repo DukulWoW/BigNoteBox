@@ -192,8 +192,8 @@ local function Paint(btn)
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinBorderOf(p)
         local m = act and 1 or 0.6
-        btn:SetBackdropColor(math.min(1, p.r + p.lift * 1.5) * m, math.min(1, p.g + p.lift * 1.5) * m,
-            math.min(1, p.b + p.lift * 1.5) * m, 0.97)
+        local fr, fg, fb = BNB.SkinButtonOf(p)
+        btn:SetBackdropColor(fr * m, fg * m, fb * m, 0.97)
         btn:SetBackdropBorderColor(br, bg_, bb, 1)
         btn.hl:SetShown(hov)
     else

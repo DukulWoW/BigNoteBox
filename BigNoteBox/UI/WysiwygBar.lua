@@ -121,9 +121,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             local function ApplyBoxSkin()
                 local sp = BNB.GetSkinPreset and BNB.GetSkinPreset()
                 if not sp then return end
-                local r = math.min(1, sp.r + sp.lift * 1.5)
-                local g = math.min(1, sp.g + sp.lift * 1.5)
-                local b = math.min(1, sp.b + sp.lift * 1.5)
+                local r, g, b = BNB.SkinButtonOf(sp)
                 local sbr, sbg, sbb = BNB.SkinBorderOf(sp)
                 BNB.SetBackdrop(btn, r, g, b, 0.92, sbr, sbg, sbb, 1)
                 btn._br, btn._bg_, btn._bb = r, g, b
@@ -235,9 +233,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local function ApplyFontDDBgSkin()
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
-        local r  = math.min(1, p.r + p.lift * 1.5)
-        local g  = math.min(1, p.g + p.lift * 1.5)
-        local b  = math.min(1, p.b + p.lift * 1.5)
+        local r, g, b = BNB.SkinButtonOf(p)
         local br, bg_, bb = BNB.SkinBorderOf(p)
         BNB.SetBackdrop(fontDDBg, r, g, b, 0.92, br, bg_, bb, 1)
     end
@@ -387,9 +383,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local function ApplySizeBgSkin()
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
-        local r  = math.min(1, p.r + p.lift * 1.5)
-        local g  = math.min(1, p.g + p.lift * 1.5)
-        local b  = math.min(1, p.b + p.lift * 1.5)
+        local r, g, b = BNB.SkinButtonOf(p)
         local br, bg_, bb = BNB.SkinBorderOf(p)
         BNB.SetBackdrop(sizeBg, r, g, b, 0.92, br, bg_, bb, 1)
     end

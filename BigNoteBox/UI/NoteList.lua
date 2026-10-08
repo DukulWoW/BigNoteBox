@@ -404,9 +404,7 @@ local function BuildSearchBar(parent)
         local db = BigNoteBoxDB
         if db and db.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
-            local r = math.min(1, p.r + p.lift * 1.5)
-            local g = math.min(1, p.g + p.lift * 1.5)
-            local b = math.min(1, p.b + p.lift * 1.5)
+            local r, g, b = BNB.SkinButtonOf(p)
             local br, bg_, bb = BNB.SkinBorderOf(p)
             BNB.SetBackdrop(bar, r, g, b, 0.92, br, bg_, bb, 1)
         else

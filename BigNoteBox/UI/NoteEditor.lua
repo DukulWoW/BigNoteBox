@@ -975,9 +975,7 @@ local function RebuildTagChips(strip, tags)
         -- Chip backdrop: skin lifted colour + border when in skin mode, dark otherwise
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
-            local r = math.min(1, p.r + p.lift * 1.5)
-            local g = math.min(1, p.g + p.lift * 1.5)
-            local b = math.min(1, p.b + p.lift * 1.5)
+            local r, g, b = BNB.SkinButtonOf(p)
             local br, bg_, bb = BNB.SkinBorderOf(p)
             BNB.SetBackdrop(chip, r, g, b, 0.92, br, bg_, bb, 1)
         else
@@ -1892,8 +1890,8 @@ local function MakeSkinTab(parent, symbol, label, tip)
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinBorderOf(p)
         local m = active and 1 or 0.6
-        btn:SetBackdropColor(math.min(1, p.r + p.lift * 1.5) * m, math.min(1, p.g + p.lift * 1.5) * m,
-            math.min(1, p.b + p.lift * 1.5) * m, 0.97)
+        local fr, fg, fb = BNB.SkinButtonOf(p)
+        btn:SetBackdropColor(fr * m, fg * m, fb * m, 0.97)
         btn:SetBackdropBorderColor(br, bg_, bb, 1)
         hl:SetShown(hover and not active)
         local s = 2.2 * (active and 1 or 0.45)   -- the skin icon buttons' symbol tint

@@ -60,8 +60,7 @@ end
 local function HeaderRGB(cfg)
     local p = SkinFollowPreset(cfg)
     if p then
-        local lift = p.lift or 0
-        return math.min(1, p.r + lift), math.min(1, p.g + lift), math.min(1, p.b + lift)
+        return BNB.SkinLiftedOf(p)
     end
     return COL_HEADER[1], COL_HEADER[2], COL_HEADER[3]
 end

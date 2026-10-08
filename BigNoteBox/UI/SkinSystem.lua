@@ -19,10 +19,22 @@ local L   = BNB.L
 
 --------------------------------------------------------------------------------
 -- PRESET DEFINITIONS
--- Each preset: { r, g, b, lift, br, bg_, bb }
+-- Each preset: { r, g, b, lift, br, bg_, bb } plus optional exact colours
 --   r/g/b     = base fill colour
 --   lift      = how much brighter chrome strips (title/toolbar/footer) are vs body
 --   br/bg_/bb = border colour (bg_ avoids collision with Lua 'bg' idiom)
+-- Optional exact colours (ALL-403, written by the Skin Lab's Export), each
+-- { r, g, b }; nil = worked out as before, so a preset without them looks
+-- exactly as it did:
+--   lifted = the strips' colour before brightness   (nil = body + lift)
+--   button = skin button fill, not scaled           (nil = body + lift * 1.5)
+--   accent = accent at the default brightness 1.50, scales with brightness
+--            (nil = the border hue turned, BNB.SkinAccentOf)
+--   header = heading colour, scales as accent        (nil = accent)
+--   text   = the brightest white text, or one grey  (nil = white)
+--   noBright = true: the brightness setting does not apply (OLED)
+-- Read them only through SkinColourOf / SkinLiftedOf / SkinButtonOf /
+-- SkinAccentOf / SkinHeaderOf / SkinTextOf, never the fields.
 --------------------------------------------------------------------------------
 BNB.SKIN_PRESETS = {
     obsidian   = { r=0.070, g=0.070, b=0.070, lift=0.05, br=0.28, bg_=0.28, bb=0.28 },
@@ -39,7 +51,7 @@ BNB.SKIN_PRESETS = {
     argent     = { r=0.090, g=0.090, b=0.095, lift=0.05, br=0.36, bg_=0.36, bb=0.40 },
     -- text = the brightest white text on this preset (ALL-402 S2: OLED's pure
     -- white on black was too sharp); nil = 1. Read through BNB.TextWhite
-    oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18, text=0.80 },
+    oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18, text=0.80, noBright=true },
 }
 
 -- Display order of the presets: the one list Settings > Appearance and the
@@ -58,22 +70,39 @@ function BNB.SkinPresetLabel(key, short)
     return BNB.HasL(k) and L[k] or key
 end
 
+-- Skin Lab override (ALL-403): while the lab is open every skin colour reads
+-- its preset, brightness and opacity instead of the saved ones, on every open
+-- window. o = { key, preset, brightness, alpha } (brightness / alpha nil =
+-- the saved ones), nil = off. The caller re-applies (BNB.ApplyMainWindowSkin);
+-- nothing is saved.
+local _override
+function BNB.SetSkinOverride(o) _override = o end
+function BNB.GetSkinOverride() return _override end
+
+-- The active preset's key (the lab's while it overrides)
+function BNB.GetSkinPresetKey()
+    if _override then return _override.key end
+    return BigNoteBoxDB and BigNoteBoxDB.skinPreset or "obsidian"
+end
+
 -- Returns the active preset table, falling back to obsidian.
 function BNB.GetSkinPreset()
+    if _override and _override.preset then return _override.preset end
     local key = BigNoteBoxDB and BigNoteBoxDB.skinPreset or "obsidian"
     return BNB.SKIN_PRESETS[key] or BNB.SKIN_PRESETS.obsidian
 end
 
 -- Returns the current brightness multiplier (0.5 - 3.0, default BNB.DEFAULTS.skinBrightness = 1.5).
--- Always returns 1.0 for the OLED preset (pure black must stay pure black).
+-- Always returns 1.0 for a noBright preset (OLED: pure black must stay pure black).
 function BNB.GetSkinBrightness()
-    local key = BigNoteBoxDB and BigNoteBoxDB.skinPreset or "obsidian"
-    if key == "oled" then return 1.0 end
+    if BNB.GetSkinPreset().noBright then return 1.0 end
+    if _override and _override.brightness then return _override.brightness end
     return (BigNoteBoxDB and BigNoteBoxDB.skinBrightness) or BNB.DEFAULTS.skinBrightness
 end
 
 -- Returns the window background opacity (0.0 - 1.0, default 0.97).
 function BNB.GetSkinBgAlpha()
+    if _override and _override.alpha then return _override.alpha end
     return (BigNoteBoxDB and BigNoteBoxDB.skinBgAlpha) or 0.97
 end
 
@@ -85,14 +114,40 @@ function BNB.WindowAlpha(f)
     return (f and f._isSkin) and 1.0 or 0.95
 end
 
--- Returns r, g, b for a preset body colour at the given lift level,
+-- The strips' (title bar, toolbar, footer) colour before brightness: the
+-- exact `lifted` colour, else body + lift. Sticky headers use it unscaled.
+function BNB.SkinLiftedOf(preset)
+    local c = preset.lifted
+    if c then return c[1], c[2], c[3] end
+    local lift = preset.lift or 0
+    return math.min(1, preset.r + lift), math.min(1, preset.g + lift), math.min(1, preset.b + lift)
+end
+
+-- Skin button fill, not scaled by brightness: the exact `button` colour, else
+-- body + lift * 1.5 (the colour every skin button had by hand)
+function BNB.SkinButtonOf(preset)
+    local c = preset.button
+    if c then return c[1], c[2], c[3] end
+    local lift = (preset.lift or 0) * 1.5
+    return math.min(1, preset.r + lift), math.min(1, preset.g + lift), math.min(1, preset.b + lift)
+end
+
+-- Returns r, g, b for a preset body colour (lifted = the strips' colour),
 -- scaled by the current brightness multiplier.
 function BNB.SkinColourOf(preset, lifted)
-    local lift = lifted and preset.lift or 0
-    local brt  = BNB.GetSkinBrightness()
-    return math.min(1, (preset.r + lift) * brt),
-           math.min(1, (preset.g + lift) * brt),
-           math.min(1, (preset.b + lift) * brt)
+    local brt = BNB.GetSkinBrightness()
+    local r, g, b = preset.r, preset.g, preset.b
+    if lifted then r, g, b = BNB.SkinLiftedOf(preset) end
+    return math.min(1, r * brt), math.min(1, g * brt), math.min(1, b * brt)
+end
+
+-- The brightest white text on a preset: the exact `text` colour (a number =
+-- one grey), else white. BNB.TextWhite (UI/TextColors.lua) caps by it.
+function BNB.SkinTextOf(preset)
+    local c = preset.text
+    if type(c) == "number" then return c, c, c end
+    if type(c) == "table" then return c[1], c[2], c[3] end
+    return 1, 1, 1
 end
 
 -- Divider rules (ALL-394): the border colour, with the brightness stopping at
@@ -144,7 +199,19 @@ local function HSVtoRGB(h, s, v)
     return v, p, q
 end
 
+-- An exact colour (accent / header) at the default brightness, scaled by the
+-- current brightness (and mult against the usual ACCENT_MULT), never past the
+-- brightest shade of its hue
+local function ScaleExact(c, mult)
+    local h, s, v = RGBtoHSV(c[1], c[2], c[3])
+    local def = BNB.DEFAULTS and BNB.DEFAULTS.skinBrightness or 1.5
+    local brt = BNB.GetSkinPreset().noBright and def or BNB.GetSkinBrightness()
+    v = math.min(1, v * (brt / def) * ((mult or ACCENT_MULT) / ACCENT_MULT))
+    return HSVtoRGB(h, s, v)
+end
+
 function BNB.SkinAccentOf(preset, mult)
+    if preset.accent then return ScaleExact(preset.accent, mult) end
     local h, s, v = RGBtoHSV(preset.br, preset.bg_, preset.bb)
     v = math.min(1, v * BNB.GetSkinBrightness() * (mult or ACCENT_MULT))
     if s < GREY_SAT then
@@ -154,6 +221,12 @@ function BNB.SkinAccentOf(preset, mult)
     end
     h = (h + (BNB.skinAccentHue or 30) / 360) % 1
     return HSVtoRGB(h, math.min(1, s * 1.2 + 0.1), v)
+end
+
+-- Heading colour (BNB.HeaderColor in skin mode): the exact `header`, else the accent
+function BNB.SkinHeaderOf(preset)
+    if preset.header then return ScaleExact(preset.header) end
+    return BNB.SkinAccentOf(preset)
 end
 
 -- Returns br, bg_, bb for a preset scaled by the current brightness multiplier.
