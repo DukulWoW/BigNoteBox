@@ -1360,6 +1360,42 @@ function BNB.CreateNoteRule(parent)
     return t
 end
 
+-- Selection cards (ALL-404): the bundled-font cards in Settings > Appearance,
+-- the New note dialog and the setup wizard, and the wizard's other picks
+-- (usage, picture choices, list mode), one look for all. state = "sel"
+-- | "hover" | nil. Normal mode keeps the green selection; skin mode takes the
+-- preset: body fill + rule border, lifted fill + accent border when selected,
+-- a dimmer accent border on hover. nameLbl (optional) = accent when selected,
+-- white otherwise; hover leaves it alone. Callers re-paint on SkinChanged.
+function BNB.PaintSelectCard(btn, state, nameLbl)
+    if not (btn and btn.SetBackdropColor) then return end
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        local p = BNB.GetSkinPreset()
+        local fr, fg, fb = BNB.SkinColourOf(p, state == "sel")
+        btn:SetBackdropColor(fr, fg, fb, 0.95)
+        if state == "sel" then
+            btn:SetBackdropBorderColor(BNB.SkinAccentOf(p))
+        elseif state == "hover" then
+            btn:SetBackdropBorderColor(BNB.SkinAccentOf(p, 1.3))
+        else
+            local r, g, b = BNB.SkinRuleOf(p)
+            btn:SetBackdropBorderColor(r, g, b, 1)
+        end
+    elseif state == "sel" then
+        btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
+        btn:SetBackdropBorderColor(0.4, 0.8, 0.4, 1)
+    elseif state == "hover" then
+        btn:SetBackdropColor(0.10, 0.12, 0.10, 0.95)
+        btn:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
+    else
+        btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
+        btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
+    end
+    if nameLbl and state ~= "hover" then
+        if state == "sel" then BNB.SetHeaderColor(nameLbl) else BNB.SetTextWhite(nameLbl, 0.85) end
+    end
+end
+
 -- List window rows (Trash, Note History, Alarms): hover, selection and Select
 -- mode backgrounds. Normal mode = Dukul's greyscale ui-window-* art stretched
 -- over the whole row and tinted the BNB green, as the note list's row art

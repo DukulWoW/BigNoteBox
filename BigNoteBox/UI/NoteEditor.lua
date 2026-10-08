@@ -225,7 +225,14 @@ local function BuildTitleField(parent)
     richBadge:SetPoint("RIGHT", bg, "RIGHT", -6, 0)
     local richTx = richBadge:CreateTexture(nil, "ARTWORK")
     richTx:SetAllPoints()
-    richTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Search\\s-icon-rich")
+    -- Skin mode: Dukul's white s-icon-skin-rich in the skin's accent colour
+    -- (2026-10-08; the Oracle keeps s-icon-rich until its skin set is done)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        richTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Search\\s-icon-skin-rich")
+        BNB.RegisterSkinAccentTex(richTx)
+    else
+        richTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Search\\s-icon-rich")
+    end
     richBadge:EnableMouse(true)
     richBadge:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
@@ -1921,8 +1928,8 @@ local function MakeSkinTab(parent, symbol, label, tip)
         end
         local k = math.min(1.7, 1 / math.max(ar, ag, ab, 0.001))
         icon:SetDesaturated(true)
-        icon:SetVertexColor(ar * k, ag * k, ab * k)
-        -- Inactive label at 0.7 opacity (Dukul, 2026-10-08)
+        -- Inactive icon and label at 0.7 opacity (Dukul, 2026-10-08)
+        icon:SetVertexColor(ar * k, ag * k, ab * k, active and 1 or 0.7)
         if active then fs:SetTextColor(BNB.TextWhite()) else fs:SetTextColor(ar, ag, ab, 0.7) end
     end
     function btn:SetActive(on) active = on and true or false; Paint() end

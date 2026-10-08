@@ -199,21 +199,10 @@ local function RefreshFontHighlight()
     local hlFont = _selFont or BNB.GetFontSetDefault()
     if _refreshLSM then _refreshLSM() end
     for _, e in ipairs(_fontBtns) do
-        local sel = (e.id == hlFont)
-        if e.btn.SetBackdropColor then
-            if sel then
-                e.btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
-                e.btn:SetBackdropBorderColor(0.4, 0.8, 0.4, 1)
-            else
-                e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-            end
-        end
-        if e.nameLbl then
-            if sel then BNB.SetHeaderColor(e.nameLbl) else BNB.SetTextWhite(e.nameLbl, 0.85) end
-        end
+        BNB.PaintSelectCard(e.btn, e.id == hlFont and "sel" or nil, e.nameLbl)
     end
 end
+BNB.RegisterMessage("NewNoteDialog.FontCards", "SkinChanged", function() RefreshFontHighlight() end)
 
 local function RefreshColorHighlight()
     local any = false
@@ -423,10 +412,7 @@ local function BuildDialog()
 
         local defId = def.id
         btn:SetScript("OnEnter", function(s)
-            if defId ~= _selFont then
-                s:SetBackdropColor(0.10, 0.12, 0.10, 0.95)
-                s:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
-            end
+            if defId ~= _selFont then BNB.PaintSelectCard(s, "hover") end
         end)
         btn:SetScript("OnLeave", RefreshFontHighlight)
         btn:SetScript("OnClick", function() SelectFont(defId) end)

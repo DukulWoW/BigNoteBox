@@ -408,7 +408,7 @@ function BNB.PopulateTrashWindow()
         -- The note's own title colour, as in the note list; gold without one (ALL-272)
         local tc = note.titleColor
         if tc and tc.r then row._titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
-        else BNB.SetHeaderColor(row._titleLbl) end
+        else BNB.SetTextWhite(row._titleLbl) end   -- white, as the note list (Dukul 2026-10-08)
 
         -- In the trash since, and size (ALL-299)
         row._dateLbl:SetText(string.format(L["TW_ROW_DELETED_FMT"], FormatDeleted(note.deletedAt)))

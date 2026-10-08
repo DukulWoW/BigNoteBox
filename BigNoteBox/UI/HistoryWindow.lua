@@ -98,6 +98,10 @@ local function BuildRow(parent, note, id, yOff)
     titleLbl:SetJustifyH("LEFT")
     titleLbl:SetHeight(16)
     titleLbl:SetText(note.title or L["HW_UNTITLED"])
+    -- The note's title colour, as the note list and Trash (Dukul 2026-10-08)
+    local tc = note.titleColor
+    if tc and tc.r then titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
+    else BNB.SetTextWhite(titleLbl) end
 
     -- Slot count
     local n   = SlotCount(id)

@@ -494,7 +494,8 @@ local function PopulateStickySettings(noteID)
     local packHint = BNB.AddFontPackHint(ct1, ct1, 0, ct1._y - usedRows * (PH_FONT + PG_FONT),
         SETTINGS_CW, (gridRows - usedRows) * (PH_FONT + PG_FONT) - PG_FONT)
     if packHint then plainOnlyWidgets[#plainOnlyWidgets + 1] = packHint end
-    ct1._y = ct1._y - gridRows * (PH_FONT + PG_FONT) + PG_FONT
+    -- 8 px under the grid, or the checkbox sat on the cards (Dukul 2026-10-08)
+    ct1._y = ct1._y - gridRows * (PH_FONT + PG_FONT) + PG_FONT - 8
 
     -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
     -- its row is kept either way.

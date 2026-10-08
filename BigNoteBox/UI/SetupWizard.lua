@@ -717,17 +717,10 @@ local function BuildUsagePage(content)
     local function Highlight()
         for _, c in ipairs(cards) do
             c._badge:SetSelected(_usage == c._key)
-            if _usage == c._key then
-                c:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
-                c:SetBackdropBorderColor(0.35, 0.80, 0.35, 1)
-                BNB.SetHeaderColor(c._title)
-            else
-                c:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                c:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-                c._title:SetTextColor(0.85, 0.85, 0.85)
-            end
+            BNB.PaintSelectCard(c, _usage == c._key and "sel" or nil, c._title)
         end
     end
+    BNB.RegisterMessage("SetupWizard.UsageCards", "SkinChanged", function() Highlight() end)
 
     for _, ch in ipairs(USAGE_CHOICES) do
         local c = BNB.CreateBackdropFrame("Button", nil, f)
@@ -753,7 +746,7 @@ local function BuildUsagePage(content)
         d:SetText(L[ch.desc])
 
         c:SetScript("OnEnter", function(self)
-            if _usage ~= self._key then self:SetBackdropBorderColor(0.45, 0.65, 0.45, 1) end
+            if _usage ~= self._key then BNB.PaintSelectCard(self, "hover") end
         end)
         c:SetScript("OnLeave", Highlight)
         c:SetScript("OnClick", function(self)
@@ -894,22 +887,13 @@ local function BuildPage2(content)
         lbl:SetText(label)
 
         local function Highlight()
-            if _selected == choiceKey then
-                btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
-                btn:SetBackdropBorderColor(0.35, 0.80, 0.35, 1)
-                BNB.SetHeaderColor(lbl)
-            else
-                btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-                lbl:SetTextColor(0.85, 0.85, 0.85)
-            end
+            BNB.PaintSelectCard(btn, _selected == choiceKey and "sel" or nil, lbl)
         end
         Highlight()
+        BNB.RegisterMessage(btn, "SkinChanged", function() Highlight() end)
 
         btn:SetScript("OnEnter", function()
-            if _selected ~= choiceKey then
-                btn:SetBackdropBorderColor(0.45, 0.65, 0.45, 1)
-            end
+            if _selected ~= choiceKey then BNB.PaintSelectCard(btn, "hover") end
         end)
         btn:SetScript("OnLeave", Highlight)
         btn:SetScript("OnClick", function()
@@ -1101,18 +1085,11 @@ local function BuildPage4(content)
         local function HighlightCards()
             local cur = BNB.GetEffectiveFontID()
             for _, e in ipairs(_cards) do
-                if e.id == cur then
-                    e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
-                    e.btn:SetBackdropBorderColor(0.35, 0.75, 0.35, 1)
-                    if e.nameLbl then BNB.SetHeaderColor(e.nameLbl) end
-                else
-                    e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                    e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-                    if e.nameLbl then e.nameLbl:SetTextColor(0.85, 0.85, 0.85, 1) end
-                end
+                BNB.PaintSelectCard(e.btn, e.id == cur and "sel" or nil, e.nameLbl)
             end
             if _wowCb then _wowCb:SetChecked(cur == "wow") end
         end
+        BNB.RegisterMessage("SetupWizard.FontCards", "SkinChanged", function() HighlightCards() end)
 
         for i, def in ipairs(fonts) do
             local col     = (i - 1) % 2
@@ -1129,9 +1106,7 @@ local function BuildPage4(content)
             local d = def
             btn:SetScript("OnEnter", function(self)
                 local cur = BNB.GetEffectiveFontID()
-                if cur ~= d.id then
-                    self:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
-                end
+                if cur ~= d.id then BNB.PaintSelectCard(self, "hover") end
             end)
             btn:SetScript("OnLeave", HighlightCards)
             btn:SetScript("OnClick", function()
@@ -1264,17 +1239,10 @@ local function BuildPage4(content)
     local function HighlightModes()
         local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or BNB.DEFAULTS.listEntryHeight
         for _, e in ipairs(_modeBtns) do
-            if e.key == cur then
-                e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
-                e.btn:SetBackdropBorderColor(0.35, 0.75, 0.35, 1)
-                if e.lbl then BNB.SetHeaderColor(e.lbl) end
-            else
-                e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-                if e.lbl then e.lbl:SetTextColor(0.85, 0.85, 0.85, 1) end
-            end
+            BNB.PaintSelectCard(e.btn, e.key == cur and "sel" or nil, e.lbl)
         end
     end
+    BNB.RegisterMessage("SetupWizard.ModeCards", "SkinChanged", function() HighlightModes() end)
 
     local MODE_BTN_H = 52
     for mi, m in ipairs(MODE_ITEMS) do
@@ -1310,7 +1278,7 @@ local function BuildPage4(content)
         local mk = m.key
         btn:SetScript("OnEnter", function(self)
             local cur = (BigNoteBoxDB and BigNoteBoxDB.listEntryHeight) or BNB.DEFAULTS.listEntryHeight
-            if cur ~= mk then self:SetBackdropBorderColor(0.45, 0.65, 0.45, 1) end
+            if cur ~= mk then BNB.PaintSelectCard(self, "hover") end
         end)
         btn:SetScript("OnLeave", HighlightModes)
         btn:SetScript("OnClick", function()

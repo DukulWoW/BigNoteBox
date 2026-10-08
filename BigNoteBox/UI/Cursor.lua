@@ -88,6 +88,8 @@ end
 -- The frame whose cursor is showing. Clearing is only done by that frame,
 -- so a late OnLeave cannot wipe the cursor the next frame just set.
 local _owner
+local guard = CreateFrame("Frame")   -- see the guard below Release
+guard:Hide()
 
 local function ShowFor(frame)
     local kind = frame._bnbCursor
@@ -96,6 +98,7 @@ local function ShowFor(frame)
     if not path then return end
     SetCursor(path)
     _owner = frame
+    guard:Show()
 end
 
 local function ClearFor(frame)
@@ -112,11 +115,51 @@ local function Release(frame)
     else ShowFor(frame) end
 end
 
+-- Guard (Dukul 2026-10-08: the move cursor stuck after moving from the main
+-- window's top bar into the window). Clearing hangs on OnLeave / OnMouseUp /
+-- OnDragStop hooks, and a later SetScript on the frame wipes a hook (the main
+-- window sets its own OnMouseDown / OnDragStop / OnHide after SeatChrome).
+-- While one of our cursors shows, this checks every frame: a held cursor is
+-- released once no mouse button is down, any other is cleared once neither
+-- its frame nor one of its children is under the mouse. Not for MANUAL.
+local function UnderMouse(frame)
+    local foci = GetMouseFoci and GetMouseFoci()
+    if not foci then return frame:IsMouseOver() end
+    for _, x in ipairs(foci) do
+        local depth = 0
+        while x and depth < 20 do
+            if x == frame then return true end
+            x = x.GetParent and x:GetParent()
+            depth = depth + 1
+        end
+    end
+    return false
+end
+
+local function AnyButtonDown()
+    return IsMouseButtonDown("LeftButton") or IsMouseButtonDown("RightButton")
+        or IsMouseButtonDown("MiddleButton")
+end
+
+guard:SetScript("OnUpdate", function(self)
+    local o = _owner
+    if type(o) ~= "table" or not o.IsVisible then self:Hide(); return end
+    if o._bnbCursorHeld then
+        if not AnyButtonDown() then Release(o) end
+        return
+    end
+    if not o:IsVisible() or not UnderMouse(o) then
+        o._bnbHover = nil
+        ClearFor(o)
+        self:Hide()
+    end
+end)
+
 local function OnDown(self, btn)
     if self._bnbCursorHeldKind then
         self._bnbCursorHeld = true
         local path = BNB.CursorPath(self._bnbCursorHeldKind)
-        if path then SetCursor(path); _owner = self end
+        if path then SetCursor(path); _owner = self; guard:Show() end
     elseif btn == "LeftButton" and _owner == self then
         self._bnbCursorHeld = true
     end

@@ -252,7 +252,9 @@ local function BuildGeneralTab(panel)
     -- WoW Default checkbox on its own row (Dukul 2026-10-06; the colour grid
     -- lost its button row, so both fit again). Shared BuildLSMFontDropdown
     -- helper from ConfigWindow.lua; it builds nothing with the setting off or
-    -- no LSM fonts installed.
+    -- no LSM fonts installed. Without it the checkbox gets its own 8 px gap
+    -- under the grid, or it sat on the cards (Dukul 2026-10-08).
+    local lsmBuilt = false
     if BigNoteBoxDB and BigNoteBoxDB.lsmFonts
        and BNB._BuildLSMFontDropdown then
         -- 10 px gap above its header, under the grid (Dukul 2026-10-06)
@@ -293,8 +295,9 @@ local function BuildGeneralTab(panel)
                 if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
             end,
             CW)
-        if dd then y = lsmY - 4 end
+        if dd then y = lsmY - 4; lsmBuilt = true end
     end
+    if not lsmBuilt then y = y - 8 end
 
     -- WoW Default checkbox, below the grid (and the LSM dropdown) instead of a
     -- 9th card. Latin set only; its row is kept either way.

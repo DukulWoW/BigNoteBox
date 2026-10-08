@@ -32,19 +32,12 @@ local function BuildFontPicker(ct, y)
     local function Highlight()
         local cur = BNB.GetEffectiveFontID()
         for _, e in ipairs(fontPickerBtns) do
-            if e.id == cur then
-                e.btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
-                e.btn:SetBackdropBorderColor(0.4, 0.8, 0.4, 1)
-                if e.nameLbl then BNB.SetHeaderColor(e.nameLbl) end
-            else
-                e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
-                e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
-                if e.nameLbl then e.nameLbl:SetTextColor(0.85, 0.85, 0.85, 1) end
-            end
+            BNB.PaintSelectCard(e.btn, e.id == cur and "sel" or nil, e.nameLbl)
         end
         if _wowCb then _wowCb:SetChecked(cur == "wow") end
     end
     _refreshFontHL = Highlight
+    BNB.RegisterMessage("Config.FontCards", "SkinChanged", function() Highlight() end)
 
     -- Re-applies TTF paths to all picker label FontStrings.
     -- Called on Appearance tab OnShow so the renderer is guaranteed ready.
@@ -79,10 +72,7 @@ local function BuildFontPicker(ct, y)
         btn:EnableMouse(true)
 
         btn:SetScript("OnEnter", function(self)
-            if BNB.GetEffectiveFontID() ~= def.id then
-                self:SetBackdropColor(0.10, 0.12, 0.10, 0.95)
-                self:SetBackdropBorderColor(0.35, 0.55, 0.35, 1)
-            end
+            if BNB.GetEffectiveFontID() ~= def.id then BNB.PaintSelectCard(self, "hover") end
         end)
         btn:SetScript("OnLeave", Highlight)
         btn:SetScript("OnClick", function()
@@ -155,6 +145,7 @@ end
 local function BuildAppearanceTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
+    local LayoutSkinSection   -- set at the end, once the tab's height is known
 
     -- ── Skins ─────────────────────────────────────────────────────────────────
     y = AddHeader(ct, y, L["CFG_HDR_SKINS"])
@@ -189,6 +180,15 @@ local function BuildAppearanceTab(sf, ct)
 
     y = y - (ROW_H + ROW_GAP)
 
+    -- Everything under the checkbox lives in skinBox, which shows only while
+    -- skin mode is on; the rest of the tab sits in `below` and moves up to the
+    -- checkbox while it is hidden (Dukul, 2026-10-08: never used in normal mode).
+    -- Children are parented to skinBox but still anchored to ct.
+    local skinTopY = y
+    local skinBox  = CreateFrame("Frame", nil, ct)
+    skinBox:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, 0)
+    skinBox:SetSize(1, 1)
+
     -- Preset dropdown (only active when skin mode is enabled)
     -- Order and labels from BNB.SKIN_PRESET_ORDER (UI/SkinSystem.lua)
     local SKIN_PRESETS = {}
@@ -196,7 +196,7 @@ local function BuildAppearanceTab(sf, ct)
         SKIN_PRESETS[#SKIN_PRESETS + 1] = { key = key, label = BNB.SkinPresetLabel(key) }
     end
 
-    local skinPresetLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local skinPresetLbl = skinBox:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     skinPresetLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinPresetLbl:SetHeight(ROW_H); skinPresetLbl:SetJustifyH("LEFT")
     skinPresetLbl:SetText(L["CFG_SKIN_PRESET"])
@@ -207,7 +207,7 @@ local function BuildAppearanceTab(sf, ct)
     -- Forward declaration so preset callbacks below can call it before it's defined
     local RefreshBrightnessVisibility
 
-    skinPresetDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
+    skinPresetDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, skinBox, "WowStyle1DropdownTemplate"))
     skinPresetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinPresetDD:SetWidth(CONTENT_W - 18)
     local function RebuildSkinMenu()
@@ -238,7 +238,7 @@ local function BuildAppearanceTab(sf, ct)
 
     -- Brightness slider (float 0.5-3.0, step 0.05)
     -- Hidden when OLED preset is selected (brightness is meaningless on pure black)
-    local skinBrightnessSl = BNB.CreateStackedSlider(ct, CONTENT_W - 18, {
+    local skinBrightnessSl = BNB.CreateStackedSlider(skinBox, CONTENT_W - 18, {
         label = L["CFG_SKIN_BRIGHTNESS"], min = 0.5, max = 3.0, step = 0.05,
         value = db.skinBrightness or BNB.DEFAULTS.skinBrightness, default = BNB.DEFAULTS.skinBrightness,
         onChange = function(v) db.skinBrightness = v; ApplySkin() end,
@@ -248,7 +248,7 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (SLIDER_H + ROW_GAP)
 
     -- Window opacity slider (0.0 - 1.0, step 0.01, default 0.97)
-    local skinOpacitySl = BNB.CreateStackedSlider(ct, CONTENT_W - 18, {
+    local skinOpacitySl = BNB.CreateStackedSlider(skinBox, CONTENT_W - 18, {
         label = L["CFG_SKIN_OPACITY"], min = 0.0, max = 1.0, step = 0.01,
         value = db.skinBgAlpha or 0.97, default = 0.97,
         onChange = function(v) db.skinBgAlpha = v; ApplySkin() end,
@@ -257,7 +257,7 @@ local function BuildAppearanceTab(sf, ct)
     skinOpacitySl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     y = y - (SLIDER_H + ROW_GAP)
 
-    local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    local skinRandomizeCb = CreateFrame("CheckButton", nil, skinBox, "UICheckButtonTemplate")
     BNB.LabelHit(skinRandomizeCb)   -- the tooltip and click reach over its label too
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
     skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
@@ -285,7 +285,7 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (ROW_H + ROW_GAP)
 
     -- Nested: randomize brightness too
-    skinRandomizeBrightnessCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    skinRandomizeBrightnessCb = CreateFrame("CheckButton", nil, skinBox, "UICheckButtonTemplate")
     BNB.LabelHit(skinRandomizeBrightnessCb)   -- the tooltip and click reach over its label too
     skinRandomizeBrightnessCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 30, y)
     skinRandomizeBrightnessCb.text = skinRandomizeBrightnessCb.text
@@ -356,11 +356,20 @@ local function BuildAppearanceTab(sf, ct)
         local newVal = self:GetChecked() and true or nil
         db.skinMode = newVal
         RefreshSkinControls()
+        if LayoutSkinSection then LayoutSkinSection() end
         local msg = newVal
             and L["CFG_SKIN_MODE_ON_MSG"]
             or  L["CFG_SKIN_MODE_OFF_MSG"]
         StaticPopup_Show("BNB_SKIN_MODE_TOGGLE", msg)
     end)
+
+    -- The rest of the tab: built at y = 0 inside `below`, placed by LayoutSkinSection
+    local skinBottomY = y
+    local below = CreateFrame("Frame", nil, ct)
+    below:SetHeight(1)
+    local appearanceCt = ct
+    ct = below
+    y = 0
 
     AddRule(ct, y); y = y - 18
 
@@ -538,7 +547,17 @@ local function BuildAppearanceTab(sf, ct)
         end,
         L["CFG_CHK_SERVER_TIME_TIP"])
 
-    sf:FinaliseHeight(math.abs(y) + 12)
+    local belowH = math.abs(y)
+    LayoutSkinSection = function()
+        local on  = db.skinMode == true
+        local top = on and skinBottomY or skinTopY
+        skinBox:SetShown(on)
+        below:ClearAllPoints()
+        below:SetPoint("TOPLEFT",  appearanceCt, "TOPLEFT",  0, top)
+        below:SetPoint("TOPRIGHT", appearanceCt, "TOPRIGHT", 0, top)
+        sf:FinaliseHeight(math.abs(top) + belowH + 12)
+    end
+    LayoutSkinSection()
 end
 
 -- Called by RefreshConfigFonts in ConfigWindow.lua (window show, Appearance
