@@ -64,9 +64,7 @@ function BNB.SyncTrashBtnState()
     if not btn then return end
     local ndb = BNB.NotesDB()
     local hasItems = ndb and ndb.trash and next(ndb.trash) ~= nil or false
-    btn:SetEnabled(hasItems)
-    btn:SetAlpha(hasItems and 1.0 or 0.4)
-    pcall(function() btn._tx:SetDesaturated(not hasItems) end)
+    btn:SetIconEnabled(hasItems)
 end
 
 -- The toolbar's Tag Manager button is greyed while no note has a tag, like
@@ -76,9 +74,7 @@ function BNB.SyncTagsBtnState()
     local btn = BNB._toolbarTagsBtn
     if not btn then return end
     local hasTags = next(BNB.TagIndex()) ~= nil
-    btn:SetEnabled(hasTags)
-    btn:SetAlpha(hasTags and 1.0 or 0.4)
-    pcall(function() btn._tx:SetDesaturated(not hasTags) end)
+    btn:SetIconEnabled(hasTags)
 end
 local function SyncTagsOnTagChange(_, _, fields)
     if fields == nil or fields.tags ~= nil or fields._clear then BNB.SyncTagsBtnState() end
@@ -99,9 +95,7 @@ function BNB.SyncAlarmsBtnState()
     for _, n in pairs(ndb and ndb.notes or {}) do
         if n.alarm then has = true; break end
     end
-    btn:SetEnabled(has)
-    btn:SetAlpha(has and 1.0 or 0.4)
-    pcall(function() btn._tx:SetDesaturated(not has) end)
+    btn:SetIconEnabled(has)
 end
 local function SyncAlarmsOnChange(_, _, fields)
     if fields == nil or fields.alarm ~= nil or fields._clear then BNB.SyncAlarmsBtnState() end

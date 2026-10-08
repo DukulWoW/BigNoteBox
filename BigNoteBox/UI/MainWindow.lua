@@ -103,36 +103,93 @@ end
 -- Title-bar icon buttons are BNB.CreateIconButton (UI/IconButton.lua, ALL-214).
 
 -- Toolbar icon: plain Button, no template, fixed TOPRIGHT anchor on the window.
-local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick)
+-- Toolbar icon button. Two looks:
+--   single texture (skin mode, the BCB promo icon): drawn inset at rest and
+--   grown over the hitbox on hover, greyed by alpha + desaturation;
+--   four-state art (normal mode, Assets\Topbar\Normal\<base>-normal / -press /
+--   -disabled / -hover): one picture per state, the hover glow drawn under
+--   whichever of the other three shows (Dukul, 2026-10-08).
+-- btn:SetIconEnabled(on) greys it in either look; btn:SetStateArt(base, tex)
+-- switches look (base nil = single texture tex); btn:SetArtDim(on) shows the
+-- disabled picture on a button that stays clickable (sidebar toggle while the
+-- sidebar is hidden).
+local TB_ART = 24   -- four-state art size, centred on the 20 px hitbox
+local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick, stateBase)
     local ICON_BTN_SIZE = 20
     local btn = CreateFrame("Button", nil, f)
     btn:SetSize(ICON_BTN_SIZE, ICON_BTN_SIZE)
     btn:SetPoint("TOPRIGHT", f, "TOPRIGHT", x, y)
 
+    local hoverTx = btn:CreateTexture(nil, "BACKGROUND")
+    hoverTx:SetSize(TB_ART, TB_ART)
+    hoverTx:SetPoint("CENTER")
+    hoverTx:Hide()
     local iconTx = btn:CreateTexture(nil, "ARTWORK")
-    -- Texture slightly inset at rest; expands to fill (and slightly overflow)
-    -- the fixed hitbox on hover — gives a centred grow effect without moving
-    -- the frame anchor or shifting cursor hit registration.
-    local REST  = 2   -- inset each side at rest  (renders at ICON_BTN_SIZE - 4)
-    local HOVER = 2   -- outset each side on hover (renders at ICON_BTN_SIZE + 4)
-    iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
-    iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
-    iconTx:SetTexture(iconTex)
     btn._tx = iconTx   -- exposed for SetDesaturated / alpha callers
+    local REST  = 2    -- single texture: inset each side at rest  (ICON_BTN_SIZE - 4)
+    local HOVER = 2    -- single texture: outset each side on hover (ICON_BTN_SIZE + 4)
+    local over, pressed = false, false
+
+    local function Refresh()
+        iconTx:ClearAllPoints()
+        local base = btn._stateArt
+        if base then
+            iconTx:SetSize(TB_ART, TB_ART)
+            iconTx:SetPoint("CENTER")
+            local state = pressed and btn:IsEnabled() and "-press"
+                or ((not btn:IsEnabled() or btn._artDim) and "-disabled" or "-normal")
+            iconTx:SetTexture(base .. state)
+            hoverTx:SetShown(over)
+        else
+            local d = over and -HOVER or REST
+            iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      d, -d)
+            iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -d,  d)
+            hoverTx:Hide()
+        end
+    end
+
+    function btn:SetStateArt(base, tex)
+        self._stateArt = base and (TOPBAR .. "Normal\\" .. base) or nil
+        if base then
+            hoverTx:SetTexture(self._stateArt .. "-hover")
+            iconTx:SetDesaturated(false)
+            self:SetAlpha(1.0)
+        else
+            iconTx:SetTexture(tex)
+        end
+        Refresh()
+    end
+    function btn:SetArtDim(on)
+        self._artDim = on and true or nil
+        Refresh()
+    end
+    function btn:SetIconEnabled(on)
+        self:SetEnabled(on)
+        if self._stateArt then
+            Refresh()
+        else
+            self:SetAlpha(on and 1.0 or 0.4)
+            pcall(function() iconTx:SetDesaturated(not on) end)
+        end
+    end
 
     btn:SetScript("OnEnter", function(self)
-        iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      -HOVER,  HOVER)
-        iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT",   HOVER, -HOVER)
+        over = true; Refresh()
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:AddLine(tooltipText, 1, 1, 1)
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function()
-        iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
-        iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
+        over = false; Refresh()
         GameTooltip:Hide()
     end)
+    btn:SetScript("OnMouseDown", function(self)
+        if self:IsEnabled() then pressed = true; Refresh() end
+    end)
+    btn:SetScript("OnMouseUp", function() pressed = false; Refresh() end)
+    btn:SetScript("OnHide", function() over, pressed = false, false; Refresh() end)
     btn:SetScript("OnClick", onClick)
+    btn:SetStateArt(stateBase, iconTex)
     return btn
 end
 
@@ -662,44 +719,53 @@ function BNB.CreateMainWindow()
 
     -- ── Toolbar icons (right side of the toolbar strip) ──────────────────────
     -- Slot 0 is the right-most (sidebar toggle); each slot one ICON_STEP left.
-    local function TBIcon(tex, tip, slot, onClick)
+    -- Normal mode draws the four-state art from Assets\Topbar\Normal\ (base =
+    -- its file name without the state); skin mode keeps the single tinted
+    -- texture (tex)
+    local function TBIcon(tex, tip, slot, onClick, base)
         return MakeIconToolbarBtn(f, tex, tip,
-            chrome.iconX - ICON_STEP * slot, chrome.iconY, onClick)
+            chrome.iconX - ICON_STEP * slot, chrome.iconY, onClick,
+            not skin and base or nil)
     end
 
-    local sidebarToggleBtn = TBIcon(TOPBAR .. "tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
+    local sidebarToggleBtn = TBIcon(TOPBAR .. "Normal\\tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
         function()
             if BNB.Sidebar and BNB.Sidebar.ToggleCollapsed then
                 BNB.Sidebar.ToggleCollapsed()
             end
-        end)
+        end, "tp-sidebar")
     BNB._toolbarSidebarBtn = sidebarToggleBtn
 
-    -- Refreshes sidebar toggle icon to match current state
+    -- Refreshes sidebar toggle icon to match current state: normal mode shows
+    -- the disabled picture while the sidebar is hidden (still clickable), skin
+    -- mode swaps the open / closed icon. Hidden while the Character Sidebar
+    -- module is off (ApplyToolbarIcons)
     function BNB.RefreshSidebarToggleBtn()
         local collapsed = BigNoteBoxDB and BigNoteBoxDB.sidebarCollapsed
-        local tex = TOPBAR .. (collapsed and "tp-sidebar-closed" or "tp-sidebar-open")
+        if BNB._toolbarSidebarBtn._stateArt then
+            BNB._toolbarSidebarBtn:SetArtDim(collapsed)
+            return
+        end
+        local tex = TOPBAR .. (collapsed and "Normal\\tp-sidebar-closed" or "Normal\\tp-sidebar-open")
         pcall(function() BNB._toolbarSidebarBtn._tx:SetTexture(tex) end)
     end
     BNB.RefreshSidebarToggleBtn()
 
     local configBtn = TBIcon(TOPBAR .. "tp-cog", L["MW_CONFIG_TIP"], 1,
-        function() if BNB.OpenConfig then BNB.OpenConfig() end end)
+        function() if BNB.OpenConfig then BNB.OpenConfig() end end, "tp-settings")
 
     local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 2,
-        function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end)
+        function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end, "tp-trash")
     BNB._toolbarTrashBtn = trashBtn
 
     -- History button (desaturated until history exists)
     local histBtn = TBIcon(TOPBAR .. "tp-history", L["HISTORY_TOOLBAR_TIP"], 3,
-        function() if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end end)
-    histBtn:SetEnabled(false)
-    histBtn:SetAlpha(0.4)
-    pcall(function() histBtn._tx:SetDesaturated(true) end)
+        function() if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end end, "tp-notehistory")
+    histBtn:SetIconEnabled(false)
     BNB._toolbarHistoryBtn = histBtn
 
     local tagsBtn = TBIcon(TOPBAR .. "tp-tags", L["TAG_MGR_TOOLTIP"], 4,
-        function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end)
+        function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end, "tp-tagmanager")
     BNB._toolbarTagsBtn = tagsBtn
 
     -- Share/import button — toggles the import-only window
@@ -711,7 +777,7 @@ function BNB.CreateMainWindow()
             else
                 if BNB.OpenImportWindow then BNB.OpenImportWindow() end
             end
-        end)
+        end, "tp-import")
 
     -- Alarm overview button
     local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarm", L["MW_ALARM_TIP"], 6,
@@ -719,12 +785,12 @@ function BNB.CreateMainWindow()
             if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
                 BNB.AlarmOverview.Toggle()
             end
-        end)
+        end, "tp-alarms")
     BNB._toolbarAlarmsBtn = alarmOvBtn   -- greyed while no note has an alarm (ALL-352)
     if BNB.SyncAlarmsBtnState then BNB.SyncAlarmsBtnState() end
 
-    -- Send-to-BCB button. Icon: tp-bcb when BCB is installed, bcb-icon when
-    -- absent. Always full colour. Click: BNB.SendCurrentNoteToBCB (below the
+    -- Send-to-BCB button. Icon: tp-bcb when BCB is installed (four-state art in
+    -- normal mode), bcb-icon when absent. Always full colour. Click: BNB.SendCurrentNoteToBCB (below the
     -- window builder; ChatCapture wires the same function).
     local importBtn = TBIcon(
         (BigChatBox and BigChatBox.SendDirect) and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON,
@@ -734,7 +800,11 @@ function BNB.CreateMainWindow()
     local function RefreshImportBtn()
         local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
         pcall(function()
-            importBtn._tx:SetTexture(hasBCB and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON)
+            if skin or not hasBCB then
+                importBtn:SetStateArt(nil, hasBCB and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON)
+            else
+                importBtn:SetStateArt("tp-bcb")
+            end
             importBtn._tx:SetDesaturated(false)
             importBtn:SetAlpha(1.0)
         end)
@@ -1162,7 +1232,8 @@ end
 --        are packed into the first slots, so a hidden icon leaves no gap.
 -- Visibility: everything hides in multi-select (the action buttons use that
 -- space); the trash icon also hides while Trash is off in Settings, the
--- alarms and history icons while their modules are off.
+-- alarms and history icons while their modules are off, the sidebar toggle
+-- while the Character Sidebar is off.
 --------------------------------------------------------------------------------
 -- _tbRow, _tbSlots are declared with the toolbar strip art above (live lift)
 
@@ -1180,11 +1251,13 @@ function BNB.ApplyToolbarIcons()
     local trashOn = not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false
     local alarmsOn = BNB.AlarmsEnabled()    -- Alarms module (ALL-343)
     local histOn   = BNB.HistoryEnabled()   -- Note History module (ALL-343)
+    local sideOn   = BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled() or false
     local slot = 0
     for _, btn in ipairs(_tbRow) do
         local show = not multi and (btn ~= BNB._toolbarTrashBtn or trashOn)
                      and (btn ~= BNB._toolbarAlarmsBtn or alarmsOn)
                      and (btn ~= BNB._toolbarHistoryBtn or histOn)
+                     and (btn ~= BNB._toolbarSidebarBtn or sideOn)
         btn:SetShown(show)
         if show then
             slot = slot + 1

@@ -711,22 +711,20 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- Toast... (ALL-383): the note's own toast style and time on screen, in a
     -- small window (the tab is full). Shares row 1 with Show as
-    local TOAST_BTN_W = 66
+    -- An icon button (bt-toast), so the Show as dropdown keeps the room
+    local TOAST_BTN_W = 24
     disp.frame:SetPoint("TOPRIGHT", optArea, "TOP", -OPT_GAP / 2 - TOAST_BTN_W - 4, -21)
-    local toastBtn = BNB.CreateButton(nil, panel, L["SIT_TOAST_BTN"], TOAST_BTN_W, 24)
+    local toastBtn = BNB.CreateIconButton(panel, TOAST_BTN_W, "toast", {
+        onClick = function()
+            local id = NoteID(); if not id then return end
+            BNB.NoteToastWindow.Toggle(id, ed.host)
+        end,
+        tip = function(self)
+            return L["SIT_TOAST_BTN_TIP_TITLE"],
+                self:IsEnabled() and L["SIT_TOAST_BTN_TIP"] or L["SIT_TOAST_BTN_OFF_TIP"]
+        end,
+        tipAnchor = "ANCHOR_TOP", tipWrap = true })
     toastBtn:SetPoint("TOPLEFT", disp.frame, "TOPRIGHT", 4, 0)
-    toastBtn:SetScript("OnClick", function()
-        local id = NoteID(); if not id then return end
-        BNB.NoteToastWindow.Open(id, ed.host)
-    end)
-    toastBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["SIT_TOAST_BTN_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(self:IsEnabled() and L["SIT_TOAST_BTN_TIP"] or L["SIT_TOAST_BTN_OFF_TIP"],
-            0.78, 0.78, 0.78, true)
-        GameTooltip:Show()
-    end)
-    toastBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     toastBtn:SetMotionScriptsWhileDisabled(true)
     -- Greyed while the note would show no toast: Show as Sticky alone, or
     -- the Toasts module / situation toasts off
@@ -1188,7 +1186,7 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- Everything below the add row except the waypoints shows only while the
     -- note has a situation
-    local typedOnly = { dispDiv, dispLabel, disp.frame, trigLabel, trig.frame, freqLabel, freq.frame }
+    local typedOnly = { dispDiv, dispLabel, disp.frame, toastBtn, trigLabel, trig.frame, freqLabel, freq.frame }
 
     -- ── Refreshers ───────────────────────────────────────────────────────────
     -- The two checkboxes: greyed without a situation or waypoint support

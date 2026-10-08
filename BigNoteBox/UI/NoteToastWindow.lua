@@ -138,6 +138,15 @@ function NTW.Open(noteID, host)
     _f:Show(); _f:Raise()
 end
 
+-- The Situation tab's toast button: a second click closes it (Dukul, 2026-10-08)
+function NTW.Toggle(noteID, host)
+    if _f and _f:IsShown() and host == _host and noteID == _noteID then
+        _f:Hide()
+    else
+        NTW.Open(noteID, host)
+    end
+end
+
 function NTW.Close(host)
     if _f and _f:IsShown() and (host == nil or host == _host) then _f:Hide() end
 end

@@ -540,6 +540,7 @@ local MODULES = {
           if not v and SB and SB.SetActive then SB.SetActive("all") end
           if SB and SB.Refresh then SB.Refresh() end
           if BNB.SyncSidebarWysiwygBtns then BNB.SyncSidebarWysiwygBtns() end
+          if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
       end },
     { key = "context", label = "CFG_HDR_CONTEXT_POPUP", tip = "SW_MOD_CONTEXT_TIP",
       get = function() return BNB.SituationsEnabled() end,

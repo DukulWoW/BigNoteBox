@@ -22,9 +22,10 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 -- same per-client sizes (its WOW_PROJECT_ID rule), at SCALE.
 local MAINLINE = WOW_PROJECT_ID == WOW_PROJECT_MAINLINE
 local BTN      = 31
--- Badge centre against the portrait's BOTTOMRIGHT corner, in badge pixels.
+-- Badge centre against the portrait's TOPRIGHT corner, in badge pixels (the
+-- bottom right covered the level bubble, Dukul 2026-10-08).
 -- Tune live with /bnb unitbadge <x> <y> [scale].
-local OFF_X, OFF_Y, SCALE = -4, 6, 0.8
+local OFF_X, OFF_Y, SCALE = -4, -6, 0.8
 
 local UNITS = {
     { unit = "target", frame = "TargetFrame" },
@@ -101,7 +102,7 @@ end
 local function PlaceBadge(b)
     b:SetScale(SCALE)
     b:ClearAllPoints()
-    b:SetPoint("CENTER", b._portrait, "BOTTOMRIGHT", OFF_X / SCALE, OFF_Y / SCALE)
+    b:SetPoint("CENTER", b._portrait, "TOPRIGHT", OFF_X / SCALE, OFF_Y / SCALE)
 end
 
 local function MakeBadge(spec)

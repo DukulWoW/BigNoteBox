@@ -1106,6 +1106,7 @@ local function BuildSidebarPage(sf, ct, y, page)
         end
         if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
         if BNB.SyncSidebarWysiwygBtns then BNB.SyncSidebarWysiwygBtns() end
+        if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end   -- top bar sidebar button
     end
 
     sidebarEnableCb:SetScript("OnClick", function(self)

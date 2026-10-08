@@ -86,10 +86,11 @@ end
 -- 2026-09-28; it used to stay, greyed), and so does the Tasks button when
 -- Tasks is off (ALL-102). _baseX is recorded once, when the toolbar is built.
 -- Called on save-mode, Reference Box and Tasks toggles.
--- Forever's action bar art is more detailed, so its icons (and slots) are drawn
--- AB_GROW px larger there (Dukul, 2026-09-27).
-local AB_GROW     = BNB.IsForever and 6 or 0
-local SAVE_SLOT_W = 32 + AB_GROW
+-- The ab-forever action bar art is more detailed, so its icons (and slots) are
+-- drawn AB_GROW px larger wherever it is used (Dukul, 2026-09-27; BNB.AbDetailed,
+-- Init.lua). Set by BuildToolbar, once the settings are loaded.
+local AB_GROW     = 0
+local SAVE_SLOT_W = 32
 function BNB.ApplySaveMode()
     local bar = BNB._editorToolbar
     if not (bar and saveBtn) then return end
@@ -688,6 +689,8 @@ end
 -- Right side: Send | [tag chips + add-tag input]
 --------------------------------------------------------------------------------
 local function BuildToolbar(parent)
+    AB_GROW     = BNB.AbDetailed() and 6 or 0
+    SAVE_SLOT_W = 32 + AB_GROW
     local bar = CreateFrame("Frame", nil, parent)
     bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, 0)
     bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)

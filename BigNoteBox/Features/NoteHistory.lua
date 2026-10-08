@@ -360,9 +360,7 @@ function BNB.SyncHistoryBtnState()
     local btn = BNB._toolbarHistoryBtn
     if not btn then return end
     local has = BNB.HistoryAnyExists()
-    btn:SetEnabled(has)
-    btn:SetAlpha(has and 1.0 or 0.4)
-    pcall(function() btn._tx:SetDesaturated(not has) end)
+    btn:SetIconEnabled(has)
     -- Keep history window list current whenever history changes
     if BNB.RefreshHistoryWindow then BNB.RefreshHistoryWindow() end
 end
