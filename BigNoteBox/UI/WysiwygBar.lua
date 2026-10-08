@@ -100,8 +100,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- 2026-10-08). Normal mode tints it the gold of the old art; skin mode
     -- the preset's accent colour, as the top bar icons (RegisterSkinAccentTex,
     -- follows preset changes), and a press nudges it 1 px down-right.
-    -- Hover: tb-hover over the icon, tinted the same.
-    local WY_GOLD = { 1, 0.86, 0.2 }
+    -- Hover: ui-hover-64 over the icon, tinted the same (BNB.TintUIIcon).
     local function WyBtn(icon, tip)
         local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
         local btn = CreateFrame("Button", nil, bar)
@@ -109,12 +108,9 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         local tx = btn:CreateTexture(nil, "ARTWORK")
         tx:SetAllPoints()
         tx:SetTexture(ASSETS_WY .. icon)
-        local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-        hi:SetAllPoints(tx)
-        hi:SetTexture(ASSETS_WY .. "tb-hover")
+        BNB.TintUIIcon(tx)
+        BNB.AddUIIconHover(btn, tx)
         if skin then
-            BNB.RegisterSkinAccentTex(tx)
-            BNB.RegisterSkinAccentTex(hi)
             btn:SetScript("OnMouseDown", function(self)
                 if not self:IsEnabled() then return end
                 tx:ClearAllPoints()
@@ -124,9 +120,6 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             btn:SetScript("OnMouseUp", function()
                 tx:ClearAllPoints(); tx:SetAllPoints()
             end)
-        else
-            tx:SetVertexColor(WY_GOLD[1], WY_GOLD[2], WY_GOLD[3])
-            hi:SetVertexColor(WY_GOLD[1], WY_GOLD[2], WY_GOLD[3])
         end
         btn._tx = tx
         btn.SetIconEnabled = function(self, en)

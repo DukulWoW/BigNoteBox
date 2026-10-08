@@ -134,9 +134,12 @@ local function RefreshSkin(self)
         self._sym:SetVertexColor(d, d, d)
         return
     end
-    local s = SKIN_SYM_MULT * (dim and SKIN_DIM or 1)
+    -- One factor for all three channels, capped where the brightest one hits
+    -- 1: clamping each channel on its own turned the symbols white above skin
+    -- brightness ~1.80 (Dukul, 2026-10-08; same rule as the note icon markers)
+    local s = math.min(SKIN_SYM_MULT, 1 / math.max(br, bg_, bb, 0.001)) * (dim and SKIN_DIM or 1)
     self._sym:SetDesaturated(true)
-    self._sym:SetVertexColor(math.min(1, br * s), math.min(1, bg_ * s), math.min(1, bb * s))
+    self._sym:SetVertexColor(br * s, bg_ * s, bb * s)
 end
 
 local function Refresh(self)

@@ -98,7 +98,7 @@ function BNB.BuildMainWindowSkinChrome()
             for _, btn in ipairs(icons) do
                 if btn ~= BNB._toolbarImportBtn or hasBCB then
                     BNB.RegisterSkinAccentTex(btn._tx)
-                    if btn.SetSkinHover then btn:SetSkinHover(true) end   -- tp-hover plate
+                    if btn.SetSkinHover then btn:SetSkinHover(true) end   -- ui-hover-64 plate
                 end
             end
             BNB.RefreshSkinAccents()

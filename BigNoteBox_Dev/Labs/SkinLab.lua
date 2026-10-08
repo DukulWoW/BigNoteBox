@@ -320,10 +320,15 @@ local ART = {
     { "Top bar: settings",     "Topbar\\tp-settings",    "accent", "lifted" },
     { "Top bar: trash",        "Topbar\\tp-trash",       "accent", "lifted" },
     { "Top bar: alarms",       "Topbar\\tp-alarms",      "accent", "lifted" },
-    { "Top bar: hover plate",  "Topbar\\tp-hover",       "plate",  "lifted" },
+    { "Top bar: hover plate",  "UI\\ui-hover-64",        "plate",  "lifted" },
     { "Toolbar: undo",         "Toolbar\\tb-undo",       "accent", "body" },
     { "Toolbar: share",        "Toolbar\\tb-share",      "accent", "body" },
-    { "Toolbar: hover",        "Toolbar\\tb-hover",      "accent", "body" },
+    { "Toolbar: hover",        "UI\\ui-hover-64",        "accent", "body" },
+    { "Note list: tag tree",   "UI\\ui-treeview",        "accent", "body" },
+    { "Note list: favourites", "UI\\ui-favorite",        "accent", "body" },
+    { "Note list: tasks",      "UI\\ui-tasks",           "accent", "body" },
+    { "Note list: reset",      "UI\\ui-reset",           "accent", "body" },
+    { "Note list: collapse",   "UI\\ui-arrow-left",      "accent", "body" },
     { "Marker: alarm",         "Overlay\\ov-alarm",      "marker", "body" },
     { "Marker: favourite",     "Overlay\\ov-favorite",   "marker", "body" },
     { "Marker: situation",     "Overlay\\ov-situation",  "marker", "body" },
@@ -447,21 +452,79 @@ end
 
 -- ── Specimen ─────────────────────────────────────────────────────────────────
 -- Fake notes for the real list rows (never saved; ids no note can have)
+-- The specimen's note list (Dukul, 2026-10-08): the top note carries every
+-- marker, the bottom one nothing, the ones between are random (title colour,
+-- icon, icon frame or LSM edge border, markers); Shuffle draws new ones
+local RANDOM_ROWS = 6
+local RANDOM_TITLES = { "Raid night plan", "Gold farming route", "Mount collection",
+    "Profession cooldowns", "Guild bank list", "Transmog wishlist", "Quest chain notes",
+    "Rare spawn timers", "Achievement hunt", "Alt checklist", "Dungeon tactics", "Fishing spots" }
+
+local function Pick(t) if t and #t > 0 then return t[math.random(#t)] end end
+
+-- A known character key with a class, for the class marker (current first)
+local function CharScope(random)
+    local kc = BigNoteBoxDB and BigNoteBoxDB.knownChars or {}
+    local keys = {}
+    for k, v in pairs(kc) do if type(v) == "table" and v.class then keys[#keys + 1] = k end end
+    local k = (random and Pick(keys)) or BNB.currentChar or keys[1]
+    return k and ("char:" .. k) or nil
+end
+
+local function RandomNote(i)
+    local n = { id = "skinlab:r" .. i, title = Pick(RANDOM_TITLES), body = "Random look: Shuffle for another.",
+        icon = Pick(BNB.ICON_MANIFEST) or "Interface\\Icons\\INV_Misc_Note_01" }
+    if math.random() < 0.7 then
+        n.titleColor = { r = 0.3 + math.random() * 0.7, g = 0.3 + math.random() * 0.7, b = 0.3 + math.random() * 0.7 }
+    end
+    local look = math.random(3)
+    if look == 1 then
+        local e = Pick(BNB.IconFrames and BNB.IconFrames.LIST)
+        n.iconFrame = e and e.key
+    elseif look == 2 then
+        local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
+        local list = LSM and LSM:List("border")
+        local b = Pick(list)
+        if b and b ~= "None" then n.borderOverride = b; n.borderScale = 60 + math.random(80) end
+    end
+    if math.random() < 0.5 then n.favorited = true end
+    if math.random() < 0.4 then
+        local fired = math.random() < 0.3
+        n.alarm = { time = time() + (fired and -60 or 86400), fired = fired or nil }
+    end
+    if math.random() < 0.4 then n.situations = { "zone:Orgrimmar" } end
+    if math.random() < 0.3 then n.waypoints = { { mapID = 85, x = 50, y = 50, on = true } } end
+    if math.random() < 0.4 then n.scope = CharScope(true) end
+    return n
+end
+
 local function FakeNotes()
-    local me = BNB.currentChar
-    return {
-        { id = "skinlab:1", title = "Selected note", body = "The open note: its title takes the heading colour.",
-          icon = "Interface\\Icons\\INV_Misc_Note_01", favorited = true },
-        { id = "skinlab:2", title = "Alarm and favourite", body = "Markers on the icon are tinted to the border.",
-          icon = "Interface\\Icons\\INV_Misc_PocketWatch_01", favorited = true, alarm = { time = time() + 86400 } },
-        { id = "skinlab:3", title = "Situation note", body = "Situation, location and class markers.",
-          icon = "Interface\\Icons\\INV_Misc_Map_01", situations = { "zone:Orgrimmar" },
-          waypoints = { { mapID = 85, x = 50, y = 50, on = true } }, scope = me and ("char:" .. me) or nil },
-        { id = "skinlab:4", title = "Fired alarm", body = "A fired alarm's marker is greyed.",
-          icon = "Interface\\Icons\\INV_Misc_Book_09", alarm = { time = time() - 60, fired = true } },
-        { id = "skinlab:5", title = "Plain note", body = "Nothing on the icon.",
-          icon = "Interface\\Icons\\INV_Scroll_03" },
+    local list = {
+        { id = "skinlab:1", title = "Selected note", body = "The open note, with every marker on its icon.",
+          icon = "Interface\\Icons\\INV_Misc_Note_01", favorited = true, alarm = { time = time() + 86400 },
+          situations = { "zone:Orgrimmar" }, waypoints = { { mapID = 85, x = 50, y = 50, on = true } },
+          scope = CharScope(false) },
     }
+    for i = 1, RANDOM_ROWS do list[#list + 1] = RandomNote(i) end
+    list[#list + 1] = { id = "skinlab:plain", title = "Plain note", body = "Nothing on the icon.",
+        icon = "Interface\\Icons\\INV_Scroll_03" }
+    return list
+end
+
+-- Fill the specimen's list rows with a fresh set of fake notes
+local function FillFakeRows(sp)
+    if not (sp and sp.rows and BNB.PopulateListEntry) then return end
+    for i, note in ipairs(FakeNotes()) do
+        local row = sp.rows[i]
+        if row then
+            pcall(BNB.PopulateListEntry, row, note, i == 1, false)
+            -- No alarm glow for a note that does not exist
+            if BNB.Alarm and BNB.Alarm.UnregisterGlowTarget and row._iconGlowFrame then
+                BNB.Alarm.UnregisterGlowTarget(note.id, row._iconGlowFrame)
+                row._iconGlowFrame._bnbGlowNoteID = nil
+            end
+        end
+    end
 end
 
 -- The formatting toolbar's icon button (UI/WysiwygBar.lua WyBtn, skin look)
@@ -473,7 +536,7 @@ local function ToolbarIcon(parent, file, tip)
     tx:SetTexture(ASSETS .. "Toolbar\\" .. file)
     local hi = btn:CreateTexture(nil, "HIGHLIGHT")
     hi:SetAllPoints(tx)
-    hi:SetTexture(ASSETS .. "Toolbar\\tb-hover")
+    hi:SetTexture(ASSETS .. "UI\\ui-hover-64")
     BNB.RegisterSkinAccentTex(tx)
     BNB.RegisterSkinAccentTex(hi)
     btn._tx = tx
@@ -493,14 +556,14 @@ local function ToolbarIcon(parent, file, tip)
 end
 
 -- The main window's top bar icon (UI/MainWindow.lua, skin look: white icon
--- in the accent, tp-hover plate under it at 0.6)
+-- in the accent, ui-hover-64 plate under it at 0.6)
 local function TopBarIcon(parent, file, tip)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(20, 20)
     local plate = btn:CreateTexture(nil, "BACKGROUND")
     plate:SetSize(24, 24)
     plate:SetPoint("CENTER")
-    plate:SetTexture(ASSETS .. "Topbar\\tp-hover")
+    plate:SetTexture(ASSETS .. "UI\\ui-hover-64")
     BNB.RegisterSkinAccentTex(plate, 0.6)
     plate:Hide()
     local tx = btn:CreateTexture(nil, "ARTWORK")
@@ -680,22 +743,24 @@ local function BuildSpecimen(parent, x, y, w, h)
     sf:SetScrollChild(child)
     local ry = 0
     if BNB._createListEntry and BNB.PopulateListEntry then
-        for i, note in ipairs(FakeNotes()) do
+        for i = 1, RANDOM_ROWS + 2 do
             local row = BNB._createListEntry(child)
             row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -ry)
             row:SetWidth(lw)
             row:EnableMouse(false)
-            pcall(BNB.PopulateListEntry, row, note, i == 1, false)
-            -- No alarm glow for a note that does not exist
-            if BNB.Alarm and BNB.Alarm.UnregisterGlowTarget and row._iconGlowFrame then
-                BNB.Alarm.UnregisterGlowTarget(note.id, row._iconGlowFrame)
-                row._iconGlowFrame._bnbGlowNoteID = nil
-            end
             sp.rows[i] = row
-            ry = ry + math.max(26, row:GetHeight())
         end
+        FillFakeRows(sp)
+        for _, row in ipairs(sp.rows) do ry = ry + math.max(26, row:GetHeight()) end
     end
     child:SetHeight(math.max(1, ry))
+    local shufBtn = BNB.CreateSkinButton(nil, fr, "Shuffle notes", 112, 22)
+    shufBtn:SetPoint("TOPLEFT", toastBtn, "BOTTOMLEFT", 0, -6)
+    shufBtn:SetScript("OnClick", function() FillFakeRows(sp) end)
+    Tip(shufBtn, function()
+        GameTooltip:AddLine("Shuffle notes", 1, 1, 1)
+        GameTooltip:AddLine("New random title colours, icons, frames, borders and markers for the notes between the top and bottom one.", 0.8, 0.8, 0.8, true)
+    end)
     return sp
 end
 

@@ -362,6 +362,11 @@ local function BuildSearchBar(parent)
     local treeTx = treeBtn:CreateTexture(nil, "ARTWORK")
     treeTx:SetAllPoints()
     treeTx:SetTexture(ASSETS .. "UI\\ui-treeview")
+    -- The four search-row icons are white art, bare (no button border): gold
+    -- in normal mode, the skin accent in skin mode, ui-hover-64 on hover
+    -- (Dukul, 2026-10-08)
+    BNB.TintUIIcon(treeTx)
+    BNB.AddUIIconHover(treeBtn, treeTx)
     treeBtn._tx = treeTx
     local _treeActive = BigNoteBoxDB and BigNoteBoxDB.tagTreeMode or BNB.DEFAULTS.tagTreeMode
     local function ApplyTreeBtnState()
@@ -451,7 +456,9 @@ local function BuildSearchBar(parent)
     favBtn:SetPoint("LEFT", bar, "RIGHT", OUTER_GAP, 0)
     local favTx = favBtn:CreateTexture(nil, "ARTWORK")
     favTx:SetAllPoints()
-    favTx:SetTexture(ASSETS .. "Overlay\\ov-favorite")
+    favTx:SetTexture(ASSETS .. "UI\\ui-favorite")
+    BNB.TintUIIcon(favTx)
+    BNB.AddUIIconHover(favBtn, favTx)
     favBtn._tx = favTx
     -- Start inactive
     favBtn:SetAlpha(0.35)
@@ -481,6 +488,8 @@ local function BuildSearchBar(parent)
     local taskFilterTx = taskFilterBtn:CreateTexture(nil, "ARTWORK")
     taskFilterTx:SetAllPoints()
     taskFilterTx:SetTexture(ASSETS .. "UI\\ui-tasks")
+    BNB.TintUIIcon(taskFilterTx)
+    BNB.AddUIIconHover(taskFilterBtn, taskFilterTx)
     taskFilterBtn._tx = taskFilterTx
     taskFilterBtn:SetAlpha(0.35)
     pcall(function() taskFilterTx:SetDesaturated(true) end)
@@ -515,6 +524,8 @@ local function BuildSearchBar(parent)
     local oTex = outerClear:CreateTexture(nil, "ARTWORK")
     oTex:SetAllPoints()
     oTex:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-reset")
+    BNB.TintUIIcon(oTex)
+    BNB.AddUIIconHover(outerClear, oTex)
 
     -- Active (lit) only when something is actually filtering; grey otherwise.
     local function ApplyOuterClearState()
@@ -1302,6 +1313,7 @@ local function CreateListEntry(parent)
     taskIcon:SetSize(11, 11)
     taskIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", textLeft, -8)
     taskIcon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-tasks")
+    BNB.TintUIIcon(taskIcon)   -- white art: gold / skin accent
     taskIcon:SetAlpha(0.7)
     taskIcon:Hide()
     btn._taskIcon = taskIcon
@@ -2369,6 +2381,7 @@ function BNB.BuildNoteList()
     local colTex = colBtn:CreateTexture(nil, "ARTWORK")
     colTex:SetAllPoints()
     colBtn._tx = colTex
+    BNB.TintUIIcon(colTex)   -- white arrows (2026-10-08): gold / skin accent
     PaintCollapseArrow(colBtn, false)
     colBtn:SetScript("OnClick", function()
         BNB.SetListCollapsed(not BNB._listCollapsed)

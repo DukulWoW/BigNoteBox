@@ -1026,6 +1026,37 @@ end
 -- following preset changes (ALL-262, Dukul 2026-10-05: "The dividers in skin
 -- mode should all be tinted, not grey."). Focus mode uses it too.
 BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
+
+--------------------------------------------------------------------------------
+-- WHITE UI ICONS  (Dukul, 2026-10-08: all new icon art is white)
+-- A bare icon with no button border: gold in normal mode (the formatting
+-- toolbar's gold), the skin preset's accent in skin mode (follows preset
+-- changes through RegisterSkinAccentTex). One hover glow for every place,
+-- Assets/UI/ui-hover-64 (top bar, formatting toolbar, note list), tinted the
+-- same as the icon.
+--------------------------------------------------------------------------------
+BNB.ICON_GOLD    = { 1, 0.86, 0.2 }
+BNB.UI_HOVER_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-hover-64"
+
+function BNB.TintUIIcon(tx, shade)
+    local k = shade or 1
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.RegisterSkinAccentTex then
+        BNB.RegisterSkinAccentTex(tx, k)
+    else
+        local g = BNB.ICON_GOLD
+        tx:SetVertexColor(g[1] * k, g[2] * k, g[3] * k)
+    end
+end
+
+-- The hover glow over `tx` (default: the whole button), shown by the client
+-- while the pointer is over `btn` (HIGHLIGHT layer).
+function BNB.AddUIIconHover(btn, tx)
+    local hi = btn:CreateTexture(nil, "HIGHLIGHT")
+    hi:SetAllPoints(tx or btn)
+    hi:SetTexture(BNB.UI_HOVER_TEX)
+    BNB.TintUIIcon(hi)
+    return hi
+end
 --------------------------------------------------------------------------------
 -- CHECKBOX LABEL HIT  (Dukul, 2026-10-07: the tooltip shows over the text too,
 -- everywhere)
@@ -1073,6 +1104,101 @@ local function FitCheckHit(cb)
     cb:SetHitRectInsets(0, -math.floor((gap + w) / scale + 0.5), 0, 0)
 end
 
+--------------------------------------------------------------------------------
+-- SKIN CHECKBOXES  (ALL-405, Dukul's art 2026-10-08; skin mode only, normal
+-- mode keeps the game's checkbox; the ui-cb-box / -mark / -mark-hover normal
+-- set is shipped but unused for now). Every checkbox that goes through
+-- BNB.LabelHit is drawn with Assets/UI/ui-cb-skin-* (64x64 canvases):
+-- ui-cb-skin-bg in the skin button colour (only while ticked, faint), ui-cb-skin-box in the preset border
+-- colour (capped, never white), ui-cb-skin-check and -check-hover in the accent. Everything rides on
+-- the button's native textures (Normal / Pushed / Disabled = box, Checked /
+-- DisabledChecked = tick, Highlight = hover tick), so a SetScript after this
+-- (CheckTip sets OnEnter) cannot break it and the hover covers the label too
+-- (LabelHit's hit rect). A preset change repaints (RegisterSkinButton).
+--------------------------------------------------------------------------------
+local CB_DIR   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-cb-"
+local CB_SCALE = 0.75   -- canvas size / checkbox size: the box comes out about
+                        -- as big as the game's box art was
+
+local function PaintCheck(cb)
+    if not cb._cbSkin then return end
+    local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
+    if not p then return end
+    local on = cb:IsEnabled()
+    local dim = on and 1 or 0.5
+    local r, g, b = BNB.SkinButtonOf(p)
+    -- The background only behind a tick, and faint, so the tick stands out
+    -- against it (Dukul, 2026-10-08)
+    -- Darkened rather than faded: a dark fill behind the tick (Dukul, 2026-10-08)
+    local d = 0.4
+    cb._cbBg:SetVertexColor(r * d, g * d, b * d, on and 0.6 or 0.3)
+    cb._cbBg:SetShown(cb:GetChecked() and true or false)
+    local br, bg_, bb = BNB.SkinBorderOf(p)
+    local k = math.min(1, 1 / math.max(br, bg_, bb, 0.001)) * dim
+    for _, t in ipairs({ cb:GetNormalTexture(), cb:GetPushedTexture(), cb:GetDisabledTexture() }) do
+        if t then t:SetVertexColor(br * k, bg_ * k, bb * k) end
+    end
+    local ar, ag, ab = BNB.SkinAccentOf(p)
+    local ct, hl = cb:GetCheckedTexture(), cb:GetHighlightTexture()
+    if ct then ct:SetVertexColor(ar, ag, ab) end
+    if hl then hl:SetVertexColor(ar, ag, ab) end
+end
+
+-- artSize = the drawn size in the checkbox's own units (nil = CB_SCALE x its
+-- width); the sticky task boxes pass it to match the Reference Box tasks
+function BNB.SkinCheckbox(cb, artSize)
+    if not cb or cb._cbStyled then return end
+    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset) then return end
+    if not (cb.IsObjectType and cb:IsObjectType("CheckButton")) then return end
+    cb._cbStyled = true
+    cb._cbSkin = true
+    local w = cb:GetWidth()
+    if not w or w < 8 then w = 24 end
+    local sz = artSize or math.floor(w * CB_SCALE + 0.5)
+    local function Place(t, layer, sub)
+        if not t then return end
+        t:ClearAllPoints()
+        t:SetPoint("CENTER", cb, "CENTER", 0, 0)
+        t:SetSize(sz, sz)
+        t:SetTexCoord(0, 1, 0, 1)
+        t:SetDrawLayer(layer, sub)
+        t:SetAlpha(1)
+    end
+    local box, mark, hover = CB_DIR .. "skin-box", CB_DIR .. "skin-check", CB_DIR .. "skin-check-hover"
+    local bg = cb:CreateTexture(nil, "BACKGROUND")
+    bg:SetTexture(CB_DIR .. "skin-bg")
+    Place(bg, "BACKGROUND", 0)
+    cb._cbBg = bg
+    cb:SetNormalTexture(box)
+    cb:SetPushedTexture(box)
+    cb:SetDisabledTexture(box)
+    cb:SetCheckedTexture(mark)
+    cb:SetDisabledCheckedTexture(mark)
+    cb:SetHighlightTexture(hover, "BLEND")
+    Place(cb:GetNormalTexture(),   "BORDER", 0)
+    Place(cb:GetPushedTexture(),   "BORDER", 0)
+    Place(cb:GetDisabledTexture(), "BORDER", 0)
+    Place(cb:GetCheckedTexture(),  "ARTWORK", 1)
+    Place(cb:GetDisabledCheckedTexture(), "ARTWORK", 1)
+    Place(cb:GetHighlightTexture(), "HIGHLIGHT", 0)
+    -- Disabled tick: grey (the box dims in PaintCheck)
+    local dct = cb:GetDisabledCheckedTexture()
+    if dct then dct:SetDesaturated(true); dct:SetVertexColor(0.5, 0.5, 0.5) end
+    local function Paint() PaintCheck(cb) end
+    Paint()
+    -- Method hooks survive a later SetScript; OnShow catches a preset change
+    -- made while it was hidden (RegisterSkinButton skips hidden owners)
+    hooksecurefunc(cb, "SetEnabled", Paint)
+    hooksecurefunc(cb, "Enable", Paint)
+    hooksecurefunc(cb, "Disable", Paint)
+    cb:HookScript("OnShow", Paint)
+    -- The checked state: SetChecked from code, PostClick for a click (sites
+    -- SetScript their OnClick after LabelHit, which would drop an OnClick hook)
+    hooksecurefunc(cb, "SetChecked", Paint)
+    cb:HookScript("PostClick", Paint)
+    if BNB.RegisterSkinButton then BNB.RegisterSkinButton(Paint, cb) end
+end
+
 -- A checkbox's tooltip (ALL-373): one wrapped grey line, as Settings' AddCheck
 -- draws it. text may be a function (read on every hover). Call LabelHit too, so
 -- the tooltip shows over the label.
@@ -1096,6 +1222,7 @@ function BNB.LabelHit(cb, lbl)
     end
     cb._labelHit = true
     cb._hitLbl = lbl
+    BNB.SkinCheckbox(cb)
     -- Checkbox labels are white in both modes, only headings take the accent
     -- (ALL-402 S2); a label coloured by hand keeps its colour
     BNB.UseLabelFont(cb.Text)

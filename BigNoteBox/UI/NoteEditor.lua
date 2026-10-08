@@ -706,10 +706,22 @@ local function BuildToolbar(parent)
 
     -- Icon button helper — 26×26, texture from Assets/
     -- Returns btn, tx. Calling btn:SetIconEnabled(bool) sets alpha + desaturation.
-    -- Hover: button grows to 30×30 and restores to 26×26 on leave (no colour flash).
+    -- Hover: the ui-hover-64 glow behind the icon (gold in normal mode, the skin
+    -- accent in skin mode, BNB.TintUIIcon) instead of growing the button
+    -- (Dukul, 2026-10-08). Shown only while the button is enabled.
     local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
     local BTN_NORMAL = 26 + AB_GROW
-    local BTN_HOVER  = 30 + AB_GROW
+    local function AddHoverBg(btn)
+        local hv = btn:CreateTexture(nil, "BACKGROUND")
+        hv:SetAllPoints()
+        hv:SetTexture(BNB.UI_HOVER_TEX)
+        BNB.TintUIIcon(hv)
+        hv:Hide()
+        btn._hoverBg = hv
+        return hv
+    end
+    local function HoverOn(btn)  if btn:IsEnabled() then btn._hoverBg:Show() end end
+    local function HoverOff(btn) btn._hoverBg:Hide() end
     local function SlotX(i) return 6 + i * SAVE_SLOT_W end   -- left edge of slot i
     local function MakeIconBtn(parent, texName, tip, w, h)
         local btn = CreateFrame("Button", nil, parent)
@@ -719,16 +731,18 @@ local function BuildToolbar(parent)
         local tx = btn:CreateTexture(nil, "ARTWORK")
         tx:SetAllPoints()
         tx:SetTexture(ASSETS .. texName)
+        AddHoverBg(btn)
         btn:SetScript("OnEnter", function(self)
-            self:SetSize(bw + 4, bh + 4)
+            HoverOn(self)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(type(tip) == "function" and tip() or tip, 1, 1, 1)
             GameTooltip:Show()
         end)
         btn:SetScript("OnLeave", function(self)
-            self:SetSize(bw, bh)
+            HoverOff(self)
             GameTooltip:Hide()
         end)
+        btn:HookScript("OnDisable", HoverOff)
         btn._tx = tx
         -- Helper: set enabled + visual state (alpha + desaturation)
         btn.SetIconEnabled = function(self, enabled)
@@ -854,11 +868,11 @@ local function BuildToolbar(parent)
         if BNB.Sticky and BNB.Sticky.RefreshLockIcons then BNB.Sticky.RefreshLockIcons(id) end
         BNB.LoadNoteInEditor(id)
     end)
-    -- OnEnter/OnLeave include grow (BTN_NORMAL/BTN_HOVER from MakeIconBtn closure)
-    -- and also show the dynamic tooltip. We re-set both scripts here so they
+    -- OnEnter/OnLeave include the hover glow (HoverOn / HoverOff) and also show
+    -- the dynamic tooltip. We re-set both scripts here so they
     -- replace the static-tip ones set inside MakeIconBtn.
     lockBtn:SetScript("OnEnter", function(self)
-        self:SetSize(BTN_HOVER, BTN_HOVER)
+        HoverOn(self)
         local id   = BNB._currentNoteID
         local note = id and BNB.GetNote(id)
         local isLocked = note and NoteIsLocked(note)
@@ -868,7 +882,7 @@ local function BuildToolbar(parent)
         GameTooltip:Show()
     end)
     lockBtn:SetScript("OnLeave", function(self)
-        self:SetSize(BTN_NORMAL, BTN_NORMAL)
+        HoverOff(self)
         GameTooltip:Hide()
     end)
     bar._lockBtn = lockBtn
@@ -881,6 +895,7 @@ local function BuildToolbar(parent)
     local pinTx = pinBtn:CreateTexture(nil, "ARTWORK")
     pinTx:SetAllPoints()
     pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("stickynote"))
+    AddHoverBg(pinBtn)
     pinBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
@@ -895,7 +910,7 @@ local function BuildToolbar(parent)
         end)
     end)
     pinBtn:SetScript("OnEnter", function(self)
-        self:SetSize(28 + AB_GROW, 28 + AB_GROW)
+        HoverOn(self)
         local id   = BNB._currentNoteID
         local open = id and BNB.Sticky and BNB.Sticky.IsOpen(id)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -903,7 +918,7 @@ local function BuildToolbar(parent)
         GameTooltip:Show()
     end)
     pinBtn:SetScript("OnLeave", function(self)
-        self:SetSize(24 + AB_GROW, 24 + AB_GROW)
+        HoverOff(self)
         GameTooltip:Hide()
     end)
     -- Hidden while the Sticky Notes module is off (ALL-343); its slot stays
@@ -918,14 +933,14 @@ local function BuildToolbar(parent)
     sendBtn:SetPoint("RIGHT", bar, "RIGHT", -26, 0)
     -- Override OnEnter to add the sub-line tooltip
     sendBtn:SetScript("OnEnter", function(self)
-        self:SetSize(32 + AB_GROW, 32 + AB_GROW)
+        HoverOn(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SEND_TITLE"], 1, 1, 1)
         GameTooltip:AddLine(L["NE_SEND_TIP_BODY"], 0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     sendBtn:SetScript("OnLeave", function(self)
-        self:SetSize(28 + AB_GROW, 28 + AB_GROW)
+        HoverOff(self)
         GameTooltip:Hide()
     end)
     sendBtn:SetScript("OnClick", function()
@@ -1894,11 +1909,21 @@ local function MakeSkinTab(parent, symbol, label, tip)
         btn:SetBackdropColor(fr * m, fg * m, fb * m, 0.97)
         btn:SetBackdropBorderColor(br, bg_, bb, 1)
         hl:SetShown(hover and not active)
-        local s = 2.2 * (active and 1 or 0.45)   -- the skin icon buttons' symbol tint
+        -- Icon in the accent, as the top bar and toolbar icons (Dukul,
+        -- 2026-10-08). The bt- symbol is gold art, darker than the white
+        -- icons once desaturated, so it is lifted by one factor capped where
+        -- the brightest channel hits 1. Active = white label; inactive = icon
+        -- and label in the accent at half its saturation
+        local ar, ag, ab = BNB.SkinAccentOf(p)
+        if not active then
+            local lum = 0.299 * ar + 0.587 * ag + 0.114 * ab
+            ar, ag, ab = (ar + lum) / 2, (ag + lum) / 2, (ab + lum) / 2
+        end
+        local k = math.min(1.7, 1 / math.max(ar, ag, ab, 0.001))
         icon:SetDesaturated(true)
-        icon:SetVertexColor(math.min(1, br * s), math.min(1, bg_ * s), math.min(1, bb * s))
-        local v = active and 1 or 0.6
-        fs:SetTextColor(v, v, v)
+        icon:SetVertexColor(ar * k, ag * k, ab * k)
+        -- Inactive label at 0.7 opacity (Dukul, 2026-10-08)
+        if active then fs:SetTextColor(BNB.TextWhite()) else fs:SetTextColor(ar, ag, ab, 0.7) end
     end
     function btn:SetActive(on) active = on and true or false; Paint() end
     btn:SetScript("OnEnter", function(self)

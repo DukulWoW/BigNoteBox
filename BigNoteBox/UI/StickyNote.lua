@@ -1227,6 +1227,22 @@ local function CreateStickyTaskRow(ct, f)
     local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     cb:SetSize(CB_SZ, CB_SZ)
     cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+    -- Skin mode: the Settings checkbox art, drawn 16 px (over the 14 px box) to
+    -- match the Reference Box tasks (32 x 0.75 at scale 0.65; Dukul, 2026-10-08)
+    BNB.SkinCheckbox(cb, 16)
+    -- Normal mode: the game's art drawn 21 px (its box is ~62 % of the canvas,
+    -- so about the skin box's 13 px), centred on the same 14 px click box
+    -- (Dukul, 2026-10-08)
+    if not cb._cbStyled then
+        for _, t in ipairs({ cb:GetNormalTexture(), cb:GetPushedTexture(), cb:GetHighlightTexture(),
+                cb:GetDisabledTexture(), cb:GetCheckedTexture(), cb:GetDisabledCheckedTexture() }) do
+            if t then
+                t:ClearAllPoints()
+                t:SetPoint("CENTER", cb, "CENTER", 0, 0)
+                t:SetSize(21, 21)
+            end
+        end
+    end
     cb:SetScript("OnClick", function()
         if BNB.Task and BNB.Task.ToggleTask then
             BNB.Task.ToggleTask(row._noteID, row._taskID)

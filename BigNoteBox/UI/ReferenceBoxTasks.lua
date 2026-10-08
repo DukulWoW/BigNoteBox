@@ -641,6 +641,7 @@ local function CreateTaskRow(tsc)
     local cb = CreateFrame("CheckButton", nil, row, "UICheckButtonTemplate")
     cb:SetScale(TASK_CB_SCALE)
     cb:SetPoint("LEFT", row, "LEFT", 0, 0)
+    BNB.SkinCheckbox(cb)   -- skin mode: the Settings checkbox art (Dukul, 2026-10-08)
     cb:SetScript("OnClick", function(self, btn)
         if btn ~= "RightButton" and NoteID() then BNB.Task.ToggleTask(NoteID(), row._taskID) end
     end)

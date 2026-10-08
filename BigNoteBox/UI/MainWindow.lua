@@ -24,7 +24,10 @@ local DEFAULT_LIST_W = BNB.DEFAULTS.splitX
 local COLLAPSED_W    = 90   -- PAD_L(8) + ICON_SIZE_SPACIOUS(42) + square row art margin(12) + 6 + scrollbar(22)
 
 local SORT_BTN_H = 22   -- height to match WowStyle1 button
-local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4)
+local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4); skin mode
+-- Normal mode draws 24 px art on the 20 px hitbox, so the pictures touched at
+-- 24: 28 leaves 4 px between them (Dukul, 2026-10-08)
+local ICON_STEP_NORMAL = 28
 
 local TOPBAR = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
 local BCB_PROMO_ICON = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
@@ -141,7 +144,7 @@ local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick, stateB
             iconTx:SetTexture(base .. state)
             hoverTx:SetShown(over)
         elseif btn._skinHover then
-            -- Skin mode: the icon keeps its size; tp-hover sits under it
+            -- Skin mode: the icon keeps its size; ui-hover-64 sits under it
             iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
             iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
             hoverTx:SetShown(over)
@@ -153,13 +156,13 @@ local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick, stateB
         end
     end
 
-    -- Skin mode's white icons (Dukul, 2026-10-08): a hover plate (tp-hover)
+    -- Skin mode's white icons (Dukul, 2026-10-08): a hover plate (UI/ui-hover-64)
     -- under the icon in a darker accent colour instead of growing the icon.
     -- Off = the grow-on-hover look (the BCB promo icon)
     function btn:SetSkinHover(on)
         self._skinHover = on and true or nil
         if on and not self._stateArt then
-            hoverTx:SetTexture(TOPBAR .. "tp-hover")
+            hoverTx:SetTexture(BNB.UI_HOVER_TEX)
             if BNB.RegisterSkinAccentTex then BNB.RegisterSkinAccentTex(hoverTx, 0.6) end
         end
         Refresh()
@@ -741,7 +744,7 @@ function BNB.CreateMainWindow()
     -- texture (tex)
     local function TBIcon(tex, tip, slot, onClick, base)
         return MakeIconToolbarBtn(f, tex, tip,
-            chrome.iconX - ICON_STEP * slot, chrome.iconY, onClick,
+            chrome.iconX - (skin and ICON_STEP or ICON_STEP_NORMAL) * slot, chrome.iconY, onClick,
             not skin and base or nil)
     end
 
