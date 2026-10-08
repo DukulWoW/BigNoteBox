@@ -140,7 +140,7 @@ local function BuildGeneralTab(sf, ct)
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 
-        local langDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local langDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         langDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         langDD:SetWidth(CONTENT_W)
         langDD:SetupMenu(function(_, root)
@@ -325,7 +325,7 @@ local function BuildGeneralTab(sf, ct)
             { key = "hide_all",           label = L["CFG_COMBAT_ITEM_HIDE_ALL"] },
         }
         local curCombat = db.combatAction or BNB.DEFAULTS.combatAction
-        local combatDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local combatDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         combatDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         combatDD:SetWidth(CONTENT_W)
         combatDD:SetupMenu(function(_, root)
@@ -381,7 +381,7 @@ local function BuildGeneralTab(sf, ct)
     rule:SetHeight(1)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         rule:SetColorTexture(br, bg_, bb, 0.9)
         if BNB.RegisterSkinRule then BNB.RegisterSkinRule(rule, 0.9) end
     else

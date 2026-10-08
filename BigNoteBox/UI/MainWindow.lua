@@ -778,7 +778,7 @@ function BNB.CreateMainWindow()
         dirDD:GenerateMenu()
     end
 
-    sortDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+    sortDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
     sortDD:SetSize(DD_W, SORT_BTN_H)
     sortDD:SetPoint("TOPLEFT", f, "TOPLEFT", chrome.sortX, chrome.sortY)
     sortDD:SetupMenu(function(_, root)
@@ -790,7 +790,7 @@ function BNB.CreateMainWindow()
         end
     end)
 
-    dirDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+    dirDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
     dirDD:SetSize(DD_W, SORT_BTN_H)
     dirDD:SetPoint("LEFT", sortDD, "RIGHT", 4, 0)
     dirDD:SetupMenu(function(_, root)
@@ -1310,102 +1310,76 @@ end
 --------------------------------------------------------------------------------
 local _bcbPromoFrame
 
+-- Where BigChatBox can be downloaded: one full-width button per site, as on the
+-- Report a bug window (ALL-390). A site joins the list when BCB ships there.
+local BCB_LINKS = {
+    { "CurseForge", "https://www.curseforge.com/wow/addons/bigchatbox" },
+}
+
+-- Same look as the Report a bug window (UI/BugReport.lua, ALL-390): its width,
+-- padding, link buttons and Close button, height measured from the text.
 local function BuildBCBPromo()
-    local PROMO_W  = 360
-    local PROMO_H  = 550
-    local PAD_P    = 16
+    local W, PAD   = 400, 20
+    local LOGO     = 128
     local ASSETS   = "Interface\\AddOns\\BigNoteBox\\Assets\\"
     local f = BNB.CreateToolWindow({   -- shared chrome (CMP-02)
-        name = "BigNoteBoxBCBPromoFrame", w = PROMO_W, h = PROMO_H,
+        name = "BigNoteBoxBCBPromoFrame", w = W, h = 1,
         title = L["MW_BCB_PROMO_TITLE"], toplevel = true, escClose = true, keyEsc = true,
     })
     local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 36
+    local innerW = W - PAD * 2
 
-    -- Running Y cursor, starts just below the title bar
-    local y = -(titleH + PAD_P)
-
-    -- ── BCB logo (256×256 displayed at 128×128, centred) ──────────────────────
+    -- ── BCB logo (256x256 displayed at 128x128, centred) ──────────────────────
     local logo = f:CreateTexture(nil, "ARTWORK")
-    logo:SetSize(128, 128)
-    logo:SetPoint("TOP", f, "TOP", 0, y)
-    y = y - 128 - 14
+    logo:SetSize(LOGO, LOGO)
+    logo:SetPoint("TOP", f, "TOP", 0, -(titleH + 12))
+    logo:SetTexture(ASSETS .. "BCB\\bcb-logo")
 
-    -- ── "By Dukul" — large, same blue as URL ──────────────────────────────────
+    -- ── "By Dukul" ────────────────────────────────────────────────────────────
     local byLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-    byLbl:SetPoint("TOP", f, "TOP", 0, y)
-    byLbl:SetWidth(PROMO_W - PAD_P * 2)
+    byLbl:SetPoint("TOP", logo, "BOTTOM", 0, -12)
+    byLbl:SetWidth(innerW)
     byLbl:SetJustifyH("CENTER")
-    byLbl:SetTextColor(0.31, 0.76, 1.0, 1)   -- same blue as URL box
+    byLbl:SetTextColor(0.31, 0.76, 1.0, 1)
     byLbl:SetText(L["MW_BCB_PROMO_BY"])
-    y = y - 26 - 10
 
     -- ── Description ───────────────────────────────────────────────────────────
-    local desc = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    desc:SetPoint("TOP", f, "TOP", 0, y)
-    desc:SetWidth(PROMO_W - PAD_P * 2)
+    local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    desc:SetPoint("TOP", byLbl, "BOTTOM", 0, -10)
+    desc:SetWidth(innerW)
     desc:SetJustifyH("CENTER")
-    desc:SetTextColor(0.80, 0.80, 0.80, 1)
-    desc:SetSpacing(3)
+    desc:SetSpacing(2)
     desc:SetText(L["MW_BCB_PROMO_DESC"])
-    y = y - 52 - 12
 
-    -- ── URL label ─────────────────────────────────────────────────────────────
-    local urlLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    urlLbl:SetPoint("TOP", f, "TOP", 0, y)
-    urlLbl:SetWidth(PROMO_W - PAD_P * 2)
-    urlLbl:SetJustifyH("CENTER")
-    urlLbl:SetTextColor(0.55, 0.55, 0.55, 1)
-    urlLbl:SetText(L["MW_BCB_PROMO_URL_LBL"])
-    y = y - 18 - 6
+    -- ── Site buttons, full width ──────────────────────────────────────────────
+    local BTN_H, GAP = BNB.LINK_BTN_H or 24, BNB.LINK_BTN_GAP or 6
+    local prev = desc
+    for i, site in ipairs(BCB_LINKS) do
+        local b = BNB.CreateLinkButton(f, site[1], site[2], f._isSkin)
+        b:SetPoint("TOP", prev, "BOTTOM", 0, i == 1 and -16 or -GAP)
+        b:SetWidth(innerW)
+        prev = b
+    end
+    local linksH = #BCB_LINKS * BTN_H + (#BCB_LINKS - 1) * GAP
 
-    -- ── Copyable URL editbox ───────────────────────────────────────────────────
-    local urlBox = CreateFrame("EditBox", nil, f)
-    urlBox:SetPoint("TOP", f, "TOP", 0, y)
-    urlBox:SetSize(PROMO_W - PAD_P * 2, 22)
-    urlBox:SetAutoFocus(false)
-    urlBox:SetMultiLine(false)
-    urlBox:SetMaxLetters(200)
-    urlBox:SetFontObject("GameFontNormalSmall")
-    urlBox:SetTextColor(0.31, 0.76, 1.0, 1)
-    urlBox:SetJustifyH("CENTER")
-    urlBox:SetText("https://www.curseforge.com/wow/addons/bigchatbox")
-    urlBox:SetScript("OnEditFocusGained", function(self) self:HighlightText() end)
-    urlBox:SetScript("OnEscapePressed",   function(self) self:ClearFocus() end)
-    y = y - 22
-
-    -- Underline for URL box
-    local urlUnder = f:CreateTexture(nil, "ARTWORK")
-    urlUnder:SetHeight(1)
-    urlUnder:SetPoint("TOPLEFT",  urlBox, "BOTTOMLEFT",  0, -2)
-    urlUnder:SetPoint("TOPRIGHT", urlBox, "BOTTOMRIGHT", 0, -2)
-    urlUnder:SetColorTexture(0.25, 0.55, 0.85, 0.7)
-    y = y - 6 - 20   -- gap after underline before screenshots
-
-    -- ── Screenshots: bcb-left + bcb-right side by side, 80% of dialog width ──
-    -- Each image is 128×128 TGA. Displayed together they fill 80% of PROMO_W.
-    -- screenshotW = PROMO_W * 0.8 = 288. Each half = 144×144 (scaled up slightly).
-    local ssW   = math.floor(PROMO_W * 0.80)   -- 288
-    local halfW = math.floor(ssW / 2)          -- 144
-    local ssH   = 144
-
+    -- ── Screenshots: bcb-left + bcb-right side by side, 80% of the width ──────
+    local half = math.floor(W * 0.80 / 2)   -- 160 each
     local ssLeft = f:CreateTexture(nil, "ARTWORK")
-    ssLeft:SetSize(halfW, ssH)
-    -- TOP anchor is at frame's top-centre. Offset by -halfW/2 so the pair is centred.
-    ssLeft:SetPoint("TOP", f, "TOP", -math.floor(halfW / 2), y)
+    ssLeft:SetSize(half, half)
+    ssLeft:SetPoint("TOPRIGHT", prev, "BOTTOM", 0, -16)
     ssLeft:SetTexture(ASSETS .. "BCB\\bcb-left")
 
     local ssRight = f:CreateTexture(nil, "ARTWORK")
-    ssRight:SetSize(halfW, ssH)
+    ssRight:SetSize(half, half)
     ssRight:SetPoint("LEFT", ssLeft, "RIGHT", 0, 0)
     ssRight:SetTexture(ASSETS .. "BCB\\bcb-right")
 
-    -- ── Close button, well below the screenshots ───────────────────────────────
-    local closeBtn = BNB.CreateButton(nil, f, L["CLOSE"], 80, 24)
-    closeBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, PAD_P + 4)
-    closeBtn:SetScript("OnClick", function() f:Hide() end)
+    local close = BNB.CreateButton(nil, f, L["CLOSE"], 120, 26)
+    close:SetPoint("BOTTOM", f, "BOTTOM", 0, 16)
+    close:SetScript("OnClick", function() f:Hide() end)
 
-    -- Deferred texture set (needs PLAYER_LOGIN for safe GPU load in some cases)
-    logo:SetTexture(ASSETS .. "BCB\\bcb-logo")
+    f:SetHeight(titleH + 12 + LOGO + 12 + byLbl:GetStringHeight() + 10
+        + desc:GetStringHeight() + 16 + linksH + 16 + half + 20 + 26 + 16)
 
     f:Hide()
     return f

@@ -325,9 +325,7 @@ function BNB.CreateStateButtonGrid(parent, y, width, defs, h)
             b:SetText(b._def.text() or "")
             if b._def.enabled then
                 local on = b._def.enabled() and true or false
-                b:SetEnabled(on)
-                -- A skin button has no disabled look of its own: grey its label
-                if b._lbl then local c = on and 1 or 0.5; b._lbl:SetTextColor(c, c, c) end
+                b:SetEnabled(on)   -- a skin button greys its own label (ALL-392)
             end
         end
     end
@@ -405,8 +403,10 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     hl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2, 2)
     hl:SetColorTexture(1, 1, 1, 0.10)
 
-    -- Darken on mouse down, restore on mouse up
+    -- Darken on mouse down, restore on mouse up. A disabled button still gets
+    -- the mouse events: no press look then (ALL-392)
     btn:SetScript("OnMouseDown", function(self)
+        if not self:IsEnabled() then return end
         if self.SetBackdropColor then
             self:SetBackdropColor(
                 (self._br or 0.10) * 0.70,
@@ -457,6 +457,18 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
         end)
     end
 
+    -- Disabled = dimmed label (ALL-392), as the template buttons do. The colour
+    -- a caller set (state grids colour their labels) comes back on enable.
+    btn:HookScript("OnDisable", function()
+        if not btn._lblCol then btn._lblCol = { lbl:GetTextColor() } end
+        lbl:SetTextColor(0.5, 0.5, 0.5)
+    end)
+    btn:HookScript("OnEnable", function()
+        local c = btn._lblCol
+        btn._lblCol = nil
+        if c then lbl:SetTextColor(c[1], c[2], c[3]) end
+    end)
+
     -- Mimic standard Button API
     function btn:SetText(t) lbl:SetText(t or "") end
     function btn:GetText() return lbl:GetText() end
@@ -498,7 +510,278 @@ function BNB.CreateScrollFrame(name, parent)
             if bar.Update then bar:Update() end
         end
     end
+    BNB.SkinScrollBar(sf.ScrollBar)
     return sf
+end
+
+--------------------------------------------------------------------------------
+-- SKIN-MODE SCROLLBARS  (ALL-393)
+-- In skin mode the scrollbar keeps the game's own art, desaturated and tinted to
+-- the preset's border colour (Dukul 2026-10-08, from the /bnbskinw test:
+-- "Tinted game art with tint at 1.00"): track darker, arrows and thumb lighter.
+-- Skin mode is set at build time (switching it reloads); a preset change
+-- re-tints every bar through SkinChanged. The thumb and arrows swap atlases on
+-- hover / press and the arrows re-desaturate on enable, so those re-tint.
+-- Normal mode: untouched.
+--------------------------------------------------------------------------------
+local SB_TINT = { track = 0.7, thumb = 1.4, arrow = 1.2 }
+local _skinBars = setmetatable({}, { __mode = "k" })   -- frame -> its tint function
+
+local function TintRegions(frame, m, deep, r, g, b)
+    if not frame then return end
+    for _, t in ipairs({ frame:GetRegions() }) do
+        if t.IsObjectType and t:IsObjectType("Texture") then
+            t:SetDesaturated(true)
+            t:SetVertexColor(math.min(1, r * m), math.min(1, g * m), math.min(1, b * m))
+        end
+    end
+    if deep then
+        for _, c in ipairs({ frame:GetChildren() }) do TintRegions(c, m, true, r, g, b) end
+    end
+end
+
+local function TintScrollBar(bar)
+    local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
+    if not p then return end
+    local r, g, b = BNB.SkinBorderOf(p)
+    local track = bar.Track
+    TintRegions(track, SB_TINT.track, false, r, g, b)
+    TintRegions(track and track.Thumb, SB_TINT.thumb, false, r, g, b)
+    TintRegions(bar.Back, SB_TINT.arrow, true, r, g, b)
+    TintRegions(bar.Forward, SB_TINT.arrow, true, r, g, b)
+end
+
+-- Registers a tinted widget: tint now, again after its parts change state
+-- (hover / press / enable swap atlases or reset desaturation), and on SkinChanged
+local _sbMsg = false
+local function KeepTinted(key, tint, parts)
+    _skinBars[key] = tint
+    tint()
+    local function Again() C_Timer.After(0, tint) end
+    for _, f in ipairs(parts) do
+        if f and f.HookScript then
+            for _, script in ipairs({ "OnEnter", "OnLeave", "OnMouseUp", "OnEnable", "OnDisable" }) do
+                pcall(f.HookScript, f, script, Again)
+            end
+        end
+    end
+    if not _sbMsg and BNB.RegisterMessage then
+        _sbMsg = true
+        BNB.RegisterMessage("SkinScrollBars", "SkinChanged", function()
+            for _, fn in pairs(_skinBars) do pcall(fn) end
+        end)
+    end
+end
+
+function BNB.SkinScrollBar(bar)
+    if not bar or _skinBars[bar] or not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then return end
+    local track = bar.Track
+    KeepTinted(bar, function() TintScrollBar(bar) end, { track and track.Thumb, bar.Back, bar.Forward })
+end
+
+-- Skin-mode sliders (ALL-393, Dukul 2026-10-08: "skin the value sliders"):
+-- MinimalSliderWithSteppersTemplate tinted like the scrollbars, track darker,
+-- thumb and stepper arrows lighter, half as bright while disabled. Called by
+-- BNB.CreateStackedSlider, the one slider builder.
+function BNB.SkinSlider(sl)
+    if not sl or _skinBars[sl] or not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then return end
+    local inner = sl.Slider
+    local function Tint()
+        local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
+        if not p then return end
+        local r, g, b = BNB.SkinBorderOf(p)
+        local dim = (inner and inner.IsEnabled and not inner:IsEnabled()) and 0.5 or 1
+        TintRegions(inner, SB_TINT.track * dim, false, r, g, b)
+        local thumb = inner and inner.GetThumbTexture and inner:GetThumbTexture()
+        if thumb then
+            local m = SB_TINT.thumb * dim
+            thumb:SetDesaturated(true)
+            thumb:SetVertexColor(math.min(1, r * m), math.min(1, g * m), math.min(1, b * m))
+        end
+        TintRegions(sl.Back, SB_TINT.arrow * dim, true, r, g, b)
+        TintRegions(sl.Forward, SB_TINT.arrow * dim, true, r, g, b)
+    end
+    KeepTinted(sl, Tint, { inner, sl.Back, sl.Forward })
+end
+
+--------------------------------------------------------------------------------
+-- SKIN-MODE DROPDOWNS  (ALL-393, the closed box half of ALL-80)
+-- In skin mode a dropdown is drawn with our own skin pieces (Dukul 2026-10-08,
+-- from the /bnbskinw test: "Flat drawn dropdown"): the skin text button
+-- (CreateSkinButton) as the box and a square skin icon button with the "down"
+-- symbol at its right end. Both sit under the real WowStyle1 dropdown as a
+-- sibling with the mouse off; the dropdown's art is hidden (alpha 0, the
+-- template keeps swapping atlases), its text kept, its hover / press / enabled
+-- state and its alpha / visibility passed on. The open menu is still the
+-- game's (ALL-80's menu hook). Usage: wrap the CreateFrame call,
+--   local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, p, "WowStyle1DropdownTemplate"))
+-- Normal mode: returns dd untouched.
+--
+-- The open list (Dukul 2026-10-08: the Flat column's list in /bnbskinw): while
+-- one of our dropdowns has the game's menu open, the menu's own background is
+-- hidden and our skin box lent to it (fill = preset colour, border = preset
+-- border), and the game's atlas chrome on the rows (radio / check marks,
+-- highlight, arrows, its scrollbar) is desaturated and tinted to the border.
+-- Plain textures (icons in entries) are left alone. Menu frames are pooled and
+-- shared with every addon, so every touched texture is put back as it was on
+-- close. A ticker re-tints rows a scrolling menu acquires while open.
+-- Submenus keep the game's look.
+--------------------------------------------------------------------------------
+local _menuSkin              -- our one skin box, lent to the open menu
+local _touched = {}          -- texture -> { desaturated, r, g, b, a, alpha }
+local _menuTicker, _openMenu
+local MENU_TINT = 1.4
+
+local function Touch(t)
+    if _touched[t] then return end
+    local r, g, b, a = t:GetVertexColor()
+    _touched[t] = { t:IsDesaturated(), r, g, b, a, t:GetAlpha() }
+end
+
+local function RestoreMenu()
+    if _menuTicker then _menuTicker:Cancel(); _menuTicker = nil end
+    for t, s in pairs(_touched) do
+        t:SetDesaturated(s[1]); t:SetVertexColor(s[2], s[3], s[4], s[5]); t:SetAlpha(s[6])
+    end
+    wipe(_touched)
+    if _menuSkin then _menuSkin:Hide(); _menuSkin:SetParent(UIParent) end
+    _openMenu = nil
+end
+
+local function TintMenu(menu)
+    if not (menu and menu:IsShown()) or _openMenu ~= menu then RestoreMenu(); return end
+    local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
+    if not p then return end
+    local br, bg, bb = BNB.SkinBorderOf(p)
+    local tr, tg, tb = math.min(1, br * MENU_TINT), math.min(1, bg * MENU_TINT), math.min(1, bb * MENU_TINT)
+    for _, t in ipairs({ menu:GetRegions() }) do   -- the menu's own background
+        if t.IsObjectType and t:IsObjectType("Texture") then Touch(t); t:SetAlpha(0) end
+    end
+    local function Walk(f)
+        for _, c in ipairs({ f:GetChildren() }) do
+            if c ~= _menuSkin then
+                for _, t in ipairs({ c:GetRegions() }) do
+                    local atlas = t.IsObjectType and t:IsObjectType("Texture") and t.GetAtlas and t:GetAtlas()
+                    if atlas and atlas:find("dropdown%-bg") then
+                        Touch(t); t:SetAlpha(0)   -- the background on a style child
+                    elseif atlas then
+                        Touch(t); t:SetDesaturated(true); t:SetVertexColor(tr, tg, tb)
+                    end
+                end
+                Walk(c)
+            end
+        end
+    end
+    Walk(menu)
+end
+
+local function SkinOpenMenu(menu)
+    if not menu and Menu and Menu.GetManager then
+        local mgr = Menu.GetManager()
+        menu = mgr and mgr.GetOpenMenu and mgr:GetOpenMenu()
+    end
+    if not menu then return end
+    RestoreMenu()
+    _openMenu = menu
+    if not _menuSkin then _menuSkin = BNB.CreateBackdropFrame("Frame", nil, UIParent) end
+    local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
+    if p then
+        local br, bg, bb = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(_menuSkin, p.r, p.g, p.b, 0.96, br, bg, bb, 1)
+    end
+    _menuSkin:SetParent(menu)
+    _menuSkin:ClearAllPoints()
+    _menuSkin:SetAllPoints(menu)
+    _menuSkin:SetFrameLevel(menu:GetFrameLevel())   -- under the rows
+    _menuSkin:Show()
+    TintMenu(menu)
+    _menuTicker = C_Timer.NewTicker(0.15, function() TintMenu(menu) end)
+end
+
+function BNB.SkinDropdown(dd)
+    if not dd or dd._skinDD or not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then return dd end
+    dd._skinDD = true
+    local vis, arrow
+
+    local function HideArt()
+        for _, t in ipairs({ dd:GetRegions() }) do
+            if t.IsObjectType and t:IsObjectType("Texture") then t:SetAlpha(0) end
+        end
+        for _, c in ipairs({ dd:GetChildren() }) do
+            for _, t in ipairs({ c:GetRegions() }) do
+                if t.IsObjectType and t:IsObjectType("Texture") then t:SetAlpha(0) end
+            end
+        end
+        local on = dd:IsEnabled()
+        if dd.Text then
+            local c = on and 1 or 0.5
+            dd.Text:SetTextColor(c, c, c)
+        end
+        if vis then vis:SetEnabled(on) end
+        if arrow then arrow:SetEnabled(on) end
+    end
+    local function Pass(f, script)
+        local fn = f and f:GetScript(script)
+        if fn then pcall(fn, f) end
+    end
+
+    -- Built once the dropdown has its size (sites set width / height after
+    -- CreateFrame); the arrow button's box is chosen by its size
+    local function Build()
+        if vis then return end
+        local h = math.floor(dd:GetHeight() + 0.5)
+        if h < 10 then h = 26 end
+        vis = BNB.CreateSkinButton(nil, dd:GetParent(), "", math.max(1, dd:GetWidth()), h)
+        vis:SetAllPoints(dd)
+        vis:SetFrameLevel(math.max(0, dd:GetFrameLevel() - 1))
+        vis:EnableMouse(false)
+        vis:SetAlpha(dd:GetAlpha())
+        vis:SetShown(dd:IsShown())
+        arrow = BNB.CreateIconButton(vis, h, "down", { skin = true })
+        arrow:SetPoint("RIGHT", vis, "RIGHT", 0, 0)
+        arrow:EnableMouse(false)
+        HideArt()
+    end
+    if dd:IsVisible() then C_Timer.After(0, Build) end
+
+    local function Later() C_Timer.After(0, HideArt) end
+    dd:HookScript("OnShow", function() Build(); if vis then vis:Show() end; Later() end)
+    dd:HookScript("OnHide", function() if vis then vis:Hide() end end)
+    dd:HookScript("OnSizeChanged", function()
+        if arrow then
+            local h = math.floor(dd:GetHeight() + 0.5)
+            if h >= 10 then arrow:SetSize(h, h) end
+        end
+    end)
+    dd:HookScript("OnEnter", function()
+        if vis and dd:IsEnabled() then vis:LockHighlight(); Pass(arrow, "OnEnter") end
+        Later()
+    end)
+    dd:HookScript("OnLeave", function()
+        if vis then vis:UnlockHighlight(); Pass(vis, "OnMouseUp"); Pass(arrow, "OnLeave") end
+        Later()
+    end)
+    dd:HookScript("OnMouseDown", function()
+        if vis and dd:IsEnabled() then Pass(vis, "OnMouseDown"); Pass(arrow, "OnMouseDown") end
+    end)
+    dd:HookScript("OnMouseUp", function()
+        if vis then Pass(vis, "OnMouseUp"); Pass(arrow, "OnMouseUp") end
+        Later()
+    end)
+    dd:HookScript("OnEnable", Later)
+    dd:HookScript("OnDisable", Later)
+    -- Greying by alpha (some pages fade a dropdown instead of disabling it)
+    hooksecurefunc(dd, "SetAlpha", function(_, a) if vis then vis:SetAlpha(a) end end)
+    -- The open list (see above): DropdownButtonMixin calls these with the menu
+    if dd.OnMenuOpened then
+        hooksecurefunc(dd, "OnMenuOpened", function(_, menu) pcall(SkinOpenMenu, menu) end)
+    end
+    if dd.OnMenuClosed then
+        hooksecurefunc(dd, "OnMenuClosed", function(_, menu)
+            if menu == nil or menu == _openMenu then RestoreMenu() end
+        end)
+    end
+    return dd
 end
 
 --------------------------------------------------------------------------------
@@ -713,9 +996,9 @@ function BNB.CreateDivider(parent, orientation, r, g, b, a)
     local t = parent:CreateTexture(nil, "ARTWORK")
     local alpha = a or 1
     if BigNoteBoxDB and BigNoteBoxDB.skinMode
-       and BNB.GetSkinPreset and BNB.SkinBorderOf and BNB.RegisterSkinRule then
+       and BNB.GetSkinPreset and BNB.SkinRuleOf and BNB.RegisterSkinRule then
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         t:SetColorTexture(br, bg_, bb, alpha)
         BNB.RegisterSkinRule(t, alpha)
     else
@@ -811,8 +1094,8 @@ function BNB.CreateNoteRule(parent)
     local t = parent:CreateTexture(nil, "ARTWORK")
     local c = BNB.NOTE_RULE_RGBA
     if BigNoteBoxDB and BigNoteBoxDB.skinMode
-       and BNB.GetSkinPreset and BNB.SkinBorderOf and BNB.RegisterSkinRule then
-        local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+       and BNB.GetSkinPreset and BNB.SkinRuleOf and BNB.RegisterSkinRule then
+        local br, bg_, bb = BNB.SkinRuleOf(BNB.GetSkinPreset())
         t:SetColorTexture(br, bg_, bb, c[4])
         BNB.RegisterSkinRule(t, c[4])
     else
@@ -938,7 +1221,7 @@ function BNB.CreateValueDropdown(parent, entries, initial, onChange, width, heig
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(width, height)
 
-    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate"))
     dd:SetToplevel(true); dd:SetWidth(width); dd:SetHeight(height)
     dd:SetPoint("TOPLEFT")
     dd._selected = initial
@@ -990,7 +1273,7 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     local c = CreateFrame("Frame", nil, parent)
     c:SetSize(width, height)
 
-    local dd = CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate"))
     dd:SetToplevel(true); dd:SetSize(width, height); dd:SetPoint("TOPLEFT")
     -- The box shows the value; the template's own label stays empty
     if dd.Text then dd.Text:SetAlpha(0) end
@@ -1278,6 +1561,7 @@ function BNB.CreateStackedSlider(parent, width, o)
     local cur = Snap(o.value)
     sl:Init(cur, o.min, o.max, math.floor((o.max - o.min) / step + 0.5))
     NoSliderWheel(sl)
+    BNB.SkinSlider(sl)   -- skin mode: tinted to the preset (ALL-393)
 
     local enabled, muted = true, false
     local function Sync()
@@ -1328,6 +1612,7 @@ function BNB.CreateStackedSlider(parent, width, o)
         enabled = on and true or false
         pcall(sl.SetEnabled, sl, enabled)
         Sync()
+        if _skinBars[sl] then C_Timer.After(0, _skinBars[sl]) end   -- dim / undim the tint
     end
     Sync()
     return h

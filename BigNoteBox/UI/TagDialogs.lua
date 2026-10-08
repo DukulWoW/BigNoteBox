@@ -115,7 +115,7 @@ function BNB.OpenImgDialog(insertFn)
 
         if #userImages > 0 then
             Lbl(L["NE_PICK_USERIMAGES"])
-            pickerDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+            pickerDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
             pickerDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
             pickerDD:SetWidth(INNER_W)
             pickerDD:SetupMenu(function(_, root)
@@ -152,7 +152,7 @@ function BNB.OpenImgDialog(insertFn)
         local selAlign = 1  -- index into ALIGN_OPTS
         local alignDD
 
-        alignDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+        alignDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
         alignDD:SetPoint("TOPLEFT", f, "TOPLEFT", DPAD, curY)
         alignDD:SetWidth(INNER_W)
         alignDD:SetupMenu(function(_, root)
@@ -537,7 +537,7 @@ function BNB.OpenIcoDialog(insertFn)
         alignLbl:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DPAD, BTN_H + DPAD + 12 + 22 + 2)
         alignLbl:SetTextColor(0.65, 0.65, 0.65)
         alignLbl:SetText(L["NE_ALIGNMENT_LABEL"])
-        local alignDD = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+        local alignDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
         alignDD:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", DPAD, BTN_H + DPAD + 12)
         alignDD:SetWidth(INNER_W)
         alignDD:SetupMenu(function(_, root)

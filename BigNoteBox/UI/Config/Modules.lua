@@ -64,7 +64,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
             { key = "confirm", label = L["CFG_QN_ITEM_CONFIRM"] },
         }
         local curQN = db.quickNoteAction or BNB.DEFAULTS.quickNoteAction
-        local qnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local qnDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         qnDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         qnDD:SetWidth(CONTENT_W)
         qnDD:SetupMenu(function(_, root)
@@ -217,6 +217,15 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         end,
         L["CFG_UNIT_ENABLE_TIP"])
     page.enableCb = enableCb   -- twin on the Modules overview row
+
+    -- Note icon on the Target / Focus frames (ALL-389), Features/UnitFrameBadge.lua
+    y = AddCheck(ct, y, L["CFG_UNIT_BADGE_LABEL"],
+        function() return db.unitFrameBadge ~= false end,
+        function(v)
+            db.unitFrameBadge = v
+            if BNB.ApplyUnitFrameBadges then BNB.ApplyUnitFrameBadges() end
+        end,
+        L["CFG_UNIT_BADGE_TIP"])
     -- ── Inspect Note ──────────────────────────────────────────────────────────
     do
         y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])
@@ -234,7 +243,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             { key = "auto_normal", label = L["CFG_ITEM_AUTO_NORMAL"] },
         }
         local curInsMode = db.inspectNoteMode or BNB.DEFAULTS.inspectNoteMode
-        local insModeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local insModeDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         insModeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         insModeDD:SetWidth(CONTENT_W)
 
@@ -287,7 +296,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
         local curInsType = db.inspectNoteType or BNB.DEFAULTS.inspectNoteType
-        insTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        insTypeDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         insTypeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         insTypeDD:SetWidth(CONTENT_W)
         insTypeDD:SetupMenu(function(_, root)
@@ -336,7 +345,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             { key = "transmog", label = L["CFG_INS_GEAR_TRANSMOG"]},
         }
         local curGearShow = db.inspectNoteGearShow or BNB.DEFAULTS.inspectNoteGearShow
-        local gearShowDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local gearShowDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         gearShowDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         gearShowDD:SetWidth(CONTENT_W)
         gearShowDD:SetupMenu(function(_, root)
@@ -379,7 +388,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             { key = "always_normal", label = L["CFG_ITEM_ALWAYS_NORMAL"] },
         }
         local curTNType = db.targetNoteType or BNB.DEFAULTS.targetNoteType
-        local tnTypeDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local tnTypeDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         tnTypeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         tnTypeDD:SetWidth(CONTENT_W)
         tnTypeDD:SetupMenu(function(_, root)
@@ -486,7 +495,7 @@ local function BuildTasksPage(sf, ct, y, page)
             { key = "inline", label = L["CFG_TASK_POS_KEEP_SHORT"]  },
         }
 
-        local cpDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local cpDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         cpDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         cpDD:SetWidth(CONTENT_W)
         cpDD:SetupMenu(function(_, root)
@@ -542,7 +551,7 @@ local function BuildTasksPage(sf, ct, y, page)
             end
         end
 
-        local spDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local spDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         spDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         spDD:SetWidth(CONTENT_W)
         spDD:SetupMenu(function(_, root)
@@ -620,7 +629,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
         y = y - (ROW_H + ROW_GAP)
 
         -- Side: Left / Right dropdown
-        local sideDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local sideDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         sideDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         sideDD:SetWidth(CONTENT_W)
         sideDD:SetHeight(22)
@@ -650,7 +659,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
         y = y - (22 + ROW_GAP)
 
         -- Display style dropdown
-        local styleDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local styleDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         styleDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         styleDD:SetWidth(CONTENT_W)
         styleDD:SetHeight(22)
@@ -803,7 +812,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             { key = "left",  label = L["CFG_SIDEBAR_SIDE_LEFT"] },
         }
         local curSide = db.sidebarSide or BNB.DEFAULTS.sidebarSide
-        local sideDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
+        local sideDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate"))
         sideDD:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         sideDD:SetWidth(CONTENT_W)
         sideDD:SetupMenu(function(_, root)
@@ -902,7 +911,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             { key = true,  label = L["CFG_SIDEBAR_POS_BOTTOM"] },
         }
         local curBottom = db.sidebarAtBottom == true
-        posDD = CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate")
+        posDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, sidebarSub, "WowStyle1DropdownTemplate"))
         posDD:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         posDD:SetWidth(CONTENT_W)
         posDD:SetupMenu(function(_, root)
@@ -1552,20 +1561,7 @@ local function BuildToastsPage(sf, ct, y, page)
 
     -- Sound (S3): nil = none; the alarm sounds, played once per burst
     do
-        local entries = {
-            { label = L["AW_SND_SILENT"],      value = "silent" },
-            { label = L["AW_SND_DEFAULT"],     value = "default" },
-            { label = L["AW_SND_DOUBLE_HIT"],  value = "sound01" },
-            { label = L["AW_SND_LONG_POP"],    value = "sound02" },
-            { label = L["AW_SND_MAGIC"],       value = "sound03" },
-            { label = L["AW_SND_SCREAM"],      value = "sound04" },
-            { label = L["AW_SND_YELL"],        value = "sound05" },
-            { label = L["AW_SND_TRIPLE_HIT"],  value = "sound06" },
-            { label = L["AW_SND_DRUM_DING"],   value = "sound07" },
-            { label = L["AW_SND_XYLOPHONE"],   value = "sound08" },
-            { label = L["AW_SND_TADA"],        value = "sound09" },
-            { label = L["AW_SND_SOFT_DINGS"],  value = "sound10" },
-        }
+        local entries = BNB.AlarmSoundEntries()   -- Features/AlarmManager.lua SOUND_LIST
         local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")

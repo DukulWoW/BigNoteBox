@@ -41,6 +41,7 @@ function BNB.ApplyUnitNotesModule(on)
     if UN.ApplyInspectBtn then UN.ApplyInspectBtn(on) end
     if not on and UN.CloseDialogs then UN.CloseDialogs() end
     if BNB.ApplyRefBoxModules then BNB.ApplyRefBoxModules() end   -- Model tab
+    if BNB.ApplyUnitFrameBadges then BNB.ApplyUnitFrameBadges() end   -- Target / Focus badge (ALL-389)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end         -- live portraits
     local SN = BNB.Sticky
     if SN and SN.RefreshNote and SN.IsOpen then

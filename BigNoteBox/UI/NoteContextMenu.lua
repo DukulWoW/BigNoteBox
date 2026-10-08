@@ -121,6 +121,11 @@ StaticPopupDialogs["BNB_CM_CLEAR_HISTORY"] = {
 local function RefBoxOn()
     return BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled ~= false
 end
+-- The note's own player / NPC model (Player & NPC Notes on, ALL-388)
+local function NoteHasModel(noteID)
+    local K = BNB._RefBoxKit
+    return K and K.HasModel and K.HasModel(noteID) or false
+end
 local function RefBoxShows(noteID)
     local f = _G["BigNoteBoxReferenceBoxFrame"]
     local K = BNB._RefBoxKit
@@ -233,10 +238,12 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             BNB.FocusEnabled() and {   -- Focus Mode module (ALL-343)
               key = "focus",    label = L["CFG_DBL_FOCUS"], fn = function() A.focus(noteID) end,
               opts = { disabled = locked, icon = "focus-mode" } } or false,
-            -- Reference Box (ALL-360): only while its module is on; closes it
-            -- when it already shows this note
-            RefBoxOn() and { key = "refBox",
-              label = RefBoxShows(noteID) and L["NL_CM_CLOSE_REFBOX"] or L["NL_CM_OPEN_REFBOX"],
+            -- Reference Box (ALL-360): while its module is on, or (ALL-388) on
+            -- a player / NPC note with a model, as "Open model"; closes the
+            -- window when it already shows this note
+            (RefBoxOn() or NoteHasModel(noteID)) and { key = "refBox",
+              label = RefBoxOn() and (RefBoxShows(noteID) and L["NL_CM_CLOSE_REFBOX"] or L["NL_CM_OPEN_REFBOX"])
+                  or (RefBoxShows(noteID) and L["NL_CM_CLOSE_MODEL"] or L["NL_CM_OPEN_MODEL"]),
               fn = function()
                 if RefBoxShows(noteID) then BNB.CloseReferenceBox()
                 elseif BNB.OpenReferenceBox then BNB.OpenReferenceBox(noteID) end

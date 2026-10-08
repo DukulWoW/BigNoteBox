@@ -300,7 +300,7 @@ local function BuildChannelDropdown(parent, onChange)
     -- Pre-declare dd so UpdateText closure can reference it safely
     local dd
 
-    dd = CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate")
+    dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, container, "WowStyle1DropdownTemplate"))
     dd:SetPoint("TOPLEFT",  container, "TOPLEFT",  0, 0)
     dd:SetPoint("TOPRIGHT", container, "TOPRIGHT", 0, 0)
     dd:SetHeight(26)

@@ -473,7 +473,7 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
             { key = "plain",    label = L["CFG_EXPORT_HTML_PLAIN"] },
             { key = "stylized", label = L["CFG_EXPORT_HTML_STYLIZED"] },
         }
-        local dd = CreateFrame("DropdownButton", nil, _exportWin, "WowStyle1DropdownTemplate")
+        local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, _exportWin, "WowStyle1DropdownTemplate"))
         dd:SetPoint("LEFT", _exportWin._copyBtn, "RIGHT", 8, 0)
         dd:SetWidth(150)
         dd:SetHeight(24)

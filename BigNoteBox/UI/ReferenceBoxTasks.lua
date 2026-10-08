@@ -20,7 +20,7 @@ local ASSETS = K.ASSETS
 local RBFrame, NoteID, RBMode = K.RBFrame, K.NoteID, K.RBMode
 -- HasModel: the note has a model view (its own, or an entry shown, ALL-206)
 local HasModel, OnModeClick = K.HasModel, K.OnModeClick
-local TasksOnly = K.TasksOnly
+local RBOn, TasksOnly = K.RBOn, K.TasksOnly
 local UpdateModeStrip, UpdateModelViewer, UpdateDynamicTitle =
     K.UpdateModeStrip, K.UpdateModelViewer, K.UpdateDynamicTitle
 
@@ -87,7 +87,10 @@ ApplyTaskLayout = function(f)
     end)()
     local isSkin     = BigNoteBoxDB and BigNoteBoxDB.skinMode
     local titleH     = isSkin and SK_RB_TITLE_H or TITLE_H
-    local contentTop = -(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
+    -- Without the Reference part (ALL-388) no add strip or count above the content
+    local refOn      = RBOn()
+    local contentTop = refOn and -(titleH + 4 + MANUAL_H + MANUAL_GAP + COUNT_H + 4)
+        or -(titleH + 4)
     local botPad     = BOTTOM_PAD
 
     -- Update external mode strip button states
@@ -96,13 +99,14 @@ ApplyTaskLayout = function(f)
     -- Hide wide add-tasks button by default
     if addWide then addWide:Hide() end
 
-    -- ── STATE: tasks-only window (Reference Box off, ALL-102) ─────────────────
+    -- ── STATE: tasks view without the Reference part (ALL-102, ALL-388) ───────
     -- No add strip, count, attachment list or splitter: the task panel fills
     -- the window under the title, or the wide Add Tasks button sits there.
+    -- (The model view without it keeps the list for the gear, under the title.)
     local strip, count = f._manualStrip, f._countLabel
     local tasksOnly = TasksOnly()
-    if strip then strip:SetShown(not tasksOnly) end
-    if count then if tasksOnly then count:Hide() else count:Show() end end
+    if strip then strip:SetShown(refOn) end
+    if count then if refOn then count:Show() else count:Hide() end end
     if sf then sf:SetShown(not tasksOnly) end
     if tasksOnly then
         if sp then sp:Hide() end

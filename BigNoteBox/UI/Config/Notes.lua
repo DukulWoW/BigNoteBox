@@ -43,7 +43,7 @@ local function BuildNotesTab(sf, ct)
             { key = "immediate", label = L["CFG_NEWNOTE_ITEM_IMMEDIATE"]             },
         }
         local curBehaviour = db.newNoteBehaviour or "prompt"
-        local nnDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+        local nnDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         nnDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         nnDD:SetWidth(CONTENT_W)
         nnDD:SetupMenu(function(_, root)

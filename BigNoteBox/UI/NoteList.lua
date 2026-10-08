@@ -2450,21 +2450,25 @@ end
 
 -- True when note is a target or inspect note about the unit targeted now.
 -- The note list row and the sticky badge (ALL-208) draw its live portrait then.
-function BNB.NoteMatchesTarget(note)
+-- NoteMatchesUnit is the same test for any unit token (the Target / Focus
+-- frame badge, ALL-389).
+function BNB.NoteMatchesTarget(note) return BNB.NoteMatchesUnit(note, "target") end
+
+function BNB.NoteMatchesUnit(note, unit)
     if not BNB.UnitNotesEnabled() then return false end   -- Player & NPC Notes off (ALL-343)
     if not note or not (note.source == "target" or note.source == "inspect")
-            or not UnitExists("target") then
+            or not UnitExists(unit) then
         return false
     end
     if note.source == "inspect" then
-        if UnitIsPlayer("target") and note.inspectName then
-            local name, realm = BNB.UnitNameRealm("target")
+        if UnitIsPlayer(unit) and note.inspectName then
+            local name, realm = BNB.UnitNameRealm(unit)
             return (name == note.inspectName) and
                 (not note.inspectRealm or note.inspectRealm == "" or realm == note.inspectRealm)
         end
     elseif note.targetNpcID then
         -- NPC match: compare stored creature ID against current target GUID
-        local guid = UnitGUID("target")
+        local guid = UnitGUID(unit)
         local curID = guid and (
             guid:match("^Creature%-0%-%d+%-%d+%-%d+%-(%d+)") or
             guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)") or
@@ -2473,7 +2477,7 @@ function BNB.NoteMatchesTarget(note)
         return curID == note.targetNpcID
     elseif note.targetPlayerKey then
         -- Player match: compare stored key against current target name+realm
-        local name, realm = BNB.UnitNameRealm("target")
+        local name, realm = BNB.UnitNameRealm(unit)
         realm = (realm and realm ~= "") and realm or
                 GetNormalizedRealmName() or ""
         local curKey = "player:" .. (name or "") .. (realm ~= "" and ("-" .. realm) or "")

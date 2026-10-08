@@ -1259,7 +1259,7 @@ function M.ShowPopup()
     sep:SetPoint("TOPRIGHT", ct, "TOPRIGHT", -PAD, y)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         sep:SetColorTexture(br, bg_, bb, 0.8)
         BNB.RegisterSkinRule(sep, 0.8)
     else

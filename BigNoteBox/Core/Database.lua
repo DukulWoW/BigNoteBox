@@ -129,6 +129,7 @@ BNB.DEFAULTS = {
     stickiesEnabled     = true,    -- Sticky Notes,
     richEnabled         = true,    -- Rich Notes,
     unitNotesEnabled    = true,    -- Player & NPC Notes
+    unitFrameBadge      = true,    -- note icon on the Target / Focus frames (ALL-389)
     toastsEnabled       = true,    -- Toasts (ALL-384)
     refboxDisplayStyle  = "normal",
     refboxMaxItems      = 50,

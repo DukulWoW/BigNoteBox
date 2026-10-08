@@ -151,6 +151,21 @@ function BNB.RegisterSlashCommands()
                 BNB:Print("|cffffff00Usage:|r /bnb topbar <y> [h] [cropTop] [tileW] [lift] [left] [header]  (live, not saved)")
             end
 
+        -- ── Developer: Target / Focus frame note badge (ALL-389, Features/UnitFrameBadge.lua)
+        elseif cmd == "unitbadge" or cmd:sub(1, 10) == "unitbadge " then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            if not BNB.TuneUnitBadge then return end
+            local x, y, s = cmd:sub(11):match("^%s*(%S*)%s*(%S*)%s*(%S*)")
+            local x2, y2, s2 = BNB.TuneUnitBadge(tonumber(x), tonumber(y), tonumber(s))
+            BNB:Print(string.format("|cff88bbffUnit frame badge:|r x=%s y=%s scale=%s  (live, not saved)",
+                tostring(x2), tostring(y2), tostring(s2)))
+            if not tonumber(x) then
+                BNB:Print("|cffffff00Usage:|r /bnb unitbadge <x> <y> [scale]")
+            end
+
         -- ── Developer: chrome seating (FOR-05, UI/Chrome.lua) ─────────────────
         -- "chromeprobe" dumps the template layout; "chrome l t r b" re-seats
         -- every window live. Nothing is saved: Forever drops SavedVariables.

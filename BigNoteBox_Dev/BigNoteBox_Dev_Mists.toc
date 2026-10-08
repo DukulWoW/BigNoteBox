@@ -11,6 +11,7 @@ BigNoteBox_Dev.lua
 ButtonTest.lua
 IconProbe.lua
 SidebarTopTest.lua
+SkinWidgetsTest.lua
 
 # The labs (ARCH-04): queued here, run by BigNoteBox's Core/DevTools.lua.
 # IconLabAtlas.lua is generated and git-ignored: _work/tools/iconlab-regions.py

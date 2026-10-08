@@ -428,8 +428,8 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local alignDD = CreateFrame("DropdownButton", nil, panel,
-        "WowStyle1DropdownTemplate")
+    local alignDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, panel,
+        "WowStyle1DropdownTemplate"))
     alignDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     alignDD:SetWidth(CW)
     alignDD:SetupMenu(function(_, root)
@@ -483,8 +483,8 @@ local function BuildAppearanceTab(panel)
         end
     end
 
-    local outlineDD = CreateFrame("DropdownButton", nil, panel,
-        "WowStyle1DropdownTemplate")
+    local outlineDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, panel,
+        "WowStyle1DropdownTemplate"))
     outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     outlineDD:SetWidth(CW)
     outlineDD:SetupMenu(function(_, root)

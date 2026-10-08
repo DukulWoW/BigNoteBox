@@ -102,9 +102,33 @@ end
 -- the window's Test button: ringing went to LSM, which answered an unknown key
 -- with its silent "None" sound, so every one of them rang silent (ALL-136.3).
 local SOUND_DIR   = "Interface/AddOns/BigNoteBox/Assets/Sounds/"
+-- The one list of our sounds, in menu order: soundNN.ogg = label key. A new
+-- sound = the file + one line here + its AW_SND_* key (both sound menus read it)
+local SOUND_LIST = {
+    "AW_SND_DOUBLE_HIT", "AW_SND_LONG_POP", "AW_SND_MAGIC", "AW_SND_SCREAM",
+    "AW_SND_YELL", "AW_SND_TRIPLE_HIT", "AW_SND_DRUM_DING", "AW_SND_XYLOPHONE",
+    "AW_SND_TADA", "AW_SND_SOFT_DINGS",
+    -- Dukul, 2026-10-08
+    "AW_SND_APPLE_PAY", "AW_SND_HEARTBEAT", "AW_SND_HORROR_WARNING", "AW_SND_KA_CHING",
+    "AW_SND_MGS_ALERT", "AW_SND_QUACK", "AW_SND_SAD_TROMBONE", "AW_SND_TOASTY",
+    "AW_SND_VIOLIN_STING", "AW_SND_WARNING_ALERT", "AW_SND_WHISTLE",
+}
 local SOUND_FILES = {}
-for i = 1, 10 do
+for i = 1, #SOUND_LIST do
     SOUND_FILES[string.format("sound%02d", i)] = string.format("%ssound%02d.ogg", SOUND_DIR, i)
+end
+
+-- Dropdown entries for a sound menu: Silent, Default, then ours (the Set alarm
+-- window's Sound and the Toasts page's sound)
+function BNB.AlarmSoundEntries()
+    local out = {
+        { label = L["AW_SND_SILENT"],  value = "silent" },
+        { label = L["AW_SND_DEFAULT"], value = "default" },
+    }
+    for i, key in ipairs(SOUND_LIST) do
+        out[#out + 1] = { label = L[key], value = string.format("sound%02d", i) }
+    end
+    return out
 end
 
 -- File path for an alarm sound key; nil for "silent"

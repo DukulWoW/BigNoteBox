@@ -488,20 +488,7 @@ local function BuildSoundBlock(ct1)
     Div(blk,y); y = y - AW_GAP
     SectionHdr(blk,L["AW_SECT_SOUND"],y); y = y - AW_LBL - 2
     -- Silent first, then Default, then custom sounds
-    local sndEntries={
-        {label=L["AW_SND_SILENT"],      value="silent"  },
-        {label=L["AW_SND_DEFAULT"],     value="default" },
-        {label=L["AW_SND_DOUBLE_HIT"],  value="sound01" },
-        {label=L["AW_SND_LONG_POP"],    value="sound02" },
-        {label=L["AW_SND_MAGIC"],       value="sound03" },
-        {label=L["AW_SND_SCREAM"],      value="sound04" },
-        {label=L["AW_SND_YELL"],        value="sound05" },
-        {label=L["AW_SND_TRIPLE_HIT"],  value="sound06" },
-        {label=L["AW_SND_DRUM_DING"], value="sound07" },
-        {label=L["AW_SND_XYLOPHONE"],   value="sound08" },
-        {label=L["AW_SND_TADA"],        value="sound09" },
-        {label=L["AW_SND_SOFT_DINGS"],  value="sound10" },
-    }
+    local sndEntries=BNB.AlarmSoundEntries()   -- Features/AlarmManager.lua SOUND_LIST
     local sDDW = AW_CW - 56
     local soundDD = MakeDD(blk,sndEntries,"default",nil,sDDW)
     soundDD:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y)

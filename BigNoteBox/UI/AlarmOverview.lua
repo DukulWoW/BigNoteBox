@@ -102,7 +102,7 @@ local function BuildPopup()
 
     -- Snooze duration dropdown (right of snooze button)
     local snoozeDDW = math.floor(contentW * 0.5)
-    local dd = CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
     dd:SetToplevel(true)
     dd:SetWidth(snoozeDDW)
     dd:SetHeight(24)

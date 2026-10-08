@@ -8,6 +8,7 @@
 -- Public API:
 --   BNB.ShowBugReport()              open the window
 --   BNB.CreateBugLinkButtons(parent) frame with the link buttons, see below
+--   BNB.CreateLinkButton(parent, text, url, skin)  one copy-the-link button
 --   BNB.AttachBugButton()            called from Initialize once mainFrame exists
 --   BNB.AttachSettingsBugButton(f)   called from OpenConfig once the Settings frame exists
 
@@ -30,31 +31,37 @@ BNB.BUG_LINKS = {
 --------------------------------------------------------------------------------
 local BTN_H, ROW_GAP = 24, 6
 BNB.BUG_LINKS_H = BTN_H * 2 + ROW_GAP
+BNB.LINK_BTN_H, BNB.LINK_BTN_GAP = BTN_H, ROW_GAP
+
+-- One link button: a click opens the copy box with the URL, the tooltip shows
+-- it. Also the Get BigChatBox window's site buttons (ALL-390). Width is the
+-- caller's (anchors or SetWidth).
+function BNB.CreateLinkButton(parent, text, url, skin)
+    local b
+    if skin then
+        b = BNB.CreateSkinButton(nil, parent, text, 80, BTN_H)
+    else
+        b = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
+        b:SetHeight(BTN_H)
+        b:SetText(text)
+    end
+    b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true) end)
+    -- Hooks: a skin button draws its hover in its own OnEnter / OnLeave
+    b:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["BUG_LINK_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(url, 0.6, 0.6, 0.6)
+        GameTooltip:Show()
+    end)
+    b:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
 
 function BNB.CreateBugLinkButtons(parent, width, skin)
     local box = CreateFrame("Frame", nil, parent)
     box:SetSize(width, BNB.BUG_LINKS_H)
 
-    local function LinkBtn(text, url)
-        local b
-        if skin then
-            b = BNB.CreateSkinButton(nil, box, text, 80, BTN_H)
-        else
-            b = CreateFrame("Button", nil, box, BNB.PanelButtonTemplate())
-            b:SetHeight(BTN_H)
-            b:SetText(text)
-        end
-        b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true) end)
-        -- Hooks: a skin button draws its hover in its own OnEnter / OnLeave
-        b:HookScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(L["BUG_LINK_TIP"], 1, 1, 1)
-            GameTooltip:AddLine(url, 0.6, 0.6, 0.6)
-            GameTooltip:Show()
-        end)
-        b:HookScript("OnLeave", function() GameTooltip:Hide() end)
-        return b
-    end
+    local function LinkBtn(text, url) return BNB.CreateLinkButton(box, text, url, skin) end
 
     local gh = LinkBtn(L["BUG_BTN_GITHUB"], BNB.BUG_LINKS.github)
     gh:SetPoint("TOPLEFT", box, "TOPLEFT", 0, 0)

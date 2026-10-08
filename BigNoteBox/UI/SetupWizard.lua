@@ -332,7 +332,7 @@ end
 
 -- Dropdown helper (WowStyle1DropdownTemplate)
 local function MakeDropdown(parent, y, w, setupMenu)
-    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate"))
     dd:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     dd:SetWidth(w or CW)
     dd:SetToplevel(true)
@@ -480,7 +480,7 @@ local function BuildPage1(content)
 
         local curLangCode = (BigNoteBoxLocale and BigNoteBoxLocale ~= "") and BigNoteBoxLocale or "client"
 
-        local langDD = CreateFrame("DropdownButton", nil, lb, "WowStyle1DropdownTemplate")
+        local langDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, lb, "WowStyle1DropdownTemplate"))
         langDD:SetPoint("TOP", lb, "TOP", 0, ly)
         langDD:SetWidth(CW - 40)
         langDD:SetupMenu(function(_, root)

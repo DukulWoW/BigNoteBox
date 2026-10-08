@@ -583,7 +583,7 @@ local function PopulateStickySettings(noteID)
     end
 
     SubLbl(ct1, L["STICKY_LINE_HEIGHT_LABEL"])
-    local lhSDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    local lhSDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate"))
     lhSDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
     lhSDD:SetWidth(SETTINGS_CW)
     lhSDD:SetupMenu(function(_, root)
@@ -609,7 +609,7 @@ local function PopulateStickySettings(noteID)
     -- the saved value or the ALIGN_MAP lookup.
     local ALIGN_KEYS   = { "LEFT", "CENTER", "RIGHT" }
     local ALIGN_LABELS = { LEFT = L["STICKY_ALIGN_LEFT"], CENTER = L["STICKY_ALIGN_CENTER"], RIGHT = L["STICKY_ALIGN_RIGHT"] }
-    local alignDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    local alignDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate"))
     alignDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
     alignDD:SetWidth(SETTINGS_CW)
     alignDD:SetupMenu(function(_, root)
@@ -632,7 +632,7 @@ local function PopulateStickySettings(noteID)
     -- Font outline
     SubLbl(ct1, L["STICKY_FONT_OUTLINE_LABEL"])
     local function GetOutlineLabel() return cfg.fontOutline or "None" end
-    local outlineDD = CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate")
+    local outlineDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct1, "WowStyle1DropdownTemplate"))
     outlineDD:SetPoint("TOPLEFT", ct1, "TOPLEFT", 0, ct1._y)
     outlineDD:SetWidth(SETTINGS_CW)
     outlineDD:SetupMenu(function(_, root)
@@ -865,7 +865,7 @@ local function PopulateStickySettings(noteID)
     -- before the function body is assigned (Lua 5.1 upvalue capture fix).
     local SyncBorderSliders
     local curBorder = cfg.borderName or "None"
-    local bdd = CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate")
+    local bdd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate"))
     bdd:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
     bdd:SetWidth(SETTINGS_CW)
     bdd:SetupMenu(function(_, root)

@@ -93,6 +93,19 @@ function BNB.SkinColourOf(preset, lifted)
            math.min(1, (preset.b + lift) * brt)
 end
 
+-- Divider rules (ALL-394): the border colour, with the brightness stopping at
+-- the default (1.50). A window edge carries a bright border; a 1 px rule
+-- across a page went glaring from 2.00 up (Dukul 2026-10-08, screenshots at
+-- 1.00 / 2.00 / 3.00). Every rule colour (RegisterSkinRule targets and their
+-- first colour) comes from here.
+function BNB.SkinRuleOf(preset)
+    local cap = BNB.DEFAULTS and BNB.DEFAULTS.skinBrightness or 1.5
+    local brt = math.min(BNB.GetSkinBrightness(), cap)
+    return math.min(1, preset.br * brt),
+           math.min(1, preset.bg_ * brt),
+           math.min(1, preset.bb * brt)
+end
+
 -- Returns br, bg_, bb for a preset scaled by the current brightness multiplier.
 function BNB.SkinBorderOf(preset)
     local brt = BNB.GetSkinBrightness()
@@ -219,13 +232,14 @@ function BNB.ApplyMainWindowSkin()
         pcall(refreshFn)
     end
 
-    -- Recolour all registered divider rule textures
-    local br, bg_, bb = BNB.SkinBorderOf(preset)
+    -- Recolour all registered divider rule textures (brightness capped, ALL-394)
+    local rr, rg, rb = BNB.SkinRuleOf(preset)
     for _, r in ipairs(_skinRules) do
         if r.tex and r.tex.SetColorTexture then
-            r.tex:SetColorTexture(br, bg_, bb, r.alpha)
+            r.tex:SetColorTexture(rr, rg, rb, r.alpha)
         end
     end
+    local br, bg_, bb = BNB.SkinBorderOf(preset)
 
     -- Recolour registered FontString labels (metadata strips, etc.)
     for _, l in ipairs(_skinLabels) do

@@ -85,7 +85,6 @@ L["MW_MULTI_EXPORT_TIP_SUB"] = "输出内容可通过“备份”选项卡重新
 L["MW_BCB_PROMO_TITLE"]   = "获取 BigChatBox"
 L["MW_BCB_PROMO_BY"]      = "作者：Dukul"
 L["MW_BCB_PROMO_DESC"]    = "将您的笔记逐行发送到任何频道，\n将它们推送到 BCB 的多行编辑器中，\n或使用 BNB 内置的共享系统\n与其他玩家共享笔记。"
-L["MW_BCB_PROMO_URL_LBL"] = "在 CurseForge 上找到它 - 复制下方 URL："
 
 -- ── Main window: notes-unavailable panel ─────────────────────────────────────
 L["MW_DB_UNAVAILABLE_HEADER"] = "BigNoteBoxDB 未加载"

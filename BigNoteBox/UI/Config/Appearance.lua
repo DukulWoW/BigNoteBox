@@ -207,7 +207,7 @@ local function BuildAppearanceTab(sf, ct)
     -- Forward declaration so preset callbacks below can call it before it's defined
     local RefreshBrightnessVisibility
 
-    skinPresetDD = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    skinPresetDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
     skinPresetDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinPresetDD:SetWidth(CONTENT_W - 18)
     local function RebuildSkinMenu()
@@ -453,7 +453,7 @@ local function BuildAppearanceTab(sf, ct)
     }
 
     local curMode = db.listEntryHeight or BNB.DEFAULTS.listEntryHeight
-    local modeDD2 = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    local modeDD2 = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
     modeDD2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     modeDD2:SetWidth(CONTENT_W)
     modeDD2:SetupMenu(function(_, root)
@@ -493,7 +493,7 @@ local function BuildAppearanceTab(sf, ct)
     }
     -- WowStyle1DropdownTemplate
 
-    local dd = CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
     dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     dd:SetWidth(CONTENT_W)
     local curFmt = db.dateFormat or BNB.DEFAULTS.dateFormat

@@ -117,7 +117,7 @@ local function AddRule(ct, y)
         -- theme (the fixed grey 0.25,0.25,0.28 disappears on lighter presets).
         -- Register so the rule recolours live on preset / brightness change.
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         t:SetColorTexture(br, bg_, bb, 0.9)
         if BNB.RegisterSkinRule then BNB.RegisterSkinRule(t, 0.9) end
     else
@@ -358,7 +358,7 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
     hdr:SetText(L["CFG_LSM_FONTS_OTHER"])
     y = y - 18
 
-    local dd = CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, parent, "WowStyle1DropdownTemplate"))
     dd:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     dd:SetWidth(W)
     dd:SetupMenu(function(_, root)

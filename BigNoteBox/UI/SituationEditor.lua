@@ -72,7 +72,7 @@ local function Divider(panel)
     local t = panel:CreateTexture(nil, "ARTWORK")
     t:SetHeight(1)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+        local br, bg_, bb = BNB.SkinRuleOf(BNB.GetSkinPreset())
         t:SetColorTexture(br, bg_, bb, 0.8)
         BNB.RegisterSkinRule(t, 0.8)
     else
@@ -112,7 +112,7 @@ local function NewChoice(panel, keys, labels, onPick)
         for i, kk in ipairs(c.keys) do if kk == k then return c.labels[i] end end
         return c.labels[1]
     end
-    local dd = CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate")
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, panel, "WowStyle1DropdownTemplate"))
     dd:SetHeight(24)
     dd:SetupMenu(function(_, root)
         for i, label in ipairs(c.labels) do

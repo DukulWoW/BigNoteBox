@@ -87,7 +87,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         d:SetPoint("LEFT", anchorFrame, anchorPoint or "RIGHT", 6, 0)
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
-            local br, bg_, bb = BNB.SkinBorderOf(p)
+            local br, bg_, bb = BNB.SkinRuleOf(p)
             d:SetColorTexture(br, bg_, bb, 0.25)
             BNB.RegisterSkinRule(d, 0.25)
         else
@@ -631,7 +631,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     shareDiv:SetPoint("RIGHT", mapBtn, "LEFT", -6, 0)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         shareDiv:SetColorTexture(br, bg_, bb, 0.40)
         BNB.RegisterSkinRule(shareDiv, 0.40)
     else
@@ -681,7 +681,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     cmDiv:SetPoint("RIGHT", alarmBtn, "LEFT", -6, 0)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb = BNB.SkinRuleOf(p)
         cmDiv:SetColorTexture(br, bg_, bb, 0.40)
         BNB.RegisterSkinRule(cmDiv, 0.40)
     else
