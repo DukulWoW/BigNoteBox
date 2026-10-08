@@ -149,7 +149,7 @@ function AP.Show(noteID, alarm, missedList)
     if note.icon then
         f._iconTx:SetTexture(note.icon)
     else
-        f._iconTx:SetTexture("Interface/AddOns/BigNoteBox/Assets/Topbar/tp-alarm")
+        f._iconTx:SetTexture("Interface/AddOns/BigNoteBox/Assets/Topbar/Normal/tp-alarms-normal")   -- coloured art in both modes: the white skin file would draw white
     end
 
     -- Text

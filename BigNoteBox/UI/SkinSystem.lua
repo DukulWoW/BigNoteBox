@@ -106,6 +106,54 @@ function BNB.SkinRuleOf(preset)
            math.min(1, preset.bb * brt)
 end
 
+-- Accent colour (Dukul, 2026-10-08): white art in skin mode (top bar icons)
+-- is drawn in a colour that pairs with the preset instead of the preset's own
+-- hue ("not purple on purple"): the border hue turned SKIN_ACCENT_HUE degrees,
+-- a little more saturated, as bright as the brightness asks but never past the
+-- brightest shade of that colour (never white). Presets with next to no hue
+-- (Obsidian, OLED, Argent) get a warm gold, a little muted. The turn is
+-- BNB.skinAccentHue (tune live with /bnb skinhue <degrees>, debug mode).
+BNB.skinAccentHue = 30
+local ACCENT_MULT    = 2.2    -- brightness boost, as the icon symbols had
+local GREY_SAT       = 0.15   -- below this a preset counts as colourless
+local MUTED_GOLD_H   = 42 / 360
+local MUTED_GOLD_S   = 0.62
+
+local function RGBtoHSV(r, g, b)
+    local mx, mn = math.max(r, g, b), math.min(r, g, b)
+    local d = mx - mn
+    local h = 0
+    if d > 0 then
+        if mx == r then h = ((g - b) / d) % 6
+        elseif mx == g then h = (b - r) / d + 2
+        else h = (r - g) / d + 4 end
+        h = h / 6
+    end
+    return h, (mx > 0) and d / mx or 0, mx
+end
+
+local function HSVtoRGB(h, s, v)
+    local i = math.floor(h * 6) % 6
+    local f = h * 6 - math.floor(h * 6)
+    local p, q, t = v * (1 - s), v * (1 - f * s), v * (1 - (1 - f) * s)
+    if i == 0 then return v, t, p elseif i == 1 then return q, v, p
+    elseif i == 2 then return p, v, t elseif i == 3 then return p, q, v
+    elseif i == 4 then return t, p, v end
+    return v, p, q
+end
+
+function BNB.SkinAccentOf(preset, mult)
+    local h, s, v = RGBtoHSV(preset.br, preset.bg_, preset.bb)
+    v = math.min(1, v * BNB.GetSkinBrightness() * (mult or ACCENT_MULT))
+    if s < GREY_SAT then
+        -- Never below 0.78: OLED's dark border (0.18) left them looking
+        -- disabled (Dukul, 2026-10-08)
+        return HSVtoRGB(MUTED_GOLD_H, MUTED_GOLD_S, math.min(0.9, math.max(v, 0.78)))
+    end
+    h = (h + (BNB.skinAccentHue or 30) / 360) % 1
+    return HSVtoRGB(h, math.min(1, s * 1.2 + 0.1), v)
+end
+
 -- Returns br, bg_, bb for a preset scaled by the current brightness multiplier.
 function BNB.SkinBorderOf(preset)
     local brt = BNB.GetSkinBrightness()
@@ -181,6 +229,24 @@ end
 function BNB.RegisterSkinIconTex(tx, mult)
     _skinIconTexs[#_skinIconTexs + 1] = { tx = tx, mult = mult or 2.2 }
 end
+-- An icon texture drawn in the accent colour (BNB.SkinAccentOf), re-tinted
+-- on every preset change. shade scales it (0.6 = the top bar hover plate,
+-- darker so the icon stands out); registering a texture again sets its shade
+local _accentTexs = {}
+function BNB.RegisterSkinAccentTex(tx, shade)
+    if not tx then return end
+    _accentTexs[tx] = shade or 1
+    if BNB.GetSkinPreset then
+        local r, g, b = BNB.SkinAccentOf(BNB.GetSkinPreset())
+        local k = _accentTexs[tx]
+        tx:SetVertexColor(r * k, g * k, b * k)
+    end
+end
+function BNB.RefreshSkinAccents()
+    if not BNB.GetSkinPreset then return end
+    local r, g, b = BNB.SkinAccentOf(BNB.GetSkinPreset())
+    for tx, k in pairs(_accentTexs) do tx:SetVertexColor(r * k, g * k, b * k) end
+end
 
 -- Public: zero-arg callback that re-applies the skin backdrop to a frame.
 -- Used by wysiwyg font/size backdrop frames so they update on preset change.
@@ -247,6 +313,8 @@ function BNB.ApplyMainWindowSkin()
             l.fs:SetTextColor(br * l.mult, bg_ * l.mult, bb * l.mult)
         end
     end
+
+    BNB.RefreshSkinAccents()
 
     -- Tint registered icon textures to the border colour at boosted brightness.
     for _, ic in ipairs(_skinIconTexs) do

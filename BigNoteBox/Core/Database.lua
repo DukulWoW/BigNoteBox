@@ -174,6 +174,7 @@ BNB.DEFAULTS = {
     toastGrow   = "down",
     toastMax    = 5,
     toastSlide  = true,
+    toastOnTop  = true,    -- FULLSCREEN_DIALOG over every window; false = DIALOG (ALL-396)
     toastCombat = "wait",
     toastScale  = 1,       -- 0.5-1.5; toastStyle stays out: nil = the faction loot toast
     -- What a note toast shows (S3); toastSound stays out: nil = no sound

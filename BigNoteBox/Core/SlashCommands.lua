@@ -141,6 +141,20 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.OpenIconLab then BNB.OpenIconLab() else BNB.DevToolMissing() end
 
+        -- ── Developer: skin accent hue turn (UI/SkinSystem.lua, not saved) ───
+        elseif cmd == "skinhue" or cmd:sub(1, 8) == "skinhue " then
+            if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            local deg = tonumber(cmd:sub(9))
+            if deg then
+                BNB.skinAccentHue = deg
+                if BNB.RefreshSkinAccents then BNB.RefreshSkinAccents() end
+            end
+            BNB:Print(string.format("|cff88bbffSkin accent hue:|r %s degrees  |cffffff00Usage:|r /bnb skinhue <degrees>  (live, not saved)",
+                tostring(BNB.skinAccentHue)))
+
         -- ── Developer: main window toolbar strip art (ALL-240, UI/MainWindow.lua) ─
         elseif cmd == "topbar" or cmd:sub(1, 7) == "topbar " then
             if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then

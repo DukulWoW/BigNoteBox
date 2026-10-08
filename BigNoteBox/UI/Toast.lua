@@ -31,6 +31,7 @@
 --                    a list hanging under the toast (the grouped situation toast)
 --       hold       = seconds on screen (nil = popupHoldTime; 0 = until clicked)
 --       onClick    = function(spec): left click; the toast closes after it
+--       onClose    = function(spec): the hover X was clicked; the toast closes after it
 --       onRightClick = function(spec, f): right click (nil = close); a menu
 --                    opened on f keeps every timer paused while it is open
 --       force      = true: shows in combat whatever toastCombat says (Test)
@@ -164,6 +165,14 @@ local function Place(f)
 end
 
 local Remove   -- forward: the click handlers close the toast
+local CLOSE_SZ = 18   -- the hover close X
+
+-- Show on top of all windows (toastOnTop, ALL-396): one strata over the
+-- DIALOG windows (Settings, Reference Box, Note Settings). The right-click
+-- menu is FULLSCREEN_DIALOG too and raises itself when it opens
+local function ToastStrata()
+    return Setting("toastOnTop") and "FULLSCREEN_DIALOG" or "DIALOG"
+end
 
 local function CreateToast()
     local f = BNB.CreateBackdropFrame("Button", nil, UIParent)
@@ -183,6 +192,21 @@ local function CreateToast()
         end
         Remove(self)
     end)
+
+    -- Close X, top right, shown while the pointer is over the toast (the
+    -- driver's Tick): the quick way to clear one (Dukul, 2026-10-08).
+    -- spec.onClose runs first (an alarm toast dismisses its alarm)
+    local x = BNB.CreateIconButton(f, CLOSE_SZ, "close", {
+        onClick = function()
+            local spec = f._spec
+            if not spec or f._leaving then return end
+            if spec.onClose then securecallfunction(spec.onClose, spec) end
+            if not f._leaving then Remove(f) end
+        end })
+    x:SetPoint("TOPRIGHT", f, "TOPRIGHT", -2, -2)
+    x:SetFrameLevel(f:GetFrameLevel() + 20)
+    x:Hide()
+    f._closeX = x
     return f
 end
 
@@ -313,6 +337,11 @@ local function Tick(self, dt)
     -- Backwards: a toast that runs out is removed from _shown here
     for i = #_shown, 1, -1 do
         local f = _shown[i]
+        local x = f._closeX
+        if x then
+            local over = f:IsMouseOver() or (x:IsShown() and x:IsMouseOver())
+            if over ~= x:IsShown() then x:SetShown(over) end
+        end
         if f._x ~= f._tx or f._y ~= f._ty then
             f._x = f._x + (f._tx - f._x) * k
             f._y = f._y + (f._ty - f._y) * k
@@ -368,6 +397,7 @@ local function Add(spec)
     end
     f._leaving = nil
     Place(f)
+    f:SetFrameStrata(ToastStrata())
     f:Show()
     f:Raise()
     BNB.FadeTo(f, 0, 1, FADE)
@@ -388,6 +418,7 @@ Remove = function(f)
     end
     f._leaving = true
     f._more:Hide()
+    if f._closeX then f._closeX:Hide() end
     BNB.FadeTo(f, f:GetAlpha(), 0, FADE, function()
         f:Hide()
         f._spec, f._leaving = nil, nil
@@ -529,8 +560,10 @@ local function DressBox(box, alpha)
 end
 
 function T.RefreshAnchor()
+    for _, t in ipairs(_shown) do t:SetFrameStrata(ToastStrata()) end
     local f = _anchor
     if not f then return end
+    f:SetFrameStrata(ToastStrata())
     local def  = BNB.ToastStyles.Resolve(BNB.ToastStyles.Current())
     local w, h = StyleSize(def)
     f:SetSize(w, h)

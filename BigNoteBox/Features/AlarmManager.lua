@@ -642,6 +642,7 @@ local function ShowAlarmToast(noteID, missed)
         text       = why,
         line2      = (alarm.label and alarm.label ~= "") and alarm.label or nil,
         onClick    = function() AM.Dismiss(noteID) end,
+        onClose    = function() AM.Dismiss(noteID) end,   -- the hover X
         onRightClick = function(_, f) AlarmToastMenu(noteID, f) end,
     })
 end

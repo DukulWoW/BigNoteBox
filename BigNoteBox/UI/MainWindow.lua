@@ -140,12 +140,29 @@ local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick, stateB
                 or ((not btn:IsEnabled() or btn._artDim) and "-disabled" or "-normal")
             iconTx:SetTexture(base .. state)
             hoverTx:SetShown(over)
+        elseif btn._skinHover then
+            -- Skin mode: the icon keeps its size; tp-hover sits under it
+            iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      REST, -REST)
+            iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -REST,  REST)
+            hoverTx:SetShown(over)
         else
             local d = over and -HOVER or REST
             iconTx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      d, -d)
             iconTx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -d,  d)
             hoverTx:Hide()
         end
+    end
+
+    -- Skin mode's white icons (Dukul, 2026-10-08): a hover plate (tp-hover)
+    -- under the icon in a darker accent colour instead of growing the icon.
+    -- Off = the grow-on-hover look (the BCB promo icon)
+    function btn:SetSkinHover(on)
+        self._skinHover = on and true or nil
+        if on and not self._stateArt then
+            hoverTx:SetTexture(TOPBAR .. "tp-hover")
+            if BNB.RegisterSkinAccentTex then BNB.RegisterSkinAccentTex(hoverTx, 0.6) end
+        end
+        Refresh()
     end
 
     function btn:SetStateArt(base, tex)
@@ -728,7 +745,7 @@ function BNB.CreateMainWindow()
             not skin and base or nil)
     end
 
-    local sidebarToggleBtn = TBIcon(TOPBAR .. "Normal\\tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
+    local sidebarToggleBtn = TBIcon(TOPBAR .. "tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
         function()
             if BNB.Sidebar and BNB.Sidebar.ToggleCollapsed then
                 BNB.Sidebar.ToggleCollapsed()
@@ -746,12 +763,12 @@ function BNB.CreateMainWindow()
             BNB._toolbarSidebarBtn:SetArtDim(collapsed)
             return
         end
-        local tex = TOPBAR .. (collapsed and "Normal\\tp-sidebar-closed" or "Normal\\tp-sidebar-open")
+        local tex = TOPBAR .. (collapsed and "tp-sidebar-closed" or "tp-sidebar-open")
         pcall(function() BNB._toolbarSidebarBtn._tx:SetTexture(tex) end)
     end
     BNB.RefreshSidebarToggleBtn()
 
-    local configBtn = TBIcon(TOPBAR .. "tp-cog", L["MW_CONFIG_TIP"], 1,
+    local configBtn = TBIcon(TOPBAR .. "tp-settings", L["MW_CONFIG_TIP"], 1,
         function() if BNB.OpenConfig then BNB.OpenConfig() end end, "tp-settings")
 
     local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 2,
@@ -759,17 +776,17 @@ function BNB.CreateMainWindow()
     BNB._toolbarTrashBtn = trashBtn
 
     -- History button (desaturated until history exists)
-    local histBtn = TBIcon(TOPBAR .. "tp-history", L["HISTORY_TOOLBAR_TIP"], 3,
+    local histBtn = TBIcon(TOPBAR .. "tp-notehistory", L["HISTORY_TOOLBAR_TIP"], 3,
         function() if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end end, "tp-notehistory")
     histBtn:SetIconEnabled(false)
     BNB._toolbarHistoryBtn = histBtn
 
-    local tagsBtn = TBIcon(TOPBAR .. "tp-tags", L["TAG_MGR_TOOLTIP"], 4,
+    local tagsBtn = TBIcon(TOPBAR .. "tp-tagmanager", L["TAG_MGR_TOOLTIP"], 4,
         function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end, "tp-tagmanager")
     BNB._toolbarTagsBtn = tagsBtn
 
     -- Share/import button — toggles the import-only window
-    local shareTopBtn = TBIcon(TOPBAR .. "tp-share", L["MW_IMPORT_SHARED_TIP"], 5,
+    local shareTopBtn = TBIcon(TOPBAR .. "tp-import", L["MW_IMPORT_SHARED_TIP"], 5,
         function()
             local iw = _G["BNBImportFrame"]
             if iw and iw:IsShown() then
@@ -780,7 +797,7 @@ function BNB.CreateMainWindow()
         end, "tp-import")
 
     -- Alarm overview button
-    local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarm", L["MW_ALARM_TIP"], 6,
+    local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarms", L["MW_ALARM_TIP"], 6,
         function()
             if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
                 BNB.AlarmOverview.Toggle()
@@ -807,6 +824,12 @@ function BNB.CreateMainWindow()
             end
             importBtn._tx:SetDesaturated(false)
             importBtn:SetAlpha(1.0)
+            -- Skin mode, BCB loaded late: the white tp-bcb takes the accent
+            -- and the hover plate like the other icons
+            if skin and hasBCB and BNB.RegisterSkinAccentTex then
+                BNB.RegisterSkinAccentTex(importBtn._tx)
+                importBtn:SetSkinHover(true)
+            end
         end)
     end
     RefreshImportBtn()

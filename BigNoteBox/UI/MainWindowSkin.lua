@@ -86,23 +86,22 @@ function BNB.BuildMainWindowSkinChrome()
             skinChangeBtn:SetPoint("RIGHT", lockBtn, "LEFT", -4, 0)
         end,
 
-        -- Tint the topbar icons to SkinBorderOf × 2.2, matching the wysiwyg
-        -- icon tint pattern. SetVertexColor + SetDesaturated(true) produces the
-        -- correct greyed-out look for disabled buttons (history etc.). The BCB
-        -- button is only tinted when BCB is installed; without BCB it shows the
-        -- promo icon, which stays unskinned.
+        -- Tint the topbar icons (white art) to the accent colour, a hue that
+        -- pairs with the preset (BNB.SkinAccentOf, Dukul 2026-10-08).
+        -- SetVertexColor + SetDesaturated(true) produces the greyed-out look
+        -- for disabled buttons (history etc.). The BCB button is only tinted
+        -- when BCB is installed; without BCB it shows the promo icon, which
+        -- stays unskinned.
         StyleIcons = function(icons)
             if not BNB.GetSkinPreset then return end
-            local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
-            local MULT = 2.2
             local hasBCB = BigChatBox and BigChatBox.SendDirect
             for _, btn in ipairs(icons) do
                 if btn ~= BNB._toolbarImportBtn or hasBCB then
-                    btn._tx:SetVertexColor(math.min(1, br * MULT),
-                        math.min(1, bg_ * MULT), math.min(1, bb * MULT))
-                    BNB.RegisterSkinIconTex(btn._tx, MULT)
+                    BNB.RegisterSkinAccentTex(btn._tx)
+                    if btn.SetSkinHover then btn:SetSkinHover(true) end   -- tp-hover plate
                 end
             end
+            BNB.RefreshSkinAccents()
         end,
 
         -- Splitter grip dots follow the preset, a little lighter than the border

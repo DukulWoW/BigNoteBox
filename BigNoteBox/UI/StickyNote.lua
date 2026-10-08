@@ -1092,23 +1092,20 @@ local function BuildIconBadge(f, noteID, note)
     local borderBright = note and note.borderBrightness or 100
     ApplyIconDecoration(iconFrame, iconTex, note, noteBorder, borderScale, borderOffset, borderBright)
 
-    -- Markers from the note list icon (UI/NoteList.lua): situation top-right,
+    -- Markers from the note list icon (UI/NoteList.lua): situation top-left,
     -- class icon of the owning character bottom-left. Same size ratio as the
     -- list's OverlaySize. Shown/hidden by UpdateStickyMarkers.
-    local ovSz   = math.max(10, math.floor(ICON_SZ * 0.38))
+    local ovSz   = math.max(10, math.floor(ICON_SZ * (BigNoteBoxDB.skinMode and 0.38 or 0.5)))
     local ovHost = CreateFrame("Frame", nil, iconFrame)
     ovHost:SetAllPoints(iconFrame)
     ovHost:SetFrameLevel(iconFrame:GetFrameLevel() + 5)   -- above the icon border
     ovHost:EnableMouse(false)
-    local situ = ovHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    local situ = BNB.CreateIconMarker(ovHost, "situation")   -- layered in normal mode
     situ:SetSize(ovSz, ovSz)
-    situ:SetPoint("TOPRIGHT", iconFrame, "TOPRIGHT", 2, 2)
-    situ:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\ov-situation")
-    situ:Hide()
-    local scope = ovHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    situ:SetPoint("TOPLEFT", iconFrame, "TOPLEFT", -2, 2)
+    local scope = BNB.CreateClassMarker(ovHost)   -- round + ring in normal mode
     scope:SetSize(ovSz, ovSz)
     scope:SetPoint("BOTTOMLEFT", iconFrame, "BOTTOMLEFT", -2, -2)
-    scope:Hide()
     iconFrame._situTex  = situ
     iconFrame._scopeTex = scope
     UpdateStickyMarkers(iconFrame, note)

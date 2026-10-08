@@ -120,8 +120,11 @@ local function GetListMode()
 end
 
 -- Pin/situation overlay size scales proportionally with icon
+-- Normal mode's layered markers are drawn larger (Dukul, 2026-10-08); skin
+-- mode keeps 0.38. Skin mode changes reload, so read once per call is fine
 local function OverlaySize(iconSz)
-    return math.max(10, math.floor(iconSz * 0.38))
+    local f = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 0.38 or 0.5
+    return math.max(10, math.floor(iconSz * f))
 end
 
 local function ApplyListMode()
@@ -165,17 +168,22 @@ local function ApplyListMode()
             if btn._favTex then
                 btn._favTex:SetSize(ovSz, ovSz)
                 btn._favTex:ClearAllPoints()
-                btn._favTex:SetPoint("TOPLEFT", btn._icon, "TOPLEFT", -2, 2)
+                btn._favTex:SetPoint("TOPRIGHT", btn._icon, "TOPRIGHT", 2, 2)
             end
             if btn._situTex then
                 btn._situTex:SetSize(ovSz, ovSz)
                 btn._situTex:ClearAllPoints()
-                btn._situTex:SetPoint("TOPRIGHT", btn._icon, "TOPRIGHT", 2, 2)
+                btn._situTex:SetPoint("TOPLEFT", btn._icon, "TOPLEFT", -2, 2)
             end
             if btn._scopeTex then
                 btn._scopeTex:SetSize(ovSz, ovSz)
                 btn._scopeTex:ClearAllPoints()
                 btn._scopeTex:SetPoint("BOTTOMLEFT", btn._icon, "BOTTOMLEFT", -2, -2)
+            end
+            if btn._locTex then
+                btn._locTex:SetSize(ovSz, ovSz)
+                btn._locTex:ClearAllPoints()
+                btn._locTex:SetPoint("LEFT", btn._icon, "LEFT", -2, 0)
             end
             -- Title offset: align top of text with top of icon so they read as a unit.
             -- For compact mode: vertically centred (no y offset). For normal/spacious:
@@ -1224,41 +1232,42 @@ local function CreateListEntry(parent)
     -- Alarm indicator -- bottom-right of icon (replaces pin overlay; pinned notes
     -- already live in their own pinned section so the pin badge is redundant).
     local ovSz = OverlaySize(ICON_SIZE)
-    local alarmOverlay = overlayHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    -- Markers: layered art in normal mode, the single pictures tinted to the
+    -- skin in skin mode (BNB.CreateIconMarker, UI/Widgets.lua)
+    local alarmOverlay = BNB.CreateIconMarker(overlayHost, "alarm")
     alarmOverlay:SetSize(ovSz, ovSz)
     alarmOverlay:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT", 2, -2)
-    alarmOverlay:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\tp-alarm")
-    alarmOverlay:Hide()
     btn._alarmTex = alarmOverlay
 
-    -- Favorite star overlay — top-left of icon (opposite corner to pin)
-    local favOverlay = overlayHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    -- Favorite star overlay — top-right of icon (Dukul 2026-10-08: swapped with situation)
+    local favOverlay = BNB.CreateIconMarker(overlayHost, "favorite")
     favOverlay:SetSize(ovSz, ovSz)
-    favOverlay:SetPoint("TOPLEFT", icon, "TOPLEFT", -2, 2)
-    favOverlay:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\ov-favorite")
-    favOverlay:Hide()
+    favOverlay:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 2, 2)
     btn._favTex = favOverlay
 
-    -- Situation marker — child of overlayHost, always above border frame
-    local situOverlay = overlayHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    -- Situation marker — top-left, child of overlayHost, always above border frame
+    local situOverlay = BNB.CreateIconMarker(overlayHost, "situation")
     situOverlay:SetSize(ovSz, ovSz)
-    situOverlay:SetPoint("TOPRIGHT", icon, "TOPRIGHT", 2, 2)
-    situOverlay:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\ov-situation")
-    situOverlay:Hide()
+    situOverlay:SetPoint("TOPLEFT", icon, "TOPLEFT", -2, 2)
     btn._situTex = situOverlay
 
     -- Scope badge — bottom-left of icon; shows the class icon of the owning
     -- character when the note is character-scoped.
-    local scopeOverlay = overlayHost:CreateTexture(nil, "OVERLAY", nil, 1)
+    local scopeOverlay = BNB.CreateClassMarker(overlayHost)   -- round + ring in normal mode
     scopeOverlay:SetSize(ovSz, ovSz)
     scopeOverlay:SetPoint("BOTTOMLEFT", icon, "BOTTOMLEFT", -2, -2)
-    scopeOverlay:SetTexCoord(0, 1, 0, 1)
-    scopeOverlay:Hide()
     btn._scopeTex = scopeOverlay
+
+    -- Location marker: the note places a waypoint when its situation matches
+    -- (BNB.HasActiveWaypoint). Left side, middle (Dukul, 2026-10-08)
+    local locOverlay = BNB.CreateIconMarker(overlayHost, "location")
+    locOverlay:SetSize(ovSz, ovSz)
+    locOverlay:SetPoint("LEFT", icon, "LEFT", -2, 0)
+    btn._locTex = locOverlay
 
     -- Attachment count badge — small gold number right-middle inside icon.
     -- Right-middle avoids the pin (bottom-right), scope (bottom-left),
-    -- favorite (top-left), and situation (top-right) overlays.
+    -- situation (top-left), and favorite (top-right) overlays.
     -- Uses a FontString with drop shadow directly on overlayHost.
     -- Width 22px fits two-digit counts (10+) without truncation at font size 9.
     local badgeHost = CreateFrame("Frame", nil, overlayHost)
@@ -1695,12 +1704,10 @@ local function PopulateEntry(btn, note, selected, collapsed)
             if active then
                 btn._alarmTex:Hide()
             elseif alarm.fired then
-                btn._alarmTex:SetDesaturated(true)
-                btn._alarmTex:SetVertexColor(0.5, 0.5, 0.5)
+                btn._alarmTex:SetMuted(true)
                 btn._alarmTex:Show()
             else
-                btn._alarmTex:SetDesaturated(false)
-                btn._alarmTex:SetVertexColor(1, 1, 1)
+                btn._alarmTex:SetMuted(false)
                 btn._alarmTex:Show()
             end
         end
@@ -1740,6 +1747,15 @@ local function PopulateEntry(btn, note, selected, collapsed)
             btn._situTex:Show()
         else
             btn._situTex:Hide()
+        end
+    end
+
+    -- Location marker: a waypoint is placed when the situation matches
+    if btn._locTex then
+        if BNB.SituationsEnabled() and BNB.HasSituation(note) and BNB.HasActiveWaypoint(note) then
+            btn._locTex:Show()
+        else
+            btn._locTex:Hide()
         end
     end
 

@@ -2790,6 +2790,8 @@ L["CFG_TOAST_MAX"]                 = "Max shown"
 L["CFG_TOAST_MAX_TIP"]             = "How many toasts can be on screen at once. More wait their turn; the last toast says how many."
 L["CFG_TOAST_SLIDE"]               = "Slide in"
 L["CFG_TOAST_SLIDE_TIP"]           = "New toasts slide into place, and the others move up smoothly when one closes. Off: they appear and move at once."
+L["CFG_TOAST_ON_TOP"]              = "Show on top of all windows"
+L["CFG_TOAST_ON_TOP_TIP"]          = "Toasts show above every window, Settings and dialogs included. Off: windows such as Settings and Note Settings can cover them."
 -- Settings > Modules > Toasts (ALL-384)
 L["CFG_CHK_TOASTS"]                = "Enable toasts"
 L["CFG_CHK_TOASTS_TIP"]            = "On: situation notes and tasks can show a toast. Off: no toast shows anywhere. Situations still match: the minimap count, the list markers, waypoints and stickies that open by themselves keep working."

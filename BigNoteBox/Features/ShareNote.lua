@@ -940,7 +940,7 @@ end
 
 --------------------------------------------------------------------------------
 -- IMPORT-ONLY WINDOW
--- Opened from the topbar tp-share button. Shows only the import section so
+-- Opened from the topbar tp-import button. Shows only the import section so
 -- users can add a shared note without having to select one of their own first.
 -- Reuses OpenSharePreview / CloseSharePreview for the preview flow.
 --------------------------------------------------------------------------------

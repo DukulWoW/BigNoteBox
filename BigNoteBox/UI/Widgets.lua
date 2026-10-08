@@ -1029,14 +1029,20 @@ BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
 -- the checkbox. Re-measured on every show (text can change), only over the
 -- visible text, never past the label's own width.
 --------------------------------------------------------------------------------
+local function HasText(fs)
+    return fs and fs.GetText and (fs:GetText() or "") ~= ""
+end
 local function FindCheckLabel(cb)
     for _, fs in ipairs({ cb.text, cb.Text }) do
-        if fs and fs.GetText and (fs:GetText() or "") ~= "" then return fs end
+        if HasText(fs) then return fs end
     end
+    -- An empty FontString is never the label: the template's own Text is
+    -- anchored to the checkbox too, and taking it (no width) left the hit
+    -- area on the box alone (Settings > Modules > Toasts, 2026-10-08)
     local parent = cb:GetParent()
     for _, holder in ipairs({ cb, parent }) do
         for _, r in ipairs({ holder:GetRegions() }) do
-            if r:GetObjectType() == "FontString" then
+            if r:GetObjectType() == "FontString" and HasText(r) then
                 for i = 1, r:GetNumPoints() do
                     local _, rel = r:GetPoint(i)
                     if rel == cb then return r end
@@ -1047,7 +1053,8 @@ local function FindCheckLabel(cb)
 end
 
 local function FitCheckHit(cb)
-    local lbl = cb._hitLbl or FindCheckLabel(cb)
+    local lbl = cb._hitLbl
+    if not HasText(lbl) then lbl = FindCheckLabel(cb) end
     cb._hitLbl = lbl
     if not (lbl and lbl:IsShown()) then cb:SetHitRectInsets(0, 0, 0, 0); return end
     local w = lbl:GetStringWidth() or 0
@@ -1088,6 +1095,108 @@ function BNB.LabelHit(cb, lbl)
         C_Timer.After(0, function() if self:IsShown() then FitCheckHit(self) end end)
     end)
     if cb:IsVisible() then C_Timer.After(0, function() FitCheckHit(cb) end) end
+end
+
+--------------------------------------------------------------------------------
+-- ICON MARKERS  (Dukul, 2026-10-08)
+-- The small markers on a note icon (alarm, favourite, situation). Normal mode,
+-- every client: three layers on one 64x64 canvas, as the icon buttons are:
+-- Overlay/Layers/ov-bottom, Overlay/Symbols/ov-<symbol>, Overlay/Layers/ov-top.
+-- Skin mode keeps the single Overlay/ov-<symbol> picture, drawn white and tinted
+-- to the preset border x 2.2 as the skin icon buttons' symbols are (Dukul,
+-- 2026-10-08); a preset change re-tints through SkinChanged. Returns something
+-- that takes SetSize / SetPoint / ClearAllPoints / Show / Hide / SetShown, plus
+-- SetMuted(on) = greyed (a fired alarm). Decided once, when built (skin mode
+-- changes reload).
+--------------------------------------------------------------------------------
+local OVERLAY_DIR = "Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\"
+local MARKER_TINT = 2.2
+local _skinMarkers = setmetatable({}, { __mode = "k" })
+
+local function TintMarker(t)
+    local br, bg_, bb = 1, 1, 1
+    if BNB.GetSkinPreset and BNB.SkinBorderOf then br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset()) end
+    -- One factor for all three channels, capped where the brightest one hits
+    -- 1: clamping each channel on its own turned a bright preset white
+    -- (skin brightness 3.00, Dukul 2026-10-08)
+    local hi = math.max(br, bg_, bb, 0.001)
+    local m = math.min(MARKER_TINT, 1 / hi) * (t._muted and 0.5 or 1)
+    t:SetVertexColor(br * m, bg_ * m, bb * m)
+end
+
+function BNB.CreateIconMarker(host, symbol)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        local t = host:CreateTexture(nil, "OVERLAY", nil, 1)
+        t:SetTexture(OVERLAY_DIR .. "ov-" .. symbol)
+        function t:SetMuted(on) self._muted = on or nil; TintMarker(self) end
+        _skinMarkers[t] = true
+        TintMarker(t)
+        t:Hide()
+        if not _skinMarkers._msg and BNB.RegisterMessage then
+            _skinMarkers._msg = true
+            BNB.RegisterMessage("Widgets.IconMarkers", "SkinChanged", function()
+                for k in pairs(_skinMarkers) do if type(k) == "table" then TintMarker(k) end end
+            end)
+        end
+        return t
+    end
+    local m = CreateFrame("Frame", nil, host)
+    m:SetFrameLevel(host:GetFrameLevel() + 1)
+    m:EnableMouse(false)
+    local parts = {}
+    for i, path in ipairs({ OVERLAY_DIR .. "Layers\\ov-bottom",
+                            OVERLAY_DIR .. "Symbols\\ov-" .. symbol,
+                            OVERLAY_DIR .. "Layers\\ov-top" }) do
+        local t = m:CreateTexture(nil, "OVERLAY", nil, i)
+        t:SetAllPoints()
+        t:SetTexture(path)
+        parts[i] = t
+    end
+    function m:SetMuted(on)
+        local c = on and 0.5 or 1
+        for _, t in ipairs(parts) do t:SetDesaturated(on and true or false); t:SetVertexColor(c, c, c) end
+    end
+    m:Hide()
+    return m
+end
+
+-- The owning character's class icon (bottom-left): normal mode draws it round
+-- in ov-top's hole, under the ring, so it matches the other markers; skin mode
+-- keeps the plain square texture. Its picture is set with SetTexture as before.
+-- The hole is x 12-51, y 9-48 of the 64 px canvas (measured, 2026-10-08).
+local HOLE_L, HOLE_T, HOLE_W = 12 / 64, 9 / 64, 40 / 64
+function BNB.CreateClassMarker(host)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        local t = host:CreateTexture(nil, "OVERLAY", nil, 1)
+        t:SetTexCoord(0, 1, 0, 1)
+        t:Hide()
+        return t
+    end
+    local m = CreateFrame("Frame", nil, host)
+    m:SetFrameLevel(host:GetFrameLevel() + 1)
+    m:EnableMouse(false)
+    local icon = m:CreateTexture(nil, "OVERLAY", nil, 1)
+    local mask = m:CreateMaskTexture()
+    mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask",
+        "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+    mask:SetAllPoints(icon)
+    icon:AddMaskTexture(mask)
+    local top = m:CreateTexture(nil, "OVERLAY", nil, 3)
+    top:SetAllPoints()
+    top:SetTexture(OVERLAY_DIR .. "Layers\\ov-top")
+    local function Place(self, w)
+        w = w or self:GetWidth()
+        icon:ClearAllPoints()
+        icon:SetPoint("TOPLEFT", self, "TOPLEFT", w * HOLE_L, -w * HOLE_T)
+        icon:SetSize(w * HOLE_W, w * HOLE_W)
+    end
+    m:SetScript("OnSizeChanged", Place)
+    m:SetScript("OnShow", function(self) Place(self) end)   -- sized while hidden
+    function m:SetTexture(path) icon:SetTexture(path) end
+    function m:SetTexCoord(...) icon:SetTexCoord(...) end
+    function m:SetVertexColor(r, g, b, a) icon:SetVertexColor(r, g, b, a) end
+    m:Hide()
+    return m
 end
 
 function BNB.CreateNoteRule(parent)

@@ -1560,6 +1560,14 @@ local function BuildToastsPage(sf, ct, y, page)
     offWidgets[#offWidgets + 1] = slideCb
     offLabels[#offLabels + 1]   = slideCb._lbl
 
+    local topCb
+    y, topCb = AddCheck(ct, y, L["CFG_TOAST_ON_TOP"],
+        function() return db.toastOnTop ~= false end,
+        function(v) db.toastOnTop = v; ToastChanged() end,
+        L["CFG_TOAST_ON_TOP_TIP"])
+    offWidgets[#offWidgets + 1] = topCb
+    offLabels[#offLabels + 1]   = topCb._lbl
+
     -- Sound (S3): nil = none; the alarm sounds, played once per burst
     do
         local entries = BNB.AlarmSoundEntries()   -- Features/AlarmManager.lua SOUND_LIST

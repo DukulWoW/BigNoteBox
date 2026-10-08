@@ -691,6 +691,10 @@ end
 local function BuildToolbar(parent)
     AB_GROW     = BNB.AbDetailed() and 6 or 0
     SAVE_SLOT_W = 32 + AB_GROW
+    -- The larger icons left 2 px above and below them on Retail / Classic normal
+    -- mode, where the window's bottom edge sits closer than Forever's chrome
+    -- (Dukul, 2026-10-08): the bar grows there. Built before anything else reads it
+    if AB_GROW > 0 and not BNB.IsForever then TOOLBAR_H = 36 + 10 end
     local bar = CreateFrame("Frame", nil, parent)
     bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, 0)
     bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
