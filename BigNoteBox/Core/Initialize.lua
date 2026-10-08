@@ -139,6 +139,10 @@ function BNB.Initialize()
         end
     end
 
+    -- 1e. Header / accent text colour (ALL-402): skin accent or the normal-mode
+    -- colour onto the BNBFontNormal* font objects, before any window is built
+    if BNB.ApplyHeaderColor then SafeCall("HeaderColor", BNB.ApplyHeaderColor) end
+
     -- 2. Detect BigChatBox companion
     BNB.hasBCB = (BigChatBox ~= nil and BigChatBox.SendDirect ~= nil)
 

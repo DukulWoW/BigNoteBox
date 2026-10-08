@@ -376,7 +376,7 @@ local function GetPooledBtn(idx, parent)
         end
 
         -- Badge fontstring (note count, bottom-right of icon)
-        local badge = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local badge = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         badge:SetPoint("BOTTOMRIGHT", iconTex, "BOTTOMRIGHT", 0, 0)
         badge:SetJustifyH("RIGHT")
         badge:SetTextColor(1, 1, 1)
@@ -908,7 +908,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         if not lbl then
             -- The row's own child, so it hides with the row: on sc it stayed
             -- when the list got shorter, a name with no checkbox (ALL-309)
-            lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
             lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
             lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
             lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)
@@ -1034,7 +1034,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         if not lbl then
             -- The row's own child, so it hides with the row: on sc it stayed
             -- when the list got shorter, a name with no checkbox (ALL-309)
-            lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
             lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
             lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
             lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)

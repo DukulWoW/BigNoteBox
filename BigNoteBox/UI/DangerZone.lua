@@ -130,7 +130,7 @@ local function MakeRedButton(parent, text, w, h)
         end
     end)
 
-    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetAllPoints()
     lbl:SetJustifyH("CENTER")
     lbl:SetJustifyV("MIDDLE")
@@ -197,7 +197,7 @@ end
 
 -- ── Content builder helpers ───────────────────────────────────────────────────
 local function MakeHeader(ct, y, text)
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     lbl:SetTextColor(1, 0.35, 0.35)
     lbl:SetText(text)
@@ -205,7 +205,7 @@ local function MakeHeader(ct, y, text)
 end
 
 local function MakeDesc(ct, y, text)
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     lbl:SetWidth(CW); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
     lbl:SetTextColor(0.75, 0.60, 0.60)
@@ -564,7 +564,7 @@ local function BuildWindow()
     titleTex:SetAllPoints()
     titleTex:SetColorTexture(RED_STRIP_R, RED_STRIP_G, RED_STRIP_B, 1)
 
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", 0, 0)
     titleLbl:SetTextColor(1, 0.30, 0.30)
     titleLbl:SetText(L["DZ_WINDOW_TITLE"])

@@ -250,7 +250,7 @@ local function PopulateEntries(ct, entries)
     local availW = ct:GetWidth() - ENTRY_PAD_X * 2
     local y = -PAD
     for _, entry in ipairs(entries or {}) do
-        local fs = ct:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        local fs = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
         fs:SetFont("Fonts\\FRIZQT__.TTF", ENTRY_FONT_SIZE, "")
         fs:SetPoint("TOPLEFT", ct, "TOPLEFT", ENTRY_PAD_X, y)
         fs:SetWidth(availW)

@@ -212,13 +212,13 @@ local function CreateConfirmDialog()
     -- top of content below title chrome
     local contentY = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -TITLE_H
 
-    local statsLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local statsLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     statsLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY)
     statsLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY)
     statsLbl:SetJustifyH("LEFT"); statsLbl:SetTextColor(0.90, 0.90, 0.90)
     f._statsLbl = statsLbl
 
-    local chanLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local chanLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     chanLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY - 22)
     chanLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY - 22)
     chanLbl:SetJustifyH("LEFT")
@@ -239,7 +239,7 @@ local function CreateConfirmDialog()
         div:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY - 44)
     end
 
-    local warnLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local warnLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     warnLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY - 52)
     warnLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY - 52)
     warnLbl:SetJustifyH("LEFT"); warnLbl:SetWordWrap(true)
@@ -429,7 +429,7 @@ local function CreateSendDialog()
     local y = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 8) or -TITLE_H
 
     -- Channel label + dropdown
-    local chanHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local chanHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     chanHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     chanHdr:SetTextColor(0.78, 0.78, 0.78); chanHdr:SetText(L["SEND_CHANNEL_LABEL"])
     y = y - 18
@@ -458,7 +458,7 @@ local function CreateSendDialog()
     targetRow:SetHeight(24); targetRow:Hide()
     f._targetRow = targetRow
 
-    local targetLbl = targetRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local targetLbl = targetRow:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     targetLbl:SetPoint("LEFT", targetRow, "LEFT", 0, 0)
     targetLbl:SetTextColor(0.78, 0.78, 0.78); targetLbl:SetText(L["STC_TARGET_LBL"])
 
@@ -467,7 +467,7 @@ local function CreateSendDialog()
     BNB.EnsureBackdrop(targetEb)
     targetEb:SetPoint("LEFT",  targetLbl, "RIGHT",  6, 0)
     targetEb:SetPoint("RIGHT", targetRow, "RIGHT",  0, 0)
-    targetEb:SetHeight(20); targetEb:SetFontObject("GameFontNormal")
+    targetEb:SetHeight(20); targetEb:SetFontObject("BNBFontNormal")
     targetEb:SetAutoFocus(false); targetEb:SetMaxLetters(64)
     BNB.SetBackdropDark(targetEb)
     targetEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -480,7 +480,7 @@ local function CreateSendDialog()
     BNB.LabelHit(lineCheck)   -- the tooltip and click reach over its label too
     lineCheck:SetSize(20, 20); lineCheck:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     lineCheck:SetChecked(_lineByLine)
-    local lineLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lineLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     lineLbl:SetPoint("LEFT", lineCheck, "RIGHT", 4, 0)
     lineLbl:SetTextColor(0.88, 0.88, 0.88); lineLbl:SetText(L["SEND_LINE_BY_LINE"])
     BNB.CheckTip(lineCheck, L["SEND_LINE_BY_LINE_TIP"])
@@ -488,7 +488,7 @@ local function CreateSendDialog()
     y = y - 28
 
     -- Stats label
-    local statsLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local statsLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     statsLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     statsLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     statsLbl:SetJustifyH("LEFT"); statsLbl:SetTextColor(0.55, 0.55, 0.55)
@@ -496,7 +496,7 @@ local function CreateSendDialog()
     y = y - 20
 
     -- Preview header
-    local previewHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local previewHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     previewHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     previewHdr:SetTextColor(0.78, 0.78, 0.78); previewHdr:SetText(L["STC_PREVIEW_HDR"])
     y = y - 18

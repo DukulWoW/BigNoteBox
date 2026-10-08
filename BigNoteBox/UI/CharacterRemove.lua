@@ -111,7 +111,7 @@ local function Build()
     _dd = BNB.CreateValueDropdown(f, _entries, "global", nil, W - 2 * PAD, DD_H)
     _dd:SetPoint("TOPLEFT", _text, "BOTTOMLEFT", 0, -8)
 
-    _hint = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    _hint = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     _hint:SetWidth(W - 2 * PAD)
     _hint:SetJustifyH("LEFT"); _hint:SetWordWrap(true)
     _hint:SetTextColor(0.6, 0.6, 0.6)

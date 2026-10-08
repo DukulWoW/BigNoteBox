@@ -1022,7 +1022,7 @@ local function PopulatePreview(entries)
     local lastAddon = nil
 
     if #entries == 0 then
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetWidth(CW); lbl:SetJustifyH("LEFT")
         lbl:SetTextColor(0.55, 0.55, 0.55)
@@ -1033,10 +1033,10 @@ local function PopulatePreview(entries)
             -- Addon header
             if e.addon ~= lastAddon then
                 if lastAddon then y = y - 8 end
-                local hdr = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local hdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
                 hdr:SetWidth(CW); hdr:SetJustifyH("LEFT")
-                hdr:SetTextColor(1, 0.82, 0)
+                BNB.SetHeaderColor(hdr)
                 hdr:SetText(ADDON_NAMES[e.addon] or e.addon)
                 y = y - 20
                 lastAddon = e.addon
@@ -1047,18 +1047,18 @@ local function PopulatePreview(entries)
             row:SetPoint("TOPLEFT", ct, "TOPLEFT", 8, y)
             row:SetSize(CW - 8, 18)
 
-            local bullet = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local bullet = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             bullet:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
             bullet:SetText("|cff66bb6a*|r")
             bullet:SetWidth(10)
 
-            local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local titleLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             titleLbl:SetPoint("LEFT", bullet, "RIGHT", 4, 0)
             titleLbl:SetWidth(CW - 140)
             titleLbl:SetJustifyH("LEFT")
             titleLbl:SetText(e.title)
 
-            local scopeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local scopeLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             scopeLbl:SetPoint("RIGHT", row, "RIGHT", 0, 0)
             scopeLbl:SetWidth(130)
             scopeLbl:SetJustifyH("RIGHT")
@@ -1122,7 +1122,7 @@ function M.ShowAddonPopup(key)
     local y  = -(titleH + 12)
     local CW = 360 - PAD * 2
 
-    local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     desc:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     desc:SetWidth(CW); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
     desc:SetTextColor(0.8, 0.8, 0.8)
@@ -1138,7 +1138,7 @@ function M.ShowAddonPopup(key)
         catCb:SetSize(24, 24)
         catCb:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD - 2, y + 2)
         catCb:SetChecked(false)
-        local catLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local catLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
         catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
         BNB.CheckTip(catCb, L["MIG_USE_CATEGORY_TAGS_TIP"])
@@ -1150,7 +1150,7 @@ function M.ShowAddonPopup(key)
 
     -- NotepadChar / QuickNotes info text (per-character scope)
     if key == "NotepadChar" or key == "QuickNotes" then
-        local infoLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local infoLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
         infoLbl:SetWidth(CW); infoLbl:SetJustifyH("LEFT"); infoLbl:SetWordWrap(true)
         infoLbl:SetTextColor(0.5, 0.5, 0.5)
@@ -1159,7 +1159,7 @@ function M.ShowAddonPopup(key)
     end
 
     -- Reload warning
-    local warn = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local warn = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     warn:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     warn:SetWidth(CW); warn:SetJustifyH("LEFT"); warn:SetWordWrap(true)
     warn:SetTextColor(1, 0.6, 0.0)
@@ -1227,17 +1227,17 @@ function M.ShowPopup()
     y = y - 88
 
     -- Title
-    local titleLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local titleLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     titleLbl:SetPoint("TOP", ct, "TOP", 0, y)
     titleLbl:SetJustifyH("CENTER")
-    titleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(titleLbl)
     titleLbl:SetText(L["MIG_POPUP_TITLE"])
     y = y - 26
 
     -- "You currently have X" line
     local addonNames = {}
     for _, k in ipairs(available) do tinsert(addonNames, ADDON_NAMES[k]) end
-    local detectedLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local detectedLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     detectedLbl:SetPoint("TOP", ct, "TOP", 0, y)
     detectedLbl:SetWidth(CW); detectedLbl:SetJustifyH("CENTER"); detectedLbl:SetWordWrap(true)
     detectedLbl:SetTextColor(0.9, 0.9, 0.9)
@@ -1246,7 +1246,7 @@ function M.ShowPopup()
     y = y - 36
 
     -- Explanatory text
-    local explainLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local explainLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     explainLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
     explainLbl:SetWidth(CW); explainLbl:SetJustifyH("LEFT"); explainLbl:SetWordWrap(true)
     explainLbl:SetTextColor(0.7, 0.7, 0.7)
@@ -1316,7 +1316,7 @@ function M.ShowPopup()
         cb:SetSize(24, 24)
         cb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, y + 2)
         cb:SetChecked(false)
-        local cbLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local cbLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         cbLbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
         cbLbl:SetText(string.format(L["MIG_MIGRATE_ADDON_FMT"], (ADDON_NAMES[k] or k)))
         local aName = ADDON_NAMES[k] or k
@@ -1326,7 +1326,7 @@ function M.ShowPopup()
 
         -- NotepadChar / QuickNotes info text (per-character scope)
         if k == "NotepadChar" or k == "QuickNotes" then
-            local infoLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local infoLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 + 18, y)
             infoLbl:SetWidth(SF_W - X0 - 18 - 4)
             infoLbl:SetJustifyH("LEFT")
@@ -1347,7 +1347,7 @@ function M.ShowPopup()
             catCb:SetChecked(false)
             catCb:SetEnabled(false)
             catCb:SetAlpha(0.4)
-            catLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            catLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             catLbl:SetPoint("LEFT", catCb, "RIGHT", 4, 0)
             catLbl:SetText(L["MIG_USE_CATEGORY_TAGS"])
             catLbl:SetTextColor(0.5, 0.5, 0.5)
@@ -1388,7 +1388,7 @@ function M.ShowPopup()
 
     -- "Don't ask again" per addon
     local daaY = y
-    local daaLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local daaLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     daaLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", X0, daaY)
     daaLbl:SetTextColor(0.5, 0.5, 0.5)
     daaLbl:SetText(L["MIG_DONT_ASK_AGAIN"])
@@ -1400,7 +1400,7 @@ function M.ShowPopup()
         daaCb:SetSize(20, 20)
         daaCb:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 - 2, daaY + 2)
         daaCb:SetChecked(false)
-        local daaItemLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local daaItemLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         daaItemLbl:SetPoint("LEFT", daaCb, "RIGHT", 4, 0)
         daaItemLbl:SetText(ADDON_NAMES[k] or k)
         daaItemLbl:SetTextColor(0.55, 0.55, 0.55)
@@ -1415,7 +1415,7 @@ function M.ShowPopup()
 
     -- Footer: on the window itself, not in the scroll content
     -- Reload warning, pinned above migrate button
-    local warnLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local warnLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     warnLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, PAD + 32)
     warnLbl:SetJustifyH("RIGHT")
     warnLbl:SetTextColor(1, 0.6, 0.0)

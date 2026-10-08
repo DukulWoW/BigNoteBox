@@ -666,7 +666,7 @@ local function BuildFocusFrame()
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then titleEb:SetFont(font, 20, flags or "")
-        else titleEb:SetFontObject("GameFontNormalLarge") end
+        else titleEb:SetFontObject("BNBFontNormalLarge") end
     end
     titleEb:SetAutoFocus(false)
     titleEb:SetMaxLetters(200)
@@ -703,7 +703,7 @@ local function BuildFocusFrame()
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
     focusTitleUl = underline
 
-    local tsStrip = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local tsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     tsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
     tsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
     tsStrip:SetHeight(TSTAMP_H)
@@ -712,7 +712,7 @@ local function BuildFocusFrame()
     tsStrip:SetText("")
     focusTsStrip = tsStrip
 
-    local statsStrip = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local statsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     statsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
     statsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
     statsStrip:SetHeight(TSTAMP_H)
@@ -835,7 +835,7 @@ local function BuildFocusFrame()
     if BNB.WireDropTarget       then BNB.WireDropTarget(eb)       end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
 
-    local hintLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, TOOLBAR_H + 4)
     hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, TOOLBAR_H + 4)
     hintLbl:SetJustifyH("CENTER")
@@ -923,9 +923,9 @@ local function BuildFocusFrameSkin()
     titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
     titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
 
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -40, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(titleLbl)
     titleLbl:SetText(L["FOCUS_MODE_TITLE"])
 
     -- Close (X) button
@@ -965,7 +965,7 @@ local function BuildFocusFrameSkin()
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then titleEb:SetFont(font, 20, flags or "")
-        else titleEb:SetFontObject("GameFontNormalLarge") end
+        else titleEb:SetFontObject("BNBFontNormalLarge") end
     end
     titleEb:SetAutoFocus(false)
     titleEb:SetMaxLetters(200)
@@ -1002,7 +1002,7 @@ local function BuildFocusFrameSkin()
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
     focusTitleUl = underline
 
-    local tsStrip = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local tsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     tsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
     tsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
     tsStrip:SetHeight(TSTAMP_H)
@@ -1011,7 +1011,7 @@ local function BuildFocusFrameSkin()
     tsStrip:SetText("")
     focusTsStrip = tsStrip
 
-    local statsStrip2 = content:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local statsStrip2 = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     statsStrip2:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
     statsStrip2:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
     statsStrip2:SetHeight(TSTAMP_H)
@@ -1135,7 +1135,7 @@ local function BuildFocusFrameSkin()
     if BNB.WireDropTarget      then BNB.WireDropTarget(eb)      end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end
 
-    local hintLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, TOOLBAR_H + 4)
     hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, TOOLBAR_H + 4)
     hintLbl:SetJustifyH("CENTER")

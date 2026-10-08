@@ -10,9 +10,9 @@ local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.A
 
 -- A smaller gold heading for a group inside a section (Trash, Tag tree under Notes).
 local function AddSubHeader(ct, y, text)
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 6)
-    lbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(lbl)
     lbl:SetText(text)
     return y - 26
 end
@@ -32,7 +32,7 @@ local function BuildNotesTab(sf, ct)
 
     -- New note behaviour dropdown
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_NEWNOTE_BEHAVIOUR"])
@@ -72,7 +72,7 @@ local function BuildNotesTab(sf, ct)
     -- tab. Read by BNB.NewNoteScope (Core/NoteManager.lua), which the New
     -- note dialog's character dropdown starts on.
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_NEWNOTE_SCOPE"])
@@ -99,7 +99,7 @@ local function BuildNotesTab(sf, ct)
 
     -- What double-clicking a note in the list does (ALL-100); nil = settings
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_LIST_DBLCLICK"])
@@ -226,7 +226,7 @@ local function BuildNotesTab(sf, ct)
     AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_FORMATTING_TOOLBAR"])
 
-    local tbDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local tbDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     tbDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     tbDesc:SetWidth(CONTENT_W); tbDesc:SetJustifyH("LEFT")
     tbDesc:SetWordWrap(true); tbDesc:SetHeight(28)
@@ -255,7 +255,7 @@ local function BuildNotesTab(sf, ct)
     AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_UNDO_REDO"])
 
-    local undoDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local undoDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     undoDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     undoDesc:SetWidth(CONTENT_W); undoDesc:SetJustifyH("LEFT")
     undoDesc:SetWordWrap(true); undoDesc:SetHeight(28)
@@ -265,7 +265,7 @@ local function BuildNotesTab(sf, ct)
 
     -- Warning label declared before slider so the onChange closure can reference it.
     -- Anchored relative to where the slider will sit (y - SLIDER_H - ROW_GAP).
-    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     warnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - (SLIDER_H + ROW_GAP))
     warnLbl:SetWidth(CONTENT_W); warnLbl:SetJustifyH("LEFT")
     warnLbl:SetWordWrap(true); warnLbl:SetHeight(28)
@@ -292,7 +292,7 @@ local function BuildNotesTab(sf, ct)
     -- Idle delay slider (0.3 – 3.0 s, step 0.1, default 0.8)
     -- Stored as a float; displayed with one decimal place.
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
         lbl:SetTextColor(0.55, 0.55, 0.55)
@@ -318,7 +318,7 @@ local function BuildNotesTab(sf, ct)
     -- Forced interval slider (1 – 10 s, whole seconds, default 3)
     -- Fires even if you never stop typing, capping continuous-typing chunk size.
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
         lbl:SetTextColor(0.55, 0.55, 0.55)

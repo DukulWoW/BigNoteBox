@@ -153,9 +153,9 @@ local function BuildFrameSkin(frameName, onClose, frameParent)
     titleBar:SetScript("OnDragStart", function() f:StartMoving() end)
     titleBar:SetScript("OnDragStop",  function() f:StopMovingOrSizing() end)
 
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -12, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(titleLbl)
     titleLbl:SetText(L["RICH_PREVIEW_TITLE"])
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar, onClose)

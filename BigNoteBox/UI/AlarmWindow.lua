@@ -205,7 +205,7 @@ local function TimePair(row)
         onTab=function() mBox.eb:SetFocus() end })
     mBox = BNB.CreateNumberCombo(row,0,59,0,100,AW_ROW,{ onDirty=MarkDirty,
         onTab=function() hBox.eb:SetFocus() end })
-    local cln = row:CreateFontString(nil,"OVERLAY","GameFontNormal"); cln:SetText(":")
+    local cln = row:CreateFontString(nil,"OVERLAY","BNBFontNormal"); cln:SetText(":")
     local apDD = MakeDD(row,{ {label=L["AW_AM"],value="am"}, {label=L["AW_PM"],value="pm"} },"am",nil,
         math.floor((AW_CW-20)/3))
     local use24 = true
@@ -271,7 +271,7 @@ local function BuildTimeSection(ct1, y)
     realSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
     realSection:SetWidth(AW_CW); realSection:SetHeight(CAL_TOTAL)
 
-    local calTitle = realSection:CreateFontString(nil,"OVERLAY","GameFontNormal")
+    local calTitle = realSection:CreateFontString(nil,"OVERLAY","BNBFontNormal")
     calTitle:SetPoint("TOP",realSection,"TOP",0,-1)
     calTitle:SetWidth(AW_CW-44); calTitle:SetJustifyH("CENTER")
 
@@ -284,7 +284,7 @@ local function BuildTimeSection(ct1, y)
 
     for i,dnKey in ipairs(DAY_NAME_KEYS) do
         local dn = L[dnKey]
-        local dl = realSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        local dl = realSection:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
         dl:SetSize(CAL_CELL,CAL_H_DAYS)
         dl:SetPoint("TOPLEFT",realSection,"TOPLEFT",(i-1)*CAL_CELL,-CAL_H_HDR)
         dl:SetText(dn:sub(1,1)); dl:SetJustifyH("CENTER")
@@ -297,7 +297,7 @@ local function BuildTimeSection(ct1, y)
         db:SetSize(CAL_CELL-2,CAL_H_ROW-1)
         db:SetPoint("TOPLEFT",realSection,"TOPLEFT",
             col*CAL_CELL, -(CAL_H_HDR+CAL_H_DAYS+row*CAL_H_ROW))
-        local fl = db:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        local fl = db:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
         fl:SetAllPoints(); fl:SetJustifyH("CENTER")
         db._lbl=fl; db._day=nil
         local selBg = db:CreateTexture(nil,"BACKGROUND")
@@ -351,7 +351,7 @@ local function BuildTimeSection(ct1, y)
     igSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,topY)
     igSection:Hide()
 
-    local igNote = igSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    local igNote = igSection:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
     igNote:SetPoint("TOPLEFT",igSection,"TOPLEFT",0,0)
     igNote:SetWidth(AW_CW); igNote:SetJustifyH("LEFT")
     igNote:SetText(L["AW_INGAME_NOTE"])
@@ -366,7 +366,7 @@ local function BuildTimeSection(ct1, y)
     resetSection:SetSize(AW_CW, RESET_H)
     resetSection:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,topY)
     resetSection:Hide()
-    local resetNote = resetSection:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    local resetNote = resetSection:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
     resetNote:SetPoint("TOPLEFT",resetSection,"TOPLEFT",0,0)
     resetNote:SetWidth(AW_CW); resetNote:SetJustifyH("LEFT"); resetNote:SetWordWrap(true)
     resetNote:SetTextColor(0.55,0.55,0.55,1)
@@ -438,7 +438,7 @@ local function BuildRepeatBlock(ct1)
         BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetSize(20,20); cb:SetPoint("LEFT",wdRow,"LEFT",(i-1)*wdCW,0)
         cb:HookScript("OnClick",function() MarkDirty() end)
-        local dl=wdRow:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+        local dl=wdRow:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
         dl:SetPoint("LEFT",cb,"RIGHT",1,0); dl:SetText(dn:sub(1,1))
         dl:SetTextColor(0.72,0.72,0.72,1); cb._dayIndex=i; wdChecks[i]=cb
         BNB.CheckTip(cb, string.format(L["AW_WEEKDAY_TIP_FMT"], dn))   -- the label is one letter
@@ -582,7 +582,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     labelEB:SetSize(AW_CW,AW_ROW); labelEB:SetPoint("TOPLEFT",ct1,"TOPLEFT",0,y)
     labelEB:SetAutoFocus(false); labelEB:SetMaxLetters(80)
     BNB.AddPlaceholder(labelEB,L["AW_REMINDER_PLACEHOLDER"])
-    labelEB:SetFontObject("GameFontNormalSmall")
+    labelEB:SetFontObject("BNBFontNormalSmall")
     labelEB:HookScript("OnTextChanged", function() MarkDirty() end)
     y = y - AW_ROW - AW_SECT_GAP
     Div(ct1,y); y = y - AW_GAP
@@ -882,7 +882,7 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     snoozeEnableCB:SetPoint("TOPLEFT",ct3,"TOPLEFT",0,y3+2)
     snoozeEnableCB:SetChecked(true)
     snoozeEnableCB:HookScript("OnClick",function() MarkDirty() end)
-    local snoozeEnableLbl=ct3:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+    local snoozeEnableLbl=ct3:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
     snoozeEnableLbl:SetPoint("LEFT",snoozeEnableCB,"RIGHT",2,0)
     snoozeEnableLbl:SetText(L["AW_ENABLE_SNOOZE"])
     snoozeEnableLbl:SetTextColor(0.85,0.85,0.85,1)

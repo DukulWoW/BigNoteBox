@@ -296,7 +296,7 @@ local function GetOrCreateBadge()
     local btn   = icon and icon:GetMinimapButton("BigNoteBox")
     if not btn then return nil end
 
-    _badge = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    _badge = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     _badge:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 2, -2)
     _badge:SetJustifyH("RIGHT")
     _badge:SetTextColor(1, 0.3, 0.3)

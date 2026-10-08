@@ -43,6 +43,8 @@ UI\Cursor.lua
 UI\GlowOverlay.lua
 UI\Fonts.lua
 UI\SkinSystem.lua
+UI\HeaderFonts.xml
+UI\TextColors.lua
 UI\IconButton.lua
 UI\ContextMenu.lua
 UI\MainWindow.lua

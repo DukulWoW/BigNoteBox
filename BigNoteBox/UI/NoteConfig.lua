@@ -79,9 +79,9 @@ end
 
 -- Layout micro-helpers
 local function Hdr(parent, y, text)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local l = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    l:SetTextColor(1, 0.82, 0, 1); l:SetText(text)
+    BNB.SetHeaderColor(l); l:SetText(text)
     return y - 20
 end
 local function Rule(parent, y)
@@ -230,13 +230,13 @@ local function BuildGeneralTab(panel)
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  5, -5)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -5, -5)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(16)
-        BNB.SetFontSafe(nameLbl, def.bold, 11, "GameFontNormal")
+        BNB.SetFontSafe(nameLbl, def.bold, 11, "BNBFontNormal")
         nameLbl:SetText(def.label)
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  5, 5)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -5, 5)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(12)
-        BNB.SetFontSafe(prevLbl, def.regular, 10, "GameFontNormalSmall")
+        BNB.SetFontSafe(prevLbl, def.regular, 10, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
         fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
     end
@@ -304,7 +304,7 @@ local function BuildGeneralTab(panel)
         wowCb:SetSize(20, 20)
         wowCb:SetPoint("TOPLEFT", panel, "TOPLEFT", -2, y)
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())
-        local wowLbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local wowLbl = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         wowLbl:SetPoint("LEFT",  wowCb,  "RIGHT", 4, 0)
         wowLbl:SetPoint("RIGHT", panel,  "RIGHT", 0, 0)
         wowLbl:SetJustifyH("LEFT")
@@ -348,8 +348,8 @@ local function BuildGeneralTab(panel)
     local function ReapplyFontPreviews()
         for _,e in ipairs(fontPickerBtns) do
             local def = e.def
-            BNB.SetFontSafe(e.nameLbl, def.bold,    12, "GameFontNormal")
-            BNB.SetFontSafe(e.prevLbl, def.regular, 10, "GameFontNormalSmall")
+            BNB.SetFontSafe(e.nameLbl, def.bold,    12, "BNBFontNormal")
+            BNB.SetFontSafe(e.prevLbl, def.regular, 10, "BNBFontNormalSmall")
             e.nameLbl:SetText(def.label)
             e.prevLbl:SetText(def.preview or "")
         end

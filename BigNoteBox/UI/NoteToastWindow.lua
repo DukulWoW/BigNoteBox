@@ -67,7 +67,7 @@ local function Save(field, v)
 end
 
 local function Label(parent, text, anchor, y)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local l = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     l:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, y)
     l:SetText(text)
     l:SetTextColor(0.78, 0.78, 0.78)

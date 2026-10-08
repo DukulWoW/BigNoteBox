@@ -179,7 +179,7 @@ local function GetRow(parent, index)
 
     local textLeft = ICON_X + ICON_SZ + 10
     -- Title
-    local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  textLeft, -4)
     titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -4)
     titleLbl:SetJustifyH("LEFT")
@@ -187,14 +187,14 @@ local function GetRow(parent, index)
     row._titleLbl = titleLbl
 
     -- How long it has been in the trash
-    local dateLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dateLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     dateLbl:SetPoint("TOPLEFT", row, "TOPLEFT", textLeft, -22)
     dateLbl:SetJustifyH("LEFT")
     dateLbl:SetTextColor(0.55, 0.55, 0.55)
     row._dateLbl = dateLbl
 
     -- Size, bottom-right
-    local sizeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local sizeLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     sizeLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
     sizeLbl:SetJustifyH("RIGHT")
     sizeLbl:SetTextColor(0.40, 0.40, 0.40)
@@ -259,7 +259,7 @@ local function BuildViewPage(f, top)
     page._sf = sf
     local ct = CreateFrame("Frame", nil, sf)
     ct:SetWidth(CONTENT_W); sf:SetScrollChild(ct)
-    local bodyFs = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local bodyFs = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     bodyFs:SetPoint("TOPLEFT"); bodyFs:SetWidth(CONTENT_W)
     bodyFs:SetJustifyH("LEFT"); bodyFs:SetWordWrap(true)
     bodyFs:SetTextColor(0.85, 0.85, 0.85, 1)
@@ -408,7 +408,7 @@ function BNB.PopulateTrashWindow()
         -- The note's own title colour, as in the note list; gold without one (ALL-272)
         local tc = note.titleColor
         if tc and tc.r then row._titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
-        else row._titleLbl:SetTextColor(1, 0.82, 0, 1) end
+        else BNB.SetHeaderColor(row._titleLbl) end
 
         -- In the trash since, and size (ALL-299)
         row._dateLbl:SetText(string.format(L["TW_ROW_DELETED_FMT"], FormatDeleted(note.deletedAt)))
@@ -510,7 +510,7 @@ local function BuildTrashWindow()
     f._scrollChild = child
 
     -- Empty state label
-    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     emptyLbl:SetPoint("TOP", child, "TOP", 0, -20)
     emptyLbl:SetWidth(CONTENT_W); emptyLbl:SetJustifyH("CENTER")
     emptyLbl:SetTextColor(0.4, 0.4, 0.4); emptyLbl:SetText(L["TW_EMPTY_STATE"])
@@ -601,7 +601,7 @@ local function BuildTrashWindow()
     _cancelSelBtn = cancelSelBtn
 
     -- Info block: "Kept X days\nX notes in trash" — bottom-right of strip
-    local infoLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local infoLbl = list:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     infoLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 10)
     infoLbl:SetJustifyH("RIGHT")
     infoLbl:SetTextColor(0.45, 0.45, 0.45)

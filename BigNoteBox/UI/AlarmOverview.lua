@@ -62,15 +62,15 @@ local function BuildPopup()
     f._iconGlowHost = iconGlowHost
 
     -- Title
-    local titleLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  POPUP_PAD + 38, -POPUP_PAD)
     titleLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -POPUP_PAD,     -POPUP_PAD)
     titleLbl:SetJustifyH("LEFT")
-    titleLbl:SetTextColor(1, 0.85, 0.2, 1)
+    BNB.SetHeaderColor(titleLbl)
     f._titleLbl = titleLbl
 
     -- Label
-    local labelLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local labelLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     labelLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  POPUP_PAD + 38, -POPUP_PAD - 16)
     labelLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -POPUP_PAD,     -POPUP_PAD - 16)
     labelLbl:SetJustifyH("LEFT")
@@ -520,19 +520,19 @@ local function MakeRow(parent)
     iconGlowFrame:EnableMouse(false)
 
     -- Title, with the time left on the right (ALL-303: History-size rows)
-    local timeLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local timeLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     timeLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -8)
     timeLbl:SetHeight(14); timeLbl:SetJustifyH("RIGHT")
     timeLbl:SetTextColor(0.50, 0.50, 0.50, 1)
 
-    local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -6)
     titleLbl:SetPoint("RIGHT",    timeLbl, "LEFT", -6, 0)
     titleLbl:SetJustifyH("LEFT"); titleLbl:SetHeight(16)
     titleLbl:SetWordWrap(false)
 
     -- Alarm label (subtitle)
-    local labelLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local labelLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     labelLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  OV_TEXT_LEFT, -23)
     labelLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -23)
     labelLbl:SetJustifyH("LEFT"); labelLbl:SetHeight(14)
@@ -540,12 +540,12 @@ local function MakeRow(parent)
     labelLbl:SetWordWrap(false)
 
     -- Bottom line: kind and repeat on the left, the date on the right
-    local infoLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local infoLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     infoLbl:SetPoint("BOTTOMLEFT", row, "BOTTOMLEFT", OV_TEXT_LEFT, 6)
     infoLbl:SetHeight(12); infoLbl:SetJustifyH("LEFT")
     infoLbl:SetTextColor(0.45, 0.45, 0.45, 1)
 
-    local dateLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dateLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     dateLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
     dateLbl:SetHeight(12); dateLbl:SetJustifyH("RIGHT")
     dateLbl:SetTextColor(0.50, 0.50, 0.50, 1)
@@ -781,7 +781,7 @@ function AO.Refresh()
     if #entries == 0 then
         ct:SetHeight(40)
         if not f._emptyLbl then
-            f._emptyLbl = ct:CreateFontString(nil,"OVERLAY","GameFontNormalSmall")
+            f._emptyLbl = ct:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
             f._emptyLbl:SetPoint("TOP", ct, "TOP", 0, -10)
             f._emptyLbl:SetText(L["AO_EMPTY_STATE"])
             f._emptyLbl:SetTextColor(0.5, 0.5, 0.5, 1)

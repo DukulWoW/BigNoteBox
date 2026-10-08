@@ -268,7 +268,7 @@ end
 
 function BNB.SetFontSafe(fs, path, size, fallbackObj)
     if not fs then return end
-    fs:SetFontObject(fallbackObj or "GameFontNormal")
+    fs:SetFontObject(fallbackObj or "BNBFontNormal")
     if not path or path == "" then fs._bnbFontSpec = nil; return end
     size = BNB.FontPx(path, size)
     fs._bnbFontSpec = { path = path, size = size }
@@ -676,13 +676,13 @@ function BNB.AddFontPackHint(parent, anchor, x, y, w, h, fontObj)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetPoint("TOPLEFT", anchor, "TOPLEFT", x, y)
     btn:SetSize(w, h)
-    local fs = btn:CreateFontString(nil, "OVERLAY", fontObj or "GameFontNormalSmall")
+    local fs = btn:CreateFontString(nil, "OVERLAY", fontObj or "BNBFontNormalSmall")
     fs:SetPoint("TOPLEFT",  btn, "TOPLEFT",  4, -4)
     fs:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
     fs:SetJustifyH("LEFT"); fs:SetJustifyV("TOP")
     fs:SetTextColor(0.65, 0.65, 0.65)
     fs:SetText(L[pack.hintKey])
-    btn:SetScript("OnEnter", function() fs:SetTextColor(1, 0.82, 0) end)
+    btn:SetScript("OnEnter", function() BNB.SetHeaderColor(fs) end)
     btn:SetScript("OnLeave", function() fs:SetTextColor(0.65, 0.65, 0.65) end)
     btn:SetScript("OnClick", function(self)
         if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true) end

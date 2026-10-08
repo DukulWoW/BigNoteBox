@@ -31,7 +31,7 @@ local function BuildAdvancedTab(sf, ct)
     AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_DEVELOPER"])
 
-    local devDesc2 = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local devDesc2 = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     devDesc2:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     devDesc2:SetWidth(CONTENT_W); devDesc2:SetJustifyH("LEFT")
     devDesc2:SetWordWrap(true); devDesc2:SetHeight(20)
@@ -99,7 +99,7 @@ local function BuildAdvancedTab(sf, ct)
     AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_DANGERZONE_TIP_TITLE"])
 
-    local dzDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dzDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     dzDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     dzDesc:SetWidth(CONTENT_W); dzDesc:SetJustifyH("LEFT"); dzDesc:SetWordWrap(true)
     dzDesc:SetTextColor(0.75, 0.40, 0.40)

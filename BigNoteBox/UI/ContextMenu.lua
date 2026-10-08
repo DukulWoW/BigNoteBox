@@ -76,7 +76,6 @@ local OVERLAP  = 2              -- a sub-menu overlaps its parent by this
 local STRATA   = "FULLSCREEN_DIALOG"
 local SKIN_SYM_MULT = 1         -- skin icon tint = the preset border, as the dividers (Dukul, L18)
 local SKIN_HOVER_LIFT = 0.5     -- skin look on hover: icon and arrow this far toward white (Dukul)
-local TITLE_GOLD = { 1, 0.82, 0 }   -- header text without a colour (GameFontNormal)
 local DANGER_TEXT = { 1, 0.32, 0.32 }   -- label of a WARNING row, like its red symbol (L18)
 -- Header badge, as the sticky's icon badge: overhangs the top-left corner
 local BADGE, BADGE_INSET, BADGE_PAD = 36, 6, 2
@@ -403,10 +402,10 @@ local function Fill(f, d)
             r._div:Show()
         elseif it.kind == "title" then
             r:SetHeight(TITLE_H); r:EnableMouse(false)
-            r._text:SetFontObject("GameFontNormal")
+            r._text:SetFontObject("BNBFontNormal")
             local tc = it.opts.color   -- { r, g, b }, e.g. the note's titleColor
-            r._text:SetTextColor(tc and tc.r or TITLE_GOLD[1], tc and tc.g or TITLE_GOLD[2],
-                tc and tc.b or TITLE_GOLD[3])
+            if tc then r._text:SetTextColor(tc.r, tc.g, tc.b)
+            else BNB.SetHeaderColor(r._text) end
             r._text:SetText(it.text or "")
             r._text:Show()
             local o, x = it.opts, 8

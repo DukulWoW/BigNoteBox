@@ -34,10 +34,10 @@ function BNB.BuildMainWindowSkinChrome()
     titleBar:SetHeight(SK_TITLE_H)
     titleBar:EnableMouse(true)
 
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     -- Offset left by ~40px so it centres in the space left of the buttons
     titleLbl:SetPoint("CENTER", titleBar, "CENTER", -40, 0)
-    titleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(titleLbl)
     titleLbl:SetText(BNB.MainWindowTitle())
 
     local closeBtn = BNB.CreateSkinCloseButton(titleBar,

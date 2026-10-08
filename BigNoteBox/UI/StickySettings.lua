@@ -219,15 +219,15 @@ local function PopulateStickySettings(noteID)
     -- ── Shared layout helpers (take ct as param) ──────────────────────────────
     local function Sec(ct, txt)
         local y = ct._y or -8
-        local l = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local l = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         l:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        l:SetTextColor(1, 0.82, 0, 1); l:SetText(txt)
+        BNB.SetHeaderColor(l); l:SetText(txt)
         ct._y = y - 22
     end
 
     local function SubLbl(ct, txt)
         local y = ct._y or -8
-        local l = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local l = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         l:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         l:SetTextColor(0.60, 0.60, 0.60); l:SetText(txt)
         ct._y = y - 16
@@ -235,7 +235,7 @@ local function PopulateStickySettings(noteID)
 
     local function Hdr(ct, txt)
         local y = ct._y or -8
-        local l = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local l = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         l:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         l:SetTextColor(0.75, 0.75, 0.75); l:SetText(txt)
         ct._y = y - 18
@@ -476,13 +476,13 @@ local function PopulateStickySettings(noteID)
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  5, -5)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -5, -5)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(16)
-        BNB.SetFontSafe(nameLbl, def.bold, 11, "GameFontNormal")
+        BNB.SetFontSafe(nameLbl, def.bold, 11, "BNBFontNormal")
         nameLbl:SetText(def.label)
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  5, 5)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -5, 5)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(12)
-        BNB.SetFontSafe(prevLbl, def.regular, 10, "GameFontNormalSmall")
+        BNB.SetFontSafe(prevLbl, def.regular, 10, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
         fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=fid, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
         plainOnlyWidgets[#plainOnlyWidgets+1] = btn
@@ -503,7 +503,7 @@ local function PopulateStickySettings(noteID)
         BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
         wowCb:SetSize(20, 20)
         wowCb:SetPoint("TOPLEFT", ct1, "TOPLEFT", -2, ct1._y)
-        local wowLbl = ct1:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local wowLbl = ct1:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         wowLbl:SetPoint("LEFT",  wowCb, "RIGHT", 4, 0)
         wowLbl:SetPoint("RIGHT", ct1,   "RIGHT", 0, 0)
         wowLbl:SetJustifyH("LEFT")

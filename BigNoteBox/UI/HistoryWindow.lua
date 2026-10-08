@@ -92,7 +92,7 @@ local function BuildRow(parent, note, id, yOff)
     if BNB.ApplyIconFrame then BNB.ApplyIconFrame(icon, note, ICON_SZ) end
 
     -- Title
-    local titleLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     titleLbl:SetPoint("TOPLEFT",  row, "TOPLEFT", TEXT_LEFT,   -4)
     titleLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -4)
     titleLbl:SetJustifyH("LEFT")
@@ -102,7 +102,7 @@ local function BuildRow(parent, note, id, yOff)
     -- Slot count
     local n   = SlotCount(id)
     local sub = n == 1 and L["HW_SNAPSHOT_ONE"] or string.format(L["HW_SNAPSHOT_N_FMT"], n)
-    local subLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local subLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     subLbl:SetPoint("TOPLEFT",  row, "TOPLEFT", TEXT_LEFT,   -22)
     subLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -22)
     subLbl:SetJustifyH("LEFT")
@@ -112,7 +112,7 @@ local function BuildRow(parent, note, id, yOff)
 
     -- Size
     local sz = BNB.HistoryFormatSize(BNB.HistoryNoteSize(id))
-    local szLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local szLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     szLbl:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -4, 6)
     szLbl:SetHeight(12)
     szLbl:SetJustifyH("RIGHT")
@@ -330,7 +330,7 @@ local function BuildHistoryWindow()
     f._scrollChild = child
 
     -- Empty state
-    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local emptyLbl = child:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     emptyLbl:SetPoint("TOP", child, "TOP", 0, -20)
     emptyLbl:SetWidth(CONTENT_W); emptyLbl:SetJustifyH("CENTER")
     emptyLbl:SetTextColor(0.4, 0.4, 0.4)
@@ -397,7 +397,7 @@ local function BuildHistoryWindow()
     _cancelSelBtn = cancelSelBtn
 
     -- Size label
-    local szLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local szLbl = list:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     szLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
     szLbl:SetJustifyH("RIGHT")
     szLbl:SetTextColor(0.45, 0.45, 0.45)

@@ -388,7 +388,7 @@ local function BuildHelp()
             local y = -(i + 1) * HELP_LINE_H   -- below the intro and a blank line
             local fs, x
             if line.h then
-                fs, x = FS("GameFontNormalSmall", line.h), x0
+                fs, x = FS("BNBFontNormalSmall", line.h), x0
             elseif line.k then
                 local key = FS("GameFontHighlightSmall", line.k)
                 key:SetPoint("TOPLEFT", helpFrame, anchor, x0 + 4, y)
@@ -939,7 +939,7 @@ local function BuildMoveTip()
     moveTip = BNB.CreateBackdropFrame("Frame", nil, bar)
     moveTip:SetSize(240, 30)
     BNB.SetBackdrop(moveTip, 0.10, 0.10, 0.12, 0.92, 0.45, 0.70, 0.45, 1)
-    local fs = moveTip:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = moveTip:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     fs:SetPoint("LEFT", moveTip, "LEFT", 8, 0)
     fs:SetPoint("RIGHT", moveTip, "RIGHT", -8, 0)
     fs:SetJustifyH("CENTER")

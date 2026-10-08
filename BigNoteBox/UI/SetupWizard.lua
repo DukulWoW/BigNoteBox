@@ -301,7 +301,7 @@ end
 -- SHARED HELPERS
 --------------------------------------------------------------------------------
 local function MakeLabel(parent, y, text, fontSize, r, g, b)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     fs:SetPoint("TOPLEFT",  parent, "TOPLEFT",  0, y)
     fs:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
     fs:SetJustifyH("LEFT")
@@ -323,9 +323,9 @@ local function MakeRule(parent, y)
 end
 
 local function MakeHeader(parent, y, text)
-    local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local fs = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     fs:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
-    fs:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(fs)
     fs:SetText(text)
     return y - 24
 end
@@ -346,7 +346,7 @@ local function MakeCheck(parent, y, text, getter, setter, tip)
     BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
     cb:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     cb:SetChecked(getter())
-    cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
     cb.text:SetText(text)
     cb:SetScript("OnClick", function(self) setter(self:GetChecked()) end)
@@ -404,7 +404,7 @@ local function BuildPage1(content)
     y = y - 96 - 10
 
     -- Addon name
-    local name = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    local name = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalHuge")
     name:SetPoint("TOP", ct, "TOP", 0, y)
     name:SetText(L["OPT_TITLE"])
     y = y - (name:GetStringHeight() or 20) - 4
@@ -720,7 +720,7 @@ local function BuildUsagePage(content)
             if _usage == c._key then
                 c:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
                 c:SetBackdropBorderColor(0.35, 0.80, 0.35, 1)
-                c._title:SetTextColor(1, 0.82, 0)
+                BNB.SetHeaderColor(c._title)
             else
                 c:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
                 c:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
@@ -741,7 +741,7 @@ local function BuildUsagePage(content)
         c._badge:SetPoint("LEFT", c, "LEFT", 4, 0)
         c._badge:SetScript("OnClick", function() c:Click() end)
 
-        c._title = c:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+        c._title = c:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
         c._title:SetPoint("TOPLEFT", c._badge, "TOPRIGHT", 10, -14)
         c._title:SetText(L[ch.title])
 
@@ -804,7 +804,7 @@ local function BuildModulesPage(content)
         local cb = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
         BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
         cb:SetPoint("TOPLEFT", f, "TOPLEFT", col * COL_W - 2, y - row * ROW_H)
-        cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        cb.text = cb.text or cb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         cb.text:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         cb.text:SetWidth(COL_W - 34)
         cb.text:SetJustifyH("LEFT"); cb.text:SetWordWrap(false)
@@ -889,7 +889,7 @@ local function BuildPage2(content)
         img:SetHeight(IMG_H)
         img:SetTexture(ASSETS .. "UI\\" .. texPath)
 
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("BOTTOM", btn, "BOTTOM", 0, 7)
         lbl:SetText(label)
 
@@ -897,7 +897,7 @@ local function BuildPage2(content)
             if _selected == choiceKey then
                 btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
                 btn:SetBackdropBorderColor(0.35, 0.80, 0.35, 1)
-                lbl:SetTextColor(1, 0.82, 0)
+                BNB.SetHeaderColor(lbl)
             else
                 btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
                 btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
@@ -938,7 +938,7 @@ local function BuildPage2(content)
         row:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
         row:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
         row:SetHeight(28)
-        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("LEFT", row, "LEFT", 0, 0)
         lbl:SetText(L["SW_THEME_COLOR_HDR"])
         local entries = {}
@@ -958,7 +958,7 @@ local function BuildPage2(content)
     desc:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
     desc:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     desc:SetJustifyH("LEFT"); desc:SetWordWrap(true); desc:SetSpacing(2)
-    desc:SetText(L["SW_SKIN_CHOICE_DESC"])
+    desc:SetText(BNB.AccentMarkup(L["SW_SKIN_CHOICE_DESC"]))
     desc:SetTextColor(0.75, 0.75, 0.75)
 
     -- Store getter for Next handler
@@ -1104,7 +1104,7 @@ local function BuildPage4(content)
                 if e.id == cur then
                     e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
                     e.btn:SetBackdropBorderColor(0.35, 0.75, 0.35, 1)
-                    if e.nameLbl then e.nameLbl:SetTextColor(1, 0.82, 0, 1) end
+                    if e.nameLbl then BNB.SetHeaderColor(e.nameLbl) end
                 else
                     e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
                     e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
@@ -1141,7 +1141,7 @@ local function BuildPage4(content)
                 if _p4PreviewLbl then
                     local sz = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                     local p = (d.bold and d.bold ~= "") and d.bold or d.regular
-                    BNB.SetFontSafe(_p4PreviewLbl, p, sz, "GameFontNormal")
+                    BNB.SetFontSafe(_p4PreviewLbl, p, sz, "BNBFontNormal")
                 end
             end)
 
@@ -1149,14 +1149,14 @@ local function BuildPage4(content)
             nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  7, -7)
             nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -7, -7)
             nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(18)
-            BNB.SetFontSafe(nameLbl, def.bold, 13, "GameFontNormal")
+            BNB.SetFontSafe(nameLbl, def.bold, 13, "BNBFontNormal")
             nameLbl:SetText(def.label)
 
             local prevLbl = btn:CreateFontString(nil, "OVERLAY")
             prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  7, 7)
             prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -7, 7)
             prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
-            BNB.SetFontSafe(prevLbl, def.regular, 11, "GameFontNormalSmall")
+            BNB.SetFontSafe(prevLbl, def.regular, 11, "BNBFontNormalSmall")
             prevLbl:SetTextColor(0.62, 0.62, 0.62)
             prevLbl:SetText(def.preview or "")
 
@@ -1176,7 +1176,7 @@ local function BuildPage4(content)
         BNB.LabelHit(wowCb)   -- the tooltip and click reach over its label too
         wowCb:SetShown(BNB.ShowWoWFontCheckbox())
         wowCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        wowCb.text = wowCb.text or wowCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        wowCb.text = wowCb.text or wowCb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         wowCb.text:SetPoint("LEFT", wowCb, "RIGHT", 2, 0)
         wowCb.text:SetText(L["FONT_USE_WOW_DEFAULT"])
         wowCb:SetScript("OnEnter", function(self)
@@ -1192,7 +1192,7 @@ local function BuildPage4(content)
                 local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
                 if boldPath and boldPath ~= "" then
-                    BNB.SetFontSafe(_p4PreviewLbl, boldPath, sz, "GameFontNormal")
+                    BNB.SetFontSafe(_p4PreviewLbl, boldPath, sz, "BNBFontNormal")
                 end
             end
         end)
@@ -1229,7 +1229,7 @@ local function BuildPage4(content)
     previewBox:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     BNB.SetBackdrop(previewBox, 0.04, 0.04, 0.06, 0.95, 0.22, 0.22, 0.25, 1)
 
-    local previewLbl = previewBox:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local previewLbl = previewBox:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     previewLbl:SetPoint("LEFT",  previewBox, "LEFT",  10, 0)
     previewLbl:SetPoint("RIGHT", previewBox, "RIGHT", -10, 0)
     previewLbl:SetJustifyH("CENTER")
@@ -1239,7 +1239,7 @@ local function BuildPage4(content)
     C_Timer.After(0.05, function()
         local sz       = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
-        BNB.SetFontSafe(previewLbl, boldPath, sz, "GameFontNormal")
+        BNB.SetFontSafe(previewLbl, boldPath, sz, "BNBFontNormal")
     end)
     _p4PreviewLbl = previewLbl
     y = y - 46
@@ -1267,7 +1267,7 @@ local function BuildPage4(content)
             if e.key == cur then
                 e.btn:SetBackdropColor(0.08, 0.18, 0.08, 0.95)
                 e.btn:SetBackdropBorderColor(0.35, 0.75, 0.35, 1)
-                if e.lbl then e.lbl:SetTextColor(1, 0.82, 0, 1) end
+                if e.lbl then BNB.SetHeaderColor(e.lbl) end
             else
                 e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
                 e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
@@ -1294,13 +1294,13 @@ local function BuildPage4(content)
         iconTex:SetTexCoord(0, 1, 0, 1)
 
         -- Label
-        local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  8 + iconSz + 6, -8)
         lbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -8)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(m.label)
 
-        local sub = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local sub = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         sub:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -2)
         sub:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, 0)
         sub:SetJustifyH("LEFT")
@@ -1431,7 +1431,7 @@ local function BuildPage5(content)
         local HINT_W = 110
         local LBL_W  = CW - 16 - BTN_W - HINT_W - 8   -- remaining left side
 
-        local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, yp)
         lbl:SetWidth(LBL_W)
         lbl:SetJustifyH("LEFT")
@@ -1441,7 +1441,7 @@ local function BuildPage5(content)
         kbBtn:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, yp)
         kbBtn:RegisterForClicks("AnyUp")
 
-        local hint = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local hint = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         hint:SetPoint("RIGHT", kbBtn, "LEFT", -6, 0)
         hint:SetWidth(HINT_W)
         hint:SetJustifyH("RIGHT")
@@ -1529,12 +1529,12 @@ local function BuildPage6(content)
     y = MakeRule(f, y)
 
     local _, ny2 = MakeLabel(f, y,
-        L["SW_MIGRATION_COPY_NOTE"],
+        BNB.AccentMarkup(L["SW_MIGRATION_COPY_NOTE"]),
         nil, 0.80, 0.80, 0.80)
     y = ny2 - 8
 
     local _, ny3 = MakeLabel(f, y,
-        L["SW_MIGRATION_LATER_NOTE"],
+        BNB.AccentMarkup(L["SW_MIGRATION_LATER_NOTE"]),
         nil, 0.60, 0.60, 0.60)
     y = ny3
 
@@ -1551,7 +1551,7 @@ local function BuildPage7(content)
 
     local y = -10
 
-    local thanks = f:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    local thanks = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalHuge")
     thanks:SetPoint("TOP", f, "TOP", 0, y)
     thanks:SetWidth(CW); thanks:SetJustifyH("CENTER")
     thanks:SetText(L["SW_THANKS"])
@@ -1564,13 +1564,13 @@ local function BuildPage7(content)
         L["SW_TIP_4"],
     }
     for _, tip in ipairs(tips) do
-        local _, ny = MakeLabel(f, y, string.format(L["SW_TIP_BULLET_FMT"], tip), nil, 0.80, 0.80, 0.80)
+        local _, ny = MakeLabel(f, y, BNB.AccentMarkup(string.format(L["SW_TIP_BULLET_FMT"], tip)), nil, 0.80, 0.80, 0.80)
         y = ny - 2
     end
 
     y = y - 10
     -- CurseForge link
-    local urlLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local urlLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     urlLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
     urlLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     urlLbl:SetJustifyH("CENTER")
@@ -1601,7 +1601,7 @@ local function BuildPage7(content)
     y = y - 32
 
     -- Dukul.net link
-    local siteLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local siteLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     siteLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
     siteLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     siteLbl:SetJustifyH("CENTER")
@@ -1619,7 +1619,7 @@ local function BuildPage7(content)
     y = y - 40
 
     -- Reload note
-    local rnote = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local rnote = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     rnote:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 114)
     rnote:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 114)
     rnote:SetJustifyH("CENTER")
@@ -1682,7 +1682,7 @@ local function BuildWizardFrame()
     -- of the close button
     local contentTopInset   -- how far below the frame top the content starts
     _pageTitle = { SetText = function(_, txt) f:SetWindowTitle(txt or "") end }
-    _pageCounter = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    _pageCounter = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     _pageCounter:SetTextColor(0.55, 0.55, 0.55)
     _pageCounter:SetPoint("TOPRIGHT", f, "TOPRIGHT", -36, -8)
     -- ButtonFrameTemplate title bar is ~32px tall; skin mode keeps its old inset

@@ -56,7 +56,7 @@ local function Tip(w, text)
 end
 
 local function Label(ct, y, text)
-    local fs = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fs = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     fs:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     fs:SetHeight(ROW_H); fs:SetJustifyH("LEFT")
     fs:SetText(text)
@@ -530,7 +530,7 @@ local function BuildOraclePage(sf, ct, y, page)
     enableCb:SetChecked(db.oracleEnabled ~= false)
     Tip(enableCb, L["CFG_ORACLE_ENABLE_TIP"])
     page.enableCb = enableCb   -- twin on the Modules overview row
-    local enableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local enableLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     enableLbl:SetPoint("LEFT", enableCb, "RIGHT", 4, 0)
     enableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
     enableLbl:SetJustifyH("LEFT"); enableLbl:SetHeight(ROW_H)

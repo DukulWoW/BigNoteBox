@@ -991,7 +991,7 @@ function BNB.CreateMainWindow()
     local sizeLabelBg = sizeLabel:CreateTexture(nil, "BACKGROUND")
     sizeLabelBg:SetAllPoints()
     sizeLabelBg:SetColorTexture(0, 0, 0, 0.75)
-    local sizeLabelTxt = sizeLabel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local sizeLabelTxt = sizeLabel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     sizeLabelTxt:SetAllPoints()
     sizeLabelTxt:SetJustifyH("CENTER")
     sizeLabelTxt:SetTextColor(1, 1, 1)
@@ -1434,7 +1434,7 @@ local function BuildBCBPromo()
     logo:SetTexture(ASSETS .. "BCB\\bcb-logo")
 
     -- ── "By Dukul" ────────────────────────────────────────────────────────────
-    local byLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local byLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     byLbl:SetPoint("TOP", logo, "BOTTOM", 0, -12)
     byLbl:SetWidth(innerW)
     byLbl:SetJustifyH("CENTER")
@@ -1602,13 +1602,13 @@ function BNB.BuildNotesUnavailablePanel(listPane, editorPane)
     icon:SetAtlas("UI-Frame-ErrorDialog-Icon")
 
     -- Header
-    local header = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalHuge")
+    local header = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalHuge")
     header:SetPoint("TOP", icon, "BOTTOM", 0, -16)
     header:SetTextColor(1, 0.25, 0.25)
     header:SetText(L["MW_DB_UNAVAILABLE_HEADER"])
 
     -- Body explanation
-    local body = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local body = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     body:SetPoint("TOP", header, "BOTTOM", 0, -16)
     body:SetWidth(480)
     body:SetJustifyH("CENTER")

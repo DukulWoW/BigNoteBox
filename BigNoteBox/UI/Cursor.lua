@@ -278,7 +278,7 @@ local function BuildTest()
     }
     local mine = BNB.IsForever and "gold" or "silver"
     for _, c in ipairs(cols) do
-        local h = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local h = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         h:SetPoint("TOPLEFT", f, "TOPLEFT", c.x, y)
         h:SetWidth(TILE_W)
         h:SetText(c.head)

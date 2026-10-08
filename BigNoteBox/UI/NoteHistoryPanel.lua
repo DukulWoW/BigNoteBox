@@ -49,7 +49,7 @@ local function BuildSectionHeader(parent, y, label, r, g, b)
     rule:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, y)
     rule:SetColorTexture(0.22, 0.22, 0.25, 1)
 
-    local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y - 2)
     lbl:SetHeight(SECTION_H - 2)
     lbl:SetJustifyH("LEFT")
@@ -88,7 +88,7 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     if live and BNB.ApplyIconFrame then BNB.ApplyIconFrame(icon, live, ICON_SZ) end
 
     -- Timestamp
-    local tsLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local tsLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     tsLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  TEXT_LEFT, -4)
     tsLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4,        -4)
     tsLbl:SetJustifyH("LEFT"); tsLbl:SetHeight(16)
@@ -98,14 +98,14 @@ local function BuildSnapRow(parent, snap, noteID, slotType, slotIndex, yOff)
     local szBytes = (snap.title and #snap.title or 0)
                   + (snap.body  and #snap.body  or 0)
                   + 64
-    local szLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local szLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     szLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -4, -4)
     szLbl:SetHeight(14); szLbl:SetJustifyH("RIGHT")
     szLbl:SetTextColor(0.40, 0.40, 0.40)
     szLbl:SetText(BNB.HistoryFormatSize(szBytes))
 
     -- Title preview
-    local prevLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local prevLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     prevLbl:SetPoint("TOPLEFT",  row, "TOPLEFT",  TEXT_LEFT, -20)
     prevLbl:SetPoint("TOPRIGHT", row, "TOPRIGHT", -90,       -20)
     prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
@@ -234,7 +234,7 @@ function BNB.PopulateNoteHistoryPanel()
     _page._clearBtn:SetEnabled(numAuto > 0)
 
     if numAuto == 0 and not hasManual then
-        local e = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local e = child:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         e:SetPoint("TOP", child, "TOP", 0, -20)
         e:SetWidth(CONTENT_W); e:SetJustifyH("CENTER")
         e:SetTextColor(0.4, 0.4, 0.4)
@@ -318,7 +318,7 @@ function BNB._BuildNoteHistoryPage(f, top)
     page._clearBtn = clearBtn
 
     -- This note's history size, where the list page shows the total
-    local szLbl = page:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local szLbl = page:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     szLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
     szLbl:SetJustifyH("RIGHT")
     szLbl:SetTextColor(0.45, 0.45, 0.45)

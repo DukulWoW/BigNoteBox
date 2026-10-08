@@ -39,7 +39,7 @@ function K.BuildContextMenuPage(sf, ct, y)
     db.contextMenuClick = db.contextMenuClick or CopyTable(BNB.DEFAULTS.contextMenuClick)
     for _, m in ipairs(BNB.NOTE_MENU_CLICKS) do
         local item = m[1]
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L[m[2]])

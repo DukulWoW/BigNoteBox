@@ -76,7 +76,7 @@ local function UpdateSizePreview()
         if path and path ~= "" then
             _sizePreviewLbl:SetFont(path, BNB.FontPx(path, size), "")
         else
-            _sizePreviewLbl:SetFontObject(GameFontNormal)
+            _sizePreviewLbl:SetFontObject("BNBFontNormal")
         end
     end)
 end
@@ -249,7 +249,7 @@ local function ApplyTitleFont()
     else
         local font, _, flags = GameFontNormalHuge:GetFont()
         if font then pcall(function() _titleEB:SetFont(font, 20, flags or "") end)
-        else _titleEB:SetFontObject("GameFontNormalLarge") end
+        else _titleEB:SetFontObject("BNBFontNormalLarge") end
     end
 end
 
@@ -371,7 +371,7 @@ local function BuildDialog()
     colR:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD + COL_L_W + COL_GAP, contentY)
 
     -- ── LEFT COLUMN: font cards ───────────────────────────────────────────────
-    local fontHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local fontHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     fontHdr:SetPoint("TOPLEFT", colL, "TOPLEFT", 0, 0)
     fontHdr:SetWidth(COL_L_W); fontHdr:SetJustifyH("LEFT")
     fontHdr:SetText(L["NND_FONT_HDR"])
@@ -410,14 +410,14 @@ local function BuildDialog()
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  4, -4)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -4, -4)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(16)
-        BNB.SetFontSafe(nameLbl, def.bold, 11, "GameFontNormal")
+        BNB.SetFontSafe(nameLbl, def.bold, 11, "BNBFontNormal")
         nameLbl:SetText(def.label)
 
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  4, 4)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -4, 4)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(11)
-        BNB.SetFontSafe(prevLbl, def.regular, 9, "GameFontNormalSmall")
+        BNB.SetFontSafe(prevLbl, def.regular, 9, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55)
         prevLbl:SetText(def.preview or "")
 
@@ -449,7 +449,7 @@ local function BuildDialog()
     wowCheck:SetSize(18, 18)
     wowCheck:SetPoint("TOPLEFT", colL, "TOPLEFT", 0,
         leftY - fontGridRows * (CARD_H + CARD_GAP) + CARD_GAP - 2)
-    local wowLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local wowLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wowLbl:SetPoint("LEFT",  wowCheck, "RIGHT", 4, 0)
     wowLbl:SetPoint("RIGHT", colL,     "RIGHT", 0, 0)
     wowLbl:SetJustifyH("LEFT")
@@ -495,7 +495,7 @@ local function BuildDialog()
     -- ── RIGHT COLUMN: title colour + font size ───────────────────────────────
     local rightY = 0
 
-    local colorHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local colorHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     colorHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     colorHdr:SetWidth(COL_R_W); colorHdr:SetJustifyH("LEFT")
     colorHdr:SetText(L["NND_TITLE_COLOR_HDR"])
@@ -570,7 +570,7 @@ local function BuildDialog()
     end
 
     -- Font size — header label above, slider below, filling full column width
-    local sizeHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local sizeHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     sizeHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sizeHdr:SetWidth(COL_R_W); sizeHdr:SetJustifyH("LEFT")
     sizeHdr:SetText(L["NND_FONT_SIZE_HDR"])
@@ -592,14 +592,14 @@ local function BuildDialog()
     _sizeSlider = szWidget
 
     -- Font size preview label — live sample text at current size
-    local sampleHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local sampleHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     sampleHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sampleHdr:SetWidth(COL_R_W); sampleHdr:SetJustifyH("LEFT")
     sampleHdr:SetText(L["NND_SAMPLE_SIZE_HDR"])
     sampleHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
-    local previewLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local previewLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     previewLbl:SetPoint("TOPLEFT",  colR, "TOPLEFT",  0, rightY)
     previewLbl:SetPoint("TOPRIGHT", colR, "TOPRIGHT", 0, rightY)
     previewLbl:SetJustifyH("CENTER")
@@ -628,7 +628,7 @@ local function BuildDialog()
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
         -chromeTopH - ICON_SZ - 10 - colMaxH - 4)
-    local richLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local richLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     richLbl:SetPoint("LEFT",  richCheck, "RIGHT",  4, 0)
     richLbl:SetPoint("RIGHT", f,         "RIGHT", -DLG_PAD, 0)
     richLbl:SetJustifyH("LEFT")

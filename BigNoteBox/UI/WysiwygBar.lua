@@ -248,7 +248,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         BNB.SetBackdrop(fontDDBg, 0.08, 0.08, 0.10, 0.90, 0.28, 0.28, 0.30, 1)
     end
 
-    local fontDDLabel = fontDDBg:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local fontDDLabel = fontDDBg:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     fontDDLabel:SetPoint("LEFT",  fontDDBg, "LEFT",  5, 0)
     fontDDLabel:SetPoint("RIGHT", fontDDBg, "RIGHT", -14, 0)
     fontDDLabel:SetJustifyH("LEFT")
@@ -400,7 +400,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         BNB.SetBackdrop(sizeBg, 0.08, 0.08, 0.10, 0.90, 0.28, 0.28, 0.30, 1)
     end
 
-    local sizeLbl = sizeBg:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local sizeLbl = sizeBg:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     sizeLbl:SetPoint("LEFT",  sizeBg, "LEFT",  4, 0)
     sizeLbl:SetPoint("RIGHT", sizeBg, "RIGHT", -3, 0)
     sizeLbl:SetJustifyH("CENTER")

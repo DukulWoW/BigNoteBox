@@ -129,7 +129,7 @@ local function AddRule(ct, y)
 end
 
 local function AddHeader(ct, y, text, r, g, b)
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     lbl:SetTextColor(r or 1, g or 0.82, b or 0)
     lbl:SetText(text)
@@ -150,7 +150,7 @@ local function AddCheck(ct, y, text, getter, setter, tip)
         end)
         cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("LEFT",  cb,  "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", ct,  "RIGHT", 0, 0)
     lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H); lbl:SetText(text)
@@ -240,9 +240,9 @@ local function NewSubPage(title, build, key)
         tip = L["CFG_SUBPAGE_BACK"], tipAnchor = "ANCHOR_RIGHT" })
     back:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, -8)
 
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     lbl:SetPoint("LEFT", back, "RIGHT", 8, 0)
-    lbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(lbl)
     lbl:SetText(title)
 
     build(sf, ct, AddRule(ct, -38) - 4, page)
@@ -305,7 +305,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
         end
     end
 
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("LEFT",  ct,   "TOPLEFT", TEXT_X, y - 10)
     if open then lbl:SetPoint("RIGHT", open, "LEFT", -8, 0)
     else         lbl:SetPoint("RIGHT", ct,   "TOPRIGHT", 0, y - 10) end
@@ -352,7 +352,7 @@ local function BuildLSMFontDropdown(parent, y, getChoice, setChoice, overrideW)
     if #lsmFonts == 0 then return y end
 
     -- Section header
-    local hdr = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local hdr = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hdr:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     hdr:SetTextColor(0.55, 0.55, 0.55)
     hdr:SetText(L["CFG_LSM_FONTS_OTHER"])
@@ -409,7 +409,7 @@ end
 -- Returns the new y offset after the row.
 -- ─────────────────────────────────────────────────────────────────────────────
 local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, tooltipVerb)
-    local kbLabel = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local kbLabel = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     kbLabel:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y + 2)
     kbLabel:SetText(labelText)
 
@@ -417,7 +417,7 @@ local function MakeKeybindRow(parent, y, labelText, kbAction, defaultHint, toolt
     kbBtn:SetPoint("LEFT", kbLabel, "RIGHT", 8, 0)
     kbBtn:RegisterForClicks("AnyUp")
 
-    local kbHint = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local kbHint = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     kbHint:SetPoint("LEFT", kbBtn, "RIGHT", 8, 0)
     kbHint:SetTextColor(0.5, 0.5, 0.5)
     kbHint:SetText(defaultHint)
@@ -469,7 +469,7 @@ local function MakeKeybindPair(parent, y, cells)
     local updaters = {}
     for i, c in ipairs(cells) do
         local x = (i - 1) * colW
-        local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
         lbl:SetWidth(BTN_W)
         lbl:SetJustifyH("LEFT")
@@ -531,7 +531,7 @@ local BUILDERS = {}
 -- placement (ALL-291), so a change on one page shows on the other. Returns y, holder.
 local function AddSideRow(ct, y, label, dbKey, frameName, apply)
     local db = BigNoteBoxDB
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
     lbl:SetText(label)

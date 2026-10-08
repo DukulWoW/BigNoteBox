@@ -100,14 +100,14 @@ local function GetOrCreateTagHeader(child, idx)
     arrowBtn:SetPoint("LEFT", btn, "LEFT", PAD_L, 0)
     btn._arrowBtn  = arrowBtn
 
-    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("LEFT", arrowBtn, "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", btn, "RIGHT", -40, 0)
     lbl:SetJustifyH("LEFT")
     lbl:SetTextColor(1, 1, 1, 1)
     btn._lbl = lbl
 
-    local countLbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local countLbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     countLbl:SetPoint("RIGHT", btn, "RIGHT", -PAD_L, 0)
     countLbl:SetJustifyH("RIGHT")
     countLbl:SetTextColor(0.55, 0.55, 0.55, 1)

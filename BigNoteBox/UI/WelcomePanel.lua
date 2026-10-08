@@ -205,7 +205,7 @@ local function GetImportFrame()
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
 
     -- Description label
-    local desc = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local desc = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     desc:SetPoint("TOPLEFT",  f, "TOPLEFT",  16, -36)
     desc:SetPoint("TOPRIGHT", f, "TOPRIGHT", -16, -36)
     desc:SetJustifyH("LEFT")
@@ -314,7 +314,7 @@ local function BuildEmptyState(parent)
     pcall(function()
         local boldPath = BNB.GetUIBoldFont and BNB.GetUIBoldFont()
         if boldPath then greetLbl:SetFont(boldPath, 15, "")
-        else greetLbl:SetFontObject("GameFontNormal") end
+        else greetLbl:SetFontObject("BNBFontNormal") end
     end)
     greetLbl:SetTextColor(0.9, 0.9, 0.9)
 
@@ -325,12 +325,12 @@ local function BuildEmptyState(parent)
     pcall(function()
         local boldPath = BNB.GetUIBoldFont and BNB.GetUIBoldFont()
         if boldPath then clockLbl:SetFont(boldPath, 34, "")
-        else clockLbl:SetFontObject("GameFontNormalHuge") end
+        else clockLbl:SetFontObject("BNBFontNormalHuge") end
     end)
     clockLbl:SetTextColor(1, 1, 1)
 
     -- ── Date ─────────────────────────────────────────────────────────────────
-    local dateLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dateLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     dateLbl:SetPoint("TOP", clockLbl, "BOTTOM", 0, -LINE_PAD)
     dateLbl:SetJustifyH("CENTER")
     dateLbl:SetTextColor(0.75, 0.75, 0.75)
@@ -348,7 +348,7 @@ local function BuildEmptyState(parent)
     pcall(function()
         local bodyPath = BNB.GetUIFont and BNB.GetUIFont()
         if bodyPath then quoteLbl:SetFont(bodyPath, 12, "")
-        else quoteLbl:SetFontObject("GameFontNormalSmall") end
+        else quoteLbl:SetFontObject("BNBFontNormalSmall") end
     end)
     quoteLbl:SetTextColor(0.65, 0.65, 0.65)
 
@@ -358,7 +358,7 @@ local function BuildEmptyState(parent)
     end)
 
     -- ── "Select a note" hint ─────────────────────────────────────────────────
-    local hintLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     hintLbl:SetPoint("TOP", quoteLbl, "BOTTOM", 0, -(LINE_PAD + 28))
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(unpack(COL_GREY))
@@ -387,14 +387,14 @@ local function BuildEmptyState(parent)
 
     -- ── Dynamic sections container ────────────────────────────────────────────
     -- Location notes header
-    local locHeader = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local locHeader = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     locHeader:SetJustifyH("CENTER")
     locHeader:SetTextColor(0.9, 0.82, 0.5)
     -- Text is set dynamically in RefreshIconRows with the current zone name.
     locHeader:Hide()
 
     -- Favorite notes header
-    local favHeader = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local favHeader = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     favHeader:SetJustifyH("CENTER")
     favHeader:SetTextColor(0.9, 0.82, 0.5)
     favHeader:SetText(L["WELCOME_FAV_NOTES"])

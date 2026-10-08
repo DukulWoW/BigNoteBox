@@ -112,7 +112,7 @@ end
 function UN.WarnDialog(globalName, w, h, rowY, dupeW)
     local f = UN.Dialog(globalName, w, h, L["INS_NOTE_EXISTS"])
 
-    local msg = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local msg = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     msg:SetPoint("TOP",   f, "TOP",   0,   -38)
     msg:SetPoint("LEFT",  f, "LEFT",  16,  0)
     msg:SetPoint("RIGHT", f, "RIGHT", -16, 0)

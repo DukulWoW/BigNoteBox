@@ -40,7 +40,6 @@ local FLIP_TIME  = 0.18   -- seconds for settings fade-in/out
 local COL_HEADER = { 0.10, 0.10, 0.13 }
 local COL_BG     = { 0.07, 0.07, 0.09 }
 local COL_BORDER = { 0.35, 0.35, 0.38 }
-local COL_GOLD   = { 1, 0.82, 0, 1 }
 
 -- The default sticky colours (Dukul 2026-10-06): in skin mode the skin preset's
 -- own colour and border at brightness 1.00, so a sticky stays fairly dark
@@ -1276,7 +1275,7 @@ local function CreateStickyTaskRow(ct, f)
     end)
 
     -- Task text label — anchored by the fill, after the last icon shown
-    local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetJustifyH("LEFT"); lbl:SetMaxLines(1); lbl:SetWordWrap(false)
     -- Tooltip on truncation
     lbl:SetScript("OnEnter", function(self)
@@ -1764,7 +1763,7 @@ local function CreateStickyFrame(noteID)
 
     -- Header title — spans the full header width so the title text uses all
     -- available space. The icon button overlay will float above it on hover.
-    local titleLbl = header:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+    local titleLbl = header:CreateFontString(nil, "ARTWORK", "BNBFontNormal")
     titleLbl:SetPoint("LEFT",  header, "LEFT",  titleLeft, 0)
     titleLbl:SetPoint("RIGHT", header, "RIGHT", -PAD, 0)
     titleLbl:SetJustifyH("LEFT"); titleLbl:SetMaxLines(1); titleLbl:SetWordWrap(false)
@@ -1772,10 +1771,10 @@ local function CreateStickyFrame(noteID)
     -- A font object, not a raw SetFont(GetFont(), 16): GetFont() returns only the
     -- Latin file, and setting it raw drops the per-alphabet fallback, so a Chinese
     -- or Korean note title drew as boxes. GameFontNormalLarge is the 16px sibling.
-    titleLbl:SetFontObject("GameFontNormalLarge")
+    titleLbl:SetFontObject("BNBFontNormalLarge")
     local tc = note.titleColor
     if tc then titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
-    else        titleLbl:SetTextColor(unpack(COL_GOLD)) end
+    else        BNB.SetHeaderColor(titleLbl) end
     titleLbl:SetText(note.title ~= "" and note.title or L["UNTITLED"])
     f._titleLbl = titleLbl
 
@@ -2401,7 +2400,7 @@ local function CreateStickyFrame(noteID)
     taskFooter:Hide()
     f._taskFooter = taskFooter
 
-    local taskFooterLbl = taskFooter:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local taskFooterLbl = taskFooter:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     taskFooterLbl:SetPoint("LEFT",  taskFooter, "LEFT",  0, 0)
     taskFooterLbl:SetPoint("RIGHT", taskFooter, "RIGHT", -(12 + 4 + 12 + 4), 0)
     taskFooterLbl:SetJustifyH("LEFT")
@@ -3132,7 +3131,7 @@ function SN.RefreshNote(noteID)
     if f._titleLbl then
         local t = note.titleColor
         if t then f._titleLbl:SetTextColor(t.r, t.g, t.b, 1)
-        else       f._titleLbl:SetTextColor(unpack(COL_GOLD)) end
+        else       BNB.SetHeaderColor(f._titleLbl) end
         f._titleLbl:SetText(note.title ~= "" and note.title or L["UNTITLED"])
     end
     -- Rebuild icon badge (handles icon added, changed, or cleared)

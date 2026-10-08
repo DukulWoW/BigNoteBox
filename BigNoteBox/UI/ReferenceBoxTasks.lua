@@ -314,7 +314,7 @@ local function BuildTaskPanel(f)
 
     -- Fixed header label on pnl (not tsc) so it doesn't scroll with task rows.
     -- Created once at build time; RenderTaskPanel updates its text each render.
-    local pnlHdrLbl = pnl:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local pnlHdrLbl = pnl:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     pnlHdrLbl:SetPoint("TOPLEFT",  pnl, "TOPLEFT",  PAD + 3, -4)
     pnlHdrLbl:SetPoint("TOPRIGHT", pnl, "TOPRIGHT", -4,      -4)
     pnlHdrLbl:SetHeight(TASK_HDR_H - 4)
@@ -654,7 +654,7 @@ local function CreateTaskRow(tsc)
     row._cb = cb
 
     -- Task text / inline editbox
-    local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     lbl:SetPoint("LEFT",  cb,  "RIGHT", 2,  0)
     lbl:SetPoint("RIGHT", row, "RIGHT", -38, 0)   -- clear of X and toggle (ALL-109)
     lbl:SetJustifyH("LEFT")
@@ -670,7 +670,7 @@ local function CreateTaskRow(tsc)
     eb:SetAutoFocus(false)
     eb:SetMultiLine(false)
     eb:SetMaxLetters(500)
-    eb:SetFontObject("GameFontNormalSmall")
+    eb:SetFontObject("BNBFontNormalSmall")
     eb:SetTextInsets(4, 4, 1, 1)
     eb:Hide()
     row._editBox = eb
@@ -1061,7 +1061,7 @@ local function DoRenderTaskPanel()
     doneRule:Hide()
     local doneLbl = tsc._doneLbl
     if not doneLbl then
-        doneLbl = tsc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        doneLbl = tsc:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         doneLbl:SetTextColor(0.6, 0.6, 0.6)
         tsc._doneLbl = doneLbl
     end

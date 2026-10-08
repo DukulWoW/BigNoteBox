@@ -567,7 +567,7 @@ local function EnsurePrompt()
     local y = -(titleH + PAD)
 
     -- "From:" line
-    local fromLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local fromLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     fromLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     fromLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     fromLbl:SetJustifyH("LEFT"); fromLbl:SetMaxLines(1)
@@ -576,7 +576,7 @@ local function EnsurePrompt()
     y = y - 18
 
     -- "Via:" line
-    local viaLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local viaLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     viaLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     viaLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     viaLbl:SetJustifyH("LEFT"); viaLbl:SetMaxLines(1)
@@ -585,7 +585,7 @@ local function EnsurePrompt()
     y = y - 18
 
     -- "Title:" line
-    local noteTitleLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local noteTitleLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     noteTitleLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     noteTitleLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     noteTitleLbl:SetJustifyH("LEFT"); noteTitleLbl:SetMaxLines(2)

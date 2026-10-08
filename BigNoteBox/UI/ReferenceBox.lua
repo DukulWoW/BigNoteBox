@@ -792,7 +792,7 @@ local function BuildPickerWindow()
     local search = CreateFrame("EditBox", nil, sBg)
     search:SetAllPoints()
     search:SetTextInsets(6, 6, 0, 0)
-    search:SetFontObject("GameFontNormal"); search:SetAutoFocus(false); search:SetMaxLetters(64)
+    search:SetFontObject("BNBFontNormal"); search:SetAutoFocus(false); search:SetMaxLetters(64)
     BNB.AddPlaceholder(search, L["SEARCH_PLACEHOLDER"], 0.4, 0.4, 0.4)
     search:SetScript("OnEnterPressed",  function(self) self:ClearFocus() end)
     search:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
@@ -888,7 +888,7 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
             end
 
             -- Title label
-            local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
             lbl:SetPoint("LEFT",   row, "LEFT",   ICON_W + 10, 0)
             lbl:SetPoint("RIGHT",  row, "RIGHT",  -(BTN_W * 2 + 10), 0)
             lbl:SetPoint("CENTER", row, "CENTER", 0, 0)
@@ -1227,21 +1227,21 @@ local function AcquireRow(parent)
     iconBorder:SetTexture("Interface\\Common\\WhiteIconFrame")
     row._iconBorder = iconBorder
 
-    local typeLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local typeLabel = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     typeLabel:SetJustifyH("LEFT"); typeLabel:SetTextColor(0.55, 0.55, 0.60)
     row._typeLabel = typeLabel
 
-    local nameLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local nameLabel = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     nameLabel:SetJustifyH("LEFT"); nameLabel:SetWordWrap(false); nameLabel:SetMaxLines(1)
     row._nameLabel = nameLabel
 
-    local pendingLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local pendingLabel = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     pendingLabel:SetJustifyH("LEFT"); pendingLabel:SetTextColor(0.45, 0.45, 0.50)
     pendingLabel:SetText(L["REFBOX_LOADING"]); pendingLabel:Hide()
     row._pendingLabel = pendingLabel
 
     -- Slot label: shown on gear cards (normal mode = top-right; compact = right-aligned).
-    local slotLabel = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local slotLabel = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     slotLabel:SetJustifyH("RIGHT"); slotLabel:SetTextColor(0.55, 0.55, 0.60)
     slotLabel:Hide()
     row._slotLabel = slotLabel
@@ -1569,7 +1569,7 @@ RenderList = function()
             if not hdr then
                 hdr = CreateFrame("Button", nil, sc)
                 hdr:SetHeight(20)
-                hdr.fs = hdr:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                hdr.fs = hdr:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 hdr.fs:SetAllPoints(); hdr.fs:SetJustifyH("LEFT")
                 hdr:RegisterForClicks("RightButtonUp")
                 hdr:SetScript("OnClick", function(self)
@@ -2060,7 +2060,7 @@ local function BuildReferenceBox()
     eb:SetPoint("TOPRIGHT", manualStrip, "TOPRIGHT", -68, 0)
     eb:SetHeight(MANUAL_H)
     eb:SetAutoFocus(false); eb:SetMultiLine(false); eb:SetMaxLetters(256)
-    eb:SetFontObject("GameFontNormalSmall"); eb:SetTextInsets(6, 6, 2, 2)
+    eb:SetFontObject("BNBFontNormalSmall"); eb:SetTextInsets(6, 6, 2, 2)
     BNB.AddPlaceholder(eb, L["REFBOX_PLACEHOLDER"], 0.4, 0.4, 0.45)
     eb:SetScript("OnEnterPressed", function(self)
         CommitManualEntry(self:GetRealText()); self:SetRealText(""); self:ClearFocus()
@@ -2105,7 +2105,7 @@ local function BuildReferenceBox()
     end)
 
     local countY = -(titleH + 4 + MANUAL_H + MANUAL_GAP + 2)
-    local countLabel = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")   -- bigger (ALL-167)
+    local countLabel = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")   -- bigger (ALL-167)
     countLabel:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, countY)
     countLabel:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, countY)
     countLabel:SetJustifyH("LEFT"); countLabel:SetTextColor(0.50, 0.50, 0.55)
@@ -2134,7 +2134,7 @@ local function BuildReferenceBox()
     end)
 
     -- Empty label lives inside the scroll child so it scrolls with gear sections.
-    local emptyLabel = sc:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local emptyLabel = sc:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     emptyLabel:SetPoint("TOPLEFT",  sc, "TOPLEFT",  PAD, -8)
     emptyLabel:SetPoint("TOPRIGHT", sc, "TOPRIGHT", -PAD, -8)
     emptyLabel:SetJustifyH("CENTER")
@@ -2394,7 +2394,7 @@ BuildModelViewer = function(f)
     end)
 
     -- Placeholder label for when target is out of range
-    local placeholder = model:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local placeholder = model:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     placeholder:SetPoint("CENTER", model, "CENTER", 0, 0)
     placeholder:SetWidth(RBW - 40)
     placeholder:SetJustifyH("CENTER")
@@ -2403,7 +2403,7 @@ BuildModelViewer = function(f)
     placeholder:Hide()
 
     -- "Live" indicator label
-    local liveLabel = model:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local liveLabel = model:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     liveLabel:SetPoint("TOPLEFT", model, "TOPLEFT", 6, -4)
     liveLabel:SetTextColor(0.3, 1.0, 0.3, 0.8)
     liveLabel:SetText(L["REFBOX_MV_LIVE"])
@@ -2607,7 +2607,7 @@ BuildModelViewer = function(f)
     end
 
     -- Secondary label: "Transmog gear" / "Regular gear" — shown below the LIVE/RECONSTRUCTED label.
-    local gearLabel = model:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local gearLabel = model:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     gearLabel:SetPoint("TOPLEFT", liveLabel, "BOTTOMLEFT", 0, -2)
     gearLabel:SetTextColor(0.75, 0.75, 0.75, 0.8)
     gearLabel:Hide()

@@ -1,0 +1,22 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!--
+        Header / accent text fonts (ALL-402). Copies of the game's gold
+        GameFontNormal* fonts whose colour BigNoteBox sets itself: the skin
+        accent in skin mode, BNB.HEADER_COLOR_NORMAL in normal mode
+        (UI/TextColors.lua). Inherited in XML so the per-alphabet fallback of
+        the game's font family comes along (CJK clients). Never recolour
+        GameFontNormal itself: every addon and the game share it.
+    -->
+    <Font name="BNBFontNormal" inherits="GameFontNormal" virtual="true">
+        <Color r="1.0" g="0.82" b="0"/>
+    </Font>
+    <Font name="BNBFontNormalSmall" inherits="GameFontNormalSmall" virtual="true">
+        <Color r="1.0" g="0.82" b="0"/>
+    </Font>
+    <Font name="BNBFontNormalLarge" inherits="GameFontNormalLarge" virtual="true">
+        <Color r="1.0" g="0.82" b="0"/>
+    </Font>
+    <Font name="BNBFontNormalHuge" inherits="GameFontNormalHuge" virtual="true">
+        <Color r="1.0" g="0.82" b="0"/>
+    </Font>
+</Ui>

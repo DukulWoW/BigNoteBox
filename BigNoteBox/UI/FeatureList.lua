@@ -290,7 +290,7 @@ local function PopulateContent(ct, sf)
         local h = 4  -- top padding inside content frame
         -- Blurb
         if section.blurb and section.blurb ~= "" then
-            local mfs = measurer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            local mfs = measurer:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
             mfs:SetFont("Fonts\\FRIZQT__.TTF", BLURB_SIZE, "")
             mfs:SetWidth(textW - 8)
             mfs:SetWordWrap(true)
@@ -300,7 +300,7 @@ local function PopulateContent(ct, sf)
         end
         -- Items
         for _, item in ipairs(section.items or {}) do
-            local mfs = measurer:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            local mfs = measurer:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
             mfs:SetFont("Fonts\\FRIZQT__.TTF", ITEM_SIZE, "")
             mfs:SetWidth(textW - 16)
             mfs:SetWordWrap(true)
@@ -383,13 +383,13 @@ local function PopulateContent(ct, sf)
         sec.arBtn = arBtn
 
         -- Section header label
-        local lbl = hdrBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = hdrBtn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetFont("Fonts\\FRIZQT__.TTF", HEADER_SIZE, "")
         lbl:SetPoint("LEFT", arBtn, "RIGHT", 4, 0)
         lbl:SetPoint("RIGHT", hdrBtn, "RIGHT", -4, 0)
         lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)
-        lbl:SetTextColor(1, 0.82, 0)
+        BNB.SetHeaderColor(lbl)
         lbl:SetText(sec.data.header or "")
 
         -- Separator line
@@ -407,7 +407,7 @@ local function PopulateContent(ct, sf)
 
         local cy2 = -4
         if sec.data.blurb and sec.data.blurb ~= "" then
-            local blurb = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            local blurb = content:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
             blurb:SetFont("Fonts\\FRIZQT__.TTF", BLURB_SIZE, "")
             blurb:SetPoint("TOPLEFT", content, "TOPLEFT", 0, cy2)
             blurb:SetWidth(textW - 8)
@@ -419,7 +419,7 @@ local function PopulateContent(ct, sf)
             cy2 = cy2 - math.max(blurb:GetStringHeight(), BLURB_SIZE + 2) - ITEMS_GAP
         end
         for _, item in ipairs(sec.data.items or {}) do
-            local fs = content:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+            local fs = content:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
             fs:SetFont("Fonts\\FRIZQT__.TTF", ITEM_SIZE, "")
             fs:SetPoint("TOPLEFT", content, "TOPLEFT", 8, cy2)
             fs:SetWidth(textW - 16)

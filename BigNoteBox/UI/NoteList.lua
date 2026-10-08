@@ -28,11 +28,10 @@ local COLLAPSED_W  = PAD_L + ICON_SIZE_SPACIOUS + 12 + 6 + 22   -- 90px
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 local ICON_BORDER  = "Interface\\Common\\WhiteIconFrame"
 
-local COL_GOLD   = { 1,    0.82, 0,    1 }
 local COL_WHITE  = { 1,    1,    1,    1 }
 local COL_GREY   = { 0.58, 0.58, 0.58, 1 }
 local COL_SEL_BG = { 0.40, 0.85, 0.40, 0.12 }   -- BNB green, Sidebar ACTIVE_R/G/B (ALL-98)
-local HDR_GOLD   = { 1, 0.84, 0, 0.35 }   -- Pinned / Notes headers: text, then the rule's alpha (ALL-328)
+local HDR_RULE_A = 0.35   -- Pinned / Notes headers: the rule's alpha (ALL-328); colour = BNB.HeaderColor()
 -- Normal mode row art, a test (Dukul 2026-10-03): stretched over the whole row.
 -- Skin mode keeps the colour fills above and below.
 local ROW_SEL_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-selection"
@@ -100,7 +99,7 @@ function BNB.FilterByTag(tag)
         if currentTagFilter then
             _searchEb._showingPlaceholder = false
             _searchEb:SetText("#" .. currentTagFilter)
-            pcall(function() _searchEb:SetTextColor(1, 0.82, 0, 1) end)
+            pcall(function() BNB.SetHeaderColor(_searchEb) end)
         else
             _searchEb:SetText("")
             BNB.AddPlaceholder(_searchEb, L["SEARCH_PLACEHOLDER"], 0.40, 0.40, 0.40)
@@ -422,7 +421,7 @@ local function BuildSearchBar(parent)
     local eb = CreateFrame("EditBox", nil, bar)
     eb:SetPoint("TOPLEFT",     bar, "TOPLEFT",     6,   0)
     eb:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", -22, 0)
-    eb:SetFontObject("GameFontNormal")
+    eb:SetFontObject("BNBFontNormal")
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(200)
     BNB.AddPlaceholder(eb, L["SEARCH_PLACEHOLDER"], 0.40, 0.40, 0.40)
@@ -434,7 +433,7 @@ local function BuildSearchBar(parent)
     local innerClear = CreateFrame("Button", nil, bar)
     innerClear:SetSize(18, 18)
     innerClear:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
-    local iClbl = innerClear:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local iClbl = innerClear:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     iClbl:SetAllPoints(); iClbl:SetText("x"); iClbl:SetTextColor(0.65, 0.65, 0.65)
     innerClear:Hide()
     innerClear:SetScript("OnEnter", function() iClbl:SetTextColor(1, 0.4, 0.4) end)
@@ -611,10 +610,10 @@ local function BuildSearchBar(parent)
                 row:SetHeight(ROW_H_AC)
                 row:SetPoint("TOPLEFT",  _tagAC, "TOPLEFT",  4, -2 - (i-1)*ROW_H_AC)
                 row:SetPoint("TOPRIGHT", _tagAC, "TOPRIGHT", -4, -2 - (i-1)*ROW_H_AC)
-                local rowLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local rowLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 rowLbl:SetPoint("LEFT", row, "LEFT", 4, 0)
                 rowLbl:SetJustifyH("LEFT")
-                rowLbl:SetTextColor(1, 0.82, 0, 1)
+                BNB.SetHeaderColor(rowLbl)
                 row._lbl = rowLbl
                 local rowHi = row:CreateTexture(nil, "HIGHLIGHT")
                 rowHi:SetAllPoints(); rowHi:SetColorTexture(1, 1, 1, 0.08)
@@ -630,7 +629,7 @@ local function BuildSearchBar(parent)
                 currentFilter    = ""
                 eb._showingPlaceholder = false
                 eb:SetText("#" .. tag)
-                pcall(function() eb:SetTextColor(1, 0.82, 0, 1) end)
+                pcall(function() BNB.SetHeaderColor(eb) end)
                 innerClear:Show()
                 HideTagAC()
                 BNB.RefreshNoteList()
@@ -660,7 +659,7 @@ local function BuildSearchBar(parent)
             if tag and tag ~= "" then
                 currentTagFilter = tag
                 currentFilter    = ""
-                pcall(function() eb:SetTextColor(1, 0.82, 0, 1) end)
+                pcall(function() BNB.SetHeaderColor(eb) end)
             else
                 currentTagFilter = nil
                 currentFilter    = text
@@ -877,7 +876,7 @@ local function GetOrCreateDragGhost()
     g:SetFrameStrata("TOOLTIP")
     g:SetSize(200, ENTRY_H_NORMAL)
     BNB.SetBackdrop(g, 0.15, 0.15, 0.20, 0.85, DRAG_R, DRAG_G, DRAG_B, 1)
-    local lbl = g:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = g:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetPoint("LEFT", g, "LEFT", 8, 0)
     lbl:SetPoint("RIGHT", g, "RIGHT", -8, 0)
     lbl:SetJustifyH("LEFT")
@@ -1280,7 +1279,7 @@ local function CreateListEntry(parent)
     badgeLbl:SetFont("Fonts\\FRIZQT__.TTF", 9, "OUTLINE")
     badgeLbl:SetJustifyH("RIGHT")
     badgeLbl:SetJustifyV("MIDDLE")
-    badgeLbl:SetTextColor(1, 0.82, 0, 1)
+    BNB.SetHeaderColor(badgeLbl)
     badgeLbl:SetShadowColor(0, 0, 0, 1)
     badgeLbl:SetShadowOffset(1, -1)
     badgeHost:Hide()
@@ -1309,7 +1308,7 @@ local function CreateListEntry(parent)
     taskIcon:Hide()
     btn._taskIcon = taskIcon
 
-    local titleLbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     -- Title left anchor shifts right by 13px per shown prefix icon (task/lock).
     titleLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  textLeft, -6)
     titleLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -6)
@@ -1319,7 +1318,7 @@ local function CreateListEntry(parent)
     titleLbl:SetWordWrap(false)
     btn._titleLbl = titleLbl
 
-    local previewLbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local previewLbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     previewLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  textLeft, -22)
     previewLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -20, -22)
     previewLbl:SetPoint("BOTTOM",   btn, "BOTTOM",    0,  4)
@@ -1857,7 +1856,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
                     math.min(1, tc.g * 1.10 + 0.05),
                     math.min(1, tc.b * 1.10 + 0.05), 1)
             else
-                btn._titleLbl:SetTextColor(unpack(COL_GOLD))
+                BNB.SetHeaderColor(btn._titleLbl)
             end
         end
     else
@@ -1917,7 +1916,7 @@ local function RefreshNoteList()
 
     -- ── Section header helper ────────────────────────────────────────────────
     -- Reuse pre-built headers stored on child to avoid leaking. A header is a
-    -- frame holding the label and a gold rule running from its right to the
+    -- frame holding the label and a rule in the header colour running from its right to the
     -- edge, as the Reference Box "Done (N)" title (ALL-328, Dukul 2026-10-06);
     -- hiding the frame hides both (TagTree hides them by these keys).
     local function GetSectionHeader(key, labelText)
@@ -1925,12 +1924,10 @@ local function RefreshNoteList()
         if not hdr then
             hdr = CreateFrame("Frame", nil, child)
             hdr:SetHeight(16)
-            local fs = hdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local fs = hdr:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             fs:SetPoint("LEFT", hdr, "LEFT", 0, 0)
             fs:SetJustifyH("LEFT")
-            fs:SetTextColor(HDR_GOLD[1], HDR_GOLD[2], HDR_GOLD[3])
             local rule = hdr:CreateTexture(nil, "ARTWORK")
-            rule:SetColorTexture(HDR_GOLD[1], HDR_GOLD[2], HDR_GOLD[3], HDR_GOLD[4])
             if rule.SetSnapToPixelGrid then   -- one exact pixel (ALL-246)
                 rule:SetSnapToPixelGrid(false)
                 rule:SetTexelSnappingBias(0)
@@ -1939,10 +1936,14 @@ local function RefreshNoteList()
             else rule:SetHeight(1) end
             rule:SetPoint("LEFT",  fs,  "RIGHT", 6, 0)
             rule:SetPoint("RIGHT", hdr, "RIGHT", 0, 0)
-            hdr._text = fs
+            hdr._text, hdr._rule = fs, rule
             child[key] = hdr
         end
         hdr._text:SetText(labelText)
+        -- Text follows the BNBFontNormalSmall colour; the rule is set on every
+        -- layout so it follows a preset change too (ALL-402)
+        local hr, hg, hb = BNB.HeaderColor()
+        hdr._rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
         hdr:ClearAllPoints()
         return hdr
     end
@@ -2012,7 +2013,7 @@ local function RefreshNoteList()
     -- Empty state
     if #notes == 0 then
         if not BNB._listEmptyLabel then
-            local lbl = child:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            local lbl = child:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
             lbl:SetPoint("TOP", child, "TOP", 0, -24)
             lbl:SetWidth(200); lbl:SetJustifyH("CENTER"); lbl:SetWordWrap(true)
             lbl:SetTextColor(0.38, 0.38, 0.38)
@@ -2259,7 +2260,7 @@ function BNB.SelectNote(id)
                             math.min(1, tc.g * 1.10 + 0.05),
                             math.min(1, tc.b * 1.10 + 0.05), 1)
                     else
-                        btn._titleLbl:SetTextColor(unpack(COL_GOLD))
+                        BNB.SetHeaderColor(btn._titleLbl)
                     end
                 end
                 btn._selBg:Show()

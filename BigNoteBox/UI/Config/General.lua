@@ -105,7 +105,7 @@ local function BuildGeneralTab(sf, ct)
         y = AddRule(ct, y) - 4
         y = AddHeader(ct, y, L["CFG_HDR_LANGUAGE"])
 
-        local langDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local langDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         langDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         langDesc:SetWidth(CONTENT_W); langDesc:SetJustifyH("LEFT")
         langDesc:SetTextColor(0.7, 0.7, 0.7)
@@ -198,12 +198,12 @@ local function BuildGeneralTab(sf, ct)
     local cellX2  = cellW + cellGap
 
     local function Cell(xOff, yOff, hdr, desc)
-        local h = ct:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        local h = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormal")
         h:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff)
         h:SetWidth(cellW); h:SetJustifyH("LEFT")
-        h:SetTextColor(1, 0.82, 0, 1); h:SetText(hdr)
+        BNB.SetHeaderColor(h); h:SetText(hdr)
 
-        local d = ct:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        local d = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
         d:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff - 18)
         d:SetWidth(cellW); d:SetJustifyH("LEFT")
         d:SetWordWrap(true); d:SetSpacing(2)
@@ -217,16 +217,16 @@ local function BuildGeneralTab(sf, ct)
         h3 = Cell(0, y, bcbLabel, L["CFG_BCB_DESC"])
     else
         -- BCB not installed: draw the header manually so we can add a clickable badge
-        local hdr = ct:CreateFontString(nil, "ARTWORK", "GameFontNormal")
+        local hdr = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormal")
         hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         hdr:SetWidth(cellW); hdr:SetJustifyH("LEFT")
-        hdr:SetTextColor(1, 0.82, 0, 1); hdr:SetText(bcbLabel)
+        BNB.SetHeaderColor(hdr); hdr:SetText(bcbLabel)
 
         -- (NOT INSTALLED) button — small, blue, sits right of the header text
         local notInstBtn = CreateFrame("Button", nil, ct)
         notInstBtn:SetSize(96, 16)
         notInstBtn:SetPoint("LEFT", hdr, "LEFT", hdr:GetStringWidth() + 6, 0)
-        local notInstLbl = notInstBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local notInstLbl = notInstBtn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         notInstLbl:SetAllPoints()
         notInstLbl:SetJustifyH("LEFT")
         notInstLbl:SetText("|cff4fc3f7" .. L["CFG_NOT_INSTALLED"] .. "|r")
@@ -245,7 +245,7 @@ local function BuildGeneralTab(sf, ct)
             GameTooltip:Hide()
         end)
 
-        local desc3 = ct:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
+        local desc3 = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
         desc3:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 18)
         desc3:SetWidth(cellW); desc3:SetJustifyH("LEFT")
         desc3:SetWordWrap(true); desc3:SetSpacing(2)
@@ -312,7 +312,7 @@ local function BuildGeneralTab(sf, ct)
 
     -- Combat action dropdown
     do
-        local combatLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local combatLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         combatLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         combatLbl:SetHeight(ROW_H); combatLbl:SetJustifyH("LEFT")
         combatLbl:SetText(L["CFG_COMBAT_LABEL"])

@@ -188,6 +188,10 @@ function BNB.SeatChrome(f)
     _seated[f] = pieces
     if not IsZero(BNB.CHROME_DELTA) then pcall(Apply, f, BNB.CHROME_DELTA) end
     pcall(ReplaceCloseButton, f)
+    -- The title in the header colour (ALL-402): the template draws it with
+    -- GameFontNormal, our copy keeps its size and font family
+    local tt = (f.TitleContainer and f.TitleContainer.TitleText) or f.TitleText
+    if tt and tt.SetFontObject then pcall(tt.SetFontObject, tt, "BNBFontNormal") end
 end
 
 -- Re-seat every window built so far. d = nil restores the built-in delta.

@@ -37,7 +37,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
         qnEnableCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
         page.enableCb = qnEnableCb   -- twin on the Features overview row
 
-        local qnEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local qnEnableLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         qnEnableLbl:SetPoint("LEFT",  qnEnableCb, "RIGHT", 4, 0)
         qnEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
         qnEnableLbl:SetJustifyH("LEFT"); qnEnableLbl:SetHeight(ROW_H)
@@ -51,7 +51,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
             function(v) db.saveQuestRewards = v end,
             L["CFG_CHK_QUEST_REWARDS_TIP"])
 
-        local qnLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local qnLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         qnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         qnLbl:SetHeight(ROW_H); qnLbl:SetJustifyH("LEFT")
         qnLbl:SetText(L["CFG_QN_CREATE_MODE_LABEL"])
@@ -101,9 +101,9 @@ local function BuildQuickNotePage(sf, ct, y, page)
 
         -- ── DialogueUI subsection (only shown when DialogueUI is installed) ──────
         if C_AddOns.IsAddOnLoaded("DialogueUI") then
-            local duiHdr = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local duiHdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             duiHdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            duiHdr:SetTextColor(1, 0.82, 0)
+            BNB.SetHeaderColor(duiHdr)
             duiHdr:SetText(L["CFG_DUI_HEADER"])
             table.insert(qnWidgets, duiHdr)
             y = y - (16 + 2)
@@ -120,9 +120,9 @@ local function BuildQuickNotePage(sf, ct, y, page)
 
         -- ── Immersion subsection (only shown when Immersion is installed) ─────────
         if C_AddOns.IsAddOnLoaded("Immersion") then
-            local immHdr = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local immHdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             immHdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-            immHdr:SetTextColor(1, 0.82, 0)
+            BNB.SetHeaderColor(immHdr)
             immHdr:SetText(L["CFG_IMMERSION_HEADER"])
             table.insert(qnWidgets, immHdr)
             y = y - (16 + 2)
@@ -172,7 +172,7 @@ local function BuildQuickNotePage(sf, ct, y, page)
 
     -- Where the quick-note key puts the new note; nil = main window
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_QN_KEY_MODE_LABEL"])
@@ -231,7 +231,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])
 
         -- Creation mode dropdown
-        local insModeLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local insModeLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         insModeLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         insModeLbl:SetHeight(ROW_H); insModeLbl:SetJustifyH("LEFT")
         insModeLbl:SetText(L["CFG_INS_MODE_LABEL"])
@@ -248,7 +248,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         insModeDD:SetWidth(CONTENT_W)
 
         -- Note type dropdown (below)
-        local insTypeLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local insTypeLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         local insTypeDD
 
         local function RefreshInsTypeState()
@@ -333,7 +333,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             L["CFG_CHK_SITUATION_TIP"])
 
         -- Gear to show dropdown
-        local gearShowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local gearShowLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         gearShowLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         gearShowLbl:SetHeight(ROW_H); gearShowLbl:SetJustifyH("LEFT")
         gearShowLbl:SetText(L["CFG_INS_GEAR_SHOW"])
@@ -375,7 +375,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         y = AddHeader(ct, y, L["CFG_HDR_TARGET_NOTE"])
 
         -- Note type dropdown
-        local tnTypeLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local tnTypeLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         tnTypeLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         tnTypeLbl:SetHeight(ROW_H)
         tnTypeLbl:SetJustifyH("LEFT")
@@ -413,7 +413,7 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         y = y - (ROW_H + ROW_GAP)
 
         -- Tag checklist header
-        local tagHeaderLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local tagHeaderLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         tagHeaderLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         tagHeaderLbl:SetHeight(ROW_H)
         tagHeaderLbl:SetJustifyH("LEFT")
@@ -484,7 +484,7 @@ local function BuildTasksPage(sf, ct, y, page)
 
     -- Completed tasks position dropdown
     do
-        local cpLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local cpLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         cpLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         cpLbl:SetText(L["CFG_TASK_COMPLETED_POS_LABEL"])
         cpLbl:SetHeight(ROW_H)
@@ -525,7 +525,7 @@ local function BuildTasksPage(sf, ct, y, page)
 
     -- Task row spacing dropdown
     do
-        local spLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local spLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         spLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         spLbl:SetText(L["CFG_TASK_SPACING_LABEL"])
         spLbl:SetHeight(ROW_H)
@@ -621,7 +621,7 @@ local function BuildRefBoxPage(sf, ct, y, page)
         end)
         rbEnableCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
         page.enableCb = rbEnableCb   -- twin on the Features overview row
-        local rbEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local rbEnableLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         rbEnableLbl:SetPoint("LEFT", rbEnableCb, "RIGHT", 4, 0)
         rbEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
         rbEnableLbl:SetJustifyH("LEFT"); rbEnableLbl:SetHeight(ROW_H)
@@ -745,7 +745,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     sidebarEnableCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     sidebarEnableCb:SetChecked(db.sidebarEnabled == true)
     page.enableCb = sidebarEnableCb   -- twin on the Features overview row
-    local sidebarEnableLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local sidebarEnableLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     sidebarEnableLbl:SetPoint("LEFT",  sidebarEnableCb, "RIGHT", 4, 0)
     sidebarEnableLbl:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
     sidebarEnableLbl:SetJustifyH("LEFT"); sidebarEnableLbl:SetHeight(ROW_H)
@@ -776,7 +776,7 @@ local function BuildSidebarPage(sf, ct, y, page)
         GameTooltip:Show()
     end)
     autoSwCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    local autoSwLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local autoSwLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     autoSwLbl:SetPoint("LEFT",  autoSwCb, "RIGHT", 4, 0)
     autoSwLbl:SetPoint("RIGHT", sidebarSub, "RIGHT", 0, 0)
     autoSwLbl:SetJustifyH("LEFT"); autoSwLbl:SetHeight(ROW_H)
@@ -800,7 +800,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Side dropdown (Top / Right / Left)
     do
-        local sideLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local sideLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         sideLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         sideLbl:SetHeight(ROW_H); sideLbl:SetJustifyH("LEFT")
         sideLbl:SetText(L["CFG_SIDEBAR_SIDE_LABEL"])
@@ -841,7 +841,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     -- Sort order of the character icons, both side strip and top tabs
     -- (ALL-298): nil = newest first; pinned characters stay in front
     do
-        local sortLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local sortLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         sortLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         sortLbl:SetHeight(ROW_H); sortLbl:SetJustifyH("LEFT")
         sortLbl:SetText(L["CFG_SIDEBAR_SORT_LABEL"])
@@ -890,7 +890,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             GameTooltip:Show()
         end)
         fillCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        fillLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        fillLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         fillLbl:SetPoint("LEFT",  fillCb, "RIGHT", 4, 0)
         fillLbl:SetPoint("RIGHT", sidebarSub, "RIGHT", 0, 0)
         fillLbl:SetJustifyH("LEFT"); fillLbl:SetHeight(ROW_H)
@@ -900,7 +900,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Position dropdown (Top / Bottom)
     do
-        posLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        posLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         posLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
         posLbl:SetHeight(ROW_H); posLbl:SetJustifyH("LEFT")
         posLbl:SetText(L["CFG_SIDEBAR_STARTPOS_LABEL"])
@@ -953,7 +953,7 @@ local function BuildSidebarPage(sf, ct, y, page)
             GameTooltip:Show()
         end)
         smallCb:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        smallLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        smallLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         smallLbl:SetPoint("LEFT",  smallCb, "RIGHT", 4, 0)
         smallLbl:SetPoint("RIGHT", sidebarSub, "RIGHT", 0, 0)
         smallLbl:SetJustifyH("LEFT"); smallLbl:SetHeight(ROW_H)
@@ -963,7 +963,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     SyncTopGrey()
 
     -- Description text
-    local descLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local descLbl = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     descLbl:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
     descLbl:SetWidth(CONTENT_W); descLbl:SetJustifyH("LEFT")
     descLbl:SetWordWrap(true); descLbl:SetHeight(36)
@@ -972,7 +972,7 @@ local function BuildSidebarPage(sf, ct, y, page)
     subY = subY - 42
 
     -- Characters header
-    local charsHdr = sidebarSub:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local charsHdr = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     charsHdr:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
     charsHdr:SetHeight(ROW_H); charsHdr:SetJustifyH("LEFT")
     charsHdr:SetText(L["CFG_SIDEBAR_CHARS_HEADER"])
@@ -994,7 +994,7 @@ local function BuildSidebarPage(sf, ct, y, page)
         if row then return row end
         row = CreateFrame("Frame", nil, sidebarSub)
         row:SetHeight(26)
-        local lbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetPoint("LEFT",  row, "LEFT",  0,    0)
         lbl:SetPoint("RIGHT", row, "RIGHT", -156, 0)
         lbl:SetJustifyH("LEFT"); lbl:SetHeight(26); lbl:SetWordWrap(false)
@@ -1136,7 +1136,7 @@ local function BuildStickyPage(sf, ct, y, page)
         L["CFG_STICKY_ENABLE_TIP"])
     page.enableCb = enableCb   -- twin on the Modules overview row
     do
-        local desc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
         desc:SetTextColor(0.60, 0.60, 0.60)
@@ -1397,7 +1397,7 @@ local function BuildToastsPage(sf, ct, y, page)
     end
     -- Label above a full-width value dropdown (as Quick Note's key mode)
     local function AddDrop(labelKey, tipKey, entries, key, apply)
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L[labelKey])
@@ -1493,7 +1493,7 @@ local function BuildToastsPage(sf, ct, y, page)
     offWidgets[#offWidgets + 1] = facCb
     offLabels[#offLabels + 1]   = facCb._lbl
     do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_TOAST_STYLE"])
@@ -1571,7 +1571,7 @@ local function BuildToastsPage(sf, ct, y, page)
     -- Sound (S3): nil = none; the alarm sounds, played once per burst
     do
         local entries = BNB.AlarmSoundEntries()   -- Features/AlarmManager.lua SOUND_LIST
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_TOAST_SOUND"])
@@ -1596,7 +1596,7 @@ local function BuildToastsPage(sf, ct, y, page)
 
     -- What each note toast shows (S3)
     do
-        local hdr = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local hdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         hdr:SetHeight(ROW_H); hdr:SetJustifyH("LEFT")
         hdr:SetText(L["CFG_TOAST_SHOW_HDR"])

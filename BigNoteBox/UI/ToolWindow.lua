@@ -102,7 +102,7 @@ local function BuildSkin(o)
         titleBar:SetScript("OnDragStop",  function() DragStop(f, o) end)
     end
 
-    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     -- Centred 15 px left of the strip's centre (the close button's room), and
     -- held clear of the close button: a long title (Reference Box, Note
     -- Settings) truncates instead of running under it
@@ -110,7 +110,7 @@ local function BuildSkin(o)
     titleLbl:SetPoint("RIGHT", titleBar, "RIGHT", -38, 0)
     titleLbl:SetJustifyH("CENTER")
     titleLbl:SetWordWrap(false)
-    titleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(titleLbl)
     titleLbl:SetText(o.title)
     function f:SetWindowTitle(text) titleLbl:SetText(text) end
 
@@ -189,11 +189,11 @@ local function AddPage(f, key, opts)
         tip = BNB.L["CFG_SUBPAGE_BACK"], tipAnchor = "ANCHOR_RIGHT" })
     back:SetPoint("TOPLEFT", page, "TOPLEFT", pad, -(top + 8))
 
-    local head = page:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local head = page:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     head:SetPoint("LEFT",  back, "RIGHT", 8, 0)
     head:SetPoint("RIGHT", page, "TOPRIGHT", -padR, -(top + 19))
     head:SetJustifyH("LEFT"); head:SetWordWrap(false)
-    head:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(head)
     function page:SetHeading(text) head:SetText(text) end
 
     local rule = BNB.CreateRule(page, -(top + 36))

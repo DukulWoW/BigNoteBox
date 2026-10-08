@@ -49,7 +49,7 @@ local NORMAL = { h = 32, w = 170, minW = 90, gap = 0, x = 8, y = BNB.IsForever a
 -- (-2.5 + 3 for both)
 local SKIN = { h = 32, tuck = 6, w = 170, minW = 90, gap = 5, x = 8,
     iconSz = 16, iconX = 13, iconY = 0.5, border = 1, textGap = 5, textY = 0.5,
-    rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.6, font = "GameFontNormalSmall",
+    rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.6, font = "BNBFontNormalSmall",
     pinSz = 14, pinX = -7, pinY = -6 }
 -- More tabs than fit at w: they share the width, and icon, spacing and text
 -- shrink with it (Dukul, 2026-10-04): icon and spacing by w / S.w down to

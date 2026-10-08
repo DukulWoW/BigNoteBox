@@ -426,7 +426,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     -- PLAYER_LOGIN / InitFonts — if we SetFont to a TTF path before the renderer
     -- has cached the file, the label renders blank. This defers the swap so the
     -- button always shows text, even on the very first session open.
-    local lbl = btn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     lbl:SetAllPoints()
     lbl:SetJustifyH("CENTER")
     lbl:SetJustifyV("MIDDLE")
@@ -839,7 +839,7 @@ function BNB.CreateScrolledEditBox(name, parent, fontSize)
     local eb = CreateFrame("EditBox", name and (name .. "EditBox") or nil, sf)
     eb:SetMultiLine(true)
     eb:SetAutoFocus(false)
-    eb:SetFontObject("GameFontNormal")
+    eb:SetFontObject("BNBFontNormal")
     if fontSize then
         local fontPath = eb:GetFont()
         if fontPath then pcall(function() eb:SetFont(fontPath, fontSize, "") end) end
@@ -1089,6 +1089,21 @@ function BNB.LabelHit(cb, lbl)
     end
     cb._labelHit = true
     cb._hitLbl = lbl
+    -- The template's own label is gold GameFontNormal*: our copy takes the
+    -- header colour (ALL-402); a label coloured by hand keeps its colour
+    local t = cb.Text
+    if t and t.GetFontObject then
+        local fo = t:GetFontObject()
+        local to = (fo == GameFontNormalSmall and "BNBFontNormalSmall")
+            or (fo == GameFontNormal and "BNBFontNormal") or nil
+        if to then
+            local r, g, b, a = t:GetTextColor()
+            t:SetFontObject(to)
+            if not (r > 0.99 and math.abs(g - 0.82) < 0.01 and b < 0.01) then
+                t:SetTextColor(r, g, b, a)
+            end
+        end
+    end
     cb:HookScript("OnShow", function(self)
         FitCheckHit(self)
         -- Anchored labels have no size until the next frame
@@ -1303,17 +1318,17 @@ end
 
 -- Yellow section header
 function BNB.CreateSectionHeader(parent, text, y, width)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local l = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     l:SetWidth(width); l:SetJustifyH("LEFT")
     l:SetText(text)
-    l:SetTextColor(1, 0.82, 0.0, 1)
+    BNB.SetHeaderColor(l)
     return l
 end
 
 -- Small grey label
 function BNB.CreateSmallLabel(parent, text, y, width)
-    local l = parent:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local l = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     l:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, y)
     l:SetWidth(width); l:SetJustifyH("LEFT")
     l:SetText(text); l:SetTextColor(0.68, 0.68, 0.68, 1)
@@ -1647,7 +1662,7 @@ function BNB.CreateStackedSlider(parent, width, o)
     val:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, 0)
     val:SetJustifyH("RIGHT")
 
-    local lbl = h:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local lbl = h:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     lbl:SetPoint("TOPLEFT", h, "TOPLEFT", 0, 0)
     lbl:SetPoint("RIGHT", val, "LEFT", -8, 0)
     lbl:SetJustifyH("LEFT")
@@ -2227,7 +2242,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         end)
 
         -- ── Main label ─────────────────────────────────────────────────────────
-        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        local lbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("LEFT",  icon, "RIGHT", 8, 4)
         lbl:SetPoint("RIGHT", f,    "RIGHT", -8, 4)
         lbl:SetJustifyH("LEFT")
@@ -2235,7 +2250,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         lbl:SetTextColor(0.400, 0.733, 0.416, 1)
 
         -- ── Sub-label ──────────────────────────────────────────────────────────
-        local sub = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local sub = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         sub:SetPoint("LEFT",  icon, "RIGHT", 8, -10)
         sub:SetPoint("RIGHT", f,    "RIGHT", -8, -10)
         sub:SetJustifyH("LEFT")

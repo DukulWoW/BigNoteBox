@@ -248,12 +248,12 @@ local function BuildSharePreview()
     local FOOT_H = 44
 
     -- Note title label
-    local noteTitleLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local noteTitleLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     noteTitleLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -(titleH + 10))
     noteTitleLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -(titleH + 10))
     noteTitleLbl:SetJustifyH("LEFT")
     noteTitleLbl:SetHeight(22)
-    noteTitleLbl:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(noteTitleLbl)
     f._noteTitleLbl = noteTitleLbl
 
     -- Divider below title
@@ -291,7 +291,7 @@ local function BuildSharePreview()
     f._previewSF = sf
     f._previewCt = ct
 
-    local bodyLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local bodyLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     bodyLbl:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, 0)
     bodyLbl:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, 0)
     bodyLbl:SetJustifyH("LEFT"); bodyLbl:SetJustifyV("TOP")
@@ -300,7 +300,7 @@ local function BuildSharePreview()
     f._bodyLbl = bodyLbl
 
     -- Refbox attachments label (shown only when data has attachments)
-    local attLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local attLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     attLbl:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, 0)
     attLbl:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, 0)
     attLbl:SetJustifyH("LEFT"); attLbl:SetWordWrap(true)
@@ -465,15 +465,15 @@ local function BuildShareWindow()
     local CW = SHARE_W - PAD * 2
 
     -- ── SHARE OUT ─────────────────────────────────────────────────────────────
-    local shareHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local shareHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     shareHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
-    shareHdr:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(shareHdr)
     shareHdr:SetText(L["SHARE_HDR"])
     y = y - 20
 
     -- What to include: one checkbox per share group (ALL-179), three columns.
     -- Title, body and rich mode always go, so they have no box.
-    local ddLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local ddLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     ddLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     ddLbl:SetTextColor(0.78, 0.78, 0.78)
     ddLbl:SetText(L["SHARE_INCLUDE"])
@@ -530,7 +530,7 @@ local function BuildShareWindow()
     local shareEB = CreateFrame("EditBox", nil, shareBg)
     shareEB:SetPoint("TOPLEFT",     shareBg, "TOPLEFT",     4,  -4)
     shareEB:SetPoint("BOTTOMRIGHT", shareBg, "BOTTOMRIGHT", -4,  4)
-    shareEB:SetFontObject("GameFontNormalSmall")
+    shareEB:SetFontObject("BNBFontNormalSmall")
     shareEB:SetMultiLine(false)
     shareEB:SetAutoFocus(false)
     shareEB:SetMaxLetters(0)
@@ -589,7 +589,7 @@ local function BuildShareWindow()
     f._refreshBCBShareBtn = RefreshBCBShareBtn
 
     -- Character counter (right-aligned, same row as copy/BCB buttons)
-    local charCounter = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local charCounter = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     charCounter:SetPoint("RIGHT", f, "RIGHT", -PAD, 0)
     charCounter:SetPoint("TOP",   copyBtn, "TOP", 0, 0)
     charCounter:SetTextColor(0.55, 0.55, 0.55)
@@ -614,9 +614,9 @@ local function BuildShareWindow()
     dsDiv1:SetPoint("TOPRIGHT", dsDiv1Host, "TOPRIGHT", 0, 0)
     y = y - 14
 
-    local dsHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local dsHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     dsHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
-    dsHdr:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(dsHdr)
     dsHdr:SetText(L["DS_SECTION_HEADER"])
     y = y - 22
 
@@ -632,7 +632,7 @@ local function BuildShareWindow()
     local dsEb = CreateFrame("EditBox", nil, dsEbBg)
     dsEb:SetAllPoints(dsEbBg)
     dsEb:SetTextInsets(6, 6, 0, 0)
-    dsEb:SetFontObject("GameFontNormalSmall")
+    dsEb:SetFontObject("BNBFontNormalSmall")
     dsEb:SetAutoFocus(false)
     dsEb:SetMaxLetters(80)
     BNB.AddPlaceholder(dsEb, L["DS_TARGET_PLACEHOLDER"], 0.45, 0.45, 0.45)
@@ -647,7 +647,7 @@ local function BuildShareWindow()
     f._dsSendBtn = dsSendBtn
 
     -- Status label (success / error feedback, cleared on next OpenShareWindow)
-    local dsStatus = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local dsStatus = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     dsStatus:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y - 28)
     dsStatus:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y - 28)
     dsStatus:SetJustifyH("LEFT")
@@ -705,12 +705,12 @@ local function BuildShareWindow()
                 row:SetHeight(ROW_H)
                 local hi = row:CreateTexture(nil, "HIGHLIGHT")
                 hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.08)
-                local nl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local nl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 nl:SetPoint("LEFT",  row, "LEFT",  4, 0)
                 nl:SetPoint("RIGHT", row, "RIGHT", -80, 0)
                 nl:SetJustifyH("LEFT"); nl:SetMaxLines(1); nl:SetTextColor(1, 1, 1)
                 row._nameLbl = nl
-                local cl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                local cl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
                 cl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
                 cl:SetWidth(76); cl:SetJustifyH("RIGHT"); cl:SetMaxLines(1)
                 cl:SetTextColor(0.50, 0.50, 0.50)
@@ -816,13 +816,13 @@ local function BuildShareWindow()
     y = y - 14
 
     -- ── IMPORT ────────────────────────────────────────────────────────────────
-    local importHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local importHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     importHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
-    importHdr:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(importHdr)
     importHdr:SetText(L["SHARE_IMPORT_HDR"])
     y = y - 20
 
-    local importLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local importLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     importLbl:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     importLbl:SetTextColor(0.78, 0.78, 0.78)
     importLbl:SetText(L["SHARE_PASTE_PROMPT"])
@@ -838,7 +838,7 @@ local function BuildShareWindow()
     local importEB = CreateFrame("EditBox", nil, importBg)
     importEB:SetPoint("TOPLEFT",     importBg, "TOPLEFT",     4,  -4)
     importEB:SetPoint("BOTTOMRIGHT", importBg, "BOTTOMRIGHT", -4,  4)
-    importEB:SetFontObject("GameFontNormalSmall")
+    importEB:SetFontObject("BNBFontNormalSmall")
     importEB:SetMultiLine(false)
     importEB:SetAutoFocus(false)
     importEB:SetMaxLetters(0)
@@ -849,7 +849,7 @@ local function BuildShareWindow()
     y = y - 58
 
     -- Error label
-    local errLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local errLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     errLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     errLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     errLbl:SetJustifyH("LEFT"); errLbl:SetWordWrap(true); errLbl:SetHeight(18)
@@ -959,7 +959,7 @@ local function BuildImportWindow()
 
     local y   = -(titleH + 10)
 
-    local instrLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local instrLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     instrLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     instrLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     instrLbl:SetJustifyH("LEFT")
@@ -977,7 +977,7 @@ local function BuildImportWindow()
     local importEB = CreateFrame("EditBox", nil, importBg)
     importEB:SetPoint("TOPLEFT",     importBg, "TOPLEFT",     4, -4)
     importEB:SetPoint("BOTTOMRIGHT", importBg, "BOTTOMRIGHT", -4, 4)
-    importEB:SetFontObject("GameFontNormalSmall")
+    importEB:SetFontObject("BNBFontNormalSmall")
     importEB:SetMultiLine(false)
     importEB:SetAutoFocus(false)
     importEB:SetMaxLetters(0)
@@ -988,7 +988,7 @@ local function BuildImportWindow()
     y = y - 58
 
     -- Error label
-    local errLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local errLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     errLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, y)
     errLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, y)
     errLbl:SetJustifyH("LEFT"); errLbl:SetWordWrap(true); errLbl:SetHeight(18)
@@ -1017,7 +1017,7 @@ local function BuildImportWindow()
     end)
 
     -- Character counter right of preview button
-    local impCharCounter = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local impCharCounter = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     impCharCounter:SetPoint("LEFT",  previewBtn, "RIGHT", 8, 0)
     impCharCounter:SetPoint("RIGHT", f,           "RIGHT", -PAD, 0)
     impCharCounter:SetJustifyH("LEFT")

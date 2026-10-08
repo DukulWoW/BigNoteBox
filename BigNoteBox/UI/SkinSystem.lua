@@ -246,6 +246,8 @@ function BNB.RefreshSkinAccents()
     if not BNB.GetSkinPreset then return end
     local r, g, b = BNB.SkinAccentOf(BNB.GetSkinPreset())
     for tx, k in pairs(_accentTexs) do tx:SetVertexColor(r * k, g * k, b * k) end
+    -- Header / accent text follows the same colour (UI/TextColors.lua, ALL-402)
+    if BNB.ApplyHeaderColor then BNB.ApplyHeaderColor() end
 end
 
 -- Public: zero-arg callback that re-applies the skin backdrop to a frame.
@@ -483,7 +485,7 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
         btn._bg = bg
 
         -- Label parented to _bg so it renders above the backdrop fill
-        local lbl = bg:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = bg:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetAllPoints()
         lbl:SetJustifyH("CENTER")
         lbl:SetText(label)

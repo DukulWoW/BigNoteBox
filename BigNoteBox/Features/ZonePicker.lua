@@ -297,7 +297,7 @@ local function BuildPicker()
 
     local searchEb = CreateFrame("EditBox", nil, searchFrame)
     searchEb:SetAllPoints()
-    searchEb:SetFontObject("GameFontNormal")
+    searchEb:SetFontObject("BNBFontNormal")
     searchEb:SetAutoFocus(false)
     searchEb:SetMaxLetters(64)
     searchEb:SetTextInsets(6, 6, 0, 0)
@@ -306,12 +306,12 @@ local function BuildPicker()
     searchEb:SetScript("OnEscapePressed", function() ZP.Close() end)
 
     -- ── Column headers ────────────────────────────────────────────────────────
-    local colHdrZone = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local colHdrZone = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     colHdrZone:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD + 4, -(PAD + TAB_H + 4 + SEARCH_H + 4))
     colHdrZone:SetTextColor(0.55, 0.55, 0.55)
     colHdrZone:SetText(BNB.L["ZP_COL_NAME"])
 
-    local colHdrCont = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local colHdrCont = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     colHdrCont:SetPoint("TOPRIGHT", f, "TOPRIGHT", -(PAD + SCROLL_PAD + 4), -(PAD + TAB_H + 4 + SEARCH_H + 4))
     colHdrCont:SetTextColor(0.55, 0.55, 0.55)
     colHdrCont:SetJustifyH("RIGHT")
@@ -383,7 +383,7 @@ local function BuildPicker()
                 row._selTex = sel
 
                 -- Normal name label (truncated by column width)
-                local nameLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                local nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 nameLbl:SetPoint("LEFT",  row, "LEFT",  NAME_PAD, 0)
                 nameLbl:SetPoint("RIGHT", row, "RIGHT", -(CONT_W + NAME_PAD), 0)
                 nameLbl:SetJustifyH("LEFT")
@@ -391,7 +391,7 @@ local function BuildPicker()
                 row._nameLbl = nameLbl
 
                 -- Continent label (right-aligned)
-                local contLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                local contLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
                 contLbl:SetPoint("RIGHT", row, "RIGHT", -NAME_PAD, 0)
                 contLbl:SetWidth(CONT_W)
                 contLbl:SetJustifyH("RIGHT")

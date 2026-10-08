@@ -35,7 +35,6 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 
-local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local ROW_H  = 24
 local LIST_ROWS, LIST_ROW_H = 5, 20   -- the list box is always 5 rows; the wheel scrolls past that
 local TYPE_W = 110                    -- the add row's type dropdown ("Instance type" fits)
@@ -165,25 +164,25 @@ local function BuildPopup()
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     BNB.SetBackdrop(f, 0.08, 0.08, 0.11, 0.96, 0.35, 0.35, 0.38, 1)
 
-    local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
+    local title = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-    title:SetTextColor(1, 0.82, 0)
+    BNB.SetHeaderColor(title)
     title:SetText(L["STICKY_WP_SUPPORT_TITLE"])
 
     -- Our close button (ALL-316); follows skin mode like the window's look
     local closeBtn = BNB.CreateIconButton(f, 20, "close", { onClick = function() f:Hide() end })
     closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
 
-    f._statusLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    f._statusLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     f._statusLbl:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
     f._statusLbl:SetWidth(280); f._statusLbl:SetJustifyH("LEFT")
 
-    f._descLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    f._descLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     f._descLbl:SetPoint("TOPLEFT", f._statusLbl, "BOTTOMLEFT", 0, -6)
     f._descLbl:SetWidth(280); f._descLbl:SetJustifyH("LEFT"); f._descLbl:SetWordWrap(true)
     f._descLbl:SetTextColor(0.78, 0.78, 0.78)
 
-    local linksHdr = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local linksHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     linksHdr:SetPoint("TOPLEFT", f._descLbl, "BOTTOMLEFT", 0, -14)
     linksHdr:SetText(L["STICKY_WP_RECOMMENDED_ADDONS"])
     linksHdr:SetTextColor(1, 1, 1)
@@ -382,13 +381,13 @@ function BNB.CreateSituationEditor(panel, opts)
                           state = L["SIT_KIND_RESTED"] }
 
     local y = opts.top or -8
-    local hdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local hdr = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     hdr:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
-    hdr:SetTextColor(1, 0.82, 0, 1)
+    BNB.SetHeaderColor(hdr)
     hdr:SetText(L["SIT_LIST_HDR"])
     y = y - 18
 
-    local desc = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local desc = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     desc:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
     desc:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
     desc:SetTextColor(0.60, 0.60, 0.60)
@@ -411,7 +410,7 @@ function BNB.CreateSituationEditor(panel, opts)
     list:SetHeight(LIST_H)
     y = y - LIST_H - 6
 
-    local emptyLbl = list:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local emptyLbl = list:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     emptyLbl:SetPoint("LEFT",  list, "LEFT",  8, 0)
     emptyLbl:SetPoint("RIGHT", list, "RIGHT", -8, 0)
     emptyLbl:SetJustifyH("CENTER")
@@ -433,7 +432,7 @@ function BNB.CreateSituationEditor(panel, opts)
         row:EnableMouse(true)
         -- The waypoint rows' hover: list art, 18% fill in skin mode (Dukul, 2026-10-08)
         local hi = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.18 })
-        row._kind = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        row._kind = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         row._kind:SetPoint("LEFT", row, "LEFT", 6, 0)
         row._kind:SetWidth(62)
         row._kind:SetJustifyH("LEFT"); row._kind:SetWordWrap(false)
@@ -496,7 +495,7 @@ function BNB.CreateSituationEditor(panel, opts)
     local valueEb = CreateFrame("EditBox", nil, valueRow, "BackdropTemplate")
     BNB.EnsureBackdrop(valueEb)
     valueEb:SetHeight(20)
-    valueEb:SetFontObject("GameFontNormal")
+    valueEb:SetFontObject("BNBFontNormal")
     valueEb:SetAutoFocus(false)
     valueEb:SetMaxLetters(128)
     valueEb:SetTextInsets(4, 4, 0, 0)
@@ -504,32 +503,22 @@ function BNB.CreateSituationEditor(panel, opts)
     BNB.SetBackdropDark(valueEb)
     valueEb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
-    -- Browse button (zone / instance only): the full zone picker
-    local browseBtn = CreateFrame("Button", nil, valueRow)
-    browseBtn:SetSize(20, 20)
+    -- Browse button (zone / instance only): the full zone picker. An icon
+    -- button (bt-situation) as the Toast button, both modes (Dukul, 2026-10-08)
+    local BROWSE_BTN_W = 24
+    local browseBtn = BNB.CreateIconButton(valueRow, BROWSE_BTN_W, "situation", {
+        tip = function()
+            return L["STICKY_SIT_BROWSE_TIP_TITLE"], L["STICKY_SIT_BROWSE_TIP_BODY"]
+        end,
+        tipWrap = true })
     browseBtn:SetPoint("RIGHT", valueRow, "RIGHT", 0, 0)
-    local browseTx = browseBtn:CreateTexture(nil, "ARTWORK")
-    browseTx:SetAllPoints()
-    browseTx:SetTexture(ASSETS .. "Overlay\\ov-situation")
-    browseBtn:SetScript("OnEnter", function(self)
-        self:SetAlpha(1.0)
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_TITLE"], 1, 1, 1)
-        GameTooltip:AddLine(L["STICKY_SIT_BROWSE_TIP_BODY"], 0.78, 0.78, 0.78)
-        GameTooltip:Show()
-    end)
-    browseBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(0.7)
-        GameTooltip:Hide()
-    end)
-    browseBtn:SetAlpha(0.7)
     browseBtn:Hide()
 
     -- The name box ends at the browse button while it shows
     local function PlaceValueBox(withBrowse)
         valueEb:ClearAllPoints()
         valueEb:SetPoint("LEFT",  valueRow, "LEFT",  TYPE_W + 6, 0)
-        valueEb:SetPoint("RIGHT", valueRow, "RIGHT", withBrowse and -26 or 0, 0)
+        valueEb:SetPoint("RIGHT", valueRow, "RIGHT", withBrowse and -(BROWSE_BTN_W + 4) or 0, 0)
     end
     PlaceValueBox(false)
 
@@ -546,16 +535,29 @@ function BNB.CreateSituationEditor(panel, opts)
     pick.frame:Hide()
 
     -- ── Use current / Add / Clear all ────────────────────────────────────────
+    -- The three buttons share the row: Add and Clear all one width, Use
+    -- Current a little wider for its longer label (Dukul, 2026-10-08)
+    local ROW_BTN_GAP, USE_CURRENT_RATIO = 6, 1.3
     local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 22)
     useCurrentBtn:SetPoint("TOPLEFT", valueRow, "BOTTOMLEFT", 0, -4)
 
-    local addBtn = BNB.CreateButton(nil, panel, L["SIT_ADD_BTN"], 60, 22)
-    addBtn:SetPoint("LEFT", useCurrentBtn, "RIGHT", 6, 0)
+    local addBtn = BNB.CreateButton(nil, panel, L["SIT_ADD_BTN"], 90, 22)
+    addBtn:SetPoint("LEFT", useCurrentBtn, "RIGHT", ROW_BTN_GAP, 0)
     addBtn:SetEnabled(false)
 
-    local clearBtn = BNB.CreateButton(nil, panel, L["SIT_CLEAR_ALL"], 72, 22)
+    local clearBtn = BNB.CreateButton(nil, panel, L["SIT_CLEAR_ALL"], 90, 22)
     clearBtn:SetPoint("TOPRIGHT", valueRow, "BOTTOMRIGHT", 0, -4)
     clearBtn:SetEnabled(false)
+
+    local function SizeRowButtons()
+        local w = valueRow:GetWidth()
+        if not w or w <= 0 then return end
+        local bw = math.floor((w - 2 * ROW_BTN_GAP) / (2 + USE_CURRENT_RATIO))
+        useCurrentBtn:SetWidth(w - 2 * ROW_BTN_GAP - 2 * bw)
+        addBtn:SetWidth(bw); clearBtn:SetWidth(bw)
+    end
+    valueRow:HookScript("OnSizeChanged", SizeRowButtons)
+    SizeRowButtons()
 
     -- ── Autocomplete under the add row (2+ characters typed) ─────────────────
     local acFrame = BNB.CreateBackdropFrame("Frame", nil, panel)
@@ -584,12 +586,12 @@ function BNB.CreateSituationEditor(panel, opts)
                 row:SetHeight(AC_ROW_H)
                 local hi = row:CreateTexture(nil, "HIGHLIGHT")
                 hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.08)
-                row._nameLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                row._nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 row._nameLbl:SetPoint("LEFT",  row, "LEFT",  4, 0)
                 row._nameLbl:SetPoint("RIGHT", row, "RIGHT", -80, 0)
                 row._nameLbl:SetJustifyH("LEFT"); row._nameLbl:SetMaxLines(1)
                 row._nameLbl:SetTextColor(1, 1, 1)
-                row._contLbl = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+                row._contLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
                 row._contLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
                 row._contLbl:SetWidth(76); row._contLbl:SetJustifyH("RIGHT"); row._contLbl:SetMaxLines(1)
                 row._contLbl:SetTextColor(0.50, 0.50, 0.50)
@@ -685,7 +687,7 @@ function BNB.CreateSituationEditor(panel, opts)
             c.frame:SetPoint("TOPLEFT",  optArea, "TOP", OPT_GAP / 2, y)
             c.frame:SetPoint("TOPRIGHT", optArea, "TOPRIGHT", 0, y)
         end
-        local lbl = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetPoint("BOTTOMLEFT",  c.frame, "TOPLEFT",  0, 3)
         lbl:SetPoint("BOTTOMRIGHT", c.frame, "TOPRIGHT", 0, 3)
         lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false)
@@ -849,13 +851,13 @@ function BNB.CreateSituationEditor(panel, opts)
     wpDiv:SetPoint("TOPLEFT",  dispDiv, "TOPLEFT",  0, -(6 + 2 * OPT_PITCH + 4))
     wpDiv:SetPoint("TOPRIGHT", panel,   "TOPRIGHT", -padR, 0)
 
-    local wpHdr = panel:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local wpHdr = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     wpHdr:SetPoint("TOPLEFT", wpDiv, "BOTTOMLEFT", 0, -6)
-    wpHdr:SetTextColor(1, 0.82, 0, 1)
+    BNB.SetHeaderColor(wpHdr)
     wpHdr:SetText(L["STICKY_WP_HEADER"])
 
     -- "(Addon installed)" / "(Enhanced)" / "(Basic)" / "(Addon required)"
-    local wpStatusTag = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local wpStatusTag = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wpStatusTag:SetPoint("LEFT", wpHdr, "RIGHT", 6, 0)
 
     local wpInfoLbl, wpInfoHit   -- built below; RefreshWPStatusTag shows / hides them
@@ -929,7 +931,7 @@ function BNB.CreateSituationEditor(panel, opts)
     colHdr:SetPoint("BOTTOMRIGHT", wpList, "TOPRIGHT", -7, 2)
     colHdr:SetHeight(2 * WP_HDR_LINE_H)
     local function ColLabel(key)
-        local fs = colHdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local fs = colHdr:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         fs:SetText(L[key])
         fs:SetTextColor(0.60, 0.60, 0.60)
         return fs
@@ -937,7 +939,7 @@ function BNB.CreateSituationEditor(panel, opts)
     PlaceWpCols(colHdr, ColLabel("WP_COL_NAME"), ColLabel("WP_COL_XY"), ColLabel("WP_COL_ZONE"),
         ColLabel("WP_COL_SUBZONE"), 0, -WP_HDR_LINE_H, WP_HDR_LINE_H)
 
-    local wpEmpty = wpList:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local wpEmpty = wpList:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wpEmpty:SetPoint("LEFT",  wpList, "LEFT",  8, 0)
     wpEmpty:SetPoint("RIGHT", wpList, "RIGHT", -8, 0)
     wpEmpty:SetJustifyH("CENTER")
@@ -1098,7 +1100,7 @@ function BNB.CreateSituationEditor(panel, opts)
         local chk = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
         BNB.LabelHit(chk)   -- the tooltip and click reach over its label too
         chk:SetSize(24, 24)
-        local lbl = chk:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = chk:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lbl:SetPoint("LEFT", chk, "RIGHT", 2, 0)
         lbl:SetPoint("RIGHT", panel, "RIGHT", -padR, 0)
         lbl:SetJustifyH("LEFT")
@@ -1143,7 +1145,7 @@ function BNB.CreateSituationEditor(panel, opts)
     wpManualRow:Hide()
 
     local function CoordBox(anchor, label)
-        local lbl = wpManualRow:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        local lbl = wpManualRow:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         if anchor then lbl:SetPoint("LEFT", anchor, "RIGHT", 6, 0)
         else lbl:SetPoint("LEFT", wpManualRow, "LEFT", 0, 0) end
         lbl:SetText(label)
@@ -1154,7 +1156,7 @@ function BNB.CreateSituationEditor(panel, opts)
         BNB.SetBackdropDark(eb)
         eb:SetPoint("LEFT", lbl, "RIGHT", 2, 0)
         eb:SetSize(46, 20)
-        eb:SetFontObject("GameFontNormalSmall")
+        eb:SetFontObject("BNBFontNormalSmall")
         eb:SetAutoFocus(false); eb:SetMaxLetters(8)
         eb:SetNumeric(false); eb:SetTextInsets(3, 3, 0, 0)
         return eb
@@ -1169,14 +1171,14 @@ function BNB.CreateSituationEditor(panel, opts)
     wpNameEb:SetPoint("LEFT",  wpYEb,    "RIGHT", 6, 0)
     wpNameEb:SetPoint("RIGHT", wpSetBtn, "LEFT", -4, 0)
     wpNameEb:SetHeight(20)
-    wpNameEb:SetFontObject("GameFontNormalSmall")
+    wpNameEb:SetFontObject("BNBFontNormalSmall")
     wpNameEb:SetAutoFocus(false); wpNameEb:SetMaxLetters(64)
     wpNameEb:SetTextInsets(3, 3, 0, 0)
     BNB.AddPlaceholder(wpNameEb, L["WP_NAME_PLACEHOLDER"])
 
     -- Without any waypoint support: the red line in the manual row's place
     -- (Manual is greyed then, so the row never shows)
-    local wpNoSupport = panel:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local wpNoSupport = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wpNoSupport:SetPoint("TOPLEFT",  wpManualRow, "TOPLEFT",  0, 0)
     wpNoSupport:SetPoint("TOPRIGHT", wpManualRow, "TOPRIGHT", 0, 0)
     wpNoSupport:SetJustifyH("LEFT"); wpNoSupport:SetWordWrap(true)
@@ -1275,7 +1277,7 @@ function BNB.CreateSituationEditor(panel, opts)
                 row._kind:SetText(KIND_LABELS[kind] or kind or "?")
                 row._value:SetText(BNB.SituationValueLabel(kind, value) or s)
                 -- Gold while Edit has it in the add row
-                if idx == editIndex then row._value:SetTextColor(1, 0.82, 0)
+                if idx == editIndex then BNB.SetHeaderColor(row._value)
                 else row._value:SetTextColor(1, 1, 1) end
                 row:Show()
                 -- A hidden row gets no OnLeave: its X must not come back with it
@@ -1466,7 +1468,8 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
 
     -- With 2+ situations Clear all takes two clicks: the first turns the
-    -- button into "Sure?" for a few seconds (Dukul, 2026-10-04)
+    -- button into "Remove N?" for a few seconds (Dukul, 2026-10-04; the
+    -- count since 2026-10-08)
     local CLEAR_ARM_SECS = 3
     local clearArmed, clearTimer = false, nil
     local function DisarmClear()
@@ -1479,9 +1482,10 @@ function BNB.CreateSituationEditor(panel, opts)
     -- Every situation and every option back to the defaults
     clearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
-        if not clearArmed and #BNB.NoteSituations(BNB.GetNote(id)) > 1 then
+        local n = #BNB.NoteSituations(BNB.GetNote(id))
+        if not clearArmed and n > 1 then
             clearArmed = true
-            clearBtn:SetText("|cffff5555" .. L["SIT_CLEAR_SURE"] .. "|r")
+            clearBtn:SetText("|cffff5555" .. string.format(L["SIT_CLEAR_SURE_FMT"], n) .. "|r")
             clearTimer = C_Timer.NewTimer(CLEAR_ARM_SECS, DisarmClear)
             return
         end
@@ -1859,7 +1863,7 @@ function BNB.CreateSituationEditor(panel, opts)
     off:SetScript("OnMouseWheel", function() end)
     local offBg = off:CreateTexture(nil, "BACKGROUND")
     offBg:SetAllPoints(); offBg:SetColorTexture(0, 0, 0, 0.85)
-    local offTxt = off:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local offTxt = off:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     offTxt:SetPoint("LEFT",  off, "LEFT",  16, 24)
     offTxt:SetPoint("RIGHT", off, "RIGHT", -16, 24)
     offTxt:SetJustifyH("CENTER"); offTxt:SetWordWrap(true)

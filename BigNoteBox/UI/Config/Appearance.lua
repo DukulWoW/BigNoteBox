@@ -35,7 +35,7 @@ local function BuildFontPicker(ct, y)
             if e.id == cur then
                 e.btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)
                 e.btn:SetBackdropBorderColor(0.4, 0.8, 0.4, 1)
-                if e.nameLbl then e.nameLbl:SetTextColor(1, 0.82, 0, 1) end
+                if e.nameLbl then BNB.SetHeaderColor(e.nameLbl) end
             else
                 e.btn:SetBackdropColor(0.06, 0.06, 0.08, 0.95)
                 e.btn:SetBackdropBorderColor(0.28, 0.28, 0.30, 1)
@@ -95,14 +95,14 @@ local function BuildFontPicker(ct, y)
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  7, -7)
         nameLbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", -7, -7)
         nameLbl:SetJustifyH("LEFT"); nameLbl:SetHeight(18)
-        BNB.SetFontSafe(nameLbl, def.bold, 13, "GameFontNormal")
+        BNB.SetFontSafe(nameLbl, def.bold, 13, "BNBFontNormal")
         nameLbl:SetText(def.label)
 
         local prevLbl = btn:CreateFontString(nil, "OVERLAY")
         prevLbl:SetPoint("BOTTOMLEFT",  btn, "BOTTOMLEFT",  7, 7)
         prevLbl:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -7, 7)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(14)
-        BNB.SetFontSafe(prevLbl, def.regular, 11, "GameFontNormalSmall")
+        BNB.SetFontSafe(prevLbl, def.regular, 11, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.62, 0.62, 0.62); prevLbl:SetText(def.preview or "")
 
         fontPickerBtns[#fontPickerBtns + 1] = { btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def }
@@ -138,7 +138,7 @@ local function BuildFontPicker(ct, y)
         Highlight()
         if _refreshLSMDropdown then _refreshLSMDropdown() end
     end)
-    local wowLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local wowLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     wowLbl:SetPoint("LEFT",  wowCb, "RIGHT", 4, 0)
     wowLbl:SetPoint("RIGHT", ct,    "RIGHT", 0, 0)
     wowLbl:SetJustifyH("LEFT"); wowLbl:SetHeight(ROW_H); wowLbl:SetText(L["FONT_USE_WOW_DEFAULT"])
@@ -159,7 +159,7 @@ local function BuildAppearanceTab(sf, ct)
     -- ── Skins ─────────────────────────────────────────────────────────────────
     y = AddHeader(ct, y, L["CFG_HDR_SKINS"])
 
-    local skinDesc = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    local skinDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     skinDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     skinDesc:SetWidth(CONTENT_W); skinDesc:SetJustifyH("LEFT")
     skinDesc:SetWordWrap(true); skinDesc:SetHeight(28)
@@ -174,7 +174,7 @@ local function BuildAppearanceTab(sf, ct)
     skinCb:SetPoint("TOPLEFT", ct, "TOPLEFT", -2, y + 2)
     skinCb:SetChecked(db.skinMode == true)
 
-    local skinCbLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local skinCbLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     skinCbLbl:SetPoint("LEFT", skinCb, "RIGHT", 4, 0)
     skinCbLbl:SetJustifyH("LEFT"); skinCbLbl:SetHeight(ROW_H)
     skinCbLbl:SetText(L["CFG_SKIN_ENABLE"])
@@ -196,7 +196,7 @@ local function BuildAppearanceTab(sf, ct)
         SKIN_PRESETS[#SKIN_PRESETS + 1] = { key = key, label = BNB.SkinPresetLabel(key) }
     end
 
-    local skinPresetLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    local skinPresetLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     skinPresetLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, y)
     skinPresetLbl:SetHeight(ROW_H); skinPresetLbl:SetJustifyH("LEFT")
     skinPresetLbl:SetText(L["CFG_SKIN_PRESET"])
@@ -260,7 +260,7 @@ local function BuildAppearanceTab(sf, ct)
     local skinRandomizeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     BNB.LabelHit(skinRandomizeCb)   -- the tooltip and click reach over its label too
     skinRandomizeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 14, y)
-    skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    skinRandomizeCb.text = skinRandomizeCb.text or skinRandomizeCb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     skinRandomizeCb.text:SetPoint("LEFT", skinRandomizeCb, "RIGHT", 2, 0)
     skinRandomizeCb.text:SetText(L["CFG_SKIN_RANDOMIZE"])
     skinRandomizeCb:SetChecked(db.skinRandomize == true)
@@ -289,7 +289,7 @@ local function BuildAppearanceTab(sf, ct)
     BNB.LabelHit(skinRandomizeBrightnessCb)   -- the tooltip and click reach over its label too
     skinRandomizeBrightnessCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 30, y)
     skinRandomizeBrightnessCb.text = skinRandomizeBrightnessCb.text
-        or skinRandomizeBrightnessCb:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        or skinRandomizeBrightnessCb:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     skinRandomizeBrightnessCb.text:SetPoint("LEFT", skinRandomizeBrightnessCb, "RIGHT", 2, 0)
     skinRandomizeBrightnessCb.text:SetText(L["CFG_SKIN_RAND_BRIGHTNESS"])
     skinRandomizeBrightnessCb:SetChecked(db.skinRandomizeBrightness == true)
@@ -395,9 +395,9 @@ local function BuildAppearanceTab(sf, ct)
             L["CFG_LSM_FONTS_TIP"])
 
         -- Inline "Reload required" label + button, hidden until the value changes
-        lsmReloadLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        lsmReloadLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         lsmReloadLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 22, y + 2)
-        lsmReloadLbl:SetTextColor(1, 0.82, 0, 1)
+        BNB.SetHeaderColor(lsmReloadLbl)
         lsmReloadLbl:SetText(L["CFG_LSM_FONTS_RELOAD"])
         lsmReloadLbl:Hide()
 
