@@ -61,6 +61,21 @@ jobs:
             -n "{package-name}-{project-version}:{package-name}-{project-version}"
             ${{ inputs.mode == 'dry' && '-d' || '' }}
 
+      # The developer addon (DEVTOOL.md) goes on the GitHub release only, as its
+      # own asset: never in the addon zip, never on the three addon sites
+      # (.pkgmeta ignores the folder). Runs where the GitHub release is cut: a
+      # tag push, or github-only (run with --ref <tag>, so GITHUB_REF_NAME is
+      # the tag). Labs/IconLabAtlas.lua is generated and git-ignored, so it is
+      # not in the zip; DEVTOOL.md says so.
+      - name: Attach BigNoteBox_Dev to the GitHub release
+        if: github.event_name == 'push' || inputs.mode == 'github-only'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ZIP="BigNoteBox_Dev-${GITHUB_REF_NAME}.zip"
+          zip -qr "$ZIP" BigNoteBox_Dev
+          gh release upload "$GITHUB_REF_NAME" "$ZIP" --clobber
+
       - name: Keep the build for inspection
         if: always()
         uses: actions/upload-artifact@v4

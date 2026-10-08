@@ -3,11 +3,13 @@ BigNoteBox_Dev
 
 Developer mode for BigNoteBox. Not needed to play, and not part of the release.
 
-Enable it in the AddOn list and reload: BigNoteBox then uses a separate set of
-notes (a copy of your own notes, made once on the first dev-mode login) and keeps
-the developer labs' work in this addon's own saved variables. Disable it and
-reload to get your own notes back. Settings are shared between the two.
+WARNING: while this addon is enabled, BigNoteBox uses a separate copy of your
+notes (made once, on the first dev-mode login). Notes written in dev mode are
+not in your own notes. Disable this addon and reload to get them back.
+Settings are shared between the two.
 
-The developer labs live here too (Labs\): the Icon Lab (/bnb iconlab), the
-Background Lab (/bnb bglab) and the search bar layout tool (/bnb searchlayout),
-all in debug mode. Without this addon those commands say so.
+The tools: Settings > Advanced > Developer Tools, or /bnb debug.
+/bnb devtools opens them in a window of their own.
+
+Full guide (what each tool does, download, install, version matching):
+https://github.com/DukulWoW/BigNoteBox/blob/main/DEVTOOL.md

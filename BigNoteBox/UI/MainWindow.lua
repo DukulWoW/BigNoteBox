@@ -353,7 +353,8 @@ end
 
 -- Tiled overlay over the window background (Dukul's ui-bg-devmode, faint by its
 -- own alpha). Top of BACKGROUND: over the template Bg / skin backdrop, under
--- the borders and every child frame.
+-- the borders and every child frame. Also on Settings and the Developer
+-- Tools window (ALL-395).
 local function AddDevModeOverlay(f)
     if not (BNB.IsDevMode and BNB.IsDevMode()) then return end
     local ov = f:CreateTexture(nil, "BACKGROUND", nil, 7)
@@ -368,6 +369,7 @@ local function AddDevModeOverlay(f)
     ov:SetVertTile(true)
     f._devOverlay = ov
 end
+BNB.AddDevModeOverlay = AddDevModeOverlay
 
 -- Toolbar strip art, normal mode only (ALL-240, Dukul 2026-10-04): a tiling
 -- header piece from a game file, one per client, repeated across the strip under

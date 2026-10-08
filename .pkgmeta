@@ -31,4 +31,5 @@ ignore:
   - FILEMAP.md
   - README.md
   - CONTRIBUTING.md
+  - DEVTOOL.md
   - BigNoteBox_Dev

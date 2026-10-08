@@ -283,3 +283,9 @@ Advanced reset tools.
 - Clear history and stickies
 - Remove all stored data
 - Re-run setup wizard
+
+---
+
+# 🛠️ Developer Tools
+
+Working on BigNoteBox itself? The developer tools are a separate addon, `BigNoteBox_Dev`, downloadable from each GitHub release. You do not need it to use BigNoteBox. See [DEVTOOL.md](DEVTOOL.md).

@@ -39,12 +39,60 @@ local function BuildAdvancedTab(sf, ct)
     devDesc2:SetText(L["CFG_DEV_DESC"])
     y = y - 24
 
-    -- ALL-30: the tools live in their own window (UI/DebugWindow.lua), also /bnb debug.
+    -- Debug mode works without the dev addon, for this session only (ALL-395).
+    -- In dev mode it is always on: checked and greyed.
+    local devMode = BNB.IsDevMode()
+    local dbgCb
+    y, dbgCb = AddCheck(ct, y, L["CFG_DEBUG_MODE_LABEL"],
+        function() return BNB.IsDebugMode() end,
+        function(v)
+            if not BNB.SetDebugMode(v) then dbgCb:SetChecked(BNB.IsDebugMode()) end
+        end,
+        devMode and L["CFG_DEBUG_MODE_DEV_TIP"] or L["CFG_DEBUG_MODE_TIP"])
+    K.ReadOnShow(dbgCb, function() return BNB.IsDebugMode() end)
+    if devMode then
+        dbgCb:SetEnabled(false); dbgCb._lbl:SetAlpha(0.6)
+        dbgCb:SetMotionScriptsWhileDisabled(true)   -- the tooltip says why
+    end
+
+    -- Pseudo-locale stays here, not on the dev page, so translators can use it
+    -- without the dev addon (Dukul, 2026-10-08). Not tied to debug mode: it
+    -- takes a reload, and debug mode is cleared on every load.
+    y = AddCheck(ct, y, L["CFG_DEV_PSEUDOLOC_LABEL"],
+        function() return BigNoteBoxDB.debugPseudoLocale == true end,
+        function(v) BigNoteBoxDB.debugPseudoLocale = v or nil end,
+        L["CFG_DEV_PSEUDOLOC_TIP_BODY"])
+    y = y - 6
+
+    -- The tools are a sub-page (UI/Config/DevTools.lua, also /bnb debug), only
+    -- while the dev addon is loaded; without it a second button gives the link.
+    local devPage = K.NewSubPage(L["DEV_WIN_TITLE"], K.BuildDevToolsPage, "devtools")
     local devOpenBtn = BNB.CreateButton(nil, ct, L["CFG_DEV_OPEN_BTN"], 180, 24)
     devOpenBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y + 2)
-    devOpenBtn:SetScript("OnClick", function()
-        if BNB.DebugWindow and BNB.DebugWindow.Open then BNB.DebugWindow.Open() end
-    end)
+    devOpenBtn:SetScript("OnClick", devPage.Open)
+    if not devMode then
+        devOpenBtn:SetEnabled(false)
+        devOpenBtn:SetMotionScriptsWhileDisabled(true)
+        devOpenBtn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_DEV_OPEN_BTN"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_DEVADDON_NEEDS_ADDON_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        devOpenBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+        local getBtn = BNB.CreateButton(nil, ct, L["CFG_DEVADDON_GET_BTN"], 180, 24)
+        getBtn:SetPoint("LEFT", devOpenBtn, "RIGHT", 8, 0)
+        getBtn:SetScript("OnClick", function(self) BNB.ShowClipboardHint(BNB.DEVTOOL_URL, self, true) end)
+        getBtn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_DEVADDON_GET_BTN"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_DEVADDON_GET_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:AddLine(BNB.DEVTOOL_URL, 0.6, 0.6, 0.6)
+            GameTooltip:Show()
+        end)
+        getBtn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     y = y - 34
 
     -- ── Danger Zone (last on the tab, Dukul 2026-09-26) ────────────────────────

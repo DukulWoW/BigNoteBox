@@ -662,6 +662,7 @@ function BNB._CreateConfigShell(w)
         title = L["CONFIG_TITLE"], toplevel = true,
     })
     f:SetPoint("CENTER")
+    if BNB.AddDevModeOverlay then BNB.AddDevModeOverlay(f) end   -- dev mode marking (ALL-395)
     return f
 end
 

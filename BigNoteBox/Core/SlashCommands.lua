@@ -24,7 +24,14 @@ function BNB.RegisterSlashCommands()
         elseif cmd == "config" or cmd == "settings" then
             if BNB.OpenConfig then BNB.OpenConfig() end
         elseif cmd == "debug" then
-            if BNB.DebugWindow then BNB.DebugWindow.Toggle() end
+            -- The dev tools page in dev mode, else the Advanced tab (ALL-395)
+            if BNB.OpenDevTools then BNB.OpenDevTools() end
+        elseif cmd == "devtools" then
+            -- Only the Developer Tools, in a window of their own (dev addon only)
+            if BNB.IsDevMode() and BNB.ToggleDevToolsWindow then BNB.ToggleDevToolsWindow()
+            else BNB.DevToolMissing() end
+        elseif cmd == "debug on" or cmd == "debug off" then
+            if BNB.SetDebugMode then BNB.SetDebugMode(cmd == "debug on") end
         elseif cmd == "search" or cmd:sub(1, 7) == "search " then
             -- Oracle search (ALL-69); the text keeps its case
             if BNB.Oracle then BNB.Oracle.Open((msg:match("^%s*%S+%s+(.-)%s*$"))) end
