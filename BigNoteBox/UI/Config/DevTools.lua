@@ -196,6 +196,8 @@ function K.BuildDevToolsPage(sf, ct, y)
             function() BNB.OpenIconLab() end, BNB.OpenIconLab ~= nil },
         { L["CFG_DEV_TOASTLAB_BTN"], L["CFG_DEV_TOASTLAB_TIP_BODY"],
             function() BNB.OpenToastLab() end, BNB.OpenToastLab ~= nil },
+        { L["CFG_DEV_SKINLAB_BTN"], L["CFG_DEV_SKINLAB_TIP_BODY"],
+            function() BNB.OpenSkinLab() end, BNB.OpenSkinLab ~= nil },
         { L["CFG_DEV_SEARCHLAYOUT_BTN"], L["CFG_DEV_SEARCHLAYOUT_TIP_BODY"],
             function() BNB.ToggleSearchLayoutTool() end, BNB.ToggleSearchLayoutTool ~= nil },
     })

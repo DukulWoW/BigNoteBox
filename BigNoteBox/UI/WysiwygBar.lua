@@ -96,57 +96,37 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         return d
     end
 
-    -- Icon button (20x20). Skin mode: the icon sits inside a skin box with the
-    -- fill, border, hover and press look of BNB.CreateSkinButton, matching the
-    -- font / size dropdown boxes. Normal mode: bare icon.
-    local SKIN_ICON_INSET = 3   -- keeps the icon inside the box border
+    -- Icon button (20x20): the bare icon in both modes (white art, Dukul
+    -- 2026-10-08). Normal mode tints it the gold of the old art; skin mode
+    -- the preset's accent colour, as the top bar icons (RegisterSkinAccentTex,
+    -- follows preset changes), and a press nudges it 1 px down-right.
+    -- Hover: tb-hover over the icon, tinted the same.
+    local WY_GOLD = { 1, 0.86, 0.2 }
     local function WyBtn(icon, tip)
         local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
-        local btn = CreateFrame("Button", nil, bar, skin and "BackdropTemplate" or nil)
+        local btn = CreateFrame("Button", nil, bar)
         btn:SetSize(20, 20)
         local tx = btn:CreateTexture(nil, "ARTWORK")
-        if skin then
-            tx:SetPoint("TOPLEFT",     btn, "TOPLEFT",      SKIN_ICON_INSET, -SKIN_ICON_INSET)
-            tx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -SKIN_ICON_INSET,  SKIN_ICON_INSET)
-        else
-            tx:SetAllPoints()
-        end
+        tx:SetAllPoints()
         tx:SetTexture(ASSETS_WY .. icon)
+        local hi = btn:CreateTexture(nil, "HIGHLIGHT")
+        hi:SetAllPoints(tx)
+        hi:SetTexture(ASSETS_WY .. "tb-hover")
         if skin then
-            local p  = BNB.GetSkinPreset()
-            local br, bg_, bb = BNB.SkinBorderOf(p)
-            tx:SetVertexColor(math.min(1, br * 2.2), math.min(1, bg_ * 2.2), math.min(1, bb * 2.2))
-            BNB.RegisterSkinIconTex(tx, 2.2)
-
-            local function ApplyBoxSkin()
-                local sp = BNB.GetSkinPreset and BNB.GetSkinPreset()
-                if not sp then return end
-                local r, g, b = BNB.SkinButtonOf(sp)
-                local sbr, sbg, sbb = BNB.SkinBorderOf(sp)
-                BNB.SetBackdrop(btn, r, g, b, 0.92, sbr, sbg, sbb, 1)
-                btn._br, btn._bg_, btn._bb = r, g, b
-            end
-            ApplyBoxSkin()
-            BNB.RegisterSkinBackdrop(ApplyBoxSkin)
-
-            -- Darken on mouse down, restore on mouse up (as CreateSkinButton)
+            BNB.RegisterSkinAccentTex(tx)
+            BNB.RegisterSkinAccentTex(hi)
             btn:SetScript("OnMouseDown", function(self)
                 if not self:IsEnabled() then return end
-                self:SetBackdropColor((self._br or 0.10) * 0.70, (self._bg_ or 0.10) * 0.70,
-                    (self._bb or 0.12) * 0.70, 0.95)
+                tx:ClearAllPoints()
+                tx:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+                tx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
             end)
-            btn:SetScript("OnMouseUp", function(self)
-                self:SetBackdropColor(self._br or 0.10, self._bg_ or 0.10, self._bb or 0.12, 0.92)
+            btn:SetScript("OnMouseUp", function()
+                tx:ClearAllPoints(); tx:SetAllPoints()
             end)
-        end
-        local hi = btn:CreateTexture(nil, "HIGHLIGHT")
-        if skin then
-            hi:SetPoint("TOPLEFT",     btn, "TOPLEFT",      2, -2)
-            hi:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", -2,  2)
-            hi:SetColorTexture(1, 1, 1, 0.10)
         else
-            hi:SetAllPoints()
-            hi:SetColorTexture(1, 1, 1, 0.18)
+            tx:SetVertexColor(WY_GOLD[1], WY_GOLD[2], WY_GOLD[3])
+            hi:SetVertexColor(WY_GOLD[1], WY_GOLD[2], WY_GOLD[3])
         end
         btn._tx = tx
         btn.SetIconEnabled = function(self, en)
@@ -162,6 +142,39 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         btn:SetIconEnabled(false)
         return btn
+    end
+
+    -- Skin mode look of the font / size picker boxes: the skin dropdown of
+    -- BNB.SkinDropdown (skin text button box + square skin "down" icon button
+    -- at its right end, white label), drawn under the click button with the
+    -- mouse off and fed its hover / press. Call after the button's own
+    -- SetScripts (hooks). Normal mode: nothing changes.
+    local function SkinPickerBox(bg, btn, arrowTex, label)
+        if not (BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset) then return end
+        local w, h = bg:GetWidth(), bg:GetHeight()
+        BNB.SetBackdrop(bg, 0, 0, 0, 0, 0, 0, 0, 0)
+        arrowTex:Hide()
+        local vis = BNB.CreateSkinButton(nil, bg, "", w, h)
+        vis:SetAllPoints(bg)
+        vis:EnableMouse(false)
+        vis:SetFrameLevel(bg:GetFrameLevel() + 1)
+        btn:SetFrameLevel(bg:GetFrameLevel() + 3)
+        local arrow = BNB.CreateIconButton(vis, h, "down", { skin = true })
+        arrow:SetPoint("RIGHT", vis, "RIGHT", 0, 0)
+        arrow:EnableMouse(false)
+        label:SetParent(btn)
+        label:SetPoint("RIGHT", bg, "RIGHT", -h, 0)
+        BNB.SetTextWhite(label)
+        local function Pass(f, script)
+            local fn = f:GetScript(script)
+            if fn then pcall(fn, f) end
+        end
+        btn:HookScript("OnEnter", function() vis:LockHighlight(); Pass(arrow, "OnEnter") end)
+        btn:HookScript("OnLeave", function()
+            vis:UnlockHighlight(); Pass(vis, "OnMouseUp"); Pass(arrow, "OnLeave")
+        end)
+        btn:HookScript("OnMouseDown", function() Pass(vis, "OnMouseDown"); Pass(arrow, "OnMouseDown") end)
+        btn:HookScript("OnMouseUp", function() Pass(vis, "OnMouseUp"); Pass(arrow, "OnMouseUp") end)
     end
 
     -- ── LEFT SIDE ─────────────────────────────────────────────────────────────
@@ -314,6 +327,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 "WowStyle1DropdownTemplate")
             _fontMenuDD:SetSize(1, 1); _fontMenuDD:SetAlpha(0)
             _fontMenuDD:SetToplevel(true)
+            BNB.SkinDropdownMenu(_fontMenuDD)
         end
         _fontMenuDD:ClearAllPoints()
         _fontMenuDD:SetPoint("TOPLEFT", fontDDBg, "BOTTOMLEFT", 0, 0)
@@ -365,6 +379,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         GameTooltip:Show()
     end)
     fontDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    SkinPickerBox(fontDDBg, fontDDBtn, fontDDArrow, fontDDLabel)
 
     -- ── Font size: decrease / increase / dropdown ─────────────────────────────
     local decBtn = WyBtn("tb-decreasesize", L["CFG_EXPORT_DECREASE_FONT"])
@@ -376,7 +391,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     incBtn:SetIconEnabled(true)
 
     -- Size display button — shows current pt value, opens preset quick-pick menu
-    local SIZE_BTN_W = 38
+    -- Skin mode: room for the square arrow button beside "12pt"
+    local SIZE_BTN_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 52 or 38
     local sizeBg = BNB.CreateBackdropFrame("Frame", nil, bar)
     sizeBg:SetSize(SIZE_BTN_W, FONT_BTN_H)
     sizeBg:SetPoint("LEFT", incBtn, "RIGHT", 4, 0)
@@ -445,6 +461,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 "WowStyle1DropdownTemplate")
             _sizeMenuDD:SetSize(1, 1); _sizeMenuDD:SetAlpha(0)
             _sizeMenuDD:SetToplevel(true)
+            BNB.SkinDropdownMenu(_sizeMenuDD)
         end
         _sizeMenuDD:ClearAllPoints()
         _sizeMenuDD:SetPoint("TOPLEFT", sizeBg, "BOTTOMLEFT", 0, 0)
@@ -465,6 +482,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         GameTooltip:Show()
     end)
     sizeDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    SkinPickerBox(sizeBg, sizeDDBtn, sizeArrow, sizeLbl)
 
     -- tb-bulletlist: insert "  · " at the start of the cursor's current line
     local bulletBtn = WyBtn("tb-bulletlist", L["NE_INSERT_BULLET_TIP"])
@@ -540,6 +558,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 "WowStyle1DropdownTemplate")
             _stampMenuDD:SetSize(1, 1); _stampMenuDD:SetAlpha(0)
             _stampMenuDD:SetToplevel(true)
+            BNB.SkinDropdownMenu(_stampMenuDD)
         end
         _stampMenuDD:ClearAllPoints()
         _stampMenuDD:SetPoint("TOPLEFT", self, "BOTTOMLEFT", 0, 0)

@@ -769,7 +769,16 @@ function BNB.SkinDropdown(dd)
     dd:HookScript("OnDisable", Later)
     -- Greying by alpha (some pages fade a dropdown instead of disabling it)
     hooksecurefunc(dd, "SetAlpha", function(_, a) if vis then vis:SetAlpha(a) end end)
-    -- The open list (see above): DropdownButtonMixin calls these with the menu
+    BNB.SkinDropdownMenu(dd)
+    return dd
+end
+
+-- The open list only (see above), for an invisible menu anchor whose visible
+-- box is drawn some other way (the formatting toolbar's font / size pickers).
+-- DropdownButtonMixin calls these with the menu. Normal mode: no-op.
+function BNB.SkinDropdownMenu(dd)
+    if not dd or dd._skinMenu or not (BigNoteBoxDB and BigNoteBoxDB.skinMode) then return dd end
+    dd._skinMenu = true
     if dd.OnMenuOpened then
         hooksecurefunc(dd, "OnMenuOpened", function(_, menu) pcall(SkinOpenMenu, menu) end)
     end
