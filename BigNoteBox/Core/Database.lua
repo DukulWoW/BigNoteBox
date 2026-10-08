@@ -182,7 +182,7 @@ BNB.DEFAULTS = {
     toastShowPin     = true,
     -- Which senders may show a toast (ALL-384): situation notes, task
     -- situations; a sender not listed is always on
-    toastSources = { situation = true, tasks = true },
+    toastSources = { situation = true, tasks = true, alarms = true },
 
     -- Known characters registry, built on each login.
     -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.

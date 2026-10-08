@@ -544,10 +544,90 @@ local function ShowNextPopup()
 end
 
 -- ---------------------------------------------------------------------------
+-- ALARM TOASTS (ALL-385)
+-- BigNoteBoxDB.alarmDisplay: nil = the alarm window, "toast" = a toast, for
+-- alarms whose fire mode is Popup. Missed alarms (rang while offline or were
+-- held for combat) always come as toasts (Dukul, 2026-10-08). Either way the
+-- popup is the fallback while toasts or their Alarms source are off.
+-- A toast stays until clicked: left click dismisses, right click = Open /
+-- Snooze / Dismiss. It shows in combat (force) and plays no toast sound: the
+-- alarm has its own.
+-- ---------------------------------------------------------------------------
+local SNOOZE_MINS = { 1, 5, 10, 15, 30, 60 }   -- the alarm popup's choices
+local _toasted = {}   -- noteID = true while its ring is shown as a toast
+
+local function AlarmToastOn()
+    return BNB.ToastsEnabled and BNB.ToastsEnabled() and BNB.ToastSourceOn("alarms")
+end
+
+function AM.ShowsAsToast()
+    return BigNoteBoxDB and BigNoteBoxDB.alarmDisplay == "toast" or false
+end
+
+local function AlarmToastMenu(noteID, owner)
+    local note, CM = GetNote(noteID), BNB.ContextMenu
+    if not (note and note.alarm and CM) then return end
+    local alarm = note.alarm
+    CM.Open(owner, function(root)
+        root:CreateTitle((note.title and note.title ~= "") and note.title or L["AO_UNTITLED"], { badge = true,
+            icon = (note.icon and note.icon ~= "") and note.icon or nil,
+            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+        root:CreateButton(L["AO_OPEN_NOTE_BTN"], function()
+            if BNB.OpenNoteInMain then BNB.OpenNoteInMain(noteID) end
+        end, { icon = "editor" })
+        if alarm.snoozeEnabled ~= false then
+            local sn = root:CreateButton(L["AO_SNOOZE_BTN"], nil, { icon = "history" })
+            for _, m in ipairs(SNOOZE_MINS) do
+                sn:CreateButton(string.format(L["AO_MIN_FMT"], m), function() AM.Snooze(noteID, m) end)
+            end
+        end
+        root:CreateDivider()
+        root:CreateButton(L["AO_DISMISS_BTN"], function() AM.Dismiss(noteID) end)
+    end)
+end
+
+-- missed: rang while offline or in combat (its why line says when)
+local function ShowAlarmToast(noteID, missed)
+    local note  = GetNote(noteID)
+    local alarm = note and note.alarm
+    if not alarm then return end
+    _activePopups[noteID] = true   -- active until Dismiss / Snooze (StopRinging)
+    _toasted[noteID] = true
+    local due = alarm.snoozedUntil or alarm.time or time()
+    local why
+    if missed then
+        why = string.format(L["ALARM_TOAST_MISSED"], BNB.FmtDate(due) .. " " .. BNB.FmtClock(due))
+    else
+        why = string.format(L["ALARM_TOAST_WHY"], BNB.FmtClock(due))
+    end
+    BNB.Toast.Show({
+        key        = "alarm:" .. noteID,
+        source     = "alarms",
+        force      = true,
+        silent     = true,
+        hold       = 0,
+        icon       = (note.icon and note.icon ~= "") and note.icon or nil,
+        iconSetup  = function(tex, _, ownFrame)
+            if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+            if note.iconFrame and not ownFrame and BNB.ApplyIconFrame then
+                return BNB.ApplyIconFrame(tex, note, tex:GetWidth())
+            end
+        end,
+        title      = (note.title and note.title ~= "") and note.title or L["AO_UNTITLED"],
+        titleColor = note.titleColor,
+        text       = why,
+        line2      = (alarm.label and alarm.label ~= "") and alarm.label or nil,
+        onClick    = function() AM.Dismiss(noteID) end,
+        onRightClick = function(_, f) AlarmToastMenu(noteID, f) end,
+    })
+end
+
+-- ---------------------------------------------------------------------------
 -- DELIVER: show a ringing alarm the way its fire mode asks
 -- noPopup: login scan, which shows the popups itself after the missed list
+-- missed: held for combat, shown now (ALL-385: as a toast)
 -- ---------------------------------------------------------------------------
-local function Deliver(noteID, noPopup)
+local function Deliver(noteID, noPopup, missed)
     local note  = GetNote(noteID)
     local alarm = note and note.alarm
     if not alarm then return end
@@ -590,7 +670,12 @@ local function Deliver(noteID, noPopup)
     else
         -- "popup" (default): glow on the note list row now, AP.Show adds the popup
         AM.GlowStart(noteID)
-        if not noPopup then ShowAlarmPopup(noteID) end
+        if noPopup then return end
+        if (missed or AM.ShowsAsToast()) and AlarmToastOn() then
+            ShowAlarmToast(noteID, missed)
+        else
+            ShowAlarmPopup(noteID)
+        end
     end
 end
 
@@ -644,7 +729,21 @@ local function StopRinging(noteID)
     StopNag(noteID)
     AM.GlowStop(noteID)
     if BNB.AlarmPopup and BNB.AlarmPopup.HideFor then BNB.AlarmPopup.HideFor(noteID) end
+    if BNB.Toast then BNB.Toast.Dismiss("alarm:" .. noteID) end   -- ALL-385
+    _toasted[noteID] = nil
     ShowNextPopup()
+end
+
+-- Toasts or their Alarms source switched off (UI/Toast.lua): an alarm still
+-- ringing as a toast moves to the popup, so it is never left unseen
+function AM.ToastsOff()
+    for id in pairs(_toasted) do
+        _toasted[id] = nil
+        if _ringing[id] then
+            _activePopups[id] = nil
+            ShowAlarmPopup(id)
+        end
+    end
 end
 
 function AM.Dismiss(noteID)
@@ -783,7 +882,7 @@ local function OnCombatEnd()
     local stickies = _stickyAfterCombat
     _stickyAfterCombat = {}
     for id in pairs(stickies) do
-        if _ringing[id] then Deliver(id) end
+        if _ringing[id] then Deliver(id, nil, true) end
     end
 
     if #_combatQueue == 0 then return end
@@ -809,11 +908,11 @@ local function OnCombatEnd()
 
     if mode == "summary" then
         BNB:Print(string.format("[BNB] %d alarm(s) fired during combat.", #batch))
-        for _, id in ipairs(batch) do Deliver(id) end
+        for _, id in ipairs(batch) do Deliver(id, nil, true) end
     else  -- "immediate" and "chat"
         for _, id in ipairs(batch) do
             PlayAlarmSound(GetNote(id) and GetNote(id).alarm)
-            Deliver(id)
+            Deliver(id, nil, true)
         end
     end
 end
@@ -839,12 +938,22 @@ local function LoginScan()
     end
 
     if #_missedOnLogin > 0 then
+        -- Missed alarms come as toasts while toasts are on (ALL-385); an alarm
+        -- that opened its sticky has been seen there
+        local rest = {}
+        for _, id in ipairs(_missedOnLogin) do
+            if AlarmToastOn() and not _activeStickyAlarms[id] then
+                ShowAlarmToast(id, true)
+            else
+                rest[#rest + 1] = id
+            end
+        end
         -- Two or more missed: the overview lists them (and says so in chat);
         -- a single one gets just its popup (ALL-190, Dukul 2026-10-02)
-        if #_missedOnLogin > 1 and BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
-            BNB.AlarmOverview.ShowMissed(_missedOnLogin)
+        if #rest > 1 and BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
+            BNB.AlarmOverview.ShowMissed(rest)
         end
-        for _, id in ipairs(_missedOnLogin) do
+        for _, id in ipairs(rest) do
             ShowAlarmPopup(id)
         end
         _missedOnLogin = {}

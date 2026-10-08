@@ -279,8 +279,9 @@ local function NewWaypointRow(list, i)
     row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, top)
     row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, top)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    row._hi = row:CreateTexture(nil, "BACKGROUND")
-    row._hi:SetAllPoints(); row._hi:SetColorTexture(1, 1, 1, 0.06); row._hi:Hide()
+    -- The Trash / Alarms hover art, stretched over the two-line row (Dukul, 2026-10-08)
+    -- Skin mode fill at 18%: 6% could not be seen over the dark list (Dukul)
+    row._hi = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.18 })
     local function Col() return row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall") end
     row._name, row._xy, row._zone, row._sub = Col(), Col(), Col(), Col()
     PlaceWpCols(row, row._name, row._xy, row._zone, row._sub, -1, -1 - WP_LINE_H, WP_LINE_H)
@@ -430,8 +431,8 @@ function BNB.CreateSituationEditor(panel, opts)
         row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
         row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
         row:EnableMouse(true)
-        local hi = row:CreateTexture(nil, "BACKGROUND")
-        hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.06); hi:Hide()
+        -- The waypoint rows' hover: list art, 18% fill in skin mode (Dukul, 2026-10-08)
+        local hi = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.18 })
         row._kind = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         row._kind:SetPoint("LEFT", row, "LEFT", 6, 0)
         row._kind:SetWidth(62)
@@ -693,6 +694,7 @@ function BNB.CreateSituationEditor(panel, opts)
         return lbl
     end
 
+    local RefreshToastBtn   -- below the Toast... button; the Show as pick calls it
     local disp = NewChoice(panel, DISPLAY_KEYS,
         { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] },
         function(mode)
@@ -702,9 +704,40 @@ function BNB.CreateSituationEditor(panel, opts)
             else
                 BNB.UpdateNote(id, { _clear = { "contextDisplay" } })
             end
+            RefreshToastBtn()
             Sync(id)
         end)
     local dispLabel = OptionRow(1, 1, "SIT_ROW_SHOW_AS", disp)
+
+    -- Toast... (ALL-383): the note's own toast style and time on screen, in a
+    -- small window (the tab is full). Shares row 1 with Show as
+    local TOAST_BTN_W = 66
+    disp.frame:SetPoint("TOPRIGHT", optArea, "TOP", -OPT_GAP / 2 - TOAST_BTN_W - 4, -21)
+    local toastBtn = BNB.CreateButton(nil, panel, L["SIT_TOAST_BTN"], TOAST_BTN_W, 24)
+    toastBtn:SetPoint("TOPLEFT", disp.frame, "TOPRIGHT", 4, 0)
+    toastBtn:SetScript("OnClick", function()
+        local id = NoteID(); if not id then return end
+        BNB.NoteToastWindow.Open(id, ed.host)
+    end)
+    toastBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["SIT_TOAST_BTN_TIP_TITLE"], 1, 1, 1)
+        GameTooltip:AddLine(self:IsEnabled() and L["SIT_TOAST_BTN_TIP"] or L["SIT_TOAST_BTN_OFF_TIP"],
+            0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    toastBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    toastBtn:SetMotionScriptsWhileDisabled(true)
+    -- Greyed while the note would show no toast: Show as Sticky alone, or
+    -- the Toasts module / situation toasts off
+    function RefreshToastBtn()
+        local sticky = disp.value == "sticky" and BNB.StickiesEnabled()
+        local on = not sticky and BNB.ToastsEnabled() and BNB.ToastSourceOn("situation")
+        toastBtn:SetEnabled(on and true or false)
+    end
+    if ed.host then
+        ed.host:HookScript("OnHide", function() BNB.NoteToastWindow.Close(ed.host) end)
+    end
 
     local trig   -- the trigger picker, built below; RefreshLeaveRow reads it
 
@@ -1792,6 +1825,8 @@ function BNB.CreateSituationEditor(panel, opts)
             c.frame:SetEnabled(stickyOn); c.frame:SetAlpha(stickyOn and 1 or 0.45)
         end
         dispLabel:SetAlpha(stickyOn and 1 or 0.45); leaveLabel:SetAlpha(stickyOn and 1 or 0.45)
+        RefreshToastBtn()
+        BNB.NoteToastWindow.Rebind(noteID, self.host)
         local tr = note and note.contextTrigger
         trig:Set((tr == "leave" or tr == "both") and tr or "arrive")
         local fq = note and note.contextFreq

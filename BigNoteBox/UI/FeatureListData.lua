@@ -208,7 +208,7 @@ BNB.FEATURE_LIST = {
         items  = {
             "DUIs copy text button will automatically create a note",
             "Immersion has an extra floating button that when clicked creates a note",
-            "You can turn this on and off in \"Main config > Features\"",
+            "You can turn this on and off in \"Settings > Modules > Note Capture\"",
         },
     },
 
@@ -380,7 +380,7 @@ BNB.FEATURE_LIST = {
             "Minimap button position is draggable",
             "Keybind for open/close BNB (default: Ctrl+N)",
             "Keybind for New Note",
-            "Keybind for Quick Note",
+            "Keybind for Quick Note (F7)",
             "Keybind for Focus Mode",
             "Keybind for Sticky Note (current note)",
             "All keybinds configurable from Settings > General",

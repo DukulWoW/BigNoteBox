@@ -433,6 +433,7 @@ local function QuietToday(note)
 end
 
 local HOLD_CHOICES = { 5, 10, 30, 60 }
+BNB.TOAST_HOLD_CHOICES = HOLD_CHOICES   -- the note's Toast window offers the same (ALL-383)
 local NoteSpec   -- forward: the menu redraws the toast with the note's new style
 
 -- The right-click menu of a note toast or a grouped toast's row. owner = the
@@ -519,6 +520,16 @@ NoteSpec = function(note, why)
         spec.onRightClick = function(_, f) NoteMenu(id, f, spec.key, why) end
     end
     return spec
+end
+
+-- The note's own toast as it would show, from its Toast window (ALL-383):
+-- shown even in combat and while situation toasts are off (source "test")
+function BNB.TestNoteToast(id)
+    local note = BNB.GetNote(id)
+    if not note then return end
+    local spec = NoteSpec(note, L["NOTE_TOAST_TEST_WHY"])
+    spec.source, spec.force = "test", true
+    BNB.Toast.Show(spec)
 end
 
 -- Grouped: one toast, a row per note (the last row says how many more)

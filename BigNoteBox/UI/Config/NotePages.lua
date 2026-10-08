@@ -370,11 +370,13 @@ end
 function K.BuildAlarmsPage(sf, ct, y, page)
     -- Module switch (ALL-343). Applies live: off hides every way in and no
     -- alarm rings; the alarms stay on their notes (BNB.Alarm.ApplyModule).
-    local enableCb, sideDD
+    local enableCb, sideDD, showLbl, showDD
     local function ApplyAlarmsSection(on)
         local a = on and 1 or 0.35
         sideDD:SetAlpha(a); sideDD._lbl:SetAlpha(a)
         if sideDD._dd then sideDD._dd:SetEnabled(on) end
+        showLbl:SetAlpha(a); showDD:SetAlpha(a)
+        if showDD._dd then showDD._dd:SetEnabled(on) end
     end
     y, enableCb = AddCheck(ct, y, L["CFG_ALARMS_ENABLE_LABEL"],
         function() return BNB.AlarmsEnabled() end,
@@ -389,6 +391,34 @@ function K.BuildAlarmsPage(sf, ct, y, page)
 
     -- Which side the Alarms window opens on (ALL-269)
     y, sideDD = K.AddSideRow(ct, y, L["CFG_SIDE_ALARMS"], "alarmsSide", "BNBAlarmOverviewFrame")
+
+    -- Alarm window or toast (ALL-385): BigNoteBoxDB.alarmDisplay nil = the
+    -- window, "toast". Only for alarms whose fire mode is Popup; missed alarms
+    -- are toasts either way (Features/AlarmManager.lua)
+    showLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    showLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    showLbl:SetHeight(K.ROW_H); showLbl:SetJustifyH("LEFT")
+    showLbl:SetText(L["CFG_ALARM_SHOW_AS"])
+    y = y - (K.ROW_H + 2)
+    showDD = BNB.CreateValueDropdown(ct, {
+            { label = L["CFG_ALARM_SHOW_WINDOW"], value = "window" },
+            { label = L["CFG_ALARM_SHOW_TOAST"],  value = "toast" },
+        }, BigNoteBoxDB and BigNoteBoxDB.alarmDisplay == "toast" and "toast" or "window",
+        function(v)
+            if not BigNoteBoxDB then return end
+            if v == "toast" then BigNoteBoxDB.alarmDisplay = "toast" else BigNoteBoxDB.alarmDisplay = nil end
+        end, K.CONTENT_W, 26)
+    showDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    local tipOwner = showDD._dd or showDD
+    tipOwner:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_ALARM_SHOW_AS"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_ALARM_SHOW_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (32 + K.ROW_GAP)
+
     ApplyAlarmsSection(BNB.AlarmsEnabled())
     sf:FinaliseHeight(math.abs(y) + 12)
 end

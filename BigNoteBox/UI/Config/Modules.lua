@@ -164,7 +164,9 @@ local function BuildQuickNotePage(sf, ct, y, page)
         ApplyQNSection(db.quickNoteEnabled ~= false)
     end
 
-    -- Moved from Advanced > Keybindings (ALL-84): the key belongs to this module.
+    -- Moved from Advanced > Keybindings (ALL-84). Its own header since the
+    -- module became Note Capture (ALL-386): the F7 quick note is not a capture.
+    y = AddHeader(ct, y - 6, L["CFG_HDR_QUICK_NOTE_KEY"])
     y = MakeKeybindRow(ct, y, L["CFG_KB_QUICK_NOTE"],
         "BIGNOTEBOXQUICKNOTE", "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F7") .. ")", L["CFG_KB_DESC_QUICK_NOTE"])
 
@@ -1163,7 +1165,10 @@ local function BuildStickyPage(sf, ct, y, page)
     y = AddCheck(ct, y, L["CFG_CHK_ESC_DIM_LABEL"],
         function() return db.stickyEscOverlay ~= false end,
         -- nil = on, false = off. Not `v and nil or false`: that is always false.
-        function(v) if v then db.stickyEscOverlay = nil else db.stickyEscOverlay = false end end,
+        function(v)
+            if v then db.stickyEscOverlay = nil else db.stickyEscOverlay = false end
+            if BNB.Sticky and BNB.Sticky.ApplyEscOverlay then BNB.Sticky.ApplyEscOverlay() end
+        end,
         L["CFG_CHK_ESC_DIM_TIP"])
 
     -- On by default: nil = on, explicit false = off.
@@ -1404,13 +1409,16 @@ local function BuildToastsPage(sf, ct, y, page)
         end,
         L["CFG_CHK_TOASTS_TIP"])
 
-    -- Who may show a toast (Alarms later, ALL-385)
+    -- Who may show a toast
     y = AddHeader(ct, y - 6, L["CFG_TOAST_SOURCES_HDR"])
     for _, src in ipairs({
         { "situation", "CFG_TOAST_SRC_SITUATION", "CFG_TOAST_SRC_SITUATION_TIP",
           function() return BNB.SituationsEnabled() end },
         { "tasks", "CFG_TOAST_SRC_TASKS", "CFG_TOAST_SRC_TASKS_TIP",
           function() return BNB.SituationsEnabled() and BNB.TasksEnabled() end },
+        -- Alarm toasts (ALL-385): off = alarms use the alarm window
+        { "alarms", "CFG_TOAST_SRC_ALARMS", "CFG_TOAST_SRC_ALARMS_TIP",
+          function() return BNB.AlarmsEnabled() end },
     }) do
         local key = src[1]
         local box

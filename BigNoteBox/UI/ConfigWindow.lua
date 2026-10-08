@@ -23,7 +23,9 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 -- ── Constants ─────────────────────────────────────────────────────────────────
-local CFG_W      = 480
+-- 520 in both modes, as skin mode was: the content width follows it, so skin
+-- mode had dead space on the right and normal mode cut "Appearance" (Dukul, 2026-10-08)
+local CFG_W      = 520
 -- Top of the tab panels: tabs sit at y -25 and are ~32 tall, so this leaves a
 -- small gap under them (was 60 + 32 = 92, ~35 px of dead space)
 local CONTENT_TOP = 68

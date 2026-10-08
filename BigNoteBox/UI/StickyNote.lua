@@ -225,6 +225,18 @@ local function HideESCOverlay()
     end
 end
 
+-- The Dim screen setting changed (ALL-387): follow it at once while the game
+-- menu is up with an ESC sticky open, rather than at the next ESC.
+function SN.ApplyEscOverlay()
+    if BigNoteBoxDB and BigNoteBoxDB.stickyEscOverlay == false then
+        HideESCOverlay(); return
+    end
+    if not (GameMenuFrame and GameMenuFrame:IsShown()) then return end
+    for _, f in pairs(openFrames) do
+        if f._cfg and f._cfg.escOnly then ShowESCOverlay(); return end
+    end
+end
+
 local function EnsureESCHook()
     if _escHookDone then return end
     _escHookDone = true

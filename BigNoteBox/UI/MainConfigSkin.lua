@@ -18,7 +18,8 @@
 local BNB = BigNoteBox
 
 -- ── Layout constants ──────────────────────────────────────────────────────────
--- Wider than the classic 480px so the 6 tab labels have comfortable widths.
+-- The same width as normal mode (ConfigWindow.lua CFG_W), whose content width
+-- both modes use, so the 6 tab labels have comfortable widths.
 -- At 520 each tab is ~85px wide — "Appearance" fits cleanly.
 local SK_CFG_W        = 520
 local SK_CFG_TAB_H    = 24     -- matches SK_TAB_H in SkinSystem.lua

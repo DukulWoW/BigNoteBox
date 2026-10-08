@@ -646,10 +646,12 @@ end
 function BNB.ApplyToastsModule(on)
     if on then return end
     T.DismissAll()
+    if BNB.Alarm and BNB.Alarm.ToastsOff then BNB.Alarm.ToastsOff() end   -- ALL-385
     if _anchor and _anchor:IsShown() then SaveAnchor(_anchor); _anchor:Hide() end
 end
 
 -- One sender switched (Settings > Modules > Toasts): its toasts go
 function BNB.ApplyToastSource(source, on)
     if not on then T.DismissAll(source) end
+    if not on and source == "alarms" and BNB.Alarm and BNB.Alarm.ToastsOff then BNB.Alarm.ToastsOff() end
 end
