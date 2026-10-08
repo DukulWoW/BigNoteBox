@@ -353,10 +353,12 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
     -- White text for headings/body; colour tags in markup override per-span.
     -- Note: SimpleHTML does not support SetFontObject/SetTextColor for "a" tags —
     -- link colour is applied by wrapping <a> content in WoW colour codes in ToHTML.
-    f:SetTextColor("h1", 1, 1, 1)
-    f:SetTextColor("h2", 1, 1, 1)
-    f:SetTextColor("h3", 1, 1, 1)
-    f:SetTextColor("p",  0.90, 0.90, 0.90)
+    -- Muted on OLED (BNB.TextWhite, ALL-402 S2)
+    local hr, hg, hb = BNB.TextWhite()
+    f:SetTextColor("h1", hr, hg, hb)
+    f:SetTextColor("h2", hr, hg, hb)
+    f:SetTextColor("h3", hr, hg, hb)
+    f:SetTextColor("p",  BNB.TextWhite(0.90))
 end
 
 --------------------------------------------------------------------------------

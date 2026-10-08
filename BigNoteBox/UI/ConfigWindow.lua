@@ -131,7 +131,7 @@ end
 local function AddHeader(ct, y, text, r, g, b)
     local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
     lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    lbl:SetTextColor(r or 1, g or 0.82, b or 0)
+    if r then lbl:SetTextColor(r, g, b) else BNB.SetHeaderColor(lbl) end   -- ALL-402
     lbl:SetText(text)
     return y - 26
 end
@@ -315,7 +315,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
     local rowCb = page.get and tg or (cb and ov) or nil
     if rowCb then BNB.LabelHit(rowCb, lbl) end
 
-    local d = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local d = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     d:SetPoint("TOPLEFT", ct, "TOPLEFT", TEXT_X, y - 24)
     d:SetWidth(CONTENT_W - TEXT_X); d:SetJustifyH("LEFT"); d:SetWordWrap(true)
     d:SetTextColor(0.65, 0.65, 0.65)

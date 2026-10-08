@@ -439,7 +439,7 @@ local function PopulateStickySettings(noteID)
                 if sel then e.btn:SetBackdropColor(0.12,0.18,0.12,0.95); e.btn:SetBackdropBorderColor(0.4,0.8,0.4,1)
                 else        e.btn:SetBackdropColor(0.06,0.06,0.08,0.95); e.btn:SetBackdropBorderColor(0.28,0.28,0.30,1) end
             end
-            if e.nameLbl then e.nameLbl:SetTextColor(sel and 1 or 0.85, sel and 0.82 or 0.85, sel and 0 or 0.85, 1) end
+            if e.nameLbl then if sel then BNB.SetHeaderColor(e.nameLbl) else BNB.SetTextWhite(e.nameLbl, 0.85) end end
         end
         if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
         if _refreshLSM_sn then _refreshLSM_sn() end

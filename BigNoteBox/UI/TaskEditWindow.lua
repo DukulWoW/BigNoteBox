@@ -96,7 +96,7 @@ local function BuildContent(f, ct, saveBtn)
     textLbl:SetHeight(TW_ROW)
     textLbl:SetJustifyH("LEFT")
     textLbl:SetWordWrap(false)
-    textLbl:SetTextColor(0.9, 0.9, 0.9)
+    BNB.SetTextWhite(textLbl, 0.9)
 
     local textEB = BNB.CreateBackdropFrame("EditBox", nil, textSection)
     textEB:SetSize(TW_CW, TW_ROW)

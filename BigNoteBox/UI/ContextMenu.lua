@@ -309,7 +309,7 @@ local function NewRow(f)
     r._mark:SetTexture(RADIO)
     r._mark:SetSize(16, 16)
     r._mark:SetPoint("LEFT", 5, 0)
-    r._text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    r._text = r:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     r._text:SetJustifyH("LEFT")
     r._text:SetWordWrap(false)
     r._arrow = r:CreateTexture(nil, "ARTWORK")
@@ -446,13 +446,13 @@ local function Fill(f, d)
             r:SetHeight(ROW_H); r:EnableMouse(true)
             r._disabled = it.opts.disabled and true or false
             r._hasSub = HasSub(it) and not r._disabled
-            r._text:SetFontObject(r._disabled and "GameFontDisable" or "GameFontHighlight")
+            r._text:SetFontObject(r._disabled and "GameFontDisable" or "BNBFontHighlight")
             if r._disabled then
                 r._text:SetTextColor(0.5, 0.5, 0.5)
             elseif it.opts.danger or WARNING[it.opts.icon or ""] then
                 r._text:SetTextColor(DANGER_TEXT[1], DANGER_TEXT[2], DANGER_TEXT[3])
             else
-                r._text:SetTextColor(1, 1, 1)
+                BNB.SetTextWhite(r._text)
             end
             r._text:SetText(it.text or "")
             r._text:Show()

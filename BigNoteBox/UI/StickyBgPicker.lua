@@ -134,7 +134,7 @@ local function MakeTile()
     t.layer = BNB.BgLayer.Create(t.mini)
     t.sel = Outline(t.box, SEL_R, SEL_G, SEL_B, 1, 2)
     t.hov = Outline(t.box, 1, 1, 1, 0.5, 1)
-    t.lbl = t:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    t.lbl = t:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     t.lbl:SetPoint("TOPLEFT",  t.box, "BOTTOMLEFT",  0, -3)
     t.lbl:SetPoint("TOPRIGHT", t.box, "BOTTOMRIGHT", 0, -3)
     t.lbl:SetJustifyH("CENTER")
@@ -216,7 +216,7 @@ Render = function(scrollToSel)
             selRow = row
             t.lbl:SetTextColor(SEL_R, SEL_G, SEL_B)
         else
-            t.lbl:SetTextColor(0.9, 0.9, 0.9)
+            BNB.SetTextWhite(t.lbl, 0.9)
         end
         t:Show()
         pcall(Paint, t, st)

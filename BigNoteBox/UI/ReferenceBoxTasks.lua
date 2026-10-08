@@ -315,6 +315,7 @@ local function BuildTaskPanel(f)
     -- Fixed header label on pnl (not tsc) so it doesn't scroll with task rows.
     -- Created once at build time; RenderTaskPanel updates its text each render.
     local pnlHdrLbl = pnl:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    BNB.SetHeaderColor(pnlHdrLbl)
     pnlHdrLbl:SetPoint("TOPLEFT",  pnl, "TOPLEFT",  PAD + 3, -4)
     pnlHdrLbl:SetPoint("TOPRIGHT", pnl, "TOPRIGHT", -4,      -4)
     pnlHdrLbl:SetHeight(TASK_HDR_H - 4)

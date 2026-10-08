@@ -991,7 +991,7 @@ local function RebuildTagChips(strip, tags)
         lbl:SetPoint("RIGHT", lblBtn, "RIGHT", 0, 0)
         -- White text in skin mode, gold otherwise
         if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            lbl:SetTextColor(1, 1, 1, 1)
+            BNB.SetTextWhite(lbl)
         else
             BNB.SetHeaderColor(lbl)
         end
@@ -1845,7 +1845,7 @@ end
 -- The icon-button symbol left of a text label, centred as one group on the tab
 -- (yOff from its centre). Sets the tab's width; returns the icon and label.
 local function AddTabFace(btn, symbol, label, yOff)
-    local fs = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local fs = btn:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     fs:SetText(label)
     local icon = btn:CreateTexture(nil, "ARTWORK", nil, 2)
     icon:SetTexture(FTAB_SYM .. symbol .. "-normal")

@@ -665,7 +665,7 @@ local function BuildSearchBar(parent)
                 currentFilter    = text
                 pcall(function()
                     if not eb._showingPlaceholder then
-                        eb:SetTextColor(1, 1, 1, 1)
+                        BNB.SetTextWhite(eb)
                     end
                 end)
             end
@@ -1865,10 +1865,7 @@ local function PopulateEntry(btn, note, selected, collapsed)
             if tc then
                 btn._titleLbl:SetTextColor(tc.r, tc.g, tc.b, 1)
             else
-                btn._titleLbl:SetTextColor(
-                    hasTitle and 1 or 0.5,
-                    hasTitle and 1 or 0.5,
-                    hasTitle and 1 or 0.5)
+                btn._titleLbl:SetTextColor(BNB.TextWhite(hasTitle and 1 or 0.5))
             end
         end
     end

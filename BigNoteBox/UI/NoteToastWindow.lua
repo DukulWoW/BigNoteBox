@@ -87,7 +87,7 @@ local function Build()
     host:SetSize(cw, 1)
 
     -- Which note this is: the window can stay open across a note switch
-    local noteLbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local noteLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     noteLbl:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
     noteLbl:SetWidth(cw); noteLbl:SetJustifyH("LEFT"); noteLbl:SetWordWrap(false)
     f._noteLbl = noteLbl

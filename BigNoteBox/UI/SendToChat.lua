@@ -215,7 +215,7 @@ local function CreateConfirmDialog()
     local statsLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     statsLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, contentY)
     statsLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, contentY)
-    statsLbl:SetJustifyH("LEFT"); statsLbl:SetTextColor(0.90, 0.90, 0.90)
+    statsLbl:SetJustifyH("LEFT"); BNB.SetTextWhite(statsLbl, 0.9)
     f._statsLbl = statsLbl
 
     local chanLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")

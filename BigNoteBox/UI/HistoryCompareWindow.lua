@@ -304,6 +304,7 @@ local function BuildCompareWindow()
     local panW = math.floor((CMP_W - PAD * 2 - COL_GAP) / 2)
 
     local lHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    BNB.SetHeaderColor(lHdr)
     lHdr:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(titleH + 4))
     lHdr:SetWidth(panW); lHdr:SetJustifyH("LEFT"); lHdr:SetHeight(HDR_H)
     lHdr:SetText(L["HISTORY_COMPARE_CURRENT"])

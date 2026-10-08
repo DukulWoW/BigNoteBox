@@ -410,21 +410,21 @@ local function BuildPage1(content)
     y = y - (name:GetStringHeight() or 20) - 4
 
     -- Version
-    local ver = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local ver = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     ver:SetPoint("TOP", ct, "TOP", 0, y)
     ver:SetText(string.format(L["SW_VERSION_FMT"], BNB.ADDON_VERSION))
     ver:SetTextColor(0.55, 0.55, 0.55)
     y = y - (ver:GetStringHeight() or 12) - 2
 
     -- By Dukul
-    local by = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local by = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     by:SetPoint("TOP", ct, "TOP", 0, y)
     by:SetText(L["AUTHOR"])
     by:SetTextColor(0.65, 0.65, 0.65)
     y = y - (by:GetStringHeight() or 12) - 24
 
     -- Welcome text
-    local txt = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local txt = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     txt:SetPoint("TOP", ct, "TOP", 0, y)
     txt:SetWidth(CW - 36)
     txt:SetJustifyH("CENTER")
@@ -448,7 +448,7 @@ local function BuildPage1(content)
         sf:SetPoint("BOTTOMRIGHT", lb, "TOPRIGHT", -16, 4)
         local ly = 0
 
-        local lgLbl = lb:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        local lgLbl = lb:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         lgLbl:SetPoint("TOP", lb, "TOP", 0, ly)
         lgLbl:SetText(L["SW_WELCOME_LANG_LBL"])
         ly = ly - (lgLbl:GetStringHeight() or 14) - 6
@@ -745,7 +745,7 @@ local function BuildUsagePage(content)
         c._title:SetPoint("TOPLEFT", c._badge, "TOPRIGHT", 10, -14)
         c._title:SetText(L[ch.title])
 
-        local d = c:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local d = c:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
         d:SetPoint("TOPLEFT",  c._badge, "TOPRIGHT", 10, -38)
         d:SetPoint("RIGHT",    c, "RIGHT", -14, 0)
         d:SetJustifyH("LEFT"); d:SetJustifyV("TOP"); d:SetWordWrap(true); d:SetSpacing(2)
@@ -954,7 +954,7 @@ local function BuildPage2(content)
     y = y - 28 - 10
 
     -- Explanation text
-    local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local desc = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     desc:SetPoint("TOPLEFT",  f, "TOPLEFT",  0, y)
     desc:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0, y)
     desc:SetJustifyH("LEFT"); desc:SetWordWrap(true); desc:SetSpacing(2)

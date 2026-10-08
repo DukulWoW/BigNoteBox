@@ -132,7 +132,7 @@ function BNB.ShowForeverNotice()
         close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -14)
         close:SetFrameLevel(f:GetFrameLevel() + 5)   -- above the corner art
 
-        local body = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        local body = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -TOP)
         body:SetWidth(W - PAD * 2)
         body:SetJustifyH("LEFT")

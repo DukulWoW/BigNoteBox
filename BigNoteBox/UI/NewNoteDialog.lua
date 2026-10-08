@@ -210,7 +210,7 @@ local function RefreshFontHighlight()
             end
         end
         if e.nameLbl then
-            e.nameLbl:SetTextColor(sel and 1 or 0.85, sel and 0.82 or 0.85, sel and 0 or 0.85, 1)
+            if sel then BNB.SetHeaderColor(e.nameLbl) else BNB.SetTextWhite(e.nameLbl, 0.85) end
         end
     end
 end
@@ -345,7 +345,7 @@ local function BuildDialog()
     titleEB:SetAutoFocus(false)
     titleEB:SetMaxLetters(128)
     titleEB:SetTextInsets(2, 2, 2, 2)
-    titleEB:SetTextColor(1, 1, 1, 1)
+    BNB.SetTextWhite(titleEB)
     -- Font set in ApplyTitleFont() called from Open()
 
     titleEB:SetScript("OnEnterPressed", function() NND.Confirm() end)

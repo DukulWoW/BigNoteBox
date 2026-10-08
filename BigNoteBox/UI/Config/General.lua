@@ -51,11 +51,22 @@ local function BuildGeneralTab(sf, ct)
         end
     end)
 
-    -- By-line
-    local byLine = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    byLine:SetPoint("LEFT", ver, "RIGHT", 8, 0)
-    byLine:SetText(L["AUTHOR"])
-    byLine:SetTextColor(0.55, 0.55, 0.55)
+    -- By-line: a button that copies the link to dukul.net (Dukul, 2026-10-08)
+    local byBtn = BNB.CreateButton(nil, ct, L["AUTHOR"], 90, 20)
+    byBtn:SetPoint("LEFT", ver, "RIGHT", 8, 0)
+    local byFs = byBtn:GetFontString() or byBtn._lbl
+    if byFs and byFs.GetStringWidth then
+        byBtn:SetWidth(math.max(90, math.ceil(byFs:GetStringWidth()) + 24))
+    end
+    byBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(L["CFG_AUTHOR_TIP"], nil, nil, nil, nil, true)
+        GameTooltip:Show()
+    end)
+    byBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    byBtn:SetScript("OnClick", function(self)
+        BNB.ShowClipboardHint("https://dukul.net", self, true)
+    end)
 
     -- ── Pack status icons (ALL-14), right side of the header, right to left.
     -- Installed: full colour, tooltip "Installed, vX.Y.Z", no click. Missing: grey,
@@ -390,7 +401,7 @@ local function BuildGeneralTab(sf, ct)
     rule:SetPoint("BOTTOMLEFT",  ct, "BOTTOMLEFT",  0, SOL_H - 1)
     rule:SetPoint("BOTTOMRIGHT", ct, "BOTTOMRIGHT", 0, SOL_H - 1)
 
-    local sol = ct:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    local sol = ct:CreateFontString(nil, "ARTWORK", "BNBFontHighlightSmall")
     sol:SetPoint("BOTTOM", ct, "BOTTOM", 0, 8)
     sol:SetWidth(CONTENT_W); sol:SetJustifyH("CENTER")
     sol:SetTextColor(0.85, 0.85, 0.85)

@@ -430,7 +430,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     lbl:SetAllPoints()
     lbl:SetJustifyH("CENTER")
     lbl:SetJustifyV("MIDDLE")
-    lbl:SetTextColor(1, 1, 1)
+    BNB.SetTextWhite(lbl)
     lbl:SetText(text or "")
     btn._lbl = lbl
 
@@ -714,8 +714,7 @@ function BNB.SkinDropdown(dd)
         end
         local on = dd:IsEnabled()
         if dd.Text then
-            local c = on and 1 or 0.5
-            dd.Text:SetTextColor(c, c, c)
+            if on then dd.Text:SetTextColor(BNB.TextWhite()) else dd.Text:SetTextColor(0.5, 0.5, 0.5) end
         end
         if vis then vis:SetEnabled(on) end
         if arrow then arrow:SetEnabled(on) end
@@ -953,7 +952,7 @@ function BNB.AddPlaceholder(eb, text, r, g, b)
     -- (the editor title takes the note's title colour, ALL-260)
     local function realColor(self)
         local c = self._realColor
-        if c then setColor(self, c.r, c.g, c.b) else setColor(self, 1, 1, 1) end
+        if c then setColor(self, c.r, c.g, c.b) else setColor(self, BNB.TextWhite()) end   -- ALL-402 S2
     end
 
     local function hidePlaceholder()
@@ -1056,6 +1055,7 @@ local function FitCheckHit(cb)
     local lbl = cb._hitLbl
     if not HasText(lbl) then lbl = FindCheckLabel(cb) end
     cb._hitLbl = lbl
+    if lbl and BNB.UseLabelFont then BNB.UseLabelFont(lbl) end
     if not (lbl and lbl:IsShown()) then cb:SetHitRectInsets(0, 0, 0, 0); return end
     local w = lbl:GetStringWidth() or 0
     local lw = lbl:GetWidth() or 0
@@ -1083,27 +1083,16 @@ end
 function BNB.LabelHit(cb, lbl)
     if not cb then return end
     if cb._labelHit then   -- a pooled row with new text: measure again
-        if lbl then cb._hitLbl = lbl end
+        if lbl then cb._hitLbl = lbl; BNB.UseLabelFont(lbl) end
         C_Timer.After(0, function() if cb:IsShown() then FitCheckHit(cb) end end)
         return
     end
     cb._labelHit = true
     cb._hitLbl = lbl
-    -- The template's own label is gold GameFontNormal*: our copy takes the
-    -- header colour (ALL-402); a label coloured by hand keeps its colour
-    local t = cb.Text
-    if t and t.GetFontObject then
-        local fo = t:GetFontObject()
-        local to = (fo == GameFontNormalSmall and "BNBFontNormalSmall")
-            or (fo == GameFontNormal and "BNBFontNormal") or nil
-        if to then
-            local r, g, b, a = t:GetTextColor()
-            t:SetFontObject(to)
-            if not (r > 0.99 and math.abs(g - 0.82) < 0.01 and b < 0.01) then
-                t:SetTextColor(r, g, b, a)
-            end
-        end
-    end
+    -- Checkbox labels are white in both modes, only headings take the accent
+    -- (ALL-402 S2); a label coloured by hand keeps its colour
+    BNB.UseLabelFont(cb.Text)
+    BNB.UseLabelFont(lbl)
     cb:HookScript("OnShow", function(self)
         FitCheckHit(self)
         -- Anchored labels have no size until the next frame
@@ -1406,7 +1395,7 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     eb:SetPoint("BOTTOMRIGHT", dd, "BOTTOMRIGHT", -22, 0)  -- leave the arrow clickable
     eb:SetFrameLevel(dd:GetFrameLevel() + 2)
     eb:SetAutoFocus(false); eb:SetMaxLetters(DIGITS + 1)
-    eb:SetFontObject("GameFontHighlightSmall"); eb:SetJustifyH("CENTER")
+    eb:SetFontObject("BNBFontHighlightSmall"); eb:SetJustifyH("CENTER")
     eb:SetTextInsets(6, 6, 0, 0)
 
     local function Clamp(n)
@@ -1658,7 +1647,7 @@ function BNB.CreateStackedSlider(parent, width, o)
     local h = CreateFrame("Frame", nil, parent)
     h:SetSize(width, BNB.STACKED_SLIDER_H)
 
-    local val = h:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local val = h:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     val:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, 0)
     val:SetJustifyH("RIGHT")
 
@@ -1989,13 +1978,13 @@ local function BuildTagAutocomplete()
         row.selTex = sel
 
         -- Tag name (left)
-        local nameLbl = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        local nameLbl = row:CreateFontString(nil, "ARTWORK", "BNBFontHighlightSmall")
         nameLbl:SetPoint("LEFT", 8, 0)
         nameLbl:SetJustifyH("LEFT")
         row.nameLbl = nameLbl
 
         -- Count (right, dimmed)
-        local countLbl = row:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+        local countLbl = row:CreateFontString(nil, "ARTWORK", "BNBFontHighlightSmall")
         countLbl:SetPoint("RIGHT", -8, 0)
         countLbl:SetJustifyH("RIGHT")
         countLbl:SetTextColor(0.5, 0.5, 0.5)

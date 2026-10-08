@@ -81,7 +81,7 @@ local function ColourSwatch(parent, x, y, text, get, set, noAlpha)
     bdr:SetAllPoints(); bdr:SetFrameLevel(sw:GetFrameLevel() + 1)
     BNB.SetBackdrop(bdr, 0, 0, 0, 0, 0.45, 0.45, 0.48, 1)
     bdr:EnableMouse(false)
-    local lbl = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local lbl = parent:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     lbl:SetPoint("LEFT", sw, "RIGHT", 6, 0)
     lbl:SetText(text)
     sw._lbl = lbl
@@ -733,7 +733,7 @@ local function BuildOraclePage(sf, ct, y, page)
     local alarmRow   -- { dd, lbl }: greyed while the Alarms module is off
     for _, w in ipairs(WEIGHTS) do
         local key = w.key
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 4)
         lbl:SetWidth(CONTENT_W - WEIGHT_W - 8); lbl:SetJustifyH("LEFT")
         lbl:SetWordWrap(false)

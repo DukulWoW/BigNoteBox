@@ -105,7 +105,7 @@ function BNB.ShowBugReport()
         })
         f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
 
-        local body = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        local body = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -40)
         body:SetWidth(W - PAD * 2)
         body:SetJustifyH("LEFT")

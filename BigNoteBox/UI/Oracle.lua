@@ -371,7 +371,7 @@ local function BuildHelp()
         return fs
     end
 
-    local intro = FS("GameFontHighlightSmall", L["ORACLE_HELP_SYNTAX"])
+    local intro = FS("BNBFontHighlightSmall", L["ORACLE_HELP_SYNTAX"])
     intro:SetPoint("TOPLEFT", helpFrame, "TOPLEFT", 0, 0)
     intro:SetPoint("TOPRIGHT", helpFrame, "TOPRIGHT", 0, 0)
 
@@ -390,11 +390,11 @@ local function BuildHelp()
             if line.h then
                 fs, x = FS("BNBFontNormalSmall", line.h), x0
             elseif line.k then
-                local key = FS("GameFontHighlightSmall", line.k)
+                local key = FS("BNBFontHighlightSmall", line.k)
                 key:SetPoint("TOPLEFT", helpFrame, anchor, x0 + 4, y)
                 fs, x = FS("GameFontDisableSmall", line.d), x0 + 4 + HELP_KEY_W[c]
             elseif line.ex then
-                fs, x = FS("GameFontHighlightSmall", line.ex), x0 + 4
+                fs, x = FS("BNBFontHighlightSmall", line.ex), x0 + 4
             elseif line.sub then
                 -- Under `d` it lines up with the descriptions, under an
                 -- example it is indented a little.
@@ -585,7 +585,7 @@ local function RowText(row, r, textRight, m)
     local title = (note.title and note.title ~= "") and note.title or L["UNTITLED"]
     row.title:SetText(title)
     local tc = note.titleColor
-    if tc then row.title:SetTextColor(tc.r, tc.g, tc.b) else row.title:SetTextColor(1, 1, 1) end
+    if tc then row.title:SetTextColor(tc.r, tc.g, tc.b) else BNB.SetTextWhite(row.title) end
     row.snippet:SetText(r.snippet or "")
     row.scope:SetText("")   -- the scope is the rightmost badge now
 
@@ -661,7 +661,7 @@ end
 local function RowFonts(row, m)
     m = m or RowMetrics()
     local T, S = RESULT_SIZES.title.def, RESULT_SIZES.small.def
-    BNB.SetFontSafe(row.title,   fontPath, m.title, "GameFontHighlight")
+    BNB.SetFontSafe(row.title,   fontPath, m.title, "BNBFontHighlight")
     BNB.SetFontSafe(row.snippet, fontPath, m.small, "GameFontDisableSmall")
     BNB.SetFontSafe(row.scope,   fontPath, m.small, "GameFontDisableSmall")
     ScaleText(row.title, m.title, T)
@@ -713,7 +713,7 @@ local function BuildRow(parent, onEnter, onClick)
     scope:SetWordWrap(false)
     row.scope = scope
 
-    local title = row:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local title = row:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     title:SetJustifyH("LEFT")
     title:SetWordWrap(false)
     row.title = title
@@ -1000,7 +1000,7 @@ end
 local function ApplyFonts(themeID)
     local path, size = BNB.GetSearchFont(themeID)
     fontPath = path
-    eb:SetFontObject("GameFontHighlightLarge")
+    eb:SetFontObject("BNBFontHighlightLarge")
     placeholder:SetFontObject("GameFontDisableLarge")
     if path then
         local px = BNB.FontPx(path, size)
@@ -1045,7 +1045,7 @@ local function Build()
     eb = CreateFrame("EditBox", nil, bar)
     eb:SetPoint("TOPLEFT", bar._searchPieces.text, "TOPLEFT")
     eb:SetPoint("BOTTOMRIGHT", bar._searchPieces.text, "BOTTOMRIGHT")
-    eb:SetFontObject("GameFontHighlightLarge")
+    eb:SetFontObject("BNBFontHighlightLarge")
     eb:SetAutoFocus(false)
     eb:SetMaxLetters(200)
 

@@ -994,7 +994,7 @@ function BNB.CreateMainWindow()
     local sizeLabelTxt = sizeLabel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     sizeLabelTxt:SetAllPoints()
     sizeLabelTxt:SetJustifyH("CENTER")
-    sizeLabelTxt:SetTextColor(1, 1, 1)
+    BNB.SetTextWhite(sizeLabelTxt)
 
     -- Sidebar width (BTN_SZ in Sidebar.lua = 64) subtracted when sidebar is visible
     -- so the label shows the notepad window size, not including the sidebar strip.
@@ -1442,7 +1442,7 @@ local function BuildBCBPromo()
     byLbl:SetText(L["MW_BCB_PROMO_BY"])
 
     -- ── Description ───────────────────────────────────────────────────────────
-    local desc = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    local desc = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     desc:SetPoint("TOP", byLbl, "BOTTOM", 0, -10)
     desc:SetWidth(innerW)
     desc:SetJustifyH("CENTER")

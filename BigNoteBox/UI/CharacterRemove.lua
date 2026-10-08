@@ -103,7 +103,7 @@ local function Build()
     local top = (f._isSkin and BNB.TOOL_SKIN_TITLE_H or 28) + 12
     f._top = top
 
-    _text = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    _text = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
     _text:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -top)
     _text:SetWidth(W - 2 * PAD)
     _text:SetJustifyH("LEFT"); _text:SetWordWrap(true)

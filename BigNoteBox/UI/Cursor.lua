@@ -264,7 +264,7 @@ local function BuildTest()
     closeBtn:SetScript("OnClick", function() f:Hide() end)
 
     local y = -40
-    local intro = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local intro = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     intro:SetPoint("TOPLEFT",  f, "TOPLEFT",  T_PAD, y)
     intro:SetPoint("TOPRIGHT", f, "TOPRIGHT", -T_PAD, y)
     intro:SetJustifyH("LEFT")
@@ -292,7 +292,7 @@ local function BuildTest()
     status:SetWordWrap(true)
 
     for _, row in ipairs(TEST_ROWS) do
-        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local lbl = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
         lbl:SetPoint("LEFT", f, "TOPLEFT", T_PAD, y - TILE_H / 2)
         lbl:SetWidth(LABEL_W - 8)
         lbl:SetJustifyH("LEFT")

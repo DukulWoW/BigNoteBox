@@ -104,7 +104,7 @@ local function GetOrCreateTagHeader(child, idx)
     lbl:SetPoint("LEFT", arrowBtn, "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", btn, "RIGHT", -40, 0)
     lbl:SetJustifyH("LEFT")
-    lbl:SetTextColor(1, 1, 1, 1)
+    BNB.SetTextWhite(lbl)
     btn._lbl = lbl
 
     local countLbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")

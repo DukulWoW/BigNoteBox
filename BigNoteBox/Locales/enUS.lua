@@ -38,6 +38,7 @@ local L = BigNoteBox.L
 -- ── Addon identity ────────────────────────────────────────────────────────────
 L["ADDON_NAME"]   = "BigNoteBox"
 L["AUTHOR"]       = "by Dukul"
+L["CFG_AUTHOR_TIP"] = "Copy the link to dukul.net"
 L["LOADED_MSG"]   = "BigNoteBox v%s loaded! Type /bnb for options."
 
 -- ── Shared UI ─────────────────────────────────────────────────────────────────

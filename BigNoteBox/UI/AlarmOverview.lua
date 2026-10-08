@@ -74,7 +74,7 @@ local function BuildPopup()
     labelLbl:SetPoint("TOPLEFT",  f, "TOPLEFT",  POPUP_PAD + 38, -POPUP_PAD - 16)
     labelLbl:SetPoint("TOPRIGHT", f, "TOPRIGHT", -POPUP_PAD,     -POPUP_PAD - 16)
     labelLbl:SetJustifyH("LEFT")
-    labelLbl:SetTextColor(0.9, 0.9, 0.9, 1)
+    BNB.SetTextWhite(labelLbl, 0.9)
     f._labelLbl = labelLbl
 
     -- Divider
@@ -670,7 +670,7 @@ function AO.Refresh()
             end)
         elseif gone then
             pcall(function() row._iconTx:SetDesaturated(false) end)
-            row._titleLbl:SetTextColor(1, 1, 1, 1)
+            BNB.SetTextWhite(row._titleLbl)
             row._timeLbl:Hide(); row._resetBtn:Hide(); row._dismissBtn:Show()
             -- Recurring alarms move on to their next time, one-off ones end (AM.Dismiss)
             row._dismissBtn:SetScript("OnClick", function()
@@ -678,7 +678,7 @@ function AO.Refresh()
             end)
         else
             pcall(function() row._iconTx:SetDesaturated(false) end)
-            row._titleLbl:SetTextColor(1, 1, 1, 1)
+            BNB.SetTextWhite(row._titleLbl)
             row._timeLbl:SetText(FormatFireTime(noteID))
             row._timeLbl:Show(); row._resetBtn:Hide()
         end

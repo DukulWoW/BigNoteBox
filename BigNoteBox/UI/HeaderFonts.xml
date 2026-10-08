@@ -1,22 +1,39 @@
 <Ui xmlns="http://www.blizzard.com/wow/ui/">
     <!--
-        Header / accent text fonts (ALL-402). Copies of the game's gold
-        GameFontNormal* fonts whose colour BigNoteBox sets itself: the skin
-        accent in skin mode, BNB.HEADER_COLOR_NORMAL in normal mode
-        (UI/TextColors.lua). Inherited in XML so the per-alphabet fallback of
-        the game's font family comes along (CJK clients). Never recolour
+        Copies of the game's gold GameFontNormal* fonts whose colour BigNoteBox
+        sets itself (ALL-402, UI/TextColors.lua). Normal and Small are labels:
+        white (BNB.TextWhite; Dukul, 2026-10-08: "checkbox, dropdown titles etc.
+        should be white, green on headers and important things"). Large and
+        Huge are headings: the skin accent in skin mode, BNB.HEADER_COLOR_NORMAL
+        in normal mode. A normal-size heading calls BNB.SetHeaderColor.
+        Inherited in XML so the per-alphabet fallback of the game's font
+        family comes along (CJK clients). Never recolour
         GameFontNormal itself: every addon and the game share it.
     -->
     <Font name="BNBFontNormal" inherits="GameFontNormal" virtual="true">
-        <Color r="1.0" g="0.82" b="0"/>
+        <Color r="1.0" g="1.0" b="1.0"/>
     </Font>
     <Font name="BNBFontNormalSmall" inherits="GameFontNormalSmall" virtual="true">
-        <Color r="1.0" g="0.82" b="0"/>
+        <Color r="1.0" g="1.0" b="1.0"/>
     </Font>
     <Font name="BNBFontNormalLarge" inherits="GameFontNormalLarge" virtual="true">
         <Color r="1.0" g="0.82" b="0"/>
     </Font>
     <Font name="BNBFontNormalHuge" inherits="GameFontNormalHuge" virtual="true">
         <Color r="1.0" g="0.82" b="0"/>
+    </Font>
+    <!--
+        White text fonts (ALL-402 S2): copies of GameFontHighlight*, white on
+        every skin preset but the ones with a muted text value (OLED), set by
+        BNB.ApplyHeaderColor through BNB.TextWhite.
+    -->
+    <Font name="BNBFontHighlight" inherits="GameFontHighlight" virtual="true">
+        <Color r="1.0" g="1.0" b="1.0"/>
+    </Font>
+    <Font name="BNBFontHighlightSmall" inherits="GameFontHighlightSmall" virtual="true">
+        <Color r="1.0" g="1.0" b="1.0"/>
+    </Font>
+    <Font name="BNBFontHighlightLarge" inherits="GameFontHighlightLarge" virtual="true">
+        <Color r="1.0" g="1.0" b="1.0"/>
     </Font>
 </Ui>

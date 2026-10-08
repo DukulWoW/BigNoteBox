@@ -379,7 +379,7 @@ local function GetPooledBtn(idx, parent)
         local badge = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         badge:SetPoint("BOTTOMRIGHT", iconTex, "BOTTOMRIGHT", 0, 0)
         badge:SetJustifyH("RIGHT")
-        badge:SetTextColor(1, 1, 1)
+        BNB.SetTextWhite(badge)
         badge:Hide()
 
         _btnPool[idx] = { btn = btn, borderTex = borderTex, iconTex = iconTex, hoverTex = hoverTex, activeTex = activeTex, badge = badge }

@@ -21,7 +21,7 @@ local function Plain(s)
 end
 
 local function Desc(ct, y, text)
-    local fs = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    local fs = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     fs:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     fs:SetWidth(CONTENT_W)
     fs:SetJustifyH("LEFT")

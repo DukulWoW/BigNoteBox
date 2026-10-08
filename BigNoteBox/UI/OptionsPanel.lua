@@ -23,17 +23,17 @@ local function CreateOptionsPanel()
     title:SetPoint("TOP", logo, "BOTTOM", 0, -8)
     title:SetText(L["OPT_TITLE"])
 
-    local version = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local version = panel:CreateFontString(nil, "ARTWORK", "BNBFontHighlight")
     version:SetPoint("TOP", title, "BOTTOM", 0, -4)
     version:SetText(string.format(L["OPT_VERSION_FMT"], BNB.ADDON_VERSION or "1.0.0"))
     version:SetTextColor(0.7, 0.7, 0.7)
 
-    local author = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlightSmall")
+    local author = panel:CreateFontString(nil, "ARTWORK", "BNBFontHighlightSmall")
     author:SetPoint("TOP", version, "BOTTOM", 0, -2)
     author:SetText(L["AUTHOR"])
     author:SetTextColor(0.55, 0.55, 0.55)
 
-    local hint = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    local hint = panel:CreateFontString(nil, "ARTWORK", "BNBFontHighlight")
     hint:SetPoint("TOP", author, "BOTTOM", 0, -10)
     hint:SetText(L["OPT_HINT"])
 

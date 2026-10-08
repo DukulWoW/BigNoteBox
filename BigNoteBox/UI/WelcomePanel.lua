@@ -316,7 +316,7 @@ local function BuildEmptyState(parent)
         if boldPath then greetLbl:SetFont(boldPath, 15, "")
         else greetLbl:SetFontObject("BNBFontNormal") end
     end)
-    greetLbl:SetTextColor(0.9, 0.9, 0.9)
+    BNB.SetTextWhite(greetLbl, 0.9)
 
     -- ── Clock ─────────────────────────────────────────────────────────────────
     local clockLbl = f:CreateFontString(nil, "OVERLAY")
@@ -327,7 +327,7 @@ local function BuildEmptyState(parent)
         if boldPath then clockLbl:SetFont(boldPath, 34, "")
         else clockLbl:SetFontObject("BNBFontNormalHuge") end
     end)
-    clockLbl:SetTextColor(1, 1, 1)
+    BNB.SetTextWhite(clockLbl)
 
     -- ── Date ─────────────────────────────────────────────────────────────────
     local dateLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -389,14 +389,14 @@ local function BuildEmptyState(parent)
     -- Location notes header
     local locHeader = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     locHeader:SetJustifyH("CENTER")
-    locHeader:SetTextColor(0.9, 0.82, 0.5)
+    BNB.SetHeaderColor(locHeader)
     -- Text is set dynamically in RefreshIconRows with the current zone name.
     locHeader:Hide()
 
     -- Favorite notes header
     local favHeader = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     favHeader:SetJustifyH("CENTER")
-    favHeader:SetTextColor(0.9, 0.82, 0.5)
+    BNB.SetHeaderColor(favHeader)
     favHeader:SetText(L["WELCOME_FAV_NOTES"])
     favHeader:Hide()
 

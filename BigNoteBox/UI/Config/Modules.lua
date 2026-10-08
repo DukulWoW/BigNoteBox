@@ -414,13 +414,14 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
 
         -- Tag checklist header
         local tagHeaderLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        BNB.SetHeaderColor(tagHeaderLbl)
         tagHeaderLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         tagHeaderLbl:SetHeight(ROW_H)
         tagHeaderLbl:SetJustifyH("LEFT")
         tagHeaderLbl:SetText(L["CFG_TN_TAGS_HEADER"])
         y = y - (ROW_H + 2)
 
-        local subLbl = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local subLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
         subLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         subLbl:SetWidth(CONTENT_W)
         subLbl:SetHeight(ROW_H - 4)
@@ -973,6 +974,7 @@ local function BuildSidebarPage(sf, ct, y, page)
 
     -- Characters header
     local charsHdr = sidebarSub:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    BNB.SetHeaderColor(charsHdr)
     charsHdr:SetPoint("TOPLEFT", sidebarSub, "TOPLEFT", 0, subY)
     charsHdr:SetHeight(ROW_H); charsHdr:SetJustifyH("LEFT")
     charsHdr:SetText(L["CFG_SIDEBAR_CHARS_HEADER"])
@@ -1597,6 +1599,7 @@ local function BuildToastsPage(sf, ct, y, page)
     -- What each note toast shows (S3)
     do
         local hdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        BNB.SetHeaderColor(hdr)
         hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         hdr:SetHeight(ROW_H); hdr:SetJustifyH("LEFT")
         hdr:SetText(L["CFG_TOAST_SHOW_HDR"])

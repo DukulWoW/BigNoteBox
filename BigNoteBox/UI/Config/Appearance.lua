@@ -331,7 +331,7 @@ local function BuildAppearanceTab(sf, ct)
     local function RefreshSkinControls()
         local on = db.skinMode == true
         local alpha = on and 1.0 or 0.4
-        skinPresetLbl:SetTextColor(on and 1 or 0.45, on and 0.82 or 0.45, on and 0 or 0.45)
+        if on then BNB.SetHeaderColor(skinPresetLbl) else skinPresetLbl:SetTextColor(0.45, 0.45, 0.45) end
         if skinPresetDD        then skinPresetDD:SetEnabled(on);        skinPresetDD:SetAlpha(alpha)        end
         skinRandomizeCb:SetEnabled(on)
         skinRandomizeCb:SetAlpha(alpha)
@@ -371,7 +371,7 @@ local function BuildAppearanceTab(sf, ct)
     -- CJK clients (ALL-22): the bundled fonts have no CJK glyphs, so say which one does.
     -- Only while the Latin set shows; a CJK font set (ALL-14) has its own cards.
     if BNB.IsCJKClient and BNB.IsCJKClient() and BNB.GetActiveFontSet() == "latin" then
-        local hint = ct:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local hint = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
         hint:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         hint:SetWidth(CONTENT_W)
         hint:SetJustifyH("LEFT")

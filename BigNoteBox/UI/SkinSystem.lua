@@ -37,7 +37,9 @@ BNB.SKIN_PRESETS = {
     ragnaros   = { r=0.130, g=0.070, b=0.020, lift=0.05, br=0.40, bg_=0.26, bb=0.12 },
     earthen    = { r=0.090, g=0.070, b=0.040, lift=0.05, br=0.30, bg_=0.24, bb=0.14 },
     argent     = { r=0.090, g=0.090, b=0.095, lift=0.05, br=0.36, bg_=0.36, bb=0.40 },
-    oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18 },
+    -- text = the brightest white text on this preset (ALL-402 S2: OLED's pure
+    -- white on black was too sharp); nil = 1. Read through BNB.TextWhite
+    oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18, text=0.80 },
 }
 
 -- Display order of the presets: the one list Settings > Appearance and the
@@ -450,7 +452,7 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
                     btn._bg:SetBackdropColor(r, g, b, 0.97)
                     btn._bg:SetBackdropBorderColor(br, bg_, bb, 1)
                 end
-                if btn._lbl then btn._lbl:SetTextColor(1, 1, 1) end
+                if btn._lbl then BNB.SetTextWhite(btn._lbl) end
             end
         end
     end
@@ -489,7 +491,7 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
         lbl:SetAllPoints()
         lbl:SetJustifyH("CENTER")
         lbl:SetText(label)
-        lbl:SetTextColor(1, 1, 1)  -- white; RefreshVisual sets selected colour
+        BNB.SetTextWhite(lbl)  -- white; RefreshVisual sets selected colour
         btn._lbl = lbl
 
         btn:SetScript("OnClick", function()

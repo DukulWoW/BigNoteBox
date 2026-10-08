@@ -1240,7 +1240,7 @@ function M.ShowPopup()
     local detectedLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     detectedLbl:SetPoint("TOP", ct, "TOP", 0, y)
     detectedLbl:SetWidth(CW); detectedLbl:SetJustifyH("CENTER"); detectedLbl:SetWordWrap(true)
-    detectedLbl:SetTextColor(0.9, 0.9, 0.9)
+    BNB.SetTextWhite(detectedLbl, 0.9)
     local addonList = table.concat(addonNames, ", ")
     detectedLbl:SetText(string.format(L["MIG_DETECTED_FMT"], addonList))
     y = y - 36

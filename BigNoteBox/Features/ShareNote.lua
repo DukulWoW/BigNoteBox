@@ -500,7 +500,7 @@ local function BuildShareWindow()
         cb:SetPoint("TOPLEFT", f, "TOPLEFT", PAD - 2 + col * colW, y - row * ROW_H + 2)
         -- The label is part of the button, so a click on it ticks the box
         cb:SetHitRectInsets(0, -(colW - 30), 0, 0)
-        local lbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        local lbl = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
         lbl:SetPoint("LEFT", cb, "RIGHT", 2, 0)
         lbl:SetWidth(colW - 30); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false)
         lbl:SetText(L[g.label])
@@ -579,7 +579,7 @@ local function BuildShareWindow()
                     if region.IsObjectType and region:IsObjectType("Texture") then
                         region:SetVertexColor(0.30, 0.85, 0.35)
                     elseif region.IsObjectType and region:IsObjectType("FontString") then
-                        region:SetTextColor(1, 1, 1)
+                        BNB.SetTextWhite(region)
                     end
                 end
             end)
@@ -708,7 +708,7 @@ local function BuildShareWindow()
                 local nl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 nl:SetPoint("LEFT",  row, "LEFT",  4, 0)
                 nl:SetPoint("RIGHT", row, "RIGHT", -80, 0)
-                nl:SetJustifyH("LEFT"); nl:SetMaxLines(1); nl:SetTextColor(1, 1, 1)
+                nl:SetJustifyH("LEFT"); nl:SetMaxLines(1); BNB.SetTextWhite(nl)
                 row._nameLbl = nl
                 local cl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
                 cl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
