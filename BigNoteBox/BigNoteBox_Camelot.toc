@@ -4,7 +4,7 @@
 ## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
 ## Author: Dukul
 ## Group: BigNoteBox
-## Version: 1.21.0
+## Version: 1.21.1
 ## SavedVariables: BigNoteBoxDB
 # No BigNoteBoxLocale SavedVariable and no LoadSavedVariablesFirst here (FOR-32):
 # whether Forever supports LoadSavedVariablesFirst is not known yet (FOR-08), and a
