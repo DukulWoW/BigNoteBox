@@ -170,7 +170,7 @@ function BNB.ShowForeverNotice()
         bugs:SetWidth(W - PAD * 2)
         bugs:SetJustifyH("LEFT")
         bugs:SetText(L["FOREVER_NOTICE_BUGS"])
-        local links = BNB.CreateBugLinkButtons(f, W - PAD * 2)
+        local links = BNB.CreateBugLinkButtons(f, W - PAD * 2, f._isSkin)
         links:SetPoint("TOPLEFT", bugs, "BOTTOMLEFT", 0, -8)
 
         -- Checkbox + label, centred as a group above the OK button

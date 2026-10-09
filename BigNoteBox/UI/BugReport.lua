@@ -26,8 +26,8 @@ BNB.BUG_LINKS = {
 --------------------------------------------------------------------------------
 -- LINK BUTTONS: GitHub full width on top, the three sites in a row below.
 -- Returns a frame of the given width; its height is fixed (BUG_LINKS_H).
--- skin = true: skin buttons, for a window built in skin mode (ALL-79); the
--- Forever login notice has no skin mode and keeps the template buttons.
+-- skin = true: skin buttons, for a window built in skin mode (ALL-79; the
+-- beta notice passes it since ALL-418).
 --------------------------------------------------------------------------------
 local BTN_H, ROW_GAP = 24, 6
 BNB.BUG_LINKS_H = BTN_H * 2 + ROW_GAP
