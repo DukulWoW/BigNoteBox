@@ -16,12 +16,17 @@
 --
 --   BNB.ZonePicker.GetMatches(text, kind, maxResults)
 --     Returns a list of {name, continent, kind} tables matching text.
---     kind: "zone" | "instance" | "subzone" | "player"
+--     kind: "zone" | "instance" | "subzone" | "player" (player entries may
+--     carry `class`, a class file for the name's colour; continent = the source)
 --     Used by the autocomplete dropdown in NoteConfig.
+--
+--   BNB.ZonePicker.ZoneMapID(name) -> mapID or nil   (/way links, ALL-381)
+--   BNB.ZonePicker.AskGuildRoster()                  (asks the game for the roster)
 
 local BNB = BigNoteBox
 BNB.ZonePicker = BNB.ZonePicker or {}
 local ZP = BNB.ZonePicker
+local L  = BNB.L
 
 -- ── Zone continent lookup ─────────────────────────────────────────────────────
 -- Walks a zone's uiMapID parent chain up to its Continent-type ancestor.
@@ -179,6 +184,138 @@ end
 -- ── Public: GetMatches ────────────────────────────────────────────────────────
 -- Returns up to maxResults entries matching text for the given kind.
 -- kind = "zone" | "instance" | "player"
+-- ── Player names (ALL-371) ───────────────────────────────────────────────────
+-- Friends (character and Battle.net), the guild and the group, the way
+-- BigChatBox's whisper autocomplete gathers them. Names are saved the way Use
+-- Current saves a target: the short name on your own realm, "Name-Realm" on
+-- another (a player situation matches either); never a realm on Forever, whose
+-- second name part is a surname. Names that start with the text come first,
+-- then names that only contain it. The guild roster has to be asked for before
+-- GetGuildRosterInfo answers; the game answers at most every 10 seconds, so
+-- the first letters typed may come before it.
+local _rosterAsked = 0
+local function AskGuildRoster()
+    if not (IsInGuild and IsInGuild()) then return end
+    if GetTime() - _rosterAsked < 10 then return end
+    _rosterAsked = GetTime()
+    if C_GuildInfo and C_GuildInfo.GuildRoster then pcall(C_GuildInfo.GuildRoster) end
+end
+ZP.AskGuildRoster = AskGuildRoster
+
+local function OwnRealm()
+    return GetNormalizedRealmName and GetNormalizedRealmName() or (GetRealmName() or ""):gsub("%s", "")
+end
+
+-- "Name" or "Name-Realm" (another realm); Forever: the name alone
+local function WithRealm(name, realm)
+    if not name or name == "" then return nil end
+    name = name:match("^([^%-]+)") or name
+    if BNB.IsForever or not realm or realm == "" then return name end
+    realm = realm:gsub("%s", "")
+    if realm == OwnRealm() then return name end
+    return name .. "-" .. realm
+end
+
+local function ClassFile(className)
+    if not className then return nil end
+    local f = className:upper():gsub(" ", "")
+    return RAID_CLASS_COLORS and RAID_CLASS_COLORS[f] and f or nil
+end
+
+local function PlayerMatches(lower, maxResults)
+    AskGuildRoster()
+    local all, seen = {}, {}
+    local function Add(name, source, class)
+        if not name or name == "" then return end
+        local key = name:lower()
+        if seen[key] then
+            if class and not seen[key].class then seen[key].class = class end
+            return
+        end
+        local e = { name = name, continent = source, kind = "player", class = class }
+        seen[key] = e
+        all[#all + 1] = e
+    end
+    -- Character friends, online or not
+    for i = 1, (C_FriendList and C_FriendList.GetNumFriends and C_FriendList.GetNumFriends() or 0) do
+        local info = C_FriendList.GetFriendInfoByIndex(i)
+        if info and info.name then
+            local n, r = info.name:match("^([^%-]+)%-(.+)$")
+            Add(WithRealm(n or info.name, r), L["SIT_AC_FRIEND"], ClassFile(info.className))
+        end
+    end
+    -- Battle.net friends: the WoW character they play now (only known while online)
+    for i = 1, (BNGetNumFriends and BNGetNumFriends() or 0) do
+        local acc = C_BattleNet and C_BattleNet.GetFriendAccountInfo and C_BattleNet.GetFriendAccountInfo(i)
+        local g = acc and acc.gameAccountInfo
+        if g and g.isOnline and g.clientProgram == "WoW" and g.characterName
+           and (not g.wowProjectID or not WOW_PROJECT_ID or g.wowProjectID == WOW_PROJECT_ID) then
+            Add(WithRealm(g.characterName, g.realmName), L["SIT_AC_FRIEND"], ClassFile(g.className))
+        end
+    end
+    -- The guild, online or not
+    if IsInGuild and IsInGuild() then
+        for i = 1, (GetNumGuildMembers and GetNumGuildMembers() or 0) do
+            local full, _, _, _, _, _, _, _, _, _, classFile = GetGuildRosterInfo(i)
+            if full then
+                local n, r = full:match("^([^%-]+)%-(.+)$")
+                Add(WithRealm(n or full, r), L["SIT_AC_GUILD"], classFile)
+            end
+        end
+    end
+    -- The group
+    local num = GetNumGroupMembers and GetNumGroupMembers() or 0
+    if num > 0 then
+        local raid = IsInRaid and IsInRaid()
+        for i = 1, raid and num or (num - 1) do
+            local unit = (raid and "raid" or "party") .. i
+            if UnitExists(unit) and UnitIsPlayer(unit) and not UnitIsUnit(unit, "player") then
+                local n, r = BNB.UnitNameRealm(unit)   -- Forever: first name + surname
+                local _, class = UnitClass(unit)
+                Add(WithRealm(n, r), L["SIT_AC_GROUP"], class)
+            end
+        end
+    end
+    table.sort(all, function(a, b) return a.name:lower() < b.name:lower() end)
+    local results = {}
+    for pass = 1, 2 do
+        for _, e in ipairs(all) do
+            if #results >= maxResults then return results end
+            local at = e.name:lower():find(lower, 1, true)
+            if at and ((pass == 1) == (at == 1)) then results[#results + 1] = e end
+        end
+    end
+    return results
+end
+
+-- The map id of a zone named in a /way line (ALL-381): the picker's zones
+-- first (one per name, Azeroth's own), then any map of that name, a zone
+-- before a city / dungeon / continent. Case does not matter. Built once.
+local _mapByName
+local MAX_MAP_ID = 3000
+function ZP.ZoneMapID(name)
+    if not name or name == "" then return nil end
+    local key = name:lower():gsub("%s+", " ")
+    if not _mapByName then
+        _mapByName = {}
+        local rank = {}
+        local ZONE = Enum and Enum.UIMapType and Enum.UIMapType.Zone or 3
+        for id = 1, MAX_MAP_ID do
+            local info = C_Map.GetMapInfo(id)
+            if info and info.name and info.name ~= "" then
+                local k = info.name:lower()
+                local r = (info.mapType == ZONE) and 0 or 1
+                if not rank[k] or r < rank[k] then rank[k], _mapByName[k] = r, id end
+            end
+        end
+        BuildCache()
+        for _, z in ipairs(_cache.zones) do
+            if z.mapID then _mapByName[z.name:lower()] = z.mapID end
+        end
+    end
+    return _mapByName[key]
+end
+
 function ZP.GetMatches(text, kind, maxResults)
     maxResults = maxResults or 8
     local results = {}
@@ -186,39 +323,7 @@ function ZP.GetMatches(text, kind, maxResults)
     local lower = text:lower()
 
     if kind == "player" then
-        -- Friend list
-        local numFriends = C_FriendList and C_FriendList.GetNumFriends
-            and C_FriendList.GetNumFriends() or 0
-        for i = 1, numFriends do
-            if #results >= maxResults then break end
-            local info = C_FriendList.GetFriendInfoByIndex(i)
-            if info and info.name and info.name:lower():find(lower, 1, true) == 1 then
-                results[#results + 1] = { name = info.name, continent = FRIEND, kind = "player" }
-            end
-        end
-        -- Guild roster
-        local numGuild = GetNumGuildMembers and GetNumGuildMembers() or 0
-        for i = 1, numGuild do
-            if #results >= maxResults then break end
-            local name = GetGuildRosterInfo(i)
-            if name then
-                -- Strip realm suffix if present
-                local shortName = name:match("^([^%-]+)") or name
-                if shortName:lower():find(lower, 1, true) == 1 then
-                    -- Avoid duplicates with friends list
-                    local dup = false
-                    for _, r in ipairs(results) do
-                        if r.name == shortName then dup = true; break end
-                    end
-                    if not dup then
-                        results[#results + 1] = {
-                            name = shortName, continent = GUILD, kind = "player"
-                        }
-                    end
-                end
-            end
-        end
-        return results
+        return PlayerMatches(lower, maxResults)
     end
 
     -- Sub-zones: names that start with the text first, then names that

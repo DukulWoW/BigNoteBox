@@ -17,7 +17,10 @@
 -- with or without a situation: the creation spot, then every waypoint
 -- (Name | Zone | X, Y; click = green / grey, double-click the name = rename,
 -- hover arrow = navigate, hover X = remove, right-click = all of those,
--- ALL-282 S2).
+-- ALL-282 S2; Shift+click and the menu's Show on map = the world map at that
+-- spot, ALL-319). Add with nothing typed adds where you are or your target
+-- (ALL-398); the player name box suggests friends, the guild and the group
+-- (ALL-371).
 --
 -- Public API:
 --   BNB.CreateSituationEditor(panel, opts) -> ed   build once per window
@@ -355,6 +358,190 @@ local function AttachSubzoneAC(eb)
     return ac
 end
 
+-- The waypoint row column under the pointer: the line by y, the column by x
+-- (a FontString is only as wide as its column)
+local function ColumnAt(row)
+    local s = row:GetEffectiveScale()
+    local x, y = GetCursorPosition()
+    x, y = x / s, y / s
+    local function In(fs, l) return x >= (l or fs:GetLeft() or 0) and x <= (fs:GetRight() or 0) end
+    if y < (row:GetTop() or 0) - 1 - WP_LINE_H then
+        if In(row._sub) then return "sub" end
+        if In(row._zone, row:GetLeft()) then return "zone" end
+    else
+        if In(row._xy) then return "xy" end
+        if In(row._name, row:GetLeft()) then return "name" end
+    end
+end
+
+-- The waypoint rows' scripts (split out of the editor, CMP-07). act = the
+-- editor's handlers: toggle(e), remove(e), navigate(e), menu(row) and
+-- edit(row, column). One press on a column toggles the row a moment later; a
+-- second press inside that time edits that column instead (name, X, Y and
+-- sub-zone = the edit boxes, zone = location browser; Dukul 2026-10-06), so a
+-- double-click never toggles first (two presses, as the sticky's inline edit
+-- counts them, ALL-47). Never on the creation row. Shift+click shows the
+-- waypoint on the map (ALL-319). Returns CancelPending.
+local DBL_SECS = 0.35
+local function WireWaypointRows(rows, act)
+    local pendingRow, pendingTimer
+    local function CancelPending()
+        if pendingTimer then pendingTimer:Cancel() end
+        pendingRow, pendingTimer = nil, nil
+    end
+    for _, row in ipairs(rows) do
+        local hi = row._hi
+        row._del:SetScript("OnClick", function() GameTooltip:Hide(); act.remove(row._entry) end)
+        row._nav:SetScript("OnClick", function() act.navigate(row._entry) end)
+        local function HoverOff()
+            if row:IsMouseOver() then return end   -- moved between the row and its buttons
+            hi:Hide(); row._del:Hide(); row._nav:Hide()
+        end
+        for _, b in ipairs({ row._del, row._nav }) do
+            b:HookScript("OnEnter", function() hi:Show() end)
+            b:HookScript("OnLeave", HoverOff)
+        end
+        function row._showHover(self)
+            hi:Show(); self._nav:Show()
+            if self._entry and not self._entry.created then self._del:Show() end
+        end
+        row:SetScript("OnEnter", function(self)
+            self:_showHover()
+            local e = self._entry; if not e then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(self._name:GetText() or "", 1, 1, 1)
+            local where = BNB.WaypointZone(e.wp)
+            if e.wp.subzone then where = where .. " - " .. e.wp.subzone end
+            GameTooltip:AddLine(string.format("%s  %.1f, %.1f", where, e.wp.x, e.wp.y), 0.78, 0.78, 0.78)
+            if e.created then GameTooltip:AddLine(L["WP_ROW_TIP_CREATED"], 0.60, 0.60, 0.60, true) end
+            GameTooltip:AddLine(e.wp.on and L["WP_ROW_TIP_ON"] or L["WP_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
+            if not HasWPAddon() then GameTooltip:AddLine(L["WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
+            if not e.created then GameTooltip:AddLine(L["WP_ROW_TIP_RENAME"], 0.60, 0.60, 0.60, true) end
+            GameTooltip:AddLine(L["WP_ROW_TIP_SHIFT"], 0.60, 0.60, 0.60, true)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
+        row:SetScript("OnClick", function(self, button)
+            local e = self._entry; if not e then return end
+            GameTooltip:Hide()
+            if button == "RightButton" then CancelPending(); act.menu(self); return end
+            if IsShiftKeyDown() then CancelPending(); BNB.ShowWaypointOnMap(e.wp); return end
+            local col = not e.created and ColumnAt(self)
+            if not col then CancelPending(); act.toggle(e); return end
+            if pendingRow == self then
+                CancelPending()
+                act.edit(self, col)
+                return
+            end
+            CancelPending()
+            pendingRow = self
+            pendingTimer = C_Timer.NewTimer(DBL_SECS, function()
+                pendingRow, pendingTimer = nil, nil
+                act.toggle(e)
+            end)
+        end)
+    end
+    return CancelPending
+end
+
+-- What Use Current fills in for a typed kind: the zone, sub-zone or instance
+-- you are in, your target's name or guild. strict (Add with nothing typed,
+-- ALL-398) = nil when there is none, plus the locale key of a line saying so;
+-- without it the old Use Current answers stay (an instance outside one = the
+-- zone name the game gives).
+local function CurrentSituationText(kind, strict)
+    local val, why = "", nil
+    if kind == "zone" then
+        val = GetZoneText() or ""
+    elseif kind == "subzone" then
+        if strict then
+            val, why = BNB.CurrentSubzone() or "", "SIT_ADD_NO_SUBZONE"
+        else
+            val = GetSubZoneText and GetSubZoneText() or ""
+        end
+    elseif kind == "instance" then
+        if strict and not (IsInInstance and IsInInstance()) then return nil, "SIT_ADD_NO_INSTANCE" end
+        val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
+    elseif kind == "player" or kind == "npc" then
+        val, why = (BNB.UnitNameRealm("target")) or "", "SIT_ADD_NO_TARGET"
+    elseif kind == "guild" then
+        -- The target's guild, never your own through targeting yourself
+        if UnitIsPlayer("target") and not UnitIsUnit("target", "player") then
+            val = GetGuildInfo("target") or ""
+        end
+        why = "SIT_ADD_NO_GUILD"
+    end
+    if val == "" then
+        if strict then return nil, why end
+        return ""
+    end
+    return val
+end
+
+-- The suggestions under the add row's name box (split out of the editor,
+-- CMP-07): ac:Show(matches) / ac:Hide(), ac.frame. A pick fills the box and
+-- keeps it focused. A player name is drawn in its class colour (ALL-371),
+-- with where it comes from (Friend / Guild / Group) on the right, where a
+-- zone shows its continent.
+local VALUE_AC_ROW_H, VALUE_AC_MAX = 22, 7
+local function BuildValueAC(panel, valueRow, valueEb)
+    local acFrame = BNB.CreateBackdropFrame("Frame", nil, panel)
+    BNB.SetBackdrop(acFrame, 0.08, 0.08, 0.10, 0.97, 0.35, 0.35, 0.38, 1)
+    acFrame:SetPoint("TOPLEFT",  valueRow, "BOTTOMLEFT",  0, -2)
+    acFrame:SetPoint("TOPRIGHT", valueRow, "BOTTOMRIGHT", 0, -2)
+    acFrame:SetFrameLevel(panel:GetFrameLevel() + 30)
+    acFrame:Hide()
+
+    local ac = { frame = acFrame }
+    local acRows = {}
+    function ac:Hide() acFrame:Hide() end
+    function ac:Show(matches)
+        if #matches == 0 then acFrame:Hide(); return end
+        local n = math.min(#matches, VALUE_AC_MAX)
+        acFrame:SetHeight(n * VALUE_AC_ROW_H + 4)
+        for i = 1, n do
+            local row = acRows[i]
+            if not row then
+                row = CreateFrame("Button", nil, acFrame)
+                row:SetHeight(VALUE_AC_ROW_H)
+                local hi = row:CreateTexture(nil, "HIGHLIGHT")
+                hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.08)
+                row._nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+                row._nameLbl:SetPoint("LEFT",  row, "LEFT",  4, 0)
+                row._nameLbl:SetPoint("RIGHT", row, "RIGHT", -80, 0)
+                row._nameLbl:SetJustifyH("LEFT"); row._nameLbl:SetMaxLines(1)
+                row._contLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+                row._contLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+                row._contLbl:SetWidth(76); row._contLbl:SetJustifyH("RIGHT"); row._contLbl:SetMaxLines(1)
+                row._contLbl:SetTextColor(0.50, 0.50, 0.50)
+                row:SetScript("OnClick", function(self)
+                    valueEb:SetText(self._name)
+                    acFrame:Hide()
+                    if ac.onPick then ac.onPick() end   -- the editor's pending search
+                    valueEb:SetFocus()
+                end)
+                acRows[i] = row
+            end
+            local m = matches[i]
+            row._name = m.name
+            row._nameLbl:SetText(m.name)
+            local cc = m.class and RAID_CLASS_COLORS and RAID_CLASS_COLORS[m.class]
+            -- Set by hand, not SetTextWhite: a white-registered row would turn
+            -- white again on a skin change after it showed a class colour
+            local r, g, b = BNB.TextWhite()
+            if cc then r, g, b = cc.r, cc.g, cc.b end
+            row._nameLbl:SetTextColor(r, g, b)
+            row._contLbl:SetText(m.continent or "")
+            row:SetPoint("TOPLEFT",  acFrame, "TOPLEFT",  4, -2 - (i - 1) * VALUE_AC_ROW_H)
+            row:SetPoint("TOPRIGHT", acFrame, "TOPRIGHT", -4, -2 - (i - 1) * VALUE_AC_ROW_H)
+            row:Show()
+        end
+        for i = n + 1, #acRows do acRows[i]:Hide() end
+        acFrame:Show()
+    end
+    return ac
+end
+
 --------------------------------------------------------------------------------
 -- THE EDITOR
 --------------------------------------------------------------------------------
@@ -541,9 +728,12 @@ function BNB.CreateSituationEditor(panel, opts)
     local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 22)
     useCurrentBtn:SetPoint("TOPLEFT", valueRow, "BOTTOMLEFT", 0, -4)
 
+    -- Nothing typed = where you are or your target (ALL-398), so it is never
+    -- greyed for a typed kind
     local addBtn = BNB.CreateButton(nil, panel, L["SIT_ADD_BTN"], 90, 22)
     addBtn:SetPoint("LEFT", useCurrentBtn, "RIGHT", ROW_BTN_GAP, 0)
     addBtn:SetEnabled(false)
+    Tip(addBtn, L["SIT_ADD_TIP_TITLE"], L["SIT_ADD_TIP_BODY"], true)
 
     local clearBtn = BNB.CreateButton(nil, panel, L["SIT_CLEAR_ALL"], 90, 22)
     clearBtn:SetPoint("TOPRIGHT", valueRow, "BOTTOMRIGHT", 0, -4)
@@ -560,66 +750,18 @@ function BNB.CreateSituationEditor(panel, opts)
     SizeRowButtons()
 
     -- ── Autocomplete under the add row (2+ characters typed) ─────────────────
-    local acFrame = BNB.CreateBackdropFrame("Frame", nil, panel)
-    BNB.SetBackdrop(acFrame, 0.08, 0.08, 0.10, 0.97, 0.35, 0.35, 0.38, 1)
-    acFrame:SetPoint("TOPLEFT",  valueRow, "BOTTOMLEFT",  0, -2)
-    acFrame:SetPoint("TOPRIGHT", valueRow, "BOTTOMRIGHT", 0, -2)
-    acFrame:SetFrameLevel(panel:GetFrameLevel() + 30)
-    acFrame:Hide()
-
-    local acRows, acTimer = {}, nil
-    local AC_ROW_H = 22
-
+    local ac, acTimer = BuildValueAC(panel, valueRow, valueEb), nil
     local function HideAC()
-        acFrame:Hide()
+        ac:Hide()
         if acTimer then acTimer:Cancel(); acTimer = nil end
     end
-
-    local function ShowAC(matches)
-        if #matches == 0 then HideAC(); return end
-        local n = math.min(#matches, 7)
-        acFrame:SetHeight(n * AC_ROW_H + 4)
-        for i = 1, n do
-            local row = acRows[i]
-            if not row then
-                row = CreateFrame("Button", nil, acFrame)
-                row:SetHeight(AC_ROW_H)
-                local hi = row:CreateTexture(nil, "HIGHLIGHT")
-                hi:SetAllPoints(); hi:SetColorTexture(1, 1, 1, 0.08)
-                row._nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-                row._nameLbl:SetPoint("LEFT",  row, "LEFT",  4, 0)
-                row._nameLbl:SetPoint("RIGHT", row, "RIGHT", -80, 0)
-                row._nameLbl:SetJustifyH("LEFT"); row._nameLbl:SetMaxLines(1)
-                BNB.SetTextWhite(row._nameLbl)
-                row._contLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-                row._contLbl:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-                row._contLbl:SetWidth(76); row._contLbl:SetJustifyH("RIGHT"); row._contLbl:SetMaxLines(1)
-                row._contLbl:SetTextColor(0.50, 0.50, 0.50)
-                row:SetScript("OnClick", function(self)
-                    valueEb:SetText(self._name)
-                    HideAC()
-                    valueEb:SetFocus()
-                end)
-                acRows[i] = row
-            end
-            local m = matches[i]
-            row._name = m.name
-            row._nameLbl:SetText(m.name)
-            row._contLbl:SetText(m.continent or "")
-            row:SetPoint("TOPLEFT",  acFrame, "TOPLEFT",  4, -2 - (i - 1) * AC_ROW_H)
-            row:SetPoint("TOPRIGHT", acFrame, "TOPRIGHT", -4, -2 - (i - 1) * AC_ROW_H)
-            row:Show()
-        end
-        for i = n + 1, #acRows do acRows[i]:Hide() end
-        acFrame:Show()
-    end
+    ac.onPick = HideAC
 
     valueEb:SetScript("OnTextChanged", function(self, userInput)
         local text = self:GetText() or ""
         -- A picked kind can always be added (the box is hidden, but a note
         -- switch still empties it)
         if KEY_KINDS[typ.value] then HideAC(); return end
-        addBtn:SetEnabled(text:find("%S") ~= nil)
         if not userInput then return end
         -- No list of NPC or guild names to offer (GetMatches would answer with zones)
         if #text < 2 or typ.value == "npc" or typ.value == "guild" then HideAC(); return end
@@ -631,14 +773,14 @@ function BNB.CreateSituationEditor(panel, opts)
         acTimer = C_Timer.NewTimer(0.15, function()
             acTimer = nil
             if BNB.ZonePicker and BNB.ZonePicker.GetMatches then
-                ShowAC(BNB.ZonePicker.GetMatches(text, typ.value, 7))
+                ac:Show(BNB.ZonePicker.GetMatches(text, typ.value, 7))
             end
         end)
     end)
     valueEb:HookScript("OnEditFocusLost", function()
         -- Tiny delay so row clicks register before hide
         C_Timer.After(0.2, function()
-            if not acFrame:IsMouseOver() then HideAC() end
+            if not ac.frame:IsMouseOver() then HideAC() end
         end)
     end)
 
@@ -957,89 +1099,23 @@ function BNB.CreateSituationEditor(panel, opts)
     local RefreshWaypoints, WpToggle, WpRemove, WpNavigate, WpMenu, StartEdit, StartZonePick   -- below
     local renameEb, wpEditX, wpEditY, subEb   -- the edit boxes, below
 
-    -- One press on a column toggles the row a moment later; a second press
-    -- inside that time edits that column instead (name, X, Y and sub-zone =
-    -- the edit boxes, zone = location browser; Dukul 2026-10-06), so a
-    -- double-click never toggles first (two presses, as the sticky's inline
-    -- edit counts them, ALL-47). Never on the creation row
-    local DBL_SECS = 0.35
-    local pendingRow, pendingTimer
-    local function CancelPending()
-        if pendingTimer then pendingTimer:Cancel() end
-        pendingRow, pendingTimer = nil, nil
-    end
-    -- The column under the pointer: the line by y, the column by x (a
-    -- FontString is only as wide as its column)
-    local function ColumnAt(row)
-        local s = row:GetEffectiveScale()
-        local x, y = GetCursorPosition()
-        x, y = x / s, y / s
-        local function In(fs, l) return x >= (l or fs:GetLeft() or 0) and x <= (fs:GetRight() or 0) end
-        if y < (row:GetTop() or 0) - 1 - WP_LINE_H then
-            if In(row._sub) then return "sub" end
-            if In(row._zone, row:GetLeft()) then return "zone" end
-        else
-            if In(row._xy) then return "xy" end
-            if In(row._name, row:GetLeft()) then return "name" end
-        end
-    end
-
+    -- The rows' scripts live in WireWaypointRows (above the editor)
     for i = 1, WP_ROWS do
-        local row = NewWaypointRow(wpList, i)
-        local hi = row._hi
-        row._del:SetScript("OnClick", function() GameTooltip:Hide(); WpRemove(row._entry) end)
-        row._nav:SetScript("OnClick", function() WpNavigate(row._entry) end)
-        local function HoverOff()
-            if row:IsMouseOver() then return end   -- moved between the row and its buttons
-            hi:Hide(); row._del:Hide(); row._nav:Hide()
-        end
-        for _, b in ipairs({ row._del, row._nav }) do
-            b:HookScript("OnEnter", function() hi:Show() end)
-            b:HookScript("OnLeave", HoverOff)
-        end
-        function row._showHover(self)
-            hi:Show(); self._nav:Show()
-            if self._entry and not self._entry.created then self._del:Show() end
-        end
-        row:SetScript("OnEnter", function(self)
-            self:_showHover()
-            local e = self._entry; if not e then return end
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(self._name:GetText() or "", 1, 1, 1)
-            local where = BNB.WaypointZone(e.wp)
-            if e.wp.subzone then where = where .. " - " .. e.wp.subzone end
-            GameTooltip:AddLine(string.format("%s  %.1f, %.1f", where, e.wp.x, e.wp.y), 0.78, 0.78, 0.78)
-            if e.created then GameTooltip:AddLine(L["WP_ROW_TIP_CREATED"], 0.60, 0.60, 0.60, true) end
-            GameTooltip:AddLine(e.wp.on and L["WP_ROW_TIP_ON"] or L["WP_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
-            if not HasWPAddon() then GameTooltip:AddLine(L["WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
-            if not e.created then GameTooltip:AddLine(L["WP_ROW_TIP_RENAME"], 0.60, 0.60, 0.60, true) end
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
-        row:SetScript("OnClick", function(self, button)
-            local e = self._entry; if not e then return end
-            GameTooltip:Hide()
-            if button == "RightButton" then CancelPending(); WpMenu(self); return end
-            local col = not e.created and ColumnAt(self)
-            if not col then CancelPending(); WpToggle(e); return end
-            if pendingRow == self then
-                CancelPending()
-                if col == "xy" then StartEdit(self, wpEditX)
-                elseif col == "sub" then StartEdit(self, subEb)
-                elseif col == "zone" then StartZonePick(self)
-                else StartEdit(self, renameEb) end
-                return
-            end
-            CancelPending()
-            pendingRow = self
-            pendingTimer = C_Timer.NewTimer(DBL_SECS, function()
-                pendingRow, pendingTimer = nil, nil
-                WpToggle(e)
-            end)
-        end)
-        row:Hide()
-        wpRows[i] = row
+        wpRows[i] = NewWaypointRow(wpList, i)
+        wpRows[i]:Hide()
     end
+    local CancelPending = WireWaypointRows(wpRows, {
+        toggle   = function(e) WpToggle(e) end,
+        remove   = function(e) WpRemove(e) end,
+        navigate = function(e) WpNavigate(e) end,
+        menu     = function(row) WpMenu(row) end,
+        edit     = function(row, col)
+            if col == "xy" then StartEdit(row, wpEditX)
+            elseif col == "sub" then StartEdit(row, subEb)
+            elseif col == "zone" then StartZonePick(row)
+            else StartEdit(row, renameEb) end
+        end,
+    })
     wpList:SetScript("OnMouseWheel", function(_, delta)
         wpOffset = wpOffset - delta
         RefreshWaypoints()
@@ -1321,11 +1397,11 @@ function BNB.CreateSituationEditor(panel, opts)
         if choices then pick:SetChoices(choices, ChoiceLabels(t)); pick.frame:Show()
         else pick.frame:Hide() end
         useCurrentBtn:SetEnabled(t ~= "state")   -- Rested has nothing to fill in
-        if KEY_KINDS[t] then
-            valueEb:ClearFocus()
-            addBtn:SetEnabled(true)
-        else
-            addBtn:SetEnabled((valueEb:GetText() or ""):find("%S") ~= nil)
+        if KEY_KINDS[t] then valueEb:ClearFocus() end
+        addBtn:SetEnabled(true)
+        -- The roster answers a moment after it is asked for: before the typing
+        if t == "player" and BNB.ZonePicker and BNB.ZonePicker.AskGuildRoster then
+            BNB.ZonePicker.AskGuildRoster()
         end
         HideAC()
         if BNB.ZonePicker and BNB.ZonePicker.Close then BNB.ZonePicker.Close() end
@@ -1407,6 +1483,15 @@ function BNB.CreateSituationEditor(panel, opts)
             val = pick.value or ""
         else
             val = (valueEb:GetText() or ""):match("^%s*(.-)%s*$") or ""
+            -- Nothing typed: where you are now, or your target (ALL-398)
+            if val == "" then
+                local cur, why = CurrentSituationText(typ.value, true)
+                if not cur then
+                    if why then BNB:Print(L[why]) end
+                    return
+                end
+                val = cur
+            end
         end
         if val == "" then return end
         local s = typ.value .. ":" .. val
@@ -1430,7 +1515,7 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- ── Button handlers ──────────────────────────────────────────────────────
     useCurrentBtn:SetScript("OnClick", function()
-        local t, val = typ.value, ""
+        local t = typ.value
         -- A picked kind: the instance type you are in or the window that is
         -- open; nothing changes when there is none
         if KEY_KINDS[t] then
@@ -1438,21 +1523,7 @@ function BNB.CreateSituationEditor(panel, opts)
             if cur and t ~= "state" then pick:Set(cur) end
             return
         end
-        if t == "zone" then
-            val = GetZoneText() or ""
-        elseif t == "subzone" then
-            val = GetSubZoneText and GetSubZoneText() or ""
-        elseif t == "instance" then
-            val = (GetInstanceInfo and select(1, GetInstanceInfo())) or GetRealZoneText() or ""
-        elseif t == "player" or t == "npc" then
-            val = (BNB.UnitNameRealm("target")) or ""
-        elseif t == "guild" then
-            -- The target's guild, never your own through targeting yourself
-            if UnitIsPlayer("target") and not UnitIsUnit("target", "player") then
-                val = GetGuildInfo("target") or ""
-            end
-        end
-        valueEb:SetText(val)
+        valueEb:SetText(CurrentSituationText(t))
     end)
 
     addBtn:SetScript("OnClick", AddSituation)
@@ -1660,6 +1731,7 @@ function BNB.CreateSituationEditor(panel, opts)
         BNB.ContextMenu.Open(row, function(root)
             root:CreateTitle(BNB.WaypointName(note, e.wp))
             root:CreateButton(L["WP_MENU_NAVIGATE"], function() WpNavigate(e) end)
+            root:CreateButton(L["WP_MENU_SHOW_MAP"], function() BNB.ShowWaypointOnMap(e.wp) end)   -- ALL-319
             if not e.created then
                 root:CreateButton(L["WP_MENU_RENAME"], function()
                     -- Still the same row (nothing reloaded the list meanwhile)

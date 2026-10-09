@@ -14,6 +14,7 @@
 local BNB = BigNoteBox
 BNB.AdvancedMode = BNB.AdvancedMode or {}
 local AM = BNB.AdvancedMode
+local L  = BNB.L
 
 --------------------------------------------------------------------------------
 -- HELPERS
@@ -86,6 +87,38 @@ local function WrapBare(s, keepBlank)
     return table.concat(out)
 end
 
+-- /way lines become links (ALL-381; rich notes only, Dukul 2026-10-09): a
+-- "/way" or "/tway" at the start of a line or after a space or a markup tag,
+-- running to the end of the line or the next "{", in every shape TomTom and
+-- Wowhead write (BNB.ParseWayLine, Features/ContextNotes.lua). The href is
+-- the line itself, read again on click: the zone name is looked up then, not
+-- on every render. A /way inside {link*...} is left alone (a "*" before it).
+local WAY_START = "/[Tt]?[Ww][Aa][Yy]%s"
+local function WayLinks(line)
+    if not (BNB.ParseWayLine and line:find(WAY_START)) then return line end
+    local out, pos, scan = {}, 1, 1
+    while true do
+        local st = line:find(WAY_START, scan)
+        if not st then break end
+        local prev = st > 1 and line:sub(st - 1, st - 1) or ""
+        local stop = line:find("{", st, true) or (#line + 1)
+        local way = line:sub(st, stop - 1):match("^(.-)%s*$")
+        if (prev == "" or prev:find("[%s}]")) and BNB.ParseWayLine(way) then
+            out[#out + 1] = line:sub(pos, st - 1)
+            out[#out + 1] = string.format("<a href=\"bnbway:%s\">|cff66d966%s|r</a>", way, way)
+            pos = st + #way
+        end
+        scan = st + 1
+    end
+    out[#out + 1] = line:sub(pos)
+    return table.concat(out)
+end
+
+-- The escaped text back as typed (an href is read as it was written)
+local function HtmlUnescape(s)
+    return (s:gsub("&quot;", "\""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
+end
+
 --------------------------------------------------------------------------------
 -- MAIN CONVERTER: AM.ToHTML(text, bodySize)
 -- Converts BNB rich-note markup to WoW SimpleHTML format.
@@ -105,6 +138,10 @@ function AM.ToHTML(text, bodySize)
 
     for _, rawLine in ipairs(lines) do
         local line = HtmlEscape(rawLine)
+
+        -- 0. /way lines -> waypoint links (ALL-381). Runs first, on the text
+        --    as typed: the link ends at the next markup tag. See WayLinks.
+        line = WayLinks(line)
 
         -- 1. {img:path:width:height[:align]} — standalone block-level element.
         --    Replace the ENTIRE line with just the <img> tag so the bare-line
@@ -381,6 +418,14 @@ function AM.CreateRenderFrame(name, parent)
     -- Item/spell hyperlink tooltip on hover
     f:SetScript("OnHyperlinkEnter", function(self, link)
         local linkType = link:match("^(%a+):")
+        if linkType == "bnbway" then   -- a /way line (ALL-381)
+            GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+            GameTooltip:AddLine(L["WAY_LINK_TIP_TITLE"], 1, 1, 1)
+            GameTooltip:AddLine(L["WAY_LINK_TIP_CLICK"], 0.40, 0.85, 0.40, true)
+            GameTooltip:AddLine(L["WAY_LINK_TIP_SHIFT"], 0.78, 0.78, 0.78, true)
+            GameTooltip:Show()
+            return
+        end
         if linkType == "item" or linkType == "spell"
            or linkType == "achievement" or linkType == "quest" then
             GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
@@ -397,6 +442,11 @@ function AM.CreateRenderFrame(name, parent)
     f:SetScript("OnHyperlinkClick", function(self, link, text, button)
         if button ~= "LeftButton" then return end
         local linkType = link:match("^(%a+):")
+        -- A /way line: placed and tracked; Shift = shown on the map (ALL-381)
+        if linkType == "bnbway" then
+            if BNB.FollowWayLine then BNB.FollowWayLine(HtmlUnescape(link:sub(8)), IsShiftKeyDown()) end
+            return
+        end
         -- Plain http/https URLs or unknown types → clipboard hint
         if not linkType or linkType == "https" or linkType == "http" then
             if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link, nil, nil, true) end

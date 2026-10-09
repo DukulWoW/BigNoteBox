@@ -1036,6 +1036,136 @@ function BNB.RemoveNoteWaypoints(id)
     _wpSent[id] = nil
 end
 
+-- ── /way lines (ALL-381) ────────────────────────────────────────────────────
+-- A /way line as TomTom and Wowhead write it: "/way Zone 45.2 60.1 Name",
+-- "/way #84 45.2 60.1 Name" (map id), "/way 45.2 60.1" (where you are); "/tway"
+-- too, and "45.2,60.1". Only the shape is read here: the zone name is looked up
+-- when the link is clicked (BNB.WayLineWaypoint). Returns x, y, zone (or nil),
+-- mapID (the #id, or nil), name (or nil); nil when it is not a /way line (x
+-- comes first, so the answer itself says whether it is one).
+function BNB.ParseWayLine(s)
+    local rest = s and s:match("^%s*/[Tt]?[Ww][Aa][Yy]%s+(.-)%s*$")
+    if not rest then return nil end
+    local mapID
+    local id, after = rest:match("^#(%d+)%s+(.*)$")
+    if id then mapID, rest = tonumber(id), after end
+    local zone, x, y, name = rest:match("^(.-)%s*(%d+%.?%d*)%s*[,%s]%s*(%d+%.?%d*)%s*(.-)$")
+    x, y = tonumber(x), tonumber(y)
+    if not (x and y and x <= 100 and y <= 100) then return nil end
+    if mapID and zone ~= "" then return nil end   -- "#84 Zone 45 60" is not a shape anyone writes
+    if zone ~= "" and not zone:find("%a") then return nil end
+    return x, y, zone ~= "" and zone or nil, mapID, name ~= "" and name or nil
+end
+
+-- The waypoint a /way line points at: { mapID, x, y, name } (name = the
+-- line's own name, else the zone's), or nil + a chat line for the player
+function BNB.WayLineWaypoint(s)
+    local x, y, zone, mapID, name = BNB.ParseWayLine(s)
+    if not x then return nil end
+    if not mapID and zone then
+        mapID = BNB.ZonePicker and BNB.ZonePicker.ZoneMapID and BNB.ZonePicker.ZoneMapID(zone)
+        if not mapID then return nil, string.format(L["WAY_LINK_UNKNOWN_ZONE"], zone) end
+    elseif not mapID then
+        mapID = C_Map and C_Map.GetBestMapForUnit and C_Map.GetBestMapForUnit("player")
+    end
+    if not (mapID and C_Map.GetMapInfo(mapID)) then
+        return nil, string.format(L["WAY_LINK_UNKNOWN_ZONE"], zone or ("#" .. tostring(mapID)))
+    end
+    local wp = { mapID = mapID, x = x, y = y, name = name }
+    if not name then wp.name = BNB.WaypointZone(wp) end
+    return wp
+end
+
+-- A click on a /way link in a rich note: placed and tracked like Navigate;
+-- Shift = show it on the map instead (ALL-381, ALL-319)
+function BNB.FollowWayLine(s, onMap)
+    local wp, err = BNB.WayLineWaypoint(s)
+    if not wp then
+        if err then BNB:Print(err) end
+        return
+    end
+    if onMap then BNB.ShowWaypointOnMap(wp) else BNB.NavigateWaypoints(nil, { wp }) end
+end
+
+-- ── Show on map (ALL-319) ───────────────────────────────────────────────────
+-- Opens the world map on the waypoint's map with a marker on the spot. Nothing
+-- is placed or tracked. The marker is our own frame on the map canvas, held at
+-- one size whatever the zoom, and shown only while the map shows that map.
+local _mapMarker, _markerWP
+
+local function MapCanvas()
+    local wm = WorldMapFrame
+    if not wm then return nil end
+    return (wm.GetCanvas and wm:GetCanvas()) or (wm.ScrollContainer and wm.ScrollContainer.Child)
+end
+
+local MARKER_PX = 30
+local function PlaceMapMarker()
+    local m, wp, wm = _mapMarker, _markerWP, WorldMapFrame
+    local canvas = MapCanvas()
+    if not (m and wp and canvas and wm:IsShown()) or wm:GetMapID() ~= wp.mapID then
+        if m then m:SetAlpha(0) end
+        return
+    end
+    local s = 1 / math.max(canvas:GetScale(), 0.01)
+    m:SetScale(s)
+    m:ClearAllPoints()
+    m:SetPoint("BOTTOM", canvas, "TOPLEFT",
+        canvas:GetWidth() * wp.x / 100 / s, -canvas:GetHeight() * wp.y / 100 / s)
+    m:SetAlpha(1)
+end
+
+local function MapMarker()
+    if _mapMarker then return _mapMarker end
+    local canvas = MapCanvas()
+    local m = CreateFrame("Frame", nil, canvas)
+    m:SetSize(MARKER_PX, MARKER_PX)
+    m:SetFrameLevel(math.min(canvas:GetFrameLevel() + 500, 9000))   -- over the map's own pins
+    m:EnableMouse(false)
+    -- The note list's location marker, normal look (it sits on the game's map)
+    local dir = "Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\"
+    for i, path in ipairs({ dir .. "Layers\\ov-bottom", dir .. "Symbols\\ov-location", dir .. "Layers\\ov-top" }) do
+        local t = m:CreateTexture(nil, "OVERLAY", nil, i)
+        t:SetAllPoints()
+        t:SetTexture(path)
+    end
+    -- A few pulses so the eye finds it
+    local ag = m:CreateAnimationGroup()
+    ag:SetLooping("BOUNCE")
+    local a = ag:CreateAnimation("Alpha")
+    a:SetFromAlpha(1); a:SetToAlpha(0.35); a:SetDuration(0.5)
+    m._pulse = ag
+    m:SetScript("OnUpdate", PlaceMapMarker)
+    WorldMapFrame:HookScript("OnHide", function()
+        _markerWP = nil
+        m:Hide()
+    end)
+    _mapMarker = m
+    return m
+end
+
+function BNB.ShowWaypointOnMap(wp)
+    if not (wp and wp.mapID and wp.x and wp.y) then return end
+    local ok = pcall(function()
+        if C_Map.OpenWorldMap then
+            C_Map.OpenWorldMap(wp.mapID)
+        elseif OpenWorldMap then
+            OpenWorldMap(wp.mapID)
+        end
+        local wm = WorldMapFrame
+        if wm and wm:IsShown() and wm:GetMapID() ~= wp.mapID then wm:SetMapID(wp.mapID) end
+    end)
+    if not (ok and WorldMapFrame and WorldMapFrame:IsShown() and MapCanvas()) then
+        BNB:Print(L["WP_MAP_FAILED"]); return
+    end
+    _markerWP = { mapID = wp.mapID, x = wp.x, y = wp.y }
+    local m = MapMarker()
+    m:Show()
+    PlaceMapMarker()
+    m._pulse:Stop(); m._pulse:Play()
+    C_Timer.After(3, function() if m._pulse then m._pulse:Stop() end end)
+end
+
 function BNB.CheckContextualNotes()
     if not BNB.SituationsEnabled() then
         UpdateMinimapBadge(0)
