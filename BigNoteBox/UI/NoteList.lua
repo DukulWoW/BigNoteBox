@@ -2253,6 +2253,12 @@ function BNB.SelectNote(id)
         end
     end
 
+    -- Leaving a rich note: its markup repairs are written into it (ALL-277)
+    local prevID = BNB._currentNoteID
+    if prevID and prevID ~= id and BNB.AdvancedMode.RepairOnLeave then
+        xpcall(BNB.AdvancedMode.RepairOnLeave, geterrorhandler(), prevID)
+    end
+
     BNB.Editor.SetCurrent(id); BigNoteBoxDB.selectedNoteID = id
     BNB.StampOpened(id)
     for _, btn in ipairs(listEntries) do

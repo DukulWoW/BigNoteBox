@@ -323,6 +323,35 @@ local function BuildTitleField(parent)
         statsStrip:SetTextColor(0.55, 0.55, 0.55)
     end
 
+    -- Markup to fix (ALL-264): left of the counts, over the timestamp hover,
+    -- in a rich note's Markup view. Placed and filled by RefreshMarkupWarn.
+    local warn = CreateFrame("Frame", nil, parent)
+    warn:SetFrameLevel(tsHover:GetFrameLevel() + 2)
+    warn:SetHeight(TSTAMP_H + 2)
+    warn:EnableMouse(true)
+    local warnTx = warn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    warnTx:SetPoint("RIGHT")
+    warnTx:SetTextColor(1, 0.6, 0.2)
+    warn._text = warnTx
+    warn:SetScript("OnEnter", function(self)
+        local list = self._repairs
+        if not list then return end
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["NE_MARKUP_WARN_TITLE"], 1, 0.6, 0.2)
+        local MAX = 10
+        for i = 1, math.min(#list, MAX) do
+            GameTooltip:AddLine(BNB.AdvancedMode.DescribeRepair(list[i]), 1, 1, 1, true)
+        end
+        if #list > MAX then
+            GameTooltip:AddLine(string.format(L["NE_MARKUP_WARN_MORE_FMT"], #list - MAX), 0.7, 0.7, 0.7)
+        end
+        GameTooltip:AddLine(L["NE_MARKUP_WARN_DESC"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    warn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    warn:Hide()
+    BNB._editorMarkupWarn = warn
+
     local phFocusGained, phFocusLost
 
     eb:SetScript("OnEditFocusGained", function(self)
@@ -451,18 +480,46 @@ end
 -- Right-aligned FontString in the timestamp strip row.
 -- Updated on every body OnTextChanged and on note load.
 --------------------------------------------------------------------------------
+-- The markup warning (ALL-264): shown with the counts in a rich note's Markup
+-- view (an unlocked one: a locked note is never repaired, ALL-277) while the
+-- text has repairs, just left of the count text. Runs with every count update
+-- and every view change (UpdateBodyTopAnchor).
+local function RefreshMarkupWarn()
+    local warn, strip, eb = BNB._editorMarkupWarn, BNB._editorStatsStrip, BNB._editorBody
+    if not (warn and strip and eb) then return end
+    local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    local list
+    if strip:IsShown() and not BNB._editorInViewMode and not BNB._editorLocked
+       and BNB.AdvancedMode.IsRich(note) then
+        list = BNB.AdvancedMode.MarkupRepairs(eb._showingPlaceholder and "" or (eb:GetText() or ""))
+    end
+    if not (list and #list > 0) then
+        warn._repairs = nil
+        warn:Hide()
+        return
+    end
+    warn._repairs = list
+    warn._text:SetText(string.format(L["NE_MARKUP_WARN_FMT"], #list))
+    warn:SetWidth(warn._text:GetStringWidth() + 4)
+    warn:ClearAllPoints()
+    warn:SetPoint("RIGHT", strip, "RIGHT", -(strip:GetStringWidth() + 12), 0)
+    warn:Show()
+    if GameTooltip:IsOwned(warn) then warn:GetScript("OnEnter")(warn) end
+end
+
 local function UpdateStatsStrip(text)
     local strip = BNB._editorStatsStrip
     if not strip then return end
     if not text or text == "" then
         strip:SetText(L["NE_STATS_EMPTY"])
-        return
+    else
+        local chars = #text
+        local words = 0
+        for _ in text:gmatch("%S+") do words = words + 1 end
+        local fmt = BreakUpLargeNumbers or tostring
+        strip:SetText(string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words)))
     end
-    local chars = #text
-    local words = 0
-    for _ in text:gmatch("%S+") do words = words + 1 end
-    local fmt = BreakUpLargeNumbers or tostring
-    strip:SetText(string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words)))
+    RefreshMarkupWarn()
 end
 
 -- Typing updates the strip once the keys pause (PERF-04): the word count
@@ -673,6 +730,7 @@ function BNB.UpdateBodyTopAnchor()
         rsf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  topX, topY)
         rsf:SetPoint("BOTTOMRIGHT", BNB.editorPane, "BOTTOMRIGHT", -22, bottomOffset)
     end
+    RefreshMarkupWarn()   -- shown in Markup view only (ALL-264)
 end
 
 --------------------------------------------------------------------------------
@@ -1418,6 +1476,7 @@ local function SetEditorLocked(locked)
     -- Undo/redo buttons must also dim when the note is locked
     if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
     RefreshFocusButton()
+    RefreshMarkupWarn()   -- a locked note is never repaired (ALL-277)
 end
 
 --------------------------------------------------------------------------------
@@ -1441,6 +1500,7 @@ function BNB.LoadNoteInEditor(id)
         if tsStrip    then tsStrip:Hide()    end
 
         if BNB._editorStatsStrip  then BNB._editorStatsStrip:Hide()  end
+        if BNB._editorMarkupWarn  then BNB._editorMarkupWarn:Hide()  end
         if BNB._editorBodyScroll  then BNB._editorBodyScroll:Hide()  end
         if BNB._editorRenderScroll then BNB._editorRenderScroll:Hide() end
         if BNB._editorRenderFrame  then BNB._editorRenderFrame:Hide()  end

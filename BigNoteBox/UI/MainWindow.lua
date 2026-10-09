@@ -1200,6 +1200,11 @@ function BNB.CreateMainWindow()
         -- An untouched quick note goes with the window (ALL-199). Only on a
         -- real close: Focus mode returns above, so a note being written there stays
         if BNB.DropEmptyQuickNote then BNB.DropEmptyQuickNote(nil) end
+        -- Closing a rich note writes its markup repairs into it (ALL-277); the
+        -- next show selects the note again, so the editor reloads the text
+        if BNB._currentNoteID and BNB.AdvancedMode.RepairOnLeave then
+            xpcall(BNB.AdvancedMode.RepairOnLeave, geterrorhandler(), BNB._currentNoteID)
+        end
         SaveWindowPos(self)
         BigNoteBoxDB.selectedNoteID = BNB._currentNoteID
         BigNoteBoxDB.splitX = BNB._listPaneW

@@ -4,6 +4,8 @@
 -- Public API (BNB.AdvancedMode):
 --   AM.IsRich(note)                          -> bool
 --   AM.ToHTML(text, bodySize)                -> html string
+--   AM.MarkupRepairs(text) / AM.RepairMarkup(text)  -> repairs ToHTML makes / text with them made
+--   AM.DescribeRepair(r) / AM.RepairOnLeave(id)     -> one repair in words / write them back (ALL-277)
 --   AM.CreateRenderFrame(name, parent)       -> SimpleHTML frame
 --   AM.ApplyFontsToRenderFrame(f, bodySize)  -> wires font objects
 --   AM.ConvertToPlain(id, onDone)            -> strips tags, confirms first
@@ -108,7 +110,8 @@ local function WayLinks(line)
             out[#out + 1] = string.format("<a href=\"bnbway:%s\">|cff66d966%s|r</a>", way, way)
             pos = st + #way
         end
-        scan = st + 1
+        -- Past a link just made: a second /way inside it is part of it
+        scan = math.max(st + 1, pos)
     end
     out[#out + 1] = line:sub(pos)
     return table.concat(out)
@@ -210,6 +213,8 @@ function AM.ToHTML(text, bodySize)
         --      Text outside a block becomes its own <P> (WrapBare); text inside
         --      one is kept as it is. A block left open runs on to the next
         --      lines and is closed at the end of the note at the latest.
+        --      AM.MarkupRepairs (below) finds the same repairs in the typed
+        --      text: change the two together.
         -- hadTag: a line with tags drops blank gaps between them (WrapBare).
         -- carried: this line continues a block opened on an earlier line, so
         -- its first text starts on a new line (<BR/>), as typed: the lines of
@@ -272,6 +277,121 @@ function AM.ToHTML(text, bodySize)
     -- block elements as orphan text nodes, which causes the parser to fall back
     -- to plain-text rendering for the entire document.
     return "<HTML><BODY>" .. table.concat(out) .. "</BODY></HTML>"
+end
+
+--------------------------------------------------------------------------------
+-- MARKUP REPAIRS (ALL-264 / ALL-277)
+-- The structure-tag repairs ToHTML's steps 6-8 make while drawing, found in the
+-- text as typed: the same tag pattern and tables, so the two always agree (a
+-- change to one is a change to both). Each repair says what the text needs so
+-- that it says what the note already shows: written back, the note draws the
+-- same and has nothing left to repair. Text the player wrote is never touched,
+-- only tags are added, swapped or removed.
+--   nested   = a block opens while another is open: its close tag goes in front
+--   mismatch = a close tag of another kind ({h1}...{/p}): it becomes the right one
+--   stray    = a close tag with nothing open: removed
+--   unclosed = a block still open at the end: its close tag goes after the last text
+-- Text outside a block is no repair: plain lines are how rich notes are written.
+--------------------------------------------------------------------------------
+local function CloseTagFor(openTag)
+    return "{/" .. openTag:match("^{(%a%d?)") .. "}"
+end
+
+-- Every repair the text needs, in text order: { kind, line, at, len, tag,
+-- open, insert } (at / len = the bytes replaced by insert, len 0 = an insert)
+function AM.MarkupRepairs(text)
+    local list = {}
+    if not text or text == "" then return list end
+    local open, openLine, lineNo, lineStart = nil, nil, 0, 1
+    for line in (text .. "\n"):gmatch("([^\n]*)\n") do
+        lineNo = lineNo + 1
+        local scan = 1
+        while true do
+            local st, en = line:find("{/?[hp]%d?:?[cr]?}", scan)
+            if not st then break end
+            local tag = line:sub(st, en)
+            local at = lineStart + st - 1
+            if STRUCT_OPEN[tag] then
+                if open then
+                    list[#list + 1] = { kind = "nested", line = lineNo, at = at, len = 0,
+                        tag = tag, open = open, insert = CloseTagFor(open) }
+                end
+                open, openLine = tag, lineNo
+            elseif STRUCT_CLOSE[tag] then
+                if not open then
+                    list[#list + 1] = { kind = "stray", line = lineNo, at = at, len = #tag,
+                        tag = tag, insert = "" }
+                elseif CloseTagFor(open) ~= tag then
+                    list[#list + 1] = { kind = "mismatch", line = lineNo, at = at, len = #tag,
+                        tag = tag, open = open, insert = CloseTagFor(open) }
+                end
+                open = nil
+            end
+            scan = en + 1
+        end
+        lineStart = lineStart + #line + 1
+    end
+    if open then
+        -- After the last character that is not white space: the open tag
+        -- itself at the latest, so this is always past every other repair
+        local last = #text
+        while last > 0 and text:sub(last, last):find("%s") do last = last - 1 end
+        list[#list + 1] = { kind = "unclosed", line = openLine, at = last + 1, len = 0,
+            tag = open, insert = CloseTagFor(open) }
+    end
+    return list
+end
+
+-- The text with every repair made, and the list (empty = nothing to do)
+function AM.RepairMarkup(text)
+    local list = AM.MarkupRepairs(text)
+    if #list == 0 then return text, list end
+    local out = text
+    for i = #list, 1, -1 do   -- back to front, so earlier positions hold
+        local r = list[i]
+        out = out:sub(1, r.at - 1) .. r.insert .. out:sub(r.at + r.len)
+    end
+    return out, list
+end
+
+-- One repair in words, for the editor's warning tooltip
+function AM.DescribeRepair(r)
+    if r.kind == "nested" then
+        return string.format(L["MARKUP_FIX_NESTED_FMT"], r.line, r.open, r.tag, r.insert)
+    elseif r.kind == "mismatch" then
+        return string.format(L["MARKUP_FIX_MISMATCH_FMT"], r.line, r.tag, r.open, r.insert)
+    elseif r.kind == "stray" then
+        return string.format(L["MARKUP_FIX_STRAY_FMT"], r.line, r.tag)
+    end
+    return string.format(L["MARKUP_FIX_UNCLOSED_FMT"], r.line, r.tag, r.insert)
+end
+
+-- Leaving a rich note in the main editor (another note, the window closed)
+-- writes the repairs into it (ALL-277). Only a saved note (unsaved text is the
+-- editor's, and a note switch that drops it does so on purpose), never a locked
+-- one, never while Focus mode has it. The text before goes into Note History
+-- first, so a repair can be undone there. noTouch: nothing the player wrote
+-- changed, so "Edited" sort and the Oracle do not move. Returns the count.
+function AM.RepairOnLeave(id)
+    local note = id and BNB.GetNote(id)
+    if not (note and AM.IsRich(note)) or (BNB._dirty and BNB._currentNoteID == id) then return 0 end
+    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then return 0 end
+    local kit = BNB._NoteListKit
+    if kit and kit.NoteIsLocked and kit.NoteIsLocked(note) then return 0 end
+    local fixed, list = AM.RepairMarkup(note.body or "")
+    if #list == 0 then return 0 end
+    -- Kept = a snapshot was made now, or the newest one already holds this text
+    local kept = false
+    if BNB.HistoryEnabled and BNB.HistoryEnabled() and BNB.HistorySnapshotNote then
+        BNB.HistorySnapshotNote(id)
+        local newest = note.history and note.history[1]
+        kept = newest ~= nil and newest.body == note.body
+    end
+    BNB.UpdateNote(id, { body = fixed }, { noTouch = true })
+    if BNB.Sticky and BNB.Sticky.RefreshBodyLive then BNB.Sticky.RefreshBodyLive(id) end
+    BNB:Print(string.format(L["MARKUP_FIXED_FMT"], note.title or "", #list)
+        .. (kept and (" " .. L["MARKUP_FIXED_HISTORY"]) or ""))
+    return #list
 end
 
 --------------------------------------------------------------------------------
