@@ -104,33 +104,54 @@ function BNB.ShowForeverNoticeIfDue()
     if db.foreverNoticeHidden or db.setupComplete ~= true then return end
     pcall(BNB.ShowForeverNotice)
 end
+-- The notice's chrome. Normal mode: a hand-built frame with the game's art
+-- (Plunderstorm on Forever, the dialog box on Classic) and its own title and X.
+-- Skin mode (ALL-418): BNB.CreateToolWindow's skin frame, title strip and X,
+-- so the window matches the rest instead of mixing game art with skin parts.
+local function NewNoticeFrame(W, title)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        local f
+        f = BNB.CreateToolWindow({
+            name = "BNBForeverNoticeFrame", w = W, h = 200, title = title,
+            toplevel = true, escClose = true, keyEsc = true,
+            onClose = function() f:Hide() end,
+        })
+        f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+        f:SetClampedToScreen(true)
+        return f, BNB.TOOL_SKIN_TITLE_H + 16, 16
+    end
+    local f = CreateFrame("Frame", "BNBForeverNoticeFrame", UIParent, "BackdropTemplate")
+    f:SetWidth(W)
+    f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
+    f:SetFrameStrata("DIALOG")
+    f:SetToplevel(true)
+    f:SetClampedToScreen(true)
+    f:EnableMouse(true)
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    BNB.SetMoveCursor(f)
+    tinsert(UISpecialFrames, "BNBForeverNoticeFrame")
+    -- ESC by hand as well: UISpecialFrames alone does not close a standalone
+    -- window on Forever (see the Reference Box)
+    BNB.AttachEscClose(f, f.Hide)
+
+    local titleFS = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
+    titleFS:SetPoint("TOP", f, "TOP", 0, -26)
+    titleFS:SetText(title)
+    local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
+    close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -14)
+    close:SetFrameLevel(f:GetFrameLevel() + 5)   -- above the corner art
+    return f, 58, 28
+end
+
 function BNB.ShowForeverNotice()
     local f = _foreverNotice
     if not f then
-        local W, PAD, TOP = 420, 30, 58
-        f = CreateFrame("Frame", "BNBForeverNoticeFrame", UIParent, "BackdropTemplate")
-        f:SetWidth(W)
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 120)
-        f:SetFrameStrata("DIALOG")
-        f:SetToplevel(true)
-        f:SetClampedToScreen(true)
-        f:EnableMouse(true)
-        f:SetMovable(true)
-        f:RegisterForDrag("LeftButton")
-        f:SetScript("OnDragStart", f.StartMoving)
-        f:SetScript("OnDragStop", f.StopMovingOrSizing)
-        BNB.SetMoveCursor(f)
-        tinsert(UISpecialFrames, "BNBForeverNoticeFrame")
-        -- ESC by hand as well: UISpecialFrames alone does not close a standalone
-        -- window on Forever (see the Reference Box)
-        BNB.AttachEscClose(f, f.Hide)
-
-        local title = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
-        title:SetPoint("TOP", f, "TOP", 0, -26)
-        title:SetText(L[BNB.IsClassic and "CLASSIC_NOTICE_TITLE" or "FOREVER_NOTICE_TITLE"])
-        local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
-        close:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -14)
-        close:SetFrameLevel(f:GetFrameLevel() + 5)   -- above the corner art
+        local W, PAD = 420, 30
+        local TOP, BOTTOM
+        f, TOP, BOTTOM = NewNoticeFrame(W, L[BNB.IsClassic and "CLASSIC_NOTICE_TITLE" or "FOREVER_NOTICE_TITLE"])
 
         local body = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -TOP)
@@ -139,10 +160,8 @@ function BNB.ShowForeverNotice()
         body:SetSpacing(2)
         body:SetText(L[BNB.IsClassic and "CLASSIC_TEST_NOTICE" or "FOREVER_TEST_NOTICE"])
 
-        local ok = CreateFrame("Button", nil, f, BNB.PanelButtonTemplate())
-        ok:SetSize(120, 26)
-        ok:SetPoint("BOTTOM", f, "BOTTOM", 0, 28)
-        ok:SetText(L["OK"])
+        local ok = BNB.CreateButton(nil, f, L["OK"], 120, 26)
+        ok:SetPoint("BOTTOM", f, "BOTTOM", 0, BOTTOM)
         ok:SetScript("OnClick", function() f:Hide() end)
 
         -- Report-a-bug links (ALL-73), under the text
@@ -174,7 +193,7 @@ function BNB.ShowForeverNotice()
         hit:SetScript("OnClick", function() cb:Click() end)
 
         -- The box is saved on close (OK, X or Escape), not on each click
-        f:SetScript("OnHide", function()
+        f:HookScript("OnHide", function()
             if BigNoteBoxDB then
                 BigNoteBoxDB.foreverNoticeHidden = cb:GetChecked() and true or nil
             end
@@ -183,8 +202,10 @@ function BNB.ShowForeverNotice()
         -- row, button row. Set here, not in OnShow: the frame is created shown, so
         -- OnShow never fired and the template's default size stayed.
         f:SetHeight(TOP + body:GetStringHeight() + 16 + bugs:GetStringHeight() + 8
-            + BNB.BUG_LINKS_H + 16 + 24 + 8 + 26 + 28)
-        if BNB.IsForever then BuildPlunderChrome(f) else BuildClassicChrome(f) end
+            + BNB.BUG_LINKS_H + 16 + 24 + 8 + 26 + BOTTOM)
+        if not f._isSkin then
+            if BNB.IsForever then BuildPlunderChrome(f) else BuildClassicChrome(f) end
+        end
         f._cb = cb
         _foreverNotice = f
     end

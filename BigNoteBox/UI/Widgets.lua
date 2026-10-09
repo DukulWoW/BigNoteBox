@@ -409,9 +409,30 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     hl:SetColorTexture(1, 1, 1, 0.10)
 
     -- Darken on mouse down, restore on mouse up. A disabled button still gets
-    -- the mouse events: no press look then (ALL-392)
+    -- the mouse events: no press look then (ALL-392). The label moves 1 px
+    -- down-right while held, as a skin icon button's symbol does (ALL-420).
+    -- Its own anchors are kept and put back: some callers re-anchor the label
+    -- (BNB.TruncateButtonText pads it)
+    local function PressLabel(on)
+        local l = btn._lbl
+        if not l then return end
+        if on then
+            if btn._lblPts then return end
+            local pts = {}
+            for i = 1, l:GetNumPoints() do pts[i] = { l:GetPoint(i) } end
+            btn._lblPts = pts
+            l:ClearAllPoints()
+            for _, pt in ipairs(pts) do l:SetPoint(pt[1], pt[2], pt[3], (pt[4] or 0) + 1, (pt[5] or 0) - 1) end
+        elseif btn._lblPts then
+            local pts = btn._lblPts
+            btn._lblPts = nil
+            l:ClearAllPoints()
+            for _, pt in ipairs(pts) do l:SetPoint(pt[1], pt[2], pt[3], pt[4], pt[5]) end
+        end
+    end
     btn:SetScript("OnMouseDown", function(self)
         if not self:IsEnabled() then return end
+        PressLabel(true)
         if self.SetBackdropColor then
             self:SetBackdropColor(
                 (self._br or 0.10) * 0.70,
@@ -420,6 +441,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
         end
     end)
     btn:SetScript("OnMouseUp", function(self)
+        PressLabel(false)
         if self.SetBackdropColor then
             self:SetBackdropColor(self._br or 0.10, self._bg_ or 0.10, self._bb or 0.12, 0.92)
         end
@@ -467,7 +489,9 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
 
     -- Disabled = dimmed label (ALL-392), as the template buttons do. The colour
     -- a caller set (state grids colour their labels) comes back on enable.
+    btn:HookScript("OnHide", function() PressLabel(false) end)
     btn:HookScript("OnDisable", function()
+        PressLabel(false)
         if not btn._lblCol then btn._lblCol = { lbl:GetTextColor() } end
         lbl:SetTextColor(0.5, 0.5, 0.5)
     end)
@@ -2362,7 +2386,7 @@ end
 -- CLIPBOARD HINT  —  floating "Press Ctrl+C to copy" prompt shown whenever
 -- the addon pre-selects text in the hidden clipboard helper editbox.
 --
--- Usage:  BNB.ShowClipboardHint(content [, anchorFrame [, deferFocus]])
+-- Usage:  BNB.ShowClipboardHint(content [, anchorFrame [, deferFocus [, preview]]])
 --   Selects `content` in the hidden helper editbox, positions a small hint
 --   frame near the cursor (or below anchorFrame if supplied), and waits for
 --   Ctrl+C (copies + dismisses) or ESC (dismisses without copying).
@@ -2373,13 +2397,17 @@ end
 --   OnClick path makes synchronous focus unreliable. Defers SetFocus() by one
 --   tick so it lands after any same-tick focus contention.
 --
+--   `preview` (optional): true adds a third, small line with the start of
+--   `content`, so a link button shows what it copies (ALL-222). Only for
+--   short text the player cannot see elsewhere: export windows leave it off.
+--
 -- IMPORTANT: The hint frame is at TOOLTIP strata. It MUST NOT have
 -- EnableKeyboard(true), because TOOLTIP strata beats editbox focus in WoW's
 -- keyboard routing priority — and Ctrl+C would be routed to the hint frame
 -- (a plain Frame, which cannot perform the engine-level copy) instead of the
 -- focused helper editbox. ESC dismissal is handled by the helper's OnKeyDown.
 --------------------------------------------------------------------------------
-function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
+function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
     -- ── 1. Ensure the invisible text-selection editbox exists ─────────────────
     if not BNB._clipboardHelper then
         local helper = CreateFrame("EditBox", nil, UIParent)
@@ -2409,6 +2437,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         local icon = f:CreateTexture(nil, "ARTWORK")
         icon:SetSize(24, 24)
         icon:SetPoint("LEFT", f, "LEFT", 10, 0)
+        f._icon = icon
         pcall(function()
             icon:SetAtlas("groupfinder-icon-keyboard", true)
         end)
@@ -2428,6 +2457,16 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         sub:SetJustifyH("LEFT")
         sub:SetTextColor(0.55, 0.55, 0.55)
         sub:SetText(L["WIDGET_CLIPBOARD_HINT_SUB"])
+
+        -- ── Preview line (opt-in, ALL-222): clipped by the client's own "..." ──
+        local prev = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+        prev:SetPoint("LEFT",  icon, "RIGHT", 8, -24)
+        prev:SetPoint("RIGHT", f,    "RIGHT", -8, -24)
+        prev:SetJustifyH("LEFT"); prev:SetWordWrap(false)
+        prev:SetTextColor(0.75, 0.75, 0.75)
+        prev:SetTextScale(0.9)
+        prev:Hide()
+        f._preview = prev
 
         -- ── Main frame pulse animation ─────────────────────────────────────────
         -- Breathes the whole frame between 0.80 and 1.0 alpha.
@@ -2516,8 +2555,19 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus)
         end
     end)
 
-    -- ── 4. Position below anchorFrame if given, otherwise near cursor ──────────
+    -- ── 4. Size for the preview line, then position below anchorFrame if
+    -- given, otherwise near the cursor ────────────────────────────────────────
     local hw, hh = 220, 48
+    if preview and content and content ~= "" then
+        hw, hh = 260, 64
+        hint._preview:SetText((content:gsub("[\r\n]+", " "):sub(1, 120)))
+        hint._preview:Show()
+        hint._icon:SetPoint("LEFT", hint, "LEFT", 10, 8)
+    else
+        hint._preview:Hide()
+        hint._icon:SetPoint("LEFT", hint, "LEFT", 10, 0)
+    end
+    hint:SetSize(hw, hh)
     hint:ClearAllPoints()
     hint._anchor = anchorFrame
     if anchorFrame then

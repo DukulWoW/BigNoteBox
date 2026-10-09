@@ -364,19 +364,20 @@ function K.BuildTrashPage(sf, ct, y, page)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- ALARMS: the module switch and the window side; defaults for new alarms
--- come with ALL-292 (BigNoteBoxDB.alarmDefaults has no settings yet)
+-- ALARMS: the module switch, the window side, how alarms show and the
+-- defaults for new alarms (ALL-292)
 -- ─────────────────────────────────────────────────────────────────────────────
 function K.BuildAlarmsPage(sf, ct, y, page)
     -- Module switch (ALL-343). Applies live: off hides every way in and no
     -- alarm rings; the alarms stay on their notes (BNB.Alarm.ApplyModule).
-    local enableCb, sideDD, showLbl, showDD
+    local enableCb, sideDD, showLbl, showDD, GreyDefaults
     local function ApplyAlarmsSection(on)
         local a = on and 1 or 0.35
         sideDD:SetAlpha(a); sideDD._lbl:SetAlpha(a)
         if sideDD._dd then sideDD._dd:SetEnabled(on) end
         showLbl:SetAlpha(a); showDD:SetAlpha(a)
         if showDD._dd then showDD._dd:SetEnabled(on) end
+        if GreyDefaults then GreyDefaults(on) end
     end
     y, enableCb = AddCheck(ct, y, L["CFG_ALARMS_ENABLE_LABEL"],
         function() return BNB.AlarmsEnabled() end,
@@ -419,6 +420,84 @@ function K.BuildAlarmsPage(sf, ct, y, page)
     tipOwner:HookScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (32 + K.ROW_GAP)
 
+    -- Defaults for new alarms (ALL-292): BigNoteBoxDB.alarmDefaults, read at
+    -- ring time (AlarmManager Defaults()). An alarm whose glow type / mode /
+    -- colour is "Default" follows these, so a change here reaches it too; the
+    -- snooze interval is copied into a new alarm when the Set alarm window
+    -- opens. glowColor is always replaced, never changed in place.
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["CFG_ALARM_DEFAULTS_HDR"])
+    local function AD()
+        BigNoteBoxDB.alarmDefaults = BigNoteBoxDB.alarmDefaults or CopyTable(BNB.DEFAULTS.alarmDefaults)
+        return BigNoteBoxDB.alarmDefaults
+    end
+    local defWidgets = {}
+    local function DefDropdown(label, entries, key)
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetHeight(K.ROW_H); lbl:SetJustifyH("LEFT")
+        lbl:SetText(label)
+        y = y - (K.ROW_H + 2)
+        local dd = BNB.CreateValueDropdown(ct, entries,
+            AD()[key] or BNB.DEFAULTS.alarmDefaults[key],
+            function(v) AD()[key] = v end, K.CONTENT_W, 26)
+        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        dd._lbl = lbl
+        dd:HookScript("OnShow", function(self)
+            self:SetSelected(AD()[key] or BNB.DEFAULTS.alarmDefaults[key])
+        end)
+        defWidgets[#defWidgets + 1] = dd
+        y = y - (32 + K.ROW_GAP)
+    end
+    DefDropdown(L["CFG_ALARM_DEF_SNOOZE"], {
+        { label = L["AW_SNZ_1MIN"],  value = 1 },
+        { label = L["AW_SNZ_5MIN"],  value = 5 },
+        { label = L["AW_SNZ_10MIN"], value = 10 },
+        { label = L["AW_SNZ_15MIN"], value = 15 },
+        { label = L["AW_SNZ_30MIN"], value = 30 },
+        { label = L["AW_SNZ_60MIN"], value = 60 },
+    }, "snoozeDefault")
+    DefDropdown(L["CFG_ALARM_DEF_GLOW"], {
+        { label = L["AW_GLOW_PIXEL"],    value = 1 },
+        { label = L["AW_GLOW_AUTOCAST"], value = 2 },
+        { label = L["AW_GLOW_BORDER"],   value = 3 },
+        { label = L["AW_GLOW_PROC"],     value = 4 },
+    }, "glowType")
+    DefDropdown(L["CFG_ALARM_DEF_GLOW_MODE"], {
+        { label = L["AW_GLOWMODE_CONTINUOUS"], value = "continuous" },
+        { label = L["AW_GLOWMODE_PULSE"],      value = "pulse" },
+        { label = L["AW_GLOWMODE_ONCE"],       value = "once" },
+    }, "glowMode")
+
+    -- Glow colour: the palette with the picker tile, as every colour choice
+    -- (ALL-327). The grid lives in its own frame so it can be greyed whole.
+    local colLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    colLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    colLbl:SetHeight(K.ROW_H); colLbl:SetJustifyH("LEFT")
+    colLbl:SetText(L["CFG_ALARM_DEF_COLOR"])
+    y = y - (K.ROW_H + 2)
+    local colBlk = CreateFrame("Frame", nil, ct)
+    colBlk:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    colBlk:SetWidth(K.CONTENT_W)
+    local function GlowColor()
+        local c = AD().glowColor or BNB.DEFAULTS.alarmDefaults.glowColor
+        return c[1], c[2], c[3]
+    end
+    local gy = BNB.BuildColorGrid(colBlk, 0, K.CONTENT_W, function(r, g, b)
+        AD().glowColor = { r, g, b, 1 }
+    end, GlowColor)
+    colBlk:SetHeight(-gy)
+    y = y + gy - K.ROW_GAP
+
+    GreyDefaults = function(on)
+        local a = on and 1 or 0.35
+        for _, dd in ipairs(defWidgets) do
+            dd:SetAlpha(a); dd._lbl:SetAlpha(a)
+            if dd._dd then dd._dd:SetEnabled(on) end
+        end
+        colLbl:SetAlpha(a); colBlk:SetAlpha(a)
+        for _, child in ipairs({ colBlk:GetChildren() }) do child:EnableMouse(on) end
+    end
     ApplyAlarmsSection(BNB.AlarmsEnabled())
     sf:FinaliseHeight(math.abs(y) + 12)
 end

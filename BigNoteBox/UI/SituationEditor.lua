@@ -142,7 +142,7 @@ end
 --------------------------------------------------------------------------------
 local function LinkButton(f, text, url)
     local b = BNB.CreateButton(nil, f, text, 200, 22)
-    b:SetScript("OnClick", function() BNB.ShowClipboardHint(url, b) end)
+    b:SetScript("OnClick", function() BNB.ShowClipboardHint(url, b, nil, true) end)
     b:SetScript("OnEnter", function(self)
         if not self:IsEnabled() then return end   -- addon already installed (ALL-316)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")

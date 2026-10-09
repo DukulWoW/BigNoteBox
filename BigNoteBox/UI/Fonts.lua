@@ -687,7 +687,7 @@ function BNB.AddFontPackHint(parent, anchor, x, y, w, h, fontObj)
     btn:SetScript("OnEnter", function() BNB.SetHeaderColor(fs) end)
     btn:SetScript("OnLeave", function() fs:SetTextColor(0.65, 0.65, 0.65) end)
     btn:SetScript("OnClick", function(self)
-        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true) end
+        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true, true) end
     end)
     return btn
 end

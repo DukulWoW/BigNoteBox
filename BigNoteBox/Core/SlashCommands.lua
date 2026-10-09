@@ -378,6 +378,10 @@ local function BuildPopups()
             -- ESC or button2 both clean up
             BNB._pendingImport = nil
         end,
+        -- The game's Esc also calls OnCancel with "clicked" unless this is set,
+        -- so Esc imported with the original scope instead of stopping (2026-10-09)
+        noCancelOnEscape = true,
+        OnHide = function() BNB._pendingImport = nil end,
         timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
         showAlert = true,
     }

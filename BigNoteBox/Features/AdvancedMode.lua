@@ -399,7 +399,7 @@ function AM.CreateRenderFrame(name, parent)
         local linkType = link:match("^(%a+):")
         -- Plain http/https URLs or unknown types → clipboard hint
         if not linkType or linkType == "https" or linkType == "http" then
-            if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link) end
+            if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link, nil, nil, true) end
         end
         -- WoW item/spell/quest links are handled by OnHyperlinkEnter tooltip only
     end)

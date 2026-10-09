@@ -219,15 +219,17 @@ local function BuildBackupTab(sf, ct)
         -- Check if any notes are scoped to a different character
         local foreignChar = BNB.ForeignScopeChar(notes)
 
-        if foreignChar and BNB.currentChar then
-            -- Store pending data for the popup callbacks
-            BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
-            StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
-        else
-            -- Same-character or scope-less path — confirm count before importing
-            BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
-            StaticPopup_Show("BNB_IMPORT_CONFIRM", #notes)
-        end
+        BNB.OfferBackupFirst(function()   -- ALL-186
+            if foreignChar and BNB.currentChar then
+                -- Store pending data for the popup callbacks
+                BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
+                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
+            else
+                -- Same-character or scope-less path — confirm count before importing
+                BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
+                StaticPopup_Show("BNB_IMPORT_CONFIRM", #notes)
+            end
+        end)
     end)
     y = y - 40
 
@@ -411,6 +413,37 @@ end
 -- User selects all with Ctrl+A and copies manually.
 
 local _exportWin = nil
+
+-- Before an import or a migration adds notes (ALL-186): while there are notes
+-- already, offer a JSON backup of them first. "Back up first" opens the export
+-- window with the notes as they are now, then carries on (the text in the
+-- window is taken before anything changes); "Skip" carries on; Esc stops.
+function BNB.OfferBackupFirst(proceed)
+    local ndb, n = BNB.NotesDB(), 0
+    for _ in pairs(ndb and ndb.notes or {}) do n = n + 1 end
+    if n == 0 then proceed(); return end
+    if not StaticPopupDialogs["BNB_BACKUP_FIRST"] then
+        StaticPopupDialogs["BNB_BACKUP_FIRST"] = {
+            text = L["BACKUP_FIRST_TEXT"],
+            button1 = L["BACKUP_FIRST_BTN"],
+            button2 = L["BACKUP_FIRST_SKIP"],
+            OnAccept = function(_, data)
+                local NE = BNB.NoteExport
+                local text = NE and NE.SerializeNotes(NE.FMT_JSON)
+                if text then BNB.OpenExportWindow(text) end
+                if data then data() end
+            end,
+            -- reason "clicked" = Skip; Esc does not call OnCancel (noCancelOnEscape)
+            OnCancel = function(_, data, reason)
+                if reason == "clicked" and data then data() end
+            end,
+            noCancelOnEscape = true,
+            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
+        }
+    end
+    StaticPopupDialogs["BNB_BACKUP_FIRST"].text = (n == 1) and L["BACKUP_FIRST_TEXT_ONE"] or L["BACKUP_FIRST_TEXT"]
+    StaticPopup_Show("BNB_BACKUP_FIRST", n, nil, proceed)
+end
 
 function BNB.OpenExportWindow(text, warningText, htmlNoteID)
     local NE = BNB.NoteExport

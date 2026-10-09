@@ -45,7 +45,7 @@ function BNB.CreateLinkButton(parent, text, url, skin)
         b:SetHeight(BTN_H)
         b:SetText(text)
     end
-    b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true) end)
+    b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true, true) end)
     -- Hooks: a skin button draws its hover in its own OnEnter / OnLeave
     b:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")

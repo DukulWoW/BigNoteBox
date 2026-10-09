@@ -35,6 +35,13 @@ local SOUND_REPEAT_DEFAULT = 10  -- alarm.soundRepeat nil = every 10 s (AlarmMan
 -- BNB green
 local BNB_GR, BNB_GG, BNB_GB = 0.400, 0.733, 0.416
 
+-- The glow colour a "Default" alarm rings with (Settings > Modules > Alarms,
+-- ALL-292); the swatch shows it while the alarm has no colour of its own
+local function DefaultGlowColor()
+    local c = BNB.Alarm.Default("glowColor")
+    return c[1], c[2], c[3]
+end
+
 -- Keys, not resolved strings: this table is built at file load, before
 -- BigNoteBoxDB (and debugPseudoLocale) is restored, so caching L[...] results
 -- here would freeze them at their pre-SavedVariables value forever. Resolve
@@ -449,15 +456,28 @@ local function BuildRepeatBlock(ct1)
     ndRow:SetSize(AW_CW,AW_ROW); ndRow:SetPoint("TOPLEFT",blk,"TOPLEFT",0,y); ndRow:Hide()
     -- A plain number field: the dropdown above already says "Every N days",
     -- and the bare 7 between "Every" and "days" did not read as editable
-    -- (ALL-347, Dukul 2026-10-06)
+    -- (ALL-347, Dukul 2026-10-06). [<] [ N ] [>] across the row (ALL-363):
+    -- the arrows step by 1 (min 1), the field fills the space between them
+    local ND_ARW, ND_MAX = 22, 999
+    local ndPrev=BNB.CreateButton(nil,ndRow,"<",ND_ARW,AW_ROW)
+    local ndNext=BNB.CreateButton(nil,ndRow,">",ND_ARW,AW_ROW)
+    ndPrev:SetPoint("LEFT",ndRow,"LEFT",0,0)
+    ndNext:SetPoint("RIGHT",ndRow,"RIGHT",0,0)
     local ndEB=BNB.CreateBackdropFrame("EditBox",nil,ndRow)
-    ndEB:SetSize(60,AW_ROW); ndEB:SetPoint("LEFT",ndRow,"LEFT",0,0)
+    ndEB:SetHeight(AW_ROW)
+    ndEB:SetPoint("LEFT",ndPrev,"RIGHT",4,0); ndEB:SetPoint("RIGHT",ndNext,"LEFT",-4,0)
     BNB.SetBackdropDark(ndEB); ndEB:SetTextInsets(6,6,0,0)
     ndEB:SetAutoFocus(false); ndEB:SetNumeric(true); ndEB:SetMaxLetters(3)
-    ndEB:SetFontObject("BNBFontHighlightSmall"); ndEB:SetText("7")
+    ndEB:SetFontObject("BNBFontHighlightSmall"); ndEB:SetJustifyH("CENTER"); ndEB:SetText("7")
     ndEB:SetScript("OnEnterPressed",function(self) self:ClearFocus() end)
     ndEB:SetScript("OnEscapePressed",function(self) self:ClearFocus() end)
     ndEB:HookScript("OnTextChanged",function() MarkDirty() end)
+    local function StepDays(d)
+        local n = (tonumber(ndEB:GetText()) or 7) + d
+        ndEB:SetText(tostring(math.max(1, math.min(ND_MAX, n))))
+    end
+    ndPrev:SetScript("OnClick",function() StepDays(-1) end)
+    ndNext:SetScript("OnClick",function() StepDays(1) end)
 
     local function SetRecur(v)
         wdRow:SetShown(v=="weekdays"); ndRow:SetShown(v=="interval")
@@ -645,23 +665,24 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     local swatchBtn=BNB.CreateBackdropFrame("Button",nil,ct2)
     swatchBtn:SetSize(AW_ROW,AW_ROW); swatchBtn:SetPoint("TOPLEFT",ct2,"TOPLEFT",0,y2)
     local swTx=swatchBtn:CreateTexture(nil,"OVERLAY"); swTx:SetAllPoints()
-    swTx:SetColorTexture(BNB_GR,BNB_GG,BNB_GB,1)
+    swTx:SetColorTexture(DefaultGlowColor())
     local glowColorVal=nil
 
     local rstCol=BNB.CreateButton(nil,ct2,L["AW_RESET_TO_DEFAULT_BTN"],AW_CW-AW_ROW-6,AW_ROW)
     rstCol:SetPoint("TOPLEFT",ct2,"TOPLEFT",AW_ROW+6,y2)
     rstCol:SetScript("OnClick",function()
-        glowColorVal=nil; swTx:SetColorTexture(BNB_GR,BNB_GG,BNB_GB,1); MarkDirty()
+        glowColorVal=nil; swTx:SetColorTexture(DefaultGlowColor()); MarkDirty()
     end)
     swatchBtn:SetScript("OnClick",function()
-        local pv=glowColorVal or {BNB_GR,BNB_GG,BNB_GB,1}
+        local orig=glowColorVal
+        local pv=glowColorVal or {DefaultGlowColor()}
         BNB.OpenColorPicker(pv[1],pv[2],pv[3],
             function(r,g,b)
                 glowColorVal={r,g,b,1}; swTx:SetColorTexture(r,g,b,1); MarkDirty()
                 if f._restartPreview then f._restartPreview() end
             end,
             function()
-                glowColorVal=pv; swTx:SetColorTexture(pv[1],pv[2],pv[3],1)
+                glowColorVal=orig; swTx:SetColorTexture(pv[1],pv[2],pv[3],1)
                 if f._restartPreview then f._restartPreview() end
             end)
     end)
@@ -980,7 +1001,15 @@ local function BuildTabContent(f, sf1, sf2, sf3, ct1, ct2, ct3, saveBtn, delBtn)
     f._setGlowColor = function(c)
         glowColorVal=c
         if c then swTx:SetColorTexture(c[1],c[2],c[3],1)
-        else       swTx:SetColorTexture(BNB_GR,BNB_GG,BNB_GB,1) end
+        else       swTx:SetColorTexture(DefaultGlowColor()) end
+    end
+    -- "Default" names what it is today: "Default (AutoCast)" (ALL-292)
+    local GT_NAME = { "AW_GLOW_PIXEL", "AW_GLOW_AUTOCAST", "AW_GLOW_BORDER", "AW_GLOW_PROC" }
+    local GM_NAME = { continuous = "AW_GLOWMODE_CONTINUOUS", pulse = "AW_GLOWMODE_PULSE", once = "AW_GLOWMODE_ONCE" }
+    f._refreshDefaultLabels = function()
+        local gt, gm = GT_NAME[BNB.Alarm.Default("glowType")], GM_NAME[BNB.Alarm.Default("glowMode")]
+        gtEntries[1].label = gt and string.format(L["AW_GLOW_DEFAULT_FMT"], L[gt]) or L["AW_GLOW_DEFAULT"]
+        gmEntries[1].label = gm and string.format(L["AW_GLOW_DEFAULT_FMT"], L[gm]) or L["AW_GLOW_DEFAULT"]
     end
     f._setTimeType      = SetTimeType
     f._setRecur         = SetRecur
@@ -1114,6 +1143,7 @@ local function Populate(noteID)
 
     _soundDD:SetSelected(alarm.sound or "default")
     _soundRepDD:SetSelected(alarm.soundRepeat or SOUND_REPEAT_DEFAULT)
+    if f._refreshDefaultLabels then f._refreshDefaultLabels() end
     _glowTypeDD:SetSelected(alarm.glowType)
     _glowModeDD:SetSelected(alarm.glowMode)
     f._setGlowColor(alarm.glowColor)
@@ -1140,7 +1170,7 @@ local function Populate(noteID)
     local snoozeOn = alarm.snoozeEnabled
     if snoozeOn == nil then snoozeOn = true end  -- default on
     _snoozeEnableCB:SetChecked(snoozeOn)
-    _snoozeIntervalDD:SetSelected(alarm.snoozeDefault or 5)
+    _snoozeIntervalDD:SetSelected(alarm.snoozeDefault or BNB.Alarm.Default("snoozeDefault"))
     _snoozeRepeatDD:SetSelected(alarm.snoozeRepeat or 0)
     f._refreshSnoozeState()
 

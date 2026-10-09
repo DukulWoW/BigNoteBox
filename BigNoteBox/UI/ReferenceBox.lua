@@ -991,7 +991,7 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
             local att2 = note and note.attachments and note.attachments[attIndex]
             if not att2 then return end
             local url = BuildWowheadURL(att2)
-            if url then BNB.ShowClipboardHint(url) end
+            if url then BNB.ShowClipboardHint(url, nil, nil, true) end
         end)
         -- Dressing room — items only
         local noteCheck = NDB() and NDB().notes and NDB().notes[noteID]
@@ -1044,7 +1044,7 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
             local att = {type = "item", id = gearEntry.id}
             local url = BuildWowheadURL(att)
-            if url then BNB.ShowClipboardHint(url) end
+            if url then BNB.ShowClipboardHint(url, nil, nil, true) end
         end)
 
         -- Show model (ALL-206) and the dressing room; a transmog card's own

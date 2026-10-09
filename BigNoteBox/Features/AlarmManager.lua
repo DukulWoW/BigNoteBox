@@ -97,6 +97,12 @@ end
 local function Defaults()
     return (BigNoteBoxDB and BigNoteBoxDB.alarmDefaults) or BNB.DEFAULTS.alarmDefaults
 end
+-- One default field (Settings > Modules > Alarms, ALL-292), never nil
+function AM.Default(key)
+    local v = Defaults()[key]
+    if v == nil then v = BNB.DEFAULTS.alarmDefaults[key] end
+    return v
+end
 
 -- The alarm window's own sounds (its Sound list). These were only known to
 -- the window's Test button: ringing went to LSM, which answered an unknown key
@@ -525,6 +531,34 @@ end
 -- waits in _popupQueue and gets the popup when that one is answered; it used to
 -- take the frame over and leave the first alarm ringing with no popup (ALL-136.3).
 -- ---------------------------------------------------------------------------
+-- The popup draws the waiting alarms as bars under itself (ALL-182)
+local function QueueChanged()
+    local AP = BNB.AlarmPopup
+    if AP and AP.RefreshQueue then AP.RefreshQueue() end
+end
+
+-- Waiting alarms in turn order, answered ones left out
+function AM.PopupQueue()
+    local out, seen = {}, {}
+    for _, id in ipairs(_popupQueue) do
+        local n = GetNote(id)
+        if not seen[id] and _activePopups[id] and n and n.alarm then
+            seen[id] = true
+            out[#out + 1] = id
+        end
+    end
+    return out
+end
+
+-- Give a waiting alarm the popup: its sound starts with it
+local function ShowQueued(id, alarm)
+    BNB.AlarmPopup.Show(id, alarm)
+    if not (InCombatLockdown() and alarm.combatMode == "queue") then
+        PlayAlarmSound(alarm)
+    end
+    StartNag(id)
+end
+
 local function ShowAlarmPopup(noteID)
     local note  = GetNote(noteID)
     local alarm = note and note.alarm
@@ -538,6 +572,7 @@ local function ShowAlarmPopup(noteID)
         -- Quiet while it waits: its sound starts again with its popup
         _popupQueue[#_popupQueue + 1] = noteID
         StopNag(noteID)
+        QueueChanged()
         return
     end
     -- A custom frame (not StaticPopup_Show) because we need a snooze dropdown
@@ -555,16 +590,30 @@ local function ShowNextPopup()
             local note  = GetNote(id)
             local alarm = note and note.alarm
             if _activePopups[id] and alarm then
-                AP.Show(id, alarm)
                 -- Its sound with its popup, not up to one repeat later
-                if not (InCombatLockdown() and alarm.combatMode == "queue") then
-                    PlayAlarmSound(alarm)
-                end
-                StartNag(id)
+                ShowQueued(id, alarm)
                 return
             end
         end
     end)
+end
+
+-- A click on a waiting alarm's bar (ALL-182): it takes the popup, and the one
+-- on screen waits again at the front of the queue, quiet like any waiting one
+function AM.BringForward(noteID)
+    local AP = BNB.AlarmPopup
+    local note  = GetNote(noteID)
+    local alarm = note and note.alarm
+    if not (AP and AP.CurrentID and alarm and _activePopups[noteID]) then return end
+    local cur = AP.CurrentID()
+    if not cur or cur == noteID then return end
+    for i = #_popupQueue, 1, -1 do
+        if _popupQueue[i] == noteID then table.remove(_popupQueue, i) end
+    end
+    table.insert(_popupQueue, 1, cur)
+    AP.HideFor(cur)
+    StopNag(cur)
+    ShowQueued(noteID, alarm)
 end
 
 -- ---------------------------------------------------------------------------
@@ -749,6 +798,9 @@ end
 local function StopRinging(noteID)
     _ringing[noteID]           = nil
     _activePopups[noteID]      = nil
+    for i = #_popupQueue, 1, -1 do
+        if _popupQueue[i] == noteID then table.remove(_popupQueue, i) end
+    end
     _activeStickyAlarms[noteID] = nil
     _stickyAfterCombat[noteID] = nil
     StopNag(noteID)
@@ -756,6 +808,7 @@ local function StopRinging(noteID)
     if BNB.AlarmPopup and BNB.AlarmPopup.HideFor then BNB.AlarmPopup.HideFor(noteID) end
     if BNB.Toast then BNB.Toast.Dismiss("alarm:" .. noteID) end   -- ALL-385
     _toasted[noteID] = nil
+    QueueChanged()
     ShowNextPopup()
 end
 

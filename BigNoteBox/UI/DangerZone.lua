@@ -225,7 +225,32 @@ local function MakeRule(ct, y)
     return y - 10
 end
 
-local function MakeActionRow(ct, y, btnLabel, btnW, confirmLabel, confirmW, onConfirm)
+-- The armed confirm button names how much it changes: "Delete all 312 notes"
+-- (ALL-186). countFn() -> n, read when the first button is clicked.
+local function CountLabel(countFn, oneKey, fmtKey)
+    return function()
+        local n = countFn()
+        local text = (n == 1) and L[oneKey] or string.format(L[fmtKey], n)
+        return "|cffff4444" .. text .. "|r"
+    end
+end
+local function CountOf(t)
+    local n = 0
+    for _ in pairs(t or {}) do n = n + 1 end
+    return n
+end
+local function NotesWith(field)
+    return function()
+        local n, ndb = 0, BNB.NotesDB()
+        for _, note in pairs(ndb and ndb.notes or {}) do
+            if note[field] then n = n + 1 end
+        end
+        return n
+    end
+end
+
+-- labelFn (optional): the confirm button's text, built when it is armed
+local function MakeActionRow(ct, y, btnLabel, btnW, confirmLabel, confirmW, onConfirm, labelFn)
     local btn = MakeRedButton(ct, btnLabel, btnW, 24)
     btn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
 
@@ -237,6 +262,7 @@ local function MakeActionRow(ct, y, btnLabel, btnW, confirmLabel, confirmW, onCo
     confirmBtn:Hide()
 
     btn:SetScript("OnClick", function()
+        if labelFn then confirmBtn:SetText(labelFn()) end
         ArmConfirm(confirmBtn, onConfirm)
     end)
 
@@ -326,7 +352,9 @@ local function PopulateContent(ct, sf)
         function()
             if BNB.EmptyTrash then BNB.EmptyTrash() end
             BNB:Print(L["DZ_MSG_TRASH_EMPTIED"])
-        end)
+        end,
+        CountLabel(function() local ndb = BNB.NotesDB(); return CountOf(ndb and ndb.trash) end,
+            "DZ_COUNT_TRASH_ONE", "DZ_COUNT_TRASH_FMT"))
     y = y - SEC_GAP
 
     -- ── 3. Clear All Session History ─────────────────────────────────────────
@@ -351,7 +379,8 @@ local function PopulateContent(ct, sf)
             if BNB.RefreshHistoryWindow    then BNB.RefreshHistoryWindow()    end
             if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
             if BNB.SyncHistoryBtnState     then BNB.SyncHistoryBtnState()     end
-        end)
+        end,
+        CountLabel(NotesWith("history"), "DZ_COUNT_HISTORY_ONE", "DZ_COUNT_HISTORY_FMT"))
     y = y - SEC_GAP
 
     -- ── 4. Clear Manual Restore Points ───────────────────────────────────────
@@ -359,7 +388,7 @@ local function PopulateContent(ct, sf)
     y = MakeHeader(ct, y, L["DZ_CLEARRESTORE_HDR"])
     y = MakeDesc(ct, y, L["DZ_CLEARRESTORE_DESC"])
     y = MakeActionRow(ct, y,
-        L["DZ_CLEARRESTORE_BTN"], 180,
+        L["DZ_CLEARRESTORE_BTN"], 170,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
             local ndb = BNB.NotesDB()
@@ -377,7 +406,8 @@ local function PopulateContent(ct, sf)
             if BNB.SyncHistoryNoteBtnState then BNB.SyncHistoryNoteBtnState() end
             if BNB.RefreshHistoryWindow    then BNB.RefreshHistoryWindow()    end
             if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
-        end)
+        end,
+        CountLabel(NotesWith("manualSnapshot"), "DZ_COUNT_RESTORE_ONE", "DZ_COUNT_RESTORE_FMT"))
     y = y - SEC_GAP
 
     -- ── 5. Reset Sticky Note Layouts ─────────────────────────────────────────
@@ -385,7 +415,7 @@ local function PopulateContent(ct, sf)
     y = MakeHeader(ct, y, L["DZ_RESETSTICKY_HDR"])
     y = MakeDesc(ct, y, L["DZ_RESETSTICKY_DESC"])
     y = MakeActionRow(ct, y,
-        L["DZ_RESETSTICKY_BTN"], 180,
+        L["DZ_RESETSTICKY_BTN"], 170,
         L["DZ_CONFIRM_RESET"], 160,
         function()
             if BigNoteBoxDB then
@@ -398,7 +428,9 @@ local function PopulateContent(ct, sf)
                     if f and f:IsShown() then f:Hide() end
                 end
             end
-        end)
+        end,
+        CountLabel(function() return CountOf(BigNoteBoxDB and BigNoteBoxDB.postits) end,
+            "DZ_COUNT_STICKY_ONE", "DZ_COUNT_STICKY_FMT"))
     y = y - SEC_GAP
 
     -- ── 6. Clear Migration History ───────────────────────────────────────────
@@ -429,7 +461,7 @@ local function PopulateContent(ct, sf)
     y = MakeHeader(ct, y, L["DZ_REMOVECHARS_HDR"])
     y = MakeDesc(ct, y, L["DZ_REMOVECHARS_DESC"])
     y = MakeActionRow(ct, y,
-        L["DZ_REMOVECHARS_BTN"], 200,
+        L["DZ_REMOVECHARS_BTN"], 170,
         L["DZ_CONFIRM_REMOVE"], 160,
         function()
             local db = BigNoteBoxDB
@@ -446,7 +478,14 @@ local function PopulateContent(ct, sf)
                 end
             end
             BNB:Print(L["DZ_MSG_CHARS_CLEARED"])
-        end)
+        end,
+        -- The character playing now is kept
+        CountLabel(function()
+            local db = BigNoteBoxDB
+            local n = CountOf(db and db.knownChars)
+            if BNB.currentChar and db and db.knownChars and db.knownChars[BNB.currentChar] then n = n - 1 end
+            return math.max(0, n)
+        end, "DZ_COUNT_CHARS_ONE", "DZ_COUNT_CHARS_FMT"))
     y = y - SEC_GAP
 
     -- ── 8. Delete All Notes ──────────────────────────────────────────────────
@@ -474,7 +513,9 @@ local function PopulateContent(ct, sf)
             if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
             BNB.SendMessage("NoteDeleted", gone, true)   -- the list follows
             BNB:Print(L["DZ_MSG_ALL_NOTES_DELETED"])
-        end)
+        end,
+        CountLabel(function() local ndb = BNB.NotesDB(); return CountOf(ndb and ndb.notes) end,
+            "DZ_COUNT_NOTES_ONE", "DZ_COUNT_NOTES_FMT"))
     y = y - SEC_GAP
 
     -- ── 9. Factory Reset ─────────────────────────────────────────────────────

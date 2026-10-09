@@ -160,7 +160,7 @@ function AP.Show(noteID, alarm, missedList)
     f._labelLbl:SetShown(labelText ~= "")
 
     -- Snooze default
-    local defSnooze = (alarm and alarm.snoozeDefault) or 5
+    local defSnooze = (alarm and alarm.snoozeDefault) or BNB.Alarm.Default("snoozeDefault")
     if f._snoozeDDContainer._selected then
         f._snoozeDDContainer._selected = defSnooze
         if f._snoozeDDContainer.SetText then
@@ -231,6 +231,92 @@ function AP.Show(noteID, alarm, missedList)
         end
     end
     f._glowNoteID = noteID
+    AP.RefreshQueue()
+end
+
+-- ── Waiting alarms (ALL-182) ────────────────────────────────────────────────
+-- One bar per alarm waiting its turn, under the popup: icon + note name. A
+-- click gives that alarm the popup (BNB.Alarm.BringForward). Bars are pooled
+-- children of the popup, so they hide with it; past QUEUE_MAX a "+N more" line.
+local QUEUE_BAR_H, QUEUE_GAP, QUEUE_MAX = 24, 3, 5
+local _queueBars, _queueMore = {}, nil
+
+local function QueueBar(i)
+    local b = _queueBars[i]
+    if b then return b end
+    local f = _popupFrame
+    b = BNB.CreateBackdropFrame("Button", nil, f)
+    b:SetSize(POPUP_W, QUEUE_BAR_H)
+    BNB.SetBackdrop(b, 0.07, 0.07, 0.09, 0.92, 0.35, 0.35, 0.38, 1)
+    local hover = BNB.CreateListRowArt(b, "hover", { 1, 1, 1, 0.08 })
+    local icon = b:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(16, 16); icon:SetPoint("LEFT", b, "LEFT", 6, 0)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    b._icon = icon
+    local lbl = b:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+    lbl:SetPoint("LEFT", icon, "RIGHT", 6, 0)
+    lbl:SetPoint("RIGHT", b, "RIGHT", -8, 0)
+    lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(false)
+    b._lbl = lbl
+    b:SetScript("OnClick", function(self)
+        if self._noteID and BNB.Alarm and BNB.Alarm.BringForward then
+            BNB.Alarm.BringForward(self._noteID)
+        end
+    end)
+    b:SetScript("OnEnter", function(self)
+        hover:Show()
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(self._lbl:GetText() or "", 1, 1, 1)
+        GameTooltip:AddLine(L["AO_QUEUE_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() hover:Hide(); GameTooltip:Hide() end)
+    b:SetScript("OnHide", function() hover:Hide() end)
+    _queueBars[i] = b
+    return b
+end
+
+function AP.RefreshQueue()
+    local f = _popupFrame
+    if not f then return end
+    local ids = (f:IsShown() and BNB.Alarm and BNB.Alarm.PopupQueue) and BNB.Alarm.PopupQueue() or {}
+    local shown = math.min(#ids, QUEUE_MAX)
+    local prev = f
+    for i = 1, shown do
+        local b = QueueBar(i)
+        local note = BNB.GetNote and BNB.GetNote(ids[i])
+        b._noteID = ids[i]
+        b._icon:SetTexture((note and note.icon) or DEFAULT_NOTE_ICON)
+        local title = note and note.title
+        local label = note and note.alarm and note.alarm.label
+        if not title or title == "" then title = L["AO_UNTITLED"] end
+        if label and label ~= "" then title = title .. " - " .. label end
+        b._lbl:SetText(title)
+        b:ClearAllPoints()
+        b:SetPoint("TOP", prev, "BOTTOM", 0, -QUEUE_GAP)
+        b:Show()
+        prev = b
+    end
+    for i = shown + 1, #_queueBars do _queueBars[i]:Hide() end
+    local extra = #ids - shown
+    if extra > 0 then
+        if not _queueMore then
+            _queueMore = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+            BNB.SetTextWhite(_queueMore, 0.8)
+        end
+        _queueMore:ClearAllPoints()
+        _queueMore:SetPoint("TOP", prev, "BOTTOM", 0, -QUEUE_GAP)
+        _queueMore:SetText(string.format(L["AO_QUEUE_MORE_FMT"], extra))
+        _queueMore:Show()
+    elseif _queueMore then
+        _queueMore:Hide()
+    end
+end
+
+-- The alarm the popup shows, nil while it is closed
+function AP.CurrentID()
+    local f = _popupFrame
+    return (f and f:IsShown()) and f._currentNoteID or nil
 end
 
 -- True while the popup shows an alarm other than noteID (nil = any alarm).

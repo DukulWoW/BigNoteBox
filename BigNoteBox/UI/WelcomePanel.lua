@@ -283,13 +283,15 @@ local function GetImportFrame()
         -- popup without its two names: notes for another character never
         -- imported from here. The import itself reports in chat (ALL-180).
         local foreignChar = BNB.ForeignScopeChar(noteList)
-        if foreignChar and BNB.currentChar then
-            BNB._pendingImport = { notes = noteList }
-            StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
-        else
-            BNB._DoImport(noteList, false)
-        end
         f:Hide()
+        BNB.OfferBackupFirst(function()   -- ALL-186
+            if foreignChar and BNB.currentChar then
+                BNB._pendingImport = { notes = noteList }
+                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
+            else
+                BNB._DoImport(noteList, false)
+            end
+        end)
     end)
 
     _importFrame = f

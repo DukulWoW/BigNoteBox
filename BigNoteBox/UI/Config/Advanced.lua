@@ -83,7 +83,7 @@ local function BuildAdvancedTab(sf, ct)
 
         local getBtn = BNB.CreateButton(nil, ct, L["CFG_DEVADDON_GET_BTN"], 180, 24)
         getBtn:SetPoint("LEFT", devOpenBtn, "RIGHT", 8, 0)
-        getBtn:SetScript("OnClick", function(self) BNB.ShowClipboardHint(BNB.DEVTOOL_URL, self, true) end)
+        getBtn:SetScript("OnClick", function(self) BNB.ShowClipboardHint(BNB.DEVTOOL_URL, self, true, true) end)
         getBtn:HookScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine(L["CFG_DEVADDON_GET_BTN"], 1, 1, 1)

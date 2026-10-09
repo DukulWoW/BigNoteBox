@@ -1562,7 +1562,7 @@ local function BuildPage7(content)
         local url = def[2]
         btn:SetScript("OnClick", function()
             if url and BNB.ShowClipboardHint then
-                BNB.ShowClipboardHint(url, btn, true)
+                BNB.ShowClipboardHint(url, btn, true, true)
             end
         end)
     end
@@ -1581,7 +1581,7 @@ local function BuildPage7(content)
     siteBtn:SetPoint("TOPLEFT", f, "TOPLEFT", math.floor((CW - 200) / 2), y)
     siteBtn:SetScript("OnClick", function()
         if BNB.ShowClipboardHint then
-            BNB.ShowClipboardHint("https://dukul.net", siteBtn, true)
+            BNB.ShowClipboardHint("https://dukul.net", siteBtn, true, true)
         end
     end)
     y = y - 40

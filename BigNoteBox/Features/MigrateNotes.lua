@@ -1176,7 +1176,7 @@ function M.ShowAddonPopup(key)
     confirmBtn:SetPoint("BOTTOMRIGHT", ct, "BOTTOMRIGHT", -PAD, PAD)
     confirmBtn:SetScript("OnClick", function()
         f:Hide()
-        M.Run(sel)
+        BNB.OfferBackupFirst(function() M.Run(sel) end)   -- ALL-186
     end)
 
     -- Resize to fit
@@ -1435,7 +1435,7 @@ function M.ShowPopup()
             end
         end
         f:Hide()
-        M.Run(sel)
+        BNB.OfferBackupFirst(function() M.Run(sel) end)   -- ALL-186
     end)
 
     -- Cancel: anchored left of Migrate Now, together they are centred

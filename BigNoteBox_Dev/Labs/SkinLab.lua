@@ -525,6 +525,17 @@ local function FillFakeRows(sp)
             end
         end
     end
+    -- Stack the rows by their filled heights (ALL-419: they were all placed
+    -- at the top, before any height was known)
+    if sp.listChild then
+        local ry = 0
+        for _, row in ipairs(sp.rows) do
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT", sp.listChild, "TOPLEFT", 0, -ry)
+            ry = ry + math.max(26, row:GetHeight())
+        end
+        sp.listChild:SetHeight(math.max(1, ry))
+    end
 end
 
 -- The formatting toolbar's icon button (UI/WysiwygBar.lua WyBtn, skin look)
@@ -741,19 +752,17 @@ local function BuildSpecimen(parent, x, y, w, h)
     local child = CreateFrame("Frame", nil, sf)
     child:SetWidth(lw)
     sf:SetScrollChild(child)
-    local ry = 0
+    child:SetHeight(1)
+    sp.listChild = child
     if BNB._createListEntry and BNB.PopulateListEntry then
         for i = 1, RANDOM_ROWS + 2 do
             local row = BNB._createListEntry(child)
-            row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -ry)
             row:SetWidth(lw)
             row:EnableMouse(false)
             sp.rows[i] = row
         end
-        FillFakeRows(sp)
-        for _, row in ipairs(sp.rows) do ry = ry + math.max(26, row:GetHeight()) end
+        FillFakeRows(sp)   -- fills and stacks the rows
     end
-    child:SetHeight(math.max(1, ry))
     local shufBtn = BNB.CreateSkinButton(nil, fr, "Shuffle notes", 112, 22)
     shufBtn:SetPoint("TOPLEFT", toastBtn, "BOTTOMLEFT", 0, -6)
     shufBtn:SetScript("OnClick", function() FillFakeRows(sp) end)

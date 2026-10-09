@@ -65,7 +65,7 @@ local function BuildGeneralTab(sf, ct)
     end)
     byBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     byBtn:SetScript("OnClick", function(self)
-        BNB.ShowClipboardHint("https://dukul.net", self, true)
+        BNB.ShowClipboardHint("https://dukul.net", self, true, true)
     end)
 
     -- ── Pack status icons (ALL-14), right side of the header, right to left.
@@ -89,7 +89,7 @@ local function BuildGeneralTab(sf, ct)
                     local hl = b:CreateTexture(nil, "HIGHLIGHT")
                     hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.15)
                     b:SetScript("OnClick", function(self)
-                        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true) end
+                        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(pack.url, self, true, true) end
                     end)
                 end
                 b:SetScript("OnEnter", function(self)
