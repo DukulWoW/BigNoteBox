@@ -65,7 +65,6 @@ local FADE         = 0.35
 local SLIDE_PX     = 40     -- a new toast slides in from this far out
 local SLIDE_RATE   = 12     -- approach speed (fraction of the gap per second)
 local ARROW        = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\Symbols\\bt-%s-normal"
-local ANCHOR_ART   = 6940170   -- interface/shop/catalogshopfxtoastmask: a white blank toast
 T.GAP, T.FADE, T.SLIDE_PX, T.SLIDE_RATE = GAP, FADE, SLIDE_PX, SLIDE_RATE   -- the Toast Lab stacks with these
 
 local GROW = {
@@ -521,11 +520,21 @@ function T.Count() return #_shown, #_queue, #_waitCombat end
 BNB.RegisterMessage("Toast", "SkinChanged", function() T.Restyle() end)
 
 -- ── The anchor: where the first toast sits ──────────────────────────────────
--- The size of a toast in the player's style, drawn with the shop's blank
--- toast mask (a backdrop where the client lacks it), with ghosts of the next
--- two slots so the grow direction shows. Drag to move; Lock (in the middle)
+-- The size of a toast in the player's style, drawn as a plain box exactly
+-- the toast's size (normal mode: transparent black with a grey border; skin
+-- mode: the preset's body and border), with ghosts of the next two slots so
+-- the grow direction shows. Drag to move; Lock (in the middle)
 -- or a right-click saves; Reset puts back the default.
 local _anchor
+
+-- Developer tools > "Print toast anchor position" (debug mode): the saved
+-- offset after a drag, for finding a better default
+local function PrintAnchorPos(x, y)
+    if not (BigNoteBoxDB and BigNoteBoxDB.debugToastAnchor and BNB.IsDebugMode and BNB.IsDebugMode()) then return end
+    local sw, sh = UIParent:GetSize()
+    BNB:Print(string.format("|cff88bbffToast anchor:|r popupAnchorX = %d, popupAnchorY = %d  (CENTER of UIParent; screen %d x %d, UI scale %.2f)",
+        x, y, math.floor(sw + 0.5), math.floor(sh + 0.5), UIParent:GetEffectiveScale()))
+end
 
 local function SaveAnchor(f)
     local cx, cy   = f:GetCenter()
@@ -542,20 +551,14 @@ local function SaveAnchor(f)
     T.Relayout()
 end
 
-local function HasAnchorArt()
-    return not (C_UIFileAsset and C_UIFileAsset.IsKnownFile)
-        or C_UIFileAsset.IsKnownFile(ANCHOR_ART)
-end
-
 local function DressBox(box, alpha)
-    if HasAnchorArt() then
-        BNB.SetBackdrop(box, 0, 0, 0, 0, 0, 0, 0, 0)
-        box._art:SetTexture(ANCHOR_ART)
-        box._art:SetVertexColor(0.45, 0.85, 0.45, alpha)
-        box._art:Show()
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        local p = BNB.GetSkinPreset()
+        local r, g, b    = BNB.SkinColourOf(p)
+        local br, bg, bb = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(box, r, g, b, BNB.GetSkinBgAlpha() * alpha, br, bg, bb, alpha)
     else
-        box._art:Hide()
-        BNB.SetBackdrop(box, 0.10, 0.10, 0.12, 0.92 * alpha, 0.45, 0.70, 0.45, alpha)
+        BNB.SetBackdrop(box, 0, 0, 0, 0.6 * alpha, 0.55, 0.55, 0.55, alpha)
     end
 end
 
@@ -582,10 +585,7 @@ function T.RefreshAnchor()
 end
 
 local function NewBox(parent, name)
-    local box = BNB.CreateBackdropFrame("Frame", name, parent)
-    box._art = box:CreateTexture(nil, "BACKGROUND")
-    box._art:SetAllPoints()
-    return box
+    return BNB.CreateBackdropFrame("Frame", name, parent)
 end
 
 local function CreateAnchor()
@@ -607,7 +607,7 @@ local function CreateAnchor()
     local title = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     title:SetPoint("BOTTOM", f, "CENTER", 0, 12)
     title:SetText(L["TOAST_ANCHOR_TITLE"])
-    title:SetTextColor(1, 0.82, 0, 1)
+    BNB.SetHeaderColor(title)
 
     -- Lock in the middle (Dukul, ALL-160), Reset beside it
     local lock = BNB.CreateButton(nil, f, L["POPANCHOR_LOCK"], 56, 20)
@@ -625,6 +625,7 @@ local function CreateAnchor()
     f:SetScript("OnDragStop", function(self)
         BNB.StopDragMoving(self)
         SaveAnchor(self)
+        PrintAnchorPos(BigNoteBoxDB and BigNoteBoxDB.popupAnchorX or 0, BigNoteBoxDB and BigNoteBoxDB.popupAnchorY or 0)
     end)
     f:SetScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" then T.LockAnchor() end

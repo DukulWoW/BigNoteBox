@@ -161,7 +161,7 @@ function K.BuildDevToolsPage(sf, ct, y)
 
     -- ── Options ─────────────────────────────────────────────────────────────
     y = AddHeader(ct, y, L["DEV_HDR_OPTIONS"])
-    local wpCb, immCb, ctxCb
+    local wpCb, immCb, ctxCb, toastCb
     y, wpCb = AddCheck(ct, y, L["CFG_DEV_WP_LABEL"],
         function() return db.debugWaypoint == true end,
         function(v) db.debugWaypoint = v or nil; BNB._debugWaypoint = db.debugWaypoint end)
@@ -184,7 +184,13 @@ function K.BuildDevToolsPage(sf, ct, y)
         L["CFG_DEV_CTX_TRACE_TIP"])
     K.ReadOnShow(wpCb, function() return db.debugWaypoint == true end)
     K.ReadOnShow(immCb, function() return BNB._debugImmersionPos == true end)
+    -- Toast anchor drag: prints the saved offset (UI/Toast.lua), to find a better default
+    y, toastCb = AddCheck(ct, y, L["CFG_DEV_TOAST_ANCHOR_LABEL"],
+        function() return db.debugToastAnchor == true end,
+        function(v) db.debugToastAnchor = v or nil end,
+        L["CFG_DEV_TOAST_ANCHOR_TIP"])
     K.ReadOnShow(ctxCb, function() return db.debugContextTrace == true end)
+    K.ReadOnShow(toastCb, function() return db.debugToastAnchor == true end)
 
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────
     AddRule(ct, y - 4); y = y - 18
@@ -243,6 +249,12 @@ function K.BuildDevToolsPage(sf, ct, y)
             Slash("BNBBUTTONTEST"), SlashCmdList.BNBBUTTONTEST ~= nil },
         { L["CFG_DEV_ICONPROBE_BTN"], L["CFG_DEV_ICONPROBE_TIP_BODY"],
             Slash("BNBICONPROBE"), SlashCmdList.BNBICONPROBE ~= nil },
+        -- Fake characters of different ages + their notes (ALL-312, dev addon)
+        { L["CFG_DEV_FAKEADD_BTN"], L["CFG_DEV_FAKEADD_TIP_BODY"],
+            Slash("BNBFAKEDATA"), SlashCmdList.BNBFAKEDATA ~= nil },
+        { L["CFG_DEV_FAKEDEL_BTN"], L["CFG_DEV_FAKEDEL_TIP_BODY"], function()
+            if SlashCmdList.BNBFAKEDATA then SlashCmdList.BNBFAKEDATA("remove") else BNB.DevToolMissing() end
+        end, SlashCmdList.BNBFAKEDATA ~= nil },
     })
 
     -- ── Reload ──────────────────────────────────────────────────────────────

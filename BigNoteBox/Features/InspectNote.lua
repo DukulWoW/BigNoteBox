@@ -800,8 +800,23 @@ end
 -- frame also gets our INSPECT_ACHIEVEMENT_READY and errors in Blizzard's own
 -- code (GetCategoryNumAchievements "summary", RET-08). It does not need our
 -- request, so it is taken off that event while one is out and put back after.
+-- The event arrives a moment after SetAchievementComparisonUnit /
+-- ClearAchievementComparisonUnit, so it is put back UNMUTE_DELAY seconds
+-- after the inspect window closes, not at once (BX8 still errored when it
+-- was put back straight after the Clear). Blizzard's comparison opening
+-- takes it back at once (its OnShow hook below).
+local UNMUTE_DELAY = 3
 local _muted = {}   -- frames we took off the event
+local _showHooked = false
+local function UnmuteNow()
+    BNB.CancelDebounce("inspectAchUnmute")
+    for i = #_muted, 1, -1 do
+        _muted[i]:RegisterEvent("INSPECT_ACHIEVEMENT_READY")
+        _muted[i] = nil
+    end
+end
 local function MuteComparison()
+    BNB.CancelDebounce("inspectAchUnmute")
     if next(_muted) or ComparisonBusy() then return end
     for _, name in ipairs({ "AchievementFrameComparison", "AchievementFrame" }) do
         local cf = _G[name]
@@ -810,12 +825,14 @@ local function MuteComparison()
             _muted[#_muted + 1] = cf
         end
     end
+    local cmp = AchievementFrameComparison
+    if cmp and not _showHooked then
+        _showHooked = true
+        cmp:HookScript("OnShow", UnmuteNow)
+    end
 end
 local function UnmuteComparison()
-    for i = #_muted, 1, -1 do
-        _muted[i]:RegisterEvent("INSPECT_ACHIEVEMENT_READY")
-        _muted[i] = nil
-    end
+    if next(_muted) then BNB.Debounce("inspectAchUnmute", UNMUTE_DELAY, UnmuteNow) end
 end
 
 local function RequestAchievementPoints()

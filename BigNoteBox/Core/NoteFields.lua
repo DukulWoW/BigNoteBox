@@ -84,6 +84,8 @@ local FIELDS = {
     { "targetNpcID",                "sn", share = "unit" },
     { "targetPlayerKey",            "s",  share = "unit" },
     { "targetIsPet",                "b",  share = "unit" },
+    -- A display stand: one creature ID shown as a different mount per spawn (ALL-340)
+    { "targetShared",               "b",  share = "unit" },
     { "targetFaction",              "s",  share = "unit" },
     { "targetClassification",       "s",  share = "unit" },
     { "targetAttackable",           "b",  share = "unit" },

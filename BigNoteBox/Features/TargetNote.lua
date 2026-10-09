@@ -173,7 +173,16 @@ end
 -- without iconSource, and every pick sets one (Dukul, 2026-10-04: the
 -- "Target note: Hogger" icon could not be changed). Revert in the icon
 -- picker brings the portrait back.
+-- Creature portraits are off (RET-09, Dukul 2026-10-09): drawing one while the
+-- Reference Box viewer loads a creature model crashed Retail to desktop
+-- (ACCESS_VIOLATION reading address 0 on a torn-down object, no Lua running).
+-- Bisected in game: portraits off = no crash, viewer off = no crash, both = a
+-- crash within a few notes. NPC notes show their icon instead. true brings
+-- them back once a safe way is found.
+local CREATURE_PORTRAITS = false
+
 function BNB.SetNpcNotePortrait(tex, note)
+    if not CREATURE_PORTRAITS then return false end
     if not (tex and note and note.source == "target" and note.targetNpcID)
        or note.targetIsPet or note.iconSource then
         return false
