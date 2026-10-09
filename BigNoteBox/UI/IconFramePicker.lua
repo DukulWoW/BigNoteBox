@@ -16,7 +16,15 @@
 --                                       strata }  strata nil = its own
 --                                 getBright -> 0..2, defaults to 1.
 --                                 getIcon -> the note's icon path/fileID.
---                                 Toggles.
+--                                 edgeOnly = only the Edge borders tab (the
+--                                 sticky window's border, ALL-147; getFrame /
+--                                 setFrame may then be nil), borderList ->
+--                                 its names ("Default" = the tooltip edge).
+--                                 Toggles. noteID is any key; the sticky
+--                                 settings pass "sticky:<id>".
+--   IFP.Step(h, d)                the < > arrows: one step through None,
+--                                 the frames and the edge borders (edge
+--                                 borders only with h.edgeOnly), wrapping.
 --   IFP.Close() / IFP.IsOpenFor(noteID)
 
 local BNB = BigNoteBox
@@ -66,6 +74,7 @@ end
 local _f, _sf, _ct, _revertBtn
 local _tabIdx = 1   -- remembered for the session
 local _tabVisual
+local _tabRow       -- the tab buttons (normal) or the skin tab strip, hidden with edgeOnly
 local _tiles = {}
 local _noteID, _h, _origFrame, _origBorder
 local Render
@@ -94,9 +103,12 @@ local function FrameEntries(cat)
     return out
 end
 
+local DEFAULT_EDGE = "Interface\\Tooltips\\UI-Tooltip-Border"
+
 local function BorderEntries()
     local out = {}
-    for _, name in ipairs(LSMBorderNames()) do
+    local names = (_h and _h.borderList) and _h.borderList() or LSMBorderNames()
+    for _, name in ipairs(names) do
         out[#out + 1] = { key = name, label = name }
     end
     return out
@@ -109,7 +121,7 @@ local function EntriesForTab()
 end
 
 local function CurKey()
-    if CurTabID() == "frame" then
+    if CurTabID() == "frame" and _h.getFrame then
         local k = _h.getFrame()
         return (k and k ~= "") and k or "none"
     end
@@ -119,7 +131,7 @@ end
 
 local function Pick(entry)
     if not _h then return end
-    if CurTabID() == "frame" then
+    if CurTabID() == "frame" and _h.setFrame then
         _h.setFrame(entry.key)
         if entry.key ~= "none" and _h.getBorder and _h.getBorder() ~= "None"
                 and _h.getBorder() ~= "" then
@@ -129,10 +141,52 @@ local function Pick(entry)
         _h.setBorder(entry.key)
         if entry.key ~= "None" then
             local fk = _h.getFrame and _h.getFrame()
-            if fk and fk ~= "" and fk ~= "none" then _h.setFrame("none") end
+            if fk and fk ~= "" and fk ~= "none" and _h.setFrame then _h.setFrame("none") end
         end
     end
     Render()
+end
+
+local function GetFrameKey(h)
+    local k = h.getFrame and h.getFrame()
+    return (k and k ~= "" and k ~= "none") and k or nil
+end
+local function GetBorderKey(h)
+    local b = h.getBorder and h.getBorder()
+    return (b and b ~= "" and b ~= "None") and b or nil
+end
+
+function IFP.Step(h, d)
+    if not h then return end
+    local prevH = _h
+    _h = h   -- BorderEntries reads borderList through _h
+    local seq = { { kind = "none" } }
+    if not h.edgeOnly then
+        for _, e in ipairs(BNB.IconFrames.LIST) do seq[#seq + 1] = { kind = "frame", key = e.key } end
+    end
+    for _, e in ipairs(BorderEntries()) do
+        if e.key ~= "None" then seq[#seq + 1] = { kind = "edge", key = e.key } end
+    end
+    _h = prevH
+    local fk, bk = GetFrameKey(h), GetBorderKey(h)
+    local idx = 1
+    for i, s in ipairs(seq) do
+        if (s.kind == "frame" and s.key == fk) or (s.kind == "edge" and not fk and s.key == bk) then
+            idx = i; break
+        end
+    end
+    local s = seq[(idx - 1 + d) % #seq + 1]
+    if s.kind == "frame" then
+        if bk then h.setBorder("None") end
+        h.setFrame(s.key)
+    elseif s.kind == "edge" then
+        if fk and h.setFrame then h.setFrame("none") end
+        h.setBorder(s.key)
+    else
+        if fk and h.setFrame then h.setFrame("none") end
+        if bk then h.setBorder("None") end
+    end
+    if _f and _f:IsShown() and _h then Render() end
 end
 
 local function MakeTile()
@@ -194,7 +248,7 @@ local function PaintEdge(t, entry)
     if BNB.IconFrameLayer then BNB.IconFrameLayer.SetShape(t.icon, nil) end
     if entry.key == "None" then t.edge:Hide(); return end
     local LSM = GetLSM()
-    local path = LSM and LSM:Fetch("border", entry.key)
+    local path = entry.key == "Default" and DEFAULT_EDGE or (LSM and LSM:Fetch("border", entry.key))
     if not path then t.edge:Hide(); return end
     pcall(function()
         t.edge:SetBackdrop({ edgeFile = path, edgeSize = 12,
@@ -233,7 +287,7 @@ Render = function()
         t.edge:Hide()
     end
     _sf:FinaliseHeight(math.ceil(#list / COLS) * ROW_H)
-    _revertBtn:SetEnabled((_h.getFrame() ~= _origFrame) or (_h.getBorder() ~= _origBorder))
+    _revertBtn:SetEnabled(((_h.getFrame and _h.getFrame()) ~= _origFrame) or (_h.getBorder() ~= _origBorder))
 end
 
 local function SelectTab(idx)
@@ -259,7 +313,7 @@ local function Build()
     f._defStrata = f:GetFrameStrata()
     revertBtn:SetScript("OnClick", function()
         if not _h then return end
-        _h.setFrame(_origFrame)
+        if _h.setFrame then _h.setFrame(_origFrame) end
         _h.setBorder(_origBorder)
         Render()
     end)
@@ -272,6 +326,7 @@ local function Build()
         ctrl.frame:SetPoint("TOPLEFT",  f, "TOPLEFT",  PAD, -38)
         ctrl.frame:SetPoint("TOPRIGHT", f, "TOPRIGHT", -PAD, -38)
         _tabVisual = function(idx) ctrl.SetVisual(idx) end
+        _tabRow = { ctrl.frame }
     else
         local tpl = "PanelTopTabButtonTemplate"
         local btns, last = {}, nil
@@ -288,6 +343,7 @@ local function Build()
             btns[i], last = btn, btn
         end
         PanelTemplates_SetNumTabs(f, #btns); f.numTabs = #btns
+        _tabRow = btns
         _tabVisual = function(idx)
             for i, b in ipairs(btns) do
                 if i == idx then PanelTemplates_SelectTab(b) else PanelTemplates_DeselectTab(b) end
@@ -308,12 +364,17 @@ function IFP.Open(noteID, anchor, h)
     if IFP.IsOpenFor(noteID) then IFP.Close(); return end
     Build()
     _noteID, _h = noteID, h
-    _origFrame  = h.getFrame()
+    _origFrame  = h.getFrame and h.getFrame()
     _origBorder = h.getBorder()
     local hasFrame  = _origFrame and _origFrame ~= "" and _origFrame ~= "none"
     local hasBorder = _origBorder and _origBorder ~= "" and _origBorder ~= "None"
-    if hasBorder and not hasFrame then _tabIdx = EDGE_TAB
+    -- The sticky window's border (ALL-147): the Edge borders tab alone, no tab row
+    for _, t in ipairs(_tabRow or {}) do t:SetShown(not h.edgeOnly) end
+    if h.edgeOnly then
+        _tabIdx = EDGE_TAB
+    elseif hasBorder and not hasFrame then _tabIdx = EDGE_TAB
     elseif _tabIdx == EDGE_TAB then _tabIdx = 1 end
+    _f:SetWindowTitle(h.edgeOnly and L["STICKY_BORDER_PICKER_TITLE"] or L["ICON_FRAME_PICKER_TITLE"])
     -- Top-aligned beside anchor (its window, not a button inside it), unlike
     -- BNB.PlaceBeside's vertical-center placement: Dukul wanted this window's
     -- top level with the config window's top, 2026-09-28.
@@ -342,6 +403,9 @@ function IFP.Rebind(noteID, h)
     Render()
 end
 
-function IFP.Close()
+-- key given = close only while open for that key (the sticky settings close
+-- their own pick, not Note Settings')
+function IFP.Close(key)
+    if key ~= nil and _noteID ~= key then return end
     if _f and _f:IsShown() then _f:Hide() end
 end

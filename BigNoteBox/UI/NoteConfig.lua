@@ -186,15 +186,12 @@ local function BuildGeneralTab(panel)
         -- font set (ALL-14) an override from a different set counts as none.
         local current = BNB.ResolveFontID(note and note.fontOverride) or BNB.GetFontSetDefault()
         for _,e in ipairs(fontPickerBtns) do
-            local sel = (e.id == current)
-            if e.btn.SetBackdropColor then
-                if sel then e.btn:SetBackdropColor(0.12,0.18,0.12,0.95); e.btn:SetBackdropBorderColor(0.4,0.8,0.4,1)
-                else        e.btn:SetBackdropColor(0.06,0.06,0.08,0.95); e.btn:SetBackdropBorderColor(0.28,0.28,0.30,1) end
-            end
-            if e.nameLbl then if sel then BNB.SetHeaderColor(e.nameLbl) else BNB.SetTextWhite(e.nameLbl, 0.85) end end
+            BNB.PaintSelectCard(e.btn, e.id == current and "sel" or nil, e.nameLbl)
         end
         if _wowCb_nc then _wowCb_nc:SetChecked(current == "wow") end
     end
+    -- A skin preset change re-paints the cards (ALL-410)
+    BNB.RegisterMessage("NoteConfig.FontCards", "SkinChanged", function() HLFonts() end)
 
     -- LSM fonts appear in the dropdown below; WoW Default has its own checkbox
     -- below the grid. Both are excluded from the card grid, which shows the
@@ -213,9 +210,7 @@ local function BuildGeneralTab(panel)
         btn:EnableMouse(true)
         btn:SetScript("OnEnter", function(s)
             local note = GetNote()
-            if (note and note.fontOverride or nil) ~= def.id then
-                s:SetBackdropColor(0.10,0.12,0.10,0.95); s:SetBackdropBorderColor(0.35,0.55,0.35,1)
-            end
+            if (note and note.fontOverride or nil) ~= def.id then BNB.PaintSelectCard(s, "hover") end
         end)
         btn:SetScript("OnLeave", HLFonts)
         btn:SetScript("OnClick", function()
@@ -518,14 +513,21 @@ local function BuildAppearanceTab(panel)
         end
         return L["STICKY_BG_NONE"]
     end
-    local ifBtn = BNB.CreateButton(nil, panel, L["NC_ICON_FRAME_BTN"], CW, 22)
+    -- [<] [name] [>] as the sticky background row (ALL-147): the arrows step
+    -- through None, the frames and the edge borders, the name opens the grid
+    local IF_ARW = 22
+    local ifPrev = BNB.CreateButton(nil, panel, "<", IF_ARW, 22)
+    local ifBtn  = BNB.CreateButton(nil, panel, L["NC_ICON_FRAME_BTN"], CW - 2 * (IF_ARW + 4), 22)
+    local ifNext = BNB.CreateButton(nil, panel, ">", IF_ARW, 22)
     BNB.TruncateButtonText(ifBtn)   -- LSM border names can be long
     local function RefreshIconFrameBtn()
         ifBtn:SetText(L["NC_ICON_FRAME_BTN"] .. ": " .. CurIconFrameLabel())
         if ifBtn._syncOffset then ifBtn._syncOffset() end
     end
     RefreshIconFrameBtn()
-    ifBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    ifPrev:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
+    ifBtn:SetPoint("LEFT", ifPrev, "RIGHT", 4, 0)
+    ifNext:SetPoint("LEFT", ifBtn, "RIGHT", 4, 0)
     local function IconFrameHandlers()
         return {
             getFrame = function() local n = GetNote(); return (n and n.iconFrame) or "none" end,
@@ -554,6 +556,18 @@ local function BuildAppearanceTab(panel)
     ifBtn:SetScript("OnClick", function(self)
         BNB.IconFramePicker.Open(_noteID, ncFrame or self, IconFrameHandlers())
     end)
+    ifPrev:SetScript("OnClick", function() if _noteID then BNB.IconFramePicker.Step(IconFrameHandlers(), -1) end end)
+    ifNext:SetScript("OnClick", function() if _noteID then BNB.IconFramePicker.Step(IconFrameHandlers(), 1) end end)
+    for btn, tip in pairs({ [ifPrev] = "ICON_FRAME_PREV", [ifBtn] = "ICON_FRAME_BROWSE_TIP",
+                            [ifNext] = "ICON_FRAME_NEXT" }) do
+        local text = L[tip]
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
     y = y - 28
 
     -- Border sliders: stacked, with Reset (ALL-121)

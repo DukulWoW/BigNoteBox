@@ -352,6 +352,18 @@ local function BuildEmptyState(parent)
     end)
     quoteLbl:SetTextColor(0.65, 0.65, 0.65)
 
+    -- A font change re-applies the greeting, clock and quote fonts live
+    -- (ALL-25); one owner, so a rebuilt panel replaces the handler
+    BNB.RegisterMessage("WelcomePanel.Font", "UIFontChanged", function()
+        local boldPath = BNB.GetUIBoldFont and BNB.GetUIBoldFont()
+        local bodyPath = BNB.GetUIFont and BNB.GetUIFont()
+        if boldPath then
+            pcall(greetLbl.SetFont, greetLbl, boldPath, 15, "")
+            pcall(clockLbl.SetFont, clockLbl, boldPath, 34, "")
+        end
+        if bodyPath then pcall(quoteLbl.SetFont, quoteLbl, bodyPath, 12, "") end
+    end)
+
     -- Update quote width when panel resizes
     f:SetScript("OnSizeChanged", function(self, w)
         quoteLbl:SetWidth(math.floor(w * 0.70))

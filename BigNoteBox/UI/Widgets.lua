@@ -379,6 +379,13 @@ end
 -- w, h, fontSize default to 80, 22, 13.
 -- Registered with ApplyMainWindowSkin so it updates on preset change.
 --------------------------------------------------------------------------------
+local _skinLabelFonts = setmetatable({}, { __mode = "k" })   -- button -> its ApplyLabelFont
+if BNB.RegisterMessage then
+    BNB.RegisterMessage("Widgets.SkinLabelFont", "UIFontChanged", function()
+        for _, apply in pairs(_skinLabelFonts) do apply() end
+    end)
+end
+
 function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     w = w or 80; h = h or 22; fontSize = fontSize or 13
 
@@ -440,6 +447,9 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
         end)
         return ok
     end
+
+    -- A font change re-applies it live (ALL-25; weak table, one handler)
+    _skinLabelFonts[btn] = ApplyLabelFont
 
     -- Try once now (works on every session after the first, once InitFonts has run).
     if not ApplyLabelFont() then
@@ -522,19 +532,20 @@ end
 -- hover / press and the arrows re-desaturate on enable, so those re-tint.
 -- Normal mode: untouched.
 --------------------------------------------------------------------------------
-local SB_TINT = { track = 0.7, thumb = 1.4, arrow = 1.2 }
+local SB_TINT = { track = 0.7, thumb = 1.4, arrow = 1.2, sliderTrackAlpha = 0.7 }
 local _skinBars = setmetatable({}, { __mode = "k" })   -- frame -> its tint function
 
-local function TintRegions(frame, m, deep, r, g, b)
+local function TintRegions(frame, m, deep, r, g, b, alpha)
     if not frame then return end
     for _, t in ipairs({ frame:GetRegions() }) do
         if t.IsObjectType and t:IsObjectType("Texture") then
             t:SetDesaturated(true)
             t:SetVertexColor(math.min(1, r * m), math.min(1, g * m), math.min(1, b * m))
+            if alpha then t:SetAlpha(alpha) end
         end
     end
     if deep then
-        for _, c in ipairs({ frame:GetChildren() }) do TintRegions(c, m, true, r, g, b) end
+        for _, c in ipairs({ frame:GetChildren() }) do TintRegions(c, m, true, r, g, b, alpha) end
     end
 end
 
@@ -589,10 +600,12 @@ function BNB.SkinSlider(sl)
         if not p then return end
         local r, g, b = BNB.SkinBorderOf(p)
         local dim = (inner and inner.IsEnabled and not inner:IsEnabled()) and 0.5 or 1
-        TintRegions(inner, SB_TINT.track * dim, false, r, g, b)
+        -- The track at 0.7 opacity, not solid black (ALL-413, Dukul 2026-10-09)
+        TintRegions(inner, SB_TINT.track * dim, false, r, g, b, SB_TINT.sliderTrackAlpha)
         local thumb = inner and inner.GetThumbTexture and inner:GetThumbTexture()
         if thumb then
             local m = SB_TINT.thumb * dim
+            thumb:SetAlpha(1)   -- the thumb is one of the slider's regions too
             thumb:SetDesaturated(true)
             thumb:SetVertexColor(math.min(1, r * m), math.min(1, g * m), math.min(1, b * m))
         end

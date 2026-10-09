@@ -89,8 +89,9 @@ function BNB.WowheadURL(kind, id)
 end
 
 -- Action bar icon path relative to Assets\ ("Actionbar\\ab-lock"). Icons that have
--- an ab-forever-<name> variant use it on Forever, and in normal mode on every
--- client (Dukul, 2026-10-08); Retail and Classic skin mode keep the plain art.
+-- an ab-forever-<name> variant use it in normal mode on every client (Dukul,
+-- 2026-10-08); skin mode keeps the plain art on every client, Forever too
+-- (Dukul, 2026-10-09: the detailed art looked wrong in skin mode).
 -- The rest keep the shared art. Decided once per session, after the settings
 -- load: a skin mode switch takes a reload.
 local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,
@@ -99,7 +100,6 @@ local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,
 local abDetailed
 function BNB.AbDetailed()
     if abDetailed ~= nil then return abDetailed end
-    if BNB.IsForever then abDetailed = true; return true end
     if not BigNoteBoxDB then return true end   -- settings not loaded yet: not cached
     abDetailed = not BigNoteBoxDB.skinMode
     return abDetailed

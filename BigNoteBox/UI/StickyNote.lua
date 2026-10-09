@@ -302,10 +302,20 @@ local function GetCfg(noteID)
         if Near(cfg.alpha, 0.96) then cfg.alpha = nil end
         cfg.cfgV = 2
     end
+    -- Once per sticky (cfgV 3, ALL-406): a text colour still at the 0.88 default
+    -- was never picked, so it follows the preset's white (OLED mutes it)
+    if cfg.cfgV < 3 then
+        if cfg.textFollow == nil and (cfg.textR == nil
+           or (Near(cfg.textR, 0.88) and Near(cfg.textG, 0.88) and Near(cfg.textB, 0.88))) then
+            cfg.textFollow = true
+        end
+        cfg.cfgV = 3
+    end
     for k, v in pairs(DEFAULT_CFG) do
         if cfg[k] == nil then cfg[k] = v end
     end
     if cfg.bgFollow then cfg.bgR, cfg.bgG, cfg.bgB = DefaultBg(cfg) end
+    if cfg.textFollow and BNB.TextWhite then cfg.textR, cfg.textG, cfg.textB = BNB.TextWhite(0.88) end
     if cfg.bgR == nil then cfg.bgR, cfg.bgG, cfg.bgB = COL_BG[1], COL_BG[2], COL_BG[3] end
     return cfg
 end
@@ -562,7 +572,10 @@ local function ApplyBgAlpha(frame, bgAlpha, cfg)
     local ec = cfg or c
     local br, bg2, bb = BorderRGB(ec)
     local effectiveBorder = ec and ec.borderName
-    local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0 or a
+    -- The border has its own opacity (ALL-289, nil = 1), apart from the
+    -- background's and its hover fade
+    local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0
+        or (ec and ec.borderAlpha or 1)
     if c and frame.SetBackdropColor then
         local layer = frame._bgLayer
         if layer and layer._def and ec then
@@ -627,6 +640,20 @@ local function HoverFadeTick(self, elapsed)
         if done then _hoverFades[f] = nil else any = true end
     end
     if not any then self:Hide() end
+end
+
+-- Scrollbars outside Minimal Sticky: shown only while there is something to
+-- scroll and the pointer is over the note (ALL-411, Dukul 2026-10-09). Alpha
+-- only, so the scroll width stays reserved and the text never reflows on
+-- hover. Driven by the hover poll (_bgHover), never OnEnter / OnLeave.
+local SCROLL_BARS = { "_bodySB", "_richSB", "_taskSB" }
+local function SyncScrollBars(frame, alpha)
+    if alpha == nil and frame._cfg and frame._cfg.focusMode then return end   -- the focus lerp owns them
+    local on = frame._bgHover and true or false
+    for _, key in ipairs(SCROLL_BARS) do
+        local sb = frame[key]
+        if sb then sb:SetAlpha(alpha or ((on and sb._hasRange) and 1.0 or 0)) end
+    end
 end
 
 -- hovered = true eases to full opacity, false back to the note's own levels
@@ -705,7 +732,8 @@ function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinCo
     local effectiveScale  = cfg.borderScale or 100
     local effectiveOffset = cfg.borderOffset or 4
     local focusMode = cfg.focusMode
-    local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0 or 1
+    local borderA = (not effectiveBorder or effectiveBorder == "" or effectiveBorder == "None") and 0
+        or (cfg.borderAlpha or 1)   -- ALL-289
     if focusMode then borderA = 0 end  -- border hidden in focus mode (lerped in OnUpdate on hover)
     pcall(function()
         ApplyBorderToFrame(frame, effectiveBorder, effectiveScale, effectiveOffset, cfg)
@@ -739,16 +767,8 @@ function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinCo
     end
     -- Snap scrollbar alpha to match focus mode immediately.
     -- In focus mode they start hidden; OnUpdate lerps them in on hover.
-    -- In normal mode restore from _hasRange so they re-appear if needed.
-    if frame._bodySB then
-        frame._bodySB:SetAlpha(focusMode and 0.0 or (frame._bodySB._hasRange and 1.0 or 0))
-    end
-    if frame._richSB then
-        frame._richSB:SetAlpha(focusMode and 0.0 or (frame._richSB._hasRange and 1.0 or 0))
-    end
-    if frame._taskSB then
-        frame._taskSB:SetAlpha(focusMode and 0.0 or (frame._taskSB._hasRange and 1.0 or 0))
-    end
+    -- In normal mode from _hasRange and the hover (ALL-411).
+    SyncScrollBars(frame, focusMode and 0 or nil)
     -- Re-anchor scroll frames when focus mode changes.
     -- TOPLEFT is now anchored to front (not header BOTTOMLEFT) via AnchorScrollTop
     -- to avoid WoW's stale-reflow bug when header height is collapsed to 0.
@@ -2119,6 +2139,7 @@ local function CreateStickyFrame(noteID)
         if over ~= f._bgHover then
             f._bgHover = over
             HoverBgAlpha(f, over)
+            SyncScrollBars(f)
         end
 
         -- ── Button fade ───────────────────────────────────────────────────────
@@ -2183,7 +2204,7 @@ local function CreateStickyFrame(noteID)
                 local note = BNB.GetNote(f._noteID)
                 local effectiveBorder = cfg.borderName or (note and note.borderOverride)
                 if effectiveBorder and effectiveBorder ~= "" and effectiveBorder ~= "None" then
-                    SetStickyBorder(f, cfg, _focusLerp)
+                    SetStickyBorder(f, cfg, _focusLerp * (cfg.borderAlpha or 1))
                 end
             end
         end
@@ -2259,10 +2280,7 @@ local function CreateStickyFrame(noteID)
                 sf2.ScrollBar._hasRange = (yRange or 0) > 1
                 -- Alpha is now driven by OnUpdate when in focus mode.
                 -- In normal mode set it directly here as before.
-                local fm = f._cfg and f._cfg.focusMode
-                if not fm then
-                    sf2.ScrollBar:SetAlpha(sf2.ScrollBar._hasRange and 1.0 or 0)
-                end
+                SyncScrollBars(f)
             end
         end)
         f._bodySB = sf2.ScrollBar
@@ -2284,10 +2302,7 @@ local function CreateStickyFrame(noteID)
         richSB._hasRange = false
         richScroll:HookScript("OnScrollRangeChanged", function(_, _, yRange)
             richSB._hasRange = (yRange or 0) > 1
-            local fm = f._cfg and f._cfg.focusMode
-            if not fm then
-                richSB:SetAlpha(richSB._hasRange and 1.0 or 0)
-            end
+            SyncScrollBars(f)
         end)
         pcall(function() ForwardHoverRecursive(richSB, f) end)
         f._richSB = richSB
@@ -2382,10 +2397,7 @@ local function CreateStickyFrame(noteID)
         taskSB._hasRange = false
         taskScroll:HookScript("OnScrollRangeChanged", function(_, _, yRange)
             taskSB._hasRange = (yRange or 0) > 1
-            local fm = f._cfg and f._cfg.focusMode
-            if not fm then
-                taskSB:SetAlpha(taskSB._hasRange and 1.0 or 0)
-            end
+            SyncScrollBars(f)
         end)
         pcall(function() ForwardHoverRecursive(taskSB, f) end)
         f._taskSB = taskSB

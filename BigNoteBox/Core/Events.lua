@@ -278,6 +278,9 @@ end)
 --                                  stickies re-colour
 --   EditorEditMode ()              AM_EnterEditMode, at its end
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
+--   UIFontChanged ()               UI/Fonts.lua, end of ApplyFont: skin button
+--                                  labels and the welcome panel re-read
+--                                  GetUIFont (ALL-25)
 -- Every way a note is created, edited or removed sends one of the Note*
 -- messages (audited in ARCH-02 session 2). Writes that send none on purpose:
 -- history snapshots, the target display-ID cache, the login scope merge,

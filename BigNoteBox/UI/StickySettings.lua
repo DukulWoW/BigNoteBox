@@ -37,6 +37,7 @@ local SETTINGS_CW = SETTINGS_W - SETTINGS_PAD - 28  -- room for a scrollbar (Not
 
 local _stickySettingsFrame = nil   -- single reusable settings window
 local _stickySettingsNoteID = nil  -- noteID it's currently editing
+local _iconFramePickKey = nil      -- "sticky:<id>": the border picker's key (ALL-147)
 
 local function GetBorderList()
     local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
@@ -103,6 +104,7 @@ local function BuildStickySettingsWindow()
     -- The Situation editor closes its own waypoint info popup
     f:HookScript("OnHide", function()
         if BNB.StickyBgPicker then BNB.StickyBgPicker.Close() end   -- ALL-110
+        if BNB.IconFramePicker and _iconFramePickKey then BNB.IconFramePicker.Close(_iconFramePickKey) end   -- ALL-147
     end)
 
     -- ── Tab buttons ───────────────────────────────────────────────────────────
@@ -376,15 +378,22 @@ local function PopulateStickySettings(noteID)
     local beforeChildren = {}
     for _, c in ipairs({ct1:GetChildren()}) do beforeChildren[c] = true end
 
-    ColorGrid(ct1, function(r, g, b)
+    -- A picked colour ends textFollow (the default white that follows the
+    -- preset, ALL-406); Cancel in the picker puts it back
+    local textFollowAtOpen
+    ColorGrid(ct1, function(r, g, b, cancelled)
         cfg.textR, cfg.textG, cfg.textB = r, g, b
+        if cancelled then cfg.textFollow = textFollowAtOpen else cfg.textFollow = nil end
         SaveCfg(noteID, cfg)
         if stickyFrame and stickyFrame._bodyEb then
             pcall(function() stickyFrame._bodyEb:SetTextColor(r, g, b) end)
         end
-    end, function() return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88 end,
-    function()   -- ring: none while the text colour was never picked (ALL-330)
-        if cfg.textR then return cfg.textR, cfg.textG, cfg.textB end
+    end, function()
+        textFollowAtOpen = cfg.textFollow
+        return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88
+    end,
+    function()   -- ring: none while the text colour was never picked (ALL-330, ALL-406)
+        if cfg.textR and not cfg.textFollow then return cfg.textR, cfg.textG, cfg.textB end
     end)
 
     -- Collect everything ColorGrid added into textColorWidgets
@@ -434,16 +443,14 @@ local function PopulateStickySettings(noteID)
         -- font set (ALL-14) a font from a different set counts as none.
         local cur = BNB.ResolveFontID(cfg.fontID) or BNB.GetFontSetDefault()
         for _, e in ipairs(fontPickerBtns) do
-            local sel = (e.id == cur)
-            if e.btn.SetBackdropColor then
-                if sel then e.btn:SetBackdropColor(0.12,0.18,0.12,0.95); e.btn:SetBackdropBorderColor(0.4,0.8,0.4,1)
-                else        e.btn:SetBackdropColor(0.06,0.06,0.08,0.95); e.btn:SetBackdropBorderColor(0.28,0.28,0.30,1) end
-            end
-            if e.nameLbl then if sel then BNB.SetHeaderColor(e.nameLbl) else BNB.SetTextWhite(e.nameLbl, 0.85) end end
+            BNB.PaintSelectCard(e.btn, e.id == cur and "sel" or nil, e.nameLbl)
         end
         if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
         if _refreshLSM_sn then _refreshLSM_sn() end
     end
+    -- A skin preset change re-paints the cards (ALL-410); one owner, so each
+    -- populate's cards replace the previous handler
+    BNB.RegisterMessage("StickySettings.FontCards", "SkinChanged", function() HLStickyFonts() end)
 
     -- WoW Default has its own checkbox below the grid, not a 9th card, and LSM
     -- fonts are in a dropdown below that (ALL-41), as on the Appearance tab. Cards
@@ -462,9 +469,7 @@ local function PopulateStickySettings(noteID)
         btn:SetPoint("TOPLEFT", ct1, "TOPLEFT", xOff, yOff)
         btn:EnableMouse(true)
         btn:SetScript("OnEnter", function(s)
-            if cfg.fontID ~= fid then
-                s:SetBackdropColor(0.10,0.12,0.10,0.95); s:SetBackdropBorderColor(0.35,0.55,0.35,1)
-            end
+            if cfg.fontID ~= fid then BNB.PaintSelectCard(s, "hover") end
         end)
         btn:SetScript("OnLeave", HLStickyFonts)
         btn:SetScript("OnClick", function()
@@ -700,6 +705,7 @@ local function PopulateStickySettings(noteID)
         end
         cfg.bgR, cfg.bgG, cfg.bgB = br, bg2, bb
         cfg.bgFollow = nil   -- a picked colour: no longer the default (skin) colour
+        cfg.textFollow = nil
         cfg.textR, cfg.textG, cfg.textB = tr, tg, tb
         SaveCfg(noteID, cfg)
         if stickyFrame then
@@ -859,32 +865,74 @@ local function PopulateStickySettings(noteID)
             cfg.alpha = v/100; SaveCfg(noteID, cfg)
             if stickyFrame then ApplyBgAlpha(stickyFrame, cfg.alpha) end
         end, 90, PCT)   -- default 90% (was 96%, Dukul 2026-10-06; StickyNote.lua DEFAULT_CFG)
+    -- The border's own opacity (ALL-289): the background slider no longer
+    -- moves it. nil = 100%, Reset clears the saved value
+    MakeSlider(ct2, L["STICKY_BORDER_OPACITY"], 0, 100,
+        math.floor((cfg.borderAlpha or 1) * 100 + 0.5),
+        function(v)
+            cfg.borderAlpha = v/100; SaveCfg(noteID, cfg)
+            if stickyFrame then ApplyBgAlpha(stickyFrame, cfg.alpha) end
+        end, 100, PCT, function()
+            cfg.borderAlpha = nil; SaveCfg(noteID, cfg)
+            if stickyFrame then ApplyBgAlpha(stickyFrame, cfg.alpha) end
+        end)
 
     Rule(ct2)
     Sec(ct2, L["NC_HDR_BORDER"])
     -- Forward declaration so the dropdown/button closures below can reference it
     -- before the function body is assigned (Lua 5.1 upvalue capture fix).
     local SyncBorderSliders
-    local curBorder = cfg.borderName or "None"
-    local bdd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct2, "WowStyle1DropdownTemplate"))
-    bdd:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
-    bdd:SetWidth(SETTINGS_CW)
-    bdd:SetupMenu(function(_, root)
-        for _, name in ipairs(GetBorderList()) do
-            local n = name
-            root:CreateRadio(n,
-                function() return curBorder == n end,
-                function()
-                    curBorder = n
-                    cfg.borderName = n
-                    SaveCfg(noteID, cfg)
-                    bdd:GenerateMenu()
-                    if stickyFrame then ApplyConfig(stickyFrame, noteID) end
-                    SyncBorderSliders(n)
-                end)
-        end
+    -- [<] [name] [>] (ALL-147, Dukul 2026-10-09): the window's edge border
+    -- through the icon frame picker on its Edge borders tab alone, the arrows
+    -- step through the list and wrap
+    local IFP = BNB.IconFramePicker
+    local pickKey = "sticky:" .. tostring(noteID)
+    local BRD_ARW = 22
+    local brdPrev = BNB.CreateButton(nil, ct2, "<", BRD_ARW, 22)
+    local brdBtn  = BNB.CreateButton(nil, ct2, cfg.borderName or "None",
+        SETTINGS_CW - 2 * (BRD_ARW + 4), 22)
+    local brdNext = BNB.CreateButton(nil, ct2, ">", BRD_ARW, 22)
+    BNB.TruncateButtonText(brdBtn)   -- LSM border names can be long
+    brdPrev:SetPoint("TOPLEFT", ct2, "TOPLEFT", 0, ct2._y)
+    brdBtn:SetPoint("LEFT", brdPrev, "RIGHT", 4, 0)
+    brdNext:SetPoint("LEFT", brdBtn, "RIGHT", 4, 0)
+    ct2._y = ct2._y - 30
+    local brdHandlers = {
+        edgeOnly   = true,
+        borderList = GetBorderList,
+        getBorder  = function() return cfg.borderName or "None" end,
+        setBorder  = function(n)
+            cfg.borderName = n
+            SaveCfg(noteID, cfg)
+            brdBtn:SetText(n)
+            if stickyFrame then ApplyConfig(stickyFrame, noteID) end
+            SyncBorderSliders(n)
+        end,
+        getIcon    = function()
+            local n = BNB.GetNote(noteID)
+            return n and (BNB.NpcNoteIcon and BNB.NpcNoteIcon(n) or n.icon)
+        end,
+    }
+    brdPrev:SetScript("OnClick", function() IFP.Step(brdHandlers, -1) end)
+    brdNext:SetScript("OnClick", function() IFP.Step(brdHandlers, 1) end)
+    brdBtn:SetScript("OnClick", function()
+        IFP.Open(pickKey, _stickySettingsFrame, brdHandlers)
     end)
-    ct2._y = ct2._y - 36
+    for btn, tip in pairs({ [brdPrev] = "STICKY_BORDER_PREV", [brdBtn] = "STICKY_BORDER_BROWSE_TIP",
+                            [brdNext] = "STICKY_BORDER_NEXT" }) do
+        local text = L[tip]
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
+    -- Settings rebuilt (Randomize, another note): an open grid follows the new
+    -- row, or closes when it belongs to another sticky
+    if IFP.IsOpenFor(pickKey) then IFP.Rebind(pickKey, brdHandlers)
+    elseif _iconFramePickKey then IFP.Close(_iconFramePickKey) end
+    _iconFramePickKey = pickKey
 
     -- Border Thickness slider
     local slThickness = MakeSlider(ct2, L["STICKY_BORDER_THICKNESS"], 1, 200, cfg.borderScale or 100,

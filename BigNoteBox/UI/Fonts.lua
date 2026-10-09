@@ -533,6 +533,8 @@ function BNB.ApplyFont(id, size)
         end
     end
     if BNB.RefreshFocusFont then BNB.RefreshFocusFont() end
+    -- Interface text that follows the font choice (ALL-25)
+    if BNB.SendMessage then BNB.SendMessage("UIFontChanged") end
 end
 
 -- ── Font packs (ALL-14) ───────────────────────────────────────────────────────
