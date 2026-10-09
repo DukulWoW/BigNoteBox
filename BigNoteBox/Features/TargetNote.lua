@@ -173,13 +173,17 @@ end
 -- without iconSource, and every pick sets one (Dukul, 2026-10-04: the
 -- "Target note: Hogger" icon could not be changed). Revert in the icon
 -- picker brings the portrait back.
--- Creature portraits are off (RET-09, Dukul 2026-10-09): drawing one while the
--- Reference Box viewer loads a creature model crashed Retail to desktop
--- (ACCESS_VIOLATION reading address 0 on a torn-down object, no Lua running).
--- Bisected in game: portraits off = no crash, viewer off = no crash, both = a
--- crash within a few notes. NPC notes show their icon instead. true brings
--- them back once a safe way is found.
-local CREATURE_PORTRAITS = false
+-- Creature portraits (RET-09, Dukul 2026-10-09). v1.21.1 switched them off
+-- after four Retail crashes to desktop (ACCESS_VIOLATION reading address 0 on a
+-- torn-down object, no Lua running) while making or opening NPC notes with the
+-- Reference Box open; a bisect pointed at a portrait drawn while the viewer
+-- loads a creature model. Back on the same day: 33 NPC notes with portraits and
+-- the viewer, and direct probes, never crashed again once the experimental
+-- display-stand code (ALL-340) and the mount display it saved were gone. Kept:
+-- no portrait for a display stand or the empty model of trigger NPCs (display
+-- 11686). false = the one-line way back to icons if the crash returns.
+local CREATURE_PORTRAITS = true
+local EMPTY_DISPLAYS = { [11686] = true }
 
 function BNB.SetNpcNotePortrait(tex, note)
     if not CREATURE_PORTRAITS then return false end
@@ -187,6 +191,7 @@ function BNB.SetNpcNotePortrait(tex, note)
        or note.targetIsPet or note.iconSource then
         return false
     end
+    if note.targetShared or EMPTY_DISPLAYS[note.targetDisplayID or 0] then return false end
     local id = note.targetDisplayID
     if id and id > 0 and SetPortraitTextureFromCreatureDisplayID then
         return (pcall(SetPortraitTextureFromCreatureDisplayID, tex, id))
