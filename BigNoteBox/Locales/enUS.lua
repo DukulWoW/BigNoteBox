@@ -1492,6 +1492,7 @@ L["CFG_INS_GEAR_SHOW_TIP"]      = "Controls which gear sections appear in the Re
 L["REFBOX_MV_GEAR_TMOG"]        = "Transmog gear"
 L["REFBOX_MV_GEAR_REG"]         = "Regular gear"
 L["REFBOX_MV_PLACEHOLDER"]      = "Target this player again\nto view their character model"
+L["REFBOX_MV_INVISIBLE"]         = "This creature has no visible model"
 L["REFBOX_MV_LIVE"]             = "LIVE"
 L["REFBOX_MV_HIDE_TIP"]         = "Hide Model Viewer"
 L["REFBOX_MV_ITEM_CLOSE_TIP"]   = "Stop showing this item"

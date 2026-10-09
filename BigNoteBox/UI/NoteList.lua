@@ -2499,7 +2499,7 @@ function BNB.NoteMatchesUnit(note, unit)
             guid:match("^Vehicle%-0%-%d+%-%d+%-%d+%-(%d+)") or
             guid:match("^Pet%-0%-%d+%-%d+%-%d+%-(%d+)")
         )
-        return curID == note.targetNpcID
+        return curID == tostring(note.targetNpcID)
     elseif note.targetPlayerKey then
         -- Player match: compare stored key against current target name+realm
         local name, realm = BNB.UnitNameRealm(unit)

@@ -105,12 +105,45 @@ local function RefreshAfterResolve()
     end)
 end
 
+-- Display stands (ALL-340, Dukul 2026-10-09): one creature ID with the
+-- invisible model of trigger NPCs, each spawn shown as a different mount by
+-- the server and named after it (NPC 185669 in Orgrimmar: "Reins of the
+-- Bilebound Ur'zul" next to the Hallowed Charger). SetCreature gives the empty
+-- model, so such a note is marked targetShared (duplicates are then told apart
+-- by name, like combat pets) and its look comes from the mount journal: the
+-- longest mount name found in the NPC's name. The mount's display is only ever
+-- shown in the Reference Box viewer, never drawn as a portrait (RET-09).
+BNB.INVISIBLE_NPC_DISPLAYS = { [11686] = true }
+
+local _mountByName = {}
+function BNB.MountDisplayForName(name)
+    if not (name and name ~= "" and C_MountJournal and C_MountJournal.GetMountIDs) then return nil end
+    if _mountByName[name] ~= nil then return _mountByName[name] or nil end
+    local best, bestLen = false, 0
+    for _, mountID in ipairs(C_MountJournal.GetMountIDs() or {}) do
+        local mName = C_MountJournal.GetMountInfoByID(mountID)
+        if mName and #mName > bestLen and name:find(mName, 1, true) then
+            local disp = C_MountJournal.GetMountInfoExtraByID(mountID)
+            if disp and disp > 0 then best, bestLen = disp, #mName end
+        end
+    end
+    _mountByName[name] = best
+    return best or nil
+end
+
 local function StoreDisplayID(npcID, displayID)
     local ndb = BNB.NotesDB()
     if not (ndb and ndb.notes) then return end
+    local stand = BNB.INVISIBLE_NPC_DISPLAYS[displayID]
     for _, note in pairs(ndb.notes) do
-        if note.source == "target" and note.targetNpcID == npcID and not note.targetIsPet then
-            note.targetDisplayID = displayID
+        if note.source == "target" and tostring(note.targetNpcID) == tostring(npcID) and not note.targetIsPet then
+            if stand then
+                note.targetShared = true
+                -- The mount it shows, else the empty display so it is not looked up again
+                note.targetDisplayID = BNB.MountDisplayForName(note.title) or note.targetDisplayID or displayID
+            else
+                note.targetDisplayID = displayID
+            end
         end
     end
 end
@@ -183,7 +216,7 @@ end
 -- no portrait for a display stand or the empty model of trigger NPCs (display
 -- 11686). false = the one-line way back to icons if the crash returns.
 local CREATURE_PORTRAITS = true
-local EMPTY_DISPLAYS = { [11686] = true }
+local EMPTY_DISPLAYS = BNB.INVISIBLE_NPC_DISPLAYS
 
 function BNB.SetNpcNotePortrait(tex, note)
     if not CREATURE_PORTRAITS then return false end
@@ -566,6 +599,12 @@ end
 -- target note's targetPlayerKey, then the inspect-note lookup InspectNote uses.
 -- Never checks title — title can be renamed freely.
 --------------------------------------------------------------------------------
+-- The creature ID is a string from the GUID, but a note that went through a
+-- Markdown import or an older build can hold a number (ALL-417)
+local function SameNpc(a, b)
+    return a ~= nil and b ~= nil and tostring(a) == tostring(b)
+end
+
 local function FindExistingNote(data)
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return nil end
@@ -582,12 +621,22 @@ local function FindExistingNote(data)
     elseif data.isPet then
         -- Combat pets share a generic creature ID — match on name + npcID
         for id, note in pairs(ndb.notes) do
-            if note.targetNpcID == data.npcID and note.title == data.name then return id end
+            if SameNpc(note.targetNpcID, data.npcID) and note.title == data.name then return id end
         end
     else
         if data.npcID then
+            -- A display stand's ID is shared by every stand: match the name
+            -- too (a renamed stand note is not found, as for combat pets).
+            -- A note made before ALL-340 knows it only by its saved empty display
+            local shared = false
+            for _, note in pairs(ndb.notes) do
+                if SameNpc(note.targetNpcID, data.npcID) and (note.targetShared
+                   or BNB.INVISIBLE_NPC_DISPLAYS[note.targetDisplayID or 0]) then
+                    shared = true; break
+                end
+            end
             for id, note in pairs(ndb.notes) do
-                if note.targetNpcID == data.npcID then return id end
+                if SameNpc(note.targetNpcID, data.npcID) and (not shared or note.title == data.name) then return id end
             end
         end
     end
@@ -597,7 +646,15 @@ end
 --------------------------------------------------------------------------------
 -- CREATE THE NOTE
 --------------------------------------------------------------------------------
+-- One note per press (ALL-417): the same unit asked for twice within a moment
+-- (a repeated click or key event) is one note, not a second "(Duplicate)".
+local _lastCreate = { guid = nil, at = 0 }
+
 local function CreateTargetNote(richMode, data)
+    local now = GetTime()
+    if data.guid and _lastCreate.guid == data.guid and now - _lastCreate.at < 2 then return end
+    _lastCreate.guid, _lastCreate.at = data.guid, now
+
     local title = UN.UniqueTitle(data.name)
     local body  = richMode and BuildRichBody(data) or BuildNormalBody(data)
 
@@ -645,6 +702,17 @@ local function CreateTargetNote(richMode, data)
     fields.targetNpcID = data.npcID  -- may be nil for vehicles/objects without creature ID
     if data.isPet then
         fields.targetIsPet = true  -- combat pet: SetCreature shows wrong model
+    end
+    -- Another stand of a known display-stand ID: mark it and take its mount now
+    if data.npcID and not data.isPet then
+        for _, note in pairs(BNB.NotesDB().notes or {}) do
+            if SameNpc(note.targetNpcID, data.npcID) and (note.targetShared
+               or BNB.INVISIBLE_NPC_DISPLAYS[note.targetDisplayID or 0]) then
+                fields.targetShared    = true
+                fields.targetDisplayID = BNB.MountDisplayForName(data.name)
+                break
+            end
+        end
     end
 
     BNB.UpdateNote(noteID, fields)

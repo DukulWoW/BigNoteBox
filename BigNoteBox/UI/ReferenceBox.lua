@@ -2677,6 +2677,7 @@ UpdateModelViewer = function()
     local closeBtn = rbFrame._modelCloseBtn
 
     if not mdl then return end
+    if ph then ph:SetText(L["REFBOX_MV_PLACEHOLDER"]) end   -- the NPC branch may say "no visible model"
     -- Only a shown entry spins and has the X; set again below when one is shown
     if closeBtn then closeBtn:Hide() end
     if not shown then
@@ -2938,29 +2939,58 @@ UpdateModelViewer = function()
         -- Note: combat pets are excluded by IsInspectNote (targetIsPet check).
         local creatureID = tonumber(note.targetNpcID)
         if creatureID then
-            pcall(function()
-                mdl:SetCreature(creatureID)
-            end)
-            -- SetCreature draws nothing for a creature the client has no data
-            -- for (NPC 185669, ALL-340): the saved display ID, then the live
-            -- unit while it is targeted, fill the viewer instead
+            local inv    = BNB.INVISIBLE_NPC_DISPLAYS or {}
             local dispID = tonumber(note.targetDisplayID)
-            local noteID = note.id
-            C_Timer.After(0.3, function()
-                if _noteID ~= noteID or not mdl:IsShown() then return end
-                local fid = mdl.GetModelFileID and mdl:GetModelFileID()
-                if fid and fid ~= 0 then return end
-                if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
-                    pcall(mdl.SetUnit, mdl, "target")
-                elseif dispID and dispID > 0 then
-                    pcall(mdl.SetDisplayInfo, mdl, dispID)
-                end
-            end)
             mdl:SetPosition(0, 0, 0)
             mdl:SetModelScale(1)
             mdl:SetFacing(0)
-            if ph then ph:Hide() end
             if ll then ll:Hide() end
+            if note.targetShared or (dispID and inv[dispID]) then
+                -- A display stand (ALL-340): NPC 185669 is one creature ID with
+                -- the empty model of trigger NPCs (display 11686, probed
+                -- 2026-10-09: nothing drawn in a PlayerModel or a DressUpModel),
+                -- shown by the server as a different mount per spawn. One load,
+                -- no SetCreature and no second model 0.3 s later (RET-09 hunt):
+                -- the mount found by name, else a line saying so.
+                if not note.targetShared or not dispID or inv[dispID] then
+                    note.targetShared = true   -- a stand note from before ALL-340
+                    local mnt = BNB.MountDisplayForName and BNB.MountDisplayForName(note.title)
+                    if mnt then note.targetDisplayID = mnt; dispID = mnt end
+                end
+                -- Never SetUnit("target") on a stand: the live stand (its look
+                -- swapped for a mount by the server) is the prime suspect for
+                -- RET-09 (crash with the stand targeted and only one note,
+                -- Dukul 2026-10-09)
+                local drawn = false
+                if dispID and dispID > 0 and not inv[dispID] then
+                    drawn = pcall(mdl.SetDisplayInfo, mdl, dispID)
+                end
+                if drawn then
+                    if ph then ph:Hide() end
+                else
+                    pcall(mdl.ClearModel, mdl)
+                    if ph then ph:SetText(L["REFBOX_MV_INVISIBLE"]); ph:Show() end
+                end
+            else
+                pcall(function()
+                    mdl:SetCreature(creatureID)
+                end)
+                -- SetCreature draws nothing for a creature the client has no
+                -- data for: the saved display ID, then the live unit while it
+                -- is targeted, fill the viewer instead
+                local noteID = note.id
+                C_Timer.After(0.3, function()
+                    if _noteID ~= noteID or not mdl:IsShown() then return end
+                    local fid = mdl.GetModelFileID and mdl:GetModelFileID()
+                    if fid and fid ~= 0 then return end
+                    if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
+                        pcall(mdl.SetUnit, mdl, "target")
+                    elseif dispID and dispID > 0 then
+                        pcall(mdl.SetDisplayInfo, mdl, dispID)
+                    end
+                end)
+                if ph then ph:Hide() end
+            end
         else
             -- Invalid creature ID — show placeholder
             mdl:SetUnit("none")
