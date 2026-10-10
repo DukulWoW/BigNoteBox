@@ -1,7 +1,8 @@
--- BigNoteBox UI/NoteTooltip.lua - the compact note tooltip (ALL-372 S3)
+-- BigNoteBox UI/NoteTooltip.lua - the compact note tooltip (ALL-372 S3, S4)
 --
 -- One builder for every place that shows a note's details in a tooltip: the
--- note list hover (UI/NoteList.lua) now, the unit frame badge (ALL-400) next.
+-- note list hover (UI/NoteList.lua) and the Target / Focus frame badge
+-- (Features/UnitFrameBadge.lua, ALL-400).
 -- Sections, each left out when it has nothing: the tl;dr, the next alarm, the
 -- situations, the waypoints. Compact on purpose (Dukul, 2026-10-08: "as
 -- compact as possible"): a gold header per section, at most MAX_ITEMS lines
@@ -17,9 +18,12 @@
 --     note has details.
 --   * Alarm and situations only while their module is on; waypoints always
 --     (Navigate works with Situations off).
+--   * The badge: title in the note's title colour, the details, then the
+--     click hint. Always with details: noteHoverDetails is about the list.
 --
 -- PUBLIC API:
 --   BNB.ShowNoteListTooltip(row, noteID, collapsed)
+--   BNB.ShowNoteBadgeTooltip(owner, noteID)
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -152,9 +156,16 @@ local function Render(tt, lines)
     end
 end
 
+-- The title in the note's own title colour, as the list draws it (Dukul,
+-- 2026-10-10), white without one
+local function TitleLine(tt, note)
+    local title = (note.title and note.title ~= "") and note.title or L["UNTITLED"]
+    local tc = note.titleColor
+    if type(tc) == "table" and tc.r then tt:AddLine(Esc(title), tc.r, tc.g, tc.b)
+    else tt:AddLine(Esc(title), 1, 1, 1) end
+end
+
 -- ── Public ──────────────────────────────────────────────────────────────────
--- The unit frame badge (ALL-372 S4 / ALL-400) gets its own entry here, on
--- Collect + Render like the list's
 
 -- The note list row's hover. Collapsed: the title, then the details; expanded:
 -- the details, nothing when the note has none
@@ -165,13 +176,18 @@ function BNB.ShowNoteListTooltip(row, noteID, collapsed)
     local lines = details and Collect(note, noteID) or {}
     if not collapsed and not lines[1] then return end
     GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-    if collapsed then
-        local title = (note.title and note.title ~= "") and note.title or L["UNTITLED"]
-        -- In the note's own title colour, as the list draws it (Dukul, 2026-10-10)
-        local tc = note.titleColor
-        if type(tc) == "table" and tc.r then GameTooltip:AddLine(Esc(title), tc.r, tc.g, tc.b)
-        else GameTooltip:AddLine(Esc(title), 1, 1, 1) end
-    end
+    if collapsed then TitleLine(GameTooltip, note) end
     Render(GameTooltip, lines)
+    GameTooltip:Show()
+end
+
+-- The Target / Focus frame badge's hover (ALL-400): title, details, click hint
+function BNB.ShowNoteBadgeTooltip(owner, noteID)
+    local note = noteID and BNB.GetNote(noteID)
+    if not note then return end
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    TitleLine(GameTooltip, note)
+    Render(GameTooltip, Collect(note, noteID))
+    GameTooltip:AddLine(L["UNIT_BADGE_TIP"], DIM[1], DIM[2], DIM[3])
     GameTooltip:Show()
 end

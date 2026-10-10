@@ -11,10 +11,11 @@
 -- Public API:
 --   BNB.UnitFrameBadgeEnabled()   module + setting
 --   BNB.ApplyUnitFrameBadges()    re-check both frames (setting / module change)
+--   BNB.NoteForUnit(unit)         the unit's note id, nil = none (also the tl;dr
+--                                 line in the unit's game tooltip, Features/Tldr.lua)
 --   BNB.TuneUnitBadge(x, y, s)    /bnb unitbadge (debug mode, live, not saved)
 
 local BNB = BigNoteBox
-local L   = BNB.L
 
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
 
@@ -146,14 +147,8 @@ local function MakeBadge(spec)
     b:SetScript("OnClick", function(self)
         if self._noteID and BNB.OpenNoteInMain then BNB.OpenNoteInMain(self._noteID) end
     end)
-    b:SetScript("OnEnter", function(self)
-        local n = self._noteID and BNB.GetNote(self._noteID)
-        if not n then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(n.title or "", 1, 1, 1)
-        GameTooltip:AddLine(L["UNIT_BADGE_TIP"], 0.6, 0.6, 0.6)
-        GameTooltip:Show()
-    end)
+    -- Title, then the note's details, tl;dr first (ALL-400, UI/NoteTooltip.lua)
+    b:SetScript("OnEnter", function(self) BNB.ShowNoteBadgeTooltip(self, self._noteID) end)
     b:SetScript("OnLeave", function() GameTooltip:Hide() end)
     PlaceBadge(b)
     b:Hide()
@@ -184,6 +179,11 @@ local function Update(unit)
     local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     b._icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
     b:Show()
+end
+
+function BNB.NoteForUnit(unit)
+    local ok, id = pcall(NoteForUnit, unit)
+    return ok and id or nil
 end
 
 function BNB.ApplyUnitFrameBadges()

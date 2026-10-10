@@ -406,11 +406,12 @@ local function WhyText(id, leftBy, locationName)
     return SituationWhy(BNB._contextMatchedBy[id]) or locationName
 end
 
--- The note's tl;dr (ALL-372), else the first line of its text with any rich
--- markup taken out. The toast cuts it at its width
+-- The note's tl;dr (ALL-372, while the module and its "On situation toasts"
+-- box are on), else the first line of its text with any rich markup taken
+-- out. The toast cuts it at its width
 local function Summary(note)
-    local t = note.tldr
-    if type(t) == "string" and t:find("%S") then return t end
+    local t = BNB.TldrShows("tldrToast") and BNB.NoteTldr(note)
+    if t then return t end
     local body = note.body or ""
     local AMode = BNB.AdvancedMode
     if note.richMode and AMode and AMode.StripMarkup then body = AMode.StripMarkup(body) end
