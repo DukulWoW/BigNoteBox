@@ -132,6 +132,15 @@ BNB.DEFAULTS = {
     unitNotesEnabled    = true,    -- Player & NPC Notes
     unitFrameBadge      = true,    -- note icon on the Target / Focus frames (ALL-389)
     toastsEnabled       = true,    -- Toasts (ALL-384)
+    -- tl;dr (ALL-372): the module, where the line shows, and the note list
+    -- hover details (its own switch, works with the module off). The snippet
+    -- list `tldrSnippets` stays out of DEFAULTS: nil = the default list, in
+    -- the player's language (Features/Tldr.lua); a list would be merged key by key
+    tldrEnabled         = true,
+    tldrUnderTitle      = true,
+    tldrUnitTooltip     = true,
+    tldrToast           = true,
+    noteHoverDetails    = true,
     refboxDisplayStyle  = "normal",
     refboxMaxItems      = 50,
     refboxAutoOpen      = true,

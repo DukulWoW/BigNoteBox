@@ -603,6 +603,12 @@ local MODULES = {
     { key = "tasks", label = "CFG_HDR_TASKS", tip = "SW_MOD_TASKS_TIP",
       get = function() return BNB.TasksEnabled() end,
       set = function(v) BNB.ApplyTasksModule(v) end },
+    { key = "tldr", label = "CFG_HDR_TLDR", tip = "SW_MOD_TLDR_TIP",
+      get = function() return BNB.TldrEnabled() end,
+      set = function(v)
+          SetDB("tldrEnabled", v)
+          if BNB.ApplyTldrModule then BNB.ApplyTldrModule(v) end
+      end },
     { key = "toasts", label = "CFG_HDR_TOASTS", tip = "SW_MOD_TOASTS_TIP",
       get = function() return BNB.ToastsEnabled() end,
       set = function(v)

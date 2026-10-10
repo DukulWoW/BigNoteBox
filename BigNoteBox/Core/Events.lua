@@ -294,6 +294,9 @@ end)
 --   EditorViewMode (id)            AM_EnterViewMode (rich note view tab)
 --   SituationsModule (on)          Features/ContextNotes.lua ApplySituationsModule
 --                                  (the Situation tabs cover / uncover)
+--   TldrSettings (on)              Features/Tldr.lua: the tl;dr module switch, a
+--                                  "show it" box or the snippet list changed
+--                                  (on = the module's state, ALL-372)
 --   SkinChanged ()                 UI/SkinSystem.lua, end of ApplyMainWindowSkin
 --                                  (preset / brightness); default-coloured
 --                                  stickies re-colour

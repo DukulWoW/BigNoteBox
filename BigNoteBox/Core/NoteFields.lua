@@ -36,6 +36,9 @@ local FIELDS = {
     { "title",       "s", share = "text" },
     { "body",        "s", share = "text" },
     { "richMode",    "b", share = "text" },
+    -- One short line about the note (ALL-372): under the title, in the game
+    -- tooltip of the unit it is about, on its situation toast. Max BNB.TLDR_MAX
+    { "tldr",        "s", share = "text" },
     { "tags",        "t", share = "tags" },
     { "tasks",       "t", share = "tasks" },
     { "taskList",    "t", share = "tasks" },
@@ -249,6 +252,27 @@ function BNB.NoteHasSituation(note, ctx)
     return false
 end
 
+-- tl;dr (ALL-372): one line of at most TLDR_MAX characters (UTF-8
+-- characters, as the edit box's SetMaxLetters counts them). Tabs and line
+-- breaks become spaces, ends trimmed; nil when nothing is left. Every way a
+-- tl;dr or a tl;dr snippet is saved goes through this.
+BNB.TLDR_MAX = 80
+
+function BNB.CleanTldr(s)
+    if type(s) ~= "string" then return nil end
+    s = s:gsub("[\t\r\n]+", " "):gsub("^%s+", ""):gsub("%s+$", "")
+    local n = 0
+    for i = 1, #s do
+        local c = s:byte(i)
+        if c < 0x80 or c >= 0xC0 then   -- the first byte of a character
+            n = n + 1
+            if n > BNB.TLDR_MAX then s = s:sub(1, i - 1):gsub("%s+$", ""); break end
+        end
+    end
+    if s == "" then return nil end
+    return s
+end
+
 -- Returns a new table with the fields of src that are in the schema, have an
 -- accepted type and shape, and pass want(def) (nil = every non-internal
 -- field). Tables are deep copies, so the result shares nothing with src.
@@ -269,6 +293,7 @@ function BNB.CleanNoteFields(src, want)
             end
             -- A bundled icon from before ALL-238 becomes its game icon
             if def.key == "icon" then v = BNB.LegacyIconPath(v) end
+            if def.key == "tldr" then v = BNB.CleanTldr(v) end
             out[def.key] = v
         end
     end

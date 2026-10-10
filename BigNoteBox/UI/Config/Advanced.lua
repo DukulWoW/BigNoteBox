@@ -28,13 +28,23 @@ local INTEG = {
     { name = "MapPinEnhanced", logo = "addon-mpe", desc = "CFG_INTEG_MPE_DESC",
       url = "https://www.curseforge.com/wow/addons/mappinenhanced", addon = "MapPinEnhanced",
       ready = function() return BNB.HasMPEGroups() end, oldTip = "CFG_INTEG_MPE_UPDATE_TIP", noClassic = true, noForever = true },
+    -- Note Capture from their dialogue windows (Features/QuickNote.lua)
+    { name = "DialogueUI", logo = "addon-dialogueui", desc = "CFG_INTEG_DUI_DESC",
+      url = "https://www.curseforge.com/wow/addons/dialogueui", addon = "DialogueUI" },
+    { name = "Immersion", logo = "addon-immersion", desc = "CFG_INTEG_IMM_DESC",
+      url = "https://www.curseforge.com/wow/addons/immersion", addon = "Immersion", noTBC = true },
 }
--- noClassic / noForever: no build for that client (CurseForge, checked
--- 2026-10-10: WaypointUI is Retail + Forever, MapPinEnhanced Retail only), so
--- it is not listed there (ALL-430)
+-- noClassic / noForever / noTBC: no build for that client (CurseForge, checked
+-- 2026-10-10: WaypointUI is Retail + Forever, MapPinEnhanced Retail only,
+-- DialogueUI every client, Immersion every client but the TBC Anniversary
+-- one), so it is not listed there (ALL-430). TBC = interface 2xxxx: when the
+-- Anniversary client moves on to Wrath, check Immersion again
+local _, _, _, _iface = GetBuildInfo()
+local IS_TBC = (_iface or 0) >= 20000 and (_iface or 0) < 30000
 for i = #INTEG, 1, -1 do
     local a = INTEG[i]
-    if (BNB.IsClassic and a.noClassic) or (BNB.IsForever and a.noForever) then table.remove(INTEG, i) end
+    if (BNB.IsClassic and a.noClassic) or (BNB.IsForever and a.noForever)
+       or (IS_TBC and a.noTBC) then table.remove(INTEG, i) end
 end
 
 -- 0 = not loaded, 1 = loaded but needs an update, 2 = active

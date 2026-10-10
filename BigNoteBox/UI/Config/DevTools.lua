@@ -83,7 +83,8 @@ local function Slash(key)
 end
 
 -- Buttons two to a row. A tool that is not loaded leaves no gap.
--- entries: { label, tipBody, onClick, available }
+-- entries: { label, tipBody, onClick, available, placeholder }
+-- placeholder = true: shown greyed out, tooltip only (a lab still to come)
 local function AddButtonGrid(ct, y, entries)
     local GAP = 8
     local bw = math.floor((CONTENT_W - GAP) / 2)
@@ -93,7 +94,9 @@ local function AddButtonGrid(ct, y, entries)
             local b = BNB.CreateButton(nil, ct, e[1], bw, 24)
             b:SetPoint("TOPLEFT", ct, "TOPLEFT", col * (bw + GAP), y)
             local fn = e[3]
-            b:SetScript("OnClick", function(self) fn(self) end)
+            if fn then b:SetScript("OnClick", function(self) fn(self) end) end
+            -- A disabled button still gets OnEnter, so the tooltip shows
+            if e[5] then b:SetEnabled(false) end
             Tip(b, e[1], e[2])
             if col == 1 then col = 0; y = y - 30 else col = 1 end
         end
@@ -161,8 +164,25 @@ function K.BuildDevToolsPage(sf, ct, y)
 
     -- ── Options ─────────────────────────────────────────────────────────────
     y = AddHeader(ct, y, L["DEV_HDR_OPTIONS"])
+    -- Two columns, filled row by row (Dukul, 2026-10-10): each column is its
+    -- own frame, so AddCheck's label stops at the column edge
+    local COL_GAP = 8
+    local colW = math.floor((CONTENT_W - COL_GAP) / 2)
+    local cols = {}
+    for i = 1, 2 do
+        cols[i] = CreateFrame("Frame", nil, ct)
+        cols[i]:SetPoint("TOPLEFT", ct, "TOPLEFT", (i - 1) * (colW + COL_GAP), y)
+        cols[i]:SetSize(colW, 10)
+    end
+    local colY, slot = { 0, 0 }, 0
+    local function OptCheck(...)
+        slot = slot % 2 + 1
+        local cb
+        colY[slot], cb = AddCheck(cols[slot], colY[slot], ...)
+        return cb
+    end
     local wpCb, immCb, ctxCb, toastCb
-    y, wpCb = AddCheck(ct, y, L["CFG_DEV_WP_LABEL"],
+    wpCb = OptCheck(L["CFG_DEV_WP_LABEL"],
         function() return db.debugWaypoint == true end,
         function(v) db.debugWaypoint = v or nil; BNB._debugWaypoint = db.debugWaypoint end)
     Tip(wpCb, nil, L["CFG_DEV_WP_TIP"], {
@@ -171,26 +191,27 @@ function K.BuildDevToolsPage(sf, ct, y)
         "/bnb testwp leave - simulates zone-leave (clears waypoints)",
         "/bnb testwp auto - shows auto-placed waypoint tracking",
     })
-    y, immCb = AddCheck(ct, y, L["CFG_DEV_IMM_LABEL"],
+    immCb = OptCheck(L["CFG_DEV_IMM_LABEL"],
         function() return BNB._debugImmersionPos == true end,
         function(v) BNB._debugImmersionPos = v or nil end,
         L["CFG_DEV_IMM_TIP"])
     -- Situation check trace (ALL-192, Features/ContextNotes.lua). Saved, so it
     -- survives the reload it is meant to watch; debug mode is re-armed every
     -- load in dev mode, so it keeps running.
-    y, ctxCb = AddCheck(ct, y, L["CFG_DEV_CTX_TRACE_LABEL"],
+    ctxCb = OptCheck(L["CFG_DEV_CTX_TRACE_LABEL"],
         function() return db.debugContextTrace == true end,
         function(v) db.debugContextTrace = v or nil end,
         L["CFG_DEV_CTX_TRACE_TIP"])
     K.ReadOnShow(wpCb, function() return db.debugWaypoint == true end)
     K.ReadOnShow(immCb, function() return BNB._debugImmersionPos == true end)
     -- Toast anchor drag: prints the saved offset (UI/Toast.lua), to find a better default
-    y, toastCb = AddCheck(ct, y, L["CFG_DEV_TOAST_ANCHOR_LABEL"],
+    toastCb = OptCheck(L["CFG_DEV_TOAST_ANCHOR_LABEL"],
         function() return db.debugToastAnchor == true end,
         function(v) db.debugToastAnchor = v or nil end,
         L["CFG_DEV_TOAST_ANCHOR_TIP"])
     K.ReadOnShow(ctxCb, function() return db.debugContextTrace == true end)
     K.ReadOnShow(toastCb, function() return db.debugToastAnchor == true end)
+    y = y + math.min(colY[1], colY[2])
 
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────
     AddRule(ct, y - 4); y = y - 18
@@ -204,6 +225,8 @@ function K.BuildDevToolsPage(sf, ct, y)
             function() BNB.OpenToastLab() end, BNB.OpenToastLab ~= nil },
         { L["CFG_DEV_SKINLAB_BTN"], L["CFG_DEV_SKINLAB_TIP_BODY"],
             function() BNB.OpenSkinLab() end, BNB.OpenSkinLab ~= nil },
+        -- Placeholder until the lab exists (Dukul, 2026-10-10)
+        { L["CFG_DEV_THEMELAB_BTN"], L["CFG_DEV_THEMELAB_TIP_BODY"], nil, true, true },
         { L["CFG_DEV_SEARCHLAYOUT_BTN"], L["CFG_DEV_SEARCHLAYOUT_TIP_BODY"],
             function() BNB.ToggleSearchLayoutTool() end, BNB.ToggleSearchLayoutTool ~= nil },
     })
