@@ -125,6 +125,54 @@ function BNB.RegisterSlashCommands()
             end
             if BNB.OpenBackgroundLab then BNB.OpenBackgroundLab() else BNB.DevToolMissing() end
 
+        -- ── Developer: link tooltips in plain notes probe (ALL-228) ──────────
+        -- Toggles hyperlinks on the main editor's plain body and reports what
+        -- the EditBox fires. To answer: do OnHyperlinkEnter / Leave / Click fire,
+        -- and do typing, cursor placement and clicks on a link still work.
+        elseif cmd == "linkprobe" then
+            if not (BNB.IsDebugMode and BNB.IsDebugMode()) then
+                BNB:Print("|cffff6666Enable Debug mode in Config -> Advanced first.|r")
+                return
+            end
+            local eb = BNB._editorBody
+            if not (eb and eb.SetHyperlinksEnabled) then
+                BNB:Print("Link probe: no editor body, or no SetHyperlinksEnabled on it.")
+                return
+            end
+            if not eb._bnbLinkProbeHooked then
+                eb._bnbLinkProbeHooked = true
+                -- An EditBox without these scripts errors on HookScript: report it
+                local hooked, err = pcall(function()
+                eb:HookScript("OnHyperlinkEnter", function(self, link)
+                    if not self._bnbLinkProbe then return end
+                    BNB:Print("Link probe: OnHyperlinkEnter " .. tostring(link):gsub("|", "||"))
+                    local ok = pcall(function()
+                        GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+                        GameTooltip:SetHyperlink(link)
+                        GameTooltip:Show()
+                    end)
+                    if not ok then GameTooltip:Hide() end
+                end)
+                eb:HookScript("OnHyperlinkLeave", function(self)
+                    if not self._bnbLinkProbe then return end
+                    BNB:Print("Link probe: OnHyperlinkLeave")
+                    GameTooltip:Hide()
+                end)
+                eb:HookScript("OnHyperlinkClick", function(self, link, _, button)
+                    if not self._bnbLinkProbe then return end
+                    BNB:Print("Link probe: OnHyperlinkClick " .. tostring(button) .. " " .. tostring(link):gsub("|", "||"))
+                end)
+                end)
+                if not hooked then
+                    BNB:Print("Link probe: the editor body has no hyperlink scripts: " .. tostring(err))
+                    return
+                end
+            end
+            eb._bnbLinkProbe = not eb._bnbLinkProbe
+            eb:SetHyperlinksEnabled(eb._bnbLinkProbe)
+            BNB:Print("Link probe " .. (eb._bnbLinkProbe and "on" or "off")
+                .. ", GetHyperlinksEnabled = " .. tostring(eb.GetHyperlinksEnabled and eb:GetHyperlinksEnabled()))
+
         -- ── Developer: toast styles (ALL-376, BigNoteBox_Dev Labs/ToastLab.lua) ─────────────
         elseif cmd == "toastlab" then
             if not (BigNoteBoxDB and BigNoteBoxDB.debugMode == true) then

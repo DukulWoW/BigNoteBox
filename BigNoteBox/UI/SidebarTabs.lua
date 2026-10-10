@@ -37,10 +37,11 @@ local CAP, ORN_L, ORN_R = 24, 114, 142
 -- Whether the tabs share the whole width is the player's setting now
 -- (sidebarTabsFill, ALL-333), not a field here
 -- Dukul's /bnbtabs Exports (2026-10-07, ALL-368), on every client: Forever
--- keeps its own normal y. under = drawn in the strata below the window, so its
+-- keeps its own normal y; Retail -2.5 (was -1.5: a 1 px gap showed, Dukul
+-- 2026-10-10). under = drawn in the strata below the window, so its
 -- top border covers their lower end (as the skin tabs are). Whether the tabs
 -- share the whole width stays the sidebarTabsFill setting (ALL-333).
-local NORMAL = { h = 32, w = 170, minW = 90, gap = 0, x = 8, y = BNB.IsForever and 6.5 or -1.5,
+local NORMAL = { h = 32, w = 170, minW = 90, gap = 0, x = 8, y = BNB.IsForever and 6.5 or -2.5,
     iconSz = 18, iconX = 18, iconY = -0.5, border = 1, textGap = 5, textY = -0.5,
     rightPad = 18, activeA = 1, hoverA = 0.5, dim = 0.6, font = "BNBFontHighlight",
     under = true, pinSz = 14, pinX = -16, pinY = -6 }

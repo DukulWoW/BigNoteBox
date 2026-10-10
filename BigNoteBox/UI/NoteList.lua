@@ -2390,6 +2390,7 @@ function BNB.BuildNoteList()
     BNB.TintUIIcon(colTex)   -- white arrows (2026-10-08): gold / skin accent
     PaintCollapseArrow(colBtn, false)
     colBtn:SetScript("OnClick", function()
+        BigNoteBoxDB.listAutoCollapsed = false   -- by hand now: widening leaves it (ALL-115)
         BNB.SetListCollapsed(not BNB._listCollapsed)
     end)
     colBtn:SetScript("OnEnter", function(self)

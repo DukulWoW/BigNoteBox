@@ -234,8 +234,28 @@ local function ModelSpec(att)
     elseif att.type == "spell" and C_MountJournal and C_MountJournal.GetMountFromSpell then
         local ok, mountID = pcall(C_MountJournal.GetMountFromSpell, att.id)
         return ok and MountSpec(mountID) or nil
+    elseif att.type == "pet" and C_PetJournal and C_PetJournal.GetPetInfoBySpeciesID then
+        -- name, icon, petType, companionID (creature), ..., creatureDisplayID (12th)
+        local ok, _, _, _, creatureID, _, _, _, _, _, _, _, displayID =
+            pcall(C_PetJournal.GetPetInfoBySpeciesID, att.id)
+        if ok and creatureID and creatureID ~= 0 then return { kind = "creature", id = creatureID } end
+        if ok and displayID and displayID ~= 0 then return { kind = "display", id = displayID } end
     end
     return nil
+end
+
+-- Mounts and battle pets from the Collections journals (ALL-215). A mount is
+-- kept as its summon spell (name, icon, Show model through GetMountFromSpell);
+-- a battle pet as its species, type "pet".
+local function MountIsSpell(spellID)
+    if not (spellID and C_MountJournal and C_MountJournal.GetMountFromSpell) then return false end
+    local ok, mountID = pcall(C_MountJournal.GetMountFromSpell, spellID)
+    return ok and mountID ~= nil and mountID ~= 0
+end
+local function PetSpeciesInfo(speciesID)
+    if not (speciesID and C_PetJournal and C_PetJournal.GetPetInfoBySpeciesID) then return nil end
+    local ok, name, icon, _, _, source, desc = pcall(C_PetJournal.GetPetInfoBySpeciesID, speciesID)
+    if ok and name and name ~= "" then return name, icon, source, desc end
 end
 
 local function IsLocked(id)
@@ -388,7 +408,13 @@ local function ResolveAttachment(att)
         _unavailable.spell[att.id] = nil
         -- icon from C_Spell is a fileDataID number; SetTexture accepts both paths and IDs
         return { name=name, icon=icon or "Interface\\Icons\\INV_Misc_QuestionMark",
-                 qr=0.40, qg=0.70, qb=1.00, typeLabel=L["REFBOX_TYPE_SPELL"], quality=-1 }
+                 qr=0.40, qg=0.70, qb=1.00, quality=-1,
+                 typeLabel = MountIsSpell(att.id) and L["REFBOX_TYPE_MOUNT"] or L["REFBOX_TYPE_SPELL"] }
+    elseif att.type == "pet" then
+        local name, icon = PetSpeciesInfo(att.id)
+        if not name then return UnavailableInfo(att, L["REFBOX_TYPE_PET"]) end
+        return { name=name, icon=icon or "Interface\\Icons\\INV_Misc_QuestionMark",
+                 qr=0.55, qg=0.85, qb=0.45, typeLabel=L["REFBOX_TYPE_PET"], quality=-1 }
     elseif att.type == "quest" then
         local title = GetQuestTitle(att.id)
         local unknown = not title or title == ""
@@ -578,6 +604,13 @@ local function ShowTooltip(anchor, att)
         GameTooltip:SetHyperlink("item:" .. att.id)
     elseif att.type == "spell" then
         GameTooltip:SetSpellByID(att.id)
+    elseif att.type == "pet" then
+        -- GameTooltip does not take battlepet links: species name, text, source
+        local name, _, source, desc = PetSpeciesInfo(att.id)
+        GameTooltip:AddLine(name or string.format(L["REFBOX_UNAVAILABLE_FMT"], tostring(att.id)), 0.55, 0.85, 0.45)
+        GameTooltip:AddLine(L["REFBOX_TYPE_PET"], 0.6, 0.6, 0.6)
+        if desc and desc ~= "" then GameTooltip:AddLine(desc, 1, 1, 1, true) end
+        if source and source ~= "" then GameTooltip:AddLine(source, 1, 1, 1, true) end
     elseif att.type == "quest" then
         local title = GetQuestTitle(att.id)
         if title and title ~= "" then
@@ -616,6 +649,10 @@ local function BuildAttachmentLink(att)
             or (att.title and att.title ~= "") and att.title
             or ("Quest " .. att.id)
         return "|cffffff00|Hquest:" .. att.id .. ":0|h[" .. title .. "]|h|r"
+    elseif att.type == "pet" then
+        -- A battlepet link needs the pet's own stats: the name in brackets
+        local name = PetSpeciesInfo(att.id)
+        if name then return "[" .. name .. "]" end
     end
     return nil
 end
@@ -625,6 +662,8 @@ local function BuildWowheadURL(att)
     -- Per client (ALL-151, BNB.WowheadURL in Init.lua)
     if att.type == "item" or att.type == "spell" or att.type == "quest" then
         return BNB.WowheadURL(att.type, att.id)
+    elseif att.type == "pet" then
+        return BNB.WowheadURL("battle-pet", att.id)
     end
     return nil
 end
@@ -1086,10 +1125,15 @@ local function TryAddLink(link)
     if not link or link == "" then return end
     if _lastAddedLink == link then return end
 
+    local petID   = link:match("battlepet:(%d+)")
     local itemID  = link:match("item:(%d+)")
     local spellID = link:match("spell:(%d+)")
     local questID = link:match("quest:(%d+)")
-    if itemID then
+    if petID then   -- species first: a pet link is no item (ALL-215)
+        _lastAddedLink = link
+        C_Timer.After(0.1, function() _lastAddedLink = nil end)
+        AddAttachment(_noteID, { type="pet", id=tonumber(petID) })
+    elseif itemID then
         _lastAddedLink = link
         C_Timer.After(0.1, function() _lastAddedLink = nil end)
         AddAttachment(_noteID, { type="item",  id=tonumber(itemID)  })
@@ -1403,6 +1447,7 @@ local function SetupRow(row, att, data, index, compact, locked)
             else
                 local typeLabel = att.type == "spell" and L["REFBOX_TYPE_SPELL"]
                     or att.type == "quest" and L["REFBOX_TYPE_QUEST"]
+                    or att.type == "pet" and L["REFBOX_TYPE_PET"]
                     or L["REFBOX_TYPE_GEAR"]
                 row._typeLabel:SetText(typeLabel)
             end
@@ -1434,12 +1479,44 @@ local function WireDragDrop(frame)
         -- On retail TWW/Midnight, GetCursorInfo for a spellbook drag returns:
         --   "spell", slotIndex, bookType, spellID
         -- The 4th return is the actual spellID; arg2 is the slot index.
-        local cursorType, id, _, spellIDArg = GetCursorInfo()
+        local cursorType, id, arg3, spellIDArg = GetCursorInfo()
         if cursorType == "item" then
             ClearCursor(); AddAttachment(_noteID, {type="item",  id=id})
         elseif cursorType == "spell" then
             local spellID = spellIDArg or id
             ClearCursor(); AddAttachment(_noteID, {type="spell", id=spellID})
+        elseif cursorType == "mount" or cursorType == "battlepet" then
+            -- Collections journals (ALL-215). Not probed yet: debug mode prints
+            -- what the cursor held, so the slot can be confirmed in game
+            if BNB.IsDebugMode and BNB.IsDebugMode() then
+                BNB:Print(string.format("RefBox drop: %s, %s, %s, %s", cursorType,
+                    tostring(id), tostring(arg3), tostring(spellIDArg)))
+            end
+            local att
+            if cursorType == "mount" then
+                -- The mount's ID is the 2nd return (as Features/DragDrop.lua
+                -- reads it); the 3rd is tried when that is no mount
+                local spellID
+                if C_MountJournal and C_MountJournal.GetMountInfoByID then
+                    for _, v in ipairs({ id, arg3 }) do
+                        if type(v) == "number" then
+                            local ok, _, sid = pcall(C_MountJournal.GetMountInfoByID, v)
+                            if ok and sid then spellID = sid; break end
+                        end
+                    end
+                end
+                att = spellID and { type = "spell", id = spellID }
+            else
+                -- A pet GUID (owned pet) or a species ID
+                local species = type(id) == "number" and id or nil
+                if type(id) == "string" and C_PetJournal and C_PetJournal.GetPetInfoByPetID then
+                    local ok, sp = pcall(C_PetJournal.GetPetInfoByPetID, id)
+                    species = ok and sp or nil
+                end
+                att = species and { type = "pet", id = species }
+            end
+            ClearCursor()
+            if att then AddAttachment(_noteID, att) else BNB:Print(L["REFBOX_DROP_FAIL"]) end
         end
     end)
     frame:SetScript("OnMouseDown", function(self, btn)

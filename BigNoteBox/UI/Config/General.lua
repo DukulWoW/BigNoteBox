@@ -10,7 +10,7 @@ local AddRule, AddHeader, AddCheck, MakeKeybindPair = K.AddRule, K.AddHeader, K.
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 1 — GENERAL
--- Logo, version, by-line, Language, BCB box + More Features, Window, Keybindings, solidarity line
+-- Logo, version, by-line, Language + More Features, Window, Keybindings, solidarity line
 -- ─────────────────────────────────────────────────────────────────────────────
 local function BuildGeneralTab(sf, ct)
     local y = -8
@@ -112,16 +112,22 @@ local function BuildGeneralTab(sf, ct)
     y = y - HEADER_H
 
     -- ── Language section (ALL-14) — retail only, mirrors BigChatBox's selector ──
+    -- Text and dropdown in the left column, More Features right of it (ALL-315)
+    local langTopY
+    local LANG_W = math.floor((CONTENT_W - 12) / 2)
     if not (BNB.IsForever or BNB.IsClassic) then   -- FOR-32, Classic the same (ALL-168)
         y = AddRule(ct, y) - 4
+        langTopY = y
         y = AddHeader(ct, y, L["CFG_HDR_LANGUAGE"])
 
         local langDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         langDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        langDesc:SetWidth(CONTENT_W); langDesc:SetJustifyH("LEFT")
+        langDesc:SetWidth(LANG_W); langDesc:SetJustifyH("LEFT")
         langDesc:SetTextColor(0.7, 0.7, 0.7)
+        langDesc:SetWordWrap(true)
         langDesc:SetText(L["CFG_LANGUAGE_DESC"])
-        y = y - 18
+        -- Half width now: the text can take two lines
+        y = y - math.max(18, math.ceil(langDesc:GetStringHeight()) + 6)
 
         local FLAG = ASSET .. "Flags\\"
         -- { code, label, flag, available }  available=false -> greyed "(Coming soon)"
@@ -153,7 +159,7 @@ local function BuildGeneralTab(sf, ct)
 
         local langDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
         langDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        langDD:SetWidth(CONTENT_W)
+        langDD:SetWidth(LANG_W)
         langDD:SetupMenu(function(_, root)
             for _, entry in ipairs(LANG_LIST) do
                 local lbl = MakeLangLabel(entry)
@@ -197,89 +203,24 @@ local function BuildGeneralTab(sf, ct)
         }
     end
 
-    -- BCB box + More Features button, one row, ruled off from Language (or the
-    -- header on Forever) like the sections below it. The four feature boxes
-    -- that used to sit here went when the Modules tab arrived: it lists the
-    -- same features, and they pushed General into scrolling (Dukul, 2026-09-26).
-    y = AddRule(ct, y) - 4
-    local rowY = y
-    local h3
-    local cellGap = 12
-    local cellW   = math.floor((CONTENT_W - cellGap) / 2)
-    local cellX2  = cellW + cellGap
-
-    local function Cell(xOff, yOff, hdr, desc)
-        local h = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormal")
-        h:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff)
-        h:SetWidth(cellW); h:SetJustifyH("LEFT")
-        BNB.SetHeaderColor(h); h:SetText(hdr)
-
-        local d = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
-        d:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, yOff - 18)
-        d:SetWidth(cellW); d:SetJustifyH("LEFT")
-        d:SetWordWrap(true); d:SetSpacing(2)
-        d:SetTextColor(0.75, 0.75, 0.75); d:SetText(desc)
-        return d:GetStringHeight() + 22
+    -- More Features: a normal-height button right of the Language text (the
+    -- BCB box went to Advanced > Addon integrations, ALL-315); without the
+    -- Language section (Forever, Classic) on a row of its own. The four feature
+    -- boxes that used to sit here went when the Modules tab arrived (Dukul,
+    -- 2026-09-26).
+    local moreBtn = BNB.CreateButton(nil, ct, L["CFG_MORE_FEATURES_BTN"], 160, 26)
+    local moreFs = moreBtn:GetFontString() or moreBtn._lbl
+    if moreFs and moreFs.GetStringWidth then
+        moreBtn:SetWidth(math.max(160, math.ceil(moreFs:GetStringWidth()) + 40))
     end
-
-    local bcbLabel = L["CFG_BCB_HEADER"]
-    if BigChatBox and BigChatBox.SendDirect then
-        bcbLabel = bcbLabel .. " |cff66bb6a(INSTALLED)|r"
-        h3 = Cell(0, y, bcbLabel, L["CFG_BCB_DESC"])
+    if langTopY then
+        -- Centred on the Language section, header to dropdown
+        moreBtn:SetPoint("RIGHT", ct, "TOPRIGHT", 0, math.floor((langTopY + y) / 2))
     else
-        -- BCB not installed: draw the header manually so we can add a clickable badge
-        local hdr = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormal")
-        hdr:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        hdr:SetWidth(cellW); hdr:SetJustifyH("LEFT")
-        BNB.SetHeaderColor(hdr); hdr:SetText(bcbLabel)
-
-        -- (NOT INSTALLED) button — small, blue, sits right of the header text
-        local notInstBtn = CreateFrame("Button", nil, ct)
-        notInstBtn:SetSize(96, 16)
-        notInstBtn:SetPoint("LEFT", hdr, "LEFT", hdr:GetStringWidth() + 6, 0)
-        local notInstLbl = notInstBtn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        notInstLbl:SetAllPoints()
-        notInstLbl:SetJustifyH("LEFT")
-        notInstLbl:SetText("|cff4fc3f7" .. L["CFG_NOT_INSTALLED"] .. "|r")
-        notInstBtn:SetScript("OnClick", function()
-            if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
-        end)
-        notInstBtn:SetScript("OnEnter", function(self)
-            notInstLbl:SetText("|cff81d4fa" .. L["CFG_NOT_INSTALLED"] .. "|r")
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(L["CFG_BCB_TIP_TITLE"], 1, 1, 1)
-            GameTooltip:AddLine(L["CFG_BCB_TIP_BODY"], 0.78, 0.78, 0.78)
-            GameTooltip:Show()
-        end)
-        notInstBtn:SetScript("OnLeave", function()
-            notInstLbl:SetText("|cff4fc3f7" .. L["CFG_NOT_INSTALLED"] .. "|r")
-            GameTooltip:Hide()
-        end)
-
-        local desc3 = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
-        desc3:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 18)
-        desc3:SetWidth(cellW); desc3:SetJustifyH("LEFT")
-        desc3:SetWordWrap(true); desc3:SetSpacing(2)
-        desc3:SetTextColor(0.75, 0.75, 0.75)
-        desc3:SetText(L["CFG_BCB_DESC"])
-        h3 = desc3:GetStringHeight() + 22
+        y = AddRule(ct, y) - 4
+        moreBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        y = y - 26 - 10
     end
-
-    -- More Features button (right of the BCB box)
-    -- The button matches the height of the left cell. Since GetStringHeight()
-    -- returns 0 at build time, we use a deferred resize via C_Timer.After(0).
-    -- More Features button: same large template as OptionsPanel and the WhatsNew OK button
-    local moreTpl = "SharedButtonLargeTemplate"
-    local moreBtn
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        moreBtn = BNB.CreateSkinButton(nil, ct, L["CFG_MORE_FEATURES_BTN"], cellW, 38)
-    else
-        moreBtn = CreateFrame("Button", nil, ct, moreTpl)
-        moreBtn:SetWidth(cellW)
-        pcall(function() DynamicResizeButton_Resize(moreBtn) end)
-        moreBtn:SetText(L["CFG_MORE_FEATURES_BTN"])
-    end
-    moreBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", cellX2, rowY)
     moreBtn:SetScript("OnClick", function()
         if BNB.FeatureList then BNB.FeatureList.Open() end
     end)
@@ -290,18 +231,6 @@ local function BuildGeneralTab(sf, ct)
         GameTooltip:Show()
     end)
     moreBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-    -- In skin mode, defer height match to the left cell after layout resolves.
-    -- In normal mode the template height is natural and should not be overridden.
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        C_Timer.After(0, function()
-            if not ct or not moreBtn then return end
-            local targetH = math.max(h3, 38)
-            moreBtn:SetHeight(targetH)
-        end)
-    end
-
-    y = rowY - math.max(h3, 38) - 10
 
     -- ── Window (moved from the Features tab, ALL-84) ───────────────────────────
     local db = BigNoteBoxDB

@@ -1190,8 +1190,6 @@ L["TASK_CTX_SIT_NONE"]     = "无 (全局)"
 L["TASK_CTX_DELETE"]        = "删除"
 
 -- ── Config window (ALL-08 sweep: SetText/AddLine/SetFormattedText literals) ────
-L["CFG_BCB_TIP_TITLE"]              = "获取 BigChatBox"
-L["CFG_BCB_TIP_BODY"]               = "点击了解更多。"
 L["CFG_BCB_DESC"]                   = "通过 BigChatBox 逐行发送笔记。\n将聊天输入捕获为新笔记。"
 L["CFG_MORE_FEATURES_BTN"]          = "更多功能"
 L["CFG_FEATURES_TIP_TITLE"]         = "BigNoteBox 中的功能"
@@ -1339,7 +1337,6 @@ L["CFG_DEV_PSEUDOLOC_LABEL"]        = "调试伪本地化 (标记翻译的字符
 L["CFG_DEV_PSEUDOLOC_TIP_BODY"]     = "在每个通过 L[...] 的字符串前加上 @@。\n任何没有标记的 UI 文本都是硬编码的字面量，仍然需要区域设置键。需要重载 UI 才能完全刷新已构建的窗口。"
 
 -- ── Config window (ALL-08 sweep pass 2: Cell/AddHeader/CreateButton/CreateSlider literals) ──
-L["CFG_BCB_HEADER"]                 = "BCB 集成"
 L["CFG_CELL_STICKY_HDR"]            = "便签"
 L["CFG_HDR_KEYBINDINGS"]            = "按键绑定"
 L["CFG_HDR_DATA_SUMMARY"]           = "数据摘要"
@@ -1458,7 +1455,6 @@ L["CFG_STAT_COUNT_FMT"]             = "%d 个笔记"
 L["CFG_SIZE_MB_FMT"]                = "%.1f MB"
 L["CFG_SIZE_KB_FMT"]                = "%.1f KB"
 L["CFG_SIZE_B_FMT"]                 = "%d B"
-L["CFG_NOT_INSTALLED"]              = "(未安装)"
 L["CFG_DONE_BADGE"]                 = "完成"
 L["CFG_NOT_YET_BADGE"]              = "尚未"
 L["CFG_TN_SUBLABEL"]                = "始终添加“目标笔记”。在下方启用任何其他标签。"

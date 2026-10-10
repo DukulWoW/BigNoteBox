@@ -287,8 +287,9 @@ end
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 -- WINDOW REGISTRY (ARCH-03)
--- Every BNB window the main window manages, in ESC order: the one ESC closes
--- first is first. It replaces four lists kept by hand (the ESC cascade,
+-- Every BNB window the main window manages. ESC closes the shown window in
+-- front (OnEscapeKey); this order only breaks a tie between two at the same
+-- strata and level, the first winning. It replaces four lists kept by hand (the ESC cascade,
 -- CloseCompanionWindows, the raise list and Focus mode's snapshot). A new
 -- window = one entry here. Fields:
 --   name       global frame name (nil for an ESC step that is not a window)
@@ -374,8 +375,8 @@ local WINDOWS = {
       esc       = function() Call(BNB, "CloseImportWindow") end,
       companion = function() Call(BNB, "CloseImportWindow") end },
     -- Addon settings window: a sub-page goes back to its tab first
-    { esc = function() return Call(BNB, "ConfigSubPageBack") end },
-    { name = "BigNoteBoxConfigFrame", esc = true, raise = true,
+    { name = "BigNoteBoxConfigFrame", raise = true,
+      esc = function(w) if not Call(BNB, "ConfigSubPageBack") then w:Hide() end end,
       companion = function(w)
           if w and w:IsShown() and not BNB._keepSettingsOpen then w:Hide() end
       end,
@@ -394,8 +395,14 @@ local function EscToGameMenu()
 end
 
 -- ESC on the main window (BNB.AttachEscClose; in combat the game has ESC):
--- the first shown window in WINDOWS closes, the main window last
+-- nameless steps first (an open right-click menu), then the shown window in
+-- front: highest strata, then highest frame level (ALL-311: Note History
+-- closed before Settings or Trash opened over it). A tie keeps WINDOWS order.
+-- The main window last.
+local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5,
+    FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
 local function OnEscapeKey()
+    local top, topE, topR, topL
     for _, e in ipairs(WINDOWS) do
         local esc = e.esc
         if esc then
@@ -404,11 +411,17 @@ local function OnEscapeKey()
             else
                 local w = _G[e.name]
                 if w and w:IsShown() then
-                    if esc == true then w:Hide() else esc(w) end
-                    return
+                    local r, l = STRATA_RANK[w:GetFrameStrata()] or 0, w:GetFrameLevel()
+                    if not top or r > topR or (r == topR and l > topL) then
+                        top, topE, topR, topL = w, e, r, l
+                    end
                 end
             end
         end
+    end
+    if top then
+        if topE.esc == true then top:Hide() else topE.esc(top) end
+        return
     end
     -- Otherwise close main window (with confirm if enabled)
     BNB.RequestCloseMainWindow()
@@ -1015,6 +1028,23 @@ function BNB.CreateMainWindow()
         sizeLabel:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / uisc + 14, cy / uisc + 4)
     end
 
+    -- Below AUTO_COLLAPSE_W (the notepad, as the size label counts it) the note
+    -- list collapses, or the welcome page's Open config button sticks out of
+    -- the window (ALL-115). Widening again brings it back only when this
+    -- collapsed it: a list collapsed by hand stays collapsed. At resize end.
+    local AUTO_COLLAPSE_W = 530
+    local function AutoCollapseList()
+        if not BNB.SetListCollapsed then return end
+        local narrow = f:GetWidth() - SidebarW() < AUTO_COLLAPSE_W
+        if narrow and not BNB._listCollapsed then
+            BigNoteBoxDB.listAutoCollapsed = true
+            BNB.SetListCollapsed(true)
+        elseif not narrow and BNB._listCollapsed and BigNoteBoxDB.listAutoCollapsed then
+            BigNoteBoxDB.listAutoCollapsed = false
+            BNB.SetListCollapsed(false)
+        end
+    end
+
     local _resizing = false
     f:HookScript("OnSizeChanged", function()
         if _resizing then UpdateSizeLabel() end
@@ -1048,6 +1078,7 @@ function BNB.CreateMainWindow()
             SaveWindowPos(f)
             -- Re-apply split so panes adjust to new width
             ApplySplit(f)
+            AutoCollapseList()
             -- Recalculate sidebar slot visibility after resize
             if BNB.Sidebar and BNB.Sidebar.Refresh then BNB.Sidebar.Refresh() end
         end,
@@ -1358,8 +1389,6 @@ end
 -- The open windows keep their stacking among themselves: raised lowest first
 -- (strata, then frame level), so the one on top stays on top. Raising them in
 -- WINDOWS order reset the stack to that order on every click.
-local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5,
-    FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
 function BNB.RaiseBNBWindows()
     RaiseShown("BigNoteBoxFrame")
     local open = {}

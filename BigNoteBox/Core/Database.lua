@@ -67,6 +67,7 @@ BNB.DEFAULTS = {
     -- Splitter and collapse state
     splitX        = 240,
     listCollapsed = false,
+    listAutoCollapsed = false,   -- collapsed by a narrow window, not by hand (ALL-115)
 
     -- Font / display (fontChoice depends on the client language: InitSettingsDB)
     fontSize   = 13,

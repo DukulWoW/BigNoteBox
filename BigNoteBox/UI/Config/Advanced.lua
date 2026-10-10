@@ -15,17 +15,106 @@ local function BuildAdvancedTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
+    -- ── Addon integrations (ALL-315), first on the tab (Dukul, 2026-10-10): a
+    -- 2x2 grid of the addons BNB works with, logo, name and whether it is active. Not active: a button that copies
+    -- the CurseForge link. EasyFind joins as the fourth card with ALL-306.
+    y = AddHeader(ct, y, L["CFG_HDR_INTEGRATIONS"])
+    do
+        local ASSET   = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\"
+        local INTEG = {
+            { name = "BigChatBox", logo = "bcb-logo", desc = L["CFG_BCB_DESC"],
+              url = "https://www.curseforge.com/wow/addons/bigchatbox",
+              addon = "BigChatBox" },
+            { name = "TomTom", logo = "addon-tomtom", desc = L["CFG_INTEG_TOMTOM_DESC"],
+              url = "https://www.curseforge.com/wow/addons/tomtom",
+              addon = "TomTom" },
+            { name = "WaypointUI", logo = "addon-waypointui", desc = L["CFG_INTEG_WPUI_DESC"],
+              url = "https://www.curseforge.com/wow/addons/waypointui",
+              addon = "WaypointUI" },
+        }
+        local GAP, CARD_H, LOGO = 12, 60, 44
+        local cardW = math.floor((CONTENT_W - GAP) / 2)
+        local cards = {}
+        for i, a in ipairs(INTEG) do
+            local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
+            local card = BNB.CreateBackdropFrame("Frame", nil, ct)
+            card:SetSize(cardW, CARD_H)
+            card:SetPoint("TOPLEFT", ct, "TOPLEFT", col * (cardW + GAP), y - row * (CARD_H + GAP))
+            BNB.PaintSelectCard(card, nil)
+            cards[#cards + 1] = card
+            -- The addon itself loaded, by folder name: a global like TomTom can
+            -- come from another addon's compatibility layer (a disabled TomTom
+            -- showed as Active, Dukul 2026-10-10)
+            local on = C_AddOns.IsAddOnLoaded(a.addon) and true or false
+            local logo = card:CreateTexture(nil, "ARTWORK")
+            logo:SetSize(LOGO, LOGO)
+            logo:SetPoint("LEFT", card, "LEFT", 8, 0)
+            logo:SetTexture(ASSET .. a.logo)
+            if not on then logo:SetDesaturated(true); logo:SetAlpha(0.6) end
+            local nameLbl = card:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+            nameLbl:SetPoint("TOPLEFT", logo, "TOPRIGHT", 10, -4)
+            nameLbl:SetPoint("RIGHT", card, "RIGHT", -8, 0)
+            nameLbl:SetJustifyH("LEFT"); nameLbl:SetWordWrap(false)
+            nameLbl:SetText(a.name)
+            BNB.SetHeaderColor(nameLbl)
+            if on then
+                local st = card:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+                st:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 10, 4)
+                st:SetText("|cff66bb6a" .. L["CFG_INTEG_ACTIVE"] .. "|r")
+            else
+                local get = BNB.CreateButton(nil, card, L["CFG_INTEG_GET_BTN"], 110, 20)
+                get:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 10, 0)
+                get:SetScript("OnClick", function(self) BNB.ShowClipboardHint(a.url, self, true, true) end)
+                get:HookScript("OnEnter", function(self)
+                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                    GameTooltip:AddLine(a.name, 1, 1, 1)
+                    GameTooltip:AddLine(L["CFG_INTEG_GET_TIP"], 0.8, 0.8, 0.8, true)
+                    GameTooltip:AddLine(a.url, 0.6, 0.6, 0.6)
+                    GameTooltip:Show()
+                end)
+                get:HookScript("OnLeave", function() GameTooltip:Hide() end)
+            end
+            -- What BNB does with it, on the card
+            card:EnableMouse(true)
+            card:SetScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(a.name, 1, 1, 1)
+                GameTooltip:AddLine(a.desc, 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine(on and L["CFG_INTEG_ACTIVE"] or L["CFG_INTEG_INACTIVE"],
+                    on and 0.4 or 0.6, on and 0.73 or 0.6, on and 0.42 or 0.6)
+                GameTooltip:Show()
+            end)
+            card:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        end
+        BNB.RegisterMessage("Config.IntegCards", "SkinChanged", function()
+            for _, c in ipairs(cards) do BNB.PaintSelectCard(c, nil) end
+        end)
+        local rows = math.ceil(#INTEG / 2)
+        y = y - rows * CARD_H - (rows - 1) * GAP - 12
+    end
+
+    AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_BEHAVIOR"])
 
-    y = AddCheck(ct, y, L["CONFIG_SHOW_MINIMAP"],
+    -- Both checkboxes on one row, so the tab fits without scrolling (Dukul,
+    -- 2026-10-10): the second moves to the right half, the first label stops
+    -- short of it
+    local HALF = math.floor(CONTENT_W / 2)
+    local rowY = y
+    local minimapCb, loginCb
+    y, minimapCb = AddCheck(ct, y, L["CONFIG_SHOW_MINIMAP"],
         function() return not (db.minimapIcon and db.minimapIcon.hide) end,
         function(v) BNB.SetMinimapButtonShown(v) end,
         L["CONFIG_SHOW_MINIMAP_TIP"])
 
-    y = AddCheck(ct, y, L["CONFIG_HIDE_LOGIN_MSG"],
+    local _
+    _, loginCb = AddCheck(ct, rowY, L["CONFIG_HIDE_LOGIN_MSG"],
         function() return db.hideLoginMessage == true end,
         function(v) db.hideLoginMessage = v end,
         "Suppress the \"BigNoteBox v... loaded\" chat message on login.")
+    loginCb:ClearAllPoints()
+    loginCb:SetPoint("TOPLEFT", ct, "TOPLEFT", HALF - 2, rowY + 2)
+    minimapCb._lbl:SetPoint("RIGHT", ct, "LEFT", HALF - 8, 0)
 
     -- ── Developer section ───────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18

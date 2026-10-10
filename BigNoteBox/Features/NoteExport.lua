@@ -341,6 +341,13 @@ local function BuildRefboxHtml(note)
             url       = BNB.WowheadURL("quest", a.id)
             typeLabel = "Quest"
             qualityHex = "#ffd100"
+        elseif a.type == "pet" then   -- battle pet species (ALL-215)
+            local pname = C_PetJournal and C_PetJournal.GetPetInfoBySpeciesID
+                and C_PetJournal.GetPetInfoBySpeciesID(a.id)
+            label     = pname or ("Battle pet " .. a.id)
+            url       = BNB.WowheadURL("battle-pet", a.id)
+            typeLabel = "Battle pet"
+            qualityHex = "#8cd973"
         else
             label     = (a.type or "?") .. " " .. (a.id or "?")
             url       = nil
