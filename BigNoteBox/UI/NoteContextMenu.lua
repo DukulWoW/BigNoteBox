@@ -261,7 +261,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         local hasAlarm = alarmsOn and note.alarm ~= nil
         local hasTasks = BNB.Task and BNB.Task.HasTasks(noteID)
         local sitOn = BNB.SituationsEnabled()   -- ALL-375
-        local hasSituation = sitOn and BNB.HasSituation(note)
+        local hasSituation = sitOn and BNB.HasSituation(note, true)   -- an off one is there to edit (ALL-435)
         -- "Create / Edit" once the note has something to edit here, plain
         -- "Create" only while every entry is a Create (Dukul, 2026-10-03)
         local canEdit = hasAlarm or hasSituation or (BNB.TasksEnabled() and hasTasks)
@@ -438,7 +438,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             if AM and AM.IsRich(n) then c.rich = c.rich + 1 end
             if n.alarm then c.alarms = c.alarms + 1 end
             if BNB.Task and BNB.Task.HasTasks(id) then c.tasks = c.tasks + 1 end
-            if BNB.HasSituation(n) then c.situations = c.situations + 1 end
+            if BNB.HasSituation(n, true) then c.situations = c.situations + 1 end
             if n.history and #n.history > 0 then c.history = c.history + 1 end
         end
     end
@@ -497,7 +497,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
 
     local function RemoveSituations()
         Each(function(id, n)
-            if BNB.HasSituation(n) then
+            if BNB.HasSituation(n, true) then
                 BNB.UpdateNote(id, { _clear = { "situations", "contextDisplay", "contextLeave",
                                                 "contextTrigger", "contextFreq" } })
                 n.contextSeen = nil

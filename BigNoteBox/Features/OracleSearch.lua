@@ -120,8 +120,10 @@ local function Fields(note)
     local tags = {}
     for i, t in ipairs(note.tags or {}) do tags[i] = tostring(t):lower() end
     local who = {}
-    local sits = BNB.NoteSituations(note)
+    -- Off situations too: still who the note is about (ALL-435)
+    local sits = BNB.AllSituations(note)
     for _, ctx in ipairs(sits) do
+        ctx = BNB.SituationBare(ctx)
         who[#who + 1] = (ctx:match("^%w+:(.+)$") or ctx):lower()
     end
     if note.inspectName then who[#who + 1] = tostring(note.inspectName):lower() end
@@ -130,6 +132,7 @@ local function Fields(note)
     -- A zone context counts for plain words (who above), not for @.
     local about = {}
     for _, ctx in ipairs(sits) do
+        ctx = BNB.SituationBare(ctx)
         local name = ctx:match("^player:(.+)$") or ctx:match("^npc:(.+)$")
         if name then about[#about + 1] = name:lower() end
     end
@@ -504,8 +507,8 @@ function OS.IsTargetNote(note, target)
     if target.isPlayer then
         local key = "player:" .. target.name
         local full = (target.realm and target.realm ~= "") and (key .. "-" .. target.realm) or key
-        if note.targetPlayerKey == full or BNB.NoteHasSituation(note, full)
-           or BNB.NoteHasSituation(note, key) then return true end
+        if note.targetPlayerKey == full or BNB.NoteHasSituation(note, full, true)
+           or BNB.NoteHasSituation(note, key, true) then return true end
         return note.source == "inspect" and note.inspectName == target.name
             and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == target.realm)
     end

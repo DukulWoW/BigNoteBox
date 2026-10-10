@@ -216,7 +216,7 @@ local SHAPES = {
     situations = function(v)
         local out = {}
         for _, s in ipairs(v) do
-            if type(s) == "string" and s:find("^%w+:.+$") then out[#out + 1] = s end
+            if type(s) == "string" and s:find("^~?%w+:.+$") then out[#out + 1] = s end   -- "~" = off (ALL-435)
         end
         return #out > 0 and out or nil
     end,
@@ -226,28 +226,59 @@ local SHAPES = {
 -- SITUATIONS (ALL-232)
 -- note.situations = { "zone:Orgrimmar", "player:Thrall", ... }; the note
 -- matches while any one of them does. Read it only through these.
+-- Off situations (ALL-435): "~" in front ("~player:Thrall") = kept on the
+-- note, grey in the editor, never matched. Older builds read "~player" as an
+-- unknown kind and never match it either. NoteSituations gives the ones that
+-- are on; AllSituations the stored list, for the editor and for anything
+-- that looks for who a note is about.
 --------------------------------------------------------------------------------
 local NO_SITUATIONS = {}   -- shared, never written to
 
--- The note's situation strings, an empty list when it has none
-function BNB.NoteSituations(note)
+function BNB.SituationIsOff(s) return type(s) == "string" and s:sub(1, 1) == "~" end
+-- The situation without its off marker
+function BNB.SituationBare(s) return (s:gsub("^~", "")) end
+-- The situation as stored, on or off
+function BNB.SituationState(s, on)
+    local bare = BNB.SituationBare(s)
+    return on and bare or ("~" .. bare)
+end
+
+-- Every stored situation string, on and off
+function BNB.AllSituations(note)
     local s = note and note.situations
     return type(s) == "table" and s or NO_SITUATIONS
 end
 
-function BNB.HasSituation(note)
-    return BNB.NoteSituations(note)[1] ~= nil
+-- The situation strings that are on, an empty list when there are none
+function BNB.NoteSituations(note)
+    local s = BNB.AllSituations(note)
+    for i = 1, #s do
+        if BNB.SituationIsOff(s[i]) then
+            local on = {}
+            for _, x in ipairs(s) do
+                if not BNB.SituationIsOff(x) then on[#on + 1] = x end
+            end
+            return on
+        end
+    end
+    return s
 end
 
--- The first situation, what older builds read as note.context
+-- withOff: an off situation counts too
+function BNB.HasSituation(note, withOff)
+    return (withOff and BNB.AllSituations(note) or BNB.NoteSituations(note))[1] ~= nil
+end
+
+-- The first situation that is on, what older builds read as note.context
 function BNB.FirstSituation(note)
     return BNB.NoteSituations(note)[1]
 end
 
--- Does the note have this exact situation string?
-function BNB.NoteHasSituation(note, ctx)
-    for _, s in ipairs(BNB.NoteSituations(note)) do
-        if s == ctx then return true end
+-- Does the note have this exact situation string? withOff: also when it is
+-- off (who the note is about, ALL-435)
+function BNB.NoteHasSituation(note, ctx, withOff)
+    for _, s in ipairs(withOff and BNB.AllSituations(note) or BNB.NoteSituations(note)) do
+        if s == ctx or (withOff and BNB.SituationBare(s) == ctx) then return true end
     end
     return false
 end
@@ -436,8 +467,8 @@ end
 -- from before ALL-232 still gets one, and one waypoint as `waypoint` for a
 -- build from before ALL-282
 function BNB.AddLegacyContext(fields)
-    local s = fields.situations
-    if type(s) == "table" and type(s[1]) == "string" then fields.context = s[1] end
+    local s = BNB.FirstSituation(fields)   -- an off one never (ALL-435)
+    if type(s) == "string" then fields.context = s end
     fields.waypoint = BNB.LegacyWaypoint(fields.waypoints)
     return fields
 end

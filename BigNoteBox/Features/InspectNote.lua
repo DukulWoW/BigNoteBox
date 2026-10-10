@@ -501,12 +501,10 @@ local function CreateInspectNote(richMode, silent)
     local noteID = BNB.CreateNote(title, body)
     if not noteID then return end
 
-    local context = nil
-    if BigNoteBoxDB and BigNoteBoxDB.inspectNoteAddSituation then
-        context = "player:" .. data.name
-        if data.realm and data.realm ~= "" then
-            context = context .. "-" .. data.realm
-        end
+    -- The player situation, always (ALL-435): on or off by the setting
+    local context = "player:" .. data.name
+    if data.realm and data.realm ~= "" then
+        context = context .. "-" .. data.realm
     end
 
     local tags = { L["INSPECT_TAG"] }
@@ -541,9 +539,7 @@ local function CreateInspectNote(richMode, silent)
     if #data.transmogItems > 0 then
         fields.inspectTransmogItems = data.transmogItems
     end
-    if context then
-        fields.situations = { context }
-    end
+    UN.AddUnitSituation(fields, context, "inspectNoteAddSituation", "inspectNoteSituationToast")
 
     local cc = RAID_CLASS_COLORS and RAID_CLASS_COLORS[data.classFile]
     if cc then

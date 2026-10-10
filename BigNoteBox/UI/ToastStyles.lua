@@ -713,7 +713,10 @@ local PIN_FILE  = "Interface\\Icons\\INV_Misc_Map_01"
 -- or its own icon frame); it returns true when it drew a frame, which then
 -- replaces the style's frame and border. ownFrame = the style keeps its own
 -- border: iconSetup must not draw the note's frame (portrait only)
-function TS.Fill(f, c)
+-- The icon part of TS.Fill. The toast engine runs it again once the toast
+-- is on screen: a unit portrait drawn while the toast was still hidden
+-- showed the plain icon (ALL-434, FB failed 2026-10-10)
+function TS.FillIcon(f, c)
     local icon = f._icon
     local def = f._style
     if c.noIcon or not (def and def.icon) then
@@ -727,6 +730,11 @@ function TS.Fill(f, c)
             if BNB.IconFrameLayer then BNB.IconFrameLayer.HideTex(f._iconFrame) end
         end
     end
+end
+
+function TS.Fill(f, c)
+    local icon = f._icon
+    TS.FillIcon(f, c)
     f._lbl:SetText(c.title or ""); FitText(f._lbl)
     local tc = c.titleColor
     if tc then f._lbl:SetTextColor(tc.r or 1, tc.g or 0.82, tc.b or 0, 1)

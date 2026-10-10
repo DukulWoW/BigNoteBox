@@ -109,11 +109,16 @@ BNB.DEFAULTS = {
     targetNoteTagFaction        = true,
     targetNoteTagZone           = true,
     targetNoteTagBoss           = true,
+    -- A new player / NPC note always gets its unit situation (ALL-435): on
+    -- (else off, grey), and then shown as a toast (else Show nothing)
+    targetNoteAddSituation      = false,
+    targetNoteSituationToast    = true,
 
     -- Inspect Note
     inspectNoteMode         = "manual",
     inspectNoteType         = "choose",
-    inspectNoteAddSituation = false,
+    inspectNoteAddSituation = false,   -- the player situation on (ALL-435: always added)
+    inspectNoteSituationToast = true,
     inspectNoteGearShow     = "both",
 
     -- Tag Tree view

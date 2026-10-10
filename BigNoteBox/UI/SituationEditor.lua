@@ -52,7 +52,10 @@ local TYPES        = { "zone", "subzone", "instance", "player", "npc", "guild", 
 -- Kinds whose value is a key from a list, not a typed name
 local KEY_KINDS    = { itype = true, open = true, state = true }
 local PLAYER_KINDS = { player = true, npc = true, guild = true }
-local DISPLAY_KEYS = { "popup", "sticky", "both" }
+-- "none" (ALL-435): the situation only marks the note and places its
+-- waypoints. Sticky Notes off: the choices without a sticky
+local DISPLAY_KEYS         = { "popup", "sticky", "both", "none" }
+local DISPLAY_KEYS_NOSTICKY = { "popup", "none" }
 local LEAVE_KEYS   = { "keep", "minimize", "hide" }
 -- contextTrigger / contextFreq; the first key of each is saved as nil
 local TRIGGER_KEYS = { "arrive", "leave", "both" }
@@ -347,6 +350,82 @@ local function WireWaypointRows(rows, act)
     return CancelPending
 end
 
+-- The situation list's rows (split out of the editor, CMP-07): kind, value,
+-- the hover X. act = the editor's handlers: remove(idx), menu(row), edit(idx),
+-- toggle(noteID, idx) and noteID(). Returns the rows and CancelSitPending.
+local function NewSituationRows(list, act)
+    local rows = {}
+    -- A row click waits DBL_SECS: a second click edits instead of toggling
+    local sitPendingRow, sitPendingTimer
+    local function CancelSitPending()
+        if sitPendingTimer then sitPendingTimer:Cancel() end
+        sitPendingRow, sitPendingTimer = nil, nil
+    end
+    for i = 1, LIST_ROWS do
+        local row = CreateFrame("Frame", nil, list)
+        row:SetHeight(LIST_ROW_H)
+        row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
+        row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
+        row:EnableMouse(true)
+        -- The waypoint rows' hover: list art, 18% fill in skin mode (Dukul, 2026-10-08)
+        local hi = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.18 })
+        row._kind = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        row._kind:SetPoint("LEFT", row, "LEFT", 6, 0)
+        row._kind:SetWidth(62)
+        row._kind:SetJustifyH("LEFT"); row._kind:SetWordWrap(false)
+        row._kind:SetTextColor(0.60, 0.60, 0.60)
+        -- No confirm, like a task row's X, and shown only while the pointer
+        -- is over the row (Dukul, 2026-10-04)
+        row._del = BNB.CreateIconButton(row, 16, "close",
+            { tip = L["SIT_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
+        row._del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+        row._del:SetScript("OnClick", function() GameTooltip:Hide(); act.remove(row._index) end)
+        row._del:Hide()
+        local function HoverOff()
+            if row:IsMouseOver() then return end   -- moved between the row and its X
+            hi:Hide(); row._del:Hide()
+        end
+        row._del:HookScript("OnEnter", function() hi:Show() end)
+        row._del:HookScript("OnLeave", HoverOff)
+        row._value = row:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+        row._value:SetPoint("LEFT",  row._kind, "RIGHT", 4, 0)
+        row._value:SetPoint("RIGHT", row._del,  "LEFT", -4, 0)
+        row._value:SetJustifyH("LEFT"); row._value:SetWordWrap(false)
+        -- The whole name, whether it is on, and what a click does
+        row:SetScript("OnEnter", function(self)
+            hi:Show(); self._del:Show()
+            if not self._index then return end
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(self._kind:GetText() or "", 0.78, 0.78, 0.78)
+            GameTooltip:AddLine(self._value:GetText() or "", 1, 1, 1, true)
+            GameTooltip:AddLine(L[self._on and "SIT_ROW_TIP_ON" or "SIT_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
+            GameTooltip:AddLine(L["SIT_ROW_TIP_EDIT"], 0.60, 0.60, 0.60, true)
+            GameTooltip:Show()
+        end)
+        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
+        -- Click: on (green) / off (grey) a moment later, as the waypoint
+        -- rows; a second click in that time edits it (ALL-435). Right-click:
+        -- Edit / Remove (ALL-282)
+        row:SetScript("OnMouseUp", function(self, button)
+            local idx = self._index; if not idx then return end
+            GameTooltip:Hide()
+            if button == "RightButton" then CancelSitPending(); act.menu(self); return end
+            if button ~= "LeftButton" then return end
+            if sitPendingRow == self then CancelSitPending(); act.edit(idx); return end
+            CancelSitPending()
+            sitPendingRow = self
+            local id = act.noteID()
+            sitPendingTimer = C_Timer.NewTimer(DBL_SECS, function()
+                sitPendingRow, sitPendingTimer = nil, nil
+                act.toggle(id, idx)
+            end)
+        end)
+        row:Hide()
+        rows[i] = row
+    end
+    return rows, CancelSitPending
+end
+
 -- What Use Current fills in for a typed kind: the zone, sub-zone or instance
 -- you are in, your target's name or guild. strict (Add with nothing typed,
 -- ALL-398) = nil when there is none, plus the locale key of a line saying so;
@@ -532,7 +611,7 @@ function BNB.CreateSituationEditor(panel, opts)
     desc:SetWordWrap(false)
     y = y - 16
 
-    local SelectType, RemoveAt, RefreshList, SitMenu   -- below
+    local SelectType, RemoveAt, RefreshList, SitMenu, EditAt, ToggleAt   -- below
     local editIndex   -- the situation loaded into the add row by Edit; Add saves over it
 
     -- ── The list: one row per situation, always 5 rows tall ──────────────────
@@ -559,55 +638,13 @@ function BNB.CreateSituationEditor(panel, opts)
     thumb:Hide()
 
     local listOffset = 0   -- situations scrolled past the top
-    local rows = {}
-    for i = 1, LIST_ROWS do
-        local row = CreateFrame("Frame", nil, list)
-        row:SetHeight(LIST_ROW_H)
-        row:SetPoint("TOPLEFT",  list, "TOPLEFT",  2, -2 - (i - 1) * LIST_ROW_H)
-        row:SetPoint("TOPRIGHT", list, "TOPRIGHT", -7, -2 - (i - 1) * LIST_ROW_H)
-        row:EnableMouse(true)
-        -- The waypoint rows' hover: list art, 18% fill in skin mode (Dukul, 2026-10-08)
-        local hi = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.18 })
-        row._kind = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        row._kind:SetPoint("LEFT", row, "LEFT", 6, 0)
-        row._kind:SetWidth(62)
-        row._kind:SetJustifyH("LEFT"); row._kind:SetWordWrap(false)
-        row._kind:SetTextColor(0.60, 0.60, 0.60)
-        -- No confirm, like a task row's X, and shown only while the pointer
-        -- is over the row (Dukul, 2026-10-04)
-        row._del = BNB.CreateIconButton(row, 16, "close",
-            { tip = L["SIT_REMOVE_TIP"], tipAnchor = "ANCHOR_TOP" })
-        row._del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
-        row._del:SetScript("OnClick", function() GameTooltip:Hide(); RemoveAt(row._index) end)
-        row._del:Hide()
-        local function HoverOff()
-            if row:IsMouseOver() then return end   -- moved between the row and its X
-            hi:Hide(); row._del:Hide()
-        end
-        row._del:HookScript("OnEnter", function() hi:Show() end)
-        row._del:HookScript("OnLeave", HoverOff)
-        row._value = row:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
-        row._value:SetPoint("LEFT",  row._kind, "RIGHT", 4, 0)
-        row._value:SetPoint("RIGHT", row._del,  "LEFT", -4, 0)
-        row._value:SetJustifyH("LEFT"); row._value:SetWordWrap(false)
-        -- The whole name in a tooltip when it does not fit
-        row:SetScript("OnEnter", function(self)
-            hi:Show(); self._del:Show()
-            if self._value:IsTruncated() then
-                GameTooltip:SetOwner(self, "ANCHOR_TOP")
-                GameTooltip:AddLine(self._kind:GetText() or "", 0.78, 0.78, 0.78)
-                GameTooltip:AddLine(self._value:GetText() or "", 1, 1, 1, true)
-                GameTooltip:Show()
-            end
-        end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide(); HoverOff() end)
-        -- Right-click: Edit / Remove (ALL-282)
-        row:SetScript("OnMouseUp", function(self, button)
-            if button == "RightButton" and self._index then GameTooltip:Hide(); SitMenu(self) end
-        end)
-        row:Hide()
-        rows[i] = row
-    end
+    local rows, CancelSitPending = NewSituationRows(list, {
+        remove = function(idx) RemoveAt(idx) end,
+        menu   = function(row) SitMenu(row) end,
+        edit   = function(idx) EditAt(idx) end,
+        toggle = function(id, idx) ToggleAt(id, idx) end,
+        noteID = function() return NoteID() end,
+    })
     list:SetScript("OnMouseWheel", function(_, delta)
         listOffset = listOffset - delta
         RefreshList()
@@ -790,11 +827,13 @@ function BNB.CreateSituationEditor(panel, opts)
     end
 
     local RefreshToastBtn   -- below the Toast... button; the Show as pick calls it
-    local disp = NewChoice(panel, DISPLAY_KEYS,
-        { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"] },
+    local DISPLAY_LABELS = { L["STICKY_DISP_POPUP"], L["STICKY_DISP_STICKY"], L["STICKY_DISP_BOTH"],
+                             L["STICKY_DISP_NONE"] }
+    local DISPLAY_LABELS_NOSTICKY = { L["STICKY_DISP_POPUP"], L["STICKY_DISP_NONE"] }
+    local disp = NewChoice(panel, DISPLAY_KEYS, DISPLAY_LABELS,
         function(mode)
             local id = NoteID(); if not id then return end
-            if mode == "sticky" or mode == "both" then
+            if mode == "sticky" or mode == "both" or mode == "none" then
                 BNB.UpdateNote(id, { contextDisplay = mode })
             else
                 BNB.UpdateNote(id, { _clear = { "contextDisplay" } })
@@ -821,11 +860,12 @@ function BNB.CreateSituationEditor(panel, opts)
         tipAnchor = "ANCHOR_TOP", tipWrap = true })
     toastBtn:SetPoint("TOPLEFT", disp.frame, "TOPRIGHT", 4, 0)
     toastBtn:SetMotionScriptsWhileDisabled(true)
-    -- Greyed while the note would show no toast: Show as Sticky alone, or
-    -- the Toasts module / situation toasts off
+    -- Greyed while the note would show no toast: Show as Sticky alone or
+    -- Show nothing, or the Toasts module / situation toasts off
     function RefreshToastBtn()
         local sticky = disp.value == "sticky" and BNB.StickiesEnabled()
-        local on = not sticky and BNB.ToastsEnabled() and BNB.ToastSourceOn("situation")
+        local on = not sticky and disp.value ~= "none"
+            and BNB.ToastsEnabled() and BNB.ToastSourceOn("situation")
         toastBtn:SetEnabled(on and true or false)
     end
     if ed.host then
@@ -1298,20 +1338,26 @@ function BNB.CreateSituationEditor(panel, opts)
 
     -- The list rows, the scroll bar, the trigger words and what shows below
     RefreshList = function()
-        local sits = BNB.NoteSituations(NoteID() and BNB.GetNote(NoteID()))
+        -- Off situations too, grey (ALL-435)
+        local sits = BNB.AllSituations(NoteID() and BNB.GetNote(NoteID()))
         local n = #sits
         listOffset = math.max(0, math.min(listOffset, n - LIST_ROWS))
         for i, row in ipairs(rows) do
             local idx = listOffset + i
             local s = sits[idx]
             if s then
-                local kind, value = BNB.DecodeContext(s)
-                row._index = idx
+                local on = not BNB.SituationIsOff(s)
+                local kind, value = BNB.DecodeContext(BNB.SituationBare(s))
+                row._index, row._on = idx, on
                 row._kind:SetText(KIND_LABELS[kind] or kind or "?")
                 row._value:SetText(BNB.SituationValueLabel(kind, value) or s)
-                -- Gold while Edit has it in the add row
+                -- Gold while Edit has it in the add row; else green = on,
+                -- grey = off, the waypoint rows' colours
                 if idx == editIndex then BNB.SetHeaderColor(row._value)
-                else BNB.SetTextWhite(row._value) end
+                elseif on then row._value:SetTextColor(0.40, 0.85, 0.40)
+                else row._value:SetTextColor(0.55, 0.55, 0.55) end
+                local k = on and 0.60 or 0.42
+                row._kind:SetTextColor(k, k, k)
                 row:Show()
                 -- A hidden row gets no OnLeave: its X must not come back with it
                 if not row:IsMouseOver() then row._del:Hide() end
@@ -1329,7 +1375,7 @@ function BNB.CreateSituationEditor(panel, opts)
         -- Instance type and rested are places; a window is its own group
         local place, player, window = false, false, false
         for _, s in ipairs(sits) do
-            local k = BNB.DecodeContext(s)
+            local k = BNB.DecodeContext(BNB.SituationBare(s))
             if PLAYER_KINDS[k] then player = true
             elseif k == "open" then window = true
             else place = true end
@@ -1389,18 +1435,29 @@ function BNB.CreateSituationEditor(panel, opts)
         local id = NoteID(); if not id or not idx then return end
         EndEdit()   -- the rows below move up
         local sits = {}
-        for i, s in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
+        for i, s in ipairs(BNB.AllSituations(BNB.GetNote(id))) do
             if i ~= idx then sits[#sits + 1] = s end
         end
         SaveSituations(id, sits)
     end
 
+    -- Turns situation idx of note id on or off (ALL-435); nothing when the
+    -- editor has moved on to another note since the click
+    ToggleAt = function(id, idx)
+        if not id or NoteID() ~= id then return end
+        local sits = {}
+        for i, s in ipairs(BNB.AllSituations(BNB.GetNote(id))) do sits[i] = s end
+        local s = sits[idx]; if not s then return end
+        sits[idx] = BNB.SituationState(s, BNB.SituationIsOff(s))
+        SaveSituations(id, sits)
+    end
+
     -- Loads situation idx into the add row; Add (now Save) puts it back in
     -- its place (ALL-282, Dukul 2026-10-05)
-    local function EditAt(idx)
+    EditAt = function(idx)
         local id = NoteID(); if not id then return end
-        local s = BNB.NoteSituations(BNB.GetNote(id))[idx]; if not s then return end
-        local kind, value = BNB.DecodeContext(s)
+        local s = BNB.AllSituations(BNB.GetNote(id))[idx]; if not s then return end
+        local kind, value = BNB.DecodeContext(BNB.SituationBare(s))
         local known = false
         for _, t in ipairs(TYPES) do if t == kind then known = true end end
         if not known then return end
@@ -1453,12 +1510,15 @@ function BNB.CreateSituationEditor(panel, opts)
         if val == "" then return end
         local s = typ.value .. ":" .. val
         local sits = {}
-        for i, old in ipairs(BNB.NoteSituations(BNB.GetNote(id))) do
-            if i ~= editIndex and old:lower() == s:lower() then BNB:Print(L["SIT_DUPLICATE"]); return end
+        for i, old in ipairs(BNB.AllSituations(BNB.GetNote(id))) do
+            if i ~= editIndex and BNB.SituationBare(old):lower() == s:lower() then
+                BNB:Print(L["SIT_DUPLICATE"]); return
+            end
             sits[i] = old
         end
         if editIndex and sits[editIndex] then
-            sits[editIndex] = s
+            -- An edited situation keeps its on / off (ALL-435); a new one is on
+            sits[editIndex] = BNB.SituationState(s, not BNB.SituationIsOff(sits[editIndex]))
         else
             sits[#sits + 1] = s
             listOffset = #sits   -- clamped by RefreshList: the new row shows at the bottom
@@ -1514,7 +1574,7 @@ function BNB.CreateSituationEditor(panel, opts)
     -- Every situation and every option back to the defaults
     clearBtn:SetScript("OnClick", function()
         local id = NoteID(); if not id then return end
-        local n = #BNB.NoteSituations(BNB.GetNote(id))
+        local n = #BNB.AllSituations(BNB.GetNote(id))
         if not clearArmed and n > 1 then
             clearArmed = true
             clearBtn:SetText("|cffff5555" .. string.format(L["SIT_CLEAR_SURE_FMT"], n) .. "|r")
@@ -1844,20 +1904,22 @@ function BNB.CreateSituationEditor(panel, opts)
         -- pending click no longer hold
         EndEdit()
         CancelPending()
+        CancelSitPending()
         self.noteID = noteID
         local note = noteID and BNB.GetNote(noteID)
         tldrCombo:SetText(note and note.tldr or "")
+        -- Sticky Notes off (ALL-343): the note shows as a toast and has no
+        -- sticky to close: Show as offers toast / nothing (ALL-435) and the
+        -- leave picker is greyed; a saved sticky choice stays
+        local stickyOn = BNB.StickiesEnabled()
         local cd = note and note.contextDisplay
-        disp:Set((cd == "sticky" or cd == "both") and cd or "popup")
+        if stickyOn then disp:SetChoices(DISPLAY_KEYS, DISPLAY_LABELS)
+        else disp:SetChoices(DISPLAY_KEYS_NOSTICKY, DISPLAY_LABELS_NOSTICKY) end
+        disp:Set((cd == "none" or (stickyOn and (cd == "sticky" or cd == "both"))) and cd or "popup")
         local lv = note and note.contextLeave
         leave:Set((lv == "minimize" or lv == "hide") and lv or "keep")
-        -- Sticky Notes off (ALL-343): the note shows as a popup and has no
-        -- sticky to close, so both pickers are greyed; the saved choice stays
-        local stickyOn = BNB.StickiesEnabled()
-        for _, c in ipairs({ disp, leave }) do
-            c.frame:SetEnabled(stickyOn); c.frame:SetAlpha(stickyOn and 1 or 0.45)
-        end
-        dispLabel:SetAlpha(stickyOn and 1 or 0.45); leaveLabel:SetAlpha(stickyOn and 1 or 0.45)
+        leave.frame:SetEnabled(stickyOn); leave.frame:SetAlpha(stickyOn and 1 or 0.45)
+        leaveLabel:SetAlpha(stickyOn and 1 or 0.45)
         RefreshToastBtn()
         BNB.NoteToastWindow.Rebind(noteID, self.host)
         local tr = note and note.contextTrigger

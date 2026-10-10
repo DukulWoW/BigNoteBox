@@ -399,6 +399,8 @@ local function Add(spec)
     f:SetFrameStrata(ToastStrata())
     f:Show()
     f:Raise()
+    -- A note's portrait again, now that the toast is shown (ALL-434)
+    if spec.iconSetup then BNB.ToastStyles.FillIcon(f, spec) end
     BNB.FadeTo(f, 0, 1, FADE)
     StartDriver()
     if not spec.silent then PlayToastSound() end
@@ -513,6 +515,28 @@ function T.Restyle()
     UpdateMore()
     T.RefreshAnchor()
 end
+
+-- A note toast's unit face follows the target, as the note list row does
+-- (ALL-434). The situation toast for a player fires the moment they are
+-- targeted, before the game has their portrait, so it kept the note's own
+-- icon (Dukul, 2026-10-10: a KOS toast showed the Human male race icon).
+-- UNIT_PORTRAIT_UPDATE says the portrait is ready; a target change puts the
+-- face on or takes it off, and once more a moment later in case the portrait
+-- event does not come. Only toasts on screen whose spec draws a note icon.
+local function RedrawUnitIcons()
+    for _, f in ipairs(_shown) do
+        local spec = f._spec
+        if spec and spec.iconSetup and not f._leaving then BNB.ToastStyles.FillIcon(f, spec) end
+    end
+end
+BNB.RegisterEvent("UNIT_PORTRAIT_UPDATE", function(_, unit)
+    if unit == "target" and #_shown > 0 then RedrawUnitIcons() end
+end)
+BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
+    if #_shown == 0 then return end
+    RedrawUnitIcons()
+    C_Timer.After(0.3, RedrawUnitIcons)
+end)
 
 function T.Count() return #_shown, #_queue, #_waitCombat end
 

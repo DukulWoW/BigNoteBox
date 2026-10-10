@@ -202,6 +202,36 @@ local function BuildQuickNotePage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- A new player / NPC note's situation (ALL-435): "Turn on the situation"
+-- and, indented under it, "Show the note as a toast", which needs the first:
+-- greyed and shown unticked while the first is off (its own setting kept).
+-- The situation is added either way, off (grey) while the first is unticked
+local function AddSituationPair(ct, y, onKey, toastKey, onLabel, onTip)
+    local toastCb
+    local function OnSet() return BigNoteBoxDB and BigNoteBoxDB[onKey] == true end
+    local function SyncToast()
+        local on = OnSet() and true or false
+        toastCb:SetEnabled(on); toastCb:SetAlpha(on and 1 or 0.35); toastCb._lbl:SetAlpha(on and 1 or 0.35)
+        toastCb:SetChecked(on and BigNoteBoxDB[toastKey] ~= false)
+    end
+    y = AddCheck(ct, y, onLabel, OnSet,
+        function(v)
+            if BigNoteBoxDB then BigNoteBoxDB[onKey] = v end
+            SyncToast()
+        end,
+        onTip)
+    local ty = y
+    y, toastCb = AddCheck(ct, y, L["CFG_CHK_SIT_TOAST_LABEL"],
+        function() return OnSet() and BigNoteBoxDB[toastKey] ~= false end,
+        function(v) if BigNoteBoxDB then BigNoteBoxDB[toastKey] = v end end,
+        L["CFG_CHK_SIT_TOAST_TIP"])
+    toastCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 16, ty + 2)
+    toastCb:SetMotionScriptsWhileDisabled(true)   -- the tip says what it needs
+    toastCb:HookScript("OnShow", SyncToast)
+    SyncToast()
+    return y
+end
+
 local function BuildPlayerNpcPage(sf, ct, y, page)
     local db = BigNoteBoxDB
 
@@ -323,14 +353,9 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
 
         RefreshInsTypeState()
 
-        -- Add player situation checkbox
-        y = AddCheck(ct, y,
-            L["CFG_CHK_SITUATION_LABEL"],
-            function() return BigNoteBoxDB and BigNoteBoxDB.inspectNoteAddSituation == true end,
-            function(v)
-                if BigNoteBoxDB then BigNoteBoxDB.inspectNoteAddSituation = v end
-            end,
-            L["CFG_CHK_SITUATION_TIP"])
+        -- The new note's player situation, on or off, and its toast (ALL-435)
+        y = AddSituationPair(ct, y, "inspectNoteAddSituation", "inspectNoteSituationToast",
+            L["CFG_CHK_SITUATION_LABEL"], L["CFG_CHK_SITUATION_TIP"])
 
         -- Gear to show dropdown
         local gearShowLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
@@ -411,6 +436,10 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         end)
         tnTypeDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
         y = y - (ROW_H + ROW_GAP)
+
+        -- The new note's NPC situation, on or off, and its toast (ALL-435)
+        y = AddSituationPair(ct, y, "targetNoteAddSituation", "targetNoteSituationToast",
+            L["CFG_CHK_NPC_SITUATION_LABEL"], L["CFG_CHK_NPC_SITUATION_TIP"])
 
         -- Tag checklist header
         local tagHeaderLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")

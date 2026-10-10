@@ -393,7 +393,8 @@ function BNB.CreateNote(title, body)
         pinned       = false, -- pinned notes always sort to top
         locked       = nil,   -- nil = follow global lockNotes setting
         -- context fields: set via NoteConfig Situation tab
-        -- contextDisplay: nil/"popup" = toast, "sticky" = open as sticky
+        -- contextDisplay: nil/"popup" = toast, "sticky" = open as sticky, "both",
+        --                 "none" = no toast or sticky (ALL-435)
         -- contextLeave:   nil/"keep" = do nothing, "minimize", "hide"
         -- contextTrigger: nil = on arriving, "leave", "both"
         -- contextFreq:    nil = every time, "session", "day", "daily", "weekly", "once"

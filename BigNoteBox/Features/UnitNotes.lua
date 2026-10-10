@@ -156,19 +156,30 @@ function UN.OpenNote(noteID)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
 end
 
+-- The unit situation a new player / NPC note gets (ALL-435): always added,
+-- on or off by the module's setting (onKey), and with it on but the toast
+-- off (toastKey) the note shows nothing ("none"). Writes into fields.
+function UN.AddUnitSituation(fields, sit, onKey, toastKey)
+    local db = BigNoteBoxDB
+    local on = db and db[onKey] == true
+    fields.situations = { BNB.SituationState(sit, on) }
+    if on and db[toastKey] == false then fields.contextDisplay = "none" end
+end
+
 -- An existing note for a player. Returns noteID or nil.
--- Matches the player context, or an inspect note's inspectName/inspectRealm
--- (the same test as NoteList and ReferenceBox). The context is only saved when
--- inspectNoteAddSituation is on (default off), so on its own it missed every
--- note made with default settings: no warning, and auto mode made a new
--- "(Duplicate)" note on every inspect.
+-- Matches the player context (on or off), or an inspect note's
+-- inspectName/inspectRealm (the same test as NoteList and ReferenceBox). The
+-- context was only saved when inspectNoteAddSituation was on (default off)
+-- before ALL-435, so on its own it missed every note made with default
+-- settings: no warning, and auto mode made a new "(Duplicate)" note on every
+-- inspect.
 function UN.FindPlayerNote(playerName, realm)
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes or not playerName then return nil end
     local ctx = "player:" .. playerName
     if realm and realm ~= "" then ctx = ctx .. "-" .. realm end
     for id, note in pairs(ndb.notes) do
-        if BNB.NoteHasSituation(note, ctx) then return id end
+        if BNB.NoteHasSituation(note, ctx, true) then return id end
         if note.source == "inspect" and note.inspectName == playerName
            and (not note.inspectRealm or note.inspectRealm == "" or note.inspectRealm == realm) then
             return id

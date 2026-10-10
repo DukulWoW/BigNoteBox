@@ -889,9 +889,11 @@ end
 
 -- Where a note that is due goes, by its display mode: a sticky, a toast.
 -- Sticky Notes off (ALL-343): the toast, the mode is kept. Toasts off, or
--- situation toasts off (ALL-384): no toast
+-- situation toasts off (ALL-384): no toast. "none" (ALL-435): nowhere, the
+-- situation only marks the note and places its waypoints
 local function Destinations(note)
     local d = note.contextDisplay
+    if d == "none" then return false, false end
     if not BNB.StickiesEnabled() then d = nil end
     local sticky = d == "sticky" or d == "both"
     local toast  = d ~= "sticky" and BNB.ToastsEnabled() and BNB.ToastSourceOn("situation")

@@ -702,6 +702,10 @@ local function CreateTargetNote(richMode, data)
         icon     = data.noteIcon,
         tags     = tags,
     }
+    -- The NPC situation, always (ALL-435): on or off by the setting
+    if data.name and data.name ~= "" then
+        UN.AddUnitSituation(fields, "npc:" .. data.name, "targetNoteAddSituation", "targetNoteSituationToast")
+    end
 
     -- Faction token ("Horde"/"Alliance"; nil for neutral) for the model
     -- viewer's crest (FOR-22), independent of the faction tag setting

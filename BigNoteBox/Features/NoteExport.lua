@@ -80,9 +80,13 @@ local function MdEncodeNote(note)
         lines[#lines + 1] = "tags: " .. table.concat(note.tags, ", ")
     end
     -- First situation as "context" (what a build from before ALL-232 reads),
-    -- any further ones as "situation" lines
+    -- any further ones as "situation" lines; off ones last, with their "~"
+    -- (ALL-435), never as "context"
     for i, s in ipairs(BNB.NoteSituations(note)) do
         lines[#lines + 1] = (i == 1 and "context: " or "situation: ") .. s
+    end
+    for _, s in ipairs(BNB.AllSituations(note)) do
+        if BNB.SituationIsOff(s) then lines[#lines + 1] = "situation: " .. s end
     end
     if note.contextDisplay then lines[#lines + 1] = "contextDisplay: " .. note.contextDisplay end
     if note.contextLeave   then lines[#lines + 1] = "contextLeave: "   .. note.contextLeave   end
