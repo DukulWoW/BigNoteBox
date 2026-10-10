@@ -1244,7 +1244,7 @@ function BNB.CheckTip(cb, text)
         local t = type(text) == "function" and text() or text
         if not t or t == "" then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(t, 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(BNB.TipOnOff(t), 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     cb:SetScript("OnLeave", function() GameTooltip:Hide() end)

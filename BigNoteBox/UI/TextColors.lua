@@ -68,6 +68,17 @@ function BNB.HeaderColorCode()
         math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
+-- A tooltip's "On:" / "Off:" labels (at its start or after a line break) in
+-- the header colour, so the two states stand apart (Dukul, 2026-10-10).
+-- Applied when the tooltip shows, so it follows the skin
+function BNB.TipOnOff(text)
+    if type(text) ~= "string" or not text:find("^On:") then return text end
+    local c = BNB.HeaderColorCode()
+    text = text:gsub("^On:", c .. "On:|r")
+    text = text:gsub("\nOff:", "\n" .. c .. "Off:|r")
+    return text
+end
+
 function BNB.AccentMarkup(text)
     if type(text) ~= "string" then return text end
     local code = BNB.HeaderColorCode()

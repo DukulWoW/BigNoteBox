@@ -146,7 +146,7 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     if tip then
         cb:SetScript("OnEnter", function(self)
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true); GameTooltip:Show()
+            GameTooltip:AddLine(BNB.TipOnOff(tip), 0.8, 0.8, 0.8, true); GameTooltip:Show()
         end)
         cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
     end
@@ -268,7 +268,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
         if page.tip then
             tg:SetScript("OnEnter", function(self)
                 GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:AddLine(page.tip, 0.8, 0.8, 0.8, true); GameTooltip:Show()
+                GameTooltip:AddLine(BNB.TipOnOff(page.tip), 0.8, 0.8, 0.8, true); GameTooltip:Show()
             end)
             tg:SetScript("OnLeave", function() GameTooltip:Hide() end)
         end
