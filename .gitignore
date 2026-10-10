@@ -3,6 +3,7 @@ CLAUDE.md
 FILEMAP.md
 _docs/
 _work/
+.claude/settings.local.json
 
 # Reference files
 _reference/
