@@ -890,7 +890,7 @@ end
 -- TomTom:AddWaypoint, or, without it, the first of them (WaypointUI has no
 -- TomTom API: it draws the game's pin in the world, ALL-307)
 -- as the game's own map pin, which holds one point.
-local function HasTomTom() return TomTom and TomTom.AddWaypoint and true or false end
+local function HasTomTom() return BNB.HasTomTom() end
 
 -- Removes the TomTom waypoints placed for a note. The game's pin (true) is
 -- left to the caller: it may belong to another note by now
@@ -1272,7 +1272,7 @@ function BNB.CheckContextualNotes()
             end
         end
         if shouldClear and C_Map and C_Map.ClearUserWaypoint
-            and not (TomTom and TomTom.RemoveWaypoint) then
+            and not BNB.HasTomTom() then
             pcall(function() C_Map.ClearUserWaypoint() end)
         end
     end

@@ -593,7 +593,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         GameTooltip:AddLine(L["NE_WP_OPEN_TIP_TITLE"], 1, 1, 1)
         local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
         GameTooltip:AddLine(string.format(L["NE_WP_ZONE_COORDS_FMT"], zone, note.coordX, note.coordY), 0.7, 0.7, 0.7)
-        if not (TomTom and TomTom.AddWaypoint) then
+        if not BNB.HasTomTom() then
             GameTooltip:AddLine(L["NE_WP_REPLACES_TIP"], 0.5, 0.5, 0.5)
         end
         GameTooltip:Show()
@@ -609,7 +609,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             and string.format("%s (%.2f %.2f)", note.coordZone, note.coordX, note.coordY)
             or  string.format("%.2f %.2f", note.coordX, note.coordY)
         if noteTitle then label = noteTitle .. " - " .. label end
-        if TomTom and TomTom.AddWaypoint and TomTom.RemoveWaypoint then
+        if BNB.HasTomTom() and TomTom.RemoveWaypoint then
             if BNB._coordWaypoint then
                 pcall(function() TomTom:RemoveWaypoint(BNB._coordWaypoint) end)
                 BNB._coordWaypoint = nil

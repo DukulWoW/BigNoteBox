@@ -83,6 +83,13 @@ local function WowheadPath()
     if WOW_PROJECT_MISTS_CLASSIC and p == WOW_PROJECT_MISTS_CLASSIC then return "mop-classic/" end
     return ""
 end
+-- TomTom itself, loaded: another addon can make a TomTom table with its own
+-- AddWaypoint (MapPinEnhanced does, with TomTom off: Dukul 2026-10-10), so the
+-- global alone is no proof. Without it, waypoints use the game's map pin
+function BNB.HasTomTom()
+    return C_AddOns.IsAddOnLoaded("TomTom") and TomTom and TomTom.AddWaypoint and true or false
+end
+
 function BNB.WowheadURL(kind, id)
     if not kind or not id then return nil end
     return "https://www.wowhead.com/" .. WowheadPath() .. kind .. "=" .. id

@@ -61,7 +61,7 @@ local _editors = {}   -- every editor built, for the cross-window reload
 local _popup          -- the waypoint info popup, shared
 local _popupOwner     -- the editor that opened it
 
-local function HasWPAddon()   return TomTom and TomTom.AddWaypoint end
+local function HasWPAddon()   return BNB.HasTomTom() end
 local function HasRetailPin() return C_Map and C_Map.SetUserWaypoint end
 -- WaypointUI draws the game's own pin in the world (arrow, distance). It does
 -- not provide TomTom's API, so placement stays one point through the game's

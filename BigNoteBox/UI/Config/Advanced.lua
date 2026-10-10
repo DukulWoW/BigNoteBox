@@ -43,8 +43,8 @@ local function BuildAdvancedTab(sf, ct)
             BNB.PaintSelectCard(card, nil)
             cards[#cards + 1] = card
             -- The addon itself loaded, by folder name: a global like TomTom can
-            -- come from another addon's compatibility layer (a disabled TomTom
-            -- showed as Active, Dukul 2026-10-10)
+            -- come from another addon (MapPinEnhanced makes one; a disabled
+            -- TomTom showed as Active, Dukul 2026-10-10)
             local on = C_AddOns.IsAddOnLoaded(a.addon) and true or false
             local logo = card:CreateTexture(nil, "ARTWORK")
             logo:SetSize(LOGO, LOGO)

@@ -70,7 +70,7 @@ end
 -- Attempt to set a TomTom waypoint programmatically.
 -- Returns true on success, false/nil on failure.
 local function SetTomTomWaypoint()
-    if not (TomTom and TomTom.AddWaypoint) then return false end
+    if not BNB.HasTomTom() then return false end
     local mapID = GetPlayerMapID()
     if not mapID then return false end
     local x, y = GetPlayerCoords()
@@ -127,7 +127,7 @@ local function ShowInsertInfoMenu(eb)
         )
 
         -- TomTom waypoint — only shown when TomTom is loaded
-        if TomTom and TomTom.AddWaypoint then
+        if BNB.HasTomTom() then
             local x, y = GetPlayerCoords()
             if x and y then
                 root:CreateButton(
