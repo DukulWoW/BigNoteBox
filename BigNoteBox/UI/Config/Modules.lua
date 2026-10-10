@@ -1465,21 +1465,31 @@ local function BuildToastsPage(sf, ct, y, page)
     offWidgets[#offWidgets + 1] = testBtn
     y = y - (22 + 10)
 
-    -- Style (ALL-376 S2): the faction loot toast by default (toastStyle nil);
-    -- unticked, the dropdown picks one. Skin colour only while skin mode is on.
-    local TS = BNB.ToastStyles
-    local styleEntries = {}
-    local function FillStyles()
-        wipe(styleEntries)
-        for _, e in ipairs(TS.List()) do
-            if e.key ~= "faction" then styleEntries[#styleEntries + 1] = { label = e.label, value = e.key } end
-        end
+    -- Style (ALL-376 S2): the faction loot toast by default (toastStyle nil).
+    -- [<] [name] [>] (ALL-401): the name opens the style picker
+    -- (UI/ToastStylePicker.lua), the arrows step through the styles; either
+    -- one unticks Follow my faction. Skin colour only while skin mode is on.
+    local TS, TSP = BNB.ToastStyles, BNB.ToastStylePicker
+    local styleBtn, facCb
+    local function GlobalStyle()
+        local s = db.toastStyle
+        if s == "faction" then return nil end
+        return s
     end
-    FillStyles()
-    local styleDd
-    local facCb
+    local function SyncStyle()
+        if styleBtn then
+            styleBtn:SetText(TS.Label(TS.Resolve(db.toastStyle)))
+            BNB.TruncateButtonText(styleBtn)
+        end
+        if facCb then facCb:SetChecked(GlobalStyle() == nil) end
+    end
+    local styleH = {
+        get = GlobalStyle,
+        set = function(k) db.toastStyle = k; BNB.Toast.Restyle(); SyncStyle() end,
+        follow = "CFG_TOAST_FACTION", followTip = "TOAST_PICKER_FACTION_TIP",
+    }
     y, facCb = AddCheck(ct, y, L["CFG_TOAST_FACTION"],
-        function() return db.toastStyle == nil or db.toastStyle == "faction" end,
+        function() return GlobalStyle() == nil end,
         function(v)
             if v then
                 db.toastStyle = nil
@@ -1488,10 +1498,8 @@ local function BuildToastsPage(sf, ct, y, page)
                 local cur = TS.Resolve(nil)
                 db.toastStyle = cur and cur.key or "plain"
             end
-            if styleDd then
-                styleDd:SetSelected(db.toastStyle or TS.Resolve(nil).key)
-                if styleDd._dd then styleDd._dd:SetEnabled(not v) end
-            end
+            SyncStyle()
+            if TSP then TSP.Refresh() end
             BNB.Toast.Restyle()
         end,
         L["CFG_TOAST_FACTION_TIP"])
@@ -1503,19 +1511,28 @@ local function BuildToastsPage(sf, ct, y, page)
         lbl:SetHeight(ROW_H); lbl:SetJustifyH("LEFT")
         lbl:SetText(L["CFG_TOAST_STYLE"])
         y = y - (ROW_H + 2)
-        styleDd = BNB.CreateValueDropdown(ct, styleEntries, db.toastStyle or TS.Resolve(nil).key,
-            function(v) db.toastStyle = v; BNB.Toast.Restyle() end, CONTENT_W, 26)
-        styleDd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        Tip(styleDd._dd or styleDd, L["CFG_TOAST_STYLE"], L["CFG_TOAST_STYLE_TIP"])
-        offLabels[#offLabels + 1] = lbl
-        y = y - (32 + ROW_GAP)
-        -- Skin mode may have changed since: the list and the greying follow
-        sf:HookScript("OnShow", function()
-            FillStyles()
-            local follow = db.toastStyle == nil or db.toastStyle == "faction"
-            styleDd:SetSelected(db.toastStyle or TS.Resolve(nil).key)
-            if styleDd._dd then styleDd._dd:SetEnabled(follow == false and BNB.ToastsEnabled()) end
+        local ARW = 22
+        local prev = BNB.CreateButton(nil, ct, "<", ARW, 22)
+        styleBtn   = BNB.CreateButton(nil, ct, "", CONTENT_W - 2 * (ARW + 4), 22)
+        local nxt  = BNB.CreateButton(nil, ct, ">", ARW, 22)
+        prev:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        styleBtn:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+        nxt:SetPoint("LEFT", styleBtn, "RIGHT", 4, 0)
+        prev:SetScript("OnClick", function() if TSP then TSP.Step(styleH, -1) end end)
+        nxt:SetScript("OnClick", function() if TSP then TSP.Step(styleH, 1) end end)
+        styleBtn:SetScript("OnClick", function()
+            if TSP then TSP.Open("global", _G["BigNoteBoxConfigFrame"] or sf, styleH) end
         end)
+        Tip(prev, L["TOAST_STYLE_PREV"], L["CFG_TOAST_STYLE_TIP"])
+        Tip(styleBtn, L["CFG_TOAST_STYLE"], L["CFG_TOAST_STYLE_TIP"])
+        Tip(nxt, L["TOAST_STYLE_NEXT"], L["CFG_TOAST_STYLE_TIP"])
+        for _, w in ipairs({ prev, styleBtn, nxt }) do offWidgets[#offWidgets + 1] = w end
+        offLabels[#offLabels + 1] = lbl
+        SyncStyle()
+        y = y - (22 + 10 + ROW_GAP)
+        -- Skin mode may have changed since: the name follows
+        sf:HookScript("OnShow", SyncStyle)
+        sf:HookScript("OnHide", function() if TSP then TSP.Close("global") end end)
     end
 
     local scaleSl

@@ -351,6 +351,9 @@ local WINDOWS = {
     -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
     { name = "BigNoteBoxIconFramePicker",
       esc = function() Call(BNB.IconFramePicker, "Close") end },
+    -- Toast style picker (ALL-401), opened from a note's Toast window or Settings
+    { name = "BigNoteBoxToastStylePicker",
+      esc = function() Call(BNB.ToastStylePicker, "Close") end },
     -- Its owners close their own picks; the sidebar's (Change icon, ALL-243)
     -- closes with the main window
     { name = "BigNoteBoxIconPicker",

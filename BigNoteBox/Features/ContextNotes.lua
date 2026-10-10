@@ -430,7 +430,7 @@ end
 -- toast style keeps its own border, so the note's frame is left off
 local function NoteIconSetup(note)
     return function(tex, _, ownFrame)
-        if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+        if BNB.SetNoteUnitPortrait then BNB.SetNoteUnitPortrait(tex, note) end
         if note.iconFrame and not ownFrame and BNB.ApplyIconFrame then
             return BNB.ApplyIconFrame(tex, note, tex:GetWidth())
         end
@@ -465,7 +465,7 @@ local function NoteMenu(id, owner, key, why)
     CM.Open(owner, function(root)
         root:CreateTitle(NoteTitle(note), { badge = true,
             icon = (note.icon and note.icon ~= "") and note.icon or nil,
-            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+            iconSetup = function(tex) if BNB.SetNoteUnitPortrait then BNB.SetNoteUnitPortrait(tex, note) end end })
         root:CreateButton(L["TOAST_CM_OPEN"], function() OpenNote(id); Close() end, { icon = "editor" })
         if BNB.StickiesEnabled() and BNB.Sticky then
             root:CreateButton(L["TOAST_CM_STICKY"], function()
@@ -684,7 +684,7 @@ local function TaskToastMenu(id, owner, key)
     CM.Open(owner, function(root)
         root:CreateTitle(NoteTitle(note), { badge = true,
             icon = (note.icon and note.icon ~= "") and note.icon or nil,
-            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+            iconSetup = function(tex) if BNB.SetNoteUnitPortrait then BNB.SetNoteUnitPortrait(tex, note) end end })
         root:CreateButton(L["TOAST_CM_OPEN_TASKS"], function() OpenTasks(id); BNB.Toast.Dismiss(key) end,
             { icon = "reference-box" })
         root:CreateButton(L["TOAST_CM_OPEN"], function() OpenNote(id); BNB.Toast.Dismiss(key) end,
@@ -810,6 +810,19 @@ function BNB.TestSituationToasts()
             noIcon = Setting("toastShowIcon") == false, rows = rows,
         })
     end
+end
+
+-- What a toast of this note shows here, for the style picker's tiles
+-- (UI/ToastStylePicker.lua, ALL-401); nil id = the Test button's first demo
+-- note. Only its content fields are read (TS.Fill)
+function BNB.ToastPreviewSpec(id)
+    local note = id and BNB.GetNote(id)
+    if not note then
+        local d = DEMO[1]
+        note = { id = d.id, icon = d.icon, title = L[d.key], body = L[d.body], _demo = true, _pin = d.pin }
+    end
+    local _, locName = GetCurrentZone()
+    return NoteSpec(note, locName)
 end
 
 -- ── When and how often (ALL-232 S2) ──────────────────────────────────────────

@@ -644,7 +644,7 @@ local function AlarmToastMenu(noteID, owner)
     CM.Open(owner, function(root)
         root:CreateTitle((note.title and note.title ~= "") and note.title or L["AO_UNTITLED"], { badge = true,
             icon = (note.icon and note.icon ~= "") and note.icon or nil,
-            iconSetup = function(tex) if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end end })
+            iconSetup = function(tex) if BNB.SetNoteUnitPortrait then BNB.SetNoteUnitPortrait(tex, note) end end })
         root:CreateButton(L["AO_OPEN_NOTE_BTN"], function()
             if BNB.OpenNoteInMain then BNB.OpenNoteInMain(noteID) end
         end, { icon = "editor" })
@@ -681,7 +681,7 @@ local function ShowAlarmToast(noteID, missed)
         hold       = 0,
         icon       = (note.icon and note.icon ~= "") and note.icon or nil,
         iconSetup  = function(tex, _, ownFrame)
-            if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
+            if BNB.SetNoteUnitPortrait then BNB.SetNoteUnitPortrait(tex, note) end
             if note.iconFrame and not ownFrame and BNB.ApplyIconFrame then
                 return BNB.ApplyIconFrame(tex, note, tex:GetWidth())
             end

@@ -9,6 +9,9 @@
 --   BNB.NoteToastWindow.Open(noteID, host)   beside host; a second open re-points it
 --   BNB.NoteToastWindow.Close(host)          only while opened from host (nil = any)
 --   BNB.NoteToastWindow.Rebind(noteID, host) the host switched note: follow it
+-- The style is a [<] [name] [>] row (ALL-401): the name opens the style
+-- picker (UI/ToastStylePicker.lua), the arrows step through As in Settings
+-- and the styles.
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -21,16 +24,9 @@ local W, H, PAD = 300, 196, 16
 local DEFAULT = "default"   -- the dropdowns' value for nil (as in Settings)
 
 local _f, _noteID, _host
-local _styleDd, _holdDd
-local _styleEntries, _holdEntries = {}, {}
-
-local function FillStyles()
-    wipe(_styleEntries)
-    _styleEntries[1] = { label = L["TOAST_CM_DEFAULT"], value = DEFAULT }
-    for _, e in ipairs(BNB.ToastStyles.List()) do
-        _styleEntries[#_styleEntries + 1] = { label = e.label, value = e.key }
-    end
-end
+local _styleBtn, _holdDd
+local _holdEntries = {}
+local PICK_KEY = "noteToast"   -- the style picker's owner key
 
 local function FillHolds()
     wipe(_holdEntries)
@@ -42,15 +38,19 @@ local function FillHolds()
 end
 
 -- Shows the note's saved choice; a style this client cannot draw reads as
--- As in Settings in the box, the saved key is kept
+-- As in Settings on the button, the saved key is kept
+local function StyleName(note)
+    local TS = BNB.ToastStyles
+    local def = note.toastStyle and TS.Get(note.toastStyle)
+    if def and TS.Usable(def) then return TS.Label(def) end
+    return L["TOAST_CM_DEFAULT"]
+end
+
 local function Refresh()
     local note = _noteID and BNB.GetNote(_noteID)
     if not (_f and note) then return end
-    FillStyles()
-    local st = note.toastStyle or DEFAULT
-    local known = false
-    for _, e in ipairs(_styleEntries) do if e.value == st then known = true end end
-    _styleDd:SetSelected(known and st or DEFAULT)
+    _styleBtn:SetText(StyleName(note))
+    BNB.TruncateButtonText(_styleBtn)
     _holdDd:SetSelected(note.toastHold or DEFAULT)
     local title = note.title
     if not title or title == "" then title = L["TOAST_CM_STYLE"] end
@@ -64,6 +64,21 @@ local function Save(field, v)
     else
         BNB.UpdateNote(_noteID, { [field] = v })
     end
+end
+
+-- The style picker's handlers for the note shown (nil = As in Settings)
+local function StyleHandlers()
+    local id = _noteID
+    return {
+        noteID = id,
+        get = function()
+            local n = BNB.GetNote(id)
+            return n and n.toastStyle
+        end,
+        set = function(k) Save("toastStyle", k or DEFAULT) end,
+        follow = "TOAST_CM_DEFAULT", followTip = "TOAST_PICKER_DEFAULT_TIP",
+        following = function() return BNB.ToastStyles.Current() end,
+    }
 end
 
 local function Label(parent, text, anchor, y)
@@ -93,10 +108,29 @@ local function Build()
     f._noteLbl = noteLbl
 
     Label(f, L["NOTE_TOAST_STYLE"], host, -26)
-    FillStyles()
-    _styleDd = BNB.CreateValueDropdown(f, _styleEntries, DEFAULT,
-        function(v) Save("toastStyle", v) end, cw, 26)
-    _styleDd:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -41)
+    local TSP = BNB.ToastStylePicker
+    local ARW = 22
+    local prev = BNB.CreateButton(nil, f, "<", ARW, 22)
+    _styleBtn  = BNB.CreateButton(nil, f, "", cw - 2 * (ARW + 4), 22)
+    local nxt  = BNB.CreateButton(nil, f, ">", ARW, 22)
+    prev:SetPoint("TOPLEFT", host, "TOPLEFT", 0, -43)
+    _styleBtn:SetPoint("LEFT", prev, "RIGHT", 4, 0)
+    nxt:SetPoint("LEFT", _styleBtn, "RIGHT", 4, 0)
+    prev:SetScript("OnClick", function() if _noteID and TSP then TSP.Step(StyleHandlers(), -1, true) end end)
+    nxt:SetScript("OnClick", function() if _noteID and TSP then TSP.Step(StyleHandlers(), 1, true) end end)
+    _styleBtn:SetScript("OnClick", function()
+        if _noteID and TSP then TSP.Open(PICK_KEY, f, StyleHandlers()) end
+    end)
+    for btn, key in pairs({ [prev] = "TOAST_STYLE_PREV", [_styleBtn] = "TOAST_STYLE_BROWSE_TIP",
+                            [nxt] = "TOAST_STYLE_NEXT" }) do
+        local text = L[key]
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:SetText(text, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    end
 
     Label(f, L["NOTE_TOAST_HOLD"], host, -76)
     FillHolds()
@@ -124,7 +158,10 @@ local function Build()
     BNB.RegisterMessage("NoteToastWindow", "NoteDeleted", function(_, id)
         if id == _noteID then f:Hide() end
     end)
-    f:HookScript("OnHide", function() _noteID, _host = nil, nil end)
+    f:HookScript("OnHide", function()
+        _noteID, _host = nil, nil
+        if TSP then TSP.Close(PICK_KEY) end
+    end)
     return f
 end
 
@@ -134,6 +171,8 @@ function NTW.Open(noteID, host)
     _noteID, _host = noteID, host
     BNB.PlaceBeside(_f, host, W)
     Refresh()
+    -- Re-pointed at another note: an open style picker follows it
+    if BNB.ToastStylePicker then BNB.ToastStylePicker.Rebind(PICK_KEY, StyleHandlers()) end
     BNB.SeatWindow(_f, _f._strata)
     _f:Show(); _f:Raise()
 end
@@ -156,4 +195,5 @@ function NTW.Rebind(noteID, host)
     if not (noteID and BNB.GetNote(noteID)) then _f:Hide(); return end
     _noteID = noteID
     Refresh()
+    if BNB.ToastStylePicker then BNB.ToastStylePicker.Rebind(PICK_KEY, StyleHandlers()) end
 end

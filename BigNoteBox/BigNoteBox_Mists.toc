@@ -131,6 +131,7 @@ Features\InsertInfo.lua
 UI\ToastStyles.lua
 UI\Toast.lua
 UI\NoteToastWindow.lua
+UI\ToastStylePicker.lua
 Features\ZonePicker.lua
 Features\QuickNote.lua
 Features\AlarmManager.lua

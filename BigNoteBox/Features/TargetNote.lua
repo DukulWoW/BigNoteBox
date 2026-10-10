@@ -233,6 +233,20 @@ function BNB.SetNpcNotePortrait(tex, note)
     return false
 end
 
+-- The note's unit face on tex, as the note list row draws it: the NPC's saved
+-- portrait, then the live one while the note's unit is targeted (a player's
+-- face exists only live: a saved ID cannot carry customizations). Toasts and
+-- their right-click menu headers use it; a player note's toast showed the
+-- plain icon while the list showed the face (Dukul, 2026-10-10)
+function BNB.SetNoteUnitPortrait(tex, note)
+    if not (tex and note) then return false end
+    local drawn = BNB.SetNpcNotePortrait(tex, note)
+    if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
+        drawn = pcall(SetPortraitTexture, tex, "target") or drawn
+    end
+    return drawn
+end
+
 -- The icon to show for a note. NPC notes made before ALL-46 stored a human
 -- face for every humanoid; show the neutral icon instead (the saved note is
 -- left as it is).
