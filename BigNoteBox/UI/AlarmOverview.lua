@@ -381,6 +381,7 @@ local function FormatFireTime(noteID)
         math.floor(diff / 3600), math.floor((diff % 3600) / 60)) end
     return string.format(L["AO_DATE_FMT"], BNB.Date("%Y-%m-%d %H:%M", t))
 end
+AO.FireTimeLeft = FormatFireTime   -- the compact note tooltip (UI/NoteTooltip.lua)
 
 -- What kind of alarm and how it repeats, for the row's bottom line (ALL-303)
 local RECUR_KEYS = { weekdays = "AW_RECUR_WEEKDAYS", interval = "AW_RECUR_INTERVAL" }

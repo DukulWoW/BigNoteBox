@@ -143,6 +143,7 @@ Features\NoteExport.lua
 Features\ShareNote.lua
 Features\OracleSearch.lua
 Features\Tldr.lua
+UI\NoteTooltip.lua
 Features\UnitNotes.lua
 Features\InspectNote.lua
 Features\TargetNote.lua

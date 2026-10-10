@@ -1206,17 +1206,18 @@ local function CreateListEntry(parent)
         hiBg:SetColorTexture(1, 1, 1, 0.05)
     end
 
-    -- Collapsed (icon-only) list: the title as a tooltip, nothing else
-    -- (Dukul, 2026-10-10)
+    -- Hover: the compact note tooltip (ALL-372 S3, UI/NoteTooltip.lua): tl;dr,
+    -- alarm, situations, waypoints; the collapsed list puts the title on top
+    -- (ALL-428, Dukul 2026-10-10). Not while a note is being dragged
     btn:HookScript("OnEnter", function(self)
-        if not BNB._listCollapsed then return end
-        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine((self._title and self._title ~= "") and self._title or L["UNTITLED"], 1, 1, 1)
-        GameTooltip:Show()
+        if _dragNoteID or not self._noteID then return end
+        BNB.ShowNoteListTooltip(self, self._noteID, BNB._listCollapsed)
     end)
-    btn:HookScript("OnLeave", function(self)
+    local function HideTip(self)
         if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
-    end)
+    end
+    btn:HookScript("OnLeave", HideTip)
+    btn:HookScript("OnHide",  HideTip)
 
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SIZE, ICON_SIZE)
@@ -1431,6 +1432,7 @@ local function CreateListEntry(parent)
     -- Whole-entry hold-to-drag: 150ms hold activates drag mode
     local _holdTimer = nil
     btn:SetScript("OnMouseDown", function(self, mouseBtn)
+        HideTip(self)   -- out of the way of a drag or the right-click menu
         if mouseBtn ~= "LeftButton" then return end
         if not CanDragReorder() then return end
         local noteID = self._noteID; if not noteID then return end

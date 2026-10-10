@@ -160,6 +160,19 @@ function BNB.SituationValueLabel(kind, value)
     return key and L[key] or value
 end
 
+-- A situation kind's short name ("Zone", "Player"...), nil for an unknown
+-- kind: the Situation editor's rows and the compact note tooltip
+local KIND_LABELS = { zone = "STICKY_KIND_ZONE", subzone = "STICKY_KIND_SUBZONE",
+                      instance = "STICKY_KIND_INSTANCE", player = "STICKY_KIND_PLAYER",
+                      npc = "STICKY_KIND_NPC", guild = "STICKY_KIND_GUILD",
+                      itype = "SIT_ROWKIND_ITYPE", open = "SIT_ROWKIND_OPEN",
+                      state = "SIT_KIND_RESTED" }
+function BNB.SituationKindLabel(kind)
+    local key = kind and KIND_LABELS[kind]
+    if not key then return nil end
+    return L[key]
+end
+
 local DELVE_DIFFICULTY = 208
 
 -- The instance type key of the instance you are in, or nil (open world, or a
