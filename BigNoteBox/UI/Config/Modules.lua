@@ -205,19 +205,27 @@ end
 -- A new player / NPC note's situation (ALL-435): "Turn on the situation"
 -- and, indented under it, "Show the note as a toast", which needs the first:
 -- greyed and shown unticked while the first is off (its own setting kept).
--- The situation is added either way, off (grey) while the first is unticked
-local function AddSituationPair(ct, y, onKey, toastKey, onLabel, onTip)
-    local toastCb
+-- The situation is added either way, off (grey) while the first is unticked.
+-- On the Situations page since ALL-436; both grey while gate() is false
+-- (Situations or Player & NPC Notes off). Returns y and Sync, which the
+-- page's module switch calls when it changes.
+local function AddSituationPair(ct, y, onKey, toastKey, onLabel, onTip, gate)
+    local onCb, toastCb
     local function OnSet() return BigNoteBoxDB and BigNoteBoxDB[onKey] == true end
-    local function SyncToast()
+    local function Grey(cb, ok)
+        cb:SetEnabled(ok); cb:SetAlpha(ok and 1 or 0.35); cb._lbl:SetAlpha(ok and 1 or 0.35)
+    end
+    local function Sync()
+        local open = gate() and true or false
         local on = OnSet() and true or false
-        toastCb:SetEnabled(on); toastCb:SetAlpha(on and 1 or 0.35); toastCb._lbl:SetAlpha(on and 1 or 0.35)
+        Grey(onCb, open)
+        Grey(toastCb, open and on)
         toastCb:SetChecked(on and BigNoteBoxDB[toastKey] ~= false)
     end
-    y = AddCheck(ct, y, onLabel, OnSet,
+    y, onCb = AddCheck(ct, y, onLabel, OnSet,
         function(v)
             if BigNoteBoxDB then BigNoteBoxDB[onKey] = v end
-            SyncToast()
+            Sync()
         end,
         onTip)
     local ty = y
@@ -226,10 +234,12 @@ local function AddSituationPair(ct, y, onKey, toastKey, onLabel, onTip)
         function(v) if BigNoteBoxDB then BigNoteBoxDB[toastKey] = v end end,
         L["CFG_CHK_SIT_TOAST_TIP"])
     toastCb:SetPoint("TOPLEFT", ct, "TOPLEFT", 16, ty + 2)
-    toastCb:SetMotionScriptsWhileDisabled(true)   -- the tip says what it needs
-    toastCb:HookScript("OnShow", SyncToast)
-    SyncToast()
-    return y
+    for _, cb in ipairs({ onCb, toastCb }) do
+        cb:SetMotionScriptsWhileDisabled(true)   -- the tip says what it needs
+        cb:HookScript("OnShow", function() onCb:SetChecked(OnSet()); Sync() end)
+    end
+    Sync()
+    return y, Sync
 end
 
 local function BuildPlayerNpcPage(sf, ct, y, page)
@@ -256,6 +266,22 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
             if BNB.ApplyUnitFrameBadges then BNB.ApplyUnitFrameBadges() end
         end,
         L["CFG_UNIT_BADGE_TIP"])
+
+    -- Whether a new note's situation starts on, and its toast: the
+    -- Situations page (ALL-436, moved there from this page)
+    y = y - 6
+    local sitBtn = BNB.CreateButton(nil, ct, L["CFG_SIT_SETTINGS_BTN"], 150, 22)
+    sitBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    sitBtn:SetScript("OnClick", function() BNB.OpenSettingsPage("modules", "situations") end)
+    sitBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_SIT_SETTINGS_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_SIT_SETTINGS_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    sitBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (22 + 10)
+
     -- ── Inspect Note ──────────────────────────────────────────────────────────
     do
         y = AddHeader(ct, y, L["CFG_HDR_INSPECT_NOTE"])
@@ -353,9 +379,6 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
 
         RefreshInsTypeState()
 
-        -- The new note's player situation, on or off, and its toast (ALL-435)
-        y = AddSituationPair(ct, y, "inspectNoteAddSituation", "inspectNoteSituationToast",
-            L["CFG_CHK_SITUATION_LABEL"], L["CFG_CHK_SITUATION_TIP"])
 
         -- Gear to show dropdown
         local gearShowLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
@@ -436,10 +459,6 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         end)
         tnTypeDD:SetScript("OnLeave", function() GameTooltip:Hide() end)
         y = y - (ROW_H + ROW_GAP)
-
-        -- The new note's NPC situation, on or off, and its toast (ALL-435)
-        y = AddSituationPair(ct, y, "targetNoteAddSituation", "targetNoteSituationToast",
-            L["CFG_CHK_NPC_SITUATION_LABEL"], L["CFG_CHK_NPC_SITUATION_TIP"])
 
         -- Tag checklist header
         local tagHeaderLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
@@ -1368,11 +1387,13 @@ end
 local function BuildContextPopupPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     local cb
+    local syncs = {}   -- the new-note pairs below, greyed with the switch
     y, cb = AddCheck(ct, y, L["CONFIG_CONTEXT_SURFACE"],
         function() return BNB.SituationsEnabled() end,
         function(v)
             db.contextSurface = v
             if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
+            for _, f in ipairs(syncs) do f() end
         end,
         L["CFG_CHK_CONTEXT_SURFACE_TIP"])
 
@@ -1389,6 +1410,18 @@ local function BuildContextPopupPage(sf, ct, y, page)
     end)
     toastsBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     y = y - (22 + 10)
+
+    -- New player and NPC notes (ALL-435, here since ALL-436): their unit
+    -- situation on or off, and its toast. Needs Player & NPC Notes too
+    local function Gate() return BNB.SituationsEnabled() and BNB.UnitNotesEnabled() end
+    y = AddHeader(ct, y, L["CFG_HDR_SIT_UNIT_NOTES"])
+    local sync
+    y, sync = AddSituationPair(ct, y, "inspectNoteAddSituation", "inspectNoteSituationToast",
+        L["CFG_CHK_SITUATION_LABEL"], L["CFG_CHK_SITUATION_TIP"], Gate)
+    syncs[#syncs + 1] = sync
+    y, sync = AddSituationPair(ct, y, "targetNoteAddSituation", "targetNoteSituationToast",
+        L["CFG_CHK_NPC_SITUATION_LABEL"], L["CFG_CHK_NPC_SITUATION_TIP"], Gate)
+    syncs[#syncs + 1] = sync
 
     page.enableCb = cb   -- twin on the Features overview row
     sf:FinaliseHeight(math.abs(y) + 12)
