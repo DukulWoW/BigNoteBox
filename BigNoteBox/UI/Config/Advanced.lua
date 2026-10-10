@@ -22,12 +22,20 @@ local INTEG = {
     { name = "TomTom", logo = "addon-tomtom", desc = "CFG_INTEG_TOMTOM_DESC",
       url = "https://www.curseforge.com/wow/addons/tomtom", addon = "TomTom" },
     { name = "WaypointUI", logo = "addon-waypointui", desc = "CFG_INTEG_WPUI_DESC",
-      url = "https://www.curseforge.com/wow/addons/waypointui", addon = "WaypointUI" },
+      url = "https://www.curseforge.com/wow/addons/waypointui", addon = "WaypointUI", noClassic = true,
+      descOther = "CFG_INTEG_WPUI_DESC_TOMTOM" },   -- off Retail: no MapPinEnhanced to name
     -- 3.x has no pin groups (ALL-421)
     { name = "MapPinEnhanced", logo = "addon-mpe", desc = "CFG_INTEG_MPE_DESC",
       url = "https://www.curseforge.com/wow/addons/mappinenhanced", addon = "MapPinEnhanced",
-      ready = function() return BNB.HasMPEGroups() end, oldTip = "CFG_INTEG_MPE_UPDATE_TIP" },
+      ready = function() return BNB.HasMPEGroups() end, oldTip = "CFG_INTEG_MPE_UPDATE_TIP", noClassic = true, noForever = true },
 }
+-- noClassic / noForever: no build for that client (CurseForge, checked
+-- 2026-10-10: WaypointUI is Retail + Forever, MapPinEnhanced Retail only), so
+-- it is not listed there (ALL-430)
+for i = #INTEG, 1, -1 do
+    local a = INTEG[i]
+    if (BNB.IsClassic and a.noClassic) or (BNB.IsForever and a.noForever) then table.remove(INTEG, i) end
+end
 
 -- 0 = not loaded, 1 = loaded but needs an update, 2 = active
 local function IntegState(a)
@@ -91,7 +99,7 @@ local function BuildIntegrationsPage(sf, ct, y)
         desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
         desc:SetTextColor(0.8, 0.8, 0.8)
-        desc:SetText(L[a.desc])
+        desc:SetText(L[((BNB.IsForever or BNB.IsClassic) and a.descOther) or a.desc])
         y = y - math.ceil(desc:GetStringHeight()) - 6
         if state == 1 and a.oldTip then
             local why = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")

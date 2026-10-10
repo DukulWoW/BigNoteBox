@@ -1808,7 +1808,9 @@ local TAB_GAP    = 1                           -- sidebar GAP
 -- Edge offset against the frame, per side and client: the sidebar's values
 -- (Sidebar.lua SIDE_OFFSET, FOR-15 on Forever; its 2 / -2 default on Retail),
 -- scaled. On Forever the right side draws below the frame, as the sidebar does.
-local TAB_OFF    = BNB.IsForever and { left = 5, right = -2 } or { left = 8, right = -4 }
+-- Classic: 3px further left, and drawn under the frame (Dukul, 2026-10-10)
+local TAB_OFF    = BNB.IsForever and { left = 5, right = -2 }
+                or BNB.IsClassic and { left = 5, right = -4 } or { left = 8, right = -4 }
 -- Skin mode: the tabs sit this much further out from the frame, their inner end
 -- under the window edge (Dukul 2026-10-03: "a tiny bit to the left"). Tune here.
 local TAB_SKIN_OUT = 2
@@ -1938,7 +1940,8 @@ end
 
 -- Skin mode: always under the frame, so its edge covers the tab's inner end
 -- (Dukul, 2026-09-27: they drew on top of the window). Normal mode: under the
--- frame on Forever's right side (its border overlaps the tab), above otherwise.
+-- frame on Forever's right side (its border overlaps the tab) and on Classic
+-- (both sides, Dukul 2026-10-10), above otherwise.
 -- "Under" is one strata lower: a child's frame level below its parent's did not
 -- hold (raising the window lifts its children back over it, Dukul 2026-10-03).
 -- A child keeps its own strata and still hides with the window.
@@ -1948,7 +1951,7 @@ local function ApplySideTabLevel()
     local strip = _modeStrip
     if not (strip and strip._sideTabs and rbFrame) then return end
     local skin   = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local under  = skin or (BNB.IsForever and SideTabSide() ~= "left")
+    local under  = skin or BNB.IsClassic or (BNB.IsForever and SideTabSide() ~= "left")
     local strata = rbFrame:GetFrameStrata()
     if under then
         strip:SetFrameStrata(STRATA_BELOW[strata] or "LOW")

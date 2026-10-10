@@ -1206,6 +1206,18 @@ local function CreateListEntry(parent)
         hiBg:SetColorTexture(1, 1, 1, 0.05)
     end
 
+    -- Collapsed (icon-only) list: the title as a tooltip, nothing else
+    -- (Dukul, 2026-10-10)
+    btn:HookScript("OnEnter", function(self)
+        if not BNB._listCollapsed then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine((self._title and self._title ~= "") and self._title or L["UNTITLED"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:HookScript("OnLeave", function(self)
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
+
     local icon = btn:CreateTexture(nil, "ARTWORK")
     icon:SetSize(ICON_SIZE, ICON_SIZE)
     icon:SetPoint("LEFT", btn, "LEFT", PAD_L, 0)

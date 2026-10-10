@@ -317,7 +317,7 @@ local function WireWaypointRows(rows, act)
             GameTooltip:AddLine(string.format("%s  %.1f, %.1f", where, e.wp.x, e.wp.y), 0.78, 0.78, 0.78)
             if e.created then GameTooltip:AddLine(L["WP_ROW_TIP_CREATED"], 0.60, 0.60, 0.60, true) end
             GameTooltip:AddLine(e.wp.on and L["WP_ROW_TIP_ON"] or L["WP_ROW_TIP_OFF"], 0.40, 0.85, 0.40, true)
-            if not HasWPAddon() then GameTooltip:AddLine(L["WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
+            if not HasWPAddon() then GameTooltip:AddLine(L[(BNB.IsForever or BNB.IsClassic) and "WP_ROW_TIP_SINGLE_TOMTOM" or "WP_ROW_TIP_SINGLE"], 0.85, 0.70, 0.2, true) end
             if not e.created then GameTooltip:AddLine(L["WP_ROW_TIP_RENAME"], 0.60, 0.60, 0.60, true) end
             GameTooltip:AddLine(L["WP_ROW_TIP_SHIFT"], 0.60, 0.60, 0.60, true)
             GameTooltip:Show()
@@ -926,7 +926,8 @@ function BNB.CreateSituationEditor(panel, opts)
         end
         -- Both addons installed: nothing left to explain, no "?" (ALL-316).
         -- The tag still opens Addon integrations
-        wpInfoLbl:SetShown(not (BNB.HasTomTom() and HasWaypointUI()))
+        -- (Classic has no WaypointUI: TomTom alone is all of them there)
+        wpInfoLbl:SetShown(not (BNB.HasTomTom() and (HasWaypointUI() or BNB.IsClassic)))
     end
 
     -- "?" icon (visual only; the hit frame below takes the click, ALL-316)
@@ -950,8 +951,10 @@ function BNB.CreateSituationEditor(panel, opts)
         wpInfoLbl:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         -- Which waypoint addons are installed (ALL-348), then the "?" hint
-        for _, a in ipairs({ { "WaypointUI", HasWaypointUI() }, { "TomTom", BNB.HasTomTom() } }) do
-            if a[2] then
+        -- WaypointUI has no Classic build: not listed there
+        for _, a in ipairs({ { "WaypointUI", HasWaypointUI(), BNB.IsClassic }, { "TomTom", BNB.HasTomTom() } }) do
+            if a[3] then   -- skipped on this client
+            elseif a[2] then
                 GameTooltip:AddLine(string.format(L["WP_ADDON_INSTALLED_FMT"], a[1]), 0.4, 1, 0.4)
             else
                 GameTooltip:AddLine(string.format(L["WP_ADDON_MISSING_FMT"], a[1]), 0.6, 0.6, 0.6)

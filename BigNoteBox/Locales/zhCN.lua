@@ -1701,6 +1701,7 @@ L["WP_LIST_EMPTY"]              = "没有路径点。点击“标记此处”或
 L["WP_ROW_TIP_ON"]              = "绿色：符合触发情境时放置。点击后仅用于导航。"
 L["WP_ROW_TIP_OFF"]             = "灰色：仅用于导航。点击后将在符合触发情境时放置。"
 L["WP_ROW_TIP_SINGLE"]          = "未安装 TomTom 时，只能有一个绿色路径点：游戏地图标记只能记录一个位置。"
+L["WP_ROW_TIP_SINGLE_TOMTOM"]   = "未安装 TomTom 时，只能有一个绿色路径点：游戏地图标记只能记录一个位置。"
 L["WP_ROW_TIP_CREATED"]         = "此笔记的创建位置。无法移除。"
 L["WP_ROW_TIP_RENAME"]          = "双击名称可重命名（名称为空时显示笔记标题）；双击区域可移至其他区域；双击 X、Y 可更改坐标。"
 L["WP_NAV_ROW_TIP"]             = "导航至此路径点"
