@@ -101,7 +101,8 @@ function BNB.RegisterSlashCommands()
                     local note = BNB.GetNote(id)
                     local title = note and note.title or "?"
                     BNB:Print(string.format("  |cff88bbff%s|r -> %s", title,
-                        placed == true and "map pin" or (#placed .. " TomTom waypoint(s)")))
+                        placed == true and "map pin"
+                        or (#placed .. (placed.mpe and " MapPinEnhanced pin(s)" or " TomTom waypoint(s)"))))
                     count = count + 1
                 end
                 if count == 0 then BNB:Print("|cff88bbffNo auto-placed waypoints tracked.|r") end

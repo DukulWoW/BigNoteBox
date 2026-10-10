@@ -90,6 +90,15 @@ function BNB.HasTomTom()
     return C_AddOns.IsAddOnLoaded("TomTom") and TomTom and TomTom.AddWaypoint and true or false
 end
 
+-- MapPinEnhanced 4.0+ (ALL-421): its public pin groups give each pin an id and
+-- a way to remove it. 3.2 has neither: it only copies the game's map pin, so
+-- BNB keeps placing that pin there. Asked by the function, not the version
+function BNB.HasMPEGroups()
+    local m = C_AddOns.IsAddOnLoaded("MapPinEnhanced") and MapPinEnhanced
+    return type(m) == "table" and type(m.RegisterGroup) == "function"
+        and type(m.AddPinToGroup) == "function" and type(m.DeletePin) == "function"
+end
+
 function BNB.WowheadURL(kind, id)
     if not kind or not id then return nil end
     return "https://www.wowhead.com/" .. WowheadPath() .. kind .. "=" .. id

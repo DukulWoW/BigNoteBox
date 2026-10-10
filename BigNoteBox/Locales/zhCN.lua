@@ -1190,7 +1190,6 @@ L["TASK_CTX_SIT_NONE"]     = "无 (全局)"
 L["TASK_CTX_DELETE"]        = "删除"
 
 -- ── Config window (ALL-08 sweep: SetText/AddLine/SetFormattedText literals) ────
-L["CFG_BCB_DESC"]                   = "通过 BigChatBox 逐行发送笔记。\n将聊天输入捕获为新笔记。"
 L["CFG_MORE_FEATURES_BTN"]          = "更多功能"
 L["CFG_FEATURES_TIP_TITLE"]         = "BigNoteBox 中的功能"
 L["CFG_FEATURES_TIP_BODY"]          = "查看 BigNoteBox 可以做的所有事情。"

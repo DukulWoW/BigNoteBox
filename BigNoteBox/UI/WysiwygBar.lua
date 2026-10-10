@@ -620,6 +620,9 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 })
             end)
             if ok and uid then BNB._coordWaypoint = uid end
+        elseif BNB.MPEUsable() and BNB.MPEAddPin(mapID, x, y, label, true) then
+            -- MapPinEnhanced 4.0+ (ALL-421): the pin is added in the test above;
+            -- the same spot again replaces it
         elseif C_Map and C_Map.SetUserWaypoint then
             local pt = UiMapPoint.CreateFromCoordinates(mapID, x, y)
             pcall(function() C_Map.SetUserWaypoint(pt) end)

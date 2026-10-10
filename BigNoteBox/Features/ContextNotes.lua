@@ -33,7 +33,8 @@ local L   = BNB.L
 BNB._contextMatches = BNB._contextMatches or {}
 -- noteID -> the situation string it matched by in the last check
 BNB._contextMatchedBy = BNB._contextMatchedBy or {}
--- noteID -> list of TomTom uids placed for it, or true for the game's own pin
+-- noteID -> list of TomTom uids placed for it, a list of MapPinEnhanced pin
+-- ids marked `mpe = true` (ALL-421), or true for the game's own pin
 BNB._autoWaypoints  = BNB._autoWaypoints  or {}
 -- The next check only takes in where the player is, showing nothing: set when
 -- the Situations module is switched back on (ALL-375)
@@ -887,16 +888,105 @@ end
 -- ── Main check ────────────────────────────────────────────────────────────────
 -- ── Situation waypoints (ALL-282) ───────────────────────────────────────────
 -- A note places every waypoint that is on (BNB.ActiveWaypoints) through
--- TomTom:AddWaypoint, or, without it, the first of them (WaypointUI has no
+-- TomTom:AddWaypoint, else through MapPinEnhanced 4.0+'s pin groups (ALL-421),
+-- or, without either, the first of them (WaypointUI has no
 -- TomTom API: it draws the game's pin in the world, ALL-307)
 -- as the game's own map pin, which holds one point.
 local function HasTomTom() return BNB.HasTomTom() end
 
--- Removes the TomTom waypoints placed for a note. The game's pin (true) is
--- left to the caller: it may belong to another note by now
+-- ── MapPinEnhanced 4.0+ (ALL-421) ───────────────────────────────────────────
+-- Every pin BNB places there goes into its own "BigNoteBox" group, named, with
+-- an id to remove it by. The group is registered on first use and again when
+-- the user has deleted it; registering every time would print MPE's "added
+-- hidden group" line on each pin while the user keeps it hidden. A failure (a
+-- group of that name the user made) means the game's pin for this session.
+-- MPE's group functions take no self: dot calls.
+local MPE_GROUP = { name = "BigNoteBox", source = "BigNoteBox", groupID = "bignotebox",
+                    icon = "Interface\\AddOns\\BigNoteBox\\Assets\\icon" }
+local _mpeGroup, _mpeFailed
+-- Pins added this session by position, so placing the same spot again (a
+-- second Navigate) replaces the pin: MPE groups do not skip duplicates
+local _mpeByPos = {}
+
+function BNB.MPEUsable() return not _mpeFailed and BNB.HasMPEGroups() end
+
+-- Adds one pin to BNB's group (x, y 0-1); returns its id, or nil
+function BNB.MPEAddPin(mapID, x, y, title, track)
+    if not BNB.MPEUsable() then return nil end
+    local pos = string.format("%s:%.4f:%.4f", mapID, x, y)
+    if _mpeByPos[pos] then
+        pcall(MapPinEnhanced.DeletePin, _mpeByPos[pos]); _mpeByPos[pos] = nil
+    end
+    for _ = 1, 2 do
+        if not _mpeGroup then
+            local ok, gid = pcall(MapPinEnhanced.RegisterGroup, CopyTable(MPE_GROUP))
+            if not (ok and gid) then _mpeFailed = true; return nil end
+            _mpeGroup = gid
+        end
+        local ok, pinID = pcall(MapPinEnhanced.AddPinToGroup, _mpeGroup,
+            { mapID = mapID, x = x, y = y, title = title, setTracked = track and true or nil })
+        if ok and pinID then _mpeByPos[pos] = pinID; return pinID end
+        _mpeGroup = nil   -- deleted by the user since: register it again, once
+    end
+    return nil
+end
+
+function BNB.MPEDeletePin(pinID)
+    if pinID and BNB.HasMPEGroups() then pcall(MapPinEnhanced.DeletePin, pinID) end
+end
+
+-- A note's waypoints as MPE pins, tracking the first unless noTrack. Returns
+-- the placed list ({ mpe = true, pinID, ... }) or nil when none went in
+local function PlaceMPEPins(note, list, noTrack)
+    local ids = { mpe = true }
+    for i, wp in ipairs(list) do
+        local pinID = BNB.MPEAddPin(wp.mapID, wp.x / 100, wp.y / 100,
+            BNB.WaypointName(note, wp), i == 1 and not noTrack)
+        if pinID then ids[#ids + 1] = pinID end
+    end
+    return ids[1] and ids or nil
+end
+
+-- MPE keeps its pins over a /reload, BNB's _autoWaypoints does not: the ids
+-- of situation pins are saved (BigNoteBoxDB.mpePins) and removed once per
+-- load, before the first placement, so a reload does not place them twice.
+-- With MPE off they are kept for the next load that has it
+local _mpeSwept = false
+local function SweepSavedMPEPins()
+    if _mpeSwept or not BNB.HasMPEGroups() then return end
+    _mpeSwept = true
+    local saved = BigNoteBoxDB and BigNoteBoxDB.mpePins
+    if not saved then return end
+    for id, ids in pairs(saved) do
+        if not BNB._autoWaypoints[id] then
+            for _, pinID in ipairs(ids) do BNB.MPEDeletePin(pinID) end
+        end
+    end
+    wipe(saved)
+end
+BNB.RegisterEvent("PLAYER_ENTERING_WORLD", function() SweepSavedMPEPins() end)
+
+local function SaveMPEPins(id, ids)
+    local saved = BigNoteBoxDB and BigNoteBoxDB.mpePins
+    if not saved then return end
+    if ids then
+        local copy = {}
+        for i, pinID in ipairs(ids) do copy[i] = pinID end
+        saved[id] = copy
+    else
+        saved[id] = nil
+    end
+end
+
+-- Removes the TomTom waypoints or MPE pins placed for a note. The game's pin
+-- (true) is left to the caller: it may belong to another note by now
 local function RemoveTomTomWaypoints(id)
     local placed = BNB._autoWaypoints[id]
-    if type(placed) == "table" and TomTom and TomTom.RemoveWaypoint then
+    if type(placed) ~= "table" then return end
+    if placed.mpe then
+        for _, pinID in ipairs(placed) do BNB.MPEDeletePin(pinID) end
+        SaveMPEPins(id, nil)
+    elseif TomTom and TomTom.RemoveWaypoint then
         for _, uid in ipairs(placed) do
             pcall(function() TomTom:RemoveWaypoint(uid) end)
         end
@@ -932,10 +1022,12 @@ end
 -- for it last; the old ones go first, so a moved waypoint is replaced, not
 -- doubled. A note with none left has its own removed.
 local function PlaceNoteWaypoints(id)
+    SweepSavedMPEPins()   -- before the first placement of this load
     local note   = BNB.GetNote(id)
     local tomtom = HasTomTom()
-    local list   = note and BNB.ActiveWaypoints(note, not tomtom) or {}
-    local sig    = note and WaypointSig(note, list, tomtom)
+    local mpe    = not tomtom and BNB.MPEUsable()
+    local list   = note and BNB.ActiveWaypoints(note, not (tomtom or mpe)) or {}
+    local sig    = note and WaypointSig(note, list, tomtom or mpe)
     if _wpSent[id] == sig then return end
     _wpSent[id] = sig
 
@@ -961,6 +1053,14 @@ local function PlaceNoteWaypoints(id)
             if ok and uid then uids[#uids + 1] = uid end
         end
         if uids[1] then BNB._autoWaypoints[id] = uids end
+        return
+    end
+    -- MapPinEnhanced 4.0+: every waypoint, named, the first tracked unless
+    -- "Don't track it"; none went in = the game's pin below
+    local ids = mpe and PlaceMPEPins(note, list, note.wpNoTrack)
+    if ids then
+        BNB._autoWaypoints[id] = ids
+        SaveMPEPins(id, ids)
     elseif C_Map and C_Map.SetUserWaypoint then
         local wp = list[1]
         -- The pin moves here: no other note holds it any more
@@ -995,8 +1095,8 @@ end
 
 -- Navigate: places the given waypoints and tracks them, whatever "Don't track
 -- it" says (only the situation's own placement honours it). TomTom takes them
--- all, its arrow on the first; the game's pin takes the first; with neither, a
--- /way line to copy into a waypoint addon
+-- all, its arrow on the first; so does MapPinEnhanced 4.0+; the game's pin
+-- takes the first; with none, a /way line to copy into a waypoint addon
 function BNB.NavigateWaypoints(note, list)
     local first = list and list[1]
     if not first then return end
@@ -1008,6 +1108,12 @@ function BNB.NavigateWaypoints(note, list)
             pcall(function() TomTom:AddWaypoint(wp.mapID, wp.x / 100, wp.y / 100, opts) end)
         end
         BNB:Print(string.format(L["NC_WP_TOMTOM_MSG"], name, first.x, first.y))
+        return
+    end
+    -- MapPinEnhanced 4.0+: all of them in BNB's group, kept until the user
+    -- removes them (asked for, unlike a situation's own)
+    if BNB.MPEUsable() and PlaceMPEPins(note, list) then
+        BNB:Print(string.format(L["NC_WP_MPE_MSG"], name, first.x, first.y))
         return
     end
     if C_Map and C_Map.SetUserWaypoint then
@@ -1271,8 +1377,10 @@ function BNB.CheckContextualNotes()
                 end
             end
         end
+        -- MapPinEnhanced: the note's own pins went above; the game's pin is
+        -- whichever MPE pin is tracked now, maybe the user's own (ALL-421)
         if shouldClear and C_Map and C_Map.ClearUserWaypoint
-            and not BNB.HasTomTom() then
+            and not BNB.HasTomTom() and not BNB.MPEUsable() then
             pcall(function() C_Map.ClearUserWaypoint() end)
         end
     end

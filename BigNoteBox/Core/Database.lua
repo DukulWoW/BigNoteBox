@@ -191,6 +191,11 @@ BNB.DEFAULTS = {
     -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.
     knownChars = {},
 
+    -- MapPinEnhanced pins placed by situations (ALL-421): { [noteID] = { pinID, ... } }.
+    -- MPE saves its pins account-wide; these are removed at login so a
+    -- /reload does not place them twice. Safe to wipe.
+    mpePins = {},
+
     -- Maximum number of sticky notes open at once (slider 1-50, BUG-28)
     stickyMaxCount        = 20,
     -- true: Ctrl+H "hide all stickies" persists across reloads and relogins

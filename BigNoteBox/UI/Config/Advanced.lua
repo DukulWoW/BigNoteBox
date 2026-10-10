@@ -8,6 +8,104 @@ local K = BNB._ConfigKit
 local CONTENT_W = K.CONTENT_W
 local AddRule, AddHeader, AddCheck = K.AddRule, K.AddHeader, K.AddCheck
 
+-- ── Addon integrations page (ALL-422) ───────────────────────────────────────
+-- The addons BNB works with, one section each (Dukul, 2026-10-10): logo, name
+-- and state centred, then what BNB does with it. The Advanced tab shows how
+-- many are active and opens this page. A new addon is one more INTEG entry.
+local ASSET = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\"
+-- addon = the folder name: a global like TomTom can come from another addon
+-- (MapPinEnhanced makes one; a disabled TomTom showed as Active, Dukul
+-- 2026-10-10). ready = loaded but too old to work with ("Needs update")
+local INTEG = {
+    { name = "BigChatBox", logo = "bcb-logo", desc = "CFG_INTEG_BCB_DESC",
+      url = "https://www.curseforge.com/wow/addons/bigchatbox", addon = "BigChatBox" },
+    { name = "TomTom", logo = "addon-tomtom", desc = "CFG_INTEG_TOMTOM_DESC",
+      url = "https://www.curseforge.com/wow/addons/tomtom", addon = "TomTom" },
+    { name = "WaypointUI", logo = "addon-waypointui", desc = "CFG_INTEG_WPUI_DESC",
+      url = "https://www.curseforge.com/wow/addons/waypointui", addon = "WaypointUI" },
+    -- 3.x has no pin groups (ALL-421)
+    { name = "MapPinEnhanced", logo = "addon-mpe", desc = "CFG_INTEG_MPE_DESC",
+      url = "https://www.curseforge.com/wow/addons/mappinenhanced", addon = "MapPinEnhanced",
+      ready = function() return BNB.HasMPEGroups() end, oldTip = "CFG_INTEG_MPE_UPDATE_TIP" },
+}
+
+-- 0 = not loaded, 1 = loaded but needs an update, 2 = active
+local function IntegState(a)
+    if not C_AddOns.IsAddOnLoaded(a.addon) then return 0 end
+    if a.ready and not a.ready() then return 1 end
+    return 2
+end
+
+local function BuildIntegrationsPage(sf, ct, y)
+    local MID, LOGO = math.floor(CONTENT_W / 2), 64
+
+    local intro = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    intro:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    intro:SetWidth(CONTENT_W); intro:SetJustifyH("LEFT"); intro:SetWordWrap(true)
+    intro:SetTextColor(0.8, 0.8, 0.8)
+    intro:SetText(L["CFG_INTEG_PAGE_INTRO"])
+    y = y - math.ceil(intro:GetStringHeight()) - 12
+
+    for _, a in ipairs(INTEG) do
+        local state = IntegState(a)
+        y = AddRule(ct, y) - 6
+
+        local logo = ct:CreateTexture(nil, "ARTWORK")
+        logo:SetSize(LOGO, LOGO)
+        logo:SetPoint("TOP", ct, "TOPLEFT", MID, y)
+        logo:SetTexture(ASSET .. a.logo)
+        if state == 0 then logo:SetDesaturated(true); logo:SetAlpha(0.6) end
+        y = y - LOGO - 4
+
+        local nameLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
+        nameLbl:SetPoint("TOP", ct, "TOPLEFT", MID, y)
+        BNB.SetHeaderColor(nameLbl)
+        nameLbl:SetText(a.name)
+        y = y - 20
+
+        if state > 0 then
+            local st = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+            st:SetPoint("TOP", ct, "TOPLEFT", MID, y)
+            st:SetText(state == 2 and ("|cff66bb6a" .. L["CFG_INTEG_ACTIVE"] .. "|r")
+                or ("|cffffaa00" .. L["CFG_INTEG_NEEDS_UPDATE"] .. "|r"))
+            y = y - 18
+        end
+        -- Not active, or too old: a button that copies the CurseForge link
+        if state < 2 then
+            local get = BNB.CreateButton(nil, ct, L["CFG_INTEG_GET_BTN"], 130, 22)
+            get:SetPoint("TOP", ct, "TOPLEFT", MID, y)
+            get:SetScript("OnClick", function(self) BNB.ShowClipboardHint(a.url, self, true, true) end)
+            get:HookScript("OnEnter", function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(a.name, 1, 1, 1)
+                GameTooltip:AddLine(L["CFG_INTEG_GET_TIP"], 0.8, 0.8, 0.8, true)
+                GameTooltip:AddLine(a.url, 0.6, 0.6, 0.6)
+                GameTooltip:Show()
+            end)
+            get:HookScript("OnLeave", function() GameTooltip:Hide() end)
+            y = y - 28
+        end
+        y = y - 4
+
+        local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
+        desc:SetTextColor(0.8, 0.8, 0.8)
+        desc:SetText(L[a.desc])
+        y = y - math.ceil(desc:GetStringHeight()) - 6
+        if state == 1 and a.oldTip then
+            local why = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+            why:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+            why:SetWidth(CONTENT_W); why:SetJustifyH("LEFT"); why:SetWordWrap(true)
+            why:SetTextColor(1, 0.67, 0)
+            why:SetText(L[a.oldTip])
+            y = y - math.ceil(why:GetStringHeight()) - 6
+        end
+        y = y - 8
+    end
+    sf:FinaliseHeight(math.abs(y) + 20)
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 4 — ADVANCED
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -15,82 +113,24 @@ local function BuildAdvancedTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
-    -- ── Addon integrations (ALL-315), first on the tab (Dukul, 2026-10-10): a
-    -- 2x2 grid of the addons BNB works with, logo, name and whether it is active. Not active: a button that copies
-    -- the CurseForge link. EasyFind joins as the fourth card with ALL-306.
+    -- ── Addon integrations (ALL-315), first on the tab (Dukul, 2026-10-10):
+    -- how many are active, and a button to the page that lists them (ALL-422)
     y = AddHeader(ct, y, L["CFG_HDR_INTEGRATIONS"])
     do
-        local ASSET   = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\"
-        local INTEG = {
-            { name = "BigChatBox", logo = "bcb-logo", desc = L["CFG_BCB_DESC"],
-              url = "https://www.curseforge.com/wow/addons/bigchatbox",
-              addon = "BigChatBox" },
-            { name = "TomTom", logo = "addon-tomtom", desc = L["CFG_INTEG_TOMTOM_DESC"],
-              url = "https://www.curseforge.com/wow/addons/tomtom",
-              addon = "TomTom" },
-            { name = "WaypointUI", logo = "addon-waypointui", desc = L["CFG_INTEG_WPUI_DESC"],
-              url = "https://www.curseforge.com/wow/addons/waypointui",
-              addon = "WaypointUI" },
-        }
-        local GAP, CARD_H, LOGO = 12, 60, 44
-        local cardW = math.floor((CONTENT_W - GAP) / 2)
-        local cards = {}
-        for i, a in ipairs(INTEG) do
-            local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
-            local card = BNB.CreateBackdropFrame("Frame", nil, ct)
-            card:SetSize(cardW, CARD_H)
-            card:SetPoint("TOPLEFT", ct, "TOPLEFT", col * (cardW + GAP), y - row * (CARD_H + GAP))
-            BNB.PaintSelectCard(card, nil)
-            cards[#cards + 1] = card
-            -- The addon itself loaded, by folder name: a global like TomTom can
-            -- come from another addon (MapPinEnhanced makes one; a disabled
-            -- TomTom showed as Active, Dukul 2026-10-10)
-            local on = C_AddOns.IsAddOnLoaded(a.addon) and true or false
-            local logo = card:CreateTexture(nil, "ARTWORK")
-            logo:SetSize(LOGO, LOGO)
-            logo:SetPoint("LEFT", card, "LEFT", 8, 0)
-            logo:SetTexture(ASSET .. a.logo)
-            if not on then logo:SetDesaturated(true); logo:SetAlpha(0.6) end
-            local nameLbl = card:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-            nameLbl:SetPoint("TOPLEFT", logo, "TOPRIGHT", 10, -4)
-            nameLbl:SetPoint("RIGHT", card, "RIGHT", -8, 0)
-            nameLbl:SetJustifyH("LEFT"); nameLbl:SetWordWrap(false)
-            nameLbl:SetText(a.name)
-            BNB.SetHeaderColor(nameLbl)
-            if on then
-                local st = card:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-                st:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 10, 4)
-                st:SetText("|cff66bb6a" .. L["CFG_INTEG_ACTIVE"] .. "|r")
-            else
-                local get = BNB.CreateButton(nil, card, L["CFG_INTEG_GET_BTN"], 110, 20)
-                get:SetPoint("BOTTOMLEFT", logo, "BOTTOMRIGHT", 10, 0)
-                get:SetScript("OnClick", function(self) BNB.ShowClipboardHint(a.url, self, true, true) end)
-                get:HookScript("OnEnter", function(self)
-                    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                    GameTooltip:AddLine(a.name, 1, 1, 1)
-                    GameTooltip:AddLine(L["CFG_INTEG_GET_TIP"], 0.8, 0.8, 0.8, true)
-                    GameTooltip:AddLine(a.url, 0.6, 0.6, 0.6)
-                    GameTooltip:Show()
-                end)
-                get:HookScript("OnLeave", function() GameTooltip:Hide() end)
-            end
-            -- What BNB does with it, on the card
-            card:EnableMouse(true)
-            card:SetScript("OnEnter", function(self)
-                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-                GameTooltip:AddLine(a.name, 1, 1, 1)
-                GameTooltip:AddLine(a.desc, 0.8, 0.8, 0.8, true)
-                GameTooltip:AddLine(on and L["CFG_INTEG_ACTIVE"] or L["CFG_INTEG_INACTIVE"],
-                    on and 0.4 or 0.6, on and 0.73 or 0.6, on and 0.42 or 0.6)
-                GameTooltip:Show()
-            end)
-            card:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        local page = K.NewSubPage(L["CFG_HDR_INTEGRATIONS"], BuildIntegrationsPage, "integrations")
+        local active = 0
+        for _, a in ipairs(INTEG) do
+            if IntegState(a) == 2 then active = active + 1 end
         end
-        BNB.RegisterMessage("Config.IntegCards", "SkinChanged", function()
-            for _, c in ipairs(cards) do BNB.PaintSelectCard(c, nil) end
-        end)
-        local rows = math.ceil(#INTEG / 2)
-        y = y - rows * CARD_H - (rows - 1) * GAP - 12
+        local cnt = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        cnt:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        cnt:SetTextColor(0.8, 0.8, 0.8)
+        cnt:SetText(string.format(L["CFG_INTEG_COUNT_FMT"], active, #INTEG))
+        y = y - 22
+        local open = BNB.CreateButton(nil, ct, L["CFG_INTEG_OPEN_BTN"], 180, 24)
+        open:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y + 2)
+        open:SetScript("OnClick", page.Open)
+        y = y - 34
     end
 
     AddRule(ct, y); y = y - 18

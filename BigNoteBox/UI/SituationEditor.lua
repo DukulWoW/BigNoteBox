@@ -61,7 +61,14 @@ local _editors = {}   -- every editor built, for the cross-window reload
 local _popup          -- the waypoint info popup, shared
 local _popupOwner     -- the editor that opened it
 
-local function HasWPAddon()   return BNB.HasTomTom() end
+-- An addon that takes several named waypoints: TomTom, or MapPinEnhanced
+-- 4.0+ through its pin groups (ALL-421)
+local function HasMPE()       return BNB.MPEUsable() end
+local function HasWPAddon()   return BNB.HasTomTom() or HasMPE() end
+-- MapPinEnhanced 3.x: it only copies the game's pin, without names
+local function MPENeedsUpdate()
+    return C_AddOns.IsAddOnLoaded("MapPinEnhanced") and not BNB.HasMPEGroups()
+end
 local function HasRetailPin() return C_Map and C_Map.SetUserWaypoint end
 -- WaypointUI draws the game's own pin in the world (arrow, distance). It does
 -- not provide TomTom's API, so placement stays one point through the game's
@@ -218,9 +225,12 @@ local function TogglePopup(ed)
     _popup = _popup or BuildPopup()
     _popupOwner = ed
     local f = _popup
-    if HasWPAddon() then
+    if BNB.HasTomTom() then
         f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_ADDON"] .. "|r")
         f._descLbl:SetText(L["NC_WP_FULL_SUPPORT_DETAIL"])
+    elseif HasMPE() then
+        f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_MPE"] .. "|r")
+        f._descLbl:SetText(L["NC_WP_MPE_DETAIL"])
     elseif HasWaypointUI() and HasRetailPin() then
         f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_WAYPOINTUI"] .. "|r")
         f._descLbl:SetText(L["NC_WP_WAYPOINTUI_DETAIL"])
@@ -233,7 +243,7 @@ local function TogglePopup(ed)
     end
     -- An addon that is installed has nothing to link to (ALL-316)
     f._wpuiBtn:SetEnabled(not HasWaypointUI())
-    f._ttBtn:SetEnabled(not HasWPAddon())
+    f._ttBtn:SetEnabled(not BNB.HasTomTom())
     f:ClearAllPoints()
     if ed.host then
         f:SetPoint("TOPLEFT", ed.host, "TOPRIGHT", 4, 0)
@@ -1004,8 +1014,11 @@ function BNB.CreateSituationEditor(panel, opts)
 
     local wpInfoLbl, wpInfoHit   -- built below; RefreshWPStatusTag shows / hides them
     local function RefreshWPStatusTag()
-        if HasWPAddon() then
+        if BNB.HasTomTom() then
             wpStatusTag:SetText(HasRetailPin() and L["STICKY_WP_TAG_ENHANCED"] or L["STICKY_WP_TAG_ADDON"])
+            wpStatusTag:SetTextColor(0.4, 1, 0.4)
+        elseif HasMPE() then
+            wpStatusTag:SetText(L["STICKY_WP_TAG_MPE"])
             wpStatusTag:SetTextColor(0.4, 1, 0.4)
         elseif HasWaypointUI() and HasRetailPin() then
             wpStatusTag:SetText(L["STICKY_WP_TAG_WAYPOINTUI"])
@@ -1018,7 +1031,7 @@ function BNB.CreateSituationEditor(panel, opts)
             wpStatusTag:SetTextColor(0.85, 0.30, 0.25)
         end
         -- Both addons installed: nothing left to explain, no "?" (ALL-316)
-        local both = (HasWPAddon() and HasWaypointUI()) and true or false
+        local both = (BNB.HasTomTom() and HasWaypointUI()) and true or false
         wpInfoLbl:SetShown(not both)
         -- The hit frame stays: the tag's tooltip lists the addons (ALL-348)
         wpInfoHit._both = both
@@ -1042,12 +1055,18 @@ function BNB.CreateSituationEditor(panel, opts)
         wpInfoLbl:SetAlpha(1)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         -- Which waypoint addons are installed (ALL-348), then the "?" hint
-        for _, a in ipairs({ { "WaypointUI", HasWaypointUI() }, { "TomTom", HasWPAddon() } }) do
+        for _, a in ipairs({ { "WaypointUI", HasWaypointUI() }, { "TomTom", BNB.HasTomTom() } }) do
             if a[2] then
                 GameTooltip:AddLine(string.format(L["WP_ADDON_INSTALLED_FMT"], a[1]), 0.4, 1, 0.4)
             else
                 GameTooltip:AddLine(string.format(L["WP_ADDON_MISSING_FMT"], a[1]), 0.6, 0.6, 0.6)
             end
+        end
+        -- MapPinEnhanced only when it is there: it is not one we recommend (ALL-421)
+        if HasMPE() then
+            GameTooltip:AddLine(string.format(L["WP_ADDON_INSTALLED_FMT"], "MapPinEnhanced"), 0.4, 1, 0.4)
+        elseif MPENeedsUpdate() then
+            GameTooltip:AddLine(string.format(L["WP_ADDON_UPDATE_FMT"], "MapPinEnhanced"), 1, 0.67, 0)
         end
         if not self._both then
             GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
@@ -1577,7 +1596,8 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
 
     -- ── Waypoint handlers ────────────────────────────────────────────────────
-    -- Without TomTom the game's pin holds one point: one green row at most
+    -- Without TomTom or MapPinEnhanced 4.0+ the game's pin holds one point:
+    -- one green row at most
     local function SinglePin() return not HasWPAddon() end
 
     -- A fresh copy of the note's waypoints to change and save; an unusable
