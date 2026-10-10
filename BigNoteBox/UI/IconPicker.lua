@@ -527,11 +527,13 @@ local function Build()
     end)
     cb:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _allCb = cb
+    -- No game list on Classic (UI/BlizzardIconList.lua, ALL-424)
+    if BNB.IsClassic then cb:Hide() end
 
     -- NPC target notes only (h.usePortrait): back to the creature's portrait,
     -- which an icon picked here replaces (BNB.SetNpcNotePortrait)
     local pb = BNB.CreateButton(nil, f, L["ICON_PICKER_PORTRAIT"], SIDE_W, 22)
-    pb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, FOOT_H + 8 + 28)
+    pb:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, FOOT_H + 8 + (BNB.IsClassic and 0 or 28))
     pb:SetScript("OnClick", function()
         if _h and _h.usePortrait then _h.usePortrait(); Render(true) end
     end)

@@ -271,11 +271,12 @@ local function RoleLetter(role)
     end
 end
 
-local OPEN_AS_ORDER = { "sticky", "focus", "refbox", "trash" }
+local OPEN_AS_ORDER = { "sticky", "focus", "refbox", "send", "trash" }
 local FILTER_ORDER  = { "player", "npc", "item", "zone", "char", "global", "tasks", "alarm", "rich", "plain" }
 local ROLE_DESC_KEY = {
     sticky = "ORACLE_PREFIX_DESC_STICKY", focus = "ORACLE_PREFIX_DESC_FOCUS",
     refbox = "ORACLE_PREFIX_DESC_REFBOX", trash = "ORACLE_PREFIX_DESC_TRASH",
+    send   = "ORACLE_PREFIX_DESC_SEND",
     player = "ORACLE_PREFIX_DESC_PLAYER", npc = "ORACLE_PREFIX_DESC_NPC",
     item   = "ORACLE_PREFIX_DESC_ITEM",   zone = "ORACLE_PREFIX_DESC_ZONE",
     char   = "ORACLE_PREFIX_DESC_CHAR",   global = "ORACLE_PREFIX_DESC_GLOBAL",
@@ -548,6 +549,9 @@ local function OpenResult(i)
     elseif Oracle._openAs == "sticky" then ok = OpenAsSticky(id)
     elseif Oracle._openAs == "focus" then ok = OpenInFocus(id)
     elseif Oracle._openAs == "refbox" then ok = OpenInRefBox(id)
+    elseif Oracle._openAs == "send" then   -- `m`: the Send to Chat window (ALL-426)
+        ok = BNB.OpenSendToChat ~= nil and not InCombatLockdown()
+        if BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
     else ok = OpenInMain(id) end
     if ok then AfterOpen() end
 end

@@ -2133,6 +2133,66 @@ function BNB.BuildColorGrid(ct, y, contentW, onPick, getColor, getCurrent)
 end
 
 --------------------------------------------------------------------------------
+-- KEYBOARD FOR SUGGESTION LISTS (ALL-427)
+-- nav = BNB.AttachListKeys(eb, list, rows): list = the suggestion frame under
+-- the box, rows = the array of row Buttons it fills (its shown rows count).
+-- Up / Down move a highlight over the shown rows, wrapping; Tab takes the
+-- highlighted row, else the first. Enter and Esc stay the box's own scripts,
+-- which ask first:
+--   if nav:Take() then return end    -- Enter: clicks the highlighted row
+--   if nav:Close() then return end   -- Esc: closes an open list, keeps focus
+-- Without an arrow press Enter does what it did before. The highlight is the
+-- row's own HIGHLIGHT texture (LockHighlight). Attach after the box's last
+-- SetScript("OnTextChanged"): typing clears the highlight through a hook.
+--------------------------------------------------------------------------------
+function BNB.AttachListKeys(eb, list, rows)
+    local nav = { sel = 0 }
+    local function Shown()
+        local out = {}
+        if list:IsShown() then
+            for _, r in ipairs(rows) do if r:IsShown() then out[#out + 1] = r end end
+        end
+        return out
+    end
+    function nav:Reset()
+        self.sel = 0
+        for _, r in ipairs(rows) do r:UnlockHighlight() end
+    end
+    function nav:Take(first)
+        local shown = Shown()
+        local r = shown[self.sel] or (first and shown[1])
+        if not r then return false end
+        self:Reset()
+        r:Click()
+        return true
+    end
+    function nav:Close()
+        if not list:IsShown() then return false end
+        list:Hide()
+        return true
+    end
+    eb:HookScript("OnArrowPressed", function(_, key)
+        local shown = Shown()
+        local n = #shown
+        if n == 0 then return end
+        if key == "DOWN" then
+            nav.sel = nav.sel % n + 1
+        elseif key == "UP" then
+            nav.sel = nav.sel <= 1 and n or nav.sel - 1
+        else
+            return
+        end
+        for i, r in ipairs(shown) do
+            if i == nav.sel then r:LockHighlight() else r:UnlockHighlight() end
+        end
+    end)
+    eb:HookScript("OnTabPressed", function() nav:Take(true) end)
+    eb:HookScript("OnTextChanged", function(_, userInput) if userInput then nav:Reset() end end)
+    list:HookScript("OnHide", function() nav:Reset() end)
+    return nav
+end
+
+--------------------------------------------------------------------------------
 -- TAG AUTOCOMPLETE
 -- Shared dropdown for tag input fields (NoteEditor + NoteConfig).
 -- Modelled on BCB's autocomplete: backdrop frame, row buttons, highlight tex.

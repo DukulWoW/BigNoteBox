@@ -58,8 +58,6 @@ local TRIGGER_KEYS = { "arrive", "leave", "both" }
 local FREQ_KEYS    = { "always", "session", "day", "daily", "weekly", "once" }
 
 local _editors = {}   -- every editor built, for the cross-window reload
-local _popup          -- the waypoint info popup, shared
-local _popupOwner     -- the editor that opened it
 
 -- An addon that takes several named waypoints: TomTom, or MapPinEnhanced
 -- 4.0+ through its pin groups (ALL-421)
@@ -147,113 +145,6 @@ local function NewChoice(panel, keys, labels, onPick)
     return c
 end
 
---------------------------------------------------------------------------------
--- WAYPOINT INFO POPUP (shared, opened beside the editor's window)
---------------------------------------------------------------------------------
-local function LinkButton(f, text, url)
-    local b = BNB.CreateButton(nil, f, text, 200, 22)
-    b:SetScript("OnClick", function() BNB.ShowClipboardHint(url, b, nil, true) end)
-    b:SetScript("OnEnter", function(self)
-        if not self:IsEnabled() then return end   -- addon already installed (ALL-316)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["NC_WP_COPY_URL_TIP"], 0.55, 0.85, 1)
-        GameTooltip:Show()
-    end)
-    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    return b
-end
-
-local function BuildPopup()
-    local f = BNB.CreateBackdropFrame("Frame", "BNBWaypointInfoPopup", UIParent)
-    f:SetSize(310, 210)   -- 20 px shorter (ALL-316)
-    f:SetFrameStrata("DIALOG")
-    f:SetClampedToScreen(true)
-    f:EnableMouse(true); f:SetMovable(true)
-    f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
-    f:SetScript("OnDragStop", f.StopMovingOrSizing)
-    BNB.SetBackdrop(f, 0.08, 0.08, 0.11, 0.96, 0.35, 0.35, 0.38, 1)
-
-    local title = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
-    title:SetPoint("TOPLEFT", f, "TOPLEFT", 14, -12)
-    BNB.SetHeaderColor(title)
-    title:SetText(L["STICKY_WP_SUPPORT_TITLE"])
-
-    -- Our close button (ALL-316); follows skin mode like the window's look
-    local closeBtn = BNB.CreateIconButton(f, 20, "close", { onClick = function() f:Hide() end })
-    closeBtn:SetPoint("TOPRIGHT", f, "TOPRIGHT", -6, -6)
-
-    f._statusLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    f._statusLbl:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10)
-    f._statusLbl:SetWidth(280); f._statusLbl:SetJustifyH("LEFT")
-
-    f._descLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    f._descLbl:SetPoint("TOPLEFT", f._statusLbl, "BOTTOMLEFT", 0, -6)
-    f._descLbl:SetWidth(280); f._descLbl:SetJustifyH("LEFT"); f._descLbl:SetWordWrap(true)
-    f._descLbl:SetTextColor(0.78, 0.78, 0.78)
-
-    local linksHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    linksHdr:SetPoint("TOPLEFT", f._descLbl, "BOTTOMLEFT", 0, -14)
-    linksHdr:SetText(L["STICKY_WP_RECOMMENDED_ADDONS"])
-    BNB.SetTextWhite(linksHdr)
-
-    local wpuiBtn = LinkButton(f, L["STICKY_WP_BTN_WAYPOINTUI"], "https://www.curseforge.com/wow/addons/waypointui")
-    wpuiBtn:SetPoint("TOPLEFT", linksHdr, "BOTTOMLEFT", 0, -6)
-    wpuiBtn:SetPoint("RIGHT", f, "RIGHT", -14, 0)   -- the buttons fill the width (ALL-316)
-    local ttBtn = LinkButton(f, L["STICKY_WP_BTN_TOMTOM"], "https://www.curseforge.com/wow/addons/tomtom")
-    ttBtn:SetPoint("TOPLEFT", wpuiBtn, "BOTTOMLEFT", 0, -4)
-    ttBtn:SetPoint("RIGHT", f, "RIGHT", -14, 0)
-    f._wpuiBtn, f._ttBtn = wpuiBtn, ttBtn
-
-    -- ESC closes one window at a time: copy box, then this popup, then the
-    -- window behind it (ALL-21). A keyboard-enabled frame gets keys before the
-    -- copy box's focused editbox, so close the box here first, the same way
-    -- MainWindow's ESC chain does
-    BNB.AttachEscClose(f, function(self)
-        local ch = BNB._clipboardHint
-        if ch and ch:IsShown() and ch._dismiss then
-            ch._dismiss()
-        else
-            self:Hide()
-        end
-    end)
-    return f
-end
-
-local function TogglePopup(ed)
-    if _popup and _popup:IsShown() and _popupOwner == ed then _popup:Hide(); return end
-    _popup = _popup or BuildPopup()
-    _popupOwner = ed
-    local f = _popup
-    if BNB.HasTomTom() then
-        f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_ADDON"] .. "|r")
-        f._descLbl:SetText(L["NC_WP_FULL_SUPPORT_DETAIL"])
-    elseif HasMPE() then
-        f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_MPE"] .. "|r")
-        f._descLbl:SetText(L["NC_WP_MPE_DETAIL"])
-    elseif HasWaypointUI() and HasRetailPin() then
-        f._statusLbl:SetText("|cff66ff66" .. L["STICKY_WP_STATUS_WAYPOINTUI"] .. "|r")
-        f._descLbl:SetText(L["NC_WP_WAYPOINTUI_DETAIL"])
-    elseif HasRetailPin() then
-        f._statusLbl:SetText("|cffffaa00" .. L["STICKY_WP_STATUS_BASIC"] .. "|r")
-        f._descLbl:SetText(L["NC_WP_BASIC_PIN_DETAIL"])
-    else
-        f._statusLbl:SetText("|cffff5555" .. L["STICKY_WP_STATUS_NONE"] .. "|r")
-        f._descLbl:SetText(L["NC_WP_NO_SUPPORT_DETAIL"])
-    end
-    -- An addon that is installed has nothing to link to (ALL-316)
-    f._wpuiBtn:SetEnabled(not HasWaypointUI())
-    f._ttBtn:SetEnabled(not BNB.HasTomTom())
-    f:ClearAllPoints()
-    if ed.host then
-        f:SetPoint("TOPLEFT", ed.host, "TOPRIGHT", 4, 0)
-    else
-        f:SetPoint("CENTER", UIParent, "CENTER", 0, 100)
-    end
-    f:Show()
-    f:Raise()   -- Note Settings is DIALOG too since 2026-10-04: stay above it
-end
-
 -- ── Waypoint rows (ALL-354) ─────────────────────────────────────────────────
 -- Two lines per waypoint: Name | X, Y on top, Zone | Sub-zone below, a faint
 -- rule between waypoints. The list is the situation list plus two rows tall
@@ -320,6 +211,7 @@ end
 -- Sub-zone suggestions under an edit box while typing (2+ letters), from the
 -- location browser's sub-zone list; a click puts the name in the box and
 -- keeps it focused. Returns the list frame (a press on it is not "outside")
+-- and its arrow-key nav (BNB.AttachListKeys, ALL-427)
 local AC_MAX, AC_ROW_H = 6, 18
 local function AttachSubzoneAC(eb)
     local ac = BNB.CreateBackdropFrame("Frame", nil, eb)
@@ -365,7 +257,7 @@ local function AttachSubzoneAC(eb)
     eb:HookScript("OnEditFocusLost", function()
         C_Timer.After(0.1, function() if not eb:HasFocus() then ac:Hide() end end)
     end)
-    return ac
+    return ac, BNB.AttachListKeys(eb, ac, rows)
 end
 
 -- The waypoint row column under the pointer: the line by y, the column by x
@@ -502,8 +394,8 @@ local function BuildValueAC(panel, valueRow, valueEb)
     acFrame:SetFrameLevel(panel:GetFrameLevel() + 30)
     acFrame:Hide()
 
-    local ac = { frame = acFrame }
     local acRows = {}
+    local ac = { frame = acFrame, rows = acRows }
     function ac:Hide() acFrame:Hide() end
     function ac:Show(matches)
         if #matches == 0 then acFrame:Hide(); return end
@@ -793,6 +685,8 @@ function BNB.CreateSituationEditor(panel, opts)
             if not ac.frame:IsMouseOver() then HideAC() end
         end)
     end)
+    -- Arrow keys over the suggestions (ALL-427); Enter / Esc ask it below
+    local valueNav = BNB.AttachListKeys(valueEb, ac.frame, ac.rows)
 
     browseBtn:SetScript("OnClick", function()
         HideAC()
@@ -1012,7 +906,7 @@ function BNB.CreateSituationEditor(panel, opts)
     local wpStatusTag = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wpStatusTag:SetPoint("LEFT", wpHdr, "RIGHT", 6, 0)
 
-    local wpInfoLbl, wpInfoHit   -- built below; RefreshWPStatusTag shows / hides them
+    local wpInfoLbl   -- built below; RefreshWPStatusTag shows / hides it
     local function RefreshWPStatusTag()
         if BNB.HasTomTom() then
             wpStatusTag:SetText(HasRetailPin() and L["STICKY_WP_TAG_ENHANCED"] or L["STICKY_WP_TAG_ADDON"])
@@ -1030,11 +924,9 @@ function BNB.CreateSituationEditor(panel, opts)
             wpStatusTag:SetText(L["STICKY_WP_TAG_REQUIRED"])
             wpStatusTag:SetTextColor(0.85, 0.30, 0.25)
         end
-        -- Both addons installed: nothing left to explain, no "?" (ALL-316)
-        local both = (BNB.HasTomTom() and HasWaypointUI()) and true or false
-        wpInfoLbl:SetShown(not both)
-        -- The hit frame stays: the tag's tooltip lists the addons (ALL-348)
-        wpInfoHit._both = both
+        -- Both addons installed: nothing left to explain, no "?" (ALL-316).
+        -- The tag still opens Addon integrations
+        wpInfoLbl:SetShown(not (BNB.HasTomTom() and HasWaypointUI()))
     end
 
     -- "?" icon (visual only; the hit frame below takes the click, ALL-316)
@@ -1044,12 +936,15 @@ function BNB.CreateSituationEditor(panel, opts)
     wpInfoLbl:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-mini-question-mark")
     wpInfoLbl:SetAlpha(0.8)
 
-    wpInfoHit = CreateFrame("Button", nil, panel)
+    -- The tag and "?" open Settings > Advanced > Addon integrations, which
+    -- says what each addon does and links the missing ones (Dukul, 2026-10-10;
+    -- it replaced the waypoint info popup)
+    local wpInfoHit = CreateFrame("Button", nil, panel)
     wpInfoHit:SetPoint("LEFT",  wpStatusTag, "LEFT",  -2, 0)
     wpInfoHit:SetPoint("RIGHT", wpInfoLbl,   "RIGHT",  4, 0)
     wpInfoHit:SetHeight(18)
-    wpInfoHit:SetScript("OnClick", function(self)
-        if not self._both then TogglePopup(ed) end
+    wpInfoHit:SetScript("OnClick", function()
+        BNB.OpenSettingsPage("advanced", "integrations")
     end)
     wpInfoHit:SetScript("OnEnter", function(self)
         wpInfoLbl:SetAlpha(1)
@@ -1068,9 +963,7 @@ function BNB.CreateSituationEditor(panel, opts)
         elseif MPENeedsUpdate() then
             GameTooltip:AddLine(string.format(L["WP_ADDON_UPDATE_FMT"], "MapPinEnhanced"), 1, 0.67, 0)
         end
-        if not self._both then
-            GameTooltip:AddLine(L["STICKY_WP_INFO_TIP"], 0.55, 0.85, 1)
-        end
+        GameTooltip:AddLine(L["STICKY_WP_INTEG_TIP"], 0.55, 0.85, 1)
         GameTooltip:Show()
     end)
     wpInfoHit:SetScript("OnLeave", function()
@@ -1163,7 +1056,7 @@ function BNB.CreateSituationEditor(panel, opts)
     wpEditX:SetMaxLetters(16)
     wpEditY:SetMaxLetters(16)
     subEb:SetMaxLetters(64)
-    local subAC = AttachSubzoneAC(subEb)
+    local subAC, subNav = AttachSubzoneAC(subEb)
     local editBoxes = { renameEb, wpEditX, wpEditY, subEb }
     BNB.TabChain(editBoxes)
     local renaming   -- index into note.waypoints of the row being edited
@@ -1173,7 +1066,10 @@ function BNB.CreateSituationEditor(panel, opts)
         editWatch:UnregisterEvent("GLOBAL_MOUSE_DOWN")
         for _, eb in ipairs(editBoxes) do eb:ClearFocus(); eb:Hide() end
     end
-    for _, eb in ipairs(editBoxes) do eb:SetScript("OnEscapePressed", EndRename) end
+    -- Esc with the sub-zone suggestions open closes only them (ALL-427)
+    for _, eb in ipairs(editBoxes) do
+        eb:SetScript("OnEscapePressed", function() if not subNav:Close() then EndRename() end end)
+    end
     wpList:HookScript("OnHide", function() if renaming then EndRename() end end)
 
     -- [Pin Here] [Manual] [Navigate]
@@ -1271,16 +1167,6 @@ function BNB.CreateSituationEditor(panel, opts)
     wpNameEb:SetTextInsets(3, 3, 0, 0)
     BNB.AddPlaceholder(wpNameEb, L["WP_NAME_PLACEHOLDER"])
 
-    -- Without any waypoint support: the red line in the manual row's place
-    -- (Manual is greyed then, so the row never shows)
-    local wpNoSupport = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    wpNoSupport:SetPoint("TOPLEFT",  wpManualRow, "TOPLEFT",  0, 0)
-    wpNoSupport:SetPoint("TOPRIGHT", wpManualRow, "TOPRIGHT", 0, 0)
-    wpNoSupport:SetJustifyH("LEFT"); wpNoSupport:SetWordWrap(true)
-    wpNoSupport:SetTextColor(0.65, 0.40, 0.35)
-    wpNoSupport:SetText(L["NC_WP_INSTALL_ADDON_FEATURE"])
-    wpNoSupport:Hide()
-
     -- Everything below the add row except the waypoints shows only while the
     -- note has a situation
     local typedOnly = { dispDiv, dispLabel, disp.frame, toastBtn, trigLabel, trig.frame, freqLabel, freq.frame }
@@ -1347,7 +1233,6 @@ function BNB.CreateSituationEditor(panel, opts)
         wpPinBtn:SetEnabled(avail); wpManualBtn:SetEnabled(avail)
         wpNavBtn:SetEnabled(avail and n > 0)
         if not avail then wpManualRow:Hide() end
-        if WPAvailable() then wpNoSupport:Hide() else wpNoSupport:Show() end
         RefreshWpChecks()
     end
 
@@ -1546,9 +1431,13 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
 
     addBtn:SetScript("OnClick", AddSituation)
-    valueEb:SetScript("OnEnterPressed", AddSituation)
-    -- ESC while editing drops the edit; the row stays as it was
+    valueEb:SetScript("OnEnterPressed", function()
+        if not valueNav:Take() then AddSituation() end
+    end)
+    -- ESC while editing drops the edit; the row stays as it was. With the
+    -- suggestions open it closes only them (ALL-427)
     valueEb:SetScript("OnEscapePressed", function(self)
+        if valueNav:Close() then if acTimer then acTimer:Cancel(); acTimer = nil end; return end
         if editIndex then
             EndEdit()
             self:SetText("")
@@ -1690,7 +1579,10 @@ function BNB.CreateSituationEditor(panel, opts)
         if subAC:IsShown() and subAC:IsMouseOver() then return end
         CommitEdit()
     end)
-    for _, eb in ipairs(editBoxes) do eb:SetScript("OnEnterPressed", CommitEdit) end
+    -- Enter on an arrow-key highlighted suggestion takes it (ALL-427)
+    for _, eb in ipairs(editBoxes) do
+        eb:SetScript("OnEnterPressed", function() if not subNav:Take() then CommitEdit() end end)
+    end
 
     WpNavigate = function(e)
         local note = NoteID() and BNB.GetNote(NoteID())
@@ -1882,13 +1774,6 @@ function BNB.CreateSituationEditor(panel, opts)
         BNB.NavigateWaypoints(note, list)
     end)
     Tip(wpNavBtn, L["STICKY_WP_NAV_TIP_TITLE"], L["STICKY_WP_NAV_TIP_BODY"], true)
-
-    -- The popup is parented to UIParent, so it would outlive the window
-    if ed.host then
-        ed.host:HookScript("OnHide", function()
-            if _popup and _popupOwner == ed then _popup:Hide() end
-        end)
-    end
 
     -- ── Load a note ──────────────────────────────────────────────────────────
     function ed:Load(noteID)

@@ -89,17 +89,12 @@ function BNB.BuildMainWindowSkinChrome()
         -- Tint the topbar icons (white art) to the accent colour, a hue that
         -- pairs with the preset (BNB.SkinAccentOf, Dukul 2026-10-08).
         -- SetVertexColor + SetDesaturated(true) produces the greyed-out look
-        -- for disabled buttons (history etc.). The BCB button is only tinted
-        -- when BCB is installed; without BCB it shows the promo icon, which
-        -- stays unskinned.
+        -- for disabled buttons (history etc.).
         StyleIcons = function(icons)
             if not BNB.GetSkinPreset then return end
-            local hasBCB = BigChatBox and BigChatBox.SendDirect
             for _, btn in ipairs(icons) do
-                if btn ~= BNB._toolbarImportBtn or hasBCB then
-                    BNB.RegisterSkinAccentTex(btn._tx)
-                    if btn.SetSkinHover then btn:SetSkinHover(true) end   -- ui-hover-64 plate
-                end
+                BNB.RegisterSkinAccentTex(btn._tx)
+                if btn.SetSkinHover then btn:SetSkinHover(true) end   -- ui-hover-64 plate
             end
             BNB.RefreshSkinAccents()
         end,

@@ -30,7 +30,6 @@ local ICON_STEP  = 24   -- toolbar icon size (20) + gap (4); skin mode
 local ICON_STEP_NORMAL = 28
 
 local TOPBAR = "Interface\\AddOns\\BigNoteBox\\Assets\\Topbar\\"
-local BCB_PROMO_ICON = "Interface\\AddOns\\BigNoteBox\\Assets\\BCB\\bcb-icon"
 
 -- Runtime split position (set from DB on first window open)
 BNB._listPaneW = DEFAULT_LIST_W
@@ -822,39 +821,16 @@ function BNB.CreateMainWindow()
     BNB._toolbarAlarmsBtn = alarmOvBtn   -- greyed while no note has an alarm (ALL-352)
     if BNB.SyncAlarmsBtnState then BNB.SyncAlarmsBtnState() end
 
-    -- Send-to-BCB button. Icon: tp-bcb when BCB is installed (four-state art in
-    -- normal mode), bcb-icon when absent. Always full colour. Click: BNB.SendCurrentNoteToBCB (below the
-    -- window builder; ChatCapture wires the same function).
-    local importBtn = TBIcon(
-        (BigChatBox and BigChatBox.SendDirect) and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON,
-        L["MW_BCB_SEND_TIP"], 7,
-        function() BNB.SendCurrentNoteToBCB() end)
-    -- Re-evaluates BCB presence and swaps icon; called after BCB loads late.
-    local function RefreshImportBtn()
-        local hasBCB = BigChatBox and BigChatBox.SendDirect and true or false
-        pcall(function()
-            if skin or not hasBCB then
-                importBtn:SetStateArt(nil, hasBCB and TOPBAR .. "tp-bcb" or BCB_PROMO_ICON)
-            else
-                importBtn:SetStateArt("tp-bcb")
-            end
-            importBtn._tx:SetDesaturated(false)
-            importBtn:SetAlpha(1.0)
-            -- Skin mode, BCB loaded late: the white tp-bcb takes the accent
-            -- and the hover plate like the other icons
-            if skin and hasBCB and BNB.RegisterSkinAccentTex then
-                BNB.RegisterSkinAccentTex(importBtn._tx)
-                importBtn:SetSkinHover(true)
-            end
-        end)
-    end
-    RefreshImportBtn()
-    BNB._toolbarImportBtn = importBtn
-    BNB._refreshImportBtn = RefreshImportBtn
+    -- Send a note (ALL-426): a note search under the button, the picked note
+    -- goes to the Send to Chat window (UI/SendNotePicker.lua). The tp-bcb art
+    -- stands in until the button has its own icon
+    local sendBtn
+    sendBtn = TBIcon(TOPBAR .. "tp-bcb", L["MW_SEND_NOTE_TIP"], 7,
+        function() if BNB.ToggleSendNotePicker then BNB.ToggleSendNotePicker(sendBtn) end end, "tp-bcb")
 
     if chrome.StyleIcons then
         chrome.StyleIcons({ sidebarToggleBtn, configBtn, trashBtn, histBtn,
-            tagsBtn, shareTopBtn, alarmOvBtn, importBtn })
+            tagsBtn, shareTopBtn, alarmOvBtn, sendBtn })
     end
 
     -- ── Sort + order dropdowns — top-left of the toolbar strip ───────────────
@@ -987,7 +963,7 @@ function BNB.CreateMainWindow()
     -- don't overlap them; the sidebar toggle right of the cog stays. Title bar
     -- buttons (focus, lock, close) are never hidden by multiselect.
     BNB.InitToolbarIconRow({
-        configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, importBtn,
+        configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, sendBtn,
     })
     function BNB._setToolbarMultiMode() BNB.ApplyToolbarIcons() end
 
@@ -1256,11 +1232,6 @@ function BNB.CreateMainWindow()
     f._built = true
     BNB.mainFrame = f
 
-    -- Re-check BCB presence each time the window opens (BCB may load after BNB)
-    f:HookScript("OnShow", function()
-        if BNB._refreshImportBtn then BNB._refreshImportBtn() end
-    end)
-
     if BNB._notesAvailable then
         if BNB.BuildNoteList   then BNB.BuildNoteList()   end
         if BNB.BuildNoteEditor then BNB.BuildNoteEditor() end
@@ -1518,24 +1489,6 @@ local function BuildBCBPromo()
 
     f:Hide()
     return f
-end
-
--- The toolbar's Send to BCB: the note into BCB's multi-line box. A BCB with no
--- box (Classic, or switched off in BCB) gets the Send to Chat window instead,
--- which sends line by line through BCB (ALL-367); no BCB = the promo.
-function BNB.SendCurrentNoteToBCB()
-    if not (BigChatBox and BigChatBox.SendDirect) then
-        if BNB.ShowBCBPromo then BNB.ShowBCBPromo() end
-        return
-    end
-    local id   = BNB._currentNoteID
-    local note = id and BNB.GetNote(id)
-    local body = note and (note.body or "") or ""
-    if body == "" then
-        BNB:Print(L["MW_NOTE_EMPTY"])
-        return
-    end
-    if not BNB.OpenInBCB(body) and BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
 end
 
 function BNB.ShowBCBPromo()

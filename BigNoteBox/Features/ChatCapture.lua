@@ -98,17 +98,6 @@ function BNB.SetupChatCapture()
     if _setupDone then return end
     _setupDone = true
 
-    -- Wire the Import toolbar button (always, even without BCB, so the button
-    -- gives useful feedback).
-    -- BNB._toolbarImportBtn is set by MainWindow.lua during frame construction.
-    -- We defer one frame so MainWindow has had time to build the toolbar.
-    C_Timer.After(0, function()
-        local btn = BNB._toolbarImportBtn
-        if btn and btn.SetScript then
-            btn:SetScript("OnClick", function() BNB.SendCurrentNoteToBCB() end)   -- UI/MainWindow.lua
-        end
-    end)
-
     -- Only hook BCB if it is actually loaded
     if not BNB.hasBCB then return end
 

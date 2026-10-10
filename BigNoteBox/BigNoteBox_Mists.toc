@@ -70,6 +70,7 @@ UI\StickyBgPicker.lua
 UI\IconFramePicker.lua
 UI\IconPicker.lua
 UI\SendToChat.lua
+UI\SendNotePicker.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua
 UI\Config\Appearance.lua

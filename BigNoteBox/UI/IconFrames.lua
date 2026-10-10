@@ -55,6 +55,10 @@ local CLASSIC_HIDE = {
     explosiona_32frames512_nature       = true,   -- Poisonous Cloud
     explosiona_32frames512_shadow       = true,   -- Shadow Mist
     explosiona_32frames512_wind         = true,   -- Airy Mist
+    -- (Dukul, Classic, 2026-10-10, ALL-424)
+    ["worldquest-followerabilityframe"] = true,   -- Golden Hunter
+    explosionb_32frames                 = true,   -- Solar Flare
+    talentframeatlas                    = true,   -- Corner Ornament
 }
 
 local function OnThisClient(key)

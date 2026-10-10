@@ -753,6 +753,11 @@ local function BuildShareWindow()
             if not dsAcFrame:IsMouseOver() then DsHideAC() end
         end)
     end)
+    -- Arrow keys over the names (ALL-427): Enter takes a highlighted one,
+    -- Esc closes an open list before the box
+    local dsNav = BNB.AttachListKeys(dsEb, dsAcFrame, _dsAcRows)
+    dsEb:SetScript("OnEnterPressed", function(self) if not dsNav:Take() then self:ClearFocus() end end)
+    dsEb:SetScript("OnEscapePressed", function(self) if not dsNav:Close() then self:ClearFocus() end end)
 
     dsSendBtn:SetScript("OnClick", function()
         DsHideAC()

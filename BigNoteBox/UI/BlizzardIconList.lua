@@ -48,7 +48,9 @@ end
 -- Returns true when the autocomplete has its list.
 function BNB.InitBlizzardIconList(announce)
     local db = BigNoteBoxDB
-    if not (db and db.blizzardIconComplete) then
+    -- Classic: the list is Retail / Forever names, almost none of them exist
+    -- there, so Classic has the curated icons only (Dukul, 2026-10-10, ALL-424)
+    if BNB.IsClassic or not (db and db.blizzardIconComplete) then
         BNB.BlizzardIconList = nil
         return false
     end
