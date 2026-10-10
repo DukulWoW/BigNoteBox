@@ -24,6 +24,8 @@
 --   BNB.SetTldrSnippets(list)    -- nil = back to the defaults; sends TldrSettings
 --   BNB.TldrSnippetsCustom()     -- true when the player changed the list
 --   BNB.TLDR_SNIPPETS_MAX
+--   BNB.NoteTldr(note)           -- the note's tl;dr, nil when none or the module is off
+--   BNB.TldrShows(key)           -- module on and that place's box ticked ("tldrUnderTitle", ...)
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -39,6 +41,16 @@ local DEFAULT_SNIPPETS = {
 
 function BNB.TldrEnabled()
     return not BigNoteBoxDB or BigNoteBoxDB.tldrEnabled ~= false
+end
+
+function BNB.TldrShows(key)
+    return BNB.TldrEnabled() and (not BigNoteBoxDB or BigNoteBoxDB[key] ~= false)
+end
+
+function BNB.NoteTldr(note)
+    local t = note and note.tldr
+    if not BNB.TldrEnabled() or type(t) ~= "string" or not t:find("%S") then return nil end
+    return t
 end
 
 -- The module switch and the per-place boxes both end here, so every surface

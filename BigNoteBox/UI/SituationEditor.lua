@@ -41,6 +41,7 @@ local L   = BNB.L
 local ROW_H  = 24
 local LIST_ROWS, LIST_ROW_H = 5, 20   -- the list box is always 5 rows; the wheel scrolls past that
 local TYPE_W = 110                    -- the add row's type dropdown ("Instance type" fits)
+local TLDR_ROW_H, TLDR_H = 22, 26     -- the tl;dr box at the top; what the tab moves down for it
 
 -- "npc" matches exactly like "player" (target or group); its own kind so the
 -- list says what the note is about (Dukul, 2026-10-04). "guild" matches a
@@ -470,15 +471,61 @@ function BNB.CreateSituationEditor(panel, opts)
                           state = L["SIT_KIND_RESTED"] }
 
     local y = opts.top or -8
+
+    -- ── tl;dr (ALL-372 S2) ───────────────────────────────────────────────────
+    -- One line at the top of the tab (Dukul, 2026-10-10: at the top, not in
+    -- Waypoints): type your own or pick a snippet from the arrow. Hidden with
+    -- the tl;dr module off; everything below moves up into its place (body)
+    local tldrRow = CreateFrame("Frame", nil, panel)
+    tldrRow:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
+    tldrRow:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -ddR, y)   -- ends where the dropdowns end
+    tldrRow:SetHeight(TLDR_ROW_H)
+    local tldrLbl = tldrRow:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    tldrLbl:SetPoint("LEFT", tldrRow, "LEFT", 0, 0)
+    BNB.SetHeaderColor(tldrLbl)
+    tldrLbl:SetText(L["SIT_TLDR_LBL"])
+    local tldrCombo = BNB.CreateTextCombo(tldrRow, 100, TLDR_ROW_H, {
+        values = BNB.TldrSnippets, maxLetters = BNB.TLDR_MAX, placeholder = L["SIT_TLDR_HINT"],
+        onCommit = function(text)
+            local id = NoteID(); if not id then return end
+            local note = BNB.GetNote(id); if not note then return end
+            local t = BNB.CleanTldr(text)
+            if t == note.tldr then return end
+            if t then BNB.UpdateNote(id, { tldr = t })
+            else BNB.UpdateNote(id, { _clear = { "tldr" } }) end
+            Sync(id)
+        end })
+    tldrCombo:ClearAllPoints()
+    tldrCombo:SetPoint("LEFT",  tldrLbl, "RIGHT", 8, 0)
+    tldrCombo:SetPoint("RIGHT", tldrRow, "RIGHT", 0, 0)
+    tldrCombo.eb:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["SIT_TLDR_LBL"], 1, 1, 1)
+        GameTooltip:AddLine(string.format(L["SIT_TLDR_TIP_FMT"], BNB.TLDR_MAX), 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    tldrCombo.eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+    local body = CreateFrame("Frame", nil, panel)
+    body:SetHeight(1)
+    local function PlaceBody()
+        local shift = BNB.TldrEnabled() and -TLDR_H or 0
+        body:ClearAllPoints()
+        body:SetPoint("TOPLEFT",  panel, "TOPLEFT",  0, shift)
+        body:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 0, shift)
+        tldrRow:SetShown(BNB.TldrEnabled())
+    end
+    PlaceBody()
+
     local hdr = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    hdr:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
+    hdr:SetPoint("TOPLEFT", body, "TOPLEFT", padL, y)
     BNB.SetHeaderColor(hdr)
     hdr:SetText(L["SIT_LIST_HDR"])
     y = y - 18
 
     local desc = panel:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    desc:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
-    desc:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
+    desc:SetPoint("TOPLEFT",  body, "TOPLEFT",  padL, y)
+    desc:SetPoint("TOPRIGHT", body, "TOPRIGHT", -padR, y)
     desc:SetTextColor(0.60, 0.60, 0.60)
     desc:SetText(L["SIT_LIST_DESC"])
     desc:SetJustifyH("LEFT")
@@ -494,8 +541,8 @@ function BNB.CreateSituationEditor(panel, opts)
     local LIST_H = LIST_ROWS * LIST_ROW_H + 4
     local list = BNB.CreateBackdropFrame("Frame", nil, panel)
     BNB.SetBackdropDark(list)
-    list:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
-    list:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
+    list:SetPoint("TOPLEFT",  body, "TOPLEFT",  padL, y)
+    list:SetPoint("TOPRIGHT", body, "TOPRIGHT", -padR, y)
     list:SetHeight(LIST_H)
     y = y - LIST_H - 6
 
@@ -572,13 +619,13 @@ function BNB.CreateSituationEditor(panel, opts)
                           L["STICKY_KIND_GUILD"], L["SIT_KIND_ITYPE"], L["SIT_KIND_OPEN"],
                           L["SIT_KIND_RESTED"] }
     local typ = NewChoice(panel, TYPES, TYPE_LABELS, function(k) SelectType(k) end)
-    typ.frame:SetPoint("TOPLEFT", panel, "TOPLEFT", padL, y)
+    typ.frame:SetPoint("TOPLEFT", body, "TOPLEFT", padL, y)
     typ.frame:SetWidth(TYPE_W)
 
     -- Spans the whole row: the autocomplete and the zone picker hang from it
     local valueRow = CreateFrame("Frame", nil, panel)
-    valueRow:SetPoint("TOPLEFT",  panel, "TOPLEFT",  padL, y)
-    valueRow:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -padR, y)
+    valueRow:SetPoint("TOPLEFT",  body, "TOPLEFT",  padL, y)
+    valueRow:SetPoint("TOPRIGHT", body, "TOPRIGHT", -padR, y)
     valueRow:SetHeight(ROW_H)
 
     local valueEb = CreateFrame("EditBox", nil, valueRow, "BackdropTemplate")
@@ -1129,14 +1176,17 @@ function BNB.CreateSituationEditor(panel, opts)
     wpNoTrackChk:SetPoint("TOPLEFT", wpLeaveChk, "TOPLEFT", CHK_COL_X, 0)
     wpLeaveChk._lbl:SetPoint("RIGHT", wpNoTrackChk, "LEFT", -2, 0)
 
-    -- Manual row (hidden until Manual is clicked) under the checkboxes:
-    -- X, Y and an optional name; nothing else lives there, so nothing has to
-    -- move (ALL-233)
+    -- Manual row (hidden until Manual is clicked): X, Y and an optional name.
+    -- It takes the checkboxes' place while open, so nothing has to move
+    -- (ALL-233); it sat under them until the tl;dr row took that room
+    -- (ALL-372, 2026-10-10)
     local wpManualRow = CreateFrame("Frame", nil, panel)
     wpManualRow:SetHeight(22)
-    wpManualRow:SetPoint("TOPLEFT",  wpPinBtn, "BOTTOMLEFT", 0, -(2 + 24 + 4))
+    wpManualRow:SetPoint("TOPLEFT",  wpPinBtn, "BOTTOMLEFT", 0, -3)
     wpManualRow:SetPoint("TOPRIGHT", panel,    "TOPRIGHT",  -padR, 0)
     wpManualRow:Hide()
+    wpManualRow:HookScript("OnShow", function() wpLeaveChk:Hide(); wpNoTrackChk:Hide() end)
+    wpManualRow:HookScript("OnHide", function() wpLeaveChk:Show(); wpNoTrackChk:Show() end)
 
     local function CoordBox(anchor, label)
         local lbl = wpManualRow:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -1796,6 +1846,7 @@ function BNB.CreateSituationEditor(panel, opts)
         CancelPending()
         self.noteID = noteID
         local note = noteID and BNB.GetNote(noteID)
+        tldrCombo:SetText(note and note.tldr or "")
         local cd = note and note.contextDisplay
         disp:Set((cd == "sticky" or cd == "both") and cd or "popup")
         local lv = note and note.contextLeave
@@ -1833,10 +1884,16 @@ function BNB.CreateSituationEditor(panel, opts)
     ShowTypedControls(false)
     RefreshWaypoints()
 
+    -- tl;dr module switched (ALL-372): the row comes or goes and the tab
+    -- moves with it, the cover below too
+    BNB.RegisterMessage("SituationEditorTldr" .. #_editors, "TldrSettings", PlaceBody)
+
     -- Situations module off (ALL-375): the tab stays, covered by a line that
-    -- says so and a way to the switch; the note's situations are kept
+    -- says so and a way to the switch; the note's situations are kept. The
+    -- tl;dr row is its own module and stays usable above the cover
     local off = CreateFrame("Frame", nil, panel)
-    off:SetAllPoints(panel)
+    off:SetPoint("TOPLEFT", body, "TOPLEFT", 0, (opts.top or -8) + 4)
+    off:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", 0, 0)
     off:SetFrameLevel(panel:GetFrameLevel() + 50)
     off:EnableMouse(true)
     off:EnableMouseWheel(true)

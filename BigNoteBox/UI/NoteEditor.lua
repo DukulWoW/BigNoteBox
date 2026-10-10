@@ -185,6 +185,7 @@ end
 -- AddPlaceholder called ONCE at build time.
 --------------------------------------------------------------------------------
 local RICH_BADGE_SIZE = 22
+local TITLE_H, TLDR_LINE_H = 36, 12  -- the title box; what a tl;dr line under it adds (ALL-372)
 
 -- Shows the rich badge for a rich note and moves the title's right edge
 -- clear of it. Run by LoadNoteInEditor, which every rich/plain switch calls.
@@ -200,12 +201,14 @@ local function BuildTitleField(parent)
     local bg = BNB.CreateBackdropFrame("Frame", nil, parent)
     bg:SetPoint("TOPLEFT",  parent, "TOPLEFT",  PAD,  -PAD)
     bg:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -PAD, -PAD)
-    bg:SetHeight(36)
+    bg:SetHeight(TITLE_H)
     BNB.SetBackdrop(bg, 0.06, 0.06, 0.09, 0, 0.30, 0.30, 0.32, 0)
 
+    -- The box keeps the title's height; a tl;dr line makes bg taller under it
     local eb = CreateFrame("EditBox", nil, bg)
-    eb:SetPoint("TOPLEFT",    bg, "TOPLEFT",    6, 0)
-    eb:SetPoint("BOTTOMRIGHT",bg, "BOTTOMRIGHT",-6, 0)
+    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, 0)
+    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", -6, 0)
+    eb:SetHeight(TITLE_H)
     local boldPath = BNB.GetBoldFont and BNB.GetBoldFont()
     if boldPath then
         pcall(function() eb:SetFont(boldPath, BNB.FontPx(boldPath, 20), "") end)
@@ -222,7 +225,7 @@ local function BuildTitleField(parent)
     -- shows on rich results (Dukul, 2026-09-27). Shown by RefreshRichBadge.
     local richBadge = CreateFrame("Frame", nil, bg)
     richBadge:SetSize(RICH_BADGE_SIZE, RICH_BADGE_SIZE)
-    richBadge:SetPoint("RIGHT", bg, "RIGHT", -6, 0)
+    richBadge:SetPoint("RIGHT", eb, "RIGHT", 0, 0)
     local richTx = richBadge:CreateTexture(nil, "ARTWORK")
     richTx:SetAllPoints()
     -- Skin mode: Dukul's white s-icon-skin-rich in the skin's accent colour
@@ -243,6 +246,29 @@ local function BuildTitleField(parent)
     richBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
     richBadge:Hide()
     BNB._editorRichBadge = richBadge
+
+    -- tl;dr under the title (ALL-372): "tl;dr - <text>", 8 pt in the UI
+    -- font, not the title's (Dukul, 2026-10-08). Filled by RefreshEditorTldr
+    -- Pinned to the bottom of bg with a fixed height, so the underline (bg's
+    -- bottom) stays under it whatever the font's line height (it ran through
+    -- the text when hung from the title box, Dukul 2026-10-10)
+    local tldr = bg:CreateFontString(nil, "OVERLAY")
+    tldr:SetPoint("BOTTOMLEFT",  bg, "BOTTOMLEFT",  8, 2)
+    tldr:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -8, 2)
+    tldr:SetHeight(TLDR_LINE_H)
+    tldr:SetJustifyH("LEFT")
+    tldr:SetJustifyV("MIDDLE")
+    tldr:SetWordWrap(false)
+    BNB.SetFontSafe(tldr, BNB.GetUIFont(), 8, "BNBFontNormalSmall")
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
+        local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+        tldr:SetTextColor(br * 0.90, bg_ * 0.90, bb * 0.90)
+        BNB.RegisterSkinLabel(tldr, 0.90)
+    else
+        tldr:SetTextColor(0.65, 0.65, 0.65)
+    end
+    tldr:Hide()
+    BNB._editorTldr = tldr
 
     -- Underline (always visible)
     local underline = BNB.CreateNoteRule(parent)
@@ -1401,6 +1427,36 @@ BNB.RegisterMessage("NoteEditorTitleColor", "NoteChanged", function(_, id, field
     BNB._editorTitle:SetRealColor(note and note.titleColor)
 end)
 
+-- The tl;dr line under the title (ALL-372): shown while the open note has
+-- one and the module and its "Under the note title" box are on; the title
+-- box grows by the line, so everything under it moves down
+function BNB.RefreshEditorTldr()
+    local fs, bg = BNB._editorTldr, BNB._editorTitleBg
+    if not fs or not bg then return end
+    local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    local t = BNB.TldrShows("tldrUnderTitle") and BNB.NoteTldr(note)
+    if t then
+        fs:SetText(string.format(L["NE_TLDR_FMT"], t))
+        fs:Show()
+    else
+        fs:Hide()
+    end
+    bg:SetHeight(t and TITLE_H + TLDR_LINE_H or TITLE_H)
+end
+
+BNB.RegisterMessage("NoteEditorTldr", "NoteChanged", function(_, id, fields)
+    if id ~= BNB._currentNoteID or not fields then return end
+    local touched = fields.tldr ~= nil
+    for _, k in ipairs(fields._clear or {}) do
+        if k == "tldr" then touched = true end
+    end
+    if touched then BNB.RefreshEditorTldr() end
+end)
+BNB.RegisterMessage("NoteEditorTldrSettings", "TldrSettings", function() BNB.RefreshEditorTldr() end)
+BNB.RegisterMessage("NoteEditorTldrFont", "UIFontChanged", function()
+    BNB.SetFontSafe(BNB._editorTldr, BNB.GetUIFont(), 8, "BNBFontNormalSmall")
+end)
+
 -- Public: rebuild chips for current note
 function BNB.RefreshTagStrip()
     if not tagStripFrame then return end
@@ -1647,6 +1703,7 @@ function BNB.LoadNoteInEditor(id)
         titleEb:SetRealColor(note.titleColor)   -- the note's title colour (ALL-260)
         titleEb:SetRealText(note.title or "")
     end
+    BNB.RefreshEditorTldr()
     if bodyEb  then
         bodyEb:SetRealText(note.body or "")
         if BNB._editorBodyScroll then

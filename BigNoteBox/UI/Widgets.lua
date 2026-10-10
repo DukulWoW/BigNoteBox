@@ -1701,6 +1701,74 @@ function BNB.CreateNumberCombo(parent, lo, hi, initial, width, height, opts)
     return c
 end
 
+-- A text box with a dropdown arrow, as CreateNumberCombo for text (the tl;dr
+-- box, ALL-372): type your own, or open the arrow and pick from a list, which
+-- replaces the text. opts:
+--   values()       -> the list to offer, read each time the menu opens
+--   maxLetters     -- the box's limit
+--   placeholder    -- grey hint while empty
+--   onCommit(text) -- Enter, focus lost or a pick; text = the box's text
+-- c:SetText(t) / c:GetText() / c:SetEnabled(on); c.eb is the edit box
+function BNB.CreateTextCombo(parent, width, height, opts)
+    opts = opts or {}
+    local c = CreateFrame("Frame", nil, parent)
+    c:SetSize(width, height)
+
+    local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, c, "WowStyle1DropdownTemplate"))
+    dd:SetToplevel(true); dd:SetAllPoints(c)
+    if dd.Text then dd.Text:SetAlpha(0) end
+    local eb = CreateFrame("EditBox", nil, dd)
+    eb:SetPoint("TOPLEFT", dd, "TOPLEFT", 4, 0)
+    eb:SetPoint("BOTTOMRIGHT", dd, "BOTTOMRIGHT", -22, 0)  -- leave the arrow clickable
+    eb:SetFrameLevel(dd:GetFrameLevel() + 2)
+    eb:SetAutoFocus(false)
+    if opts.maxLetters then eb:SetMaxLetters(opts.maxLetters) end
+    eb:SetFontObject("BNBFontHighlightSmall"); eb:SetJustifyH("LEFT")
+    eb:SetTextInsets(6, 4, 0, 0)
+    if opts.placeholder then
+        BNB.AddPlaceholder(eb, opts.placeholder)
+    else
+        eb.GetRealText = eb.GetText
+        eb.SetRealText = function(self, t) self:SetText(t or "") end
+    end
+    c.eb = eb
+
+    function c:SetText(t) eb:SetRealText(t or ""); eb:SetCursorPosition(0) end
+    function c:GetText() return eb:GetRealText() or "" end
+    function c:SetEnabled(on)
+        on = on and true or false
+        if not on then eb:ClearFocus() end
+        eb:EnableMouse(on)
+        dd:SetEnabled(on)
+        c:SetAlpha(on and 1 or 0.45)
+    end
+
+    local function Commit()
+        if opts.onCommit then opts.onCommit(c:GetText()) end
+    end
+    -- AddPlaceholder owns the focus scripts: hook, never replace
+    eb:HookScript("OnEditFocusLost", function(self)
+        self:HighlightText(0, 0)
+        Commit()
+    end)
+    eb:SetScript("OnEnterPressed", function(self) self:ClearFocus() end)   -- focus lost commits
+    eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+
+    dd:SetupMenu(function(_, root)
+        local cur = c:GetText()
+        for _, s in ipairs(opts.values and opts.values() or {}) do
+            root:CreateRadio(s,
+                function() return cur == s end,
+                function()
+                    eb:ClearFocus()
+                    c:SetText(s)
+                    Commit()
+                end)
+        end
+    end)
+    return c
+end
+
 -- Tab / Shift+Tab steps through the edit boxes in list order, wrapping at both
 -- ends, and selects the text it lands in (dialog fields, ALL-255).
 function BNB.TabChain(boxes)
