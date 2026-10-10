@@ -213,13 +213,28 @@ local function BuildGeneralTab(sf, ct)
     if moreFs and moreFs.GetStringWidth then
         moreBtn:SetWidth(math.max(160, math.ceil(moreFs:GetStringWidth()) + 40))
     end
+    -- Under it, a button per download site that copies its link (ALL-431)
+    local LINK_SZ, LINK_GAP = 28, 6
+    local LINKS_H = 6 + LINK_SZ
     if langTopY then
-        -- Centred on the Language section, header to dropdown
-        moreBtn:SetPoint("RIGHT", ct, "TOPRIGHT", 0, math.floor((langTopY + y) / 2))
+        -- More Features + the links centred on the Language section, header to dropdown
+        moreBtn:SetPoint("RIGHT", ct, "TOPRIGHT", 0, math.floor((langTopY + y) / 2) + math.floor(LINKS_H / 2))
     else
         y = AddRule(ct, y) - 4
         moreBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        y = y - 26 - 10
+        y = y - 26 - LINKS_H - 10
+    end
+    do
+        local SITES = BNB.SITE_LINKS
+        local rowW = #SITES * LINK_SZ + (#SITES - 1) * LINK_GAP
+        for i, site in ipairs(SITES) do
+            local url = site.url
+            local b = BNB.CreateIconButton(ct, LINK_SZ, site.key, {
+                tip = site.name, tipSub = string.format(L["CFG_SITE_LINK_TIP"], site.name), tipWrap = true,
+                onClick = function(self) BNB.ShowClipboardHint(url, self, true, true) end,
+            })
+            b:SetPoint("TOPLEFT", moreBtn, "BOTTOM", -math.floor(rowW / 2) + (i - 1) * (LINK_SZ + LINK_GAP), -6)
+        end
     end
     moreBtn:SetScript("OnClick", function()
         if BNB.FeatureList then BNB.FeatureList.Open() end

@@ -113,7 +113,7 @@ local function InCombat()
 end
 
 function T.AnchorPoint()
-    return "CENTER", UIParent, "CENTER", Setting("popupAnchorX") or 0, Setting("popupAnchorY") or 200
+    return "CENTER", UIParent, "CENTER", Setting("popupAnchorX"), Setting("popupAnchorY")
 end
 
 -- The size (screen units) of a toast drawn in a style
@@ -451,7 +451,7 @@ function T.Show(spec)
         if mode == "drop" then return end
         if mode ~= "show" then _waitCombat[#_waitCombat + 1] = spec; return end
     end
-    _ax, _ay = Setting("popupAnchorX") or 0, Setting("popupAnchorY") or 200
+    _ax, _ay = Setting("popupAnchorX"), Setting("popupAnchorY")
     if #_shown < MaxShown() then Add(spec) else _queue[#_queue + 1] = spec end
     UpdateMore()
 end
@@ -493,7 +493,7 @@ end
 
 -- After a settings change (grow direction, Max shown, Slide in, position)
 function T.Relayout()
-    _ax, _ay = Setting("popupAnchorX") or 0, Setting("popupAnchorY") or 200
+    _ax, _ay = Setting("popupAnchorX"), Setting("popupAnchorY")
     -- Fewer allowed than on screen: the newest go back to the queue front
     while #_shown > MaxShown() do
         local f = _shown[#_shown]
@@ -625,7 +625,7 @@ local function CreateAnchor()
     f:SetScript("OnDragStop", function(self)
         BNB.StopDragMoving(self)
         SaveAnchor(self)
-        PrintAnchorPos(BigNoteBoxDB and BigNoteBoxDB.popupAnchorX or 0, BigNoteBoxDB and BigNoteBoxDB.popupAnchorY or 0)
+        PrintAnchorPos(Setting("popupAnchorX"), Setting("popupAnchorY"))
     end)
     f:SetScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" then T.LockAnchor() end

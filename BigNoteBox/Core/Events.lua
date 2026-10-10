@@ -374,13 +374,17 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
     C_Timer.After(0.5, function()
         if BNB.Initialize then BNB.Initialize() end
         BNB.ShowForeverNoticeIfDue()
-        -- Show What's New popup if the user has updated since they last saw it.
-        -- Suppressed during first-time setup so the wizard isn't interrupted.
+        -- After an update: the patch note + its toast (ALL-409). During
+        -- first-time setup the version is only stamped, so a new install gets
+        -- no patch note and the wizard isn't interrupted.
         C_Timer.After(0.5, function()
+            -- The welcome note (ALL-242): a fresh install only, once per account
             if BNB.WhatsNew and BNB.WhatsNew.CheckAndShow then
                 local db = BigNoteBoxDB
-                if not (db and db.setupComplete == true) then return end
-                BNB.WhatsNew.CheckAndShow()
+                local newInstall = not (db and db.setupComplete == true)
+                BNB.WhatsNew.CheckAndShow(newInstall)
+                BNB.WhatsNew.CheckWelcome(newInstall)
+                BNB.WhatsNew.ShowWelcomeToast()   -- held back until setup was done
             end
         end)
         -- Show migration popup if any supported addon is detected and not dismissed.

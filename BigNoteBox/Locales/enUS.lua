@@ -39,6 +39,7 @@ local L = BigNoteBox.L
 L["ADDON_NAME"]   = "BigNoteBox"
 L["AUTHOR"]       = "by Dukul"
 L["CFG_AUTHOR_TIP"] = "Copy the link to dukul.net"
+L["CFG_SITE_LINK_TIP"] = "Copy the link to BigNoteBox on %s"   -- %s = GitHub, CurseForge, Wago, WoWInterface (ALL-431)
 L["LOADED_MSG"]   = "BigNoteBox v%s loaded! Type /bnb for options."
 
 -- ── Shared UI ─────────────────────────────────────────────────────────────────
@@ -351,6 +352,26 @@ L["OPT_OPEN_SETTINGS_BTN"]= "Open Settings"
 
 -- ── What's New window ─────────────────────────────────────────────────────────
 L["WN_TITLE_FMT"]         = "What's new in BigNoteBox v%s"
+-- The patch note and its toast after an update (ALL-409)
+L["PN_NOTE_TITLE"]        = "BigNoteBox v%s patch notes"
+L["PN_NOTE_HEADING"]      = "Changes in v%s"
+L["PN_TOAST_TITLE"]       = "BigNoteBox updated"
+L["PN_TOAST_TEXT"]        = "v%s: the patch notes are in a pinned note. Click to read them."
+-- The welcome note on a fresh install (ALL-242), written by Dukul. Keep
+-- "BigNoteBox", "GitHub", "CurseForge", "Wago.io" and "WoWInterface" exactly
+-- as written: the note colours the name and turns the site names into links.
+L["WNOTE_TITLE"]          = "Welcome to BigNoteBox!"
+L["WNOTE_GREET_HORDE"]    = "Lok'tar Ogar!"
+L["WNOTE_GREET_ALLIANCE"] = "Greetings, ally!"
+L["WNOTE_GREET_NEUTRAL"]  = "Greetings, traveler!"
+L["WNOTE_P1"]             = "Thank you so much for downloading BigNoteBox! This has been a labor of love for the past 9 months, and I think this can be very useful for your travels around Azeroth."
+L["WNOTE_P1_FOREVER"]     = "Thank you so much for downloading BigNoteBox! This has been a labor of love for the past 9 months, and now with the launch of WoW: Forever, I think this can be very useful for your travels around Azeroth."
+L["WNOTE_P2"]             = "Have a look around and get to know the addon. I promise you that what might seem like a note taking app on the surface, has a bunch of powerful and useful features underneath. When you learn to harness the power of BigNoteBox, it will go from a tool to a companion."
+L["WNOTE_P3"]             = "Again, thanks for downloading and using it! If you find any bugs, or want to request changes or features, you can do so on the GitHub Repo, CurseForge, Wago.io and WoWInterface."
+L["WNOTE_BYE_HORDE"]      = "For the Horde!"
+L["WNOTE_BYE_ALLIANCE"]   = "For the Alliance!"
+L["WNOTE_BYE_NEUTRAL"]    = "For Azeroth!"
+L["WNOTE_TOAST_TEXT"]     = "A note from Dukul is pinned at the top of your list. Click to read it."
 
 -- ── History window ────────────────────────────────────────────────────────────
 L["HW_TIME_UNKNOWN"]      = "Unknown"
@@ -1685,6 +1706,10 @@ L["CFG_DEV_MODE_COPIED_FMT"]        = "|cffff9900Dev mode|r: first run, copied %
 L["CFG_DEV_WP_LABEL"]               = "Test waypoint system"
 L["CFG_DEV_WP_TIP"]                 = "When enabled, prints waypoint debug info to chat:"
 L["CFG_DEV_TOAST_TIP_BODY"]         = "Triggers CheckContextualNotes as if you just entered your current zone."
+L["CFG_DEV_WELCOMENOTE_BTN"]        = "Fire Welcome Note"
+L["CFG_DEV_WELCOMENOTE_TIP_BODY"]   = "Makes the welcome note a fresh install gets, for this character's faction (Horde, Alliance or Neutral). Every click makes another one, with its toast."
+L["CFG_DEV_PATCHNOTE_BTN"]          = "Fire Patch Note"
+L["CFG_DEV_PATCHNOTE_TIP_BODY"]     = "Does what an update does: makes the patch note for this version and shows its toast. The last patch note is replaced unless it was edited or lost its Bnb tag."
 L["CFG_DEV_IMM_LABEL"]              = "Debug Immersion button position"
 L["CFG_DEV_IMM_TIP"]                = "When enabled, prints the saved X/Y offset to chat every time you shift-drag and release the button."
 L["CFG_DEV_CTX_TRACE_LABEL"]        = "Trace situation checks"
@@ -2877,6 +2902,9 @@ L["CFG_TOAST_SRC_TASKS_TIP"]       = "A toast listing a note's tasks when a task
 -- Alarm toasts (ALL-385)
 L["CFG_TOAST_SRC_ALARMS"]          = "Alarms"
 L["CFG_TOAST_SRC_ALARMS_TIP"]      = "On: Alarms you missed (offline or in combat) show as toasts, and alarms set to show as a toast in Settings > Modules > Alarms. Needs Alarms on.\n\nOff: They use the alarm window."
+-- Patch note toast (ALL-409)
+L["CFG_TOAST_SRC_PATCHNOTES"]      = "Messages from BigNoteBox"
+L["CFG_TOAST_SRC_PATCHNOTES_TIP"]  = "On: After an update, a toast says the patch notes are in a new pinned note; on a fresh install, one points to the welcome note. It stays until you click it.\n\nOff: The notes are still made, without a toast. The What's New window opens from the version button in Settings > General."
 L["CFG_ALARM_SHOW_AS"]             = "Show alarms as"
 L["CFG_ALARM_SHOW_WINDOW"]         = "The alarm window"
 L["CFG_ALARM_SHOW_TOAST"]          = "A toast"

@@ -1,12 +1,13 @@
 -- BigNoteBox UI/WhatsNew.lua
 --
--- "What's New?" popup shown once per version after an update.
--- Also openable at any time via the version button in Settings > General.
+-- "What's New?" window, opened from the version button in Settings > General
+-- (and /bnb whatsnew). Since ALL-409 an update no longer opens it: the release
+-- becomes a pinned patch note plus a toast (see "Patch note" below).
 --
 -- PUBLIC API:
---   BNB.WhatsNew.Open(showOverlay)   -- showOverlay: true = auto-popup, false = manual open
+--   BNB.WhatsNew.Open(showOverlay)   -- showOverlay: true = dimmer behind it, false = none
 --   BNB.WhatsNew.Close()
---   BNB.WhatsNew.CheckAndShow()      -- called on login; shows if version is new
+--   BNB.WhatsNew.CheckAndShow(newInstall)  -- called on login; the patch note + toast if the version is new
 --
 -- DATA:
 --   BNB.PATCH_NOTES  (defined in UI/WhatsNewData.lua)
@@ -17,7 +18,8 @@
 --                          this client does not auto-show.
 --
 -- PERSISTENCE:
---   BigNoteBoxDB.lastSeenWhatsNewVersion  -- set to version on close; cleared on version bump
+--   BigNoteBoxDB.lastSeenWhatsNewVersion  -- set to version on close (no longer read)
+--   NotesDB().patchNote = { version, id, sum }  -- the patch note made for a version
 --
 -- WINDOW SIZING:
 --   Width  : CFG_W (480px) -- same as ConfigWindow
@@ -351,16 +353,294 @@ function WN.Close()
     end
 end
 
+-- ── Patch note (ALL-409) ─────────────────────────────────────────────────────
+-- An update no longer opens the window: the release's lines become a pinned,
+-- favourite, Global note (rich while Rich Notes is on) tagged Bnb / V1.23.0 /
+-- V1.23, plus a toast that waits for a click (source "patchnotes", so it
+-- follows the Toasts module). The window stays on the version button.
+--
+-- Bookkeeping lives in the active notes set, so dev mode (its own notes DB)
+-- gets its own note: NotesDB().patchNote = { version, id, sum }. sum is a
+-- checksum of the title and body as written; the next version's note replaces
+-- the old one only while that still matches and the Bnb tag is on it (the
+-- player did not edit it or untag it). Pin / favourite do not count.
+local PN_TAG    = "BNB"
+local PN_GREEN  = "66bb6a"
+local PN_ORDER  = { "New", "Change", "Fixed" }   -- other labels follow, as found
+local PN_LABELS = { Changed = "Change" }          -- spellings WhatsNewData allows
+
+local function PatchTags(version)
+    local minor = version:match("^(%d+%.%d+)")
+    local tags = { BNB.NormalizeTag(PN_TAG), BNB.NormalizeTag("v" .. version) }
+    if minor and minor ~= version then tags[#tags + 1] = BNB.NormalizeTag("v" .. minor) end
+    return tags
+end
+
+local function Checksum(note)
+    local s = (note.title or "") .. "\n" .. (note.body or "")
+    local h = 5381
+    for i = 1, #s do h = (h * 33 + s:byte(i)) % 4294967296 end
+    return h
+end
+
+local function HasTag(note, tag)
+    for _, t in ipairs(note.tags or {}) do
+        if t == tag then return true end
+    end
+    return false
+end
+
+-- "|cff66bb6aNew:|r text" -> "New", "text"; a line with no label -> "", line
+local function SplitLabel(entry)
+    local label, text = entry:match("^|c%x%x%x%x%x%x%x%x(%a+):|r%s*(.*)$")
+    if not label then label, text = entry:match("^(%a+):%s+(.*)$") end
+    if not label then return "", entry end
+    return PN_LABELS[label] or label, text
+end
+
+-- Colour codes in a line: markup for a rich note, gone from a plain one.
+-- Braces become parentheses first in a rich note, so text such as "{p}" in
+-- a patch line is never read as a tag (a repair would change the body).
+local function LineText(text, rich)
+    if rich then
+        text = text:gsub("{", "("):gsub("}", ")")
+        text = text:gsub("|c%x%x(%x%x%x%x%x%x)", "{col:%1}"):gsub("|r", "{/col}")
+    else
+        text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    end
+    return text
+end
+
+local function PatchBody(version, entries, rich)
+    local groups, order = {}, {}
+    for _, label in ipairs(PN_ORDER) do groups[label] = {} end
+    for _, entry in ipairs(entries) do
+        local label, text = SplitLabel(entry)
+        if not groups[label] then groups[label] = {}; order[#order + 1] = label end
+        table.insert(groups[label], text)
+    end
+    -- Unlabelled lines first, then New / Change / Fixed, then any other label
+    local seq = {}
+    if groups[""] then seq[1] = "" end
+    for _, label in ipairs(PN_ORDER) do seq[#seq + 1] = label end
+    for _, label in ipairs(order) do
+        if label ~= "" then seq[#seq + 1] = label end
+    end
+
+    local heading = string.format(L["PN_NOTE_HEADING"], version)
+    local out = { rich and ("{h1}" .. heading .. "{/h1}") or heading }
+    for _, label in ipairs(seq) do
+        local lines = groups[label]
+        if #lines > 0 then
+            if label ~= "" then
+                if rich then
+                    out[#out + 1] = "{h3}{col:" .. PN_GREEN .. "}" .. label .. "{/col}{/h3}"
+                else
+                    out[#out + 1] = ""
+                    out[#out + 1] = label
+                end
+            elseif not rich then
+                out[#out + 1] = ""
+            end
+            for _, text in ipairs(lines) do
+                local bullet = rich and ("{col:" .. PN_GREEN .. "}-{/col} ") or "- "
+                out[#out + 1] = bullet .. LineText(text, rich)
+            end
+        end
+    end
+    return table.concat(out, "\n")
+end
+
+-- The previous version's note goes, unless the player made it theirs
+local function RemoveOldPatchNote(ndb)
+    local pn = ndb.patchNote
+    local old = pn and pn.id and ndb.notes and ndb.notes[pn.id]
+    if not old then return end
+    if not HasTag(old, BNB.NormalizeTag(PN_TAG)) then return end
+    if Checksum(old) ~= pn.sum then return end
+    BNB.DeleteNote(pn.id, true)
+end
+
+-- A note from BigNoteBox itself (patch note, welcome note): Global, pinned,
+-- favourite, and made nowhere, so no creation spot
+local function MakeAddonNote(title, body, rich, tags)
+    local id = BNB.CreateNote(title, body)
+    if not id then return nil end
+    BNB.UpdateNote(id, {
+        scope = "global", tags = tags,
+        pinned = true, favorited = true, richMode = rich,
+        _clear = { "coordX", "coordY", "coordMapID", "coordZone", "coordSubzone" },
+    })
+    return id
+end
+
+local function CreatePatchNote(version, entries)
+    local rich = BNB.RichEnabled and BNB.RichEnabled() or false
+    return MakeAddonNote(string.format(L["PN_NOTE_TITLE"], version),
+        PatchBody(version, entries, rich), rich, PatchTags(version))
+end
+
+local function ShowPatchToast(version, id)
+    if not (BNB.Toast and BNB.Toast.Show) then return end
+    BNB.Toast.Show({
+        key    = "patchnotes",
+        source = "patchnotes",
+        title  = L["PN_TOAST_TITLE"],
+        text   = string.format(L["PN_TOAST_TEXT"], version),
+        hold   = 0,   -- waits for a click
+        onClick = function()
+            if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id) end
+        end,
+    })
+end
+
 -- ── Public: CheckAndShow ──────────────────────────────────────────────────────
--- Called on PLAYER_LOGIN after Initialize(). Shows with overlay if the
--- current version hasn't been seen yet. No-op otherwise.
-function WN.CheckAndShow()
+-- Called on login after Initialize(). Once per version per notes set: makes
+-- the patch note and shows its toast (ALL-409). newInstall = setup not done
+-- yet: the version is only stamped, a new player gets no patch note for the
+-- version they installed. The window opens from the version button only.
+function WN.CheckAndShow(newInstall)
     local data = BNB.PATCH_NOTES
     if not data or not data.version then return end
+    local ndb = BNB.NotesDB and BNB.NotesDB()
+    if type(ndb) ~= "table" or type(ndb.notes) ~= "table" then return end
+    local pn = ndb.patchNote
+    if type(pn) == "table" and pn.version == data.version then return end
+    if type(pn) ~= "table" then pn = {} end
+    pn.version = data.version
+    ndb.patchNote = pn
+    if newInstall then return end
+    -- Nothing for this client in this release (e.g. a Forever-only patch on
+    -- Retail): the last patch note stays
+    local entries = ClientEntries(data.entries)
+    if #entries == 0 then return end
+    RemoveOldPatchNote(ndb)
+    local id = CreatePatchNote(data.version, entries)
+    if not id then return end
+    pn.id, pn.sum = id, Checksum(BNB.GetNote(id))
+    ShowPatchToast(data.version, id)
+end
+
+-- ── Welcome note (ALL-242) ───────────────────────────────────────────────────
+-- Dukul's note to a new player, made once on a fresh install: Horde, Alliance
+-- or (a Pandaren before choosing) Neutral text, the Forever line on Forever
+-- only. Rich: "BigNoteBox" in BNB green, the site names linked, greeting and
+-- sign-off in the faction colour, "Dukul" in shaman blue. Plain (Rich Notes
+-- off): the URLs written out in brackets after each site name.
+local WELCOME_SHAMAN = "0070dd"
+local WELCOME_FACTION = {
+    Horde    = { col = "ff5040", greet = "WNOTE_GREET_HORDE",    bye = "WNOTE_BYE_HORDE" },
+    Alliance = { col = "4da3ff", greet = "WNOTE_GREET_ALLIANCE", bye = "WNOTE_BYE_ALLIANCE" },
+    Neutral  = { col = "d8b45a", greet = "WNOTE_GREET_NEUTRAL",  bye = "WNOTE_BYE_NEUTRAL" },
+}
+
+-- Every plain-text occurrence of find in s replaced by repl (no patterns:
+-- "Wago.io" has a dot)
+local function ReplacePlain(s, find, repl)
+    local out, pos = {}, 1
+    while true do
+        local st, en = s:find(find, pos, true)
+        if not st then break end
+        out[#out + 1] = s:sub(pos, st - 1)
+        out[#out + 1] = repl
+        pos = en + 1
+    end
+    out[#out + 1] = s:sub(pos)
+    return table.concat(out)
+end
+
+-- One paragraph: the site names linked (rich) or followed by their URL
+-- (plain), "BigNoteBox" green (rich). Site names go through placeholders
+-- first, so the green never lands inside a URL
+local function WelcomeText(text, rich)
+    if not rich then
+        for _, site in ipairs(BNB.SITE_LINKS) do
+            text = ReplacePlain(text, site.name, site.name .. " (" .. site.url .. ")")
+        end
+        return text
+    end
+    text = text:gsub("{", "("):gsub("}", ")")   -- a translation is never read as markup
+    for i, site in ipairs(BNB.SITE_LINKS) do
+        text = ReplacePlain(text, site.name, "@@SITE" .. i .. "@@")
+    end
+    text = ReplacePlain(text, "BigNoteBox", "{col:" .. PN_GREEN .. "}BigNoteBox{/col}")
+    for i, site in ipairs(BNB.SITE_LINKS) do
+        text = ReplacePlain(text, "@@SITE" .. i .. "@@", "{link*" .. site.url .. "*" .. site.name .. "}")
+    end
+    return text
+end
+
+local function WelcomeBody(faction, rich)
+    local f = WELCOME_FACTION[faction] or WELCOME_FACTION.Neutral
+    local paras = {
+        L[BNB.IsForever and "WNOTE_P1_FOREVER" or "WNOTE_P1"],
+        L["WNOTE_P2"],
+        L["WNOTE_P3"],
+    }
+    local greet, bye = L[f.greet], L[f.bye]
+    local out = {}
+    if rich then
+        out[1] = "{h2}{col:" .. f.col .. "}" .. WelcomeText(greet, true) .. "{/col}{/h2}"
+        for _, p in ipairs(paras) do out[#out + 1] = WelcomeText(p, true) end
+        out[#out + 1] = "{p:r}{col:" .. f.col .. "}" .. WelcomeText(bye, true) .. "{/col}{br}{col:"
+            .. WELCOME_SHAMAN .. "}Dukul{/col}{/p}"
+    else
+        out[1] = greet
+        for _, p in ipairs(paras) do
+            out[#out + 1] = ""
+            out[#out + 1] = WelcomeText(p, false)
+        end
+        out[#out + 1] = ""
+        out[#out + 1] = bye
+        out[#out + 1] = "Dukul"
+    end
+    return table.concat(out, "\n")
+end
+
+-- Called on login with CheckAndShow. Decided once per account (settings
+-- flag welcomeNoteDone, kept out of DEFAULTS: nil = not decided yet): a
+-- fresh install with no notes gets the note, an existing install only the
+-- flag, so a deleted welcome note never comes back. force (Developer tools):
+-- make it now, whatever the flag and the notes say.
+function WN.CheckWelcome(newInstall, force)
     local db = BigNoteBoxDB
     if not db then return end
-    if db.lastSeenWhatsNewVersion == data.version then return end
-    -- Nothing for this client in this release (e.g. a Forever-only patch on Retail)
-    if #ClientEntries(data.entries) == 0 then return end
-    WN.Open(true)
+    local ndb = BNB.NotesDB and BNB.NotesDB()
+    if type(ndb) ~= "table" or type(ndb.notes) ~= "table" then return end
+    if not force then
+        if db.welcomeNoteDone then return end
+        db.welcomeNoteDone = true
+        if not newInstall or next(ndb.notes) then return end
+    end
+    local rich = BNB.RichEnabled and BNB.RichEnabled() or false
+    local faction = UnitFactionGroup("player")
+    local id = MakeAddonNote(L["WNOTE_TITLE"], WelcomeBody(faction, rich), rich,
+        { BNB.NormalizeTag(PN_TAG), BNB.NormalizeTag("Welcome") })
+    if not id then return end
+    db.welcomeToastPending = id
+    WN.ShowWelcomeToast()
+end
+
+-- The welcome note's toast waits for the end of setup: the note is made at
+-- the first login, under the wizard, and the toast shows once setup is done
+-- (the wizard's Quit, or the login after Finish, which reloads). Pending =
+-- BigNoteBoxDB.welcomeToastPending (the note id), cleared when it shows.
+-- Waits for a click, as the patch note's does, and follows the same
+-- toastSources switch ("Messages from BigNoteBox").
+function WN.ShowWelcomeToast()
+    local db = BigNoteBoxDB
+    local id = db and db.welcomeToastPending
+    if not id or db.setupComplete ~= true then return end
+    db.welcomeToastPending = nil
+    if not (BNB.GetNote(id) and BNB.Toast and BNB.Toast.Show) then return end
+    BNB.Toast.Show({
+        key    = "welcome",
+        source = "patchnotes",
+        title  = L["WNOTE_TITLE"],
+        text   = L["WNOTE_TOAST_TEXT"],
+        hold   = 0,
+        onClick = function()
+            if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id) end
+        end,
+    })
 end

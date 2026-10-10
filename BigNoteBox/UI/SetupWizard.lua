@@ -207,6 +207,8 @@ local function RegisterQuitDialog()
             StopGlow()
             -- Held back while the wizard was pending (Core/Events.lua)
             if BNB.ShowForeverNoticeIfDue then BNB.ShowForeverNoticeIfDue() end
+            -- The welcome note's toast too (ALL-242); Finish reloads, the login shows it
+            if BNB.WhatsNew and BNB.WhatsNew.ShowWelcomeToast then BNB.WhatsNew.ShowWelcomeToast() end
         end,
     }
 end

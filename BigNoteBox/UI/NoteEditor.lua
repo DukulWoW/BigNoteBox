@@ -2242,10 +2242,16 @@ function BNB.AM_EnterViewMode(id)
         if not BNB._editorInViewMode then return end
         if not rsf:IsShown() then return end
 
-        local paneW = BNB.editorPane:GetWidth()
-        if paneW and paneW > 0 then
-            rf:SetWidth(paneW - PAD - 22)
+        -- The scroll frame's own width, as Reflow uses: it starts at the title
+        -- rule, further in than PAD, so the pane width minus PAD - 22 made the
+        -- text wider than its window and cut the right edge until a resize
+        -- reflowed it (Dukul, 2026-10-10). The pane maths is only the fallback.
+        local w = rsf:GetWidth()
+        if not w or w <= 0 then
+            local paneW = BNB.editorPane:GetWidth()
+            w = (paneW and paneW > 0) and (paneW - PAD - 22) or nil
         end
+        if w then rf:SetWidth(w) end
 
         -- Re-read note in case it was saved between the call and the tick
         local freshNote = id and BNB.GetNote(id)

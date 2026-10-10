@@ -47,7 +47,7 @@ local BNB = BigNoteBox
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 12  -- bump + add block to MigrateNotesDB()
-local SETTINGS_SCHEMA_VERSION = 20 -- bump + add block to MigrateSettingsDB()
+local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -164,9 +164,10 @@ BNB.DEFAULTS = {
     sortAsc = false,
 
     -- Toast anchor position (the first toast's centre, CENTER-relative) and hold time
-    -- (seconds; 0 = stay until manually closed)
-    popupAnchorX  = 0,
-    popupAnchorY  = 200,
+    -- (seconds; 0 = stay until manually closed). Upper left since SETTINGS v21
+    -- (Dukul's pick, 2026-10-10); it was 0 / 200, the middle of the screen
+    popupAnchorX  = -442,
+    popupAnchorY  = 254,
     popupHoldTime = 5,
     -- Toasts (UI/Toast.lua, ALL-376): "each" = one toast per note, "group" =
     -- one grouped toast; grow "down" / "up" / "left" / "right"; Max shown
@@ -184,8 +185,9 @@ BNB.DEFAULTS = {
     toastShowSummary = true,
     toastShowPin     = true,
     -- Which senders may show a toast (ALL-384): situation notes, task
-    -- situations; a sender not listed is always on
-    toastSources = { situation = true, tasks = true, alarms = true },
+    -- situations; a sender not listed is always on. patchnotes = the toasts
+    -- after an update (ALL-409) and for the welcome note (ALL-242)
+    toastSources = { situation = true, tasks = true, alarms = true, patchnotes = true },
 
     -- Known characters registry, built on each login.
     -- { ["Name-Realm"] = { name, realm, class, lastSeen } }. Safe to wipe.
@@ -689,6 +691,17 @@ local function MigrateSettingsDB()
             end
         end
         v = 20
+    end
+
+    if v < 21 then
+        -- New toast anchor default (ALL-415): an anchor still on the old
+        -- default, the middle of the screen, moves to the new one; a placed
+        -- one stays where the player put it
+        if db.popupAnchorX == 0 and db.popupAnchorY == 200 then
+            db.popupAnchorX = BNB.DEFAULTS.popupAnchorX
+            db.popupAnchorY = BNB.DEFAULTS.popupAnchorY
+        end
+        v = 21
     end
 
     -- Never lower the stored version (SV-10, as in MigrateNotesDB)

@@ -9,6 +9,16 @@ local BNB = BigNoteBox
 BNB.ADDON_NAME = ADDON_NAME
 BNB.ADDON_VERSION = "1.22.0"
 
+-- Where BigNoteBox is published: the link buttons on Settings > General
+-- (ALL-431, symbol = Assets\Buttons\Symbols\bt-<key>) and the welcome note
+-- (ALL-242), which links each name where its text says it
+BNB.SITE_LINKS = {
+    { key = "github",       name = "GitHub",       url = "https://github.com/DukulWoW/BigNoteBox" },
+    { key = "curseforge",   name = "CurseForge",   url = "https://www.curseforge.com/wow/addons/bignotebox" },
+    { key = "wago",         name = "Wago.io",      url = "https://addons.wago.io/addons/bignotebox" },
+    { key = "wowinterface", name = "WoWInterface", url = "https://www.wowinterface.com/downloads/info27121-BigNoteBox.html" },
+}
+
 -- Chat line prefixed with the addon name in colour. Lives here, in the first
 -- file, so every later file can print (moved from SlashCommands.lua, ARCH-06).
 function BNB:Print(msg)

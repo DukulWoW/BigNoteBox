@@ -1431,6 +1431,9 @@ local function BuildToastsPage(sf, ct, y, page)
         -- Alarm toasts (ALL-385): off = alarms use the alarm window
         { "alarms", "CFG_TOAST_SRC_ALARMS", "CFG_TOAST_SRC_ALARMS_TIP",
           function() return BNB.AlarmsEnabled() end },
+        -- After an update (ALL-409) and on a fresh install (ALL-242): off = the notes are still made, silently
+        { "patchnotes", "CFG_TOAST_SRC_PATCHNOTES", "CFG_TOAST_SRC_PATCHNOTES_TIP",
+          function() return true end },
     }) do
         local key = src[1]
         local box
