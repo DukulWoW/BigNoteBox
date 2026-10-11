@@ -77,12 +77,13 @@ included. To keep your images, put them in a tiny addon of your own instead:
 
 2. In it, make a file called BigNoteBox_UserImages.toc with these lines:
 
-    ## Interface: 120105
+    ## Interface: 120105, 16001, 50504, 20506, 11509
     ## Title: BigNoteBox User Images
     ## Dependencies: BigNoteBox
     UserImages.lua
 
-   (WoW: Forever players use ## Interface: 16001 and name the file BigNoteBox_UserImages_Camelot.toc)
+   (The Interface line lists every game client, so the same file works on
+   Retail, WoW: Forever and Classic.)
 
 3. Make a file called UserImages.lua next to it, listing your images:
 
