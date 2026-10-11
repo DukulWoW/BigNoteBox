@@ -289,3 +289,9 @@ Advanced reset tools.
 # 🛠️ Developer Tools
 
 Working on BigNoteBox itself? The developer tools are a separate addon, `BigNoteBox_Dev`, downloadable from each GitHub release. You do not need it to use BigNoteBox. See [DEVTOOL.md](DEVTOOL.md).
+
+---
+
+# 📜 License
+
+The code is licensed under the [GNU General Public License v3](LICENSE). The BigNoteBox and BigChatBox logos and the addon icon are All Rights Reserved, and the rest of the art is World of Warcraft art belonging to Blizzard Entertainment: see [LICENSE-ASSETS](LICENSE-ASSETS). Bundled libraries and fonts keep their own licenses. Releases up to v1.22.x were MIT licensed.

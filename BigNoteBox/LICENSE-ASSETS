@@ -1,0 +1,30 @@
+BigNoteBox - artwork license
+
+Copyright (c) 2026 Dukul. All rights reserved.
+
+The source code of BigNoteBox is licensed under the GNU General Public License
+version 3 (see LICENSE). That license does NOT cover the artwork listed below.
+
+The following files are the original work of Dukul and are All Rights Reserved:
+
+    BigNoteBox/Assets/logo.tga
+    BigNoteBox/Assets/icon.tga
+    BigNoteBox/Assets/BCB/bcb-logo.tga
+    .github/logo.png (GitHub repository only)
+
+They may not be copied, modified, redistributed or used in any other project,
+including forks of BigNoteBox, without written permission from Dukul. A fork
+of the code must replace them with its own artwork.
+
+All other image files in BigNoteBox/Assets/ are game art from World of
+Warcraft, or are based on it, and belong to Blizzard Entertainment. They are
+not covered by the GPL or by this notice.
+
+The fonts in BigNoteBox/Assets/Fonts/ belong to their own authors and are
+distributed under their own licenses.
+
+The libraries in BigNoteBox/libs/ belong to their own authors and are
+distributed under their own licenses (see BigNoteBox/libs/LICENSES.md).
+
+BigNoteBox releases up to and including v1.22.x were published under the MIT
+License; copies of those releases keep that license.

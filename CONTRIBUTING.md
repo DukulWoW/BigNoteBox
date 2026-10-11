@@ -79,4 +79,4 @@ Dukul reviews every pull request before it is merged. Translations ship with the
 
 ## License
 
-BigNoteBox is MIT licensed. By sending a pull request you agree that your contribution is released under the same license.
+BigNoteBox's code is licensed under the GNU General Public License version 3 ([LICENSE](LICENSE)). By sending a pull request you agree that your contribution is released under the same license. The logo and icon are not covered by it: see [LICENSE-ASSETS](LICENSE-ASSETS).
