@@ -58,12 +58,22 @@ local function BuildCursorLink()
         return nil
 
     elseif ctype == "mount" then
-        -- id is mountID. C_MountJournal is retail+MoP; guard for Vanilla/TBC.
+        -- C_MountJournal is retail+MoP; guard for Vanilla/TBC. A mount has no
+        -- link of its own: its summon spell's link, as the Reference Box keeps
+        -- mounts (UI/ReferenceBox.lua drop), so it gets a tooltip and goes into
+        -- the Reference Box like any link (ALL-445, Dukul 2026-10-11). The
+        -- mount's ID is the 2nd return; the 3rd is tried when that is no mount.
         if C_MountJournal and C_MountJournal.GetMountInfoByID then
-            local mname = C_MountJournal.GetMountInfoByID(id)
-            if mname then
-                -- Mounts don't have a standard hyperlink — insert name in brackets
-                return "[" .. mname .. "]"
+            for _, v in ipairs({ id, subtype }) do
+                if type(v) == "number" then
+                    local ok, mname, spellID = pcall(C_MountJournal.GetMountInfoByID, v)
+                    if ok and mname then
+                        if spellID then
+                            return string.format("|cff71d5ff|Hspell:%d|h[%s]|h|r", spellID, mname)
+                        end
+                        return "[" .. mname .. "]"
+                    end
+                end
             end
         end
         return nil
@@ -87,8 +97,14 @@ local function BuildCursorLink()
         return string.format("|cffffff00|Hquest:%d:0|h[%s]|h|r", id, title)
 
     elseif ctype == "battlepet" then
-        -- id is speciesID; C_PetJournal may not exist on all clients
-        if C_PetJournal and C_PetJournal.GetPetInfoBySpeciesID then
+        -- An owned pet's GUID: its real link (species first in the link data,
+        -- what the Reference Box reads). Else id is a speciesID: the name.
+        -- C_PetJournal may not exist on all clients
+        if type(id) == "string" and C_PetJournal and C_PetJournal.GetBattlePetLink then
+            local ok, plink = pcall(C_PetJournal.GetBattlePetLink, id)
+            if ok and plink then return plink end
+        end
+        if type(id) == "number" and C_PetJournal and C_PetJournal.GetPetInfoBySpeciesID then
             local name = C_PetJournal.GetPetInfoBySpeciesID(id)
             if name then return "[" .. name .. "]" end
         end
@@ -98,9 +114,19 @@ local function BuildCursorLink()
     return nil
 end
 
+-- A link put into a note's text also goes into its Reference Box (ALL-445,
+-- the setting and the checks live in UI/ReferenceBox.lua). The note is the
+-- box's own (a sticky's, Focus mode's), else the main editor's.
+local function AddToRefBox(eb, link)
+    if not BNB.RefBoxAddFromText then return end
+    local noteID = eb._bnbNoteOf and eb._bnbNoteOf() or BNB._currentNoteID
+    pcall(BNB.RefBoxAddFromText, noteID, link)
+end
+
 -- ── Drop handler ──────────────────────────────────────────────────────────────
--- Called when a cursor object is released over an EditBox.
-local function HandleDrop(eb)
+-- Called when a cursor object is released over an EditBox. atEnd: dropped on
+-- the empty area below the text (the scroll frame), so the link goes last.
+local function HandleDrop(eb, atEnd)
     if not eb or not eb:IsEnabled() then return end
 
     -- Capture cursor state BEFORE ClearCursor wipes it
@@ -117,8 +143,66 @@ local function HandleDrop(eb)
     -- Give the EditBox focus so Insert() places text at cursor position.
     -- If it already had focus the cursor position is preserved.
     eb:SetFocus()
+    if atEnd then eb:SetCursorPosition(#eb:GetText()) end
     eb:Insert(link)
-    BNB.MarkDirty()
+    if not eb._bnbOwnSave then BNB.MarkDirty() end
+    AddToRefBox(eb, link)
+end
+
+-- ── Link tooltips in plain note text (ALL-228) ───────────────────────────────
+-- Hyperlinks on in the body EditBox: hovering an item / spell / quest link
+-- shows its tooltip. Probed 2026-10-11 (Dukul, Retail): Enter / Leave / Click
+-- fire, typing, cursor placement and selecting work as before. A plain click
+-- still only places the cursor; the link acts on hover only.
+local TIP_TYPES = { item = true, spell = true, achievement = true, quest = true, currency = true }
+local function OnLinkEnter(self, link)
+    if GetCursorInfo() then return end   -- the drag hint owns the tooltip
+    local linkType = link and link:match("^(%a+):")
+    if not TIP_TYPES[linkType] then return end
+    GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+    if pcall(GameTooltip.SetHyperlink, GameTooltip, link) then GameTooltip:Show()
+    else GameTooltip:Hide() end
+end
+
+-- ── Shift-click into the note (2026-10-11) ───────────────────────────────────
+-- Shift-clicking an item in the bags, a link in chat etc. goes through
+-- ChatEdit_InsertLink, which only knows the chat box: a note body that has
+-- focus takes the link instead. 12.x calls both names (as the Reference Box
+-- hook knows), so a repeat of the same link in the same frame is dropped.
+local wired = {}
+local lastLink, lastTime
+local function InsertIntoFocusedBody(link)
+    if not link or link == "" then return end
+    local now = GetTime()
+    if link == lastLink and lastTime == now then return end
+    for eb in pairs(wired) do
+        if eb:IsVisible() and eb:IsEnabled() and eb:HasFocus() then
+            lastLink, lastTime = link, now
+            eb:Insert(link)
+            if not eb._bnbOwnSave then BNB.MarkDirty() end
+            AddToRefBox(eb, link)
+            return
+        end
+    end
+end
+
+-- True while a note body has the keyboard: a shift-click is for the text,
+-- not for the Reference Box (UI/ReferenceBox.lua TryAddLink asks)
+function BNB.NoteBodyHasFocus()
+    for eb in pairs(wired) do
+        if eb:IsVisible() and eb:HasFocus() then return true end
+    end
+    return false
+end
+
+local insertHooked = false
+local function HookInsertLink()
+    if insertHooked then return end
+    insertHooked = true
+    if ChatEdit_InsertLink then hooksecurefunc("ChatEdit_InsertLink", InsertIntoFocusedBody) end
+    if ChatFrameUtil and ChatFrameUtil.InsertLink then
+        hooksecurefunc(ChatFrameUtil, "InsertLink", InsertIntoFocusedBody)
+    end
 end
 
 -- ── Tooltip on hover while dragging ──────────────────────────────────────────
@@ -126,7 +210,7 @@ end
 -- over the edit box with a draggable cursor object.
 local function UpdateDragTooltip(eb)
     local ctype = GetCursorInfo()
-    if not ctype then return end
+    if not ctype or not eb:IsEnabled() then return end   -- a sticky not being edited
     -- Only show hint for types we actually handle
     local supported = {
         item=true, spell=true, macro=true,
@@ -139,9 +223,14 @@ local function UpdateDragTooltip(eb)
 end
 
 -- ── Wire a single EditBox as a drop target ────────────────────────────────────
-function BNB.WireDropTarget(eb)
+-- ownSave: the box saves its own text (a sticky's inline edit saves when the
+-- edit ends), so an insert must not mark the main editor dirty.
+-- noteOf: returns the id of the note the box holds (nil = the main editor's)
+function BNB.WireDropTarget(eb, ownSave, noteOf)
     if not eb or eb._bnbDropWired then return end
     eb._bnbDropWired = true
+    eb._bnbOwnSave = ownSave or nil
+    eb._bnbNoteOf  = noteOf
 
     -- HookScript throughout, never SetScript: SetScript would drop any hooks
     -- already on the box, so this only worked while it was wired first (CMP-06).
@@ -163,4 +252,23 @@ function BNB.WireDropTarget(eb)
         if GetCursorInfo() then UpdateDragTooltip(self) end
     end)
     eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- The empty area below the last line is the scroll frame, not the box:
+    -- a drop there went nowhere (Dukul, 2026-10-11). It goes at the end now.
+    local sf = eb:GetParent()
+    if sf and sf.GetScrollChild and sf:GetScrollChild() == eb then
+        sf:HookScript("OnReceiveDrag", function() HandleDrop(eb, true) end)
+        sf:HookScript("OnMouseDown", function(_, btn)
+            if btn == "LeftButton" and GetCursorInfo() then HandleDrop(eb, true) end
+        end)
+    end
+
+    -- Link tooltips (ALL-228) and shift-click into the box
+    if eb.SetHyperlinksEnabled then
+        eb:SetHyperlinksEnabled(true)
+        eb:HookScript("OnHyperlinkEnter", OnLinkEnter)
+        eb:HookScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
+    end
+    wired[eb] = true
+    HookInsertLink()
 end

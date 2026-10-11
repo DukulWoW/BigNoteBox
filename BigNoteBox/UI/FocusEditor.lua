@@ -832,7 +832,7 @@ local function BuildFocusFrame()
     BNB._focusEditorBody = eb
     WireFocusMenu(eb, sf)
 
-    if BNB.WireDropTarget       then BNB.WireDropTarget(eb)       end
+    if BNB.WireDropTarget       then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -1132,7 +1132,7 @@ local function BuildFocusFrameSkin()
     BNB._focusEditorBody = eb
     WireFocusMenu(eb, sf)
 
-    if BNB.WireDropTarget      then BNB.WireDropTarget(eb)      end
+    if BNB.WireDropTarget      then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")

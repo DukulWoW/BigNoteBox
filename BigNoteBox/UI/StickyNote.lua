@@ -1711,6 +1711,19 @@ local function StartInlineEdit(f)
     if lcg then
         pcall(lcg.PixelGlow_Start, f, EDIT_GLOW_COLOR, 8, 0.10, 10,
               nil, nil, nil, nil, EDIT_GLOW_KEY)
+        -- The glow sometimes stayed invisible until the text scrolled or the
+        -- cursor moved (Dukul, 2026-10-11): its lines are masked, and a mask
+        -- laid out on the frame the glow starts may keep a stale rect until
+        -- something else redraws. Hiding the masks makes the glow's own
+        -- OnUpdate show and re-anchor them; info.width = nil re-measures.
+        local function Kick()
+            local g = f._inlineEditing and f["_PixelGlow" .. EDIT_GLOW_KEY]
+            if not (g and g.masks and g.info) then return end
+            g.info.width = nil
+            for _, m in pairs(g.masks) do m:ClearAllPoints(); m:Hide() end
+        end
+        C_Timer.After(0, Kick)
+        C_Timer.After(0.1, Kick)
     end
 end
 
@@ -2257,6 +2270,10 @@ local function CreateStickyFrame(noteID)
     end)
     -- Minimize, close, task view and HideAll all hide the body: end the edit
     sf2:HookScript("OnHide", function() EndInlineEdit(f) end)
+    -- Link tooltips on hover, and while editing: drop an item (also below
+    -- the text) or Shift+click one into it (Features/DragDrop.lua, ALL-228).
+    -- The inline edit saves its own text when it ends.
+    if BNB.WireDropTarget then BNB.WireDropTarget(bodyEb, true, function() return f._noteID end) end
     ForwardHover(sf2, f)
     ForwardHover(bodyEb, f)
     -- ScrollFrameTemplate scrollbar has nested children (track, thumb, buttons)

@@ -752,6 +752,12 @@ local function BuildRefBoxPage(sf, ct, y, page)
             function(v) db.refboxAutoOpen = v end,
             L["CFG_CHK_REFBOX_AUTOOPEN_TIP"])
 
+        -- A link dropped or Shift+clicked into a note's text is added here too (ALL-445)
+        y = AddCheck(ct, y, L["CFG_CHK_REFBOX_AUTOADD_LABEL"],
+            function() return db.refboxAutoAdd ~= false end,
+            function(v) db.refboxAutoAdd = v end,
+            L["CFG_CHK_REFBOX_AUTOADD_TIP"])
+
         -- Show ItemID / SpellID / QuestID in the game's native tooltip
         y = AddCheck(ct, y, L["CFG_CHK_REFBOX_IDS_LABEL"],
             function() return db.refboxShowIDs == true end,
@@ -774,6 +780,8 @@ local function BuildRefBoxPage(sf, ct, y, page)
             ApplyRBSection(db.referenceBoxEnabled)
             -- Hide the editor bar button and close its gap (NoteEditor.lua)
             if BNB.ApplySaveMode then BNB.ApplySaveMode() end
+            -- The editor toolbar's Reference Box button goes or comes back (ALL-447)
+            if BNB._refreshWysiwygRefBox then BNB._refreshWysiwygRefBox() end
             -- An open window switches to or from the tasks-only layout, or
             -- closes when it has nothing left to show (ALL-102)
             if BNB.ApplyRefBoxModules then BNB.ApplyRefBoxModules() end

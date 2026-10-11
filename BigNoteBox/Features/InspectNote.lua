@@ -312,6 +312,9 @@ local function GatherInspectData()
                 quality = quality or 1,
                 ilvl    = actualIlvl,
                 icon    = iconTex,
+                -- The link data (bonus IDs, enchants), for the rich body's
+                -- item link (ALL-444): the tooltip shows the item as worn
+                linkData = link and link:match("|H(item:[^|]+)|h") or ("item:" .. itemID),
             }
             data.gear[#data.gear + 1] = entry
             data.gearItems[#data.gearItems + 1] = { id = itemID, slot = slot.label, slotIdx = slot.id }
@@ -409,7 +412,10 @@ local function BuildNormalBody(data)
         lines[#lines + 1] = string.format(L["TGT_HDR_COLON_FMT"], L["INSPECT_HDR_EQUIPMENT"])
         for _, g in ipairs(data.gear) do
             local ilvlStr = g.ilvl and (" (" .. tostring(g.ilvl) .. ")") or ""
-            lines[#lines + 1] = "  " .. string.format(L["TGT_LINE_STAT_FMT"], g.slot, g.name .. ilvlStr)
+            -- An item link, as in the rich body (ALL-444; hover = ALL-228)
+            local qHex = QUALITY_HEX[g.quality] or QUALITY_HEX[1]
+            local itemStr = "|cff" .. qHex .. "|H" .. g.linkData .. "|h" .. g.name .. "|h|r"
+            lines[#lines + 1] = "  " .. string.format(L["TGT_LINE_STAT_FMT"], g.slot, itemStr .. ilvlStr)
         end
     end
 
@@ -474,8 +480,11 @@ local function BuildRichBody(data)
             if g.icon then
                 iconStr = "{icon:" .. tostring(g.icon) .. ":18} "
             end
-            lines[#lines + 1] = "{p}" .. iconStr .. string.format(L["TGT_LINE_STAT_FMT"], g.slot,
-                "{col:" .. qHex .. "}" .. g.name .. ilvlStr .. "{/col}") .. "{/p}"
+            -- A real item link (ALL-444): hover = tooltip, click = item card.
+            -- Written as a chat link (|c|H|h|h|r) so the colour stays on it.
+            local itemStr = "|cff" .. qHex .. "|H" .. g.linkData .. "|h" .. g.name .. "|h|r"
+            if ilvlStr ~= "" then itemStr = itemStr .. "{col:" .. qHex .. "}" .. ilvlStr .. "{/col}" end
+            lines[#lines + 1] = "{p}" .. iconStr .. string.format(L["TGT_LINE_STAT_FMT"], g.slot, itemStr) .. "{/p}"
         end
     end
 

@@ -149,6 +149,7 @@ BNB.DEFAULTS = {
     refboxDisplayStyle  = "normal",
     refboxMaxItems      = 50,
     refboxAutoOpen      = true,
+    refboxAutoAdd       = true,   -- links put into a note's text go into its Reference Box (ALL-445)
     refboxSide          = "left",
     -- Side of the main window the list windows open on (ALL-269)
     historySide         = "right",

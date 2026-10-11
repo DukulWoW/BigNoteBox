@@ -679,6 +679,9 @@ local function InsertAttachmentIntoNote(att, noteID)
         BNB:Print(L["REFBOX_LINK_FAIL"])
         return
     end
+    -- The editor toolbar's insert (ALL-447): one undo step, the note marked
+    -- changed, rich View mode switched to Edit; the old path is the fallback
+    if BNB.InsertIntoEditor then BNB.InsertIntoEditor(link); return end
     local eb = nil
     if BNB._focusEditorBody and BNB._focusEditorBody:HasFocus() then
         eb = BNB._focusEditorBody
@@ -687,6 +690,39 @@ local function InsertAttachmentIntoNote(att, noteID)
     end
     if not eb then return end
     eb:Insert(link)
+end
+
+-- ALL-447: the note's entries for the editor toolbar's Reference Box menu
+-- (UI/WysiwygBar.lua), in list order: { name, icon, r, g, b, link }. An entry
+-- whose data has not loaded yet shows as unavailable; one with no link
+-- (nothing to put in the text) is left out.
+function BNB.RefBoxEntries(noteID)
+    local out = {}
+    local note = noteID and NDB().notes[noteID]
+    if not note then return out end
+    for _, att in ipairs(note.attachments or {}) do
+        local link = BuildAttachmentLink(att)
+        if link then
+            local info = ResolveAttachment(att) or UnavailableInfo(att)
+            out[#out + 1] = { name = info.name, icon = info.icon,
+                r = info.qr or 1, g = info.qg or 1, b = info.qb or 1, link = link }
+        end
+    end
+    return out
+end
+
+-- Alt+click on an entry (ALL-447): into the note text at the cursor, through
+-- the editor toolbar's insert (one undo step, Focus mode when it is open).
+-- Only for the note the editor shows: the Reference Box can be on another.
+local function InsertEntryIntoText(att)
+    if _noteID ~= BNB._currentNoteID then
+        BNB:Print(L["REFBOX_INSERT_OTHER_NOTE"])
+        return
+    end
+    if IsLocked(_noteID) then BNB:Print(L["REFBOX_LOCKED"]); return end
+    local link = BuildAttachmentLink(att)
+    if not link then BNB:Print(L["REFBOX_LINK_FAIL"]); return end
+    if BNB.InsertIntoEditor then BNB.InsertIntoEditor(link) end
 end
 
 -- Insert link into chat.
@@ -798,8 +834,11 @@ end
 -- Left-click on a list entry, as on a link in chat (ALL-206, Dukul
 -- 2026-10-02): Shift = into the chat box, Ctrl = dressing room (items),
 -- plain = shown in the model viewer, or its link window when it has no model.
+-- Alt = into the note text at the cursor (ALL-447).
 local function OnEntryClick(att)
-    if IsShiftKeyDown() then
+    if IsAltKeyDown() then
+        InsertEntryIntoText(att)
+    elseif IsShiftKeyDown() then
         SendAttachmentToChat(att)
     elseif IsControlKeyDown() and att.type == "item" then
         DressUpEntry(att)
@@ -1117,35 +1156,51 @@ end
 local _shiftHookInstalled = false
 local _lastAddedLink = nil
 
+-- The Reference Box entry a chat link stands for, or nil
+local function LinkAttachment(link)
+    local petID   = link:match("battlepet:(%d+)")
+    local itemID  = link:match("item:(%d+)")
+    local spellID = link:match("spell:(%d+)")
+    local questID = link:match("quest:(%d+)")
+    -- species first: a pet link is no item (ALL-215)
+    if petID   then return { type = "pet",   id = tonumber(petID)   } end
+    if itemID  then return { type = "item",  id = tonumber(itemID)  } end
+    if spellID then return { type = "spell", id = tonumber(spellID) } end
+    if questID then return { type = "quest", id = tonumber(questID) } end
+end
+
 local function TryAddLink(link)
     if _suppressShiftHook then return end
     if not rbFrame or not rbFrame:IsShown() or not RBOn() then return end
     if not IsShiftKeyDown() then return end
     if not _noteID then return end
+    -- Typing in a note: the shift-click goes into its text (Features/DragDrop.lua)
+    if BNB.NoteBodyHasFocus and BNB.NoteBodyHasFocus() then return end
     if not link or link == "" then return end
     if _lastAddedLink == link then return end
 
-    local petID   = link:match("battlepet:(%d+)")
-    local itemID  = link:match("item:(%d+)")
-    local spellID = link:match("spell:(%d+)")
-    local questID = link:match("quest:(%d+)")
-    if petID then   -- species first: a pet link is no item (ALL-215)
+    local att = LinkAttachment(link)
+    if att then
         _lastAddedLink = link
         C_Timer.After(0.1, function() _lastAddedLink = nil end)
-        AddAttachment(_noteID, { type="pet", id=tonumber(petID) })
-    elseif itemID then
-        _lastAddedLink = link
-        C_Timer.After(0.1, function() _lastAddedLink = nil end)
-        AddAttachment(_noteID, { type="item",  id=tonumber(itemID)  })
-    elseif spellID then
-        _lastAddedLink = link
-        C_Timer.After(0.1, function() _lastAddedLink = nil end)
-        AddAttachment(_noteID, { type="spell", id=tonumber(spellID) })
-    elseif questID then
-        _lastAddedLink = link
-        C_Timer.After(0.1, function() _lastAddedLink = nil end)
-        AddAttachment(_noteID, { type="quest", id=tonumber(questID) })
+        AddAttachment(_noteID, att)
     end
+end
+
+-- ALL-445: a link dropped or Shift+clicked into a note's text (Features/
+-- DragDrop.lua) also goes into that note's Reference Box. Quiet when it is
+-- there already or the note is locked; a full box says so once (AddAttachment).
+-- Deleting the link from the text later keeps the entry (Dukul, 2026-10-11).
+function BNB.RefBoxAddFromText(noteID, link)
+    if not noteID or not link or not RBOn() or DB().refboxAutoAdd == false then return end
+    if IsLocked(noteID) then return end
+    local att = LinkAttachment(link)
+    local note = att and NDB().notes[noteID]
+    if not note then return end
+    for _, ex in ipairs(note.attachments or {}) do
+        if ex.type == att.type and ex.id == att.id then return end
+    end
+    AddAttachment(noteID, att)
 end
 
 local function InstallShiftHooks()
@@ -2178,6 +2233,7 @@ local function BuildReferenceBox()
         GameTooltip:AddLine(L["REFBOX_INFO_ALSO"],  1, 0.82, 0)
         GameTooltip:AddLine(L["REFBOX_INFO_DRAG"],  0.78, 0.78, 0.78)
         GameTooltip:AddLine(L["REFBOX_INFO_SHIFT"], 0.78, 0.78, 0.78)
+        GameTooltip:AddLine(L["REFBOX_INFO_ALT"],   0.78, 0.78, 0.78)
         GameTooltip:Show()
     end)
     helpBtn:SetScript("OnLeave", function(self)

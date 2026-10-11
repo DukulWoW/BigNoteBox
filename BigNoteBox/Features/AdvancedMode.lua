@@ -117,6 +117,21 @@ local function WayLinks(line)
     return table.concat(out)
 end
 
+-- Game links (item, spell, quest...) become <a href> links (ALL-444). A raw
+-- |H...|h link in SimpleHTML text drew as plain text on Forever (Dukul,
+-- 2026-10-11: no hover), while the <a> /way links worked. The colour goes
+-- inside the <a>, so it is kept; the href is the link data, as in chat.
+local function GameLinks(line)
+    if not line:find("|H", 1, true) then return line end
+    local function a(color, data, text)
+        return string.format("<a href=\"%s\">%s%s%s</a>", data, color, text, color ~= "" and "|r" or "")
+    end
+    line = line:gsub("(|c%x%x%x%x%x%x%x%x)|H([^|]+)|h(.-)|h|r", a)
+    line = line:gsub("(|cn[%w_]+:)|H([^|]+)|h(.-)|h|r", a)
+    line = line:gsub("|H([^|]+)|h(.-)|h", function(data, text) return a("", data, text) end)
+    return line
+end
+
 -- The escaped text back as typed (an href is read as it was written)
 local function HtmlUnescape(s)
     return (s:gsub("&quot;", "\""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
@@ -145,6 +160,8 @@ function AM.ToHTML(text, bodySize)
         -- 0. /way lines -> waypoint links (ALL-381). Runs first, on the text
         --    as typed: the link ends at the next markup tag. See WayLinks.
         line = WayLinks(line)
+        -- 0b. Game links -> <a href> (ALL-444), see GameLinks
+        line = GameLinks(line)
 
         -- 1. {img:path:width:height[:align]} — standalone block-level element.
         --    Replace the ENTIRE line with just the <img> tag so the bare-line
@@ -535,6 +552,10 @@ function AM.CreateRenderFrame(name, parent)
         self:SetHeight(self:GetContentHeight())
     end
 
+    -- Item / spell links in the text are |H links like <a href>: on by default,
+    -- set here so no client can leave them off
+    if f.SetHyperlinksEnabled then f:SetHyperlinksEnabled(true) end
+
     -- Item/spell hyperlink tooltip on hover
     f:SetScript("OnHyperlinkEnter", function(self, link)
         local linkType = link:match("^(%a+):")
@@ -547,7 +568,7 @@ function AM.CreateRenderFrame(name, parent)
             return
         end
         if linkType == "item" or linkType == "spell"
-           or linkType == "achievement" or linkType == "quest" then
+           or linkType == "achievement" or linkType == "quest" or linkType == "currency" then
             GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
             pcall(function() GameTooltip:SetHyperlink(link) end)
             GameTooltip:Show()
@@ -570,8 +591,17 @@ function AM.CreateRenderFrame(name, parent)
         -- Plain http/https URLs or unknown types → clipboard hint
         if not linkType or linkType == "https" or linkType == "http" then
             if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link, nil, nil, true) end
+            return
         end
-        -- WoW item/spell/quest links are handled by OnHyperlinkEnter tooltip only
+        -- Game links act as in chat: click = the item card, Shift = into the
+        -- chat line, Ctrl = dressing room (SetItemRef, every client)
+        -- text is the <a>'s shown text: rebuilt into a whole link for Shift
+        -- (GetFixedLink puts the quality colour back on an item)
+        local name = text or ""
+        name = name:match("|h(.-)|h") or name
+        name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[%w_]+:", ""):gsub("|r", "")
+        local full = "|H" .. link .. "|h" .. name .. "|h"
+        if SetItemRef then pcall(SetItemRef, link, full, button, self) end
     end)
 
     return f
