@@ -21,7 +21,8 @@ Warcraft, or are based on it, and belong to Blizzard Entertainment. They are
 not covered by the GPL or by this notice.
 
 The fonts in BigNoteBox/Assets/Fonts/ belong to their own authors and are
-distributed under their own licenses.
+distributed under their own licenses (see
+BigNoteBox/Assets/Fonts/OFL.txt and OpenDyslexic-LICENSE.txt).
 
 The libraries in BigNoteBox/libs/ belong to their own authors and are
 distributed under their own licenses (see BigNoteBox/libs/LICENSES.md).
