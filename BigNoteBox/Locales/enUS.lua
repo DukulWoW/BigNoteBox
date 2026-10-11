@@ -2926,6 +2926,7 @@ L["CFG_TOAST_SOUND"]               = "Sound"
 L["CFG_TOAST_SOUND_TIP"]           = "A sound when toasts show (once for several at a time)."
 L["CFG_TOAST_SOUND_TEST"]          = "Play"
 L["TOAST_MORE"]                    = "+%d more"
+L["TOAST_MORE_BOX"]                = "+%d"   -- the box after the last toast: how many wait in the queue
 L["TOAST_ANCHOR_TITLE"]            = "Toast position"
 L["TOAST_ANCHOR_RESET"]            = "Reset"
 L["TOAST_ANCHOR_TIP"]              = "Drag to place the first toast; the faint boxes show where the next ones go.\nLock or right-click to save. Reset puts it back in its default place."

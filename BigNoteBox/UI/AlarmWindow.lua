@@ -449,7 +449,8 @@ local function BuildRepeatBlock(ct1)
         local dl=wdRow:CreateFontString(nil,"OVERLAY","BNBFontNormalSmall")
         dl:SetPoint("LEFT",cb,"RIGHT",1,0); dl:SetText(dn:sub(1,1))
         dl:SetTextColor(0.72,0.72,0.72,1); cb._dayIndex=i; wdChecks[i]=cb
-        BNB.CheckTip(cb, string.format(L["AW_WEEKDAY_TIP_FMT"], dn))   -- the label is one letter
+        -- the label is one letter; the tip names the full day (WELCOME_WEEKDAYS is Sunday = 1, the boxes start on Monday)
+        BNB.CheckTip(cb, string.format(L["AW_WEEKDAY_TIP_FMT"], L["WELCOME_WEEKDAYS"][i % 7 + 1] or dn))
     end
 
     local ndRow = CreateFrame("Frame",nil,blk)

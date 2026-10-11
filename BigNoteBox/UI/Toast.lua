@@ -65,6 +65,12 @@ local FADE         = 0.35
 local SLIDE_PX     = 40     -- a new toast slides in from this far out
 local SLIDE_RATE   = 12     -- approach speed (fraction of the gap per second)
 local ARROW        = "Interface\\AddOns\\BigNoteBox\\Assets\\Buttons\\Symbols\\bt-%s-normal"
+local ROWS_PAD     = 3      -- inside the rows box, round the rows
+local ROWS_GAP     = 2      -- between a toast and its rows box below it
+-- A burst (toasts within BURST_WINDOW s of each other, as at login): each
+-- next one slides in BURST_STAGGER s later and stays BURST_STEP s longer, so
+-- they come one at a time and leave oldest first (Dukul, 2026-10-11)
+local BURST_WINDOW, BURST_STAGGER, BURST_STEP = 0.5, 0.25, 1
 T.GAP, T.FADE, T.SLIDE_PX, T.SLIDE_RATE = GAP, FADE, SLIDE_PX, SLIDE_RATE   -- the Toast Lab stacks with these
 
 local GROW = {
@@ -80,6 +86,8 @@ local _waitCombat = {}   -- specs held back until combat ends
 local _pool       = {}   -- toast frames not in use
 local _driver     = nil
 local _ax, _ay    = 0, 200   -- anchor offset, cached by Relayout
+local _moreBox    = nil      -- the "+N" box at the end of the line (queued toasts)
+local _burstAt, _burstN = 0, 0
 
 -- ── Settings ────────────────────────────────────────────────────────────────
 local function Setting(key)
@@ -158,9 +166,12 @@ local function Place(f)
     local s = f:GetScale()
     f:ClearAllPoints()
     -- _x / _y are the centre of the toast with its rows: the toast sits half
-    -- the rows' height above it
+    -- the rows' height above it, or half their width back from the grow
+    -- direction when they sit beside it (Left / Right)
     local up = (f._rowsH or 0) / 2
-    f:SetPoint("CENTER", UIParent, "CENTER", (_ax + f._x) / s, (_ay + f._y) / s + up)
+    local back = -GrowDir()[1] * (f._rowsW or 0) / 2
+    -- Every offset is screen units, so all of it is divided by the toast's scale
+    f:SetPoint("CENTER", UIParent, "CENTER", (_ax + f._x + back) / s, (_ay + f._y + up) / s)
 end
 
 local Remove   -- forward: the click handlers close the toast
@@ -209,16 +220,32 @@ local function CreateToast()
     return f
 end
 
+-- The rows box and the "+N" box: plain like a default sticky note in normal
+-- mode, the skin preset's colours in skin mode (Dukul, 2026-10-11)
+local function PaintBox(fr)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
+        local p = BNB.GetSkinPreset()
+        local r, g, b = BNB.SkinColourOf(p)
+        local br, bg, bb = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(fr, r, g, b, BNB.GetSkinBgAlpha(), br, bg, bb, 1)
+    else
+        BNB.SetBackdrop(fr, 0.07, 0.07, 0.09, 0.96, 0.35, 0.35, 0.38, 1)
+    end
+end
+
 -- ── Rows (the grouped toast) ────────────────────────────────────────────────
+local function RowsBox(f)
+    if not f._rowsBox then f._rowsBox = BNB.CreateBackdropFrame("Frame", nil, f) end
+    return f._rowsBox
+end
+
 local function GetRow(f, i)
     f._rowFrames = f._rowFrames or {}
     local row = f._rowFrames[i]
     if row then return row end
-    row = CreateFrame("Button", nil, f)
+    row = CreateFrame("Button", nil, RowsBox(f))
     row:SetHeight(ROW_H)
     row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-    local bg = row:CreateTexture(nil, "BACKGROUND")
-    bg:SetAllPoints(); bg:SetColorTexture(0.06, 0.06, 0.09, 0.9)
     local hi = row:CreateTexture(nil, "ARTWORK")
     hi:SetAllPoints(); hi:SetColorTexture(0.25, 0.40, 0.25, 0.4)
     hi:Hide()
@@ -249,14 +276,31 @@ local function GetRow(f, i)
     return row
 end
 
+-- Down / Up: the rows hang under the toast. Left / Right (ALL-438): they sit
+-- beside it, on the far side in the grow direction, so the toast stays in
+-- line with the others and the rows are a box of their own at the end
 local function FillRows(f, rows)
     local n = rows and math.min(#rows, MAX_ROWS) or 0
+    local dx = GrowDir()[1]
+    local w = f:GetWidth()
+    local box = RowsBox(f)
+    box:ClearAllPoints()
+    if dx > 0 then
+        box:SetPoint("TOPLEFT", f, "TOPRIGHT", GAP, 0)
+    elseif dx < 0 then
+        box:SetPoint("TOPRIGHT", f, "TOPLEFT", -GAP, 0)
+    else
+        box:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -ROWS_GAP)
+    end
+    box:SetSize(w, n * ROW_H + 2 * ROWS_PAD)
+    box:SetShown(n > 0)
+    if n > 0 then PaintBox(box) end
     for i = 1, n do
         local r, row = rows[i], GetRow(f, i)
         row._row = r
         row:ClearAllPoints()
-        row:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -(i - 1) * ROW_H)
-        row:SetPoint("TOPRIGHT", f, "BOTTOMRIGHT", 0, -(i - 1) * ROW_H)
+        row:SetPoint("TOPLEFT", box, "TOPLEFT", ROWS_PAD, -ROWS_PAD - (i - 1) * ROW_H)
+        row:SetPoint("TOPRIGHT", box, "TOPRIGHT", -ROWS_PAD, -ROWS_PAD - (i - 1) * ROW_H)
         row._lbl:SetText(r.title or "")
         local tc = r.titleColor
         if tc then row._lbl:SetTextColor(tc.r or 1, tc.g or 1, tc.b or 1)
@@ -265,8 +309,11 @@ local function FillRows(f, rows)
         row:Show()
     end
     for i = n + 1, #(f._rowFrames or {}) do f._rowFrames[i]:Hide() end
-    -- Screen units: the rows are children of the scaled toast
-    f._rowsH = n * ROW_H * f:GetScale()
+    -- Screen units: the rows are children of the scaled toast. _rowsH = what
+    -- they add below the toast, _rowsW = what they add beside it
+    local s = f:GetScale()
+    f._rowsH = (dx == 0 and n > 0) and (ROWS_GAP + n * ROW_H + 2 * ROWS_PAD) * s or 0
+    f._rowsW = (dx ~= 0 and n > 0) and (GAP + w) * s or 0
 end
 
 -- Style and content from the spec; keepTime = a restyle, not a new message
@@ -279,6 +326,7 @@ local function Fill(f, spec, keepTime)
     FillRows(f, spec.rows)
     if not keepTime then f._elapsed = 0 end
     f._hold = HoldTime(spec)
+    if f._hold > 0 then f._hold = f._hold + (f._burstExtra or 0) end
     local bar = f._bar
     if f._barW and f._hold > 0 then
         local frac = 1 - math.min((f._elapsed or 0) / f._hold, 1)
@@ -290,15 +338,42 @@ local function Fill(f, spec, keepTime)
     end
 end
 
+-- Queued toasts: a "+N" box of its own in the next slot after the last toast
+-- (Dukul, 2026-10-11, was a label on the last toast). The queue comes in one
+-- toast at a time as room frees, and N counts down
+local function PlaceMore()
+    local box, last = _moreBox, _shown[#_shown]
+    if not (box and box:IsShown() and last and last._tx) then return end
+    local d, s = GrowDir(), box:GetScale()
+    local ext = (d[1] ~= 0) and box:GetWidth() * s or box:GetHeight() * s
+    local pos = (last._ext or 0) / 2 + GapOf(last._style) + ext / 2
+    box:ClearAllPoints()
+    box:SetPoint("CENTER", UIParent, "CENTER",
+        (_ax + last._tx + d[1] * pos) / s, (_ay + last._ty + d[2] * pos) / s)
+end
+
 local function UpdateMore()
-    for i, f in ipairs(_shown) do
-        if i == #_shown and #_queue > 0 then
-            f._more:SetText(string.format(L["TOAST_MORE"], #_queue))
-            f._more:Show()
-        else
-            f._more:Hide()
-        end
+    for _, f in ipairs(_shown) do f._more:Hide() end
+    if #_queue == 0 or #_shown == 0 then
+        if _moreBox then _moreBox:Hide() end
+        return
     end
+    local box = _moreBox
+    if not box then
+        box = BNB.CreateBackdropFrame("Frame", nil, UIParent)
+        box:SetClampedToScreen(true)
+        box._text = box:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
+        box._text:SetPoint("CENTER")
+        box._text:SetTextColor(0.9, 0.9, 0.9)
+        _moreBox = box
+    end
+    box:SetScale(Scale())
+    box:SetFrameStrata(ToastStrata())
+    PaintBox(box)
+    box._text:SetText(string.format(L["TOAST_MORE_BOX"], #_queue))
+    box:SetSize(math.max(ROW_H + 10, box._text:GetStringWidth() + 18), ROW_H + 6)
+    box:Show()
+    PlaceMore()
 end
 
 -- Every toast's slot; with Slide in off (or now) they jump there
@@ -306,7 +381,8 @@ local function Retarget(now)
     local ext, gaps = {}, {}
     for i, f in ipairs(_shown) do
         local w, h = f:GetWidth() * f:GetScale(), f:GetHeight() * f:GetScale()
-        ext[i] = Extent(w, h + (f._rowsH or 0))
+        ext[i] = Extent(w + (f._rowsW or 0), h + (f._rowsH or 0))
+        f._ext = ext[i]
         gaps[i] = GapOf(f._style)
     end
     local slide = Setting("toastSlide") and not now
@@ -315,18 +391,47 @@ local function Retarget(now)
         f._tx, f._ty = o[1], o[2]
         if not slide or f._x == nil then f._x, f._y = f._tx, f._ty; Place(f) end
     end
+    PlaceMore()
 end
 
 -- ── The driver: slide and countdown, one OnUpdate for every toast ──────────
 local function MouseOverAny()
     if T._menuFor and BNB.ContextMenu and BNB.ContextMenu.IsOpen() then return true end
     for _, f in ipairs(_shown) do
-        if f:IsMouseOver() then return true end
+        if not f._delay and f:IsMouseOver() then return true end
         for _, row in ipairs(f._rowFrames or {}) do
             if row:IsShown() and row:IsMouseOver() then return true end
         end
     end
     return false
+end
+
+-- One toast's frame of the driver: close X on hover, slide, countdown
+local function TickOne(f, dt, k, paused)
+    local x = f._closeX
+    if x then
+        local over = f:IsMouseOver() or (x:IsShown() and x:IsMouseOver())
+        if over ~= x:IsShown() then x:SetShown(over) end
+    end
+    if f._x ~= f._tx or f._y ~= f._ty then
+        f._x = f._x + (f._tx - f._x) * k
+        f._y = f._y + (f._ty - f._y) * k
+        if math.abs(f._tx - f._x) < 0.5 and math.abs(f._ty - f._y) < 0.5 then
+            f._x, f._y = f._tx, f._ty
+        end
+        Place(f)
+    end
+    if not paused and f._hold > 0 then
+        f._elapsed = f._elapsed + dt
+        if f._barW then
+            local frac = 1 - math.min(f._elapsed / f._hold, 1)
+            f._bar:SetWidth(math.max(0.01, f._barW * frac))
+            if frac > 0.5 then     f._bar:SetColorTexture(0.3, 0.75, 0.3, 0.9)
+            elseif frac > 0.2 then f._bar:SetColorTexture(0.85, 0.70, 0.2, 0.9)
+            else                   f._bar:SetColorTexture(0.85, 0.25, 0.2, 0.9) end
+        end
+        if f._elapsed >= f._hold then Remove(f) end
+    end
 end
 
 local function Tick(self, dt)
@@ -336,30 +441,15 @@ local function Tick(self, dt)
     -- Backwards: a toast that runs out is removed from _shown here
     for i = #_shown, 1, -1 do
         local f = _shown[i]
-        local x = f._closeX
-        if x then
-            local over = f:IsMouseOver() or (x:IsShown() and x:IsMouseOver())
-            if over ~= x:IsShown() then x:SetShown(over) end
-        end
-        if f._x ~= f._tx or f._y ~= f._ty then
-            f._x = f._x + (f._tx - f._x) * k
-            f._y = f._y + (f._ty - f._y) * k
-            if math.abs(f._tx - f._x) < 0.5 and math.abs(f._ty - f._y) < 0.5 then
-                f._x, f._y = f._tx, f._ty
+        -- A burst toast waiting its turn: in its slot, unseen, not counting
+        if f._delay then
+            f._delay = f._delay - dt
+            if f._delay <= 0 then
+                f._delay = nil
+                BNB.FadeTo(f, 0, 1, FADE)
             end
-            Place(f)
         end
-        if not paused and f._hold > 0 then
-            f._elapsed = f._elapsed + dt
-            if f._barW then
-                local frac = 1 - math.min(f._elapsed / f._hold, 1)
-                f._bar:SetWidth(math.max(0.01, f._barW * frac))
-                if frac > 0.5 then     f._bar:SetColorTexture(0.3, 0.75, 0.3, 0.9)
-                elseif frac > 0.2 then f._bar:SetColorTexture(0.85, 0.70, 0.2, 0.9)
-                else                   f._bar:SetColorTexture(0.85, 0.25, 0.2, 0.9) end
-            end
-            if f._elapsed >= f._hold then Remove(f) end
-        end
+        if not f._delay then TickOne(f, dt, k, paused) end
     end
 end
 
@@ -385,6 +475,11 @@ T.PlaySound = PlayToastSound
 
 local function Add(spec)
     local f = table.remove(_pool) or CreateToast()
+    local now = GetTime()
+    _burstN = (now - _burstAt < BURST_WINDOW) and math.min(_burstN + 1, 9) or 0
+    _burstAt = now
+    f._burstExtra = _burstN * BURST_STEP
+    f._delay = (_burstN > 0) and _burstN * BURST_STAGGER or nil
     Fill(f, spec)
     f._x, f._y = nil, nil
     _shown[#_shown + 1] = f
@@ -401,7 +496,7 @@ local function Add(spec)
     f:Raise()
     -- A note's portrait again, now that the toast is shown (ALL-434)
     if spec.iconSetup then BNB.ToastStyles.FillIcon(f, spec) end
-    BNB.FadeTo(f, 0, 1, FADE)
+    if f._delay then f:SetAlpha(0) else BNB.FadeTo(f, 0, 1, FADE) end
     StartDriver()
     if not spec.silent then PlayToastSound() end
 end
@@ -417,7 +512,7 @@ Remove = function(f)
     for i, s in ipairs(_shown) do
         if s == f then table.remove(_shown, i); break end
     end
-    f._leaving = true
+    f._leaving, f._delay = true, nil
     f._more:Hide()
     if f._closeX then f._closeX:Hide() end
     BNB.FadeTo(f, f:GetAlpha(), 0, FADE, function()
@@ -501,6 +596,10 @@ function T.Relayout()
         local f = _shown[#_shown]
         table.insert(_queue, 1, f._spec)
         Remove(f)
+    end
+    -- Rows go under or beside a toast by grow direction (ALL-438)
+    for _, f in ipairs(_shown) do
+        if f._spec then FillRows(f, f._spec.rows) end
     end
     Retarget(true)
     PullQueue()
