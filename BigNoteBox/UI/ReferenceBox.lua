@@ -3404,8 +3404,12 @@ do
         Refresh(tooltip)
     end
 
+    -- Data-driven tooltips need C_TooltipInfo as well (Retail, Forever). TBC
+    -- Anniversary and MoP Classic have TooltipDataProcessor but not
+    -- C_TooltipInfo: their tooltips never reach its post-calls (ALL-439,
+    -- BV8), so they take the old script path with Classic Era
     local hasTDP = TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall
-        and Enum and Enum.TooltipDataType
+        and Enum and Enum.TooltipDataType and C_TooltipInfo
     if hasTDP then
         TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Item, function(tooltip, data)
             OnItemTip(tooltip, data and data.id)
@@ -3414,20 +3418,30 @@ do
             OnSpellTip(tooltip, data and data.id)
         end)
     else
-        -- Classic Era has no TooltipDataProcessor (ERA-01): the old per-tooltip
-        -- OnTooltipSetItem / OnTooltipSetSpell scripts instead
+        -- Classic (ERA-01, ALL-439): the old per-tooltip OnTooltipSetItem /
+        -- OnTooltipSetSpell scripts. Our tooltip:Show() can run the script
+        -- again, so each tooltip gets the lines once until it is cleared
+        local done = setmetatable({}, { __mode = "k" })
+        local function Once(tip, fn, id)
+            if done[tip] then return end
+            done[tip] = true
+            fn(tip, id)
+        end
         for _, tip in ipairs({ GameTooltip, ItemRefTooltip }) do
+            if tip and tip.HasScript and tip:HasScript("OnTooltipCleared") then
+                tip:HookScript("OnTooltipCleared", function(self) done[self] = nil end)
+            end
             if tip and tip.HasScript and tip:HasScript("OnTooltipSetItem") then
                 tip:HookScript("OnTooltipSetItem", function(self)
                     local _, link = self:GetItem()
                     local id = link and tonumber(link:match("item:(%d+)"))
-                    OnItemTip(self, id)
+                    Once(self, OnItemTip, id)
                 end)
             end
             if tip and tip.HasScript and tip:HasScript("OnTooltipSetSpell") then
                 tip:HookScript("OnTooltipSetSpell", function(self)
                     local _, id = self:GetSpell()
-                    OnSpellTip(self, id)
+                    Once(self, OnSpellTip, id)
                 end)
             end
         end

@@ -113,10 +113,13 @@ local function UnitTipLine(tip)
     tip:Show()
 end
 
-if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall
+-- Data-driven tooltips need C_TooltipInfo too: TBC Anniversary and MoP
+-- Classic have TooltipDataProcessor without it, and their tooltips never
+-- reach its post-calls (ALL-439)
+if TooltipDataProcessor and TooltipDataProcessor.AddTooltipPostCall and C_TooltipInfo
         and Enum and Enum.TooltipDataType and Enum.TooltipDataType.Unit then
     TooltipDataProcessor.AddTooltipPostCall(Enum.TooltipDataType.Unit, function(tip) pcall(UnitTipLine, tip) end)
 elseif GameTooltip:HasScript("OnTooltipSetUnit") then
-    -- Classic Era has no TooltipDataProcessor (ERA-01)
+    -- Classic Era, Anniversary, MoP (ERA-01, ALL-439)
     GameTooltip:HookScript("OnTooltipSetUnit", function(tip) pcall(UnitTipLine, tip) end)
 end
