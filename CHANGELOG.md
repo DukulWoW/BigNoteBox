@@ -1,55 +1,49 @@
-# BigNoteBox v1.22.0
+# BigNoteBox v1.23.0
 
 ## All versions
 
 ### New
-- Alarms: set the defaults for new alarms (snooze time, glow type, glow mode, glow colour) in Settings > Modules > Alarms. Alarms set to "Default" follow them.
-- Alarm popup: alarms waiting their turn show as bars under the popup. Click one to show it now.
-- Before an import or a migration, BigNoteBox offers to save a backup of the notes you already have.
-- Rich notes: /way lines (as TomTom and Wowhead write them, "/way Zone 45.2 60.1" or "/way #84 45.2 60.1") are clickable links. Click to place the waypoint (TomTom, or the game's map pin), Shift+click to see it on the world map.
-- Situations > Waypoints: "Show on map" in a waypoint's right-click menu, or Shift+click the row, opens the world map with a marker on the spot.
-- Situations: the player name box suggests your friends (Battle.net friends too), your guild and your group, in class colours.
-- Rich notes: broken formatting tags (a {p} never closed, a {/p} closing a heading, a close tag with nothing open) show as "Markup: N to fix" next to the word count, with the details on hover. They are fixed in the text when you open another note or close the window; Note History keeps the text from before.
-- Settings > Advanced > Addon integrations: a page of its own with one section per addon (BigChatBox, TomTom, WaypointUI), with its logo, what it does and whether it is active, and the tab shows how many you have. An addon you do not have has a button that copies its CurseForge link.
-- Reference Box: add mounts and battle pets straight from the Collections journals (drag them in or Shift+click), with their model.
+- The top bar's Send button opens a note search: type a name, pick the note with the mouse or the arrow keys, and it goes straight to the Send to Chat window, no need to open it first.
+- Oracle prefix "m" sends the note you pick to the Send to Chat window.
+- After an update, the patch notes no longer open a window over the screen: they come as a pinned, favourite note (tagged Bnb and the version number) and a toast that waits for your click. The next update replaces that note, unless you edited it or removed its Bnb tag. The What's New window is still on the version button in Settings > General.
+- Settings > Modules > Toasts: "Messages from BigNoteBox" turns the update and welcome toasts off (the notes are still made).
+- A fresh install starts with a welcome note from Dukul, pinned at the top, with a toast pointing to it.
+- Settings > General: buttons under More Features copy the link to BigNoteBox on GitHub, CurseForge, Wago and WoWInterface.
+- tl;dr notes: give a note one short line (up to 80 characters) at the top of Note Settings > Situation, typed or picked from a list of snippets (KOS, Friendly, Avoid, Vendor / trader and more). It shows under the note title, in the game tooltip of the player or NPC the note is about, on the note icon at the Target and Focus frames, and on the note's situation toast. Settings > Modules > tl;dr turns it on or off, chooses where it shows and edits the snippet list.
+- Hovering a note in the note list shows a small box with its tl;dr, next alarm, situations and waypoints; hovering the note icon on the Target or Focus frame shows the same box. Settings > Modules > tl;dr, "Note details when hovering the note list" turns the list box off.
+- Toast styles in a picker: on Settings > Modules > Toasts and in a note's Toast window, click the style name to see every style as a real toast, two side by side (the name shows on hover). Click one to use it, double-click to use it and close, Revert to go back; the arrows beside the name step through them. "Follow my faction" / "As in Settings" sits in the picker too. A note's picker shows that note's own toast.
+- Situations can be on or off: on the Situation tab a green situation is on, a grey one is kept on the note but never shows. Click one to switch it, double-click to edit it.
+- Every new player or NPC note gets a situation for that player or NPC, off unless you choose otherwise: Settings > Modules > Situations has "Turn on the player situation" and "Turn on the NPC situation", each with "Show the note as a toast" under it. So a KOS note is: make the note, pick KOS as its tl;dr, done.
+- Note Settings > Situation, Show as: "Show nothing". The situation still marks the note and places its waypoints, but no toast or sticky pops up.
 
 ### Change
-- Set alarm: "Every N days" has < > buttons to change the number.
-- Situations: Add with nothing typed adds where you are now (zone, sub-zone, instance) or your target (player, NPC, guild).
-- Danger Zone: the confirm button says how much it changes, like "Delete all 312 notes".
-- Copy boxes from link buttons show the start of the link you are copying.
-- Skin mode: text buttons look pressed while held (the label moves down a pixel).
-- Sticky notes: the border has its own opacity slider (Appearance), so the background opacity no longer fades the border.
-- Sticky notes: the scrollbar shows only while the pointer is over the note.
-- Sticky notes: the window border is picked from a thumbnail grid with < > arrows, as the background is. Note Settings' icon frame row has the < > arrows too.
-- Skin mode: slider tracks are see-through (70%) instead of solid black.
-- Skin mode: the OLED preset's softer white also reaches sticky note text that still has its default colour.
-- Changing the note font updates skin-mode button labels and the welcome screen at once, without a reload.
-- NPC notes show the creature's portrait again (switched off in v1.21.1 while a crash was tracked down).
-- The toast position anchor is now exactly the size of a toast: a see-through box in normal mode, the skin's colours in skin mode.
-- Esc closes the window in front first: Settings or Trash opened over Note History now close before it.
-- The note list collapses on its own when the main window is made narrower than 530, and comes back when you widen it again.
-- Settings > General: BCB Integration moved to Advanced > Addon integrations; a smaller More Features button sits beside Language.
-- Settings tooltips: what a checkbox does when on and when off is shown as two paragraphs, with On: and Off: in green (or the skin colour).
+- Toasts that pop up together (at login, entering a zone) now come in one after another and leave one at a time, oldest first, instead of all at once.
+- Toasts waiting for room show as a small "+N" box after the last toast, counting down as they come in. A toast's list (tasks, grouped situations) is a box of its own, dark like a sticky note, or in your skin's colours in skin mode.
+- BigNoteBox's code is now licensed under the GNU GPL v3 (it was MIT). The logo and icon are All Rights Reserved; the rest of the art is Blizzard's. See LICENSE and LICENSE-ASSETS.
+- Suggestion lists take the arrow keys: Up / Down pick a row, Enter or Tab takes it, Esc closes the list (Situations add row, waypoint sub-zone, note list "#" tags, Send directly names).
+- Note Settings > Situations > Waypoints: clicking "(Addon required)" or the ? now opens Settings > Advanced > Addon integrations instead of a separate popup.
+- The collapsed note list shows a note's title when you hover it.
+- Toasts show in the upper left instead of the middle of the screen. A toast position you placed yourself stays where it is.
+- Settings > Advanced > Addon integrations lists DialogueUI and Immersion too, with what BigNoteBox does with each (Immersion is not listed on TBC Anniversary, which it has no version for).
 
 ### Fixed
-- Import: pressing Esc on the "notes for another character" question now cancels the import instead of importing.
-- Skin mode: the font cards in Note Settings and sticky note settings use the skin's colours instead of the old green.
-- Target notes: a note imported from a file is found again when you make a note of the same NPC (it asks first instead of making a silent "(Duplicate)"), and a repeated press for the same target makes one note.
-- Mount stands (one NPC ID shared by several invisible mounts, like the Orgrimmar Trading Post): each stand gets its own note, and the Reference Box shows its mount instead of an empty viewer.
-
-## Retail only
-
-### New
-- MapPinEnhanced support (version 4.0 and newer): situation waypoints go to MapPinEnhanced as named pins in a BigNoteBox group, several at once, "Don't track it" is respected, and they are removed again when you leave. Navigate, Show on map and the coordinate button use it too. Settings > Advanced > Addon integrations has a MapPinEnhanced section, which says "Needs update" for older versions.
+- Alarm window: the day boxes under Repeat name the full day when you hover them ("Ring on Monday").
+- Toasts growing Left or Right: a toast with a list (tasks, grouped situations) no longer sits higher than the others; its list is now a box of its own beside it.
+- Rich notes in the main window no longer cut off the end of each line when opened (it only went away after resizing the window).
+- A toast for a player note now shows the player's face while you have them targeted, as the note list does (it showed the plain note icon). Its right-click menu and alarm toasts too.
 
 ## WoW Forever only
 
 ### Change
-- Skin mode: the beta notice is drawn in the skin's look.
-- Skin mode uses the plain action bar icons, as on Retail (the detailed Forever icons stay in normal mode).
+- The language selector is back in the setup wizard and Settings > General: a forced language now stays through reloads.
 
 ## Classic only
 
 ### Change
-- Skin mode: the beta notice is drawn in the skin's look.
+- Reference Box side tabs sit under the window edge.
+- Addon integrations no longer lists WaypointUI and MapPinEnhanced, which have no Classic version.
+- The icon picker has no "All game icons" list on Classic: almost none of those icons exist there, so Classic uses the curated icons.
+
+### Fixed
+- Three icon frames that do not exist on Classic (Golden Hunter, Solar Flare, Corner Ornament) are no longer offered there.
+- Note Settings > Situations > Waypoints: without a waypoint addon, the red install hint no longer runs out of the window (the line is gone; "(Addon required)" says it).
