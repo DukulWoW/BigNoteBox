@@ -437,12 +437,10 @@ local function BuildPage1(content)
 
     -- Language selector (ALL-14): pinned to the bottom of the page, right
     -- above Get started, out of the scrolling text (ALL-268). Selecting a
-    -- language asks, then reloads into page 1. Not on Classic: its TOCs have
-    -- no BigNoteBoxLocale / LoadSavedVariablesFirst, so the pick cannot
-    -- survive the reload (ALL-168). Forever has both since FOR-32 (2026-10-10,
-    -- as BCB's Forever TOC). Without the box the text keeps
-    -- MakeScrollContent's full-height anchors.
-    if not BNB.IsClassic then
+    -- language asks, then reloads into page 1. Every client: the one TOC has
+    -- BigNoteBoxLocale + LoadSavedVariablesFirst (Forever since FOR-32,
+    -- Classic since ALL-440; hidden there before, ALL-168).
+    do
         local LANG_BOX_H = 56
         local lb = CreateFrame("Frame", nil, f)
         lb:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)

@@ -115,7 +115,7 @@ local function BuildGeneralTab(sf, ct)
     -- Text and dropdown in the left column, More Features right of it (ALL-315)
     local langTopY
     local LANG_W = math.floor((CONTENT_W - 12) / 2)
-    if not BNB.IsClassic then   -- Classic TOCs lack BigNoteBoxLocale (ALL-168); Forever has it (FOR-32)
+    do   -- every client: the one TOC has BigNoteBoxLocale + LoadSavedVariablesFirst (FOR-32, Classic since ALL-440)
         y = AddRule(ct, y) - 4
         langTopY = y
         y = AddHeader(ct, y, L["CFG_HDR_LANGUAGE"])
