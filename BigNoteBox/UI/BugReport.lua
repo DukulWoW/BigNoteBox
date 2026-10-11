@@ -145,9 +145,10 @@ local BUG_BTN_X    = 6     -- gap from the window's right edge
 local BUG_BTN_Y    = -24   -- down from the window's top edge
 
 -- Where the button lives (Dukul, 2026-09-25): Settings on Retail, the main
--- window on Forever during the beta. At Forever launch, Forever moves to
--- Settings too (and loses the glow): make this true on both clients.
-local BUG_BTN_ON_SETTINGS = not BNB.IsForever
+-- window on Forever and Classic during their betas (Classic: Dukul,
+-- 2026-10-11). When a beta ends, that client moves to Settings too (and
+-- loses the glow).
+local BUG_BTN_ON_SETTINGS = not (BNB.IsForever or BNB.IsClassic)
 
 -- host: the window the button sits beside, and its parent (hidden with it).
 -- glow: the red pixel glow that gets the button noticed during the beta.
