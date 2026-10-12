@@ -33,8 +33,11 @@ local L   = BNB.L
 --   header = heading colour, scales as accent        (nil = accent)
 --   text   = the brightest white text, or one grey  (nil = white)
 --   noBright = true: the brightness setting does not apply (OLED)
+--   borderAlpha = border opacity 0..1 (nil = 1), a flat look (ALL-455)
+--   fadeRules   = true: divider rules take borderAlpha too (nil = solid)
 -- Read them only through SkinColourOf / SkinLiftedOf / SkinButtonOf /
--- SkinAccentOf / SkinHeaderOf / SkinTextOf, never the fields.
+-- SkinAccentOf / SkinHeaderOf / SkinTextOf / SkinBorderOf / SkinRuleOf,
+-- never the fields.
 --------------------------------------------------------------------------------
 BNB.SKIN_PRESETS = {
     obsidian   = { r=0.070, g=0.070, b=0.070, lift=0.05, br=0.28, bg_=0.28, bb=0.28 },
@@ -52,6 +55,10 @@ BNB.SKIN_PRESETS = {
     -- text = the brightest white text on this preset (ALL-402 S2: OLED's pure
     -- white on black was too sharp); nil = 1. Read through BNB.TextWhite
     oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18, text=0.80, noBright=true },
+    -- Flat OLED (Dukul's Skin Lab export, 2026-10-12): no borders or dividers
+    -- (borderAlpha 0 + fadeRules, ALL-455); buttons stand out by the floor in
+    -- SkinButtonOf (ALL-454)
+    oledflat   = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.00, bg_=0.00, bb=0.00, accent={ 0.200, 0.200, 0.200 }, header={ 0.455, 0.373, 0.173 }, text=0.55, noBright=true, borderAlpha=0.00, fadeRules=true },
 }
 
 -- Display order of the presets: the one list Settings > Appearance and the
@@ -62,7 +69,7 @@ BNB.SKIN_PRESETS = {
 BNB.SKIN_PRESET_ORDER = {
     "obsidian", "void", "dragonfire", "arcane", "fel",
     "titan", "icecrown", "holy", "azshara", "ragnaros",
-    "earthen", "argent", "oled",
+    "earthen", "argent", "oled", "oledflat",
 }
 
 function BNB.SkinPresetLabel(key, short)
@@ -123,13 +130,53 @@ function BNB.SkinLiftedOf(preset)
     return math.min(1, preset.r + lift), math.min(1, preset.g + lift), math.min(1, preset.b + lift)
 end
 
--- Skin button fill, not scaled by brightness: the exact `button` colour, else
--- body + lift * 1.5 (the colour every skin button had by hand)
-function BNB.SkinButtonOf(preset)
+-- The preset's own skin button fill, not scaled by brightness: the exact
+-- `button` colour, else body + lift * 1.5 (the colour every skin button had
+-- by hand). What the Skin Lab shows and edits; buttons draw SkinButtonOf.
+function BNB.SkinButtonBaseOf(preset)
     local c = preset.button
     if c then return c[1], c[2], c[3] end
     local lift = (preset.lift or 0) * 1.5
     return math.min(1, preset.r + lift), math.min(1, preset.g + lift), math.min(1, preset.b + lift)
+end
+
+-- WCAG 2 contrast ratio of two colours (1 = the same, 21 = black on white)
+local function Lum(r, g, b)
+    local function c(v) return v <= 0.03928 and v / 12.92 or ((v + 0.055) / 1.055) ^ 2.4 end
+    return 0.2126 * c(r) + 0.7152 * c(g) + 0.0722 * c(b)
+end
+local function Contrast(r1, g1, b1, r2, g2, b2)
+    local a, b = Lum(r1, g1, b1), Lum(r2, g2, b2)
+    if a < b then a, b = b, a end
+    return (a + 0.05) / (b + 0.05)
+end
+
+-- Button floor (ALL-454, Dukul 2026-10-12): on a flat preset (border = body,
+-- or faded by borderAlpha) a button whose fill is close to the body showed
+-- only its text. The fill then gets a floor of body + BTN_FLOOR_STEP x t,
+-- t ramping 0 -> 1 as the edge fades from BTN_EDGE_SEEN to nothing: a switch
+-- turned the whole step on between 16 % and 15 % border opacity (Dukul,
+-- 2026-10-12: "it turns on the color again"). A fill already above the floor
+-- is left alone. Shipped presets never reach it: their faintest edge is
+-- 1.19 : 1 (Void at brightness 0.50; checked over 0.50 - 3.00 for every preset).
+local BTN_EDGE_SEEN  = 1.18   -- edge / body from here up = no floor
+local BTN_FLOOR_STEP = 0.18   -- the floor over the body once the edge is gone (OLED's border grey)
+
+-- Skin button fill as drawn: SkinButtonBaseOf, lifted to the floor above
+-- when the button would vanish into the body. Not scaled by brightness.
+function BNB.SkinButtonOf(preset)
+    local r, g, b = BNB.SkinButtonBaseOf(preset)
+    local pr, pg, pb = BNB.SkinColourOf(preset)
+    local br, bg_, bb, ba = BNB.SkinBorderOf(preset)
+    -- The edge as it shows over the body at its opacity
+    local er, eg, eb = pr + (br - pr) * ba, pg + (bg_ - pg) * ba, pb + (bb - pb) * ba
+    local t = (BTN_EDGE_SEEN - Contrast(er, eg, eb, pr, pg, pb)) / (BTN_EDGE_SEEN - 1)
+    if t <= 0 then return r, g, b end
+    local step = BTN_FLOOR_STEP * math.min(1, t)
+    -- Each channel up to body + step; a fill darker than the body rises from
+    -- itself, so nothing jumps where the ramp starts
+    local function Lift(f, p) return math.min(1, f + math.max(0, p + step - math.max(f, p))) end
+    return Lift(r, pr), Lift(g, pg), Lift(b, pb)
 end
 
 -- The skin tabs' share of the brightness (ALL-453, Dukul 2026-10-12: "a
@@ -163,13 +210,34 @@ end
 -- the default (1.50). A window edge carries a bright border; a 1 px rule
 -- across a page went glaring from 2.00 up (Dukul 2026-10-08, screenshots at
 -- 1.00 / 2.00 / 3.00). Every rule colour (RegisterSkinRule targets and their
--- first colour) comes from here.
+-- first colour) comes from here. The 4th value is SkinRuleAlphaOf: a factor
+-- for the rule's own alpha.
 function BNB.SkinRuleOf(preset)
     local cap = BNB.DEFAULTS and BNB.DEFAULTS.skinBrightness or 1.5
     local brt = math.min(BNB.GetSkinBrightness(), cap)
     return math.min(1, preset.br * brt),
            math.min(1, preset.bg_ * brt),
-           math.min(1, preset.bb * brt)
+           math.min(1, preset.bb * brt),
+           BNB.SkinRuleAlphaOf(preset)
+end
+
+-- Border opacity (ALL-455, Dukul 2026-10-12: "a transparency dial for
+-- borders, that could potentially make flat themes a thing"): the preset's
+-- borderAlpha, 0..1, nil = 1. Every skin edge (window, strip-less frame,
+-- button, tab, dropdown box, menu, toast, icon edge) draws at it; art tinted
+-- in the border colour (icon symbols, markers, scrollbars, checkbox boxes,
+-- text) does not. The 4th value of SkinBorderOf.
+function BNB.SkinBorderAlphaOf(preset)
+    local a = preset and tonumber(preset.borderAlpha)
+    if not a then return 1 end
+    return math.max(0, math.min(1, a))
+end
+
+-- Divider rules follow the border opacity only when the preset says so
+-- (fadeRules, Dukul 2026-10-12: "a separate setting for dividers"); else 1
+function BNB.SkinRuleAlphaOf(preset)
+    if preset and preset.fadeRules then return BNB.SkinBorderAlphaOf(preset) end
+    return 1
 end
 
 -- Accent colour (Dukul, 2026-10-08): white art in skin mode (top bar icons)
@@ -238,12 +306,15 @@ function BNB.SkinHeaderOf(preset)
     return BNB.SkinAccentOf(preset)
 end
 
--- Returns br, bg_, bb for a preset scaled by the current brightness multiplier.
+-- Returns br, bg_, bb for a preset scaled by the current brightness
+-- multiplier, and the border opacity (SkinBorderAlphaOf) as a 4th value: an
+-- edge passes it as its alpha, a tint in the border colour ignores it.
 function BNB.SkinBorderOf(preset)
     local brt = BNB.GetSkinBrightness()
     return math.min(1, preset.br * brt),
            math.min(1, preset.bg_ * brt),
-           math.min(1, preset.bb * brt)
+           math.min(1, preset.bb * brt),
+           BNB.SkinBorderAlphaOf(preset)
 end
 
 --------------------------------------------------------------------------------
@@ -297,9 +368,15 @@ end
 
 -- Public: called by AddRule (ConfigWindow.lua) for each divider texture that
 -- should track the current preset border colour + brightness.
--- alpha defaults to 0.9 if nil.
+-- alpha defaults to 0.9 if nil. Painted here too, so the preset's divider
+-- fade (SkinRuleAlphaOf, ALL-455) reaches a rule from its first draw.
 function BNB.RegisterSkinRule(tex, alpha)
-    _skinRules[#_skinRules + 1] = { tex = tex, alpha = alpha or 0.9 }
+    alpha = alpha or 0.9
+    _skinRules[#_skinRules + 1] = { tex = tex, alpha = alpha }
+    if tex and tex.SetColorTexture then
+        local r, g, b, ra = BNB.SkinRuleOf(BNB.GetSkinPreset())
+        tex:SetColorTexture(r, g, b, alpha * ra)
+    end
 end
 
 -- Public: FontString that should tint to border colour × mult.
@@ -353,11 +430,11 @@ function BNB.ApplyMainWindowSkin()
             if t.frame and t.frame.SetBackdropColor then
                 local r, g, b = BNB.SkinColourOf(preset, t.lifted)
                 t.frame:SetBackdropColor(r, g, b, BNB.GetSkinBgAlpha())
-                local br, bg_, bb = BNB.SkinBorderOf(preset)
+                local br, bg_, bb, ba = BNB.SkinBorderOf(preset)
                 if t.strip then
                     t.frame:SetBackdropBorderColor(r, g, b, 0)
                 else
-                    t.frame:SetBackdropBorderColor(br, bg_, bb, 1)
+                    t.frame:SetBackdropBorderColor(br, bg_, bb, ba)
                 end
             end
         end
@@ -385,10 +462,10 @@ function BNB.ApplyMainWindowSkin()
     end
 
     -- Recolour all registered divider rule textures (brightness capped, ALL-394)
-    local rr, rg, rb = BNB.SkinRuleOf(preset)
+    local rr, rg, rb, ra = BNB.SkinRuleOf(preset)
     for _, r in ipairs(_skinRules) do
         if r.tex and r.tex.SetColorTexture then
-            r.tex:SetColorTexture(rr, rg, rb, r.alpha)
+            r.tex:SetColorTexture(rr, rg, rb, r.alpha * ra)
         end
     end
     local br, bg_, bb = BNB.SkinBorderOf(preset)
@@ -433,9 +510,9 @@ end
 function BNB.CreateSkinFrame(parent, lifted, name, isMain)
     local preset = BNB.GetSkinPreset()
     local r, g, b = BNB.SkinColourOf(preset, lifted)
-    local br, bg_, bb = BNB.SkinBorderOf(preset)
+    local br, bg_, bb, ba = BNB.SkinBorderOf(preset)
     local f = BNB.CreateBackdropFrame("Frame", name, parent)
-    BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg_, bb, 1)
+    BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg_, bb, ba)
     f._isSkin = true   -- read by BNB.WindowAlpha
     if isMain then
         RegisterMain(f, lifted, false)
@@ -509,12 +586,13 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
 
     local function RefreshVisual(selectedIdx)
         local preset = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(preset)
-        -- Selected tab label: bright preset border colour
+        local br, bg_, bb, ba = BNB.SkinBorderOf(preset)
+        -- Selected tab label: the heading colour (ALL-454; it was the border
+        -- x 3, so a flat preset's black border made it black on black). Not
+        -- the accent: OLED Flat's is 0.2 grey (Dukul, 2026-10-12); header =
+        -- accent on every preset without an exact header
         -- Unselected tab label: white (dimmed via alpha)
-        local selR = math.min(1, br * 3.0)
-        local selG = math.min(1, bg_ * 3.0)
-        local selB = math.min(1, bb * 3.0)
+        local selR, selG, selB = BNB.SkinHeaderOf(preset)
         for i, btn in ipairs(buttons) do
             local selected = (i == selectedIdx)
             if selected then
@@ -523,7 +601,7 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
                 if btn._bg and btn._bg.SetBackdropColor then
                     local r, g, b = BNB.SkinColourOf(preset, true)
                     btn._bg:SetBackdropColor(r, g, b, 0.97)
-                    btn._bg:SetBackdropBorderColor(br, bg_, bb, 1)
+                    btn._bg:SetBackdropBorderColor(br, bg_, bb, ba)
                 end
                 if btn._lbl then btn._lbl:SetTextColor(selR, selG, selB) end
             else
@@ -532,7 +610,7 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
                 if btn._bg and btn._bg.SetBackdropColor then
                     local r, g, b = BNB.SkinColourOf(preset, false)
                     btn._bg:SetBackdropColor(r, g, b, 0.97)
-                    btn._bg:SetBackdropBorderColor(br, bg_, bb, 1)
+                    btn._bg:SetBackdropBorderColor(br, bg_, bb, ba)
                 end
                 if btn._lbl then BNB.SetTextWhite(btn._lbl) end
             end
@@ -564,8 +642,8 @@ function BNB.CreateSkinTabs(parent, labels, onSelect)
         bg:SetAllPoints()
         local preset = BNB.GetSkinPreset()
         local r, g, b = BNB.SkinColourOf(preset, false)
-        local br, bg_, bb = BNB.SkinBorderOf(preset)
-        BNB.SetBackdrop(bg, r, g, b, 0.97, br, bg_, bb, 1)
+        local br, bg_, bb, ba = BNB.SkinBorderOf(preset)
+        BNB.SetBackdrop(bg, r, g, b, 0.97, br, bg_, bb, ba)
         btn._bg = bg
 
         -- Label parented to _bg so it renders above the backdrop fill

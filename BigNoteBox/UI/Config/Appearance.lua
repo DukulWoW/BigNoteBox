@@ -310,10 +310,12 @@ local function BuildAppearanceTab(sf, ct)
     y = y - (ROW_H + ROW_GAP)
 
     -- Single source of truth for the brightness controls' enabled/alpha state.
-    -- Disables the slider if EITHER skin mode is off OR OLED preset is selected.
+    -- Disables the slider if EITHER skin mode is off OR a noBright preset
+    -- (OLED, OLED Flat) is selected.
     RefreshBrightnessVisibility = function()
         local skinOn = db.skinMode == true
-        local isOled = (db.skinPreset or "obsidian") == "oled"
+        local sp = BNB.SKIN_PRESETS[db.skinPreset or "obsidian"]
+        local isOled = sp and sp.noBright and true or false
         local enabled = skinOn and not isOled
         local alpha   = enabled and 1.0 or 0.35
 

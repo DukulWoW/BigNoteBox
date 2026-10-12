@@ -410,8 +410,8 @@ local function BuildSearchBar(parent)
         if db and db.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
             local r, g, b = BNB.SkinButtonOf(p)
-            local br, bg_, bb = BNB.SkinBorderOf(p)
-            BNB.SetBackdrop(bar, r, g, b, 0.92, br, bg_, bb, 1)
+            local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+            BNB.SetBackdrop(bar, r, g, b, 0.92, br, bg_, bb, ba)
         else
             BNB.SetBackdropDark(bar)
         end

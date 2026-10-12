@@ -82,9 +82,13 @@ local function BorderRGB(cfg)
 end
 
 -- A backdrop's border at the sticky's brightness, 0..200 %: above 100 % by
--- ADD copies, since the client clamps vertex colours at 1 (ALL-142)
+-- ADD copies, since the client clamps vertex colours at 1 (ALL-142). While it
+-- follows the skin preset, the preset's border opacity fades it, copies too
+-- (ALL-455)
 local function SetStickyBorder(target, cfg, a)
     local r, g, b = BorderBase(cfg)
+    local p = SkinFollowPreset(cfg)
+    if p then a = (a or 1) * BNB.SkinBorderAlphaOf(p) end
     BNB.BorderBright.SetBackdropBorder(target, cfg and cfg.borderBrightness, r, g, b, a)
 end
 

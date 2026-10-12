@@ -116,10 +116,10 @@ local function RefreshSkin(self)
     local dim  = self._dim or not self:IsEnabled()
     local down = self._down and not dim
     local p, r, g, b = SkinColours()
-    local br, bg_, bb = BNB.SkinBorderOf(p)
+    local br, bg_, bb, ba = BNB.SkinBorderOf(p)
     local m = down and 0.7 or 1
     self:SetBackdropColor(r * m, g * m, b * m, 0.92)
-    self:SetBackdropBorderColor(br, bg_, bb, 1)
+    self:SetBackdropBorderColor(br, bg_, bb, ba)
     self._hl:SetShown(self._over and not dim and not down)
     -- The press symbol is drawn dark (it sits in the pushed plate's shadow), so
     -- tinting it would come out near black: the skin look moves the normal one

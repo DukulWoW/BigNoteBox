@@ -396,8 +396,8 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
         local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
         local r, g, b = BNB.SkinButtonOf(p)
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(btn, r, g, b, 0.92, br, bg_, bb, 1)
+        local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(btn, r, g, b, 0.92, br, bg_, bb, ba)
         btn._br, btn._bg_, btn._bb = r, g, b
     end
     ApplyPreset()
@@ -721,8 +721,8 @@ local function SkinOpenMenu(menu)
     if not _menuSkin then _menuSkin = BNB.CreateBackdropFrame("Frame", nil, UIParent) end
     local p = BNB.GetSkinPreset and BNB.GetSkinPreset()
     if p then
-        local br, bg, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(_menuSkin, p.r, p.g, p.b, 0.96, br, bg, bb, 1)
+        local br, bg, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(_menuSkin, p.r, p.g, p.b, 0.96, br, bg, bb, ba)
     end
     _menuSkin:SetParent(menu)
     _menuSkin:ClearAllPoints()
@@ -1416,7 +1416,7 @@ function BNB.PaintSelectCard(btn, state, nameLbl)
             btn:SetBackdropBorderColor(BNB.SkinAccentOf(p, 1.3))
         else
             local r, g, b = BNB.SkinRuleOf(p)
-            btn:SetBackdropBorderColor(r, g, b, 1)
+            btn:SetBackdropBorderColor(r, g, b, BNB.SkinBorderAlphaOf(p))
         end
     elseif state == "sel" then
         btn:SetBackdropColor(0.12, 0.18, 0.12, 0.95)

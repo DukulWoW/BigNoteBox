@@ -252,8 +252,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
         local r, g, b = BNB.SkinButtonOf(p)
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(fontDDBg, r, g, b, 0.92, br, bg_, bb, 1)
+        local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(fontDDBg, r, g, b, 0.92, br, bg_, bb, ba)
     end
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         ApplyFontDDBgSkin()
@@ -405,8 +405,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
         local r, g, b = BNB.SkinButtonOf(p)
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(sizeBg, r, g, b, 0.92, br, bg_, bb, 1)
+        local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(sizeBg, r, g, b, 0.92, br, bg_, bb, ba)
     end
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         ApplySizeBgSkin()

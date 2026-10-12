@@ -157,8 +157,8 @@ end
 local function SkinColours()
     local p = BNB.GetSkinPreset()
     local fr, fg, fb = BNB.SkinColourOf(p, false)
-    local br, bg_, bb = BNB.SkinBorderOf(p)
-    return fr, fg, fb, br, bg_, bb
+    local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+    return fr, fg, fb, br, bg_, bb, ba
 end
 
 --------------------------------------------------------------------------------
@@ -221,7 +221,7 @@ local function ApplyRowLook(row)
     if _skin then
         local _, _, _, br, bg_, bb = SkinColours()
         hl:SetColorTexture(br, bg_, bb, 0.25)
-        row._div:SetColorTexture(br, bg_, bb, 0.6)
+        row._div:SetColorTexture(br, bg_, bb, 0.6 * BNB.SkinRuleAlphaOf(BNB.GetSkinPreset()))
     else
         hl:SetTexture(LAYERS .. "cm-background-highlight")
         hl:SetTexCoord(0, 1, 0, 1)
@@ -350,9 +350,9 @@ end
 local function Paint(f)
     f:SetBackdrop(BACKDROP)
     if _skin then
-        local fr, fg, fb, br, bg_, bb = SkinColours()
+        local fr, fg, fb, br, bg_, bb, ba = SkinColours()
         f:SetBackdropColor(fr, fg, fb, math.max(0.9, BNB.GetSkinBgAlpha()))
-        f:SetBackdropBorderColor(br, bg_, bb, 1)
+        f:SetBackdropBorderColor(br, bg_, bb, ba)
     else
         f:SetBackdropColor(0.06, 0.06, 0.06, 0.97)
         f:SetBackdropBorderColor(0.40, 0.40, 0.40, 1)

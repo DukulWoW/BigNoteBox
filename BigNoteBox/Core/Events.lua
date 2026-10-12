@@ -357,8 +357,10 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
         if #keys > 0 then
             db.skinPreset = keys[math.random(#keys)]
         end
-        -- Randomize brightness too if enabled, unless the new preset is OLED
-        if db.skinRandomizeBrightness and db.skinPreset ~= "oled" then
+        -- Randomize brightness too if enabled, unless the new preset ignores
+        -- it (noBright: OLED, OLED Flat)
+        local np = BNB.SKIN_PRESETS and BNB.SKIN_PRESETS[db.skinPreset]
+        if db.skinRandomizeBrightness and not (np and np.noBright) then
             -- Pick a random brightness in the 0.5–2.0 range (avoids extremes)
             local MIN_BR, MAX_BR = 0.5, 2.0
             local steps = math.floor((MAX_BR - MIN_BR) / 0.05)

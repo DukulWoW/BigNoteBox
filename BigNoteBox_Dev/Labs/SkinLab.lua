@@ -12,6 +12,8 @@
 --   Lifted  lifted (strips)    Button  button (skin button fill)
 --   Accent  accent             Header  header (headings)
 --   Text    text (white text)
+-- Under them (ALL-455): Border opacity (borderAlpha, a flat look) and
+-- Dividers too (fadeRules: the divider rules fade with it).
 -- Accent and header are the colours at the default brightness (1.50); the
 -- slider scales them as the game does. A row without an edit shows what the
 -- preset draws today (worked out for accent, lifted...); its first edit
@@ -78,7 +80,8 @@ local ROWS = {
 }
 
 -- ── Saved state ──────────────────────────────────────────────────────────────
--- s.edits[presetKey][rowKey] = { r, g, b }; s.key = preset shown;
+-- s.edits[presetKey][rowKey] = { r, g, b }, plus .borderAlpha (0..1) and
+-- .fadeRules (true / false) when they differ from the preset; s.key = preset shown;
 -- s.brightness / s.alpha = the lab's sliders (nil = the saved settings);
 -- s.custom[key] = { label, from, preset } = a lab-made preset (New from this);
 -- s.freeze, s.freeHue, s.art, s.artPath, s.artMode = the S3 controls
@@ -124,6 +127,8 @@ local function Build(key)
         for _, f in ipairs({ "lifted", "button", "accent", "header", "text" }) do
             if e[f] then p[f] = { e[f][1], e[f][2], e[f][3] } end
         end
+        if e.borderAlpha ~= nil then p.borderAlpha = e.borderAlpha end
+        if e.fadeRules ~= nil then p.fadeRules = e.fadeRules or nil end
     end
     return p
 end
@@ -154,9 +159,9 @@ local function WithPreset(p, fn, ...)
     if not _ovr then return fn(p, ...) end
     local keep = _ovr.preset
     _ovr.preset = p
-    local a, b, c = fn(p, ...)
+    local a, b, c, d = fn(p, ...)
     _ovr.preset = keep
-    return a, b, c
+    return a, b, c, d
 end
 
 -- A row's colour on preset p, before brightness (accent / header: at the
@@ -166,7 +171,7 @@ local function RowColour(p, rowKey)
     if rowKey == "body"   then return p.r, p.g, p.b end
     if rowKey == "border" then return p.br, p.bg_, p.bb end
     if rowKey == "lifted" then return BNB.SkinLiftedOf(p) end
-    if rowKey == "button" then return BNB.SkinButtonOf(p) end
+    if rowKey == "button" then return BNB.SkinButtonBaseOf(p) end   -- before the floor (ALL-454)
     if rowKey == "text"   then return BNB.SkinTextOf(p) end
     -- accent / header read the brightness: ask at the default
     local keep = _ovr and _ovr.brightness
@@ -244,6 +249,10 @@ local function PresetLine(key)
         end
     end
     if p.noBright then parts[#parts + 1] = "noBright=true" end
+    if BNB.SkinBorderAlphaOf(p) < 1 then
+        parts[#parts + 1] = "borderAlpha=" .. string.format("%.2f", BNB.SkinBorderAlphaOf(p))
+    end
+    if p.fadeRules then parts[#parts + 1] = "fadeRules=true" end
     return string.format("    %-10s = { %s },", key, table.concat(parts, ", "))
 end
 
@@ -284,12 +293,31 @@ local function Ratio(r1, g1, b1, r2, g2, b2)
 end
 local function Body(p) return BNB.SkinColourOf(p) end
 local function Strip(p) return BNB.SkinColourOf(p, true) end
+-- The border as it shows over the body at the preset's border opacity
+local function Edge(p)
+    local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+    local r, g, b = BNB.SkinColourOf(p)
+    return r + (br - r) * ba, g + (bg_ - g) * ba, b + (bb - b) * ba
+end
+-- Button / body (ALL-454): can the button be seen at all, by its fill or its
+-- edge, whichever stands out more. "floor" = the game lifts the fill here
+local function ButtonSeen(p)
+    local r, g, b = WithPreset(p, Body)
+    local fr, fg, fb = WithPreset(p, BNB.SkinButtonOf)
+    local er, eg, eb = WithPreset(p, Edge)
+    local v = math.max(Ratio(fr, fg, fb, r, g, b), Ratio(er, eg, eb, r, g, b))
+    local br, bg_, bb = BNB.SkinButtonBaseOf(p)
+    return v, (math.abs(fr - br) + math.abs(fg - bg_) + math.abs(fb - bb) > 0.001) and "floor" or nil
+end
+-- { label, fg getter, bg getter, need, ratio = fn(p) -> v, note (optional),
+--   weak = orange from here (nil = need x 0.66) }
 local PAIRS = {
     { "Text / body",    BNB.SkinTextOf,   Body,             4.5 },
     { "Heading / body", BNB.SkinHeaderOf, Body,             4.5 },
     { "Accent / strip", BNB.SkinAccentOf, Strip,            3 },
     { "Text / button",  BNB.SkinTextOf,   BNB.SkinButtonOf, 4.5 },
-    { "Border / body",  BNB.SkinBorderOf, Body,             3 },
+    { "Border / body",  Edge,             Body,             3 },
+    { "Button / body",  nil,              nil,              1.5, ratio = ButtonSeen, weak = 1.2 },
 }
 
 -- ── Hue suggestions ─────────────────────────────────────────────────────────
@@ -366,6 +394,7 @@ end
 local _f
 local _rows = {}
 local _presetDD, _presetEntries, _brtSl, _alphaSl, _skinNote
+local _bAlphaSl, _fadeCb   -- Border opacity + Dividers too (ALL-455)
 local _newBtn, _renameBtn, _deleteBtn, _nameRow, _nameBox, _nameMode
 local _delArmed
 local _tiles = {}        -- all-presets strip
@@ -422,6 +451,23 @@ local function ClearEdit(rowKey)
         edits[key][rowKey] = nil
         if not next(edits[key]) then edits[key] = nil end
     end
+    ApplyOverride(); Refresh()
+end
+
+-- A non-colour field edit (borderAlpha, fadeRules): kept only while it
+-- differs from the shipped / lab-made preset
+local FIELD_BASE = { borderAlpha = 1, fadeRules = false }
+local function SetFieldEdit(field, v)
+    local edits = Store().edits
+    local key = CurKey()
+    local base = Base(key)[field]
+    if base == nil then base = FIELD_BASE[field] end
+    local same
+    if type(v) == "number" then same = math.abs(v - base) < 0.001
+    else same = (v and true or false) == (base and true or false) end
+    edits[key] = edits[key] or {}
+    if same then edits[key][field] = nil else edits[key][field] = v end
+    if not next(edits[key]) then edits[key] = nil end
     ApplyOverride(); Refresh()
 end
 
@@ -856,10 +902,10 @@ local function RefreshStrip()
         if t then
             local p = Build(key)
             local r, g, b = WithPreset(p, BNB.SkinColourOf)
-            local br, bg_, bb = WithPreset(p, BNB.SkinBorderOf)
+            local br, bg_, bb, ba = WithPreset(p, BNB.SkinBorderOf)
             local ar, ag, ab = WithPreset(p, BNB.SkinAccentOf)
             t:SetBackdropColor(r, g, b, 1)
-            t:SetBackdropBorderColor(br, bg_, bb, 1)
+            t:SetBackdropBorderColor(br, bg_, bb, ba)
             t._dot:SetVertexColor(ar, ag, ab, 1)
             t._ed:SetShown(((edits[key] and next(edits[key])) or IsCustom(key)) and true or false)
             t._key = key
@@ -874,11 +920,17 @@ local function RefreshContrast(p)
     for i, pair in ipairs(PAIRS) do
         local fs = _contrast[i]
         if fs then
-            local r1, g1, b1 = WithPreset(p, pair[2])
-            local r2, g2, b2 = WithPreset(p, pair[3])
-            local v = Ratio(r1, g1, b1, r2, g2, b2)
-            local col = (v >= pair[4] and "66bb6a") or (v >= pair[4] * 0.66 and "ffaa33") or "ff5555"
-            fs:SetText(string.format("%s  |cff%s%.1f|r", pair[1], col, v))
+            local v, note
+            if pair.ratio then
+                v, note = pair.ratio(p)
+            else
+                local r1, g1, b1 = WithPreset(p, pair[2])
+                local r2, g2, b2 = WithPreset(p, pair[3])
+                v = Ratio(r1, g1, b1, r2, g2, b2)
+            end
+            local col = (v >= pair[4] and "66bb6a") or (v >= (pair.weak or pair[4] * 0.66) and "ffaa33") or "ff5555"
+            fs:SetText(string.format("%s  |cff%s%.1f|r%s", pair[1], col, v,
+                note and ("  |cff888888" .. note .. "|r") or ""))
         end
     end
 end
@@ -904,11 +956,11 @@ local function RefreshArt()
             local p = Build(key)
             local r, g, b
             if bgKind == "lifted" then r, g, b = WithPreset(p, BNB.SkinColourOf, true)
-            elseif bgKind == "button" then r, g, b = BNB.SkinButtonOf(p)
+            elseif bgKind == "button" then r, g, b = WithPreset(p, BNB.SkinButtonOf)
             else r, g, b = WithPreset(p, BNB.SkinColourOf) end
-            local br, bg_, bb = WithPreset(p, BNB.SkinBorderOf)
+            local br, bg_, bb, ba = WithPreset(p, BNB.SkinBorderOf)
             t:SetBackdropColor(r, g, b, 1)
-            t:SetBackdropBorderColor(br, bg_, bb, 1)
+            t:SetBackdropBorderColor(br, bg_, bb, ba)
             t._tex:SetTexture(path)
             t._tex:SetVertexColor(WithPreset(p, ArtTint, mode))
             t._key = key
@@ -946,6 +998,8 @@ Refresh = function()
         row.reset:SetEnabled(src == "edited")
     end
     RefreshPresetRow()
+    _bAlphaSl:SetValue(math.floor(BNB.SkinBorderAlphaOf(p) * 100 + 0.5), true)
+    _fadeCb:SetChecked(p.fadeRules and true or false)
     _brtSl:SetEnabled(not p.noBright)
     _skinNote:SetShown(not (BigNoteBoxDB and BigNoteBoxDB.skinMode))
     RefreshStrip()
@@ -1245,6 +1299,27 @@ local function BuildWindow()
     for _, row in ipairs(_rows) do hosts[#hosts + 1] = row.hex end
     K.TabChain(hosts)
 
+    -- Border opacity + Dividers too beside it (ALL-455, Dukul 2026-10-12)
+    local CB_W = 112
+    _bAlphaSl = BNB.CreateStackedSlider(ct, COL_W - CB_W - 8, {
+        label = "Border opacity", min = 0, max = 100, step = 1, value = 100, default = 100,
+        fmt = function(v) return v .. "%" end,
+        tipTitle = "Border opacity",
+        tip = "Every skin edge of this preset (windows, buttons, tabs, boxes, menus, toasts, icon edges) at this opacity. 0% = a flat look. Exported as borderAlpha.",
+        onChange = function(v) SetFieldEdit("borderAlpha", v / 100) end,
+    })
+    _bAlphaSl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    _fadeCb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
+    _fadeCb:SetSize(24, 24)
+    _fadeCb:SetPoint("TOPLEFT", ct, "TOPLEFT", COL_W - CB_W, y - 14)
+    local fadeLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+    fadeLbl:SetPoint("LEFT", _fadeCb, "RIGHT", 2, 0)
+    fadeLbl:SetText("Dividers too")
+    BNB.LabelHit(_fadeCb, fadeLbl)
+    BNB.CheckTip(_fadeCb, "The divider rules fade with the border opacity too. Off = they stay as they are. Exported as fadeRules.")
+    _fadeCb:SetScript("OnClick", function(self) SetFieldEdit("fadeRules", self:GetChecked() and true or false) end)
+    y = y - BNB.STACKED_SLIDER_H - 4
+
     -- Contrast readout: two columns
     y = y - 4
     for i = 1, #PAIRS do
@@ -1259,8 +1334,9 @@ local function BuildWindow()
     Tip(cHit, function()
         GameTooltip:AddLine("Contrast (WCAG)", 1, 1, 1)
         GameTooltip:AddLine("Of the colours as drawn at this brightness, the window taken as opaque. Green = reads well (4.5 for text, 3 for icons and edges), orange = weak, red = poor.", 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine("Border / body takes the border opacity. Button / body = the button's fill or edge, whichever stands out more (1.5 green, 1.2 orange); \"floor\" = the edge is fading into the body, so the game lifts the fill (more as the edge fades, up to 0.18 over the body).", 0.8, 0.8, 0.8, true)
     end)
-    y = y - 54
+    y = y - 50
 
     BNB.CreateSectionHeader(ct, "Try at (lab only, not saved)", y, COL_W)
     y = y - 22

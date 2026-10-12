@@ -226,8 +226,8 @@ local function PaintBox(fr)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
         local r, g, b = BNB.SkinColourOf(p)
-        local br, bg, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(fr, r, g, b, BNB.GetSkinBgAlpha(), br, bg, bb, 1)
+        local br, bg, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(fr, r, g, b, BNB.GetSkinBgAlpha(), br, bg, bb, ba)
     else
         BNB.SetBackdrop(fr, 0.07, 0.07, 0.09, 0.96, 0.35, 0.35, 0.38, 1)
     end
@@ -678,8 +678,8 @@ local function DressBox(box, alpha)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         local p = BNB.GetSkinPreset()
         local r, g, b    = BNB.SkinColourOf(p)
-        local br, bg, bb = BNB.SkinBorderOf(p)
-        BNB.SetBackdrop(box, r, g, b, BNB.GetSkinBgAlpha() * alpha, br, bg, bb, alpha)
+        local br, bg, bb, ba = BNB.SkinBorderOf(p)
+        BNB.SetBackdrop(box, r, g, b, BNB.GetSkinBgAlpha() * alpha, br, bg, bb, ba * alpha)
     else
         BNB.SetBackdrop(box, 0, 0, 0, 0.6 * alpha, 0.55, 0.55, 0.55, alpha)
     end

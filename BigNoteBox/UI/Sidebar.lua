@@ -347,8 +347,8 @@ local function GetPooledBtn(idx, parent)
         -- Tint border to match skin preset in skin mode.
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
-            local br, bg_, bb = BNB.SkinBorderOf(p)
-            borderTex:SetVertexColor(br, bg_, bb, 1)
+            local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+            borderTex:SetVertexColor(br, bg_, bb, ba)
         end
 
         -- Icon texture (offset inside border; resized in ApplyBtnLayout)
@@ -765,16 +765,16 @@ function SB.Build(parent)
         BNB.RegisterSkinButton(function()
             local skinOn = BigNoteBoxDB and BigNoteBoxDB.skinMode
             local p = skinOn and BNB.GetSkinPreset and BNB.GetSkinPreset()
-            local br, bg_, bb
+            local br, bg_, bb, ba
             if p then
-                br, bg_, bb = BNB.SkinBorderOf(p)
+                br, bg_, bb, ba = BNB.SkinBorderOf(p)
             else
-                br, bg_, bb = ACTIVE_R, ACTIVE_G, ACTIVE_B
+                br, bg_, bb, ba = ACTIVE_R, ACTIVE_G, ACTIVE_B, 1
             end
             for _, w in pairs(_btnPool) do
                 if w then
                     if w.borderTex and w.borderTex.SetVertexColor and skinOn then
-                        w.borderTex:SetVertexColor(br, bg_, bb, 1)
+                        w.borderTex:SetVertexColor(br, bg_, bb, ba)
                     end
                     if w.activeTex and w.activeTex.SetVertexColor then
                         if skinOn then

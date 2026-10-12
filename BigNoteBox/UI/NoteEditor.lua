@@ -1091,8 +1091,8 @@ local function RebuildTagChips(strip, tags)
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
             local r, g, b = BNB.SkinButtonOf(p)
-            local br, bg_, bb = BNB.SkinBorderOf(p)
-            BNB.SetBackdrop(chip, r, g, b, 0.92, br, bg_, bb, 1)
+            local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+            BNB.SetBackdrop(chip, r, g, b, 0.92, br, bg_, bb, ba)
         else
             BNB.SetBackdrop(chip, 0.15, 0.15, 0.20, 1, 0.35, 0.35, 0.40, 1)
         end
@@ -2039,12 +2039,12 @@ local function MakeSkinTab(parent, symbol, label, tip)
     local active, hover = true, false
     local function Paint()
         local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
+        local br, bg_, bb, ba = BNB.SkinBorderOf(p)
         -- Follows the skin brightness at half strength (ALL-453)
         local m = (active and 1 or 0.6) * BNB.SkinTabLift(p)
         local fr, fg, fb = BNB.SkinButtonOf(p)
         btn:SetBackdropColor(math.min(1, fr * m), math.min(1, fg * m), math.min(1, fb * m), 0.97)
-        btn:SetBackdropBorderColor(br, bg_, bb, 1)
+        btn:SetBackdropBorderColor(br, bg_, bb, ba)
         hl:SetShown(hover and not active)
         -- Icon in the accent, as the top bar and toolbar icons (Dukul,
         -- 2026-10-08). The bt- symbol is gold art, darker than the white

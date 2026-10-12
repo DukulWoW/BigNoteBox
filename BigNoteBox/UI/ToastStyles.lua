@@ -611,8 +611,8 @@ function TS.Apply(f, def)
         if def.back == "skin" and SkinOn() and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
             local r, g, b = BNB.SkinColourOf(p)
-            local br, bg, bb = BNB.SkinBorderOf(p)
-            BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg, bb, 1)
+            local br, bg, bb, ba = BNB.SkinBorderOf(p)
+            BNB.SetBackdrop(f, r, g, b, BNB.GetSkinBgAlpha(), br, bg, bb, ba)
         else
             BNB.SetBackdrop(f, 0.06, 0.06, 0.09, 0.94, 0.40, 0.40, 0.42, 1)
         end

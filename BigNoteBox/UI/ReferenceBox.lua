@@ -1916,13 +1916,13 @@ end
 -- same formula as the sidebar's GetPooledBtn (Sidebar.lua ~320-351).
 local function TintSideTab(btn)
     local skinOn = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local br, bg_, bb
+    local br, bg_, bb, ba
     if skinOn and BNB.GetSkinPreset then
-        br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
+        br, bg_, bb, ba = BNB.SkinBorderOf(BNB.GetSkinPreset())
     end
     if btn._border and btn._border.SetVertexColor then
         if skinOn and br then
-            btn._border:SetVertexColor(br, bg_, bb, 1)
+            btn._border:SetVertexColor(br, bg_, bb, ba)
         else
             btn._border:SetVertexColor(1, 1, 1, 1)
         end
