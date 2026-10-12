@@ -132,6 +132,15 @@ function BNB.SkinButtonOf(preset)
     return math.min(1, preset.r + lift), math.min(1, preset.g + lift), math.min(1, preset.b + lift)
 end
 
+-- The skin tabs' share of the brightness (ALL-453, Dukul 2026-10-12: "a
+-- little brighter", not as bright as the body): half strength from the
+-- default, 1 for a noBright preset (OLED stays as drawn). A multiplier for
+-- SkinButtonOf; cap each channel at 1.
+function BNB.SkinTabLift(preset)
+    if preset.noBright then return 1 end
+    return 1 + (BNB.GetSkinBrightness() / BNB.DEFAULTS.skinBrightness - 1) * 0.5
+end
+
 -- Returns r, g, b for a preset body colour (lifted = the strips' colour),
 -- scaled by the current brightness multiplier.
 function BNB.SkinColourOf(preset, lifted)

@@ -491,14 +491,8 @@ local function BuildNormalBody(data)
     end
 
     lines[#lines + 1] = ""
-    -- Zone footer
-    local zoneStr = data.zone
-    if data.subZone and data.subZone ~= "" and data.subZone ~= data.zone then
-        zoneStr = data.subZone .. ", " .. data.zone
-    end
-    if zoneStr ~= "" then
-        lines[#lines + 1] = string.format(L["TGT_LINE_ENCOUNTERED"], zoneStr)
-    end
+    -- Zone footer, then the /way to the spot (ALL-449)
+    UN.AddPlainEncountered(lines, UN.EncounteredPlace(data.name))
 
     return table.concat(lines, "\n")
 end
@@ -514,7 +508,7 @@ end
 --   {h3} Details {/h3}
 --   Type, family, faction, health, power
 --   {h3} Encountered {/h3}
---   Zone
+--   Zone, /way link (ALL-449)
 --------------------------------------------------------------------------------
 local function BuildRichBody(data)
     local lines = {}
@@ -585,18 +579,8 @@ local function BuildRichBody(data)
         lines[#lines + 1] = ""
     end
 
-    -- Zone / encounter section
-    local zoneStr = data.zone
-    if data.subZone and data.subZone ~= "" and data.subZone ~= data.zone then
-        zoneStr = data.subZone .. ", " .. data.zone
-    end
-    if zoneStr and zoneStr ~= "" then
-        lines[#lines + 1] = "{h3}" .. L["TGT_HDR_ENCOUNTERED"] .. "{/h3}"
-        lines[#lines + 1] = ""
-        lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. zoneStr .. "{/p}"
-        lines[#lines + 1] = ""
-        lines[#lines + 1] = ""
-    end
+    -- Zone / encounter section: the place, then a /way link to the spot (ALL-449)
+    UN.AddRichEncountered(lines, UN.EncounteredPlace(data.name))
 
     -- Notes section: blank, for the player to fill in.
     -- A bare empty line is intentional — {p}{/p} produces an empty <P></P> in

@@ -194,7 +194,13 @@ local function RefreshRichBadge(note)
     if not (badge and eb) then return end
     local rich = BNB.AdvancedMode.IsRich(note)   -- false while Rich Notes is off (ALL-343)
     badge:SetShown(rich)
-    eb:SetPoint("BOTTOMRIGHT", eb:GetParent(), "BOTTOMRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, 0)
+    -- The title's own right edge (TOPRIGHT): a BOTTOMRIGHT point added on top
+    -- of it left the title box over the badge, so a hover or click went to
+    -- the title, never the badge's tooltip (ALL-452)
+    local bg = eb:GetParent()
+    eb:ClearAllPoints()
+    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, 0)
+    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, 0)
 end
 
 local function BuildTitleField(parent)
@@ -225,7 +231,10 @@ local function BuildTitleField(parent)
     -- shows on rich results (Dukul, 2026-09-27). Shown by RefreshRichBadge.
     local richBadge = CreateFrame("Frame", nil, bg)
     richBadge:SetSize(RICH_BADGE_SIZE, RICH_BADGE_SIZE)
-    richBadge:SetPoint("RIGHT", eb, "RIGHT", 0, 0)
+    -- At the box's right end (not the title's, which moves clear of it), one
+    -- level over the title so the mouse reaches it (ALL-452)
+    richBadge:SetPoint("RIGHT", bg, "TOPRIGHT", -6, -TITLE_H / 2)
+    richBadge:SetFrameLevel(eb:GetFrameLevel() + 1)
     local richTx = richBadge:CreateTexture(nil, "ARTWORK")
     richTx:SetAllPoints()
     -- Skin mode: Dukul's white s-icon-skin-rich in the skin's accent colour
@@ -1620,8 +1629,9 @@ function BNB.LoadNoteInEditor(id)
         if _undoForced[prevID] then _undoForced[prevID]:Cancel(); _undoForced[prevID] = nil end
     end
 
-    -- Reset undo/redo stacks for the newly loaded note.
-    -- We pass the body text so UndoPush has a clean starting snapshot.
+    -- The newly loaded note's undo/redo: its session history is kept
+    -- (ALL-451); the body seeds a note with none, or becomes one step when
+    -- it was changed outside the editor.
     BNB.UndoReset(id, note.body or "")
     if BNB._refreshUndoButtons    then BNB._refreshUndoButtons()    end
     if BNB._refreshWysiwygFont    then BNB._refreshWysiwygFont()    end
@@ -2009,7 +2019,9 @@ local STRATA_BELOW = { MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH",
 local function MakeSkinTab(parent, symbol, label, tip)
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
     btn:SetHeight(SKTAB_H)
-    local icon, fs = AddTabFace(btn, symbol, label, -SKTAB_TUCK / 2)   -- centred in the visible part
+    -- Centred in the visible part: half the tuck down, less 3 for the glyphs
+    -- drawing low in their boxes (measured 4 px low on screen, ALL-453)
+    local icon, fs = AddTabFace(btn, symbol, label, -SKTAB_TUCK / 2 + 3)
     btn:SetBackdrop(SKTAB_BOX)   -- once: Paint only sets colours, a new SetBackdrop rebuilds the pieces
     -- No top border: drop the top edge and corners, run the side edges up to the top
     for _, k in ipairs({ "TopEdge", "TopLeftCorner", "TopRightCorner" }) do
@@ -2028,9 +2040,10 @@ local function MakeSkinTab(parent, symbol, label, tip)
     local function Paint()
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinBorderOf(p)
-        local m = active and 1 or 0.6
+        -- Follows the skin brightness at half strength (ALL-453)
+        local m = (active and 1 or 0.6) * BNB.SkinTabLift(p)
         local fr, fg, fb = BNB.SkinButtonOf(p)
-        btn:SetBackdropColor(fr * m, fg * m, fb * m, 0.97)
+        btn:SetBackdropColor(math.min(1, fr * m), math.min(1, fg * m), math.min(1, fb * m), 0.97)
         btn:SetBackdropBorderColor(br, bg_, bb, 1)
         hl:SetShown(hover and not active)
         -- Icon in the accent, as the top bar and toolbar icons (Dukul,

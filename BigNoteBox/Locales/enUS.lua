@@ -1725,7 +1725,7 @@ L["CFG_PREVIEW_DELAY_DESC"]         = "Update delay: how long after your last ke
 L["CFG_PREVIEW_DELAY_TIP_TITLE"]    = "Preview update delay"
 L["CFG_PREVIEW_DELAY_TIP1"]         = "How long after your last keystroke before the live preview re-renders."
 L["CFG_PREVIEW_DELAY_TIP2"]         = "Lower = more responsive. Default: 0.3s."
-L["CFG_UNDO_DESC"]                  = "History is per-note and per-session only. Stacks are cleared on reload or logout."
+L["CFG_UNDO_DESC"]                  = "Each note keeps its own history for the whole session, also when you switch notes or use Focus mode. It is cleared on reload or logout."
 L["CFG_UNDO_DEPTH_WARN"]            = "High depth uses more memory. Keep at 50 or below if you edit many notes simultaneously in the same session."
 L["CFG_UNDO_DEPTH_TIP1"]            = "How many undo steps to keep per note."
 L["CFG_UNDO_DEPTH_TIP2"]            = "Default: 50. Higher values use more RAM per note."

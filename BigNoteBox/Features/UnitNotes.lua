@@ -11,6 +11,8 @@
 --   OpenNote(noteID)                         main window, note selected
 --   FindPlayerNote(name, realm)              existing note for a player
 --   UniqueTitle(baseName)                    "Name (Duplicate)" when taken
+--   EncounteredPlace(unitName)               place text, /way line (or nil)
+--   AddPlainEncountered / AddRichEncountered(lines, place, way)  body lines
 --   FormatNumber(n)                          client thousands separator
 --------------------------------------------------------------------------------
 
@@ -210,6 +212,53 @@ function UN.UniqueTitle(baseName)
         if not TitleTaken(ndb, candidate) then return candidate end
     end
     return string.format(L["INSPECT_DUP_N_FMT"], baseName, tostring(time()))
+end
+
+-- Where a unit note is made (ALL-449): the place ("Sub, Zone", "" when the
+-- game names none) and a /way line to the player's spot, labelled with the
+-- unit's name (nil where the game gives no position: instances). The zone is
+-- written by name when that name leads back to the same map, else as #mapID,
+-- so a click on the link always finds it.
+function UN.EncounteredPlace(unitName)
+    local zone, sub = GetZoneText() or "", GetSubZoneText() or ""
+    local place = (sub ~= "" and sub ~= zone) and (sub .. ", " .. zone) or zone
+    local way
+    pcall(function()
+        local mapID = C_Map.GetBestMapForUnit("player")
+        local pos = mapID and C_Map.GetPlayerMapPosition(mapID, "player")
+        if not pos then return end
+        local x, y = pos:GetXY()
+        if not (x and y) or (x == 0 and y == 0) then return end
+        local info = C_Map.GetMapInfo(mapID)
+        local zp = BNB.ZonePicker
+        local name = info and info.name
+        local where = (name and name ~= "" and zp and zp.ZoneMapID and zp.ZoneMapID(name) == mapID)
+                      and name or ("#" .. mapID)
+        way = string.format("/way %s %.1f %.1f", where, x * 100, y * 100)
+        if unitName and unitName ~= "" then way = way .. " " .. unitName end
+    end)
+    return place, way
+end
+
+-- The Encountered lines of a body, from EncounteredPlace: plain = a footer
+-- line plus the bare /way line; rich = a section, the /way as a link
+function UN.AddPlainEncountered(lines, place, way)
+    if place ~= "" then lines[#lines + 1] = string.format(L["TGT_LINE_ENCOUNTERED"], place) end
+    if way then lines[#lines + 1] = way end
+end
+
+function UN.AddRichEncountered(lines, place, way)
+    if place == "" and not way then return end
+    lines[#lines + 1] = "{h3}" .. L["TGT_HDR_ENCOUNTERED"] .. "{/h3}"
+    lines[#lines + 1] = ""
+    if place ~= "" then
+        lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. place .. "{/p}"
+    end
+    if way then
+        lines[#lines + 1] = "{p}{icon:inv_misc_map_01:18}  " .. way .. "{/p}"
+    end
+    lines[#lines + 1] = ""
+    lines[#lines + 1] = ""
 end
 
 function UN.FormatNumber(n)

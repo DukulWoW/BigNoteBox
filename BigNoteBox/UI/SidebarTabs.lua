@@ -192,9 +192,11 @@ local function Paint(btn)
     if btn._skin then
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinBorderOf(p)
-        local m = act and 1 or 0.6
+        -- Follows the skin brightness at half strength, as the Markup /
+        -- Note tabs (ALL-453)
+        local m = (act and 1 or 0.6) * BNB.SkinTabLift(p)
         local fr, fg, fb = BNB.SkinButtonOf(p)
-        btn:SetBackdropColor(fr * m, fg * m, fb * m, 0.97)
+        btn:SetBackdropColor(math.min(1, fr * m), math.min(1, fg * m), math.min(1, fb * m), 0.97)
         btn:SetBackdropBorderColor(br, bg_, bb, 1)
         btn.hl:SetShown(hov)
     else

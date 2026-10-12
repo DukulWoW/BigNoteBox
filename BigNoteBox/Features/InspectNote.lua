@@ -420,6 +420,10 @@ local function BuildNormalBody(data)
     end
 
     lines[#lines + 1] = ""
+    -- Where you met them: the place and a /way to the spot (ALL-449)
+    local before = #lines
+    UN.AddPlainEncountered(lines, UN.EncounteredPlace(data.name))
+    if #lines > before then lines[#lines + 1] = "" end
     lines[#lines + 1] = string.format(L["TGT_HDR_COLON_FMT"], L["TGT_HDR_NOTES"])
     lines[#lines + 1] = ""
 
@@ -490,6 +494,8 @@ local function BuildRichBody(data)
 
     lines[#lines + 1] = ""
     lines[#lines + 1] = ""
+    -- Where you met them: the place and a /way link to the spot (ALL-449)
+    UN.AddRichEncountered(lines, UN.EncounteredPlace(data.name))
     -- A bare empty line, as in TargetNote: {p}{/p} makes an empty <P></P> in
     -- SimpleHTML, which miscalculates document height and offsets the text cursor.
     lines[#lines + 1] = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
