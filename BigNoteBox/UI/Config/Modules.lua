@@ -1750,6 +1750,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_TLDR"],           L["CFG_SUB_TLDR_DESC"],       K.BuildTldrPage,       "tldr",       "tldr"    },   -- UI/Config/Tldr.lua (ALL-372)
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
+        { L["CFG_HDR_UNDO_REDO"],      L["CFG_SUB_UNDO_DESC"],       K.BuildUndoPage,      "undo" },        -- UI/Config/NotePages.lua (ALL-460)
     }
     -- Alphabetical by the shown title, in the active language (Dukul 2026-10-06,
     -- ALL-331); colour codes left out of the compare

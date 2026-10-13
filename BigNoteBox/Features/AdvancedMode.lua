@@ -401,7 +401,7 @@ function AM.RepairOnLeave(id)
     local kept = false
     if BNB.HistoryEnabled and BNB.HistoryEnabled() and BNB.HistorySnapshotNote then
         BNB.HistorySnapshotNote(id)
-        local newest = note.history and note.history[1]
+        local newest = BNB.HistoryNewest and BNB.HistoryNewest(id)
         kept = newest ~= nil and newest.body == note.body
     end
     BNB.UpdateNote(id, { body = fixed }, { noTouch = true })

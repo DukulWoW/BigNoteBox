@@ -36,6 +36,15 @@
 --   BNB.HistoryNoteHasAny(id)                   bool
 --   BNB.HistoryTotalSize()                       bytes across all history
 --   BNB.HistoryNoteSize(id)                      bytes for one note's history
+--   BNB.HistoryNewest(id)                        newest auto snapshot or nil
+--   BNB.HistoryAutoCount(id)                     number of auto snapshots
+--   BNB.HistoryClearAllAuto()                    every note's auto snapshots; count
+--
+-- ALL-466 stage 1 (2026-10-13): the automatic snapshots are read and written
+-- only through AutoList / SetAutoList below, and every other file goes
+-- through the public functions here (never note.history), so stage 2 can
+-- move them to BigNoteBox_History by changing that one block. The manual
+-- restore point stays on the note (note.manualSnapshot) for good.
 --   BNB.SyncHistoryBtnState()                   Update toolbar icon state
 --   BNB.SyncHistoryNoteBtnState()               Update per-note WYSIWYG buttons
 
@@ -100,6 +109,28 @@ local function NDB()
     return BNB.NotesDB() or {}
 end
 
+--------------------------------------------------------------------------------
+-- STORAGE SEAM (ALL-466): the only code that touches where the automatic
+-- snapshots live. AutoList(id) = the note's list, newest first, or nil.
+-- SetAutoList(id, list) stores it; nil or empty removes it. Live notes
+-- only, as before.
+--------------------------------------------------------------------------------
+local function LiveNote(id)
+    local ndb = NDB()
+    return id and ndb.notes and ndb.notes[id] or nil
+end
+
+local function AutoList(id)
+    local note = LiveNote(id)
+    return note and note.history or nil
+end
+
+local function SetAutoList(id, list)
+    local note = LiveNote(id)
+    if not note then return end
+    note.history = (list and #list > 0) and list or nil
+end
+
 local function MaxSlots()
     local db = BigNoteBoxDB
     local n  = db and db.historyMaxSlots or BNB.DEFAULTS.historyMaxSlots
@@ -115,13 +146,10 @@ end
 -- Returns true if a snapshot was actually pushed.
 --------------------------------------------------------------------------------
 function BNB.HistorySnapshotNote(id)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
+    local note = LiveNote(id)
     if not note then return false end
 
-    -- Ensure history array exists
-    if not note.history then note.history = {} end
-    local hist = note.history
+    local hist = AutoList(id) or {}
 
     -- Skip if title and body haven't changed since last auto snapshot.
     -- Metadata-only changes (icon, tags, context, etc.) do not warrant a new entry.
@@ -147,6 +175,7 @@ function BNB.HistorySnapshotNote(id)
         table.remove(hist)
     end
 
+    SetAutoList(id, hist)
     return true
 end
 
@@ -198,11 +227,10 @@ end
 -- HistoryDeleteAutoSlot — remove one entry from note.history by 1-based index.
 --------------------------------------------------------------------------------
 function BNB.HistoryDeleteAutoSlot(id, index)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
-    if not note or not note.history then return end
-    table.remove(note.history, index)
-    if #note.history == 0 then note.history = nil end
+    local hist = AutoList(id)
+    if not hist then return end
+    table.remove(hist, index)
+    SetAutoList(id, hist)
     BNB.SyncHistoryBtnState()
     BNB.SyncHistoryNoteBtnState()
 end
@@ -212,10 +240,8 @@ end
 -- Manual restore points (note.manualSnapshot) are preserved.
 --------------------------------------------------------------------------------
 function BNB.HistoryDeleteAuto(id)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
-    if not note then return end
-    note.history = nil
+    if not LiveNote(id) then return end
+    SetAutoList(id, nil)
     BNB.SyncHistoryBtnState()
     BNB.SyncHistoryNoteBtnState()
 end
@@ -226,24 +252,48 @@ end
 -- auto is always a table (may be empty). manual may be nil.
 --------------------------------------------------------------------------------
 function BNB.HistoryGetSlots(id)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
+    local note = LiveNote(id)
     if not note then return { auto = {}, manual = nil } end
     return {
-        auto   = note.history or {},
+        auto   = AutoList(id) or {},
         manual = note.manualSnapshot or nil,
     }
+end
+
+-- Newest auto snapshot of a note, or nil
+function BNB.HistoryNewest(id)
+    local hist = AutoList(id)
+    return hist and hist[1] or nil
+end
+
+-- How many auto snapshots a note has
+function BNB.HistoryAutoCount(id)
+    local hist = AutoList(id)
+    return hist and #hist or 0
+end
+
+-- Every live note's auto snapshots gone (Danger Zone); manual restore points
+-- kept. Returns how many notes had some.
+function BNB.HistoryClearAllAuto()
+    local ndb, count = NDB(), 0
+    if not ndb.notes then return 0 end
+    for id in pairs(ndb.notes) do
+        if BNB.HistoryAutoCount(id) > 0 then
+            SetAutoList(id, nil)
+            count = count + 1
+        end
+    end
+    return count
 end
 
 --------------------------------------------------------------------------------
 -- HistoryNoteHasAny — true if a note has any history at all.
 --------------------------------------------------------------------------------
 function BNB.HistoryNoteHasAny(id)
-    local ndb  = NDB()
-    local note = ndb.notes and ndb.notes[id]
+    local note = LiveNote(id)
     if not note then return false end
     if note.manualSnapshot then return true end
-    return note.history and #note.history > 0
+    return BNB.HistoryAutoCount(id) > 0
 end
 
 --------------------------------------------------------------------------------
@@ -311,10 +361,11 @@ function BNB.HistoryRestoreNote(id, snap, keepCurrent)
 
     -- Optionally preserve current state first
     if keepCurrent then
-        if not note.history then note.history = {} end
-        table.insert(note.history, 1, MakeSnap(note))
+        local hist = AutoList(id) or {}
+        table.insert(hist, 1, MakeSnap(note))
         local max = MaxSlots()
-        while #note.history > max do table.remove(note.history) end
+        while #hist > max do table.remove(hist) end
+        SetAutoList(id, hist)
     end
 
     -- Apply the snapshot's fields to the live note: each SNAP_FIELDS entry is

@@ -5,7 +5,10 @@
 -- expected behaviour (identical to every other text editor). Within a session
 -- it is kept per note across note switches and Focus mode (ALL-451), under an
 -- 8 MB budget; saving it to disk was left out (Dukul, 2026-10-12: the History
--- module already covers recovery after a reload).
+-- module already covers recovery after a reload). Since ALL-460 it can be kept
+-- between sessions, opt-in: Features/UndoKeep.lua saves the stacks in the
+-- load-on-demand addon BigNoteBox_History and hands them back through
+-- BNB.UndoAdopt when a note is first opened in a session.
 --
 -- ARCHITECTURE:
 --   Each note has its own independent stacks keyed by note ID.
@@ -36,6 +39,8 @@
 --   BNB.UndoCanUndo(noteID) -> bool
 --   BNB.UndoCanRedo(noteID) -> bool
 --   BNB.UndoClearNote(noteID)             Called when a note is deleted
+--   BNB.UndoAdopt(noteID, undo, redo, snap) Saved stacks back in (UndoKeep)
+--   BNB.UndoClearAll()                    Every note's stacks (UndoKeep reset)
 
 local BNB = BigNoteBox
 
@@ -55,6 +60,7 @@ local function MaxDepth()
     if d > 200 then d = 200 end
     return d
 end
+BNB.UndoMaxDepth = MaxDepth   -- Features/UndoKeep.lua trims saved stacks with it
 
 --------------------------------------------------------------------------------
 -- INTERNAL: session memory budget (ALL-451, Dukul 2026-10-12: 8 MB). Every
@@ -75,9 +81,7 @@ local function Recount(noteID)
     _bytes[noteID] = n
 end
 
-local function Trim(noteID)
-    _used[noteID] = GetTime()
-    Recount(noteID)
+local function Budget(noteID)
     while _total > BUDGET do
         local oldest, at
         for id, t in pairs(_used) do
@@ -95,6 +99,14 @@ local function Trim(noteID)
     end
 end
 
+local function Trim(noteID)
+    _used[noteID] = GetTime()
+    Recount(noteID)
+    -- Every change to a note's stacks goes through here: saved at logout
+    if BNB.UndoKeepTouch then BNB.UndoKeepTouch(noteID) end
+    Budget(noteID)
+end
+
 --------------------------------------------------------------------------------
 -- UndoReset — call when loading a note into the editor (a note switch, back
 -- from Focus mode). The note's history is kept for the whole session
@@ -107,6 +119,8 @@ function BNB.UndoReset(noteID, text)
     if not noteID then return end
     text = text or ""
     local snap = BNB._undoSnap[noteID]
+    -- First open this session: the saved history, when it is kept (ALL-460)
+    if not snap and BNB.UndoKeepRestore and BNB.UndoKeepRestore(noteID, text) then return end
     if not snap then
         BNB._undoStack[noteID] = {}
         BNB._redoStack[noteID] = {}
@@ -235,4 +249,33 @@ function BNB.UndoClearNote(noteID)
     BNB._undoSnap[noteID]  = nil
     _total = _total - (_bytes[noteID] or 0)
     _bytes[noteID], _used[noteID] = nil, nil
+    if BNB.UndoKeepForget then BNB.UndoKeepForget(noteID) end
+end
+
+--------------------------------------------------------------------------------
+-- UndoAdopt — saved stacks back in (Features/UndoKeep.lua, ALL-460). snap is
+-- the state the note's text is in now; steps over the depth setting are
+-- dropped oldest first, then the budget applies as for any change.
+--------------------------------------------------------------------------------
+function BNB.UndoAdopt(noteID, undo, redo, snap)
+    if not (noteID and snap) then return end
+    undo, redo = undo or {}, redo or {}
+    local depth = MaxDepth()
+    while #undo > depth do table.remove(undo, 1) end
+    while #redo > depth do table.remove(redo, 1) end
+    BNB._undoStack[noteID], BNB._redoStack[noteID], BNB._undoSnap[noteID] = undo, redo, snap
+    _used[noteID] = GetTime()
+    Recount(noteID)
+    Budget(noteID)   -- not Trim: restored as saved, nothing new to write at logout
+end
+
+--------------------------------------------------------------------------------
+-- UndoClearAll — every note's stacks gone (Reset on the Undo / Redo page).
+-- The open note starts again from its current text on the next keystroke.
+--------------------------------------------------------------------------------
+function BNB.UndoClearAll()
+    wipe(BNB._undoStack); wipe(BNB._redoStack); wipe(BNB._undoSnap)
+    wipe(_bytes); wipe(_used)
+    _total = 0
+    if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
 end

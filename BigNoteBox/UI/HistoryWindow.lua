@@ -241,8 +241,9 @@ function BNB.PopulateHistoryWindow()
         if BNB.HistoryNoteHasAny(id) then
             -- Most recent timestamp across auto+manual
             local ts = 0
-            if note.history and note.history[1] then
-                ts = note.history[1].timestamp or 0
+            local newest = BNB.HistoryNewest(id)
+            if newest then
+                ts = newest.timestamp or 0
             end
             if note.manualSnapshot then
                 ts = math.max(ts, note.manualSnapshot.timestamp or 0)

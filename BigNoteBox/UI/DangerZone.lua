@@ -365,22 +365,20 @@ local function PopulateContent(ct, sf)
         L["DZ_CLEARHIST_BTN"], 140,
         L["DZ_CONFIRM_CLEAR"], 160,
         function()
-            local ndb = BNB.NotesDB()
-            if ndb and ndb.notes then
-                local count = 0
-                for _, note in pairs(ndb.notes) do
-                    if note.history then
-                        note.history = nil
-                        count = count + 1
-                    end
-                end
-                BNB:Print(string.format(L["DZ_MSG_HISTORY_CLEARED_FMT"], count))
-            end
+            -- Through NoteHistory, which owns where the snapshots live (ALL-466)
+            local count = BNB.HistoryClearAllAuto and BNB.HistoryClearAllAuto() or 0
+            BNB:Print(string.format(L["DZ_MSG_HISTORY_CLEARED_FMT"], count))
             if BNB.RefreshHistoryWindow    then BNB.RefreshHistoryWindow()    end
             if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
             if BNB.SyncHistoryBtnState     then BNB.SyncHistoryBtnState()     end
         end,
-        CountLabel(NotesWith("history"), "DZ_COUNT_HISTORY_ONE", "DZ_COUNT_HISTORY_FMT"))
+        CountLabel(function()
+            local c, ndb = 0, BNB.NotesDB()
+            for id in pairs(ndb and ndb.notes or {}) do
+                if BNB.HistoryAutoCount(id) > 0 then c = c + 1 end
+            end
+            return c
+        end, "DZ_COUNT_HISTORY_ONE", "DZ_COUNT_HISTORY_FMT"))
     y = y - SEC_GAP
 
     -- ── 4. Clear Manual Restore Points ───────────────────────────────────────

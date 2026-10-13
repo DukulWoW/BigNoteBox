@@ -524,7 +524,8 @@ local function RemoveNote(id, permanent)
     local note = NDB().notes[id]
     if not note then return false end
 
-    if not permanent and BNB.TrashEnabled and BNB.TrashEnabled() then
+    local toTrash = not permanent and BNB.TrashEnabled and BNB.TrashEnabled()
+    if toTrash then
         -- Move to trash: full copy with deletedAt timestamp
         local ndb = NDB()
         if ndb.trash == nil then ndb.trash = {} end
@@ -551,8 +552,11 @@ local function RemoveNote(id, permanent)
     for _, tag in ipairs(deletedTags) do
         BNB.TagIndexRemove(id, tag)
     end
-    -- Free runtime undo/redo memory for this note
-    if BNB.UndoClearNote then BNB.UndoClearNote(id) end
+    -- Free runtime undo/redo memory for this note. Not for a move to the
+    -- trash: that can be undone, and the note comes back with its undo
+    -- history (Dukul 2026-10-13, test GJ3); UndoKeep drops a trashed note's
+    -- saved history once it has left the trash too.
+    if not toTrash and BNB.UndoClearNote then BNB.UndoClearNote(id) end
     return true
 end
 

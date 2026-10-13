@@ -121,6 +121,7 @@ UI\RichNote.xml
 # Features
 Features\RandomQuotes.lua
 Features\UndoManager.lua
+Features\UndoKeep.lua
 Features\NoteHistory.lua
 Features\ContextNotes.lua
 Features\ChatCapture.lua

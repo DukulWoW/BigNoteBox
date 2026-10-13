@@ -428,7 +428,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
 
     -- What the selection holds, for the labels and the greyed entries
     local c = { pinned = 0, fav = 0, locked = 0, rich = 0, alarms = 0, tasks = 0,
-                situations = 0, history = 0 }
+                situations = 0, histNotes = 0 }
     for _, id in ipairs(ids) do
         local n = BNB.GetNote(id)
         if n then
@@ -439,7 +439,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             if n.alarm then c.alarms = c.alarms + 1 end
             if BNB.Task and BNB.Task.HasTasks(id) then c.tasks = c.tasks + 1 end
             if BNB.HasSituation(n, true) then c.situations = c.situations + 1 end
-            if n.history and #n.history > 0 then c.history = c.history + 1 end
+            if BNB.HistoryAutoCount and BNB.HistoryAutoCount(id) > 0 then c.histNotes = c.histNotes + 1 end
         end
     end
     local total = #ids
@@ -572,12 +572,12 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             end)
         end, { icon = "create-restore-point" })
         hist:CreateButton(L["NL_CM_CLEAR_HISTORY"], function()
-            Confirm("MULTI_CONFIRM_CLEAR_HISTORY", c.history, function()
+            Confirm("MULTI_CONFIRM_CLEAR_HISTORY", c.histNotes, function()
                 Each(function(id) BNB.HistoryDeleteAuto(id) end)
                 if BNB.RefreshHistoryWindow then BNB.RefreshHistoryWindow() end
                 if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
             end)
-        end, { icon = "clear-note-history", danger = true, disabled = c.history == 0 })
+        end, { icon = "clear-note-history", danger = true, disabled = c.histNotes == 0 })
         end   -- HistoryEnabled
 
         local rem = root:CreateButton(L["MULTI_CM_REMOVE"], nil, { icon = "danger" })

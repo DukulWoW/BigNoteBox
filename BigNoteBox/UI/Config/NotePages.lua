@@ -3,7 +3,7 @@
 -- off the Notes and General tabs (ALL-290, Dukul 2026-10-05). Listed on the
 -- Modules tab (UI/Config/Modules.lua), built by K.NewSubPage; open one from
 -- outside with BNB.OpenSettingsPage("modules", "richNotes" | "history" |
--- "trash" | "alarms" | "placement"). Window placement (ALL-291) holds a copy
+-- "undo" | "trash" | "alarms" | "placement"). Window placement (ALL-291) holds a copy
 -- of every placement setting; the originals stay where they are.
 
 local BNB = BigNoteBox
@@ -200,7 +200,7 @@ function K.BuildRichNotesPage(sf, ct, y, page)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- NOTE HISTORY: session snapshots (undo / redo stays on the Notes tab)
+-- NOTE HISTORY: session snapshots (undo / redo has its own page, ALL-460)
 -- ─────────────────────────────────────────────────────────────────────────────
 function K.BuildHistoryPage(sf, ct, y, page)
     -- Module switch (ALL-343). Applies live: off hides every way in and takes
@@ -272,6 +272,290 @@ function K.BuildHistoryPage(sf, ct, y, page)
     end)
 
     sf:FinaliseHeight(math.abs(y) + 12)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- UNDO / REDO (ALL-460, Dukul 2026-10-13): moved off the Notes tab, plus
+-- "Keep between sessions" (Features/UndoKeep.lua, the BigNoteBox_History
+-- addon). Undo itself cannot be switched off, so the page has no master
+-- checkbox and sits with the settings-only pages; the keep switch is its own.
+-- ─────────────────────────────────────────────────────────────────────────────
+function K.BuildUndoPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
+
+
+    local undoDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    undoDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    undoDesc:SetWidth(CONTENT_W); undoDesc:SetJustifyH("LEFT")
+    undoDesc:SetWordWrap(true); undoDesc:SetHeight(28)
+    undoDesc:SetTextColor(0.60, 0.60, 0.60)
+    undoDesc:SetText(L["CFG_UNDO_DESC"])
+    y = y - 32
+
+    -- Warning label declared before slider so the onChange closure can reference it.
+    -- Anchored relative to where the slider will sit (y - SLIDER_H - ROW_GAP).
+    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    warnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - (SLIDER_H + ROW_GAP))
+    warnLbl:SetWidth(CONTENT_W); warnLbl:SetJustifyH("LEFT")
+    warnLbl:SetWordWrap(true); warnLbl:SetHeight(28)
+    warnLbl:SetTextColor(0.90, 0.30, 0.30)
+    warnLbl:SetText(L["CFG_UNDO_DEPTH_WARN"])
+    local curDepth = db and db.undoDepth or BNB.DEFAULTS.undoDepth
+    warnLbl:SetShown(curDepth > 50)
+
+    local depthSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_UNDO_DEPTH_SLIDER"], min = 10, max = 200,
+        value = curDepth, default = BNB.DEFAULTS.undoDepth,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.undoDepth = v end
+            warnLbl:SetShown(v > 50)
+        end,
+        tip = { L["CFG_UNDO_DEPTH_TIP1"], L["CFG_UNDO_DEPTH_TIP2"] },
+    })
+    depthSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- Always reserve warning label height so layout stays stable
+    y = y - 34
+
+    -- Idle delay slider (0.3 – 3.0 s, step 0.1, default 0.8)
+    -- Stored as a float; displayed with one decimal place.
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
+        lbl:SetTextColor(0.55, 0.55, 0.55)
+        lbl:SetText(L["CFG_AUTOSAVE_IDLE_DESC"])
+        local h = lbl:GetStringHeight() + 4
+        lbl:SetHeight(h); y = y - h - 2
+    end
+    local curIdle = db and db.undoIdleDelay or BNB.DEFAULTS.undoIdleDelay
+    local idleSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_AUTOSAVE_IDLE_SLIDER"], min = 3, max = 30,
+        value = math.floor(curIdle * 10 + 0.5), default = math.floor(BNB.DEFAULTS.undoIdleDelay * 10 + 0.5),
+        fmt = function(v) return string.format("%.1f", v / 10) end,
+        onChange = function(v)
+            local val = v / 10
+            if BigNoteBoxDB then BigNoteBoxDB.undoIdleDelay = val end
+        end,
+        tipTitle = L["CFG_AUTOSAVE_IDLE_TIP_TITLE"],
+        tip = { L["CFG_AUTOSAVE_IDLE_TIP1"], L["CFG_AUTOSAVE_IDLE_TIP2"] },
+    })
+    idleSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    y = y - (SLIDER_H + ROW_GAP)
+
+    -- Forced interval slider (1 – 10 s, whole seconds, default 3)
+    -- Fires even if you never stop typing, capping continuous-typing chunk size.
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
+        lbl:SetTextColor(0.55, 0.55, 0.55)
+        lbl:SetText(L["CFG_AUTOSAVE_FORCED_DESC"])
+        local h = lbl:GetStringHeight() + 4
+        lbl:SetHeight(h); y = y - h - 2
+    end
+    local curForced = db and db.undoForcedInterval or BNB.DEFAULTS.undoForcedInterval
+    local forcedSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
+        label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 1, max = 10,
+        value = curForced, default = BNB.DEFAULTS.undoForcedInterval,
+        onChange = function(v)
+            if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = v end
+        end,
+        tipTitle = L["CFG_AUTOSAVE_FORCED_TIP_TITLE"],
+        tip = { L["CFG_AUTOSAVE_FORCED_TIP1"], L["CFG_AUTOSAVE_FORCED_TIP2"], L["CFG_AUTOSAVE_FORCED_TIP3"] },
+    })
+    forcedSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    y = y - (SLIDER_H + ROW_GAP)
+
+
+    -- ── Keep between sessions ────────────────────────────────────────────────────
+    AddRule(ct, y); y = y - 18
+    y = AddHeader(ct, y, L["CFG_HDR_UNDO_KEEP"])
+
+    -- What keeping does, in plain words, before the switch (Dukul 2026-10-13).
+    -- Height from the text, so a longer translation pushes the rows down.
+    do
+        local keepDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        keepDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        keepDesc:SetWidth(CONTENT_W); keepDesc:SetJustifyH("LEFT"); keepDesc:SetWordWrap(true)
+        keepDesc:SetTextColor(0.60, 0.60, 0.60)
+        keepDesc:SetText(L["CFG_UNDO_KEEP_DESC"])
+        local h = keepDesc:GetStringHeight() + 4
+        keepDesc:SetHeight(h); y = y - h - 6
+    end
+
+    local keepCb
+    y, keepCb = AddCheck(ct, y, L["CFG_UNDO_KEEP_LABEL"],
+        function() return BNB.UndoKeepEnabled() end,
+        function(v) if BNB.UndoKeepApply then BNB.UndoKeepApply(v) end end,
+        L["CFG_UNDO_KEEP_TIP"])
+    local function KeepOn() return keepCb:GetChecked() and true or false end
+
+    local daysSlider
+    y, daysSlider = K.AddSlider(ct, y, L["CFG_UNDO_KEEP_DAYS"], 1, 30,
+        function() return (db and db.undoKeepDays) or BNB.DEFAULTS.undoKeepDays end,
+        function(v) if BigNoteBoxDB then BigNoteBoxDB.undoKeepDays = v end end,
+        { L["CFG_UNDO_KEEP_DAYS_TIP"] }, BNB.DEFAULTS.undoKeepDays)
+
+    -- Size readout + Reset, re-read whenever the page shows
+    local sizeLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    sizeLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    sizeLbl:SetWidth(CONTENT_W); sizeLbl:SetJustifyH("LEFT"); sizeLbl:SetWordWrap(true)
+    sizeLbl:SetHeight(30)
+    sizeLbl:SetTextColor(0.55, 0.55, 0.55)
+    y = y - 32
+
+    local RefreshList   -- below the Delete button (ALL-465)
+    local function RefreshSize()
+        local bytes, n
+        if BNB.UndoKeepSize then bytes, n = BNB.UndoKeepSize() end
+        if not bytes then
+            sizeLbl:SetText(L["CFG_UNDO_KEEP_SIZE_MISSING"])
+        elseif n == 0 then
+            sizeLbl:SetText(L["CFG_UNDO_KEEP_SIZE_NONE"])
+        else
+            local str = BNB.HistoryFormatSize and BNB.HistoryFormatSize(bytes)
+                or string.format(L["CFG_UNIT_KB_FMT"], math.floor(bytes / 1024))
+            sizeLbl:SetText(string.format(L["CFG_UNDO_KEEP_SIZE_FMT"], str, n))
+        end
+    end
+
+    local resetBtn = BNB.CreateButton(nil, ct, L["CFG_UNDO_KEEP_RESET"], 200, 22)
+    resetBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    resetBtn:SetScript("OnClick", function()
+        StaticPopup_Show("BNB_MULTI_CONFIRM", L["CFG_UNDO_KEEP_RESET_CONFIRM"], nil, function()
+            if BNB.UndoKeepReset then BNB.UndoKeepReset() end
+            RefreshSize(); RefreshList()
+        end)
+    end)
+    resetBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_UNDO_KEEP_RESET"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_UNDO_KEEP_RESET_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    resetBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Reload now, an icon right of Delete (Dukul's bt-save art, 2026-10-13: one
+    -- button here, not one per row). Greyed while no row waits to be written.
+    -- C_UI.Reload is protected, so it runs in the click itself.
+    local reloadBtn = BNB.CreateIconButton(ct, 22, "save", {
+        tip = L["CFG_UNDO_KEEP_ROW_RELOAD"], tipSub = L["CFG_UNDO_KEEP_ROW_RELOAD_TIP"],
+        tipWrap = true, onClick = function() C_UI.Reload() end })
+    reloadBtn:SetPoint("LEFT", resetBtn, "RIGHT", 6, 0)
+    y = y - (22 + ROW_GAP)
+
+    -- One row per note with saved (or this session's, written at logout) undo
+    -- history (ALL-465, Dukul 2026-10-13): title opens the note, size + when
+    -- it was saved, X deletes that note's history without asking. Rows are
+    -- pooled and rebuilt whenever the page shows or something is deleted.
+    -- Icon + frame and title colour as in the note list / Trash rows (Dukul 2026-10-13)
+    local LIST_ROW_H, LIST_ICON, LIST_ICON_X, listTop, rows = 28, 22, 4, y - 6, {}
+    local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
+    local function TitleColour(r)
+        local note = BNB.GetNote(r._id)
+        local tc = note and note.titleColor
+        if tc and tc.r then r._title:SetTextColor(tc.r, tc.g, tc.b, 1)
+        else BNB.SetTextWhite(r._title) end
+    end
+    local function Row(i)
+        local r = rows[i]
+        if r then return r end
+        r = CreateFrame("Frame", nil, ct)
+        r:SetSize(CONTENT_W, LIST_ROW_H)
+        r._del = BNB.CreateIconButton(r, 16, "close",
+            { tip = L["CFG_UNDO_KEEP_ROW_DEL_TIP"], tipAnchor = "ANCHOR_TOP" })
+        r._del:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+        r._info = r:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        r._info:SetPoint("RIGHT", r._del, "LEFT", -8, 0)
+        r._info:SetJustifyH("RIGHT")
+        r._info:SetTextColor(0.55, 0.55, 0.55)
+        r._open = CreateFrame("Button", nil, r)
+        -- Room on the left for an icon frame's overhang (as Trash, ALL-332)
+        r._icon = r:CreateTexture(nil, "ARTWORK", nil, 2)
+        r._icon:SetSize(LIST_ICON, LIST_ICON)
+        r._icon:SetPoint("LEFT", r, "LEFT", LIST_ICON_X, 0)
+        r._icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r._open:SetPoint("LEFT", r._icon, "RIGHT", 8, 0)
+        r._open:SetPoint("RIGHT", r._info, "LEFT", -8, 0)
+        r._open:SetHeight(LIST_ROW_H)
+        r._title = r._open:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        r._title:SetAllPoints(); r._title:SetJustifyH("LEFT"); r._title:SetWordWrap(false)
+        r._open:SetScript("OnEnter", function(self)
+            r._title:SetAlpha(0.75)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["CFG_UNDO_KEEP_ROW_OPEN_TIP"], 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        r._open:SetScript("OnLeave", function()
+            r._title:SetAlpha(1); GameTooltip:Hide()
+        end)
+        r._open:SetScript("OnClick", function() if BNB.OpenNoteInMain then BNB.OpenNoteInMain(r._id) end end)
+        r._del:SetScript("OnClick", function()
+            if BNB.UndoKeepDeleteNote then BNB.UndoKeepDeleteNote(r._id) end
+            RefreshSize(); RefreshList()
+        end)
+        rows[i] = r
+        return r
+    end
+
+    RefreshList = function()
+        local list = BNB.UndoKeepList and BNB.UndoKeepList() or {}
+        local ry = listTop
+        for i, e in ipairs(list) do
+            local r, note = Row(i), BNB.GetNote(e.id)
+            r._id = e.id
+            local title = note and note.title
+            r._title:SetText((title and title ~= "") and title or L["UNTITLED"])
+            TitleColour(r)
+            local icon = note and note.icon
+            r._icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
+            r:Show()   -- shown before the frame: a hidden icon gets none
+            if BNB.ApplyIconFrame then BNB.ApplyIconFrame(r._icon, note, LIST_ICON) end
+            local size = e.bytes and (BNB.HistoryFormatSize and BNB.HistoryFormatSize(e.bytes)
+                or string.format(L["CFG_UNIT_KB_FMT"], math.floor(e.bytes / 1024)))
+            local when
+            if e.pending then when = L["CFG_UNDO_KEEP_ROW_PENDING"]
+            else when = BNB.FmtTime and BNB.FmtTime(e.t) or "" end
+            r._info:SetText(size and (size .. "  -  " .. when) or when)
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, ry)
+            r:Show()
+            ry = ry - LIST_ROW_H
+        end
+        for i = #list + 1, #rows do rows[i]:Hide() end
+        -- Reload now is useful only while something waits to be written
+        local waiting = false
+        for _, e in ipairs(list) do if e.pending then waiting = true; break end end
+        reloadBtn:SetEnabled(waiting)
+        sf:FinaliseHeight(math.abs(ry) + 12)
+    end
+
+    -- The days only matter while keeping is on; the readout and Reset work
+    -- either way (what is saved stays when it is switched off)
+    local function SyncKeep()
+        local on = KeepOn()
+        daysSlider:SetEnabled(on); daysSlider:SetAlpha(on and 1 or 0.35)
+    end
+    keepCb:HookScript("OnClick", function() SyncKeep(); RefreshSize(); RefreshList() end)
+    sf:HookScript("OnShow", function()
+        keepCb:SetChecked(BNB.UndoKeepEnabled())
+        SyncKeep(); RefreshSize(); RefreshList()
+    end)
+    SyncKeep()
+
+    -- A note's title, icon, frame or title colour changed (or it was deleted)
+    -- while the page is open: redraw the rows, as the note list does
+    -- (Dukul 2026-10-13). Batched to one redraw per frame.
+    local function OnNoteMsg()
+        if sf:IsVisible() then BNB.Debounce("UndoPageRows", 0, RefreshList) end
+    end
+    for _, msg in ipairs({ "NoteChanged", "NoteDeleted", "NoteRestored" }) do
+        BNB.RegisterMessage("UndoPage", msg, OnNoteMsg)
+    end
+
+    sf:FinaliseHeight(math.abs(y) + 12)   -- RefreshList sets it again with the rows
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────

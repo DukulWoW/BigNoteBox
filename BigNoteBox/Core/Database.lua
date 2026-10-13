@@ -230,6 +230,10 @@ BNB.DEFAULTS = {
     undoIdleDelay      = 0.8,
     -- Max seconds of continuous typing before a snapshot is forced (1-10)
     undoForcedInterval = 3,
+    -- Keep undo between sessions in BigNoteBox_History (ALL-460): off by
+    -- default; steps of a note not edited for undoKeepDays are deleted (1-30)
+    undoKeep           = false,
+    undoKeepDays       = 7,
 
     -- Session history: max auto slots per note (1-20)
     historyMaxSlots = 5,
@@ -508,6 +512,8 @@ function BNB.MigrateNotesDB()
     -- ++ v7 -> v8: history snapshots keep only content fields (SV-11), the
     -- dummy updatedAt field goes (SV-08), ALL-136.8 ++++++++++++++++++++++++++++
     -- Snapshots copied every content field of the note, up to 21 per note.
+    -- Reads note.history directly on purpose: a migration works on the stored
+    -- shape of its own version, before NoteHistory's accessors exist (ALL-466).
     -- Trimmed to the list in Features/NoteHistory.lua (SNAP_FIELDS + timestamp),
     -- written out here because that file loads after this one.
     if v < 8 then

@@ -5,7 +5,7 @@ local BNB = BigNoteBox
 local L   = BNB.L
 
 local K = BNB._ConfigKit
-local CONTENT_W, ROW_H, ROW_GAP, SLIDER_H = K.CONTENT_W, K.ROW_H, K.ROW_GAP, K.SLIDER_H
+local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
 
 -- A smaller gold heading for a group inside a section (Trash, Tag tree under Notes).
@@ -19,9 +19,9 @@ end
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 2 -- NOTES
--- Notes (new note, lock, tag tree), then the editor: saving, toolbar,
--- undo/redo. Trash, rich notes + live preview and session history are
--- Modules pages since ALL-290 (UI/Config/NotePages.lua).
+-- Notes (new note, lock, tag tree), then the editor: saving, toolbar.
+-- Trash, rich notes + live preview and session history are Modules pages
+-- since ALL-290, undo / redo since ALL-460 (UI/Config/NotePages.lua).
 -- ─────────────────────────────────────────────────────────────────────────────
 local function BuildNotesTab(sf, ct)
     local db = BigNoteBoxDB
@@ -210,7 +210,7 @@ local function BuildNotesTab(sf, ct)
     -- ── Saving ───────────────────────────────────────────────────────────────
     -- Save mode (ALL-52): nil = automatic, "manual" = Save button. First in
     -- the tab because it changes how the whole editor works (Dukul, 2026-09-24).
-    -- Automatic uses the idle delay / forced interval under Undo / Redo.
+    -- Automatic uses the idle delay / forced interval on Modules > Undo / Redo.
     y = AddHeader(ct, y, L["CFG_HDR_SAVING"])
     y = AddCheck(ct, y, L["CFG_CHK_AUTOSAVE_LABEL"],
         function() return db.saveMode ~= "manual" end,
@@ -250,94 +250,6 @@ local function BuildNotesTab(sf, ct)
             if BNB.ApplyFocusWysiwygBar then BNB.ApplyFocusWysiwygBar() end
         end,
         L["CFG_CHK_FOCUS_WYSIWYG_TIP"])
-
-    -- ── Undo / Redo ───────────────────────────────────────────────────────────
-    AddRule(ct, y); y = y - 18
-    y = AddHeader(ct, y, L["CFG_HDR_UNDO_REDO"])
-
-    local undoDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    undoDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    undoDesc:SetWidth(CONTENT_W); undoDesc:SetJustifyH("LEFT")
-    undoDesc:SetWordWrap(true); undoDesc:SetHeight(28)
-    undoDesc:SetTextColor(0.60, 0.60, 0.60)
-    undoDesc:SetText(L["CFG_UNDO_DESC"])
-    y = y - 32
-
-    -- Warning label declared before slider so the onChange closure can reference it.
-    -- Anchored relative to where the slider will sit (y - SLIDER_H - ROW_GAP).
-    local warnLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    warnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - (SLIDER_H + ROW_GAP))
-    warnLbl:SetWidth(CONTENT_W); warnLbl:SetJustifyH("LEFT")
-    warnLbl:SetWordWrap(true); warnLbl:SetHeight(28)
-    warnLbl:SetTextColor(0.90, 0.30, 0.30)
-    warnLbl:SetText(L["CFG_UNDO_DEPTH_WARN"])
-    local curDepth = db and db.undoDepth or BNB.DEFAULTS.undoDepth
-    warnLbl:SetShown(curDepth > 50)
-
-    local depthSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
-        label = L["CFG_UNDO_DEPTH_SLIDER"], min = 10, max = 200,
-        value = curDepth, default = BNB.DEFAULTS.undoDepth,
-        onChange = function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.undoDepth = v end
-            warnLbl:SetShown(v > 50)
-        end,
-        tip = { L["CFG_UNDO_DEPTH_TIP1"], L["CFG_UNDO_DEPTH_TIP2"] },
-    })
-    depthSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- Always reserve warning label height so layout stays stable
-    y = y - 34
-
-    -- Idle delay slider (0.3 – 3.0 s, step 0.1, default 0.8)
-    -- Stored as a float; displayed with one decimal place.
-    do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
-        lbl:SetTextColor(0.55, 0.55, 0.55)
-        lbl:SetText(L["CFG_AUTOSAVE_IDLE_DESC"])
-        local h = lbl:GetStringHeight() + 4
-        lbl:SetHeight(h); y = y - h - 2
-    end
-    local curIdle = db and db.undoIdleDelay or BNB.DEFAULTS.undoIdleDelay
-    local idleSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
-        label = L["CFG_AUTOSAVE_IDLE_SLIDER"], min = 3, max = 30,
-        value = math.floor(curIdle * 10 + 0.5), default = math.floor(BNB.DEFAULTS.undoIdleDelay * 10 + 0.5),
-        fmt = function(v) return string.format("%.1f", v / 10) end,
-        onChange = function(v)
-            local val = v / 10
-            if BigNoteBoxDB then BigNoteBoxDB.undoIdleDelay = val end
-        end,
-        tipTitle = L["CFG_AUTOSAVE_IDLE_TIP_TITLE"],
-        tip = { L["CFG_AUTOSAVE_IDLE_TIP1"], L["CFG_AUTOSAVE_IDLE_TIP2"] },
-    })
-    idleSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    y = y - (SLIDER_H + ROW_GAP)
-
-    -- Forced interval slider (1 – 10 s, whole seconds, default 3)
-    -- Fires even if you never stop typing, capping continuous-typing chunk size.
-    do
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-        lbl:SetWidth(CONTENT_W); lbl:SetJustifyH("LEFT"); lbl:SetWordWrap(true)
-        lbl:SetTextColor(0.55, 0.55, 0.55)
-        lbl:SetText(L["CFG_AUTOSAVE_FORCED_DESC"])
-        local h = lbl:GetStringHeight() + 4
-        lbl:SetHeight(h); y = y - h - 2
-    end
-    local curForced = db and db.undoForcedInterval or BNB.DEFAULTS.undoForcedInterval
-    local forcedSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
-        label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 1, max = 10,
-        value = curForced, default = BNB.DEFAULTS.undoForcedInterval,
-        onChange = function(v)
-            if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = v end
-        end,
-        tipTitle = L["CFG_AUTOSAVE_FORCED_TIP_TITLE"],
-        tip = { L["CFG_AUTOSAVE_FORCED_TIP1"], L["CFG_AUTOSAVE_FORCED_TIP2"], L["CFG_AUTOSAVE_FORCED_TIP3"] },
-    })
-    forcedSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    y = y - (SLIDER_H + ROW_GAP)
 
     sf:FinaliseHeight(math.abs(y) + 12)
 end
