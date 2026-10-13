@@ -225,12 +225,16 @@ local function BuildGeneralTab(sf, ct)
         y = y - 26 - LINKS_H - 10
     end
     do
-        local SITES = BNB.SITE_LINKS
+        -- Dukul.net first, on the left (Dukul 2026-10-13). Not in
+        -- BNB.SITE_LINKS: that list is the download sites, and the welcome
+        -- note links every name in it
+        local SITES = { { key = "dukul", name = "Dukul.net", url = "https://dukul.net", tipSub = L["CFG_AUTHOR_TIP"] } }
+        for _, site in ipairs(BNB.SITE_LINKS) do SITES[#SITES + 1] = site end
         local rowW = #SITES * LINK_SZ + (#SITES - 1) * LINK_GAP
         for i, site in ipairs(SITES) do
             local url = site.url
             local b = BNB.CreateIconButton(ct, LINK_SZ, site.key, {
-                tip = site.name, tipSub = string.format(L["CFG_SITE_LINK_TIP"], site.name), tipWrap = true,
+                tip = site.name, tipSub = site.tipSub or string.format(L["CFG_SITE_LINK_TIP"], site.name), tipWrap = true,
                 onClick = function(self) BNB.ShowClipboardHint(url, self, true, true) end,
             })
             b:SetPoint("TOPLEFT", moreBtn, "BOTTOM", -math.floor(rowW / 2) + (i - 1) * (LINK_SZ + LINK_GAP), -6)

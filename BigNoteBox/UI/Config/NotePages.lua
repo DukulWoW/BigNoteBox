@@ -199,6 +199,20 @@ function K.BuildRichNotesPage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- A red line saying the BigNoteBox_History addon is missing or disabled, only
+-- while it is (ALL-466). Height from the text. Returns the new y.
+function K.AddNeedsHistoryLine(ct, y)
+    if BNB.HistoryAddonLoaded() then return y end
+    local fs = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    fs:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    fs:SetWidth(CONTENT_W); fs:SetJustifyH("LEFT"); fs:SetWordWrap(true)
+    fs:SetTextColor(1, 0.4, 0.4)
+    fs:SetText(L["CFG_HISTORY_NEEDS_ADDON"])
+    local h = fs:GetStringHeight() + 4
+    fs:SetHeight(h)
+    return y - h - 6
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- NOTE HISTORY: session snapshots (undo / redo has its own page, ALL-460)
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -215,6 +229,11 @@ function K.BuildHistoryPage(sf, ct, y, page)
         end,
         L["CFG_HISTORY_ENABLE_TIP"])
     page.enableCb = enableCb   -- twin on the Modules overview row
+    -- Needs the BigNoteBox_History addon (ALL-466): without it the module is
+    -- off and its box greyed, with the reason under it
+    page.available = BNB.HistoryAddonLoaded
+    K.GreyWhileOff(enableCb, BNB.HistoryAddonLoaded)
+    y = K.AddNeedsHistoryLine(ct, y)
 
     local histDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     histDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -271,7 +290,153 @@ function K.BuildHistoryPage(sf, ct, y, page)
         end
     end)
 
-    sf:FinaliseHeight(math.abs(y) + 12)
+    K.BuildRescueSection(sf, ct, y)   -- sets the page height
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- RESCUE (ALL-466 stage 3, Dukul 2026-10-13): the notes that exist only in the
+-- history file, or are empty while their history has text
+-- (BNB.HistoryRescueList, Features/NoteHistory.lua). What it does in plain
+-- words, a count, Rescue all, then one row per note: title, which kind and
+-- when, a Rescue button and (lost notes only) an X that drops the history
+-- for good after a confirm. Settings > Backup and the History window open
+-- this page. Sets the page height itself (rows grow it).
+-- ─────────────────────────────────────────────────────────────────────────────
+function K.BuildRescueSection(sf, ct, y)
+    AddRule(ct, y); y = y - 18
+    y = AddHeader(ct, y, L["RESCUE_HDR"])
+    do
+        local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
+        desc:SetTextColor(0.60, 0.60, 0.60)
+        desc:SetText(L["RESCUE_DESC"])
+        local h = desc:GetStringHeight() + 4
+        desc:SetHeight(h); y = y - h - 6
+    end
+
+    local countLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    countLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    countLbl:SetWidth(CONTENT_W); countLbl:SetJustifyH("LEFT"); countLbl:SetHeight(18)
+    countLbl:SetTextColor(0.55, 0.55, 0.55)
+    y = y - 22
+
+    local RefreshRescue
+    local allBtn = BNB.CreateButton(nil, ct, L["RESCUE_ALL_BTN"], 160, 22)
+    allBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    allBtn:SetScript("OnClick", function()
+        if BNB.HistoryRescueAll then BNB.HistoryRescueAll() end
+        RefreshRescue()
+    end)
+    allBtn:SetMotionScriptsWhileDisabled(true)   -- greyed, the tooltip says why
+    allBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["RESCUE_ALL_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["RESCUE_ALL_TIP"], 0.8, 0.8, 0.8, true)
+        if not self:IsEnabled() then GameTooltip:AddLine(L["RESCUE_NONE_SHORT"], 0.8, 0.4, 0.4, true) end
+        GameTooltip:Show()
+    end)
+    allBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (22 + ROW_GAP)
+
+    local ROW, BTN_W, listTop, rows = 28, 70, y - 4, {}
+    local ICON = "Interface\\Icons\\INV_Misc_Note_06"
+    local function Row(i)
+        local r = rows[i]
+        if r then return r end
+        r = CreateFrame("Frame", nil, ct)
+        r:SetSize(CONTENT_W, ROW)
+        r._del = BNB.CreateIconButton(r, 16, "close", { tip = L["RESCUE_ROW_DEL_TIP"], tipWrap = true, tipAnchor = "ANCHOR_TOP" })
+        r._del:SetPoint("RIGHT", r, "RIGHT", -2, 0)
+        r._btn = BNB.CreateButton(nil, r, L["RESCUE_ROW_BTN"], BTN_W, 20)
+        r._btn:SetPoint("RIGHT", r, "RIGHT", -24, 0)
+        r._info = r:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        r._info:SetPoint("RIGHT", r._btn, "LEFT", -8, 0)
+        r._info:SetJustifyH("RIGHT"); r._info:SetTextColor(0.55, 0.55, 0.55)
+        r._icon = r:CreateTexture(nil, "ARTWORK")
+        r._icon:SetSize(22, 22); r._icon:SetPoint("LEFT", r, "LEFT", 4, 0)
+        r._icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+        r._title = r:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        r._title:SetPoint("LEFT", r._icon, "RIGHT", 8, 0)
+        r._title:SetPoint("RIGHT", r._info, "LEFT", -8, 0)
+        r._title:SetJustifyH("LEFT"); r._title:SetWordWrap(false)
+        BNB.SetTextWhite(r._title)
+        r._btn:SetScript("OnClick", function()
+            if BNB.HistoryRescue then BNB.HistoryRescue(r._id) end
+            RefreshRescue()
+        end)
+        r._btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["RESCUE_ROW_BTN"], 1, 1, 1)
+            local tip = L["RESCUE_ROW_TIP"]
+            if r._kind == "empty" then tip = L["RESCUE_ROW_EMPTY_TIP"] end
+            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        r._btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        r._del:SetScript("OnClick", function()
+            local id, title = r._id, r._title:GetText() or ""
+            StaticPopup_Show("BNB_MULTI_CONFIRM", string.format(L["RESCUE_DEL_CONFIRM_FMT"], title), nil, function()
+                if BNB.HistoryRescueDiscard then BNB.HistoryRescueDiscard(id) end
+                RefreshRescue()
+            end)
+        end)
+        rows[i] = r
+        return r
+    end
+
+    RefreshRescue = function()
+        local list = BNB.HistoryRescueList and BNB.HistoryRescueList() or {}
+        local n = #list
+        if not BNB.HistoryAddonLoaded() then
+            countLbl:SetText(L["CFG_HISTORY_NEEDS_ADDON"])
+        elseif n == 0 then
+            countLbl:SetText(L["RESCUE_NONE"])
+        else
+            countLbl:SetText(BNB.HistoryRescueCountText(n))
+        end
+        allBtn:SetEnabled(n > 0)
+        local ry = listTop
+        for i, e in ipairs(list) do
+            local r = Row(i)
+            r._id, r._kind = e.id, e.kind
+            r._title:SetText(e.title ~= "" and e.title or L["UNTITLED"])
+            local note = e.kind == "empty" and BNB.GetNote(e.id)
+            r._icon:SetTexture(note and note.icon and note.icon ~= "" and note.icon or ICON)
+            local when = BNB.FmtTime and BNB.FmtTime(e.ts) or ""
+            if e.kind == "empty" then
+                r._info:SetText(string.format(L["RESCUE_INFO_EMPTY_FMT"], when))
+            else
+                local fmt = L["RESCUE_INFO_FMT"]
+                if e.count == 1 then fmt = L["RESCUE_INFO_ONE_FMT"] end
+                r._info:SetText(string.format(fmt, when, e.count))
+            end
+            r._del:SetShown(e.kind == "missing")   -- an empty note is deleted or written in, not here
+            r:ClearAllPoints()
+            r:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, ry)
+            r:Show()
+            ry = ry - ROW
+        end
+        for i = n + 1, #rows do rows[i]:Hide() end
+        sf:FinaliseHeight(math.abs(ry) + 12)
+    end
+
+    sf:HookScript("OnShow", RefreshRescue)
+    -- A note created, changed or deleted elsewhere while the page is open (an
+    -- empty note written in, a rescue from the popup): one redraw per frame
+    local function Follow()
+        if sf:IsVisible() then BNB.Debounce("RescueRows", 0, RefreshRescue) end
+    end
+    for _, msg in ipairs({ "NoteCreated", "NoteChanged", "NoteDeleted", "NoteRestored", "TrashChanged", "HistoryRescueChanged" }) do
+        BNB.RegisterMessage("RescuePage", msg, Follow)
+    end
+    sf:FinaliseHeight(math.abs(listTop) + 12)
+end
+
+-- Opens the Rescue list (Settings > Modules > Note History), for the buttons
+-- on Settings > Backup and in the History window
+function BNB.OpenRescuePage()
+    if BNB.OpenSettingsPage then BNB.OpenSettingsPage("modules", "history") end
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -390,6 +555,7 @@ function K.BuildUndoPage(sf, ct, y, page)
         function() return BNB.UndoKeepEnabled() end,
         function(v) if BNB.UndoKeepApply then BNB.UndoKeepApply(v) end end,
         L["CFG_UNDO_KEEP_TIP"])
+    K.GreyWhileOff(keepCb, BNB.HistoryAddonLoaded)   -- needs BigNoteBox_History (ALL-466)
     local function KeepOn() return keepCb:GetChecked() and true or false end
 
     local daysSlider

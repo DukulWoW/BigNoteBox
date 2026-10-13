@@ -4,9 +4,11 @@
 -- Mirrors Word's "Version History" — auto-snapshots on logout/reload,
 -- plus one user-controlled manual restore point per note.
 --
--- STORAGE (BigNoteBoxNotesDB, on each note object):
---   note.history        = { snap, snap, ... }  -- auto slots, [1]=newest
---   note.manualSnapshot = snap or nil
+-- STORAGE:
+--   automatic: the BigNoteBox_History file (BigNoteBoxHistoryDB.auto[set][id]
+--              = { snap, snap, ... }, [1] = newest; Core/Database.lua), since
+--              NOTES v13 (ALL-466). It used to be note.history.
+--   manual:    note.manualSnapshot = snap or nil, on the note in the notes file
 --
 -- A "snap" table contains:
 --   timestamp  — unix time of snapshot
@@ -40,11 +42,18 @@
 --   BNB.HistoryAutoCount(id)                     number of auto snapshots
 --   BNB.HistoryClearAllAuto()                    every note's auto snapshots; count
 --
--- ALL-466 stage 1 (2026-10-13): the automatic snapshots are read and written
--- only through AutoList / SetAutoList below, and every other file goes
--- through the public functions here (never note.history), so stage 2 can
--- move them to BigNoteBox_History by changing that one block. The manual
--- restore point stays on the note (note.manualSnapshot) for good.
+--   BNB.HistoryAutoNoteCount()                   notes with auto snapshots in the history file
+--   BNB.HistoryForget(id)                        a note deleted for good: its auto history goes
+--   BNB.HistoryWipeSet()                         Factory Reset: the active set's auto history
+--   BNB.HistorySaveStates()                      logout: each note's last known state (ALL-468)
+--
+-- ALL-466: the automatic snapshots are read and written only through
+-- AutoList / SetAutoList below, and every other file goes through the public
+-- functions here (never note.history). Stage 2 moved them to BigNoteBox_History
+-- by changing that seam. The manual restore point stays on the note
+-- (note.manualSnapshot) for good. History of a note that vanished without
+-- being deleted here (a lost notes file) is kept on purpose: Rescue (stage 3)
+-- rebuilds notes from it.
 --   BNB.SyncHistoryBtnState()                   Update toolbar icon state
 --   BNB.SyncHistoryNoteBtnState()               Update per-note WYSIWYG buttons
 
@@ -111,9 +120,14 @@ end
 
 --------------------------------------------------------------------------------
 -- STORAGE SEAM (ALL-466): the only code that touches where the automatic
--- snapshots live. AutoList(id) = the note's list, newest first, or nil.
--- SetAutoList(id, list) stores it; nil or empty removes it. Live notes
--- only, as before.
+-- snapshots live: the history file (BNB.HistoryAutoBucket, Core/Database.lua),
+-- keyed by note id, so a note in the trash keeps its list and has it back when
+-- restored. AutoList(id) = the note's list, newest first, or nil.
+-- SetAutoList(id, list) stores it; nil or empty removes it. History addon
+-- missing = nothing stored, nothing read (Note History counts as off).
+-- While the move from the notes file waits for its second load
+-- (BNB.HistoryMovePending), every write is mirrored onto note.history, so the
+-- notes file's copy never brings back a snapshot deleted here.
 --------------------------------------------------------------------------------
 local function LiveNote(id)
     local ndb = NDB()
@@ -121,14 +135,23 @@ local function LiveNote(id)
 end
 
 local function AutoList(id)
-    local note = LiveNote(id)
-    return note and note.history or nil
+    local bucket = id and BNB.HistoryAutoBucket()
+    return bucket and bucket[id] or nil
+end
+
+local function Mirror(id, list)
+    if not BNB.HistoryMovePending() then return end
+    local ndb = NDB()
+    local note = (ndb.notes and ndb.notes[id]) or (ndb.trash and ndb.trash[id])
+    if note then note.history = list end
 end
 
 local function SetAutoList(id, list)
-    local note = LiveNote(id)
-    if not note then return end
-    note.history = (list and #list > 0) and list or nil
+    local bucket = id and BNB.HistoryAutoBucket()
+    if not bucket then return end
+    if not (list and #list > 0) then list = nil end
+    bucket[id] = list
+    Mirror(id, list)
 end
 
 local function MaxSlots()
@@ -147,7 +170,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.HistorySnapshotNote(id)
     local note = LiveNote(id)
-    if not note then return false end
+    if not note or not BNB.HistoryAutoBucket() then return false end   -- no history file
 
     local hist = AutoList(id) or {}
 
@@ -272,18 +295,207 @@ function BNB.HistoryAutoCount(id)
     return hist and #hist or 0
 end
 
--- Every live note's auto snapshots gone (Danger Zone); manual restore points
--- kept. Returns how many notes had some.
+-- How many notes of the active set have auto snapshots in the history file:
+-- live, trashed, and ones whose note is gone (kept for Rescue)
+function BNB.HistoryAutoNoteCount()
+    local n = 0
+    for _ in pairs(BNB.HistoryAutoBucket() or {}) do n = n + 1 end
+    return n
+end
+
+-- The active set's auto snapshots gone (Danger Zone), trashed and gone notes'
+-- too; manual restore points kept. Returns how many notes had some.
 function BNB.HistoryClearAllAuto()
-    local ndb, count = NDB(), 0
-    if not ndb.notes then return 0 end
-    for id in pairs(ndb.notes) do
-        if BNB.HistoryAutoCount(id) > 0 then
-            SetAutoList(id, nil)
-            count = count + 1
+    local ids = {}
+    for id in pairs(BNB.HistoryAutoBucket() or {}) do ids[#ids + 1] = id end
+    for _, id in ipairs(ids) do SetAutoList(id, nil) end
+    -- The last known states go too: without versions they rescue nothing
+    -- (the live notes' come back at the next logout)
+    local store = BNB.HistoryDB()
+    if store then store.state[BNB.HistorySetKey()] = {} end
+    return #ids
+end
+
+--------------------------------------------------------------------------------
+-- LAST KNOWN STATE (ALL-468, Dukul 2026-10-13: a rescued note came back with
+-- its text only). One record per note in the history file, everything except
+-- title and text (BNB.CleanNoteFields: the schema's non-internal fields, so a
+-- new note field is kept without a change here): { t = time(), f = fields }.
+-- Written at logout / reload with the snapshots, for every live note; a record
+-- whose note is gone stays only while the note still has versions (a trashed
+-- or lost note: Rescue rebuilds it from both). One copy per note, never per
+-- version, so the file stays small.
+--------------------------------------------------------------------------------
+local function StateBucket()
+    local store = BNB.HistoryDB()
+    if not store then return nil end
+    local k = BNB.HistorySetKey()
+    if type(store.state[k]) ~= "table" then store.state[k] = {} end
+    return store.state[k]
+end
+
+local function NotText(def) return def.key ~= "title" and def.key ~= "body" end
+
+function BNB.HistorySaveStates()
+    local states, bucket, ndb = StateBucket(), BNB.HistoryAutoBucket(), NDB()
+    if not (states and bucket and ndb.notes) then return end
+    local now = time()
+    for id, note in pairs(ndb.notes) do
+        states[id] = { t = now, f = BNB.CleanNoteFields(note, NotText) }
+    end
+    for id in pairs(states) do
+        if not ndb.notes[id] and not bucket[id] then states[id] = nil end
+    end
+end
+
+-- A note's last known fields, or nil
+local function StateOf(id)
+    local states = StateBucket()
+    local rec = states and states[id]
+    return type(rec) == "table" and type(rec.f) == "table" and rec.f or nil
+end
+
+-- A note deleted for good (Delete permanently, the trash emptied or expired,
+-- Delete All Notes): its auto snapshots and last known state go with it. Not
+-- on a move to the trash, and never for a note that merely went missing
+-- (Rescue keeps those).
+function BNB.HistoryForget(id)
+    local bucket = id and BNB.HistoryAutoBucket()
+    if bucket then bucket[id] = nil end
+    local states = id and StateBucket()
+    if states then states[id] = nil end
+end
+
+--------------------------------------------------------------------------------
+-- RESCUE (ALL-466 stage 3, Dukul 2026-10-13). The history file keeps the
+-- versions of a note that vanished without being deleted here (a damaged or
+-- replaced notes file), so it can be rebuilt. Two kinds in one list:
+--   "missing": an id in the history file that is neither a note nor in the
+--              trash; Rescue = BNB.RescueNote (Core/NoteManager.lua) from its
+--              newest version with text.
+--   "empty":   a live note with no title and no text whose history has text;
+--              Rescue = the normal restore of that version, keepCurrent, so
+--              the empty state is kept as a version too.
+-- Lists: Settings > Modules > Note History (K.BuildHistoryPage); a button on
+-- Settings > Backup and in the History window opens it (greyed while there
+-- is nothing); a login popup when the notes set is empty (Dukul's pick).
+--------------------------------------------------------------------------------
+local function HasText(s)
+    return type(s) == "table" and ((s.title or "") ~= "" or (s.body or "") ~= "")
+end
+
+-- One rescue entry for a note's list, or nil when no version has text
+local function RescueEntry(id, list, kind)
+    if type(list) ~= "table" then return nil end
+    local best, oldest, n = nil, nil, 0
+    for _, s in ipairs(list) do   -- newest first
+        if type(s) == "table" then
+            n = n + 1
+            if not best and HasText(s) then best = s end
+            local t = s.timestamp or 0
+            if not oldest or t < oldest then oldest = t end
         end
     end
-    return count
+    if not best then return nil end
+    return { id = id, kind = kind, snap = best, title = best.title or "",
+             ts = best.timestamp or 0, count = n, oldest = oldest }
+end
+
+-- { { id, kind, snap, title, ts, count, oldest }, ... }, newest first; {} when
+-- the notes or the history file are not there
+function BNB.HistoryRescueList()
+    local out = {}
+    local bucket = BNB.HistoryAutoBucket()
+    if not (bucket and BNB._notesAvailable) then return out end
+    local ndb = NDB()
+    if not ndb.notes then return out end
+    local trash = ndb.trash or {}
+    for id, list in pairs(bucket) do
+        local note, kind = ndb.notes[id], nil
+        if not note and not trash[id] then
+            kind = "missing"
+        elseif note and (note.title or "") == "" and (note.body or "") == "" then
+            kind = "empty"
+        end
+        local e = kind and RescueEntry(id, list, kind)
+        if e then out[#out + 1] = e end
+    end
+    table.sort(out, function(a, b) return a.ts > b.ts end)
+    return out
+end
+
+function BNB.HistoryRescueCount()
+    return #BNB.HistoryRescueList()
+end
+
+-- "1 note can be rescued." / "N notes can be rescued." (the Rescue page and
+-- Settings > Backup)
+function BNB.HistoryRescueCountText(n)
+    if n == 1 then return BNB.L["RESCUE_COUNT_ONE"] end
+    return string.format(BNB.L["RESCUE_COUNT_FMT"], n)
+end
+
+-- Rescue one entry of HistoryRescueList. Returns true when it was done.
+local function RescueOne(e)
+    if e.kind == "missing" then
+        return BNB.RescueNote(e.id, e.snap, e.oldest, StateOf(e.id)) ~= nil
+    end
+    return BNB.HistoryRestoreNote(e.id, e.snap, true)
+end
+
+-- After a rescue: buttons and lists re-count. A rescued alarm whose time
+-- passed while its note was lost does not ring: caught up as after a login
+-- with Alarms off (repeating = next time, one-off = fired and listed once;
+-- Dukul's pick, ALL-468). With Alarms off, switching it on catches up.
+local function AfterRescue(ids)
+    if ids and #ids > 0 and BNB.AlarmsEnabled and BNB.AlarmsEnabled()
+       and BNB.Alarm and BNB.Alarm.CatchUpNotes then
+        BNB.Alarm.CatchUpNotes(ids, "AO_MISSED_RESCUE_FMT")
+    end
+    BNB.SyncHistoryBtnState()
+    BNB.SyncHistoryNoteBtnState()
+    BNB.SendMessage("HistoryRescueChanged")
+end
+
+-- One note by id (a row's Rescue). True when it was done.
+function BNB.HistoryRescue(id)
+    for _, e in ipairs(BNB.HistoryRescueList()) do
+        if e.id == id then
+            local ok = RescueOne(e)
+            AfterRescue(ok and { id } or nil)
+            return ok
+        end
+    end
+    return false
+end
+
+-- Every note in the list; returns how many came back, and says so in chat
+function BNB.HistoryRescueAll()
+    local done = {}
+    for _, e in ipairs(BNB.HistoryRescueList()) do
+        if RescueOne(e) then done[#done + 1] = e.id end
+    end
+    local n = #done
+    AfterRescue(done)
+    if n > 0 then
+        if n == 1 then BNB:Print(BNB.L["RESCUE_DONE_ONE"])
+        else BNB:Print(string.format(BNB.L["RESCUE_DONE_FMT"], n)) end
+    end
+    return n
+end
+
+-- A lost note's row X: its history goes for good (it cannot be rescued then)
+function BNB.HistoryRescueDiscard(id)
+    BNB.HistoryForget(id)
+    AfterRescue()
+end
+
+-- Factory Reset: the active notes set's auto history and the move's token
+function BNB.HistoryWipeSet()
+    local store = BNB.HistoryDB()
+    if not store then return end
+    local k = BNB.HistorySetKey()
+    store.auto[k], store.moved[k], store.state[k] = {}, nil, {}
 end
 
 --------------------------------------------------------------------------------
@@ -306,7 +518,8 @@ function BNB.HistoryAnyExists()
     for id in pairs(ndb.notes) do
         if BNB.HistoryNoteHasAny(id) then return true end
     end
-    return false
+    -- Notes that can be rescued: the History window holds the way to them
+    return BNB.HistoryRescueCount() > 0
 end
 
 --------------------------------------------------------------------------------
@@ -442,15 +655,25 @@ end
 BNB.RegisterEvent("PLAYER_LOGOUT", function()
     if BNB.HistorySnapshotAll and BNB.HistoryEnabled() then
         BNB.HistorySnapshotAll()
+        BNB.HistorySaveStates()   -- last known state for Rescue (ALL-468)
     end
 end)
 
 --------------------------------------------------------------------------------
 -- MODULE SWITCH (Settings > Modules > Note History, ALL-343)
 -- Off: no logout snapshots and every way in hidden; the snapshots already
--- taken stay on their notes and come back with the module.
+-- taken stay where they are and come back with the module. Also off while the
+-- BigNoteBox_History addon is missing or disabled (ALL-466, Dukul: "All modules
+-- that require it should also be turned off automatically"); the saved switch
+-- is left alone, so enabling the addon brings the module back as it was.
 --------------------------------------------------------------------------------
 function BNB.HistoryEnabled()
+    if not BNB.HistoryAddonLoaded() then return false end
+    return not BigNoteBoxDB or BigNoteBoxDB.historyEnabled ~= false
+end
+
+-- The saved switch alone (the page checkbox, the login notice)
+function BNB.HistoryWanted()
     return not BigNoteBoxDB or BigNoteBoxDB.historyEnabled ~= false
 end
 
@@ -462,3 +685,58 @@ function BNB.ApplyHistoryModule(on)
     if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end              -- toolbar History icon
     if BNB.ApplyWysiwygModuleBtns then BNB.ApplyWysiwygModuleBtns() end    -- history / restore buttons
 end
+
+--------------------------------------------------------------------------------
+-- LOGIN NOTICE (ALL-466): BigNoteBox_History is missing or disabled while
+-- something needs it (Note History on, or Keep undo between sessions on).
+-- A popup to click, not a chat line (Dukul: "warn with a popup that you have
+-- to click so people know that bnb was made to have this turned on by
+-- default"). "Don't show again" is saved; not during first-time setup.
+--------------------------------------------------------------------------------
+local function ShowAddonNotice()
+    local db = BigNoteBoxDB
+    if BNB.HistoryAddonLoaded() or not db then return end
+    if db.historyAddonNotice == false or db.setupComplete ~= true then return end
+    if not (BNB.HistoryWanted() or db.undoKeep == true) then return end
+    if not StaticPopupDialogs["BNB_HISTORY_ADDON_MISSING"] then
+        StaticPopupDialogs["BNB_HISTORY_ADDON_MISSING"] = {
+            preferredIndex = 3,
+            text    = BNB.L["HISTORY_ADDON_NOTICE"],
+            button1 = OKAY,
+            button2 = BNB.L["HISTORY_ADDON_NOTICE_NEVER"],
+            timeout = 0, whileDead = true, hideOnEscape = false,
+            noCancelOnEscape = true,
+            -- button2 only (Esc does not reach OnCancel, noCancelOnEscape)
+            OnCancel = function(_, _, reason)
+                if reason == "clicked" and BigNoteBoxDB then BigNoteBoxDB.historyAddonNotice = false end
+            end,
+        }
+    end
+    StaticPopup_Show("BNB_HISTORY_ADDON_MISSING")
+end
+
+-- The notes set is empty (no notes, nothing in the trash) but the history file
+-- holds notes to rescue: offer them once per login (ALL-466 stage 3, Dukul's
+-- pick: only then; otherwise they wait in the Rescue list)
+local function OfferRescue()
+    local ndb = BNB._notesAvailable and NDB()
+    if not (ndb and ndb.notes) or next(ndb.notes) or next(ndb.trash or {}) then return end
+    local n = BNB.HistoryRescueCount()
+    if n == 0 then return end
+    if not StaticPopupDialogs["BNB_HISTORY_RESCUE_OFFER"] then
+        StaticPopupDialogs["BNB_HISTORY_RESCUE_OFFER"] = {
+            preferredIndex = 3,
+            text    = "%s",
+            button1 = BNB.L["RESCUE_ALL_BTN"],
+            button2 = BNB.L["DZ_POPUP_LATER"],
+            OnAccept = function() BNB.HistoryRescueAll() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+    end
+    StaticPopup_Show("BNB_HISTORY_RESCUE_OFFER", string.format(BNB.L["RESCUE_OFFER_FMT"], n))
+end
+
+BNB.RegisterEvent("PLAYER_LOGIN", function()
+    C_Timer.After(3, ShowAddonNotice)   -- after What's New and the welcome note
+    C_Timer.After(4, OfferRescue)
+end)

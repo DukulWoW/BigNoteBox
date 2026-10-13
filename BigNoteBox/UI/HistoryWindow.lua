@@ -45,6 +45,12 @@ local _reopenNote = nil   -- the note page's note when the window last closed on
 local _multiMode  = false
 local _multiSel   = {}    -- { [noteID] = true }
 local _selectBtn, _clearSelBtn, _selAllBtn, _cancelSelBtn = nil, nil, nil, nil
+local _rescueBtn  = nil   -- opens the Rescue list (ALL-466 stage 3)
+
+-- Rescue is usable only while there is something to rescue (Dukul 2026-10-13)
+local function SyncRescueBtn()
+    if _rescueBtn then _rescueBtn:SetEnabled(BNB.HistoryRescueCount() > 0) end
+end
 local _entries    = {}    -- the rows' note ids, as last populated
 
 --------------------------------------------------------------------------------
@@ -187,6 +193,7 @@ local function SetHistoryMultiMode(on)
     _multiSel  = {}
     if _clearAllBtn  then _clearAllBtn:SetShown(not _multiMode) end
     if _selectBtn    then _selectBtn:SetShown(not _multiMode) end
+    if _rescueBtn    then _rescueBtn:SetShown(not _multiMode) end
     if _sizeLbl      then _sizeLbl:SetShown(not _multiMode) end
     if _clearSelBtn  then _clearSelBtn:SetShown(_multiMode); _clearSelBtn:SetEnabled(false) end
     if _selAllBtn    then _selAllBtn:SetShown(_multiMode) end
@@ -221,6 +228,7 @@ function BNB.PopulateHistoryWindow()
     if not _hwFrame then return end
     local child = _hwFrame._scrollChild
     if not child then return end
+    SyncRescueBtn()
 
     -- Clear old rows
     for _, r in ipairs(_rows) do r:Hide(); r:SetParent(nil) end
@@ -371,6 +379,28 @@ local function BuildHistoryWindow()
     end)
     selectBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _selectBtn = selectBtn
+
+    -- Rescue (ALL-466 stage 3): opens the Rescue list on Settings > Modules >
+    -- Note History. The footer buttons are as wide as their text, so the three
+    -- and the size label fit the 400 px window
+    local rescueBtn = BNB.CreateButton(nil, list, L["RESCUE_WINDOW_BTN"], 72, 26)
+    rescueBtn:SetPoint("LEFT", selectBtn, "RIGHT", 6, 0)
+    rescueBtn:SetMotionScriptsWhileDisabled(true)   -- greyed, the tooltip says why
+    rescueBtn:SetScript("OnClick", function() BNB.OpenRescuePage() end)
+    rescueBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["RESCUE_OPEN_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["RESCUE_OPEN_TIP"], 0.8, 0.8, 0.8, true)
+        if not self:IsEnabled() then GameTooltip:AddLine(L["RESCUE_NONE_SHORT"], 0.8, 0.4, 0.4, true) end
+        GameTooltip:Show()
+    end)
+    rescueBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    _rescueBtn = rescueBtn
+    for _, b in ipairs({ clearBtn, selectBtn, rescueBtn }) do
+        local fs = b:GetFontString()
+        local w = fs and fs:GetStringWidth() or 0
+        if w > 0 then b:SetWidth(math.max(56, math.ceil(w) + 22)) end
+    end
 
     local clearSelBtn = BNB.CreateButton(nil, list, L["HW_CLEAR_SEL_BTN"], 120, 26)
     clearSelBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)

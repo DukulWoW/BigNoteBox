@@ -282,6 +282,53 @@ local function BuildBackupTab(sf, ct)
         end
     end
 
+    -- ── Rescue (ALL-466 stage 3): the way to the Rescue list on the Note
+    -- History page, greyed while there is nothing to rescue (Dukul 2026-10-13)
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["RESCUE_HDR"])
+    do
+        local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        desc:SetWidth(CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
+        desc:SetTextColor(0.60, 0.60, 0.60)
+        desc:SetText(L["RESCUE_BACKUP_DESC"])
+        local h = desc:GetStringHeight() + 4
+        desc:SetHeight(h); y = y - h - 6
+
+        local btn = BNB.CreateButton(nil, ct, L["RESCUE_OPEN_BTN"], 180, 26)
+        btn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        btn:SetScript("OnClick", function() BNB.OpenRescuePage() end)
+        btn:SetMotionScriptsWhileDisabled(true)   -- greyed, the tooltip says why
+        local status = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        status:SetPoint("LEFT", btn, "RIGHT", 10, 0)
+        status:SetPoint("RIGHT", ct, "TOPRIGHT", 0, y - 13)
+        status:SetJustifyH("LEFT"); status:SetWordWrap(false)
+        status:SetTextColor(0.55, 0.55, 0.55)
+        local function Sync()
+            local n = BNB.HistoryRescueCount and BNB.HistoryRescueCount() or 0
+            btn:SetEnabled(n > 0)
+            if not BNB.HistoryAddonLoaded() then status:SetText(L["CFG_HISTORY_NEEDS_ADDON"])
+            elseif n == 0 then status:SetText(L["RESCUE_NONE_SHORT"])
+            else status:SetText(BNB.HistoryRescueCountText(n)) end
+        end
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["RESCUE_OPEN_BTN"], 1, 1, 1)
+            GameTooltip:AddLine(L["RESCUE_OPEN_TIP"], 0.8, 0.8, 0.8, true)
+            if not self:IsEnabled() then GameTooltip:AddLine(L["RESCUE_NONE_SHORT"], 0.8, 0.4, 0.4, true) end
+            GameTooltip:Show()
+        end)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        sf:HookScript("OnShow", Sync)
+        for _, msg in ipairs({ "NoteCreated", "NoteDeleted", "NoteRestored", "TrashChanged", "HistoryRescueChanged" }) do
+            BNB.RegisterMessage("BackupRescue", msg, function()
+                if sf:IsVisible() then BNB.Debounce("BackupRescue", 0, Sync) end
+            end)
+        end
+        Sync()
+        y = y - 26 - 10
+    end
+
     -- ── Data Summary section (moved here from General tab, ALL-14) ─────────────
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_HDR_DATA_SUMMARY"])

@@ -24,8 +24,11 @@
 --   A new note field is one line there; copy, history, backup, share and
 --   every import read it.
 --
--- NOTES DB ROOT: notes, noteOrder, trash, dbVersion, migrationDone (v7)
--- History snapshots hold content fields only since v8 (SV-11).
+-- NOTES DB ROOT: notes, noteOrder, trash, dbVersion, migrationDone (v7),
+-- historyMoveToken (v13, only while the history move waits for a load)
+-- History snapshots hold content fields only since v8 (SV-11). The automatic
+-- ones live in BigNoteBox_History since v13 (ALL-466, MoveAutoHistory below);
+-- the manual restore point stays on the note.
 --
 -- TRASH DB  (BigNoteBoxNotesDB.trash):
 --   Full note copy + deletedAt (unix timestamp). Purged after trashRetainDays days.
@@ -46,7 +49,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 12  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 13  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -234,6 +237,9 @@ BNB.DEFAULTS = {
     -- default; steps of a note not edited for undoKeepDays are deleted (1-30)
     undoKeep           = false,
     undoKeepDays       = 7,
+    -- The login notice when BigNoteBox_History is missing or disabled
+    -- (ALL-466); false = "Don't show again" was clicked
+    historyAddonNotice = true,
 
     -- Session history: max auto slots per note (1-20)
     historyMaxSlots = 5,
@@ -360,6 +366,58 @@ function BNB.LabDB()
 end
 
 local DeepCopy = BNB.DeepCopy
+
+--------------------------------------------------------------------------------
+-- HISTORY FILE (ALL-466): BigNoteBoxHistoryDB, owned by the BigNoteBox_History
+-- companion (always loaded, before BigNoteBox, like BigNoteBoxDB). It holds
+-- the automatic note history and the kept undo, each with a set for the real
+-- notes and one for dev mode's notes:
+--   { version = 2,
+--     notes = { [id] = undo entry }, dev = { ... },      -- Features/UndoKeep.lua
+--     auto  = { notes = { [id] = { snap, ... } }, dev = { ... } },  -- NoteHistory
+--     state = { notes = { [id] = { t, f } }, dev = { ... } },    -- last known state (ALL-468)
+--     moved = { notes = token, dev = token } }           -- the move, below
+-- Missing or disabled = nil from every accessor here: Note History and Keep
+-- undo count as off, nothing is written or deleted.
+--------------------------------------------------------------------------------
+local HISTORY_STORE_VERSION = 3   -- 3 = state (ALL-468)
+
+function BNB.HistoryAddonLoaded()
+    return BigNoteBoxHistory_Loaded == true and type(BigNoteBoxHistoryDB) == "table"
+end
+
+-- The whole history file, or nil
+function BNB.HistoryDB()
+    if not BNB.HistoryAddonLoaded() then return nil end
+    return BigNoteBoxHistoryDB
+end
+
+-- "notes" or "dev": which notes set the history file entries belong to
+function BNB.HistorySetKey()
+    return BNB._devMode and "dev" or "notes"
+end
+
+-- The active set's automatic history { [noteID] = { snap, ... } }, or nil
+function BNB.HistoryAutoBucket()
+    local store = BNB.HistoryDB()
+    if not store then return nil end
+    if type(store.auto) ~= "table" then store.auto = {} end
+    local k = BNB.HistorySetKey()
+    if type(store.auto[k]) ~= "table" then store.auto[k] = {} end
+    return store.auto[k]
+end
+
+-- Runs at ADDON_LOADED (BigNoteBox's, or the companion's when it came later).
+-- The SavedVariable is nil on the very first run.
+function BNB.InitHistoryDB()
+    if BigNoteBoxHistory_Loaded ~= true then return end
+    if type(BigNoteBoxHistoryDB) ~= "table" then BigNoteBoxHistoryDB = {} end
+    local store = BigNoteBoxHistoryDB
+    store.version = math.max(store.version or 0, HISTORY_STORE_VERSION)
+    if type(store.auto)  ~= "table" then store.auto  = {} end
+    if type(store.moved) ~= "table" then store.moved = {} end
+    if type(store.state) ~= "table" then store.state = {} end
+end
 
 local LAB_KEYS = { "devBgLab", "devIconLab", "devSearch" }
 
@@ -596,9 +654,106 @@ function BNB.MigrateNotesDB()
         v = 12
     end
 
+    -- The automatic history moves out of the notes file into BigNoteBox_History
+    -- (ALL-466). It takes two loads, so it is not a block of its own: the move
+    -- below runs on every load while a note still carries note.history.
+    -- v13 marks a notes set whose loads know about the move.
+    if v < 13 then
+        v = 13
+    end
+    BNB.MoveAutoHistory()
+
     -- Never lower the stored version: running an older build must not make the
     -- next upgrade run the migrations again (SV-10)
     ndb.dbVersion = math.max(ndb.dbVersion or 1, NOTES_SCHEMA_VERSION)
+end
+
+--------------------------------------------------------------------------------
+-- AUTOMATIC HISTORY MOVE (NOTES v13, ALL-466)
+-- Notes are precious, so the notes file lets go of note.history only after
+-- the history file has been saved and loaded back with it:
+--   load N:   every note.history (live and trash) is copied into the history
+--             file and the same table is put back on the note, so both files
+--             hold the same list (NoteHistory keeps them equal while the move
+--             is pending: BNB.HistoryMovePending). One token is written to the
+--             notes set (ndb.historyMoveToken) and to the history file
+--             (moved[set]).
+--   load N+1: the tokens match = both files were saved together. A note whose
+--             snapshots are all in the history file loses note.history. Any
+--             other note (an older build added snapshots in between) is copied
+--             again, with a new token, and waits for the next load.
+-- Tokens that do not match (the history file was not saved, or came from
+-- elsewhere) = copy again, merging by timestamp, nothing deleted. History
+-- addon missing = nothing happens at all. Reads note.history directly on
+-- purpose, like the v8 block: it works on the stored shape.
+--------------------------------------------------------------------------------
+local function SnapTimes(list)
+    local seen = {}
+    for _, s in ipairs(type(list) == "table" and list or {}) do
+        if type(s) == "table" then seen[s.timestamp or 0] = true end
+    end
+    return seen
+end
+
+function BNB.MoveAutoHistory()
+    local ndb, bucket, store = BNB.NotesDB(), BNB.HistoryAutoBucket(), BNB.HistoryDB()
+    if not (ndb and bucket and store) then return end
+    local set   = BNB.HistorySetKey()
+    local lists = { ndb.notes or {}, ndb.trash or {} }
+
+    -- Load N+1: the copy came back with the history file
+    local token = ndb.historyMoveToken
+    if token and store.moved[set] == token then
+        for _, list in ipairs(lists) do
+            for id, note in pairs(list) do
+                local h = note.history
+                if type(h) == "table" then
+                    local have, kept = SnapTimes(bucket[id]), true
+                    for t in pairs(SnapTimes(h)) do
+                        if not have[t] then kept = false; break end
+                    end
+                    if kept then note.history = nil end
+                end
+            end
+        end
+        ndb.historyMoveToken, store.moved[set] = nil, nil
+    end
+
+    -- Load N (or again): copy what the notes file still holds, merged into
+    -- what the history file already has, newest first
+    local copied = false
+    for _, list in ipairs(lists) do
+        for id, note in pairs(list) do
+            local h = note.history
+            if type(h) ~= "table" or #h == 0 then
+                note.history = nil   -- an empty list (older builds left them): nothing to keep
+            else
+                local have = type(bucket[id]) == "table" and bucket[id] or {}
+                local seen = SnapTimes(have)
+                for _, s in ipairs(h) do
+                    if type(s) == "table" and not seen[s.timestamp or 0] then
+                        have[#have + 1] = DeepCopy(s)
+                        seen[s.timestamp or 0] = true
+                    end
+                end
+                table.sort(have, function(a, b) return (a.timestamp or 0) > (b.timestamp or 0) end)
+                bucket[id]   = have
+                note.history = have   -- the same table: both files save the same list
+                copied = true
+            end
+        end
+    end
+    if copied then
+        token = string.format("%d-%d", time(), math.random(100000, 999999))
+        ndb.historyMoveToken, store.moved[set] = token, token
+    end
+end
+
+-- True while load N's copy waits for load N+1 (NoteHistory mirrors its writes
+-- onto note.history meanwhile, so a deleted snapshot does not come back)
+function BNB.HistoryMovePending()
+    local ndb = BNB.NotesDB()
+    return ndb and ndb.historyMoveToken ~= nil or false
 end
 
 --------------------------------------------------------------------------------
@@ -801,6 +956,7 @@ function BNB.InitializeDB()
     -- before SavedVariables are available — but it persists into ADDON_LOADED.
     -- Dev mode (BigNoteBox_Dev enabled) brings its own notes set.
     InitDevMode()
+    BNB.InitHistoryDB()   -- before the notes migrations: v13 moves history into it
     if BigNoteBoxNotesDB_Loaded or BNB._devMode then
         -- Companion addon is loaded and notes are available.
         BNB._notesAvailable = true

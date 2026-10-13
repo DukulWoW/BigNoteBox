@@ -301,6 +301,9 @@ end)
 --                                  (preset / brightness); default-coloured
 --                                  stickies re-colour
 --   EditorEditMode ()              AM_EnterEditMode, at its end
+--   HistoryRescueChanged ()        Features/NoteHistory.lua, after a rescue or a
+--                                  lost note's history dropped (ALL-466): the
+--                                  Rescue list and its buttons re-count
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
 --   UIFontChanged ()               UI/Fonts.lua, end of ApplyFont: skin button
 --                                  labels and the welcome panel re-read
@@ -338,6 +341,11 @@ BNB.RegisterEvent("ADDON_LOADED", function(event, addonName)
         BNB.InitNotesDB()
         BNB.MigrateNotesDB()
         BNB._notesAvailable = true
+    elseif addonName == "BigNoteBox_History" and BNB._addonLoaded then
+        -- The history file loaded after BigNoteBox (it is in OptionalDeps, so
+        -- this should not happen): set it up and run the move it missed
+        BNB.InitHistoryDB()
+        if BNB._notesAvailable then BNB.MoveAutoHistory() end
     end
 end)
 

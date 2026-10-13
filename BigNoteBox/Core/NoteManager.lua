@@ -417,6 +417,67 @@ function BNB.CreateNote(title, body)
 end
 
 --------------------------------------------------------------------------------
+-- RESCUE (ALL-466 stage 3, ALL-468): a note gone from the notes file (not
+-- deleted here) rebuilt from the history file. Keeps its old id, so every
+-- version stays attached. Title and text come from the version given (snap);
+-- everything else from the note's last known state (state = its fields as
+-- kept at the last logout / reload, Features/NoteHistory.lua), so its look,
+-- scope, Reference Box, situations, tasks and alarm come back too. Without a
+-- state (lost before ALL-468) only what a version holds comes back (richMode,
+-- tags, tasks, taskList) and the scope is All. A character scope whose
+-- character is gone from the character list becomes All. Plus
+-- BNB.RESCUED_TAG (Dukul's picks). Returns the id, or nil when that id is
+-- still a live or trashed note.
+--------------------------------------------------------------------------------
+BNB.RESCUED_TAG = "Rescued"
+
+local function RescueScope(scope)
+    if scope == "global" then return scope end
+    local char = type(scope) == "string" and scope:match("^char:(.+)$")
+    local known = BigNoteBoxDB and BigNoteBoxDB.knownChars
+    if char and known and known[char] then return scope end
+    return "global"
+end
+
+function BNB.RescueNote(id, snap, created, state)
+    local ndb = NDB()
+    if not (ndb and id and type(snap) == "table") then return nil end
+    if ndb.notes[id] or (ndb.trash and ndb.trash[id]) then return nil end
+    -- Through the schema clean, as anything read back from a file
+    local note = BNB.CleanNoteFields(type(state) == "table" and state or snap,
+        function(def) return def.key ~= "title" and def.key ~= "body" end)
+    if type(state) ~= "table" then
+        note = { richMode = note.richMode, tags = note.tags, tasks = note.tasks, taskList = note.taskList }
+    end
+    local tags = {}
+    for _, tag in ipairs(note.tags or {}) do
+        if tag ~= BNB.RESCUED_TAG then tags[#tags + 1] = tag end
+    end
+    tags[#tags + 1] = BNB.RESCUED_TAG
+    local when = snap.timestamp or time()
+    note.id       = id
+    note.title    = type(snap.title) == "string" and snap.title or ""
+    note.body     = type(snap.body)  == "string" and snap.body  or ""
+    note.richMode = note.richMode == true
+    note.tags     = tags
+    note.scope    = RescueScope(note.scope)
+    if note.pinned == nil then note.pinned = false end
+    note.created  = note.created or created or when
+    note.updated  = math.max(note.updated or 0, when)
+    ndb.notes[id] = note
+    -- A note lost from a damaged notes file can leave its id in noteOrder:
+    -- drop any old entry first, or the list would show the note twice
+    local order = ndb.noteOrder
+    for i = #order, 1, -1 do
+        if order[i] == id then table.remove(order, i) end
+    end
+    table.insert(order, 1, id)
+    for _, tag in ipairs(tags) do BNB.TagIndexAdd(id, tag) end
+    BNB.SendMessage("NoteCreated", id)
+    return id
+end
+
+--------------------------------------------------------------------------------
 -- COPY  (Duplicate and Copy/Move share this, so a copy keeps every field)
 --------------------------------------------------------------------------------
 -- Fields a copy never inherits: identity and timestamps, the creation position
@@ -557,6 +618,9 @@ local function RemoveNote(id, permanent)
     -- history (Dukul 2026-10-13, test GJ3); UndoKeep drops a trashed note's
     -- saved history once it has left the trash too.
     if not toTrash and BNB.UndoClearNote then BNB.UndoClearNote(id) end
+    -- Its automatic history goes on a delete for good only: a trashed note
+    -- keeps it in the history file and has it back when restored (ALL-466)
+    if not toTrash then BNB.HistoryForget(id) end
     return true
 end
 
@@ -608,6 +672,7 @@ function BNB.PurgeNote(id)
         BigNoteBoxDB.selectedNoteID = nil
     end
     for _, tag in ipairs(tags) do BNB.TagIndexRemove(id, tag) end
+    BNB.HistoryForget(id)
     if BNB.Sticky and BNB.Sticky.Close then BNB.Sticky.Close(id) end
     -- Still no UI refresh here; the message is data only (permanent = true)
     BNB.SendMessage("NoteDeleted", { id }, true)
@@ -652,6 +717,7 @@ function BNB.PurgeTrash()
     for id, note in pairs(ndb.trash) do
         if (note.deletedAt or 0) < cutoff then
             ndb.trash[id] = nil
+            BNB.HistoryForget(id)   -- gone for good: its history too (ALL-466)
             purged = true
         end
     end
@@ -666,7 +732,10 @@ end
 function BNB.PurgeTrashed(ids)
     local trash = NDB() and NDB().trash
     if not (trash and ids) then return end
-    for _, id in ipairs(ids) do trash[id] = nil end
+    for _, id in ipairs(ids) do
+        trash[id] = nil
+        BNB.HistoryForget(id)   -- gone for good: its history too (ALL-466)
+    end
     BNB.SendMessage("TrashChanged")
 end
 
@@ -689,6 +758,7 @@ end
 --------------------------------------------------------------------------------
 function BNB.EmptyTrash()
     local ndb = NDB()
+    for id in pairs(ndb.trash or {}) do BNB.HistoryForget(id) end   -- ALL-466
     ndb.trash = {}
     BNB.SendMessage("TrashChanged")
 end

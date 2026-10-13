@@ -286,6 +286,9 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
         ov:SetScript("OnLeave", cb:GetScript("OnLeave"))
         sf:HookScript("OnShow", function() ov:SetChecked(cb:GetChecked()) end)
         page._ov = ov   -- the Modules tab's mode badges set it after a preset (ALL-358)
+        -- A module whose companion addon is missing greys like its page box
+        -- (page.available, ALL-466: Note History needs BigNoteBox_History)
+        if page.available then GreyWhileOff(ov, page.available) end
     end
 
     local open

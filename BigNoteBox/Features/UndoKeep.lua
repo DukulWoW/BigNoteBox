@@ -1,15 +1,15 @@
 -- BigNoteBox Features/UndoKeep.lua
 --
 -- Keep undo / redo between sessions (ALL-460, Dukul 2026-10-13). Opt-in:
--- db.undoKeep. The stacks are saved in the SavedVariables of the separate,
--- load-on-demand addon BigNoteBox_History (BigNoteBoxHistoryDB), so their size
+-- db.undoKeep. The stacks are saved in the SavedVariables of the separate
+-- addon BigNoteBox_History (BigNoteBoxHistoryDB, BNB.HistoryDB), so their size
 -- never touches the settings or notes files. Off, or that addon missing or
 -- disabled = undo lasts for the session only, as before.
 --
--- LOAD: BigNoteBox_History is loaded the first time a note is opened in the
---   editor (UndoReset) or edited, or when the Undo / Redo page shows, and only
---   while the setting is on. Loading prunes: entries older than undoKeepDays,
---   and entries of notes that no longer exist.
+-- LOAD: BigNoteBox_History is always loaded since ALL-466 (it was load on
+--   demand); the first use of the saved stacks in a session (a note opened in
+--   the editor, an edit, the Undo / Redo page) prunes: entries older than
+--   undoKeepDays, and entries of notes that no longer exist.
 -- SAVE: only at PLAYER_LOGOUT (SavedVariables are written then anyway), only
 --   the notes whose stacks changed this session. Each note is one entry
 --   { t = time() of the save, d = LibSerialize + LibDeflate + EncodeForPrint
@@ -25,22 +25,22 @@
 -- CAPS: NOTE_CAP per note (oldest half of the steps dropped until it fits),
 --   TOTAL_CAP for the whole file (oldest entries dropped first).
 --
--- Store layout: BigNoteBoxHistoryDB = { version = 1, notes = { [id] = entry },
--- dev = { [id] = entry } } ("dev" = dev mode's own notes set).
+-- Store layout: BigNoteBoxHistoryDB.notes = { [id] = entry }, .dev = { [id] =
+-- entry } ("dev" = dev mode's own notes set). The rest of the file is the
+-- automatic note history (Core/Database.lua, ALL-466).
 
 local BNB = BigNoteBox
-local L   = BNB.L
 
-local ADDON     = "BigNoteBox_History"
 local NOTE_CAP  = 1024 * 1024        -- encoded bytes per note
 local TOTAL_CAP = 10 * 1024 * 1024   -- encoded bytes for the whole file
 
-local _store    = nil     -- BigNoteBoxHistoryDB once the addon is loaded
-local _tried    = false   -- LoadAddOn is attempted once per session
-local _failure  = nil     -- why it could not load ("MISSING", "DISABLED", ...)
+local _store    = nil     -- BigNoteBoxHistoryDB after the first use (pruned then)
 local _dirty    = {}      -- [noteID] = true: stacks changed this session
 
+-- Off while the history addon is missing or disabled (ALL-466); the saved
+-- switch is left alone
 function BNB.UndoKeepEnabled()
+    if not BNB.HistoryAddonLoaded() then return false end
     return BigNoteBoxDB and BigNoteBoxDB.undoKeep == true or false
 end
 
@@ -63,7 +63,7 @@ end
 
 local function Bucket()
     if not _store then return nil end
-    local k = BNB._devMode and "dev" or "notes"
+    local k = BNB.HistorySetKey()
     if type(_store[k]) ~= "table" then _store[k] = {} end
     return _store[k]
 end
@@ -123,34 +123,13 @@ local function Prune()
     end
 end
 
+-- The history file (set up by BNB.InitHistoryDB at ADDON_LOADED), pruned on
+-- the first use of the session. False = the history addon is not there.
 local function EnsureLoaded()
     if _store then return true end
-    if _tried then return false end
-    _tried = true
-    local ok, loaded, reason = pcall(C_AddOns.LoadAddOn, ADDON)
-    if not ok then
-        _failure = "ERROR"
-    elseif not loaded then
-        _failure = reason or "MISSING"
-    else
-        -- Loaded: its SavedVariables are in place now (nil on the first run)
-        if type(BigNoteBoxHistoryDB) ~= "table" then BigNoteBoxHistoryDB = {} end
-        _store = BigNoteBoxHistoryDB
-        _store.version = math.max(_store.version or 0, 1)
-        Prune()
-    end
+    _store = BNB.HistoryDB()
+    if _store then Prune() end
     return _store ~= nil
-end
-
--- Says in chat why the history addon could not load (switching the setting on)
-local function Announce()
-    if _failure == "MISSING" then
-        BNB:Print(L["UNDOKEEP_MISSING"])
-    elseif _failure == "DISABLED" then
-        BNB:Print(L["UNDOKEEP_DISABLED"])
-    elseif _failure then
-        BNB:Print(string.format(L["UNDOKEEP_FAILED_FMT"], tostring(_failure)))
-    end
 end
 
 --------------------------------------------------------------------------------
@@ -191,12 +170,11 @@ end
 -- Settings page (UI/Config/NotePages.lua, K.BuildUndoPage)
 --------------------------------------------------------------------------------
 
--- Switch from the page. On loads the history addon now (no reload, it is
--- load-on-demand) and says in chat when it cannot. Off keeps what is saved.
+-- Switch from the page. Off keeps what is saved. The page greys the switch
+-- while the history addon is missing (ALL-466).
 function BNB.UndoKeepApply(on)
     if not BigNoteBoxDB then return end
     BigNoteBoxDB.undoKeep = on and true or false
-    if on and not EnsureLoaded() then Announce() end
 end
 
 -- bytes, notes of the saved history (active notes set); nil = the history
@@ -242,10 +220,16 @@ function BNB.UndoKeepDeleteNote(noteID)
     if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
 end
 
--- Reset: everything saved (both notes sets) and this session's undo history
-function BNB.UndoKeepReset()
+-- Reset: everything saved (both notes sets) and this session's undo history.
+-- activeOnly = the active notes set's saved stacks only (Factory Reset, which
+-- in dev mode must not touch the real notes' history).
+function BNB.UndoKeepReset(activeOnly)
     if EnsureLoaded() then
-        _store.notes, _store.dev = {}, {}
+        if activeOnly then
+            _store[BNB.HistorySetKey()] = {}
+        else
+            _store.notes, _store.dev = {}, {}
+        end
     end
     wipe(_dirty)
     if BNB.UndoClearAll then BNB.UndoClearAll() end

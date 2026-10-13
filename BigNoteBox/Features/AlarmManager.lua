@@ -1078,13 +1078,20 @@ function BNB.AlarmsEnabled()
     return not BigNoteBoxDB or BigNoteBoxDB.alarmsEnabled ~= false
 end
 
-local function CatchUp()
+-- ids = only those notes (a rescue, ALL-468), nil = every note; fmtKey = the
+-- chat line for the missed ones
+local function CatchUp(ids, fmtKey)
     local ndb = BNB.NotesDB()
     if not ndb or not ndb.notes then return end
+    local only
+    if ids then
+        only = {}
+        for _, id in ipairs(ids) do only[id] = true end
+    end
     local now, missed = time(), {}
     for noteID, note in pairs(ndb.notes) do
         local alarm = note.alarm
-        if alarm and not alarm.fired then
+        if alarm and not alarm.fired and (not only or only[noteID]) then
             local fireAt = AM.GetNextFireTime(noteID)
             if fireAt and now >= fireAt then
                 alarm.snoozedUntil = nil
@@ -1100,8 +1107,14 @@ local function CatchUp()
         end
     end
     if #missed > 0 and BNB.AlarmOverview and BNB.AlarmOverview.ShowMissed then
-        BNB.AlarmOverview.ShowMissed(missed, "AO_MISSED_OFF_FMT")
+        BNB.AlarmOverview.ShowMissed(missed, fmtKey or "AO_MISSED_OFF_FMT")
     end
+end
+
+-- Rescued notes (Features/NoteHistory.lua, ALL-468): an alarm whose time
+-- passed while its note was lost is caught up instead of ringing
+function AM.CatchUpNotes(ids, fmtKey)
+    CatchUp(ids, fmtKey)
 end
 
 function AM.ApplyModule(on)

@@ -372,13 +372,8 @@ local function PopulateContent(ct, sf)
             if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
             if BNB.SyncHistoryBtnState     then BNB.SyncHistoryBtnState()     end
         end,
-        CountLabel(function()
-            local c, ndb = 0, BNB.NotesDB()
-            for id in pairs(ndb and ndb.notes or {}) do
-                if BNB.HistoryAutoCount(id) > 0 then c = c + 1 end
-            end
-            return c
-        end, "DZ_COUNT_HISTORY_ONE", "DZ_COUNT_HISTORY_FMT"))
+        -- Every note with history in the history file: trashed ones too (ALL-466)
+        CountLabel(BNB.HistoryAutoNoteCount, "DZ_COUNT_HISTORY_ONE", "DZ_COUNT_HISTORY_FMT"))
     y = y - SEC_GAP
 
     -- ── 4. Clear Manual Restore Points ───────────────────────────────────────
@@ -501,6 +496,8 @@ local function PopulateContent(ct, sf)
             for _, id in ipairs(open) do pcall(BNB.Sticky.Close, id) end
             local gone = {}
             for id in pairs(BNB.NotesDB().notes) do gone[#gone + 1] = id end
+            -- Their automatic history goes too (ALL-466, Dukul's pick)
+            for _, id in ipairs(gone) do BNB.HistoryForget(id) end
             BNB.NotesDB().notes     = {}
             BNB.NotesDB().noteOrder = {}
             -- Derived state that still pointed at the deleted notes (BUG-23)
@@ -528,6 +525,10 @@ local function PopulateContent(ct, sf)
             -- popup reads no notes instead of erroring (ALL-284); the load
             -- after the reload fills in the rest (InitNotesDB)
             BNB.SetNotesDB({ notes = {}, noteOrder = {}, trash = {} })
+            -- The history file's part for this notes set: automatic history
+            -- and kept undo (ALL-466); in dev mode the real notes' stay
+            BNB.HistoryWipeSet()
+            if BNB.UndoKeepReset then BNB.UndoKeepReset(true) end
             BNB._contextMatches = {}
             BNB.Editor.SetCurrent(nil)
             if BNB.LoadNoteInEditor then pcall(BNB.LoadNoteInEditor, nil) end

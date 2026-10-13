@@ -1725,6 +1725,13 @@ local function BuildToastsPage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- A row whose page needs the BigNoteBox_History addon says so while it is
+-- missing or disabled (ALL-466)
+local function NeedsHistory(desc)
+    if BNB.HistoryAddonLoaded() then return desc end
+    return desc .. "\n|cffff6666" .. L["CFG_HISTORY_NEEDS_ADDON"] .. "|r"
+end
+
 local function BuildModulesTab(sf, ct)
     local y  = -8
 
@@ -1740,7 +1747,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_FOCUS_ORBIT_HEADER"], L["CFG_SUB_FOCUS_DESC"],      BuildFocusPage,    nil, "focus"     },
         -- UI/Config/NotePages.lua (ALL-290)
         { L["CFG_RICH_SIZES_HEADER"],  L["CFG_SUB_RICH_DESC"],       K.BuildRichNotesPage, "richNotes", "rich"    },
-        { L["CFG_HDR_NOTE_HISTORY"],   L["CFG_SUB_HISTORY_DESC"],    K.BuildHistoryPage,   "history",   "history" },
+        { L["CFG_HDR_NOTE_HISTORY"],   NeedsHistory(L["CFG_SUB_HISTORY_DESC"]), K.BuildHistoryPage, "history", "history" },
         { L["CFG_HDR_TRASH"],          L["CFG_SUB_TRASH_DESC"],      K.BuildTrashPage,     "trash",     "trash"   },
         { L["CFG_HDR_ALARMS"],         L["CFG_SUB_ALARMS_DESC"],     K.BuildAlarmsPage,    "alarms",    "alarms"  },
         { L["CFG_HDR_QUICK_NOTE"],     L["CFG_SUB_QN_DESC"],         BuildQuickNotePage,    nil, "quickNote" },
@@ -1750,7 +1757,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_TLDR"],           L["CFG_SUB_TLDR_DESC"],       K.BuildTldrPage,       "tldr",       "tldr"    },   -- UI/Config/Tldr.lua (ALL-372)
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
-        { L["CFG_HDR_UNDO_REDO"],      L["CFG_SUB_UNDO_DESC"],       K.BuildUndoPage,      "undo" },        -- UI/Config/NotePages.lua (ALL-460)
+        { L["CFG_HDR_UNDO_REDO"],      NeedsHistory(L["CFG_SUB_UNDO_DESC"]), K.BuildUndoPage, "undo" },        -- UI/Config/NotePages.lua (ALL-460)
     }
     -- Alphabetical by the shown title, in the active language (Dukul 2026-10-06,
     -- ALL-331); colour codes left out of the compare
