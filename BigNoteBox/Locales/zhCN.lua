@@ -51,7 +51,6 @@ L["MW_LOCK_RESET_TIP"]   = "右键点击重置窗口大小和位置"
 
 -- ── Main window: toolbar icon tooltips ───────────────────────────────────────
 L["MW_CONFIG_TIP"]         = "设置 (/bnb config)"
-L["MW_SIDEBAR_TIP"]        = "切换侧边栏"
 L["MW_TRASH_TIP"]          = "回收站（已删除的笔记）"
 L["MW_ALARM_TIP"]          = "闹钟"
 L["MW_IMPORT_SHARED_TIP"]  = "导入共享笔记"

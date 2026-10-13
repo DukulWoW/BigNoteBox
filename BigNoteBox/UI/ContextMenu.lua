@@ -17,6 +17,14 @@
 --   BNB.ContextMenu.Close()
 --   BNB.ContextMenu.IsOpen()
 --   BNB.ContextMenu.IsMouseOver()   pointer over any open level
+--   owner._cmToggle = true: a button that opens and closes its menu itself
+--     (a press on it does not count as a click outside)
+--   owner._cmDropLeft = true: the menu opens under the owner, right edges
+--     lined up, and its sub-menus open to the left
+--   opts.keepOpen = true (a radio): the click leaves the menu open and the
+--     marks are read again, for lists where several get ticked in one go
+--   root:CreateButton(text, fn, { iconTex = path }): a picture instead of a
+--     cm- symbol, no plate (tinted in the skin look)
 --
 -- Building (names follow Blizzard's MenuUtil, so a menu moves over with few
 -- changes, e.g. the Tag Manager's extraTop):
@@ -186,6 +194,21 @@ end
 local function DrawIcon(row, active)
     local key = row._iconKey
     if not key then return end
+    -- A picture of its own (opts.iconTex, the top bar menu's icons): no plate,
+    -- tinted like the symbols in the skin look, greyed when disabled
+    if row._iconTex then
+        local sym = row._icon
+        row._plate:Hide()
+        sym:SetTexture(row._iconTex)
+        if row._disabled then
+            sym:SetDesaturated(true); sym:SetVertexColor(0.45, 0.45, 0.45)
+        elseif _skin then
+            SkinTint(sym, active)
+        else
+            sym:SetDesaturated(false); sym:SetVertexColor(1, 1, 1)
+        end
+        return
+    end
     local plate, sym = row._plate, row._icon
     sym:SetTexture(SYMBOLS .. "cm-" .. key)
     plate:SetShown(not _skin)
@@ -280,10 +303,27 @@ local function RowLeave(row)
     if not (_open > i and RowParentOf(i + 1) == row) then SetRowActive(row, false) end
 end
 
+-- Round marks of every open level, read again (after a keepOpen click)
+local function RefreshMarks()
+    for k = 1, _open do
+        for _, r in ipairs(_levels[k] and _levels[k]._rows or {}) do
+            local it = r:IsShown() and r._desc
+            if it and it.kind == "radio" then
+                local on = it.isSelected and it.isSelected() and true or false
+                r._mark:SetTexCoord(on and 0 or 0.5, on and 0.5 or 1, 0, 0.5)
+            end
+        end
+    end
+end
+
 local function RowClick(row)
     local d = row._desc
     if row._disabled or not d then return end
-    if d.fn then
+    if d.fn and d.opts.keepOpen then
+        -- Several to tick in one go (the top bar's Show on top bar, ALL-112)
+        xpcall(d.fn, geterrorhandler())
+        RefreshMarks()
+    elseif d.fn then
         local after = _after
         CM.Close()
         xpcall(d.fn, geterrorhandler())
@@ -380,7 +420,7 @@ end
 local function Fill(f, d)
     local hasIcons = false
     for _, it in ipairs(d.items) do
-        if (it.kind == "button" and it.opts.icon) or it.kind == "radio" then hasIcons = true; break end
+        if (it.kind == "button" and (it.opts.icon or it.opts.iconTex)) or it.kind == "radio" then hasIcons = true; break end
     end
     local textX = hasIcons and (4 + ICON + 6) or 10
     if f._badge then f._badge:Hide() end
@@ -390,7 +430,7 @@ local function Fill(f, d)
     for n, it in ipairs(d.items) do
         local r = f._rows[n] or NewRow(f)
         f._rows[n] = r
-        r._desc, r._active, r._iconKey = it, nil, nil
+        r._desc, r._active, r._iconKey, r._iconTex = it, nil, nil, nil
         r._disabled, r._hasSub = false, false
         r._hl:Hide()
         r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide(); r._mark:Hide()
@@ -466,8 +506,9 @@ local function Fill(f, d)
                     r._mark:SetDesaturated(false); r._mark:SetVertexColor(1, 1, 1)
                 end
                 r._mark:Show()
-            elseif it.opts.icon then
-                r._iconKey = it.opts.icon
+            elseif it.opts.icon or it.opts.iconTex then
+                r._iconKey = it.opts.icon or "tex"
+                r._iconTex = it.opts.iconTex
                 r._icon:SetSize(ICON, ICON)
                 r._icon:ClearAllPoints()
                 r._icon:SetPoint("LEFT", 4, 0)
@@ -502,7 +543,14 @@ end
 local function Place(f, w, h, row)
     local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
     local left, top
-    if not row then
+    local dropLeft = _owner and _owner._cmDropLeft
+    if not row and dropLeft and _owner:GetRight() then
+        -- Under its owner, right edges lined up, so it opens down and to the
+        -- left, into the window (the top bar menu, ALL-112)
+        local k = _owner:GetEffectiveScale() / f:GetEffectiveScale()
+        left, top = _owner:GetRight() * k - w, _owner:GetBottom() * k - 2
+        if left < 0 then left = 0 end
+    elseif not row then
         local cx, cy = GetCursorPosition()
         local sc = f:GetEffectiveScale()
         left, top = cx / sc, cy / sc
@@ -510,8 +558,13 @@ local function Place(f, w, h, row)
         if top - h < 0 then top = top + h end   -- opens upward from the pointer
     else
         local pf = row:GetParent()
-        left = pf:GetRight() - OVERLAP
-        if left + w > sw then left = pf:GetLeft() - w + OVERLAP end
+        if dropLeft then   -- sub-menus open to the left too, flipping at the screen edge
+            left = pf:GetLeft() - w + OVERLAP
+            if left < 0 then left = pf:GetRight() - OVERLAP end
+        else
+            left = pf:GetRight() - OVERLAP
+            if left + w > sw then left = pf:GetLeft() - w + OVERLAP end
+        end
         top = row:GetTop() + PAD
     end
     -- The header badge sticks out past the top-left corner: keep it on screen too
@@ -583,7 +636,11 @@ local function Watch()
     if not _watch then
         _watch = CreateFrame("Frame")
         _watch:SetScript("OnEvent", function()
-            if not CM.IsMouseOver() then CM.Close() end
+            -- An owner marked _cmToggle (the top bar menu button, ALL-112)
+            -- closes the menu with its own click, so a press on it is left alone
+            if CM.IsMouseOver() then return end
+            if _owner and _owner._cmToggle and _owner:IsMouseOver() then return end
+            CM.Close()
         end)
     end
     -- Next frame, so the click that opened the menu cannot close it

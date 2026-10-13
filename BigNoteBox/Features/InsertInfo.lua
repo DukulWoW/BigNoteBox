@@ -190,4 +190,16 @@ function BNB.WireInsertInfoTarget(eb)
             ShowInsertInfoMenu(self)
         end
     end)
+
+    -- The empty area below the last line is the scroll frame, not the box: the
+    -- menu opens there too (ALL-461, Dukul 2026-10-13), as a drop does
+    -- (WireDropTarget). Not typing in the box: what it inserts goes at the end
+    local sf = eb:GetParent()
+    if sf and sf.GetScrollChild and sf:GetScrollChild() == eb then
+        sf:HookScript("OnMouseUp", function(_, btn)
+            if btn ~= "RightButton" or not eb:IsEnabled() then return end
+            if not eb:HasFocus() then eb:SetCursorPosition(#(eb:GetText() or "")) end
+            ShowInsertInfoMenu(eb)
+        end)
+    end
 end

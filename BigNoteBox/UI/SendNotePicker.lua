@@ -175,13 +175,18 @@ end
 function BNB.ToggleSendNotePicker(anchor)
     Build()
     if picker:IsShown() then Close(); return end
-    if _anchor ~= anchor then
-        _anchor = anchor
+    _anchor = anchor
+    if not anchor._bnbSendPickHooked then
+        anchor._bnbSendPickHooked = true
         -- The button hides with the main window: the search goes with it
         anchor:HookScript("OnHide", Close)
     end
     picker:ClearAllPoints()
-    picker:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+    if anchor == BNB._toolbarMenuBtn then   -- top bar menu (ALL-112): the right-most icon
+        picker:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    else
+        picker:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+    end
     eb:SetText("")
     Refresh()
     picker:Show()

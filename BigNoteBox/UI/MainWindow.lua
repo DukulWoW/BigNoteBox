@@ -763,28 +763,14 @@ function BNB.CreateMainWindow()
             not skin and base or nil)
     end
 
-    local sidebarToggleBtn = TBIcon(TOPBAR .. "tp-sidebar-open", L["MW_SIDEBAR_TIP"], 0,
-        function()
-            if BNB.Sidebar and BNB.Sidebar.ToggleCollapsed then
-                BNB.Sidebar.ToggleCollapsed()
-            end
-        end, "tp-sidebar")
-    BNB._toolbarSidebarBtn = sidebarToggleBtn
-
-    -- Refreshes sidebar toggle icon to match current state: normal mode shows
-    -- the disabled picture while the sidebar is hidden (still clickable), skin
-    -- mode swaps the open / closed icon. Hidden while the Character Sidebar
-    -- module is off (ApplyToolbarIcons)
-    function BNB.RefreshSidebarToggleBtn()
-        local collapsed = BigNoteBoxDB and BigNoteBoxDB.sidebarCollapsed
-        if BNB._toolbarSidebarBtn._stateArt then
-            BNB._toolbarSidebarBtn:SetArtDim(collapsed)
-            return
-        end
-        local tex = TOPBAR .. (collapsed and "tp-sidebar-closed" or "tp-sidebar-open")
-        pcall(function() BNB._toolbarSidebarBtn._tx:SetTexture(tex) end)
-    end
-    BNB.RefreshSidebarToggleBtn()
+    -- Top bar menu (ALL-112, Dukul's art 2026-10-13), slot 0, the right-most:
+    -- the icons not shown on the bar, the ones a narrow window has no room
+    -- for, "Show on top bar", and the sidebar toggle (always the last entry;
+    -- it is no longer a bar icon). Stays in multi-select, as the toggle did
+    local menuBtn
+    menuBtn = TBIcon(TOPBAR .. "tp-menu", L["TB_MENU_TIP"], 0,
+        function() BNB.ToggleTopbarMenu(menuBtn) end, "tp-menu")
+    BNB._toolbarMenuBtn = menuBtn
 
     local configBtn = TBIcon(TOPBAR .. "tp-settings", L["MW_CONFIG_TIP"], 1,
         function() if BNB.OpenConfig then BNB.OpenConfig() end end, "tp-settings")
@@ -832,7 +818,7 @@ function BNB.CreateMainWindow()
         function() if BNB.ToggleSendNotePicker then BNB.ToggleSendNotePicker(sendBtn) end end, "tp-bcb")
 
     if chrome.StyleIcons then
-        chrome.StyleIcons({ sidebarToggleBtn, configBtn, trashBtn, histBtn,
+        chrome.StyleIcons({ menuBtn, configBtn, trashBtn, histBtn,
             tagsBtn, shareTopBtn, alarmOvBtn, sendBtn })
     end
 
@@ -963,11 +949,20 @@ function BNB.CreateMainWindow()
 
     -- Right-side toolbar icons, in slot order right to left (see
     -- BNB.InitToolbarIconRow). They hide in multi-select so the action buttons
-    -- don't overlap them; the sidebar toggle right of the cog stays. Title bar
-    -- buttons (focus, lock, close) are never hidden by multiselect.
+    -- don't overlap them; the menu button right of the cog stays. Title bar
+    -- buttons (focus, lock, close) are never hidden by multiselect. Each has
+    -- its key in BigNoteBoxDB.topbarIcons (ALL-112); the icons stop short of
+    -- the left-hand controls (TB_LEFT_LIMIT), the rest go into the menu
+    configBtn._tbKey, trashBtn._tbKey, histBtn._tbKey = "settings", "trash", "history"
+    tagsBtn._tbKey, shareTopBtn._tbKey = "tags", "import"
+    alarmOvBtn._tbKey, sendBtn._tbKey = "alarms", "send"
+    f._tbLeftFrames = { selBtn, dirDD, sortDD }
     BNB.InitToolbarIconRow({
         configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, sendBtn,
     })
+    f:HookScript("OnSizeChanged", function() BNB.ApplyToolbarIcons() end)
+    -- The left-hand controls have no screen position until laid out
+    f:HookScript("OnShow", function() C_Timer.After(0, BNB.ApplyToolbarIcons) end)
     function BNB._setToolbarMultiMode() BNB.ApplyToolbarIcons() end
 
     C_Timer.After(0, ApplySort)
@@ -1268,10 +1263,63 @@ end
 --        are packed into the first slots, so a hidden icon leaves no gap.
 -- Visibility: everything hides in multi-select (the action buttons use that
 -- space); the trash icon also hides while Trash is off in Settings, the
--- alarms and history icons while their modules are off, the sidebar toggle
--- while the Character Sidebar is off.
+-- alarms and history icons while their modules are off.
+-- Top bar menu (ALL-112, agreed with Dukul 2026-10-13): each icon is on the
+-- bar or in the menu (BigNoteBoxDB.topbarIcons, "Show on top bar" in the
+-- menu). The places stay fixed, a player only picks which show. An icon on
+-- the bar that would reach the left-hand controls (sort, order, Select) goes
+-- into the menu instead, from the left end of the row first.
 --------------------------------------------------------------------------------
 -- _tbRow, _tbSlots are declared with the toolbar strip art above (live lift)
+
+local TB_GAP = 6   -- room kept between the left-hand controls and the first icon
+
+-- Menu label and top bar art per icon: the menu shows the bar's own icons
+-- (Dukul, 2026-10-13), Normal\<base>-normal in normal mode, the single
+-- white <base> (tinted by the menu) in skin mode
+local TB_ITEMS = {
+    settings = { "TB_ITEM_SETTINGS",     "tp-settings" },
+    trash    = { "TB_ITEM_TRASH",        "tp-trash" },
+    history  = { "HISTORY_TOOLBAR_TIP",  "tp-notehistory" },
+    tags     = { "TAG_MGR_TOOLTIP",      "tp-tagmanager" },
+    import   = { "MW_IMPORT_SHARED_TIP", "tp-import" },
+    alarms   = { "MW_ALARM_TIP",         "tp-alarms" },
+    send     = { "MW_SEND_NOTE_TIP",     "tp-bcb" },
+}
+local function TBItemTex(base)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then return TOPBAR .. base end
+    return TOPBAR .. "Normal\\" .. base .. "-normal"
+end
+
+-- Whether the icon's feature is on at all (it then sits on the bar or in the menu)
+local function TBAvailable(btn)
+    local key = btn._tbKey
+    if key == "trash"   then return not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false end
+    if key == "alarms"  then return BNB.AlarmsEnabled() end     -- Alarms module (ALL-343)
+    if key == "history" then return BNB.HistoryEnabled() end    -- Note History module (ALL-343)
+    return true
+end
+
+-- Whether the player keeps the icon on the bar
+local function TBOnBar(btn)
+    local t = BigNoteBoxDB and BigNoteBoxDB.topbarIcons
+    local v = t and t[btn._tbKey]
+    if v == nil then v = BNB.DEFAULTS.topbarIcons[btn._tbKey] end
+    return v == true
+end
+
+-- Right edge of the left-hand controls plus TB_GAP, from the window's left
+-- edge (nil before the first layout)
+local function TBLeftLimit(f)
+    local fl = f:GetLeft()
+    if not fl then return nil end
+    local lim
+    for _, fr in ipairs(f._tbLeftFrames or {}) do
+        local r = fr:IsShown() and fr:GetRight()
+        if r and (not lim or r > lim) then lim = r end
+    end
+    return lim and (lim - fl + TB_GAP)
+end
 
 function BNB.InitToolbarIconRow(row)
     _tbRow, _tbSlots = row, {}
@@ -1281,19 +1329,50 @@ function BNB.InitToolbarIconRow(row)
     BNB.ApplyToolbarIcons()
 end
 
+-- Select mode's action buttons, left to right after Select All, and the ones
+-- a narrow window has no room for (listed at the top of the menu, ALL-464)
+local _multiOver = {}
+local MULTI_ICONS = { "trash", "copy-move", "export-json" }
+local function MultiActionBtns()
+    return { BNB._multiDeleteBtn, BNB._multiCopyMoveBtn, BNB._multiExportBtn }
+end
+
+-- In Select mode the action buttons stop before the menu icon; the rest
+-- leave the bar from the right end (Dukul, 2026-10-13: Cancel and Select
+-- All always stay)
+local function FitMultiButtons(f, multi)
+    wipe(_multiOver)
+    if not multi then return end
+    local fl, menu, sel, all = f:GetLeft(), BNB._toolbarMenuBtn, BNB._multiSelBtn, BNB._multiSelectAllBtn
+    local mr = menu and menu:GetLeft()
+    local x = sel and sel:GetRight()
+    if not (fl and mr and x and all) then return end
+    local limit = mr - fl - TB_GAP
+    x = x - fl + 4 + all:GetWidth()
+    local full = false
+    for _, btn in ipairs(MultiActionBtns()) do
+        x = x + 4 + btn:GetWidth()
+        if x > limit then full = true end
+        btn:SetShown(not full)
+        if full then _multiOver[#_multiOver + 1] = btn end
+    end
+end
+
 function BNB.ApplyToolbarIcons()
     if not _tbRow then return end
-    local multi   = BNB.IsMultiMode and BNB.IsMultiMode() or false
-    local trashOn = not BigNoteBoxDB or BigNoteBoxDB.trashFeature ~= false
-    local alarmsOn = BNB.AlarmsEnabled()    -- Alarms module (ALL-343)
-    local histOn   = BNB.HistoryEnabled()   -- Note History module (ALL-343)
-    local sideOn   = BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled() or false
-    local slot = 0
+    local multi = BNB.IsMultiMode and BNB.IsMultiMode() or false
+    local f = _tbRow[1]:GetParent()
+    FitMultiButtons(f, multi)
+    local limit, w = TBLeftLimit(f), f:GetWidth()
+    local slot, full = 0, false
     for _, btn in ipairs(_tbRow) do
-        local show = not multi and (btn ~= BNB._toolbarTrashBtn or trashOn)
-                     and (btn ~= BNB._toolbarAlarmsBtn or alarmsOn)
-                     and (btn ~= BNB._toolbarHistoryBtn or histOn)
-                     and (btn ~= BNB._toolbarSidebarBtn or sideOn)
+        local show = not multi and TBAvailable(btn) and TBOnBar(btn)
+        if show and not full and limit then
+            -- TOPRIGHT anchor: the icon's left edge sits at w + x - its width
+            local p = _tbSlots[slot + 1]
+            if w + p[4] - btn:GetWidth() < limit then full = true end
+        end
+        if full then show = false end
         btn:SetShown(show)
         if show then
             slot = slot + 1
@@ -1302,6 +1381,80 @@ function BNB.ApplyToolbarIcons()
             btn:SetPoint(p[1], p[2], p[3], p[4], p[5])
         end
     end
+end
+
+-- One menu entry: what the icon's own click does. Send opens its note search
+-- under the menu button, since its own button is hidden
+local function TBMenuEntry(root, btn)
+    local it = TB_ITEMS[btn._tbKey]
+    root:CreateButton(L[it[1]], function()
+        if btn._tbKey == "send" then
+            if BNB.ToggleSendNotePicker then BNB.ToggleSendNotePicker(BNB._toolbarMenuBtn) end
+        else
+            local click = btn:GetScript("OnClick")
+            if click then click(btn, "LeftButton") end
+        end
+    end, { iconTex = TBItemTex(it[2]), disabled = not btn:IsEnabled() })
+end
+
+-- The menu, top to bottom: icons meant for the bar that are not on it now (no
+-- room, or Select mode), the icons kept in the menu, "Show on top bar", and
+-- the sidebar toggle last. Entries read left to right, as on the bar
+local function BuildTopbarMenu(root)
+    local order = {}
+    for i = #_tbRow, 1, -1 do
+        if TBAvailable(_tbRow[i]) then order[#order + 1] = _tbRow[i] end
+    end
+    local any = false
+    -- Select mode actions with no room on the bar, with their counts (ALL-464)
+    for _, btn in ipairs(_multiOver) do
+        local n
+        for k, b in ipairs(MultiActionBtns()) do if b == btn then n = k end end
+        root:CreateButton(btn:GetText(), function()
+            local click = btn:GetScript("OnClick")
+            if click then click(btn, "LeftButton") end
+        end, { icon = MULTI_ICONS[n], disabled = not btn:IsEnabled() })
+        any = true
+    end
+    if any then root:CreateDivider() end
+    any = false
+    for _, btn in ipairs(order) do
+        if TBOnBar(btn) and not btn:IsShown() then TBMenuEntry(root, btn); any = true end
+    end
+    local divided = not any
+    for _, btn in ipairs(order) do
+        if not TBOnBar(btn) then
+            if not divided then root:CreateDivider(); divided = true end
+            TBMenuEntry(root, btn); any = true
+        end
+    end
+    if any then root:CreateDivider() end
+    local sub = root:CreateButton(L["TB_MENU_SHOW_ON_BAR"])
+    for _, btn in ipairs(order) do
+        local key = btn._tbKey
+        sub:CreateRadio(L[TB_ITEMS[key][1]], function() return TBOnBar(btn) end, function()
+            BigNoteBoxDB.topbarIcons = BigNoteBoxDB.topbarIcons or {}
+            BigNoteBoxDB.topbarIcons[key] = not TBOnBar(btn)
+            BNB.ApplyToolbarIcons()
+        end, { keepOpen = true })   -- tick several in one go (Dukul, 2026-10-13)
+    end
+    -- Character Sidebar module on (ALL-343): show / hide it, always last
+    if BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled() then
+        root:CreateDivider()
+        root:CreateRadio(L["TB_ITEM_SIDEBAR"],
+            function() return not (BigNoteBoxDB and BigNoteBoxDB.sidebarCollapsed) end,
+            function() if BNB.Sidebar.ToggleCollapsed then BNB.Sidebar.ToggleCollapsed() end end)
+    end
+end
+
+-- The menu button's click: opens the menu, or closes it when it is open
+function BNB.ToggleTopbarMenu(owner)
+    local CM = BNB.ContextMenu
+    if not (CM and _tbRow) then return end
+    owner._cmToggle = true
+    owner._cmDropLeft = true   -- opens down and left, inside the window
+    if CM.IsOpen() then CM.Close(); return end
+    CM.Open(owner, BuildTopbarMenu)
 end
 
 --------------------------------------------------------------------------------

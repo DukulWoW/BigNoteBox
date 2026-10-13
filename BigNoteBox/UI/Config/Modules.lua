@@ -1443,10 +1443,15 @@ local function BuildToastsPage(sf, ct, y, page)
     local cb
     local offWidgets, offLabels = {}, {}
     local srcBoxes = {}
+    -- The Style row: also greyed while Follow my faction is ticked (ALL-459)
+    local styleWidgets, styleLabels, StyleFree = {}, {}, nil
     local function GreyOff()
         local on = BNB.ToastsEnabled()
         for _, w in ipairs(offWidgets) do w:SetEnabled(on); w:SetAlpha(on and 1 or 0.35) end
         for _, l in ipairs(offLabels) do l:SetAlpha(on and 1 or 0.35) end
+        local free = on and StyleFree and StyleFree()
+        for _, w in ipairs(styleWidgets) do w:SetEnabled(free and true or false); w:SetAlpha(free and 1 or 0.35) end
+        for _, l in ipairs(styleLabels) do l:SetAlpha(free and 1 or 0.35) end
         -- A sender's box also needs its own module(s) on
         for _, s in ipairs(srcBoxes) do
             local ok = on and s.need()
@@ -1537,8 +1542,9 @@ local function BuildToastsPage(sf, ct, y, page)
 
     -- Style (ALL-376 S2): the faction loot toast by default (toastStyle nil).
     -- [<] [name] [>] (ALL-401): the name opens the style picker
-    -- (UI/ToastStylePicker.lua), the arrows step through the styles; either
-    -- one unticks Follow my faction. Skin colour only while skin mode is on.
+    -- (UI/ToastStylePicker.lua), the arrows step through the styles. All three
+    -- grey while Follow my faction is ticked (ALL-459, Dukul 2026-10-13).
+    -- Skin colour only while skin mode is on.
     local TS, TSP = BNB.ToastStyles, BNB.ToastStylePicker
     local styleBtn, facCb
     local function GlobalStyle()
@@ -1552,7 +1558,9 @@ local function BuildToastsPage(sf, ct, y, page)
             BNB.TruncateButtonText(styleBtn)
         end
         if facCb then facCb:SetChecked(GlobalStyle() == nil) end
+        GreyOff()
     end
+    StyleFree = function() return GlobalStyle() ~= nil end
     local styleH = {
         get = GlobalStyle,
         set = function(k) db.toastStyle = k; BNB.Toast.Restyle(); SyncStyle() end,
@@ -1596,8 +1604,8 @@ local function BuildToastsPage(sf, ct, y, page)
         Tip(prev, L["TOAST_STYLE_PREV"], L["CFG_TOAST_STYLE_TIP"])
         Tip(styleBtn, L["CFG_TOAST_STYLE"], L["CFG_TOAST_STYLE_TIP"])
         Tip(nxt, L["TOAST_STYLE_NEXT"], L["CFG_TOAST_STYLE_TIP"])
-        for _, w in ipairs({ prev, styleBtn, nxt }) do offWidgets[#offWidgets + 1] = w end
-        offLabels[#offLabels + 1] = lbl
+        for _, w in ipairs({ prev, styleBtn, nxt }) do styleWidgets[#styleWidgets + 1] = w end
+        styleLabels[#styleLabels + 1] = lbl
         SyncStyle()
         y = y - (22 + 10 + ROW_GAP)
         -- Skin mode may have changed since: the name follows

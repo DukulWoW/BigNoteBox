@@ -90,6 +90,11 @@ BNB.DEFAULTS = {
     -- Advanced
     confirmClose = false,
 
+    -- Top bar icons: on the bar (true) or in its menu (false) (ALL-112, Dukul
+    -- 2026-10-13); "Show on top bar" in the menu changes them
+    topbarIcons = { send = true, tags = true, history = true, trash = true,
+                    alarms = false, import = false, settings = false },
+
     -- Trash
     trashFeature     = true,
     warnBeforeDelete = true,

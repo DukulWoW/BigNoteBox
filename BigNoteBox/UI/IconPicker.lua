@@ -93,7 +93,9 @@ local SIDES = {
     { id = "professions", label = "ICON_PICKER_CAT_PROFESSIONS", cats = { "professions" } },
     { id = "zones",       label = "ICON_PICKER_CAT_ZONES",       cats = { "zones" } },
     { id = "instances",   label = "ICON_PICKER_CAT_INSTANCES",   cats = { "instances" } },
-    { id = "misc",        label = "ICON_PICKER_CAT_MISC",        cats = { "random", "storage" } },
+    { id = "tablets",     label = "ICON_PICKER_CAT_TABLETS",     cats = { "tablets" } },
+    { id = "storage",     label = "ICON_PICKER_CAT_STORAGE",     cats = { "storage" } },
+    { id = "misc",        label = "ICON_PICKER_CAT_MISC",        cats = { "random" } },
     { id = "game",        label = "ICON_PICKER_CAT_GAME",        game = true },
 }
 

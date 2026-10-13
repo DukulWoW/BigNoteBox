@@ -995,8 +995,9 @@ local function MouseOnPopup()
 end
 local function MouseInMultiArea()
     if BNB.listPane and BNB.listPane:IsVisible() and BNB.listPane:IsMouseOver() then return true end
+    -- The top bar menu icon too: it holds the actions a narrow window has no room for (ALL-464)
     for _, b in ipairs({ BNB._multiSelBtn, BNB._multiSelectAllBtn, BNB._multiDeleteBtn,
-                         BNB._multiCopyMoveBtn, BNB._multiExportBtn }) do
+                         BNB._multiCopyMoveBtn, BNB._multiExportBtn, BNB._toolbarMenuBtn }) do
         if b and b:IsVisible() and b:IsMouseOver() then return true end
     end
     if BNB.ContextMenu and BNB.ContextMenu.IsMouseOver() then return true end

@@ -69,6 +69,11 @@ local CATS = {
         "INV_Misc_Book_09",
         "INV_Misc_Book_10",
         "INV_Misc_Book_11",
+    }, classic = {
+        "inv_misc_book_12",
+        "inv_misc_book_13",
+        "inv_misc_book_14",
+        "inv_misc_book_15",
     } },
     { key = "notes", names = {
         "INV_MISC_NOTE_02",
@@ -115,6 +120,26 @@ local CATS = {
         "INV_Misc_Note_03",
         "INV_Misc_Note_04",
         "INV_Misc_Note_05",
+    }, classic = {
+        "inv_misc_scrollunrolled01",
+        "inv_misc_symbolofkings_01",
+        "inv_letter_01",
+        "inv_letter_02",
+        "inv_letter_03",
+        "inv_letter_04",
+        "inv_letter_05",
+        "inv_letter_06",
+        "inv_letter_07",
+        "inv_letter_08",
+        "inv_letter_09",
+        "inv_letter_10",
+        "inv_letter_11",
+        "inv_letter_12",
+        "inv_letter_13",
+        "inv_letter_14",
+        "inv_letter_15",
+        "inv_letter_16",
+        "inv_letter_17",
     } },
     { key = "classes", names = {
         "ClassIcon_DeathKnight",
@@ -146,6 +171,16 @@ local CATS = {
         "UI_Alliance_7LegionMedal",
         "UI_HordeIcon",
         "UI_Horde_HonorboundMedal",
+    }, classic = {
+        "vas_factionchange",
+        "inv_misc_token_thrallmar",
+        "inv_misc_token_scarletcrusade",
+        "inv_misc_token_honorhold",
+        "inv_misc_token_argentdawn3",
+        "inv_misc_token_argentdawn2",
+        "inv_misc_token_argentdawn",
+        "inv_misc_tabardpvp_04",
+        "inv_misc_tabardpvp_03",
     } },
     { key = "instances", names = {
         "Achievement_Dungeon_AtalDazar",
@@ -317,15 +352,105 @@ local CATS = {
         "race_voidelf_male",
         "race_skyborne_female",
         "race_skyborne_male",
+    }, classic = {   -- game icons (the original eight races, every Classic client)
+        "inv_misc_head_dwarf_01",
+        "inv_misc_head_dwarf_02",
+        "inv_misc_head_elf_01",
+        "inv_misc_head_elf_02",
+        "inv_misc_head_gnome_01",
+        "inv_misc_head_gnome_02",
+        "inv_misc_head_human_01",
+        "inv_misc_head_human_02",
+        "inv_misc_head_orc_01",
+        "inv_misc_head_orc_02",
+        "inv_misc_head_tauren_01",
+        "inv_misc_head_tauren_02",
+        "inv_misc_head_troll_01",
+        "inv_misc_head_troll_02",
+        "inv_misc_head_undead_01",
+        "inv_misc_head_undead_02",
     } },
     { key = "random", names = {
         "Ability_Creature_Amber_02",
         "Ability_Creature_Cursed_02",
         "INV_GnomeToy",
         "INV_Misc_Bone_HumanSkull_02",
+    }, classic = {
+        "inv_misc_gift_01",
+        "inv_misc_gift_02",
+        "inv_misc_gift_03",
+        "inv_misc_gift_04",
+        "inv_misc_gift_05",
+        "inv_misc_giftwrap_01",
+        "inv_misc_giftwrap_02",
+        "inv_misc_giftwrap_03",
     } },
-    { key = "storage", names = {
+    -- Stone tablets and Storage (Dukul, 2026-10-13): every client; "check" =
+    -- each name is looked up at load and a missing one left out, as on Classic
+    { key = "storage", check = true, names = {
         "Battleground_Strongbox_Gold_Horde",
+        "inv_misc_bag_01",
+        "inv_misc_bag_02",
+        "inv_misc_bag_03",
+        "inv_misc_bag_04",
+        "inv_misc_bag_05",
+        "inv_misc_bag_06",
+        "inv_misc_bag_07",
+        "inv_misc_bag_07_black",
+        "inv_misc_bag_07_blue",
+        "inv_misc_bag_07_green",
+        "inv_misc_bag_07_red",
+        "inv_misc_bag_08",
+        "inv_misc_bag_09",
+        "inv_misc_bag_09_black",
+        "inv_misc_bag_09_blue",
+        "inv_misc_bag_09_green",
+        "inv_misc_bag_09_red",
+        "inv_misc_bag_10",
+        "inv_misc_bag_10_black",
+        "inv_misc_bag_10_blue",
+        "inv_misc_bag_10_green",
+        "inv_misc_bag_10_red",
+        "inv_misc_bag_11",
+        "inv_misc_bag_12",
+        "inv_misc_bag_13",
+        "inv_misc_bag_14",
+        "inv_misc_bag_15",
+        "inv_misc_bag_16",
+        "inv_misc_bag_17",
+        "inv_misc_bag_18",
+        "inv_misc_bag_19",
+        "inv_misc_bag_20",
+        "inv_misc_bag_21",
+        "inv_misc_bag_22",
+        "inv_misc_bag_23_netherweave",
+        "inv_misc_bag_24_netherweave_imbued",
+        "inv_misc_bag_25_mooncloth",
+        "inv_misc_bag_26_spellfire",
+        "inv_misc_bag_27",
+        "inv_misc_bag_28_halloween",
+        "inv_misc_bag_bigbagofenchantments",
+        "inv_misc_bag_cenarionherbbag",
+        "inv_misc_bag_corefelclothbag",
+        "inv_misc_bag_enchantedmageweave",
+        "inv_misc_bag_enchantedrunecloth",
+        "inv_misc_bag_felclothbag",
+        "inv_misc_bag_herbpouch",
+        "inv_misc_bag_satchelofcenarius",
+        "inv_misc_bag_soulbag",
+    } },
+    { key = "tablets", check = true, names = {
+        "inv_misc_stonetablet_01",
+        "inv_misc_stonetablet_02",
+        "inv_misc_stonetablet_03",
+        "inv_misc_stonetablet_04",
+        "inv_misc_stonetablet_05",
+        "inv_misc_stonetablet_06",
+        "inv_misc_stonetablet_07",
+        "inv_misc_stonetablet_08",
+        "inv_misc_stonetablet_09",
+        "inv_misc_stonetablet_10",
+        "inv_misc_stonetablet_11",
     } },
     { key = "zones", names = {
         "Achievement_Zone_AlteracMountains_01",
@@ -408,33 +533,53 @@ local CATS = {
     } },
 }
 
+-- The names one category offers on this client, as { name, base } pairs: its
+-- own list (races filtered per client), then on Classic its "classic" extras
+-- (game icons, Dukul 2026-10-13: Classic has far fewer of the others)
+local function Entries(c)
+    local base, out = c.own and (OWN .. c.own .. "\\") or GAME, {}
+    for _, name in ipairs(c.names) do
+        if not c.races or RaceOnThisClient(name) then out[#out + 1] = { name, base } end
+    end
+    if BNB.IsClassic and c.classic then
+        for _, name in ipairs(c.classic) do out[#out + 1] = { name, GAME } end
+    end
+    return out
+end
+
 -- The Classic clients (Era, Anniversary, MoP) lack many of these icons. There
 -- each game icon is looked up by path as the catalog is built and a missing one
--- is left out, so no per-client list has to be kept by hand (ALL-364). Should
--- the lookup find none at all, it is not working and every icon stays.
-local function ClassicHas()
-    if not (BNB.IsClassic and GetFileIDFromPath) then return nil end
-    local has, found = {}, false
+-- is left out, so no per-client list has to be kept by hand (ALL-364). On the
+-- other clients only categories marked "check" are looked up. Should the
+-- lookup find none at all, it is not working and every icon stays.
+local function Present()
+    if not GetFileIDFromPath then return nil end
+    local has, found, any = {}, false, false
     for _, c in ipairs(CATS) do
-        if not c.own then
-            for _, name in ipairs(c.names) do
-                local ok, id = pcall(GetFileIDFromPath, GAME .. name)
-                if ok and id then has[name] = true; found = true end
+        if BNB.IsClassic or c.check then
+            for _, e in ipairs(Entries(c)) do
+                if e[2] == GAME then
+                    any = true
+                    local ok, id = pcall(GetFileIDFromPath, GAME .. e[1])
+                    if ok and id then has[e[1]] = true; found = true end
+                end
             end
         end
     end
-    return found and has or nil
+    return (any and found) and has or nil
 end
-local _classicHas = ClassicHas()
+local _present = Present()
 
 BNB.ICON_CATALOG, BNB.ICON_MANIFEST, BNB.ICON_CATEGORY = {}, {}, {}
+local _seen = {}   -- lower-case path: a Classic extra the main list already has
 for _, c in ipairs(CATS) do
-    local base = c.own and (OWN .. c.own .. "\\") or GAME
     local list = {}
-    for _, name in ipairs(c.names) do
-        if (not c.races or RaceOnThisClient(name))
-           and (c.own or not _classicHas or _classicHas[name]) then
-            local path = base .. name
+    for _, e in ipairs(Entries(c)) do
+        local name, base = e[1], e[2]
+        local path = base .. name
+        local looked = base == GAME and (BNB.IsClassic or c.check)
+        if (not looked or not _present or _present[name]) and not _seen[path:lower()] then
+            _seen[path:lower()] = true
             list[#list + 1] = path
             BNB.ICON_MANIFEST[#BNB.ICON_MANIFEST + 1] = path
             BNB.ICON_CATEGORY[path] = c.key

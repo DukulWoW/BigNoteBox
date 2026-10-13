@@ -103,6 +103,9 @@ function BNB.ApplySaveMode()
     local tb    = BNB._editorTasksBtn
     local tbOff = BNB.TasksEnabled and not BNB.TasksEnabled()
     if tb then tb:SetShown(not tbOff); if tbOff then hidden[#hidden + 1] = tb end end
+    local pb    = BNB._editorPinBtn   -- Sticky Notes module off (ALL-343, ALL-458)
+    local pbOff = not BNB.StickiesEnabled()
+    if pb then pb:SetShown(not pbOff); if pbOff then hidden[#hidden + 1] = pb end end
     for _, c in ipairs({ bar:GetChildren() }) do
         if c._baseX then
             local shift = auto and SAVE_SLOT_W or 0
@@ -1021,10 +1024,12 @@ local function BuildToolbar(parent)
         HoverOff(self)
         GameTooltip:Hide()
     end)
-    -- Hidden while the Sticky Notes module is off (ALL-343); its slot stays
-    -- empty, as the Tasks button's does
+    -- Hidden while the Sticky Notes module is off (ALL-343); the buttons to
+    -- its right close up (BNB.ApplySaveMode, ALL-458), as for Tasks
+    BNB._editorPinBtn = pinBtn
     function BNB.ApplyEditorStickyBtn()
         pinBtn:SetShown(BNB.StickiesEnabled())
+        if BNB.ApplySaveMode then BNB.ApplySaveMode() end
     end
     BNB.ApplyEditorStickyBtn()
     -- Send to Chat button (right side) — icon-only using send.tga

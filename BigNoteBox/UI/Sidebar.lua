@@ -710,13 +710,12 @@ end
 -- Build — called once from CreateMainWindow
 --------------------------------------------------------------------------------
 -- Toggle the sidebar visibility without affecting the feature-enabled setting.
--- Called by the topbar sidebar button.
+-- Called by the top bar menu's sidebar entry (ALL-112).
 function SB.ToggleCollapsed()
     local db = BigNoteBoxDB
     if not db then return end
     db.sidebarCollapsed = not db.sidebarCollapsed
     SB.Refresh()
-    if BNB.RefreshSidebarToggleBtn then BNB.RefreshSidebarToggleBtn() end
 end
 
 function SB.Build(parent)
