@@ -80,6 +80,7 @@ BNB.DEFAULTS = {
     contextSurface   = true,
     bcbIntegration   = true,
     hideLoginMessage = false,
+    brokerText = "both",   -- data broker bar text: both / total / here / none (ALL-472)
 
     -- Minimap icon (LibDBIcon state)
     minimapIcon = { hide = false, minimapPos = 220 },

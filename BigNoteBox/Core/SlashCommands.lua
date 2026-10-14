@@ -429,8 +429,7 @@ end
 
 function BNB_OnAddonCompartmentEnter(addonName, menuButtonFrame)
     GameTooltip:SetOwner(menuButtonFrame, "ANCHOR_LEFT")
-    GameTooltip:AddLine("BigNoteBox", 0.4, 0.73, 0.42)
-    BNB.AddMinimapClickLines(GameTooltip)
+    BNB.FillMinimapTooltip(GameTooltip)   -- same tooltip as the minimap button (ALL-472)
     GameTooltip:Show()
 end
 

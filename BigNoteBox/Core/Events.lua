@@ -293,6 +293,9 @@ end)
 --   EditorDirty ()                 UI/NoteEditor.lua MarkDirty, every edit
 --   EditorViewMode (id)            AM_EnterViewMode (rich note view tab)
 --   SituationsModule (on)          Features/ContextNotes.lua ApplySituationsModule
+--   SituationMatches (count)       Features/ContextNotes.lua, every situation
+--                                  check (count = notes matching now; 0 when
+--                                  the module is off): the data broker text
 --                                  (the Situation tabs cover / uncover)
 --   TldrSettings (on)              Features/Tldr.lua: the tl;dr module switch, a
 --                                  "show it" box or the snippet list changed

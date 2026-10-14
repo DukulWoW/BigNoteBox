@@ -174,6 +174,41 @@ local function BuildAdvancedTab(sf, ct)
     loginCb:SetPoint("TOPLEFT", ct, "TOPLEFT", HALF - 2, rowY + 2)
     minimapCb._lbl:SetPoint("RIGHT", ct, "LEFT", HALF - 8, 0)
 
+    -- Data broker bar text (ALL-472): Titan Panel, XIV Databar and the like.
+    -- Label on the left half, dropdown on the right half, as the row above
+    do
+        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 4, y - 6)
+        lbl:SetText(L["CFG_BROKER_TEXT"])
+        local ITEMS = {
+            { key = "both",  label = L["CFG_BROKER_BOTH"] },
+            { key = "total", label = L["CFG_BROKER_TOTAL"] },
+            { key = "here",  label = L["CFG_BROKER_HERE"] },
+            { key = "none",  label = L["CFG_BROKER_NONE"] },
+        }
+        local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
+        dd:SetPoint("TOPLEFT", ct, "TOPLEFT", HALF - 2, y)
+        dd:SetWidth(CONTENT_W - HALF + 2)
+        dd:SetupMenu(function(_, root)
+            for _, m in ipairs(ITEMS) do
+                root:CreateRadio(m.label,
+                    function() return (db.brokerText or BNB.DEFAULTS.brokerText) == m.key end,
+                    function()
+                        db.brokerText = m.key
+                        if BNB.UpdateBrokerText then BNB.UpdateBrokerText() end
+                    end)
+            end
+        end)
+        dd:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_BROKER_TEXT"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_BROKER_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        dd:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        y = y - 32
+    end
+
     -- ── Developer section ───────────────────────────────────────────────────
     AddRule(ct, y); y = y - 18
     y = AddHeader(ct, y, L["CFG_HDR_DEVELOPER"])

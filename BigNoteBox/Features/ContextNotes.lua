@@ -319,6 +319,7 @@ local function GetOrCreateBadge()
 end
 
 local function UpdateMinimapBadge(count)
+    BNB.SendMessage("SituationMatches", count or 0)   -- broker text (ALL-472)
     local b = GetOrCreateBadge()
     if not b then return end
     if count and count > 0 then
