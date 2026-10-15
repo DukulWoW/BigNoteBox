@@ -628,6 +628,8 @@ local function UpdateInspectGear(noteID, richMode)
                             fp = UN.Fingerprint(top), off = auto.off, at = enc.updated }
     end
     BNB.UpdateNote(noteID, fields)
+    -- An open sticky and the editor show the new text at once (ALL-476)
+    if fields.body then UN.RefreshNoteViews(noteID) end
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
 
@@ -665,6 +667,9 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
             button1       = L["INS_WARN_UPDATE_BTN"],
             button2       = L["CANCEL"],
             OnAccept      = function()
+                -- Unsaved editor text first: saved after the update (UN.OpenNote
+                -- saves the open note), it would write the old text back (ALL-476)
+                if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
                 -- Create restore point before overwriting the note body.
                 BNB.HistoryCreateManual(existingNoteID)
                 -- richMode captured from the outer ShowWarningDialog call.

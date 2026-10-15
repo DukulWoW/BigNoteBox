@@ -168,10 +168,7 @@ local function Update(id, note, kind, newData, extra)
 
     if not changed then return end
     BNB.UpdateNote(id, fields, { noTouch = true })
-    if fields.body then
-        if BNB._currentNoteID == id and BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
-        if BNB.Sticky and BNB.Sticky.RefreshNote then BNB.Sticky.RefreshNote(id) end
-    end
+    if fields.body then UN.RefreshNoteViews(id) end
     if extra and BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
 end
 

@@ -382,6 +382,14 @@ function UN.SplitAtHead(body, head)
     end
 end
 
+-- After a player note's body was written from here (an automatic update or
+-- "Update gear and note"): the editor and an open sticky show it at once.
+-- The sticky keeps its scroll position and leaves an inline edit alone.
+function UN.RefreshNoteViews(id)
+    if BNB._currentNoteID == id and BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
+    if BNB.Sticky and BNB.Sticky.RefreshBodyLive then BNB.Sticky.RefreshBodyLive(id) end
+end
+
 function UN.FormatNumber(n)
     if not n then return "?" end
     -- The client's own thousands separator (ALL-72)
