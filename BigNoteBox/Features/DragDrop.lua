@@ -263,6 +263,21 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
         end)
     end
 
+    -- Ctrl+click on a /way line places the waypoint, as a click on the link
+    -- in a rich note does (ALL-477); Ctrl+Shift+click opens the map at it.
+    -- The click has moved the cursor by OnMouseUp: the line around it is read
+    -- (GetCursorPosition is a byte offset, as Blizzard's AutoComplete uses it).
+    eb:HookScript("OnMouseUp", function(self, btn)
+        if btn ~= "LeftButton" or not IsControlKeyDown() or GetCursorInfo() then return end
+        if not (BNB.ParseWayLine and BNB.FollowWayLine) then return end
+        local text, pos = self:GetText() or "", self:GetCursorPosition() or 0
+        local s = pos
+        while s > 0 and text:sub(s, s) ~= "\n" do s = s - 1 end
+        local e = text:find("\n", pos + 1, true) or (#text + 1)
+        local line = text:sub(s + 1, e - 1)
+        if BNB.ParseWayLine(line) then BNB.FollowWayLine(line, IsShiftKeyDown()) end
+    end)
+
     -- Link tooltips (ALL-228) and shift-click into the box
     if eb.SetHyperlinksEnabled then
         eb:SetHyperlinksEnabled(true)

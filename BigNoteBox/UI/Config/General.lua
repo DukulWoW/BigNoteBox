@@ -138,7 +138,7 @@ local function BuildGeneralTab(sf, ct)
             { code = "deDE",   label = "Deutsch",             flag = FLAG.."flag-de",   available = false },
             { code = "frFR",   label = "Français",            flag = FLAG.."flag-fr",   available = false },
             { code = "esES",   label = "Español",             flag = FLAG.."flag-es",   available = false },
-            { code = "esMX",   label = "Español (México)",    flag = nil,               available = false },   -- no flag-mx yet (shield-mx only)
+            { code = "esMX",   label = "Español (México)",    flag = FLAG.."flag-mx",   available = false },
             { code = "ptBR",   label = "Português",           flag = FLAG.."flag-br",   available = false },
             { code = "itIT",   label = "Italiano",            flag = FLAG.."flag-it",   available = false },
             { code = "jaJP",   label = "日本語",               flag = FLAG.."flag-ja",   available = false },
