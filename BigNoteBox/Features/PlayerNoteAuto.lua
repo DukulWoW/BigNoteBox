@@ -108,9 +108,12 @@ local function Update(id, note, kind, newData, extra)
     local changed = extra ~= nil
     local now = time()
 
-    if DB("encounterOn" .. kind) and _counted[id] ~= _visit then
+    -- Developer tools > encounters every minute (debugEncounterGap): no
+    -- zone-visit rule, 60 s apart
+    local quick = BigNoteBoxDB and BigNoteBoxDB.debugEncounterGap
+    if DB("encounterOn" .. kind) and (quick or _counted[id] ~= _visit) then
         local enc = UN.NoteEncounters(note)
-        if now - (enc.seen.at or 0) >= GAP then
+        if now - (enc.seen.at or 0) >= (quick and 60 or GAP) then
             _counted[id] = _visit
             fields.unitMet  = enc.met   -- written down once for an older note
             fields.unitSeen = { n = (enc.seen.n or 1) + 1, at = now, place = (UN.EncounteredPlace()) }

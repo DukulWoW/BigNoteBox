@@ -211,6 +211,13 @@ function K.BuildDevToolsPage(sf, ct, y)
         L["CFG_DEV_TOAST_ANCHOR_TIP"])
     K.ReadOnShow(ctxCb, function() return db.debugContextTrace == true end)
     K.ReadOnShow(toastCb, function() return db.debugToastAnchor == true end)
+    -- Player note encounters every minute, ignoring the zone-visit rule
+    -- (ALL-474 testing, Features/PlayerNoteAuto.lua)
+    local encCb = OptCheck(L["CFG_DEV_ENC_GAP_LABEL"],
+        function() return db.debugEncounterGap == true end,
+        function(v) db.debugEncounterGap = v or nil end,
+        L["CFG_DEV_ENC_GAP_TIP"])
+    K.ReadOnShow(encCb, function() return db.debugEncounterGap == true end)
     y = y + math.min(colY[1], colY[2])
 
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────
