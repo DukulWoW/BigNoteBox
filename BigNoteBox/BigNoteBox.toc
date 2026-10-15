@@ -146,6 +146,7 @@ Features\Tldr.lua
 UI\NoteTooltip.lua
 Features\UnitNotes.lua
 Features\InspectNote.lua
+Features\PlayerNoteAuto.lua
 Features\TargetNote.lua
 Features\UnitFrameBadge.lua
 Features\DirectSend.lua

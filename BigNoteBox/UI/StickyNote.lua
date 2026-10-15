@@ -2698,6 +2698,12 @@ end
 -- How many stickies are open, against stickyMaxCount (ALL-234 opens several)
 function SN.CountOpen() return CountOpen() end
 
+-- True while the note's sticky is in inline edit (PlayerNoteAuto leaves its text alone, ALL-474)
+function SN.IsEditing(noteID)
+    local f = openFrames[noteID]
+    return f and f._inlineEditing == true or false
+end
+
 function SN.IsOpen(noteID)
     local f = openFrames[noteID]
     if not f then return false end

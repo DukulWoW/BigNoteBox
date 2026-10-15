@@ -417,6 +417,56 @@ local function BuildPlayerNpcPage(sf, ct, y, page)
         y = y - (ROW_H + ROW_GAP)
     end
 
+    -- ── Player notes update themselves (ALL-474, Features/PlayerNoteAuto.lua) ──
+    -- The switch, and indented under it what counts as an encounter: greyed
+    -- while the switch is off (their own settings kept)
+    do
+        y = AddRule(ct, y) - 4
+        y = AddHeader(ct, y, L["CFG_HDR_PNA"])
+        local function Get(key)
+            local v = BigNoteBoxDB and BigNoteBoxDB[key]
+            if v == nil then v = BNB.DEFAULTS[key] end
+            return v and true or false
+        end
+        local subs = {}
+        local function Sync()
+            local on = Get("playerNoteAutoUpdate")
+            for _, cb in ipairs(subs) do
+                cb:SetEnabled(on); cb:SetAlpha(on and 1 or 0.35); cb._lbl:SetAlpha(on and 1 or 0.35)
+            end
+        end
+        y = AddCheck(ct, y, L["CFG_PNA_LABEL"],
+            function() return Get("playerNoteAutoUpdate") end,
+            function(v) if BigNoteBoxDB then BigNoteBoxDB.playerNoteAutoUpdate = v end; Sync() end,
+            L["CFG_PNA_TIP"])
+
+        local subLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+        subLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 16, y)
+        subLbl:SetWidth(CONTENT_W - 16); subLbl:SetHeight(ROW_H - 4)
+        subLbl:SetJustifyH("LEFT"); subLbl:SetWordWrap(true)
+        subLbl:SetText(L["CFG_PNA_COUNT_SUB"])
+        subLbl:SetTextColor(0.65, 0.65, 0.65)
+        y = y - (ROW_H + ROW_GAP - 2)
+
+        for _, row in ipairs({
+            { key = "encounterOnTarget",    label = "CFG_PNA_ON_TARGET", tip = "CFG_PNA_ON_TARGET_TIP" },
+            { key = "encounterOnInspect",   label = "CFG_PNA_ON_INSPECT", tip = "CFG_PNA_ON_INSPECT_TIP" },
+            { key = "encounterOnGroup",     label = "CFG_PNA_ON_GROUP", tip = "CFG_PNA_ON_GROUP_TIP" },
+            { key = "encounterOnMouseover", label = "CFG_PNA_ON_MOUSEOVER", tip = "CFG_PNA_ON_MOUSEOVER_TIP" },
+        }) do
+            local ry, cb = y
+            y, cb = AddCheck(ct, y, L[row.label],
+                function() return Get(row.key) end,
+                function(v) if BigNoteBoxDB then BigNoteBoxDB[row.key] = v end end,
+                L[row.tip])
+            cb:SetPoint("TOPLEFT", ct, "TOPLEFT", 16, ry + 2)
+            cb:SetMotionScriptsWhileDisabled(true)
+            cb:HookScript("OnShow", Sync)
+            subs[#subs + 1] = cb
+        end
+        Sync()
+    end
+
     -- ── Target Note ───────────────────────────────────────────────────────────
     do
         y = AddRule(ct, y) - 4

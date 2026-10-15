@@ -380,7 +380,11 @@ local function GuildLine(data, key)
     return string.format(L[key], data.guild)
 end
 
-local function BuildNormalBody(data)
+-- Both builders return body, top, head (ALL-474): head is the Notes heading
+-- line the player writes under, top everything above it, and
+-- body = top .. "\n" .. head .. "\n". enc = UN.NoteEncounters (first met and
+-- how often since).
+local function BuildNormalBody(data, enc)
     local lines = {}
 
     -- Name (with title if set)
@@ -423,17 +427,16 @@ local function BuildNormalBody(data)
     end
 
     lines[#lines + 1] = ""
-    -- Where you met them: the place and a /way to the spot (ALL-449)
-    local before = #lines
-    UN.AddPlainEncountered(lines, UN.EncounteredPlace(data.name))
-    if #lines > before then lines[#lines + 1] = "" end
-    lines[#lines + 1] = string.format(L["TGT_HDR_COLON_FMT"], L["TGT_HDR_NOTES"])
+    -- Where you first met them, with a /way to the spot (ALL-449), and how
+    -- often since (ALL-474)
+    UN.AddPlainMet(lines, enc)
     lines[#lines + 1] = ""
-
-    return table.concat(lines, "\n")
+    local head = string.format(L["TGT_HDR_COLON_FMT"], L["TGT_HDR_NOTES"])
+    local top = table.concat(lines, "\n")
+    return top .. "\n" .. head .. "\n", top, head
 end
 
-local function BuildRichBody(data)
+local function BuildRichBody(data, enc)
     local lines = {}
 
     -- Name with title as H1
@@ -497,15 +500,23 @@ local function BuildRichBody(data)
 
     lines[#lines + 1] = ""
     lines[#lines + 1] = ""
-    -- Where you met them: the place and a /way link to the spot (ALL-449)
-    UN.AddRichEncountered(lines, UN.EncounteredPlace(data.name))
+    -- Where you first met them, with a /way link to the spot (ALL-449), and
+    -- how often since (ALL-474)
+    UN.AddRichMet(lines, enc)
     -- A bare empty line, as in TargetNote: {p}{/p} makes an empty <P></P> in
     -- SimpleHTML, which miscalculates document height and offsets the text cursor.
-    lines[#lines + 1] = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
-    lines[#lines + 1] = ""
-
-    return table.concat(lines, "\n")
+    local head = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
+    local top = table.concat(lines, "\n")
+    return top .. "\n" .. head .. "\n", top, head
 end
+
+-- Shared with Features/PlayerNoteAuto.lua (ALL-474)
+function UN.BuildPlayerBody(data, richMode, enc)
+    if richMode then return BuildRichBody(data, enc) end
+    return BuildNormalBody(data, enc)
+end
+UN.GatherInspectData = GatherInspectData
+UN.InspectUnit       = InspectUnit
 
 --------------------------------------------------------------------------------
 -- CREATE THE NOTE
@@ -514,7 +525,11 @@ local function CreateInspectNote(richMode, silent)
     local data = GatherInspectData()
     -- Title: character name only (no title)
     local title = UN.UniqueTitle(data.name)
-    local body  = richMode and BuildRichBody(data) or BuildNormalBody(data)
+    -- Making the note is the first encounter (ALL-474)
+    local place, way = UN.EncounteredPlace(data.name)
+    local now = time()
+    local enc = { met = { at = now, place = place, way = way }, seen = { n = 1, at = now, place = place }, updated = now }
+    local body, top, head = UN.BuildPlayerBody(data, richMode, enc)
 
     local noteID = BNB.CreateNote(title, body)
     if not noteID then return end
@@ -544,6 +559,10 @@ local function CreateInspectNote(richMode, silent)
         inspectName    = data.name,
         inspectRealm   = data.realm,
         inspectFaction = data.faction,   -- model viewer crest (FOR-22)
+        -- Updates itself from here on (ALL-474, Features/PlayerNoteAuto.lua)
+        unitMet        = enc.met,
+        unitSeen       = enc.seen,
+        unitAuto       = { data = UN.PlayerSnapshot(data), head = head, fp = UN.Fingerprint(top), at = now },
     }
     -- Transmog appearance IDs for reconstructed model viewer (indexed by slot)
     if data.transmogAppearances and next(data.transmogAppearances) then
@@ -589,9 +608,24 @@ local function UpdateInspectGear(noteID, richMode)
     end
     fields.inspectGearItems    = #data.gearItems    > 0 and data.gearItems    or nil
     fields.inspectTransmogItems = #data.transmogItems > 0 and data.transmogItems or nil
-    -- If caller also wants the note body updated, rebuild it.
+    -- If caller also wants the note body updated, rebuild it: only the part
+    -- above the Notes heading, everything under it kept (ALL-474). A note
+    -- whose heading is gone gets the whole body, as before. From here on the
+    -- note updates itself, also a note made before ALL-474 or one whose top
+    -- was edited by hand (the caller made a restore point first).
     if richMode ~= nil then
-        fields.body = richMode and BuildRichBody(data) or BuildNormalBody(data)
+        local note = BNB.GetNote(noteID)
+        if not note then return end
+        local enc = UN.NoteEncounters(note)
+        enc.updated = time()
+        local body, top, head = UN.BuildPlayerBody(data, richMode, enc)
+        local auto = note.unitAuto or {}
+        local _, rest = UN.SplitAtHead(note.body, auto.head or head)
+        fields.body     = rest and (top .. rest) or body
+        fields.unitMet  = enc.met
+        fields.unitSeen = enc.seen
+        fields.unitAuto = { data = UN.PlayerSnapshot(data), head = rest and (auto.head or head) or head,
+                            fp = UN.Fingerprint(top), off = auto.off, at = enc.updated }
     end
     BNB.UpdateNote(noteID, fields)
     if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
@@ -912,6 +946,8 @@ end)
 OnInspectReady = function()
     EnableInspectBtn()
     RequestAchievementPoints()
+    -- An existing player note updates itself (ALL-474, Features/PlayerNoteAuto.lua)
+    if UN.AutoOnInspect then UN.AutoOnInspect() end
     -- One-shot flag set by TargetNote right-click "Inspect & Create Note".
     -- Takes priority over auto-create mode so the user sees the type dialog.
     if BNB._inspectAndCreate then

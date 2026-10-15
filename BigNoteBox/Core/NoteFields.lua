@@ -108,6 +108,13 @@ local FIELDS = {
     { "favorited", "b" },
     { "locked",    "b" },
     { "alarm",     "t", nocopy = true },   -- a copy would ring twice
+    -- A player note that updates itself (ALL-474, Features/PlayerNoteAuto.lua):
+    -- unitAuto = { data, head, fp, edited, off, at }, unitMet = first met
+    -- { at, place, way }, unitSeen = { n, at, place }. Yours (who you met),
+    -- and a copy would update itself as a second note for the same player
+    { "unitAuto",  "t", nocopy = true },
+    { "unitMet",   "t", nocopy = true },
+    { "unitSeen",  "t", nocopy = true },
     -- When and where the note was made
     { "created",    "n", nocopy = true },
     { "updated",    "n", nocopy = true },
@@ -202,6 +209,11 @@ local SHAPES = {
     end,
     inspectGearItems     = function(v) return FilterArray(v, IsTable) end,
     inspectTransmogItems = function(v) return FilterArray(v, IsTable) end,
+    unitAuto = function(v)
+        if IsTable(v.data) and type(v.head) == "string" and type(v.fp) == "string" then return v end
+    end,
+    unitMet  = function(v) if type(v.at) == "number" then return v end end,
+    unitSeen = function(v) if type(v.n) == "number" and type(v.at) == "number" then return v end end,
     titleColor = function(v)
         if type(v.r) == "number" and type(v.g) == "number" and type(v.b) == "number" then return v end
     end,

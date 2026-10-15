@@ -129,6 +129,13 @@ BNB.DEFAULTS = {
     inspectNoteAddSituation = false,   -- the player situation on (ALL-435: always added)
     inspectNoteSituationToast = true,
     inspectNoteGearShow     = "both",
+    -- Player notes update themselves (ALL-474): the switch, and what counts
+    -- as an encounter
+    playerNoteAutoUpdate    = true,
+    encounterOnTarget       = true,
+    encounterOnInspect      = true,
+    encounterOnGroup        = false,
+    encounterOnMouseover    = false,
 
     -- Tag Tree view
     tagTreeMode          = false,
