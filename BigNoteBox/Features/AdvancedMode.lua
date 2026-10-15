@@ -558,6 +558,9 @@ function AM.CreateRenderFrame(name, parent)
 
     -- Item/spell hyperlink tooltip on hover
     f:SetScript("OnHyperlinkEnter", function(self, link)
+        -- Waypoint and note links (ALL-478, Features/NoteLinks.lua)
+        local NL = BNB.NoteLinks
+        if NL and NL.OnEnter(self, HtmlUnescape(link)) then return end
         local linkType = link:match("^(%a+):")
         if linkType == "bnbway" then   -- a /way line (ALL-381)
             GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
@@ -582,6 +585,8 @@ function AM.CreateRenderFrame(name, parent)
     -- Clickable links: WoW item/spell links are informational; plain URLs copy
     f:SetScript("OnHyperlinkClick", function(self, link, text, button)
         if button ~= "LeftButton" then return end
+        local NL = BNB.NoteLinks
+        if NL and NL.OnClick(HtmlUnescape(link), button) then return end   -- ALL-478
         local linkType = link:match("^(%a+):")
         -- A /way line: placed and tracked; Shift = shown on the map (ALL-381)
         if linkType == "bnbway" then

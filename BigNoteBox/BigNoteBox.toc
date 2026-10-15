@@ -69,6 +69,7 @@ UI\IconFramePicker.lua
 UI\IconPicker.lua
 UI\SendToChat.lua
 UI\SendNotePicker.lua
+UI\WaypointLinkPopup.lua
 UI\ConfigWindow.lua
 UI\Config\General.lua
 UI\Config\Appearance.lua
@@ -126,6 +127,7 @@ Features\NoteHistory.lua
 Features\ContextNotes.lua
 Features\ChatCapture.lua
 Features\DragDrop.lua
+Features\NoteLinks.lua
 Features\InsertInfo.lua
 UI\ToastStyles.lua
 UI\Toast.lua

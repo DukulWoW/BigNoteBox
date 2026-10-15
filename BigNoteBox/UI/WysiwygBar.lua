@@ -15,7 +15,7 @@ local _undoTimers, _undoForced = K.undoTimers, K.undoForced
 -- Sits between the timestamp strip and the body scroll frame.
 -- Toggle via BigNoteBoxDB.wysiwygBarVisible (persisted).
 --
--- Left  (left-anchored):  Undo | Redo | divider | FontType | Dec | Inc | FontSize | Bullet | Timestamp
+-- Left  (left-anchored):  Undo | Redo | divider | FontType | Dec | Inc | FontSize | Bullet | RefBox | Timestamp | Waypoint link | Note link
 -- Right (right-anchored): Restore | History | divider | CopyMove | Waypoint
 --
 -- BNB._editorWysiwygBar   — the bar frame (shown/hidden on toggle)
@@ -664,6 +664,41 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         GameTooltip:Show()
     end)
 
+    -- Waypoint and note links at the cursor (ALL-478, Features/NoteLinks.lua):
+    -- a popup for the place (UI/WaypointLinkPopup.lua), the note search for
+    -- the note (UI/SendNotePicker.lua). Art: Dukul's tb-way / tb-link.
+    local function TipWithBody(btn, title, body)
+        btn:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L[title], 1, 1, 1)
+            GameTooltip:AddLine(L[body], 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+        end)
+    end
+    local wayBtn = WyBtn("tb-way", L["NE_INSERT_WAY_TIP"])
+    wayBtn:SetPoint("LEFT", stampBtn, "RIGHT", 4, 0)
+    wayBtn:SetIconEnabled(true)
+    TipWithBody(wayBtn, "NE_INSERT_WAY_TIP", "NE_INSERT_WAY_BODY")
+    wayBtn:SetScript("OnClick", function(self)
+        if not (Body() and BNB._currentNoteID) or BNB._editorLocked then return end
+        if BNB.ToggleWaypointLinkPopup then BNB.ToggleWaypointLinkPopup(self, InsertSnippet) end
+    end)
+
+    local linkBtn = WyBtn("tb-link", L["NE_INSERT_NOTELINK_TIP"])
+    linkBtn:SetPoint("LEFT", wayBtn, "RIGHT", 4, 0)
+    linkBtn:SetIconEnabled(true)
+    TipWithBody(linkBtn, "NE_INSERT_NOTELINK_TIP", "NE_INSERT_NOTELINK_BODY")
+    linkBtn:SetScript("OnClick", function(self)
+        if not (Body() and BNB._currentNoteID) or BNB._editorLocked then return end
+        local NL = BNB.NoteLinks
+        if not (NL and BNB.ToggleNotePicker) then return end
+        BNB.ToggleNotePicker(self, {
+            onPick      = function(id) InsertSnippet(NL.NoteLink(id)) end,
+            exclude     = BNB._currentNoteID,
+            placeholder = L["NOTELINK_PICK_PH"],
+        })
+    end)
+
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
     -- Anchored from RIGHT inward so they always hug the right edge.
     -- Main editor only: Focus mode has the writing tools alone (ALL-163)
@@ -927,7 +962,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local GAP = 8
     -- Right edge of the left side, left edge of the right side (or the bar's)
     local function Overlaps()
-        local lr = stampBtn:GetRight()
+        local lr = linkBtn:GetRight()
         if not lr then return false end
         local rl = bar:GetRight() - 6
         if rightGroup and rightGroup:IsShown() then

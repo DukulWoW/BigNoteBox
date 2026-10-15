@@ -272,11 +272,18 @@ function UN.NoteEncounters(note)
     return { met = met, seen = seen }
 end
 
+-- The stored /way line written into a body as a waypoint link (ALL-478,
+-- Dukul 2026-10-15); the line itself when it cannot be one
+local function WayOut(way)
+    local NL = BNB.NoteLinks
+    return NL and NL.WayLineLink(way) or way
+end
+
 -- The Encountered lines of a body, from EncounteredPlace: plain = a footer
--- line plus the bare /way line; rich = a section, the /way as a link
+-- line plus the waypoint link; rich = a section, the same link
 function UN.AddPlainEncountered(lines, place, way)
     if place ~= "" then lines[#lines + 1] = string.format(L["TGT_LINE_ENCOUNTERED"], place) end
-    if way then lines[#lines + 1] = way end
+    if way then lines[#lines + 1] = WayOut(way) end
 end
 
 function UN.AddRichEncountered(lines, place, way)
@@ -287,7 +294,7 @@ function UN.AddRichEncountered(lines, place, way)
         lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. place .. "{/p}"
     end
     if way then
-        lines[#lines + 1] = "{p}{icon:inv_misc_map_01:18}  " .. way .. "{/p}"
+        lines[#lines + 1] = "{p}{icon:inv_misc_map_01:18}  " .. WayOut(way) .. "{/p}"
     end
     lines[#lines + 1] = ""
     lines[#lines + 1] = ""
@@ -318,7 +325,7 @@ end
 function UN.AddPlainMet(lines, enc)
     local t = EncTexts(enc)
     lines[#lines + 1] = t.met
-    if enc.met.way then lines[#lines + 1] = enc.met.way end
+    if enc.met.way then lines[#lines + 1] = WayOut(enc.met.way) end
     if t.last then lines[#lines + 1] = t.last end
     if t.count then lines[#lines + 1] = t.count end
     if t.updated then lines[#lines + 1] = t.updated end
@@ -330,7 +337,7 @@ function UN.AddRichMet(lines, enc)
     lines[#lines + 1] = ""
     lines[#lines + 1] = "{p}{icon:achievement_zone_northrend_01:18}  " .. t.met .. "{/p}"
     if enc.met.way then
-        lines[#lines + 1] = "{p}{icon:inv_misc_map_01:18}  " .. enc.met.way .. "{/p}"
+        lines[#lines + 1] = "{p}{icon:inv_misc_map_01:18}  " .. WayOut(enc.met.way) .. "{/p}"
     end
     if t.last then lines[#lines + 1] = "{p}{icon:inv_misc_pocketwatch_01:18}  " .. t.last .. "{/p}" end
     if t.count then lines[#lines + 1] = "{p}{icon:inv_misc_head_human_01:18}  " .. t.count .. "{/p}" end

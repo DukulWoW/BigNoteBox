@@ -73,6 +73,9 @@ local function ChatBody(note)
         local AM = BNB.AdvancedMode
         if AM and AM.StripMarkup then body = AM.StripMarkup(body) end
     end
+    -- Waypoint links -> the game's map pin link, note links -> their title
+    -- (ALL-478): the server drops a chat message with a custom link in it
+    if BNB.NoteLinks then body = BNB.NoteLinks.ToChat(body) end
     return body
 end
 

@@ -7,9 +7,14 @@
 -- the open note first, then the most recently edited (Dukul, 2026-10-10).
 -- Esc, a click elsewhere or the button again closes it. The Oracle's `m`
 -- prefix sends the same way (UI/Oracle.lua).
+-- The same search picks a note for a note link and for "From another note"
+-- in the waypoint link popup (ALL-478): BNB.ToggleNotePicker with opts.
 --
 -- Public API:
 --   BNB.ToggleSendNotePicker(anchor)
+--   BNB.ToggleNotePicker(anchor, opts)   opts: onPick(id), filter(note) -> bool,
+--       exclude = id, placeholder, noneText (no note passes the filter)
+--   BNB.NotePickerShown()
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -20,6 +25,7 @@ local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"   -- as the Oracle's r
 local picker, eb, placeholder, list, emptyFS, nav
 local rows = {}
 local _anchor
+local _opts = {}   -- the open picker's options (empty = Send)
 
 local function AllNotes()
     local ndb = BNB.NotesDB()
@@ -27,7 +33,9 @@ local function AllNotes()
     if not (ndb and ndb.notes) then return out end
     for _, id in ipairs(ndb.noteOrder or {}) do
         local n = ndb.notes[id]
-        if n then out[#out + 1] = n end
+        if n and id ~= _opts.exclude and not (_opts.filter and not _opts.filter(n)) then
+            out[#out + 1] = n
+        end
     end
     return out
 end
@@ -62,8 +70,10 @@ local function Close()
 end
 
 local function Send(id)
+    local onPick = _opts.onPick
     Close()
-    if BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
+    if onPick then onPick(id)
+    elseif BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
 end
 
 local function Row(i)
@@ -103,7 +113,8 @@ local function Refresh()
     end
     for i = #notes + 1, #rows do rows[i]:Hide() end
     if #notes == 0 then
-        if total == 0 then emptyFS:SetText(L["SEND_PICK_NO_NOTES"]) else emptyFS:SetText(L["SEND_PICK_EMPTY"]) end
+        if total == 0 then emptyFS:SetText(_opts.noneText or L["SEND_PICK_NO_NOTES"])
+        else emptyFS:SetText(L["SEND_PICK_EMPTY"]) end
         emptyFS:Show()
     else
         emptyFS:Hide()
@@ -173,9 +184,23 @@ local function Build()
 end
 
 function BNB.ToggleSendNotePicker(anchor)
+    BNB.ToggleNotePicker(anchor, nil)
+end
+
+function BNB.NotePickerShown()
+    return picker ~= nil and picker:IsShown()
+end
+
+function BNB.ToggleNotePicker(anchor, opts)
     Build()
-    if picker:IsShown() then Close(); return end
+    if picker:IsShown() then
+        local same = anchor == _anchor
+        Close()
+        if same then return end
+    end
     _anchor = anchor
+    _opts = opts or {}
+    placeholder:SetText(_opts.placeholder or L["SEND_PICK_PLACEHOLDER"])
     if not anchor._bnbSendPickHooked then
         anchor._bnbSendPickHooked = true
         -- The button hides with the main window: the search goes with it
@@ -189,6 +214,8 @@ function BNB.ToggleSendNotePicker(anchor)
     end
     eb:SetText("")
     Refresh()
+    -- Over Focus mode too (the editor toolbar's link button, ALL-478)
+    BNB.SeatWindow(picker, "DIALOG")
     picker:Show()
     picker:Raise()
     eb:SetFocus()

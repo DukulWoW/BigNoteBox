@@ -447,10 +447,12 @@ end
 
 -- Convert the note body (dispatches to rich or plain converter).
 local function ConvertBody(note)
+    -- Waypoint and note links as their text (ALL-478): a page has no use for them
+    local body = BNB.NoteLinks and BNB.NoteLinks.ToText(note.body) or note.body
     if note.richMode then
-        return ConvertRichBody(note.body)
+        return ConvertRichBody(body)
     else
-        return ConvertPlainBody(note.body), (note.body or ""):find("{img:") ~= nil
+        return ConvertPlainBody(body), (body or ""):find("{img:") ~= nil
     end
 end
 

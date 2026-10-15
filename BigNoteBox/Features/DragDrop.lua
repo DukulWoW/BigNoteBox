@@ -152,11 +152,14 @@ end
 -- ── Link tooltips in plain note text (ALL-228) ───────────────────────────────
 -- Hyperlinks on in the body EditBox: hovering an item / spell / quest link
 -- shows its tooltip. Probed 2026-10-11 (Dukul, Retail): Enter / Leave / Click
--- fire, typing, cursor placement and selecting work as before. A plain click
--- still only places the cursor; the link acts on hover only.
+-- fire, typing, cursor placement and selecting work as before. A click on a
+-- game link still only places the cursor; waypoint and note links act on a
+-- click (ALL-478, Features/NoteLinks.lua).
 local TIP_TYPES = { item = true, spell = true, achievement = true, quest = true, currency = true }
 local function OnLinkEnter(self, link)
     if GetCursorInfo() then return end   -- the drag hint owns the tooltip
+    local NL = BNB.NoteLinks
+    if NL and NL.OnEnter(self, link) then return end
     local linkType = link and link:match("^(%a+):")
     if not TIP_TYPES[linkType] then return end
     GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
@@ -291,6 +294,10 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
         eb:SetHyperlinksEnabled(true)
         eb:HookScript("OnHyperlinkEnter", OnLinkEnter)
         eb:HookScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
+        eb:HookScript("OnHyperlinkClick", function(_, link, _, button)
+            local NL = BNB.NoteLinks
+            if NL then NL.OnClick(link, button) end
+        end)
     end
     wired[eb] = true
     HookInsertLink()
