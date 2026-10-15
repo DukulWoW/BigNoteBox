@@ -202,6 +202,78 @@ function UN.AutoOnInspect()
     end)
 end
 
+-- ── On / off per note (ALL-474 S2) ─────────────────────────────────────────
+-- Whether a note's text still updates itself
+function UN.AutoActive(note)
+    local auto = note and note.source == "inspect" and note.unitAuto
+    return auto and auto.data and not auto.off and not auto.edited and true or false
+end
+
+-- on = false: the text stops updating (encounters and data are still kept).
+-- on = true: updates again. A top edited by hand is rebuilt from the stored
+-- data first, after a restore point; a note whose Notes heading is gone
+-- cannot be (chat line).
+function UN.SetAutoUpdate(id, on)
+    local note = BNB.GetNote(id)
+    if not (note and note.unitAuto) then return end
+    local auto = Copy(note.unitAuto)
+    local title = note.title or ""
+    if not on then
+        auto.off = true
+        BNB.UpdateNote(id, { unitAuto = auto }, { noTouch = true })
+        BNB:Print(string.format(L["PNA_STOPPED"], title))
+        return
+    end
+    auto.off = nil
+    local fields = { unitAuto = auto }
+    local top = UN.SplitAtHead(note.body, auto.head)
+    if auto.edited or not top or UN.Fingerprint(top) ~= auto.fp then
+        if BNB._currentNoteID == id and BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
+        note = BNB.GetNote(id)
+        local _, rest = UN.SplitAtHead(note.body, auto.head)
+        if not (rest and auto.data) then
+            BNB.UpdateNote(id, fields, { noTouch = true })
+            BNB:Print(string.format(L["PNA_NO_HEADING"], title))
+            return
+        end
+        if BNB.HistoryCreateManual then BNB.HistoryCreateManual(id) end
+        local enc = UN.NoteEncounters(note)
+        enc.updated = auto.at
+        local _, newTop = UN.BuildPlayerBody(auto.data, note.richMode, enc)
+        auto.edited, auto.fp = nil, UN.Fingerprint(newTop)
+        fields.body = newTop .. rest
+    end
+    BNB.UpdateNote(id, fields, { noTouch = true })
+    if fields.body then UN.RefreshNoteViews(id) end
+    BNB:Print(string.format(L["PNA_STARTED"], title))
+end
+
+-- Typing above the Notes heading of a note that updates itself: a warning,
+-- once per note per session, with Stop auto-updating / OK. Called by every
+-- note text box on user input (BNB.WireDropTarget: the editor, Focus mode,
+-- sticky inline edit; rich notes are edited as text in those same boxes).
+-- A warning, not a lock: an EditBox cannot protect a range.
+local _warned = {}   -- [noteID] = true once warned this session
+StaticPopupDialogs["BNB_PNA_TOP_WARN"] = {
+    text         = L["PNA_TOP_WARN"],
+    button1      = L["PNA_STOP_BTN"],
+    button2      = L["OK"],
+    OnAccept     = function(_, data) if data then UN.SetAutoUpdate(data, false) end end,
+    timeout      = 0,
+    whileDead    = true,
+    hideOnEscape = true,
+    preferredIndex = 3,
+}
+function UN.OnTopEdit(eb, id)
+    if not id or _warned[id] or not AutoOn() then return end
+    local note = BNB.GetNote(id)
+    if not UN.AutoActive(note) then return end
+    local top = UN.SplitAtHead(eb:GetText() or "", note.unitAuto.head)
+    if not top or (eb:GetCursorPosition() or 0) > #top then return end
+    _warned[id] = true
+    StaticPopup_Show("BNB_PNA_TOP_WARN", note.title or "", nil, id)
+end
+
 local function OnTarget() Handle("target", "Target", true) end
 local function OnMouseover() Handle("mouseover", "Mouseover", true) end
 local function OnGroup()

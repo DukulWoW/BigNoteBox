@@ -290,6 +290,14 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             function() A.fav(noteID) end, { icon = note.favorited and "unfavorite" or "favorite" })
         root:CreateButton(locked and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"],
             function() A.lock(noteID) end, { icon = locked and "unlocked" or "locked" })
+        -- A player note that updates itself (ALL-474): stop / start
+        local UN = BNB.UnitNotes
+        if note.source == "inspect" and note.unitAuto and UN and UN.SetAutoUpdate and BNB.UnitNotesEnabled() then
+            local active = UN.AutoActive(note)
+            local label = L["NL_CTX_PNA_START"]
+            if active then label = L["NL_CTX_PNA_STOP"] end
+            root:CreateButton(label, function() UN.SetAutoUpdate(noteID, not active) end, { icon = "restore-auto" })
+        end
 
         local rich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
         Parent(root, L["NL_CM_ACTIONS"], "action", ClickKey("actions"), {

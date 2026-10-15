@@ -263,6 +263,14 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
         end)
     end
 
+    -- Typing above the Notes heading of a player note that updates itself
+    -- (ALL-474, Features/PlayerNoteAuto.lua); looked up at call time
+    eb:HookScript("OnTextChanged", function(self, userInput)
+        if not userInput then return end
+        local UN = BNB.UnitNotes
+        if UN and UN.OnTopEdit then UN.OnTopEdit(self, noteOf and noteOf() or BNB._currentNoteID) end
+    end)
+
     -- Ctrl+click on a /way line places the waypoint, as a click on the link
     -- in a rich note does (ALL-477); Ctrl+Shift+click opens the map at it.
     -- The click has moved the cursor by OnMouseUp: the line around it is read
