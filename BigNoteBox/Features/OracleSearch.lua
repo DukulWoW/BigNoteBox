@@ -37,10 +37,11 @@ OS.DEFAULT_PREFIXES = {
     c = "char",   g = "global", t = "tasks", a = "alarm",
     x = "rich",   l = "plain", d = "date",
     m = "send",   -- send to chat (ALL-426)
+    o = "options",   -- search Settings instead of notes (ALL-480)
 }
 -- Roles that pick how a result opens (at most one per query) rather than
 -- filtering which notes match.
-OS.OPEN_AS = { sticky = true, focus = true, refbox = true, trash = true, send = true }
+OS.OPEN_AS = { sticky = true, focus = true, refbox = true, trash = true, send = true, options = true }
 
 OS.PREFIX_L_KEYS = {
     s = "ORACLE_PREFIX_STICKY", f = "ORACLE_PREFIX_FOCUS",
@@ -52,6 +53,7 @@ OS.PREFIX_L_KEYS = {
     x = "ORACLE_PREFIX_RICH",   l = "ORACLE_PREFIX_PLAIN",
     d = "ORACLE_PREFIX_DATE",
     m = "ORACLE_PREFIX_SEND",
+    o = "ORACLE_PREFIX_OPTIONS",
 }
 
 -- `d` argument keywords -> date kind. English by default, same L pattern.

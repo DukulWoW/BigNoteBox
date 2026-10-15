@@ -29,6 +29,7 @@ local MAX_ROWS   = 8
 local ROW_GAP    = 2
 local HINT_H     = 18
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"
+local SETTING_ICON = "Interface\\Icons\\INV_Misc_Gear_01"   -- `o` results (ALL-480)
 local BADGE_GAP  = 4
 local BADGE_ART  = "Interface\\AddOns\\BigNoteBox\\Assets\\Search\\"
 
@@ -271,12 +272,12 @@ local function RoleLetter(role)
     end
 end
 
-local OPEN_AS_ORDER = { "sticky", "focus", "refbox", "send", "trash" }
+local OPEN_AS_ORDER = { "sticky", "focus", "refbox", "send", "trash", "options" }
 local FILTER_ORDER  = { "player", "npc", "item", "zone", "char", "global", "tasks", "alarm", "rich", "plain" }
 local ROLE_DESC_KEY = {
     sticky = "ORACLE_PREFIX_DESC_STICKY", focus = "ORACLE_PREFIX_DESC_FOCUS",
     refbox = "ORACLE_PREFIX_DESC_REFBOX", trash = "ORACLE_PREFIX_DESC_TRASH",
-    send   = "ORACLE_PREFIX_DESC_SEND",
+    send   = "ORACLE_PREFIX_DESC_SEND",  options = "ORACLE_PREFIX_DESC_OPTIONS",
     player = "ORACLE_PREFIX_DESC_PLAYER", npc = "ORACLE_PREFIX_DESC_NPC",
     item   = "ORACLE_PREFIX_DESC_ITEM",   zone = "ORACLE_PREFIX_DESC_ZONE",
     char   = "ORACLE_PREFIX_DESC_CHAR",   global = "ORACLE_PREFIX_DESC_GLOBAL",
@@ -537,6 +538,11 @@ end
 local function OpenResult(i)
     local r = results[i]
     if not r then return end
+    -- `o`: a setting (ALL-480), opened in Settings at its row
+    if r.setting then
+        if BNB.OpenSettingsResult and BNB.OpenSettingsResult(r.setting.entry) then AfterOpen() end
+        return
+    end
     local id = r.note.id
     if Oracle._openAs == "trash" then
         if OpenTrashResult(id) then AfterOpen() end
@@ -578,6 +584,20 @@ end
 -- snippet end. The same for every row (Layout sizes it to the row with the
 -- most badges), so the text lines up and does not shift with the badges.
 local function RowText(row, r, textRight, m)
+    -- A setting (`o`, ALL-480): gear icon, its text, where it is; no badges
+    if r.setting then
+        row.icon:SetTexture(SETTING_ICON)
+        if BNB.ApplyIconFrame then BNB.ApplyIconFrame(row.icon, nil) end
+        row.title:SetText(r.setting.text)
+        BNB.SetTextWhite(row.title)
+        row.snippet:SetText(r.setting.path)
+        row.scope:SetText("")
+        for _, badge in pairs(row.badges) do badge:Hide() end
+        row.scope:ClearAllPoints()
+        row.scope:SetPoint("TOPRIGHT", row, "TOPRIGHT", textRight, -4)
+        row.snippet:SetPoint("RIGHT", row, "RIGHT", textRight, 0)
+        return
+    end
     local note = r.note
     local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     row.icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
@@ -738,7 +758,7 @@ end
 -- the menu is for live notes.
 local function ResultMenu(row, i)
     local r = results[i]
-    if not (r and BNB.ShowNoteContextMenu) or Oracle._openAs == "trash" then return end
+    if not (r and r.note and BNB.ShowNoteContextMenu) or Oracle._openAs == "trash" then return end
     SetSelection(i)
     BNB.ShowNoteContextMenu(row, r.note.id, nil, Oracle.Close)
 end
@@ -760,7 +780,7 @@ local function PlaceRows(parent, rowList, list, y, pad, build)
     -- Badge column as wide as the row with the most badges, plus a little
     -- air between badges and text.
     local most = 0
-    for i = 1, n do most = math.max(most, BadgeCount(list[i].note, m)) end
+    for i = 1, n do most = math.max(most, list[i].note and BadgeCount(list[i].note, m) or 0) end
     local textRight = -8
     if most > 0 then textRight = -8 - most * (m.badge + BADGE_GAP) - 4 end
     for i = 1, math.max(MAX_ROWS, #rowList) do
@@ -878,6 +898,26 @@ local function Refresh()
     if showingHelp then
         results = {}
         Layout()
+        return
+    end
+
+    -- `o`: the settings instead of notes (ALL-480, UI/ConfigSearch.lua).
+    -- SearchSettings is nil in combat (Settings cannot be built or opened)
+    if parsed.openAs == "options" then
+        local words = {}
+        for _, w in ipairs(parsed.words) do words[#words + 1] = w end
+        for _, p in ipairs(parsed.phrases) do words[#words + 1] = p end
+        local q = table.concat(words, " ")
+        local hits = BNB.SearchSettings and BNB.SearchSettings(q, MaxRows())
+        results = {}
+        for i, h in ipairs(hits or {}) do results[i] = { setting = h } end
+        if #results == 0 then
+            emptyFS:SetText((not hits and L["COMBAT_BLOCKED"])
+                or (#q < 2 and L["ORACLE_OPTIONS_TYPE"]) or L["CFG_SEARCH_NONE"])
+        end
+        hintFS:SetText(L["ORACLE_HINT_OPTIONS"])
+        Layout()
+        SetSelection(1)
         return
     end
 
@@ -1266,7 +1306,7 @@ function Oracle.RefreshPortraits()
     if not (bar and bar:IsShown() and BNB.SetNpcNotePortrait) then return end
     for i, row in ipairs(rows) do
         local r = results[i]
-        if r and row:IsShown() then BNB.SetNpcNotePortrait(row.icon, r.note) end
+        if r and r.note and row:IsShown() then BNB.SetNpcNotePortrait(row.icon, r.note) end
     end
 end
 

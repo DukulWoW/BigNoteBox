@@ -249,6 +249,8 @@ local function BuildAdvancedTab(sf, ct)
     -- The tools are a sub-page (UI/Config/DevTools.lua, also /bnb debug), only
     -- while the dev addon is loaded; without it a second button gives the link.
     local devPage = K.NewSubPage(L["DEV_WIN_TITLE"], K.BuildDevToolsPage, "devtools")
+    -- Not in the settings search while it cannot be opened (ALL-480)
+    devPage.noSearch = function() return not BNB.IsDevMode() end
     local devOpenBtn = BNB.CreateButton(nil, ct, L["CFG_DEV_OPEN_BTN"], 180, 24)
     devOpenBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y + 2)
     devOpenBtn:SetScript("OnClick", devPage.Open)

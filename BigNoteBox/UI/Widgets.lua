@@ -1240,6 +1240,7 @@ end
 -- draws it. text may be a function (read on every hover). Call LabelHit too, so
 -- the tooltip shows over the label.
 function BNB.CheckTip(cb, text)
+    cb._searchTip = text   -- the settings search reads it (ALL-480)
     cb:SetScript("OnEnter", function(self)
         local t = type(text) == "function" and text() or text
         if not t or t == "" then return end
@@ -1938,6 +1939,8 @@ function BNB.CreateStackedSlider(parent, width, o)
             .. "|cff888888" .. string.format(L["SLIDER_DEFAULT_FMT"], fmt(o.default)) .. "|r"
     end
     lbl:SetText(text)
+    -- The settings search reads the bare label and the tooltip (ALL-480)
+    lbl._searchText, lbl._searchTip = o.label, o.tip
 
     local reset = BNB.CreateButton(nil, h, L["RESET"], RESET_W, 20)
     reset:SetPoint("TOPRIGHT", h, "TOPRIGHT", 0, -16)

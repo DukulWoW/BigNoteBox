@@ -71,6 +71,7 @@ UI\SendToChat.lua
 UI\SendNotePicker.lua
 UI\WaypointLinkPopup.lua
 UI\ConfigWindow.lua
+UI\ConfigSearch.lua
 UI\Config\General.lua
 UI\Config\Appearance.lua
 UI\Config\Modules.lua

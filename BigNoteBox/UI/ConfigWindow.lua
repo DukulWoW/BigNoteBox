@@ -82,6 +82,7 @@ end
 -- included), the back button or closing the window returns to the tab.
 local activeSub  = nil   -- the open page, or nil
 local subPages   = {}    -- key -> page, for pages built with a key (BNB.OpenSettingsPage)
+local allPages   = {}    -- every page, in build order (the settings search, ALL-480)
 local buildOwner = nil   -- { parent, topOffset, idx } while _BuildConfigTabPanels runs
 
 local function CloseSubPage()
@@ -155,6 +156,7 @@ local function AddCheck(ct, y, text, getter, setter, tip)
     lbl:SetPoint("RIGHT", ct,  "RIGHT", 0, 0)
     lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H); lbl:SetText(text)
     cb._lbl = lbl   -- for callers that grey the row out
+    lbl._searchTip = tip   -- the settings search finds a row by its tooltip too (ALL-480)
     return y - (ROW_H + ROW_GAP), cb   -- cb: for an overview-row twin (ALL-84)
 end
 
@@ -229,9 +231,10 @@ end
 local function NewSubPage(title, build, key)
     local o = buildOwner
     local sf, ct = MakeScrollPanel(o.parent, o.topOffset)
-    local page = { sf = sf, ct = ct, idx = o.idx }
+    local page = { sf = sf, ct = ct, idx = o.idx, title = title }
     function page.Open() OpenSubPage(page) end
     if key then subPages[key] = page end
+    allPages[#allPages + 1] = page   -- the settings search walks every page (ALL-480)
 
     -- Back arrow: an icon button, skin look in skin mode (ALL-210). The click
     -- hides the page under the pointer; the button resets itself on hide.
@@ -314,6 +317,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
     else         lbl:SetPoint("RIGHT", ct,   "TOPRIGHT", 0, y - 10) end
     lbl:SetJustifyH("LEFT")
     lbl:SetText(title)
+    lbl._searchTip = page.tip   -- found by the settings search (ALL-480)
     -- The row's checkbox reaches over its title (tooltip and click)
     local rowCb = page.get and tg or (cb and ov) or nil
     if rowCb then BNB.LabelHit(rowCb, lbl) end
@@ -323,6 +327,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
     d:SetWidth(CONTENT_W - TEXT_X); d:SetJustifyH("LEFT"); d:SetWordWrap(true)
     d:SetTextColor(0.65, 0.65, 0.65)
     d:SetText(desc)
+    d._searchOf = lbl   -- a search hit on the description shows the row's title (ALL-480)
     local h = d:GetStringHeight()
     d:SetHeight(h)
     return y - 24 - h - ROW_GAP - 6
@@ -628,6 +633,10 @@ BNB._RefreshConfigFonts = RefreshConfigFonts
 -- SelectTab helper keep working for the classic chrome.
 --------------------------------------------------------------------------------
 function BNB._BuildConfigTabPanels(parent, topOffset)
+    -- The settings search sits on its own row under the tabs (ALL-480,
+    -- UI/ConfigSearch.lua); the panels start below it
+    local search = BNB.CreateConfigSearchRow and BNB.CreateConfigSearchRow(parent, topOffset, PAD)
+    if search then topOffset = topOffset + search.rowH end
     local panels   = {}
     local contents = {}
     for i, tab in ipairs(TABS) do
@@ -649,6 +658,23 @@ function BNB._BuildConfigTabPanels(parent, topOffset)
     -- tab becomes visible, by which point PLAYER_LOGIN + InitFonts have run.
     for i, tab in ipairs(TABS) do
         if tab.key == "appearance" then panels[i]:HookScript("OnShow", RefreshConfigFonts) end
+    end
+
+    -- What the search walks: every tab, then every sub-page, with the path a
+    -- result shows; show(src) opens the tab or page a result is on
+    if search then
+        local sources = {}
+        for i, tab in ipairs(TABS) do
+            sources[#sources + 1] = { idx = i, ct = contents[i], sf = panels[i], path = tab.label() }
+        end
+        for _, p in ipairs(allPages) do
+            sources[#sources + 1] = { idx = p.idx, ct = p.ct, sf = p.sf, page = p,
+                path = TABS[p.idx].label() .. " > " .. (p.title or "") }
+        end
+        search.SetSources(sources, function(src)
+            ReselectTab(src.idx)
+            if src.page then src.page.Open() end
+        end)
     end
 
     return panels, contents
@@ -713,20 +739,19 @@ end
 
 -- Hook called after main window is built (from OpenConfig or externally)
 function BNB.HookConfigHeightTracking()
-    if BNB._configHeightHooked then return end
+    -- Not marked done until the main window exists, so a later call hooks it
+    if BNB._configHeightHooked or not BNB.mainFrame then return end
     BNB._configHeightHooked = true
-    if BNB.mainFrame then
-        BNB.mainFrame:HookScript("OnSizeChanged", SyncConfigHeight)
-        BNB.mainFrame:HookScript("OnShow",        SyncConfigHeight)
-    end
+    BNB.mainFrame:HookScript("OnSizeChanged", SyncConfigHeight)
+    BNB.mainFrame:HookScript("OnShow",        SyncConfigHeight)
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- PUBLIC API
 -- ─────────────────────────────────────────────────────────────────────────────
-function BNB.OpenConfig()
-    if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
-
+-- Builds the window once, hidden. Also called by the Oracle's `o` prefix
+-- (BNB.BuildConfigHidden), which searches Settings before it was ever opened.
+local function EnsureConfigFrame()
     if not cfgFrame then
         -- Chrome is chosen once per session — toggling skinMode requires a reload,
         -- so there's no need to re-create the frame if the setting changes mid-run.
@@ -750,6 +775,27 @@ function BNB.OpenConfig()
         -- Report-a-bug button beside Settings (Retail; ALL-77)
         if BNB.AttachSettingsBugButton then pcall(BNB.AttachSettingsBugButton, cfgFrame) end
     end
+    return cfgFrame
+end
+
+-- True when the window exists (built now if need be); never in combat
+function BNB.BuildConfigHidden()
+    if cfgFrame then return true end
+    if InCombatLockdown() then return false end
+    return EnsureConfigFrame() ~= nil
+end
+
+function BNB.ConfigShown()
+    return cfgFrame ~= nil and cfgFrame:IsShown()
+end
+
+function BNB.OpenConfig()
+    if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
+
+    EnsureConfigFrame()
+    -- Every open: a window built hidden before the main window existed
+    -- (the Oracle's `o`) hooks its height tracking now
+    BNB.HookConfigHeightTracking()
 
     if cfgFrame:IsShown() then cfgFrame:Hide(); return end
 
