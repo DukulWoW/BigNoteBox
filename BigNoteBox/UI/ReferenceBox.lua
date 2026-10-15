@@ -1681,12 +1681,15 @@ RenderList = function()
         -- No transmog on the player: every transmog card is the item worn in
         -- that slot, so the regular list alone is shown (FOR-26). The lists
         -- differ in length anyway (rings, trinkets, neck have no transmog).
+        -- A slot missing from the regular list is not a difference: notes made
+        -- before the Ranged slot was read have a ranged transmog card only.
         if showTmog and showReg then
             local worn = {}
             for _, g in ipairs(regItems) do worn[g.slotIdx or g.slot or 0] = g.id end
             local same = true
             for _, g in ipairs(tmogItems) do
-                if worn[g.slotIdx or g.slot or 0] ~= g.id then same = false; break end
+                local w = worn[g.slotIdx or g.slot or 0]
+                if w and w ~= g.id then same = false; break end
             end
             if same then showTmog = false end
         end

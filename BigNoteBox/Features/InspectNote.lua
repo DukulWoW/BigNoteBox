@@ -110,6 +110,9 @@ local SLOT_INFO = {
     { id = 15, g = "BACKSLOT",          en = "Back" },
     { id = 16, g = "MAINHANDSLOT",      en = "Main Hand" },
     { id = 17, g = "SECONDARYHANDSLOT", en = "Off Hand" },
+    -- Ranged: Forever and Classic (empty on Retail). Without it the transmog
+    -- list had a slot the gear list lacked, and FOR-26 showed both lists
+    { id = 18, g = "RANGEDSLOT",        en = "Ranged" },
     { id = 19, g = "TABARDSLOT",        en = "Tabard" },
 }
 for _, s in ipairs(SLOT_INFO) do
