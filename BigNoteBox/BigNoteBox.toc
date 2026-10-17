@@ -131,6 +131,7 @@ Features\DragDrop.lua
 Features\NoteLinks.lua
 Features\InsertInfo.lua
 Features\Tokens.lua
+Features\NoteTemplates.lua
 UI\ToastStyles.lua
 UI\Toast.lua
 UI\NoteToastWindow.lua

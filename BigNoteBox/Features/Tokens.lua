@@ -27,7 +27,8 @@
 --
 -- Public API:
 --   BNB.Tokens.Fill(text)               -- live tokens filled, for display
---   BNB.Tokens.Snapshot(text)           -- snapshot tokens filled (templates)
+--   BNB.Tokens.Snapshot(text, blank)    -- snapshot tokens filled (templates)
+--   BNB.Tokens.HasSnapshot(text)        -- a snapshot token still in the text
 --   BNB.Tokens.WireExpand(eb, undoID)   -- expand snapshot tokens as typed
 
 local BNB = BigNoteBox
@@ -136,9 +137,27 @@ function T.Fill(text)
 end
 
 -- Snapshot tokens filled, live ones and escapes kept: a note made from a
--- template (ALL-68)
-function T.Snapshot(text)
-    return Replace(text, SNAPSHOT, false)
+-- template (ALL-68). blank = a snapshot token with no value right now
+-- ({{instance}} out in the world) becomes "" instead of staying as typed
+function T.Snapshot(text, blank)
+    if not blank then return Replace(text, SNAPSHOT, false) end
+    if not text or not text:find("{{", 1, true) then return text end
+    return (text:gsub(TOKEN_PAT, function(bs, name, colon, arg)
+        if bs ~= "" or colon ~= "" or arg ~= "" then return nil end
+        local v, known = Value(SNAPSHOT, name)
+        if not known then return nil end
+        return v or ""
+    end))
+end
+
+-- true when the text still holds a snapshot token (a template title whose
+-- {{target}} had no value falls back to the template's name)
+function T.HasSnapshot(text)
+    if not text or not text:find("{{", 1, true) then return false end
+    for bs, name in text:gmatch("(\\?){{(%a[%w_]*)}}") do
+        if bs == "" and SNAPSHOT[name:lower()] then return true end
+    end
+    return false
 end
 
 -- ---------------------------------------------------------------------------

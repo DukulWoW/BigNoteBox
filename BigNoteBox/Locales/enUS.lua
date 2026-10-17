@@ -348,6 +348,102 @@ L["NND_SCOPE_TIP"]        = "Character"
 L["NND_SCOPE_TIP_SUB"]    = "Global notes show on every character; a character's notes show only on that character. The default is set in Settings > Notes."
 L["NND_RICH_TIP_SUB"]     = "Rich notes support {h1} headers, {img} images,\n{col} colours, {icon} icons and {link} links.\nUse the markup toolbar in the editor to insert tags."
 L["NND_CREATE_BTN"]       = "Create"
+-- Template cards and the More page (ALL-68)
+L["NND_TPL_LINE_FMT"]     = "%s: %s"
+L["NND_TPL_MORE_TITLE"]   = "More templates"
+L["NND_TPL_MORE_HINT"]    = "Pick a template, then name your note and press Create."
+
+-- ── Note templates (ALL-68) ──────────────────────────────────────────────────
+-- Title / body / tasks may hold snapshot tokens ({{date}} {{zone}} {{instance}}
+-- {{target}} {{coords}} {{time}}): filled when the note is made, left out when
+-- there is no value. Keep them as they are in a translation. Tags: separated by
+-- commas. Tasks: one per line. Bodies are rich markup ({h2}...{/h2}).
+L["TPL_CARD_BLANK"]       = "Blank"
+L["TPL_CARD_BOSS"]        = "Boss"
+L["TPL_CARD_WEEKLY"]      = "Weekly"
+L["TPL_CARD_JOURNAL"]     = "Journal"
+L["TPL_CARD_MORE"]        = "More"
+L["TPL_BLANK_NAME"]       = "Blank"
+L["TPL_BLANK_DESC"]       = "An empty note."
+L["TPL_MORE_NAME"]        = "More"
+L["TPL_MORE_DESC"]        = "Show the other templates."
+
+L["TPL_BOSS_NAME"]        = "Boss strategy"
+L["TPL_BOSS_DESC"]        = "Abilities, what each role does, phases. Pops up in the instance it was made in."
+L["TPL_BOSS_TITLE"]       = "{{target}}"
+L["TPL_BOSS_TAGS"]        = "raid, boss"
+L["TPL_BOSS_BODY"]        = "{h2}Summary{/h2}\n{col:999999}The fight in one or two lines.{/col}\n\n{h2}Abilities{/h2}\n- \n- \n\n{h2}Tanks{/h2}\n- \n\n{h2}Healers{/h2}\n- \n\n{h2}Damage{/h2}\n- \n\n{h2}Phases{/h2}\n{h3}Phase 1{/h3}\n- \n{h3}Phase 2{/h3}\n- "
+
+L["TPL_DUNGEON_NAME"]     = "Dungeon route"
+L["TPL_DUNGEON_DESC"]     = "Route, dangerous packs and bosses. Pops up in the instance it was made in."
+L["TPL_DUNGEON_TITLE"]    = "{{instance}}"
+L["TPL_DUNGEON_TAGS"]     = "dungeon"
+L["TPL_DUNGEON_BODY"]     = "{h2}Route{/h2}\n1. \n2. \n3. \n\n{h2}Dangerous packs{/h2}\n- \n\n{h2}Bosses{/h2}\n- \n\n{h2}Interrupts and dispels{/h2}\n- "
+
+L["TPL_WEEKLY_NAME"]      = "Weekly checklist"
+L["TPL_WEEKLY_DESC"]      = "A task list that unticks itself at the weekly reset."
+L["TPL_WEEKLY_TITLE"]     = "Weekly checklist"
+L["TPL_WEEKLY_TAGS"]      = "weekly"
+L["TPL_WEEKLY_BODY"]      = "{col:999999}The tasks untick themselves at the weekly reset.{/col}"
+L["TPL_WEEKLY_TASKS"]     = "Weekly quest\nWorld boss\nRaid\nDungeons\nProfession weeklies\nReputation turn-ins"
+
+L["TPL_DAILY_NAME"]       = "Daily checklist"
+L["TPL_DAILY_DESC"]       = "A task list that unticks itself at the daily reset."
+L["TPL_DAILY_TITLE"]      = "Daily checklist"
+L["TPL_DAILY_TAGS"]       = "daily"
+L["TPL_DAILY_BODY"]       = "{col:999999}The tasks untick themselves at the daily reset.{/col}"
+L["TPL_DAILY_TASKS"]      = "Daily quests\nProfession cooldowns\nGathering round\nDaily dungeon"
+
+L["TPL_FARMING_NAME"]     = "Farming route"
+L["TPL_FARMING_DESC"]     = "A route with its stops and what to gather."
+L["TPL_FARMING_TITLE"]    = "Farming: {{zone}}"
+L["TPL_FARMING_TAGS"]     = "farming"
+L["TPL_FARMING_BODY"]     = "{h2}Start{/h2}\n{{coords}}\n\n{h2}Route{/h2}\n1. \n2. \n3. \n\n{h2}What to gather{/h2}\n- \n\n{h2}Notes{/h2}\n- "
+
+L["TPL_COLLECTION_NAME"]  = "Collection hunt"
+L["TPL_COLLECTION_DESC"]  = "A mount, pet, toy or look you are after: where it drops and your tries."
+L["TPL_COLLECTION_TITLE"] = "Collection hunt"
+L["TPL_COLLECTION_TAGS"]  = "collection"
+L["TPL_COLLECTION_BODY"]  = "{h2}Goal{/h2}\n{col:999999}What you are after.{/col}\n\n{h2}Where it drops{/h2}\n- \n\n{h2}Tries{/h2}\n- {{date}}: "
+
+L["TPL_CRAFTING_NAME"]    = "Crafting shopping list"
+L["TPL_CRAFTING_DESC"]    = "What you are making and the materials still to get, as tasks."
+L["TPL_CRAFTING_TITLE"]   = "Shopping list"
+L["TPL_CRAFTING_TAGS"]    = "crafting"
+L["TPL_CRAFTING_BODY"]    = "{h2}Making{/h2}\n{col:999999}What, and how many.{/col}\n\n{h2}Materials{/h2}\n{col:999999}Tick them off in the task list as you get them.{/col}"
+L["TPL_CRAFTING_TASKS"]   = "Material 1\nMaterial 2\nVendor reagents"
+
+L["TPL_PLAYER_NAME"]      = "Player / applicant"
+L["TPL_PLAYER_DESC"]      = "Someone you grouped with or who applied: role, gear and how it went."
+L["TPL_PLAYER_TITLE"]     = "{{target}}"
+L["TPL_PLAYER_TAGS"]      = "player"
+L["TPL_PLAYER_BODY"]      = "{h2}Met{/h2}\n{{zone}}, {{date}}\n\n{h2}Role and gear{/h2}\n- \n\n{h2}How it went{/h2}\n- \n\n{h2}Group again?{/h2}\n- "
+
+L["TPL_GUIDE_NAME"]       = "Guide / quest chain"
+L["TPL_GUIDE_DESC"]       = "Steps to follow in order, ticked off as you go."
+L["TPL_GUIDE_TITLE"]      = "Guide"
+L["TPL_GUIDE_TAGS"]       = "guide"
+L["TPL_GUIDE_BODY"]       = "{h2}What it is for{/h2}\n{col:999999}The reward, or why it is worth doing.{/col}\n\n{h2}Before you start{/h2}\n- \n\n{h2}Steps{/h2}\n{col:999999}The steps are in the task list.{/col}"
+L["TPL_GUIDE_TASKS"]      = "Step 1\nStep 2\nStep 3"
+
+L["TPL_ALTS_NAME"]        = "Alt status"
+L["TPL_ALTS_DESC"]        = "Your characters at a glance: level, gear, professions and what is left to do."
+L["TPL_ALTS_TITLE"]       = "Alt status"
+L["TPL_ALTS_TAGS"]        = "alts"
+L["TPL_ALTS_BODY"]        = "{h2}Characters{/h2}\n- Name: level, item level, professions\n- \n- \n\n{h2}To do{/h2}\n- "
+
+L["TPL_RAIDNIGHT_NAME"]   = "Raid night"
+L["TPL_RAIDNIGHT_DESC"]   = "The plan for tonight and a task list to get ready."
+L["TPL_RAIDNIGHT_TITLE"]  = "Raid night {{date}}"
+L["TPL_RAIDNIGHT_TAGS"]   = "raid"
+L["TPL_RAIDNIGHT_BODY"]   = "{h2}Plan{/h2}\nRaid: \nStart: \n\n{h2}Bosses{/h2}\n- \n\n{h2}After{/h2}\n- "
+L["TPL_RAIDNIGHT_TASKS"]  = "Repair\nFlasks\nFood\nRunes and oils\nAddons updated"
+
+L["TPL_JOURNAL_NAME"]     = "Journal"
+L["TPL_JOURNAL_DESC"]     = "A dated entry for your adventures."
+L["TPL_JOURNAL_TITLE"]    = "Journal {{date}}"
+L["TPL_JOURNAL_TAGS"]     = "journal"
+L["TPL_JOURNAL_BODY"]     = "{col:999999}{{time}}, {{zone}}{/col}\n\n"
 
 -- ── ESC -> Options -> Addons panel ────────────────────────────────────────────
 L["OPT_TITLE"]            = "|cff66bb6aBigNoteBox|r"

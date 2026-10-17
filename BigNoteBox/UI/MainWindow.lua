@@ -315,7 +315,8 @@ local WINDOWS = {
     -- right-click menu (it takes ESC itself while it has the keyboard; this
     -- catches the rest)
     { name = "BNBNewNoteDialogFrame",
-      esc       = function() Call(BNB.NewNoteDialog, "Close") end,
+      -- The More templates page goes back to the dialog first (ALL-68)
+      esc       = function(w) if not w:PageBack() then Call(BNB.NewNoteDialog, "Close") end end,
       companion = function() Call(BNB.NewNoteDialog, "Close") end },
     { name = "BNBClipboardHintFrame",
       esc = function() Call(BNB._clipboardHint, "_dismiss") end },

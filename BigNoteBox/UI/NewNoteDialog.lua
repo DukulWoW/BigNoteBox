@@ -4,6 +4,9 @@
 -- Parented to BNB.mainFrame on first open so it moves with it and sits centred
 -- on it. The main window is dimmed with a black overlay while the dialog is open.
 -- ESC / Cancel closes without creating. Create is disabled until a title is typed.
+-- Template cards under the title (ALL-68): Blank, Boss, Weekly, Journal, More;
+-- More opens a second page in the dialog (f:AddPage "more") with the rest.
+-- Templates themselves: Features/NoteTemplates.lua.
 --
 -- Public API:
 --   BNB.NewNoteDialog.Open()
@@ -33,6 +36,24 @@ local SCOPE_W  = 130   -- character dropdown right of the title (ALL-267)
 local CARD_H   = 38
 local CARD_GAP = 4
 
+-- Template cards under the title row (ALL-68): Blank, three templates, More.
+-- Art is 64x64 (Assets/Templates/tmp-<art>.tga, Dukul's): normal mode draws
+-- its -hover glow behind the card (white on hover, BNB green while picked);
+-- skin mode tints the white tmp-skin-<art> card (skin text colour, accent
+-- while picked) and draws the one tmp-skin-hover behind it on hover
+-- (Dukul, 2026-10-17).
+local TPL_N      = 5
+local TPL_GAP    = 4
+local TPL_CARD_W = math.floor((DLG_CW - TPL_GAP * (TPL_N - 1)) / TPL_N)   -- 76
+local TPL_ART    = 64
+local TPL_LBL_H  = 14
+local TPL_CARD_H = TPL_ART + 2 + TPL_LBL_H
+local TPL_LINE_H = 14
+local TPL_BLOCK_H = TPL_CARD_H + 4 + TPL_LINE_H + 8
+local TPL_ART_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Templates\\tmp-"
+local TPL_GREEN  = { 0.40, 0.85, 0.40 }   -- BNB green (NoteList COL_SEL_BG)
+local TPL_ROW_H  = 36   -- More page rows
+
 -- ---------------------------------------------------------------------------
 -- MODULE STATE
 -- ---------------------------------------------------------------------------
@@ -61,6 +82,16 @@ local _scopeDD        = nil   -- which character the note belongs to (ALL-267)
 local _scopeEntries   = {}    -- filled on every Open (knownChars can change)
 local _wowCheck        = nil
 local _refreshLSM      = nil   -- LSM font dropdown closed-state refresh (ALL-41)
+
+-- Templates (ALL-68): the picked one (nil = Blank), its cards, the line
+-- under them, the More page rows, and the title a template last filled in
+-- (replaced by the next pick, left alone once the player typed their own)
+local _selTpl    = nil
+local _tplCards  = {}
+local _tplLine   = nil
+local _tplRows   = {}
+local _tplTitle  = nil
+local _tplSkin   = false
 
 -- Font preview in the picked font at the picked size. One resolver for every
 -- pick (card, LSM, WoW Default, none), so "Use WoW's default font" shows too:
@@ -243,6 +274,219 @@ local function ApplyTitleFont()
 end
 
 -- ---------------------------------------------------------------------------
+-- TEMPLATES (ALL-68)
+-- ---------------------------------------------------------------------------
+local function IsQuick(key)
+    for _, k in ipairs(BNB.Templates.QUICK) do if k == key then return true end end
+    return false
+end
+
+-- Skin hover hue (Dukul, 2026-10-17: "based on the lightest part of the
+-- skin"): the border colour, the lightest of a preset's own colours, at the
+-- brightest shade of its hue. A border with no colour (OLED flat) = the text grey.
+local function SkinHoverOf(p)
+    local r, g, b = BNB.SkinBorderOf(p)
+    local mx = math.max(r, g, b)
+    if mx <= 0 then return BNB.SkinTextOf(p) end
+    return r / mx, g / mx, b / mx
+end
+
+-- Card states: picked = Blank with nothing picked, More with a More page
+-- template, or the card's own template
+local function PaintTplCards()
+    local skin = _tplSkin   -- the art was picked for the mode the dialog was built in
+    local p = skin and BNB.GetSkinPreset()
+    local hr, hg, hb
+    if skin then hr, hg, hb = SkinHoverOf(p) end
+    for _, c in ipairs(_tplCards) do
+        local picked = (c.key == "blank" and _selTpl == nil)
+            or (c.key == "more" and _selTpl ~= nil and not IsQuick(_selTpl))
+            or (c.key == _selTpl)
+        if skin then
+            if picked then c.art:SetVertexColor(BNB.SkinAccentOf(p))
+            else c.art:SetVertexColor(BNB.SkinTextOf(p)) end
+            c.glow:SetVertexColor(hr, hg, hb)
+            c.glow:SetShown(c._hover == true)
+        else
+            c.glow:SetShown(picked or c._hover == true)
+            if picked then c.glow:SetVertexColor(TPL_GREEN[1], TPL_GREEN[2], TPL_GREEN[3])
+            else c.glow:SetVertexColor(1, 1, 1) end
+        end
+        if picked then BNB.SetHeaderColor(c.lbl) else BNB.SetTextWhite(c.lbl, 0.85) end
+    end
+    for _, r in ipairs(_tplRows) do
+        BNB.PaintSelectCard(r, r.key == _selTpl and "sel" or (r._hover and "hover") or nil, r.nameLbl)
+    end
+    if _tplLine then
+        local tpl = BNB.Templates.Get(_selTpl)
+        _tplLine:SetText(string.format(L["NND_TPL_LINE_FMT"],
+            L[tpl and tpl.name or "TPL_BLANK_NAME"], L[tpl and tpl.desc or "TPL_BLANK_DESC"]))
+    end
+end
+BNB.RegisterMessage("NewNoteDialog.TplCards", "SkinChanged", function() PaintTplCards() end)
+
+local function CurrentTitle()
+    if not _titleEB or _titleEB._showingPlaceholder then return "" end
+    return _titleEB:GetText() or ""
+end
+
+-- A pick fills the dialog (Dukul, 2026-10-17): icon, title colour, Rich, and
+-- a suggested title while the box is empty or still holds the last
+-- template's. Everything stays editable; Blank puts the defaults back.
+local function PickTemplate(key)
+    local tpl = BNB.Templates.Get(key)
+    _selTpl = tpl and tpl.key or nil
+    local title = CurrentTitle()
+    local ownTitle = title ~= "" and title ~= _tplTitle
+    if tpl then
+        _selIcon  = tpl.icon
+        _selColor = tpl.color and { r = tpl.color.r, g = tpl.color.g, b = tpl.color.b } or nil
+        _selRich  = BNB.RichEnabled()
+        if not ownTitle then
+            _tplTitle = BNB.Templates.Title(tpl)
+            _titleEB:SetRealText(_tplTitle)
+        end
+    else
+        _selIcon  = RandomNoteIcon()
+        _selColor = nil
+        _selRich  = BNB.RichEnabled() and (BigNoteBoxDB and BigNoteBoxDB.newNotesRichByDefault) == true
+        if not ownTitle then
+            _tplTitle = nil
+            _titleEB:SetRealText("")
+        end
+    end
+    if _richCheck then _richCheck:SetChecked(_selRich) end
+    if _createBtn then _createBtn:SetEnabled(CurrentTitle() ~= "") end
+    ShowSelIcon()
+    RefreshColorHighlight()
+    PaintTplCards()
+end
+
+local function TplTooltip(owner, nameKey, descKey)
+    GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
+    GameTooltip:AddLine(L[nameKey], 1, 1, 1)
+    GameTooltip:AddLine(L[descKey], 0.8, 0.8, 0.8, true)
+    GameTooltip:Show()
+end
+
+-- The five cards in one row at y (from the page top), and the line under them
+local function BuildTplCards(f, body, y, skinMode)
+    _tplCards = {}
+    _tplSkin = skinMode and true or false
+    for i, key in ipairs(BNB.Templates.QUICK) do
+        local tpl = BNB.Templates.Get(key)
+        local art = tpl and tpl.art or key
+        local btn = CreateFrame("Button", nil, body)
+        btn:SetSize(TPL_CARD_W, TPL_CARD_H)
+        btn:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD + (i - 1) * (TPL_CARD_W + TPL_GAP), y)
+
+        local glow = btn:CreateTexture(nil, "BACKGROUND")
+        glow:SetSize(TPL_ART, TPL_ART)
+        glow:SetPoint("TOP", btn, "TOP", 0, 0)
+        glow:SetTexture(TPL_ART_PATH .. (skinMode and "skin-hover" or (art .. "-hover")))
+        glow:Hide()
+
+        local tex = btn:CreateTexture(nil, "ARTWORK")
+        tex:SetSize(TPL_ART, TPL_ART)
+        tex:SetPoint("TOP", btn, "TOP", 0, 0)
+        tex:SetTexture(TPL_ART_PATH .. (skinMode and ("skin-" .. art) or art))
+
+        local lbl = body:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        lbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  0, -(TPL_ART + 2))
+        lbl:SetPoint("TOPRIGHT", btn, "TOPRIGHT", 0, -(TPL_ART + 2))
+        lbl:SetHeight(TPL_LBL_H); lbl:SetJustifyH("CENTER"); lbl:SetWordWrap(false)
+        lbl:SetText(L["TPL_CARD_" .. key:upper()])
+
+        local c = { key = key, btn = btn, art = tex, glow = glow, lbl = lbl }
+        btn:SetScript("OnEnter", function(self)
+            c._hover = true; PaintTplCards()
+            TplTooltip(self, tpl and tpl.name or ("TPL_" .. key:upper() .. "_NAME"),
+                tpl and tpl.desc or ("TPL_" .. key:upper() .. "_DESC"))
+        end)
+        btn:SetScript("OnLeave", function()
+            c._hover = false; PaintTplCards(); GameTooltip:Hide()
+        end)
+        btn:SetScript("OnHide", function() c._hover = false end)
+        btn:SetScript("OnClick", function()
+            if key == "more" then f:ShowPage("more")
+            elseif key == "blank" then PickTemplate(nil)
+            else PickTemplate(key) end
+        end)
+        _tplCards[#_tplCards + 1] = c
+    end
+
+    local line = body:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    line:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD, y - TPL_CARD_H - 4)
+    line:SetPoint("TOPRIGHT", f, "TOPRIGHT", -DLG_PAD, y - TPL_CARD_H - 4)
+    line:SetHeight(TPL_LINE_H); line:SetJustifyH("LEFT"); line:SetWordWrap(false)
+    line:SetTextColor(0.65, 0.65, 0.65, 1)
+    _tplLine = line
+end
+
+-- The More page: every template not on a card, one row each. A pick goes
+-- back to the main page with it picked.
+local function BuildMorePage(f, top)
+    local page = f:AddPage("more", { top = top, pad = DLG_PAD })
+    page:SetHeading(L["NND_TPL_MORE_TITLE"])
+
+    local hint = page:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    hint:SetPoint("TOPLEFT",  page, "TOPLEFT",  DLG_PAD, -(page.top + 2))
+    hint:SetPoint("TOPRIGHT", page, "TOPRIGHT", -DLG_PAD, -(page.top + 2))
+    hint:SetJustifyH("LEFT")
+    hint:SetTextColor(0.65, 0.65, 0.65, 1)
+    hint:SetText(L["NND_TPL_MORE_HINT"])
+
+    local sf, ct = BNB.CreateAutoScrollPanel(page, DLG_CW - 24, DLG_CW)
+    sf:SetPoint("TOPLEFT", page, "TOPLEFT", DLG_PAD, -(page.top + 20))
+    sf:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -DLG_PAD, DLG_FOOT + 2)
+
+    _tplRows = {}
+    local y = 0
+    for _, tpl in ipairs(BNB.Templates.More()) do
+        local row = BNB.CreateBackdropFrame("Button", nil, ct)
+        BNB.SetBackdrop(row, 0.06, 0.06, 0.08, 0.95, 0.28, 0.28, 0.30, 1)
+        row:SetHeight(TPL_ROW_H)
+        row:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
+        row:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
+
+        local icon = row:CreateTexture(nil, "ARTWORK")
+        icon:SetSize(TPL_ROW_H - 8, TPL_ROW_H - 8)
+        icon:SetPoint("LEFT", row, "LEFT", 4, 0)
+        icon:SetTexture(tpl.icon)
+        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+        local nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        nameLbl:SetPoint("TOPLEFT",  icon, "TOPRIGHT", 8, -1)
+        nameLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+        nameLbl:SetJustifyH("LEFT"); nameLbl:SetWordWrap(false)
+        nameLbl:SetText(L[tpl.name])
+
+        local descLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        descLbl:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 8, 1)
+        descLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+        descLbl:SetJustifyH("LEFT"); descLbl:SetWordWrap(false)
+        descLbl:SetTextColor(0.65, 0.65, 0.65, 1)
+        descLbl:SetText(L[tpl.desc])
+
+        row.key, row.nameLbl = tpl.key, nameLbl
+        row:SetScript("OnEnter", function(self)
+            self._hover = true; PaintTplCards()
+            TplTooltip(self, tpl.name, tpl.desc)
+        end)
+        row:SetScript("OnLeave", function(self)
+            self._hover = false; PaintTplCards(); GameTooltip:Hide()
+        end)
+        row:SetScript("OnClick", function()
+            PickTemplate(tpl.key)
+            f:PageBack()
+        end)
+        _tplRows[#_tplRows + 1] = row
+        y = y - TPL_ROW_H - 2
+    end
+    sf:FinaliseHeight(-y)
+end
+
+-- ---------------------------------------------------------------------------
 -- BUILD DIALOG (once; re-parented to mainFrame on first Open)
 -- ---------------------------------------------------------------------------
 local function BuildDialog()
@@ -258,6 +502,8 @@ local function BuildDialog()
         onClose = function() NND.Close() end,
     })
     local skinMode = f._isSkin
+    -- Two pages (ALL-68): the dialog, and the More templates page
+    local body = f:AddPage("main")
 
     f:HookScript("OnHide", function()
         ShowMainOverlay(false)
@@ -270,7 +516,7 @@ local function BuildDialog()
     -- ── TOP ROW: icon + title editbox ────────────────────────────────────────
     local topY = skinMode and -(BNB.TOOL_SKIN_TITLE_H + 8) or -36
 
-    local iconBtn = BNB.CreateBackdropFrame("Button", nil, f)
+    local iconBtn = BNB.CreateBackdropFrame("Button", nil, body)
     BNB.SetBackdrop(iconBtn, 0.06, 0.06, 0.09, 0.95, 0.35, 0.35, 0.38, 1)
     iconBtn:SetSize(ICON_SZ, ICON_SZ)
     iconBtn:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD, topY)
@@ -309,7 +555,7 @@ local function BuildDialog()
 
     -- Character dropdown at the right end of the title row (ALL-267)
     FillScopeEntries()
-    local scopeDD = BNB.CreateValueDropdown(f, _scopeEntries, "global", nil, SCOPE_W, 26)
+    local scopeDD = BNB.CreateValueDropdown(body, _scopeEntries, "global", nil, SCOPE_W, 26)
     scopeDD:SetPoint("TOPRIGHT", f, "TOPRIGHT", -DLG_PAD, topY - (ICON_SZ - 26) / 2)
     local scopeTipOwner = scopeDD._dd or scopeDD
     scopeTipOwner:HookScript("OnEnter", function(self)
@@ -322,7 +568,7 @@ local function BuildDialog()
     _scopeDD = scopeDD
 
     -- Title editbox — 20pt bold, same as the main note editor title
-    local titleBg = BNB.CreateBackdropFrame("Frame", nil, f)
+    local titleBg = BNB.CreateBackdropFrame("Frame", nil, body)
     BNB.SetBackdrop(titleBg, 0.06, 0.06, 0.09, 0.85, 0.35, 0.35, 0.38, 1)
     titleBg:SetPoint("TOPLEFT",  iconBtn, "TOPRIGHT",  6, 0)
     titleBg:SetPoint("TOPRIGHT", scopeDD, "TOPLEFT",  -6, (ICON_SZ - 26) / 2)
@@ -349,18 +595,20 @@ local function BuildDialog()
     _titleEB = titleEB
 
     -- ── COLUMN ANCHORS ───────────────────────────────────────────────────────
-    local contentY = topY - ICON_SZ - 10
+    -- Template cards between the title row and the columns (ALL-68)
+    BuildTplCards(f, body, topY - ICON_SZ - 8, skinMode)
+    local contentY = topY - ICON_SZ - 10 - TPL_BLOCK_H
 
-    local colL = CreateFrame("Frame", nil, f)
+    local colL = CreateFrame("Frame", nil, body)
     colL:SetSize(COL_L_W, 1)
     colL:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD, contentY)
 
-    local colR = CreateFrame("Frame", nil, f)
+    local colR = CreateFrame("Frame", nil, body)
     colR:SetSize(COL_R_W, 1)
     colR:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD + COL_L_W + COL_GAP, contentY)
 
     -- ── LEFT COLUMN: font cards ───────────────────────────────────────────────
-    local fontHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local fontHdr = body:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     fontHdr:SetPoint("TOPLEFT", colL, "TOPLEFT", 0, 0)
     fontHdr:SetWidth(COL_L_W); fontHdr:SetJustifyH("LEFT")
     fontHdr:SetText(L["NND_FONT_HDR"])
@@ -389,7 +637,7 @@ local function BuildDialog()
         local xOff = col * (cardW + CARD_GAP)
         local yOff = leftY - grow * (CARD_H + CARD_GAP)
 
-        local btn = BNB.CreateBackdropFrame("Button", nil, f)
+        local btn = BNB.CreateBackdropFrame("Button", nil, body)
         BNB.SetBackdrop(btn, 0.06, 0.06, 0.08, 0.95, 0.28, 0.28, 0.30, 1)
         btn:SetSize(cardW, CARD_H)
         btn:SetPoint("TOPLEFT", colL, "TOPLEFT", xOff, yOff)
@@ -422,20 +670,20 @@ local function BuildDialog()
     -- The grid always reserves its 4 rows; free rows carry the font pack hint.
     local usedRows     = math.ceil(#fonts / 2)
     local fontGridRows = math.max(BNB.FONT_GRID_ROWS, usedRows)
-    BNB.AddFontPackHint(f, colL, 0, leftY - usedRows * (CARD_H + CARD_GAP),
+    BNB.AddFontPackHint(body, colL, 0, leftY - usedRows * (CARD_H + CARD_GAP),
         COL_L_W, (fontGridRows - usedRows) * (CARD_H + CARD_GAP) - CARD_GAP)
     local WOW_CHECK_H  = 22
     local leftColH = 18 + fontGridRows * (CARD_H + CARD_GAP) - CARD_GAP + WOW_CHECK_H
 
     -- WoW Default checkbox, below the grid instead of a 9th card. Latin set only;
     -- its row is kept either way so the dialog does not change size.
-    local wowCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    local wowCheck = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
     BNB.LabelHit(wowCheck)   -- the tooltip and click reach over its label too
     wowCheck:SetShown(BNB.ShowWoWFontCheckbox())
     wowCheck:SetSize(18, 18)
     wowCheck:SetPoint("TOPLEFT", colL, "TOPLEFT", 0,
         leftY - fontGridRows * (CARD_H + CARD_GAP) + CARD_GAP - 2)
-    local wowLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    local wowLbl = body:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     wowLbl:SetPoint("LEFT",  wowCheck, "RIGHT", 4, 0)
     wowLbl:SetPoint("RIGHT", colL,     "RIGHT", 0, 0)
     wowLbl:SetJustifyH("LEFT")
@@ -481,7 +729,7 @@ local function BuildDialog()
     -- ── RIGHT COLUMN: title colour + font size ───────────────────────────────
     local rightY = 0
 
-    local colorHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local colorHdr = body:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     colorHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     colorHdr:SetWidth(COL_R_W); colorHdr:SetJustifyH("LEFT")
     colorHdr:SetText(L["NND_TITLE_COLOR_HDR"])
@@ -498,7 +746,7 @@ local function BuildDialog()
         for i, c in ipairs(pal) do
             local col = (i - 1) % COLS
             local row = math.floor((i - 1) / COLS)
-            local sw  = CreateFrame("Button", nil, f)
+            local sw  = CreateFrame("Button", nil, body)
             sw:SetSize(SZ, SZ)
             sw:SetPoint("TOPLEFT", colR, "TOPLEFT",
                 col * (SZ + GAP),
@@ -539,7 +787,7 @@ local function BuildDialog()
         end
         -- The colour picker tile in the last slot, as every colour grid (Dukul 2026-10-06)
         local n = #pal
-        local tile = BNB.CreateColorPickerTile(f, SZ, function()
+        local tile = BNB.CreateColorPickerTile(body, SZ, function()
             if _selColor then return _selColor.r, _selColor.g, _selColor.b end
         end, function(r, g, b, cancelled)
             if cancelled and not _selColor then return end
@@ -556,7 +804,7 @@ local function BuildDialog()
     end
 
     -- Font size — header label above, slider below, filling full column width
-    local sizeHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local sizeHdr = body:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     sizeHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sizeHdr:SetWidth(COL_R_W); sizeHdr:SetJustifyH("LEFT")
     sizeHdr:SetText(L["NND_FONT_SIZE_HDR"])
@@ -565,7 +813,7 @@ local function BuildDialog()
 
     local defaultSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     -- Stacked slider with Reset (ALL-121); the header above is its label
-    local szWidget = BNB.CreateStackedSlider(f, COL_R_W, {
+    local szWidget = BNB.CreateStackedSlider(body, COL_R_W, {
         label = "", min = 8, max = 32, value = defaultSize, default = defaultSize,
         fmt = function(v) return string.format(L["NND_PT_SUFFIX_FMT"], v) end,
         onChange = function(v)
@@ -578,14 +826,14 @@ local function BuildDialog()
     _sizeSlider = szWidget
 
     -- Font size preview label — live sample text at current size
-    local sampleHdr = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local sampleHdr = body:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     sampleHdr:SetPoint("TOPLEFT", colR, "TOPLEFT", 0, rightY)
     sampleHdr:SetWidth(COL_R_W); sampleHdr:SetJustifyH("LEFT")
     sampleHdr:SetText(L["NND_SAMPLE_SIZE_HDR"])
     sampleHdr:SetTextColor(0.8, 0.8, 0.8, 1)
     rightY = rightY - 18
 
-    local previewLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    local previewLbl = body:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     previewLbl:SetPoint("TOPLEFT",  colR, "TOPLEFT",  0, rightY)
     previewLbl:SetPoint("TOPRIGHT", colR, "TOPRIGHT", 0, rightY)
     previewLbl:SetJustifyH("CENTER")
@@ -609,12 +857,12 @@ local function BuildDialog()
     -- (ALL-29 fix: the two used to disagree, so the checkbox overlapped the footer).
     local colMaxH = math.max(math.abs(leftColH or 0), math.abs(rightY))
     local chromeTopH = skinMode and (BNB.TOOL_SKIN_TITLE_H + 8) or 36
-    local richCheck = CreateFrame("CheckButton", nil, f, "UICheckButtonTemplate")
+    local richCheck = CreateFrame("CheckButton", nil, body, "UICheckButtonTemplate")
     BNB.LabelHit(richCheck)   -- the tooltip and click reach over its label too
     richCheck:SetSize(20, 20)
     richCheck:SetPoint("TOPLEFT", f, "TOPLEFT", DLG_PAD,
-        -chromeTopH - ICON_SZ - 10 - colMaxH - 4)
-    local richLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        -chromeTopH - ICON_SZ - 10 - TPL_BLOCK_H - colMaxH - 4)
+    local richLbl = body:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     richLbl:SetPoint("LEFT",  richCheck, "RIGHT",  4, 0)
     richLbl:SetPoint("RIGHT", f,         "RIGHT", -DLG_PAD, 0)
     richLbl:SetJustifyH("LEFT")
@@ -646,8 +894,9 @@ local function BuildDialog()
 
     -- ── FOOTER ───────────────────────────────────────────────────────────────
     local totalContentH = colMaxH + RICH_ROW_H
-    local dlgH = chromeTopH + ICON_SZ + 10 + totalContentH + DLG_FOOT + 8
+    local dlgH = chromeTopH + ICON_SZ + 10 + TPL_BLOCK_H + totalContentH + DLG_FOOT + 8
     f:SetHeight(dlgH)
+    BuildMorePage(f, chromeTopH - 8)
 
     createBtn:SetScript("OnClick", function() NND.Confirm() end)
     createBtn:SetEnabled(false)   -- disabled until user types a title
@@ -706,6 +955,11 @@ function NND.Open()
 
     RefreshFontHighlight()
     RefreshColorHighlight()
+
+    -- Blank picked, the main page shown (ALL-68)
+    _selTpl, _tplTitle = nil, nil
+    f:ShowPage("main")
+    PaintTplCards()
 
     -- Reset slider to global font size
     if _sizeSlider then
@@ -774,6 +1028,9 @@ function NND.Confirm()
     local scope = _scopeDD and _scopeDD:GetSelected()
     if scope then updates.scope = scope end   -- ALL-267
     BNB.UpdateNote(id, updates)
+    -- Body, tags, tasks and situation from the picked template (ALL-68)
+    local tpl = BNB.Templates.Get(_selTpl)
+    if tpl then BNB.Templates.Fill(id, tpl, _selRich) end
 
     if not BNB.mainFrame then BNB.CreateMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
