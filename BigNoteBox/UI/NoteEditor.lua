@@ -6,7 +6,7 @@ local L   = BNB.L
 BNB._coordWaypoint = nil  -- TomTom UID of the current BNB coord waypoint, or nil
 
 local TOOLBAR_H   = 36
-local MARKUP_H    = 24   -- height of the rich note markup toolbar
+local MARKUP_H    = 28   -- height of the rich note markup toolbar (= WYSIWYG_H, Dukul 2026-10-17)
 local PAD         = 8
 local TSTAMP_H    = 16   -- height of the timestamp strip below title
 local CHIP_ROW_H  = 22   -- height of one row of tag chips
@@ -141,6 +141,14 @@ local function FmtClockPart(ts, use24)
     return h .. ":" .. m .. " " .. ampm
 end
 
+-- "3 weeks ago" / "1 week ago": REL_<unit>_AGO_FMT, REL_<unit>_AGO_ONE for one
+local function Ago(n, unit)
+    if n == 1 then return L["REL_" .. unit .. "_AGO_ONE"] end
+    return string.format(L["REL_" .. unit .. "_AGO_FMT"], n)
+end
+
+local FitStatsRow   -- the row under the title on a narrow window, defined by UpdateStatsStrip
+
 local function FmtTime(ts)
     if not ts or ts == 0 then return "" end
     local db       = BigNoteBoxDB
@@ -153,9 +161,10 @@ local function FmtTime(ts)
         elseif diff < 3600   then return string.format(L["REL_MIN_AGO_FMT"],    math.floor(diff/60))
         elseif diff < 86400  then return string.format(L["REL_HOUR_AGO_FMT"],   math.floor(diff/3600))
         elseif diff < 604800 then return string.format(L["REL_DAY_AGO_FMT"],    math.floor(diff/86400))
-        elseif diff < 2592000 then return string.format(L["REL_WEEK_AGO_FMT"],  math.floor(diff/604800))
-        elseif diff < 31536000 then return string.format(L["REL_MONTH_AGO_FMT"], math.floor(diff/2592000))
-        else return string.format(L["REL_YEAR_AGO_FMT"], math.floor(diff/31536000)) end
+        -- Weeks, months, years are words: one of them has its own key (ALL-488)
+        elseif diff < 2592000 then return Ago(math.floor(diff/604800), "WEEK")
+        elseif diff < 31536000 then return Ago(math.floor(diff/2592000), "MONTH")
+        else return Ago(math.floor(diff/31536000), "YEAR") end
     end
 
     return FmtDatePart(ts, fmt) .. " " .. FmtClockPart(ts, use24)
@@ -344,6 +353,9 @@ local function BuildTitleField(parent)
     end)
     tsHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._editorTsHover = tsHover   -- hidden with the strip in a rich note's Note view (ALL-286)
+    -- Narrow window: the row gives way on the next frame (FitStatsRow, ALL-487)
+    local function FitLater() BNB.Debounce("editorStatsFit", 0, FitStatsRow) end
+    parent:HookScript("OnSizeChanged", FitLater)
 
     -- Word/char count label (M) — right-aligned in the same strip
     local statsStrip = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -545,19 +557,54 @@ local function RefreshMarkupWarn()
     if GameTooltip:IsOwned(warn) then warn:GetScript("OnEnter")(warn) end
 end
 
+-- The row under the title on a narrow window (ALL-487, Dukul 2026-10-17):
+-- the dates / coords on the left and the counts on the right ran into each
+-- other. In order, until both fit: the coords go (they are in the hover box),
+-- the dates go short ("C: ... - E: ..."), the counts become words only, the
+-- counts go. Each strip keeps its texts (tsStrip._parts, statsStrip._full /
+-- _short); runs after every text change and, on the next frame, after a
+-- size change of the pane, never inside OnSizeChanged.
+FitStatsRow = function()
+    local ts, st, warn = BNB._editorTimestamp, BNB._editorStatsStrip, BNB._editorMarkupWarn
+    if not (ts and st and st._full) then return end
+    local W = ts:GetWidth() or 0
+    if W <= 0 then return end
+    local p = ts._parts
+    local left  = p and { p.full, p.noCoords, p.short } or {}
+    local right = { st._full, st._short, "" }
+    local steps = { { 1, 1 }, { 2, 1 }, { 3, 1 }, { 3, 2 }, { 3, 3 } }
+    local warnW = (warn and warn:IsShown()) and (warn:GetWidth() + 12) or 0
+    -- The text's own width, not the part the strip has room for
+    local function TW(fs) return fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth() or fs:GetStringWidth() end
+    for i, s in ipairs(steps) do
+        if left[s[1]] then ts:SetText(left[s[1]]) end
+        st:SetText(right[s[2]])
+        local lw = p and TW(ts) or 0
+        if lw + TW(st) + warnW + 16 <= W or i == #steps then break end
+    end
+    if warn and warn:IsShown() then
+        warn:ClearAllPoints()
+        warn:SetPoint("RIGHT", st, "RIGHT", -(st:GetStringWidth() + 12), 0)
+    end
+end
+
 local function UpdateStatsStrip(text)
     local strip = BNB._editorStatsStrip
     if not strip then return end
+    local fmt = BreakUpLargeNumbers or tostring
     if not text or text == "" then
-        strip:SetText(L["NE_STATS_EMPTY"])
+        strip._full  = L["NE_STATS_EMPTY"]
+        strip._short = string.format(L["NE_STATS_WORDS_FMT"], "0")
     else
         local chars = #text
         local words = 0
         for _ in text:gmatch("%S+") do words = words + 1 end
-        local fmt = BreakUpLargeNumbers or tostring
-        strip:SetText(string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words)))
+        strip._full  = string.format(L["NE_STATS_FMT"], fmt(chars), fmt(words))
+        strip._short = string.format(L["NE_STATS_WORDS_FMT"], fmt(words))
     end
+    strip:SetText(strip._full)
     RefreshMarkupWarn()
+    FitStatsRow()
 end
 
 -- Typing updates the strip once the keys pause (PERF-04): the word count
@@ -1667,8 +1714,14 @@ function BNB.LoadNoteInEditor(id)
         else
             coords = L["NE_TS_SEP_UNKNOWN"]
         end
+        -- The shorter forms for a narrow window (FitStatsRow, ALL-487)
+        local short = (note.created and string.format(L["NE_TS_CREATED_SHORT_FMT"], FmtTime(note.created)) or "")
+            .. (note.updated and string.format(L["NE_TS_SEP_EDITED_SHORT_FMT"], FmtTime(note.updated)) or "")
+        tsStrip._parts = { full = createdStr .. updatedStr .. coords, noCoords = createdStr .. updatedStr,
+                           short = short }
         tsStrip:SetText(createdStr .. updatedStr .. coords)
         tsStrip:Show()
+        FitStatsRow()
     end
     -- Enable map button only when the note has coord data
     if BNB._wysiwygMapBtn then
@@ -1863,20 +1916,23 @@ local function BuildMarkupBar(parent, wysiwygBar)
     -- Button helper
     local MkBtn, Divider = BNB.MakeToolbarFactory(bar, PAD)
 
-    MkBtn("H1", L["NE_MU_H1_TIP"],
+    -- Icons: Dukul's tb-rich-* art (ALL-487): the pilcrow = {p}, "pl" = {p:l}
+    MkBtn("h1", L["NE_MU_H1_TIP"],
         function() InsertTagPair("{h1}", "{/h1}") end)
-    MkBtn("H2", L["NE_MU_H2_TIP"],
+    MkBtn("h2", L["NE_MU_H2_TIP"],
         function() InsertTagPair("{h2}", "{/h2}") end)
-    MkBtn("H3", L["NE_MU_H3_TIP"],
+    MkBtn("h3", L["NE_MU_H3_TIP"],
         function() InsertTagPair("{h3}", "{/h3}") end)
     Divider()
-    MkBtn("P",  L["NE_MU_P_TIP"],
+    MkBtn("p",  L["NE_MU_P_TIP"],
         function() InsertTagPair("{p}", "{/p}") end)
-    MkBtn("Pc", L["NE_MU_PC_TIP"],
+    MkBtn("pl", L["NE_MU_PL_TIP"],
+        function() InsertTagPair("{p:l}", "{/p}") end)
+    MkBtn("pc", L["NE_MU_PC_TIP"],
         function() InsertTagPair("{p:c}", "{/p}") end)
-    MkBtn("Pr", L["NE_MU_PR_TIP"],
+    MkBtn("pr", L["NE_MU_PR_TIP"],
         function() InsertTagPair("{p:r}", "{/p}") end)
-    MkBtn("Br", L["NE_MU_BR_TIP"],
+    MkBtn("br", L["NE_MU_BR_TIP"],
         function() InsertTag("{br}") end)
     Divider()
     -- Color picker state for Col button (shared across clicks)
@@ -1885,7 +1941,7 @@ local function BuildMarkupBar(parent, wysiwygBar)
     local _colPickerR, _colPickerG, _colPickerB = 1, 1, 1
     local _colPickerHooked = false
 
-    MkBtn("Col", L["NE_MU_COL_TIP"],
+    MkBtn("color", L["NE_MU_COL_TIP"],
         function()
             local eb = BNB._editorBody
             if not eb then return end
@@ -1915,26 +1971,19 @@ local function BuildMarkupBar(parent, wysiwygBar)
                 end
             end
         end)
-    MkBtn("Lnk", L["NE_INSERT_LINK_TIP"],
+    MkBtn("link", L["NE_INSERT_LINK_TIP"],
         function() BNB.OpenLnkDialog(InsertTag, BNB.PeekSelection(BNB._editorBody, true)) end)
-    MkBtn("Ico", L["NE_INSERT_ICON_TIP"],
+    MkBtn("ico", L["NE_INSERT_ICON_TIP"],
         function() BNB.OpenIcoDialog(InsertTag) end)
-    MkBtn("Img", L["NE_INSERT_IMAGE_TIP"],
+    MkBtn("img", L["NE_INSERT_IMAGE_TIP"],
         function() BNB.OpenImgDialog(InsertTag) end)
 
-    -- "Live Preview" toggle — right-aligned, does not advance btnX
-    local previewBtn = BNB.CreateBarTextButton(bar, L["MARKUP_PREVIEW_BTN"], 72, 18)
-    previewBtn:SetPoint("RIGHT", bar, "RIGHT", -PAD, 0)
-    previewBtn:SetAlpha(0.45)   -- dim until a preview window is open
+    -- Live Preview toggle: the preview-on / -off icon at the right end, does
+    -- not advance btnX (ALL-487; a text button until 2026-10-17)
+    local previewBtn = BNB.CreatePreviewButton(bar, "markupPreviewMain", PAD)
     previewBtn:SetScript("OnClick", function()
         if BNB.RichPreview then BNB.RichPreview.Toggle() end
     end)
-    previewBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["MARKUP_PREVIEW_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    previewBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._markupPreviewBtn = previewBtn
 
     bar:Hide()
@@ -2268,6 +2317,10 @@ function BNB.AM_EnterViewMode(id)
             end
         end
         rsf:SetScript("OnSizeChanged", function()
+            BNB.Debounce("editorRichReflow", 0, Reflow)
+        end)
+        -- Data a note token waited for has arrived (ALL-481 S2): draw again
+        BNB.RegisterMessage("EditorRichTokens", "TokensChanged", function()
             BNB.Debounce("editorRichReflow", 0, Reflow)
         end)
 

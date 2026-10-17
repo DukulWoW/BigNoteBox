@@ -310,6 +310,9 @@ end)
 --   TemplatesChanged ()            Features/NoteTemplates.lua, any write to the
 --                                  player's templates (ALL-68 S2): the Settings
 --                                  Templates page re-lists
+--   TokensChanged ()               Features/Tokens.lua, an item / quest / spell
+--                                  a note token waited for has loaded (ALL-481
+--                                  S2): the editor's rich view and stickies redraw
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
 --   UIFontChanged ()               UI/Fonts.lua, end of ApplyFont: skin button
 --                                  labels and the welcome panel re-read

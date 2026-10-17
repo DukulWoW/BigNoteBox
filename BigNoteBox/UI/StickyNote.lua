@@ -1648,7 +1648,8 @@ local function ReadBody(note, cfg)
     if cfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
         body = BNB.AdvancedMode.StripMarkup(body)
     end
-    if BNB.Tokens then body = BNB.Tokens.Fill(body) end
+    -- "plain": an edit box, so no pictures in its text
+    if BNB.Tokens then body = BNB.Tokens.Fill(body, "plain") end
     return body
 end
 
@@ -1685,7 +1686,7 @@ local function EndInlineEdit(f)
         end
     end
     -- The read view shows live note tokens filled (ALL-481); text keeps them
-    local shown = BNB.Tokens and BNB.Tokens.Fill(text) or text
+    local shown = BNB.Tokens and BNB.Tokens.Fill(text, "plain") or text
     if shown ~= text then eb:SetText(shown) end
     if not note or text == (note.body or "") then return end
     BNB.UpdateNote(noteID, { body = text })
@@ -3119,6 +3120,15 @@ function SN.RefreshBodyLive(noteID)
         end
     end
 end
+
+-- An item / quest / spell a note token waited for has arrived (ALL-481 S2):
+-- stickies with a token in their text draw again, scroll kept
+BNB.RegisterMessage("StickyTokens", "TokensChanged", function()
+    for id in pairs(openFrames) do
+        local note = BNB.GetNote(id)
+        if note and note.body and note.body:find("{{", 1, true) then SN.RefreshBodyLive(id) end
+    end
+end)
 
 -- Re-show the situation/class markers after a context or scope change.
 function SN.RefreshMarkers(noteID)

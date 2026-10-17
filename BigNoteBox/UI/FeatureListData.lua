@@ -91,7 +91,7 @@ BNB.FEATURE_LIST = {
                  "between the two addons without reformatting.",
         items  = {
             "Three heading levels: {h1}, {h2}, {h3} with left, centre, or right alignment",
-            "Paragraph blocks: {p}, {p:c}, {p:r} for structured body text",
+            "Paragraph blocks: {p}, {p:l}, {p:c}, {p:r} for structured body text",
             "Color: {col:rrggbb}...{/col} with a color picker in the toolbar",
             "Inline icons: {icon:IconName:size} embeds any WoW game icon inline",
             "Images: {img:filename:width:height} displays custom .tga or .blp files from UserImages/",

@@ -77,7 +77,7 @@ local function ChatBody(note)
     -- (ALL-478): the server drops a chat message with a custom link in it
     if BNB.NoteLinks then body = BNB.NoteLinks.ToChat(body) end
     -- Live note tokens with the sender's data: chat readers have no BNB (ALL-481)
-    if BNB.Tokens then body = BNB.Tokens.Fill(body) end
+    if BNB.Tokens then body = BNB.Tokens.Fill(body, "plain") end
     return body
 end
 

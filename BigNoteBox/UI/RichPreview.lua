@@ -335,11 +335,11 @@ end
 function RP.UpdateToggleBtn()
     local open = RP.IsOpen()
     if BNB._markupPreviewBtn then
-        BNB._markupPreviewBtn:SetAlpha(open and 1.0 or 0.45)
+        BNB._markupPreviewBtn:SetPreviewOn(open)
     end
     -- Focus bar button reflects focus preview state independently
     if BNB._focusMarkupPreviewBtn then
-        BNB._focusMarkupPreviewBtn:SetAlpha(RPF.IsOpen() and 1.0 or 0.45)
+        BNB._focusMarkupPreviewBtn:SetPreviewOn(RPF.IsOpen())
     end
 end
 
@@ -391,7 +391,7 @@ local function BuildFocusPreviewFrame(w, h)
         local onClose = function()
             _focusFrame:Hide()
             if BNB._focusMarkupPreviewBtn then
-                BNB._focusMarkupPreviewBtn:SetAlpha(0.45)
+                BNB._focusMarkupPreviewBtn:SetPreviewOn(false)
             end
         end
 
@@ -446,7 +446,7 @@ function RPF.Open(focusFrame, simultaneous)
     _focusFrame:Raise()
 
     if BNB._focusMarkupPreviewBtn then
-        BNB._focusMarkupPreviewBtn:SetAlpha(1.0)
+        BNB._focusMarkupPreviewBtn:SetPreviewOn(true)
     end
 
     RenderNote(note, _focusRSF, _focusRF, _focusGen)
@@ -457,7 +457,7 @@ function RPF.Close()
     BNB.CancelDebounce(FOCUS_RENDER_KEY)   -- pending live render
     if _focusFrame then _focusFrame:Hide() end
     if BNB._focusMarkupPreviewBtn then
-        BNB._focusMarkupPreviewBtn:SetAlpha(0.45)
+        BNB._focusMarkupPreviewBtn:SetPreviewOn(false)
     end
 end
 

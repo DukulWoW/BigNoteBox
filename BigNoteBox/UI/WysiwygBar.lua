@@ -28,6 +28,10 @@ local ASSETS_WY = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\"
 -- +/- buttons step 1pt at a time regardless of this list.
 local WY_SIZE_PRESETS = { 8, 9, 10, 11, 12, 13, 14, 16, 18, 20, 24, 28, 32 }
 
+-- Room between icons and on each side of a divider (Dukul, 2026-10-17, ALL-487:
+-- "more padding between them, and also more padding with the dividers")
+local ICON_GAP, DIV_GAP = 6, 10
+
 -- The main editor's context. Focus mode passes its own (ALL-163): body() =
 -- its edit box, timers() = its undo timer tables, markDirty(), applyFont(note)
 -- = re-apply font and size to its body, writingOnly = the left side only,
@@ -96,55 +100,22 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local function MakeDiv(anchorFrame, anchorPoint)
         local d = bar:CreateTexture(nil, "ARTWORK")
         d:SetSize(1, 16)
-        d:SetPoint("LEFT", anchorFrame, anchorPoint or "RIGHT", 6, 0)
+        d:SetPoint("LEFT", anchorFrame, anchorPoint or "RIGHT", DIV_GAP, 0)
         if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
             local p = BNB.GetSkinPreset()
             local br, bg_, bb = BNB.SkinRuleOf(p)
             d:SetColorTexture(br, bg_, bb, 0.25)
             BNB.RegisterSkinRule(d, 0.25)
         else
-            d:SetColorTexture(0.16, 0.16, 0.18, 1)
+            d:SetColorTexture(0.35, 0.35, 0.38, 1)   -- the light one, as the rich row (Dukul, 2026-10-17)
         end
         return d
     end
 
-    -- Icon button (20x20): the bare icon in both modes (white art, Dukul
-    -- 2026-10-08). Normal mode tints it the gold of the old art; skin mode
-    -- the preset's accent colour, as the top bar icons (RegisterSkinAccentTex,
-    -- follows preset changes), and a press nudges it 1 px down-right.
-    -- Hover: ui-hover-64 over the icon, tinted the same (BNB.TintUIIcon).
+    -- Icon button (20x20): BNB.CreateToolbarIconButton (UI/Widgets.lua), the
+    -- rich markup bars use the same one. Starts greyed.
     local function WyBtn(icon, tip)
-        local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
-        local btn = CreateFrame("Button", nil, bar)
-        btn:SetSize(20, 20)
-        local tx = btn:CreateTexture(nil, "ARTWORK")
-        tx:SetAllPoints()
-        tx:SetTexture(ASSETS_WY .. icon)
-        BNB.TintUIIcon(tx)
-        BNB.AddUIIconHover(btn, tx)
-        if skin then
-            btn:SetScript("OnMouseDown", function(self)
-                if not self:IsEnabled() then return end
-                tx:ClearAllPoints()
-                tx:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
-                tx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
-            end)
-            btn:SetScript("OnMouseUp", function()
-                tx:ClearAllPoints(); tx:SetAllPoints()
-            end)
-        end
-        btn._tx = tx
-        btn.SetIconEnabled = function(self, en)
-            self:SetEnabled(en)
-            self:SetAlpha(en and 1.0 or 0.30)
-            pcall(function() tx:SetDesaturated(not en) end)
-        end
-        btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        local btn = BNB.CreateToolbarIconButton(bar, ASSETS_WY .. icon, tip)
         btn:SetIconEnabled(false)
         return btn
     end
@@ -189,7 +160,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     undoBtn:SetPoint("LEFT", bar, "LEFT", 6, 0)
 
     local redoBtn = WyBtn("tb-redo", L["NE_TB_REDO"])
-    redoBtn:SetPoint("LEFT", undoBtn, "RIGHT", 4, 0)
+    redoBtn:SetPoint("LEFT", undoBtn, "RIGHT", ICON_GAP, 0)
 
     -- Wire undo
     undoBtn:SetScript("OnClick", function()
@@ -247,7 +218,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     local fontDDBg = BNB.CreateBackdropFrame("Frame", nil, bar)
     fontDDBg:SetSize(FONT_DD_W, FONT_BTN_H)
-    fontDDBg:SetPoint("LEFT", divFont, "RIGHT", 6, 0)
+    fontDDBg:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
     local function ApplyFontDDBgSkin()
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
@@ -388,11 +359,11 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- ── Font size: decrease / increase / dropdown ─────────────────────────────
     local decBtn = WyBtn("tb-decreasesize", L["CFG_EXPORT_DECREASE_FONT"])
-    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", 4, 0)
+    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", ICON_GAP, 0)
     decBtn:SetIconEnabled(true)
 
     local incBtn = WyBtn("tb-increasesize", L["CFG_EXPORT_INCREASE_FONT"])
-    incBtn:SetPoint("LEFT", decBtn, "RIGHT", 2, 0)
+    incBtn:SetPoint("LEFT", decBtn, "RIGHT", ICON_GAP, 0)
     incBtn:SetIconEnabled(true)
 
     -- Size display button — shows current pt value, opens preset quick-pick menu
@@ -400,7 +371,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local SIZE_BTN_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 52 or 38
     local sizeBg = BNB.CreateBackdropFrame("Frame", nil, bar)
     sizeBg:SetSize(SIZE_BTN_W, FONT_BTN_H)
-    sizeBg:SetPoint("LEFT", incBtn, "RIGHT", 4, 0)
+    sizeBg:SetPoint("LEFT", incBtn, "RIGHT", ICON_GAP, 0)
     local function ApplySizeBgSkin()
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
@@ -505,7 +476,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- tb-bulletlist: insert "  · " at the start of the cursor's current line
     local bulletBtn = WyBtn("tb-bulletlist", L["NE_INSERT_BULLET_TIP"])
-    bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", 6, 0)
+    bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", ICON_GAP, 0)
     bulletBtn:SetIconEnabled(true)
     bulletBtn:SetScript("OnClick", function()
         local eb = Body()
@@ -539,19 +510,30 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- tb-timestamp: menu to insert the date, the time, or both at the cursor,
     -- in the Appearance timestamp format (ALL-66). One undo step, like the bullet.
-    local function InsertAtCursor(snippet)
+    -- back = the cursor ends that many bytes before the snippet's end ({{item:|}}).
+    -- value = a filled-when-typed note token goes in as its value, the token
+    -- itself one undo step back, as when typed (ALL-481 S2, Dukul: "Agree")
+    local function InsertAtCursor(snippet, back, value)
         local eb = Body()
         if not eb or BNB._editorLocked or not eb:IsVisible() then return end
         local id = BNB._currentNoteID; if not id then return end
         local text   = eb:GetText() or ""
         local cursor = eb:GetCursorPosition() or 0
         local newText   = text:sub(1, cursor) .. snippet .. text:sub(cursor + 1)
-        local newCursor = cursor + #snippet
+        local newCursor = cursor + #snippet - (back or 0)
         UndoPoint(id, text, cursor)
         BNB._undoActive = true
         eb:SetText(newText)
         BNB._undoActive = false
         BNB.UndoPush(id, newText, newCursor)
+        if value then
+            newText   = text:sub(1, cursor) .. value .. text:sub(cursor + 1)
+            newCursor = cursor + #value
+            BNB._undoActive = true
+            eb:SetText(newText)
+            BNB._undoActive = false
+            BNB.UndoPush(id, newText, newCursor)
+        end
         if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
         C_Timer.After(0, function() eb:SetFocus(); eb:SetCursorPosition(newCursor) end)
         ctx.markDirty()
@@ -559,27 +541,78 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Main editor in rich View mode has no cursor: switch to Edit and put the
     -- snippet at the end (Dukul, 2026-10-11)
-    local function InsertSnippet(snippet)
+    local function InsertSnippet(snippet, back, value)
         if main and BNB._editorInViewMode and BNB.AM_EnterEditMode then
             BNB.AM_EnterEditMode()
             C_Timer.After(0, function()
                 local eb = Body()
                 if not eb or BNB._editorInViewMode then return end
                 eb:SetCursorPosition(#(eb:GetText() or ""))
-                InsertAtCursor(snippet)
+                InsertAtCursor(snippet, back, value)
             end)
             return
         end
-        InsertAtCursor(snippet)
+        InsertAtCursor(snippet, back, value)
     end
     _inserters[main and "main" or "focus"] = InsertSnippet
+
+    -- Note tokens (ALL-481 S2, Dukul's tb-syntax art): a menu of every token
+    -- by kind; hover tells what it does, how it is written and what it gives
+    -- right now. Plain notes too: they fill in stickies, toasts, tl;dr and
+    -- Send to Chat, the plain editor shows them as typed. BNB.ContextMenu in
+    -- both editors (it has the sub-menus and row tooltips).
+    local tokenBtn = WyBtn("tb-syntax", L["NE_INSERT_TOKEN_TIP"])
+    -- A divider between the bullet list and the inserts (Dukul, 2026-10-17)
+    local divInsert = MakeDiv(bulletBtn)
+    tokenBtn:SetPoint("LEFT", divInsert, "RIGHT", DIV_GAP, 0)
+    tokenBtn:SetIconEnabled(true)
+    tokenBtn._cmToggle = true
+    local function TokenRow(sub, name, kind)
+        local Tk = BNB.Tokens
+        local now, written = Tk.Preview(name, kind)
+        local label = kind == "id" and ("{{" .. name .. ":|cff888888id|r}}") or ("{{" .. name .. "}}")
+        if now and kind ~= "id" then label = label .. "  |cff888888" .. now .. "|r" end
+        local tipSub = L["TOKEN_DESC_" .. name:upper()] .. "\n" .. L["TOKEN_KIND_" .. kind:upper()]
+            .. "\n\n" .. string.format(L["TOKEN_TIP_WRITE"], "|cffffffff" .. written .. "|r")
+        if now then
+            tipSub = tipSub .. "\n" .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r")
+        elseif kind == "live" then
+            tipSub = tipSub .. "\n" .. L["TOKEN_TIP_EMPTY"]
+        end
+        sub:CreateButton(label, function()
+            if kind == "id" then InsertSnippet("{{" .. name .. ":}}", 2)
+            elseif kind == "snapshot" and now then InsertSnippet("{{" .. name .. "}}", nil, now)
+            else InsertSnippet("{{" .. name .. "}}") end
+        end, { tip = "{{" .. name .. (kind == "id" and ":id" or "") .. "}}", tipSub = tipSub })
+    end
+    tokenBtn:SetScript("OnClick", function(self)
+        local CM = BNB.ContextMenu
+        if not (CM and BNB.Tokens and Body() and BNB._currentNoteID) or BNB._editorLocked then return end
+        if CM.IsOpen() then CM.Close(); return end
+        CM.Open(self, function(root)
+            root:CreateTitle(L["TOKEN_MENU_TITLE"])
+            for _, g in ipairs(BNB.Tokens.MENU) do
+                local sub = root:CreateButton(L["TOKEN_GROUP_" .. g.group], nil,
+                    { tip = L["TOKEN_GROUP_" .. g.group], tipSub = L["TOKEN_KIND_" .. g.kind:upper()] })
+                for _, name in ipairs(g.list) do
+                    if BNB.Tokens.Available(name) then TokenRow(sub, name, g.kind) end
+                end
+            end
+        end)
+    end)
+    tokenBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(L["NE_INSERT_TOKEN_TIP"], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_INSERT_TOKEN_BODY"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
 
     -- Reference Box entries into the text (ALL-447): a menu of this note's
     -- entries, a click puts its link at the cursor. Gone while the Reference
     -- Box module is off, greyed while the note's Reference Box is empty
     -- (Dukul, 2026-10-11). Art: Dukul's tb-refbox.
     local refBtn = WyBtn("tb-refbox", L["NE_INSERT_REFBOX_TIP"])
-    refBtn:SetPoint("LEFT", bulletBtn, "RIGHT", 4, 0)
+    refBtn:SetPoint("LEFT", tokenBtn, "RIGHT", ICON_GAP, 0)
     -- Greyed = disabled: its "empty" tooltip needs hover while disabled (FU3)
     refBtn:SetMotionScriptsWhileDisabled(true)
     local _refMenuDD
@@ -623,7 +656,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             and not (BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled == false)
         refBtn:SetShown(on)
         stampBtn:ClearAllPoints()
-        stampBtn:SetPoint("LEFT", on and refBtn or bulletBtn, "RIGHT", 4, 0)
+        stampBtn:SetPoint("LEFT", on and refBtn or tokenBtn, "RIGHT", ICON_GAP, 0)
         local note = on and BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
         refBtn:SetIconEnabled(note and note.attachments and #note.attachments > 0 or false)
         if bar._collapse then bar._collapse() end   -- the left side changed width
@@ -681,7 +714,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         end)
     end
     local wayBtn = WyBtn("tb-way", L["NE_INSERT_WAY_TIP"])
-    wayBtn:SetPoint("LEFT", stampBtn, "RIGHT", 4, 0)
+    wayBtn:SetPoint("LEFT", stampBtn, "RIGHT", ICON_GAP, 0)
     wayBtn:SetIconEnabled(true)
     TipWithBody(wayBtn, "NE_INSERT_WAY_TIP", "NE_INSERT_WAY_BODY")
     wayBtn:SetScript("OnClick", function(self)
@@ -690,7 +723,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
 
     local linkBtn = WyBtn("tb-link", L["NE_INSERT_NOTELINK_TIP"])
-    linkBtn:SetPoint("LEFT", wayBtn, "RIGHT", 4, 0)
+    linkBtn:SetPoint("LEFT", wayBtn, "RIGHT", ICON_GAP, 0)
     linkBtn:SetIconEnabled(true)
     TipWithBody(linkBtn, "NE_INSERT_NOTELINK_TIP", "NE_INSERT_NOTELINK_BODY")
     linkBtn:SetScript("OnClick", function(self)
@@ -705,14 +738,14 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
 
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
-    -- Anchored from RIGHT inward so they always hug the right edge.
+    -- Placed from the right edge inward by LayoutRight (below), which puts
+    -- what does not fit into the overflow menu.
     -- Main editor only: Focus mode has the writing tools alone (ALL-163)
-    local cmDiv, shareDiv
+    local cmDiv, shareDiv, moreBtn, LayoutRight
     if main then
 
     -- tb-notemap: waypoint at note creation coords (rightmost)
     local mapBtn = WyBtn("tb-notemap", L["NE_WP_OPEN_TIP_TITLE"])
-    mapBtn:SetPoint("RIGHT", bar, "RIGHT", -6, 0)
     mapBtn:SetScript("OnEnter", function(self)
         local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
         if not note or not note.coordX then return end
@@ -764,19 +797,17 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- Divider: share | waypoint
     shareDiv = bar:CreateTexture(nil, "ARTWORK")
     shareDiv:SetSize(1, 16)
-    shareDiv:SetPoint("RIGHT", mapBtn, "LEFT", -6, 0)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinRuleOf(p)
         shareDiv:SetColorTexture(br, bg_, bb, 0.40)
         BNB.RegisterSkinRule(shareDiv, 0.40)
     else
-        shareDiv:SetColorTexture(0.16, 0.16, 0.18, 1)
+        shareDiv:SetColorTexture(0.35, 0.35, 0.38, 1)   -- the light one, as the rich row (Dukul, 2026-10-17)
     end
 
     -- tb-share (left of divider)
     local shareBtn = WyBtn("tb-share", L["NE_SHARE_NOTE_TIP"])
-    shareBtn:SetPoint("RIGHT", shareDiv, "LEFT", -6, 0)
     shareBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if id and BNB.OpenShareWindow then BNB.OpenShareWindow(id) end
@@ -785,7 +816,6 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     BNB._wysiwygShareBtn = shareBtn
     -- tb-copymove (left of share button)
     local copyMoveBtn = WyBtn("tb-copymove", L["NE_COPY_MOVE_TIP"])
-    copyMoveBtn:SetPoint("RIGHT", shareBtn, "LEFT", -4, 0)
     copyMoveBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if id and BNB.OpenCopyMovePopup then BNB.OpenCopyMovePopup(id) end
@@ -794,7 +824,6 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- tb-alarm (left of copy/move)
     local alarmBtn = WyBtn("tb-alarm", L["STICKY_SET_ALARM_TIP"])
-    alarmBtn:SetPoint("RIGHT", copyMoveBtn, "LEFT", -4, 0)
     alarmBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if not id then return end
@@ -814,19 +843,17 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- Divider: history | alarm
     cmDiv = bar:CreateTexture(nil, "ARTWORK")
     cmDiv:SetSize(1, 16)
-    cmDiv:SetPoint("RIGHT", alarmBtn, "LEFT", -6, 0)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
         local p = BNB.GetSkinPreset()
         local br, bg_, bb = BNB.SkinRuleOf(p)
         cmDiv:SetColorTexture(br, bg_, bb, 0.40)
         BNB.RegisterSkinRule(cmDiv, 0.40)
     else
-        cmDiv:SetColorTexture(0.16, 0.16, 0.18, 1)
+        cmDiv:SetColorTexture(0.35, 0.35, 0.38, 1)   -- the light one, as the rich row (Dukul, 2026-10-17)
     end
 
     -- tb-history (left of divider)
     local histBtn = WyBtn("tb-history", L["HISTORY_VIEW_BTN_TIP"])
-    histBtn:SetPoint("RIGHT", cmDiv, "LEFT", -6, 0)
     histBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID
         if id and BNB.ToggleNoteHistoryPanel then BNB.ToggleNoteHistoryPanel(id) end
@@ -836,7 +863,6 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- tb-restore (left of history)
     local restoreBtn = WyBtn("tb-restore", L["HISTORY_RESTORE_BTN_TIP"])
-    restoreBtn:SetPoint("RIGHT", histBtn, "LEFT", -4, 0)
     restoreBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         if BNB._dirty and BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
@@ -851,19 +877,102 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
     BNB._wysiwygRestoreBtn = restoreBtn
 
-    -- Modules off (ALL-343): Alarms off = no alarm button, the divider moves
-    -- up to Copy/Move; Note History off = no history / restore buttons and no
-    -- divider (nothing left of it)
-    function BNB.ApplyWysiwygModuleBtns()
-        local alarmsOn, histOn = BNB.AlarmsEnabled(), BNB.HistoryEnabled()
-        alarmBtn:SetShown(alarmsOn)
-        histBtn:SetShown(histOn); restoreBtn:SetShown(histOn)
-        cmDiv:SetShown(histOn)
-        cmDiv:ClearAllPoints()
-        cmDiv:SetPoint("RIGHT", alarmsOn and alarmBtn or copyMoveBtn, "LEFT", -6, 0)
-        if bar._collapse then bar._collapse() end   -- the right side changed width
+    -- Overflow menu (Dukul, 2026-10-17, ALL-487: "the right side icons in the
+    -- wysiwyg row are always gone" at the default size). Dukul's tb-overflow
+    -- at the right end while anything is in it; its list opens down and to
+    -- the left, like the top bar menu.
+    moreBtn = WyBtn("tb-overflow", L["NE_TB_MORE_TIP"])
+    moreBtn:SetIconEnabled(true)
+    moreBtn._cmToggle   = true
+    moreBtn._cmDropLeft = true
+    moreBtn:Hide()
+
+    -- Left to right, in groups with a divider between them. Each: button, its
+    -- art (the menu row's picture), its label, whether its module is on
+    -- (ALL-343: Alarms off = no alarm button, Note History off = no history /
+    -- restore buttons and no divider before them)
+    local RIGHT = {
+        { { restoreBtn, "tb-restore", "HISTORY_RESTORE_BTN_TIP", BNB.HistoryEnabled },
+          { histBtn,    "tb-history", "HISTORY_VIEW_BTN_TIP",    BNB.HistoryEnabled } },
+        { { alarmBtn,    "tb-alarm",    "STICKY_SET_ALARM_TIP", BNB.AlarmsEnabled },
+          { copyMoveBtn, "tb-copymove", "NE_COPY_MOVE_TIP" },
+          { shareBtn,    "tb-share",    "NE_SHARE_NOTE_TIP" } },
+        { { mapBtn, "tb-notemap", "NE_WP_OPEN_TIP_TITLE" } },
+    }
+    local RIGHT_DIVS = { cmDiv, shareDiv }   -- after group 1, after group 2
+    local _overflow = {}                     -- the items in the menu, left to right
+
+    -- Places the right side in `room` px from the bar's right edge (6 in).
+    -- The leftmost items go into the overflow menu one by one until the rest
+    -- fits (the map last). Returns false when not even the menu button fits.
+    LayoutRight = function(room)
+        local items = {}
+        for g, list in ipairs(RIGHT) do
+            for _, it in ipairs(list) do
+                it[1]:Hide()
+                if not it[4] or it[4]() then items[#items + 1] = { it = it, g = g } end
+            end
+        end
+        for _, d in ipairs(RIGHT_DIVS) do d:Hide() end
+        local function Width(first, more)
+            local w, prev = more and 20 or 0, more and 0 or nil
+            for i = #items, first, -1 do
+                if prev then w = w + ((prev ~= 0 and items[i].g ~= prev) and (2 * DIV_GAP + 1) or ICON_GAP) end
+                w = w + 20; prev = items[i].g
+            end
+            return w
+        end
+        local first = 1
+        while first <= #items and Width(first, first > 1) > room do first = first + 1 end
+        local more = first > 1
+        wipe(_overflow)
+        for i = 1, first - 1 do _overflow[i] = items[i] end
+        moreBtn:SetShown(more)
+        moreBtn:ClearAllPoints()
+        moreBtn:SetPoint("RIGHT", bar, "RIGHT", -6, 0)
+        local cur, prevG = more and moreBtn or nil, nil
+        for i = #items, first, -1 do
+            local b, g = items[i].it[1], items[i].g
+            b:ClearAllPoints()
+            if not cur then
+                b:SetPoint("RIGHT", bar, "RIGHT", -6, 0)
+            elseif prevG and g ~= prevG then
+                local d = RIGHT_DIVS[g]
+                d:ClearAllPoints()
+                d:SetPoint("RIGHT", cur, "LEFT", -DIV_GAP, 0)
+                d:Show()
+                b:SetPoint("RIGHT", d, "LEFT", -DIV_GAP, 0)
+            else
+                b:SetPoint("RIGHT", cur, "LEFT", -ICON_GAP, 0)
+            end
+            b:Show()
+            cur, prevG = b, g
+        end
+        return Width(first, more) <= room
     end
-    BNB.ApplyWysiwygModuleBtns()
+
+    moreBtn:SetScript("OnClick", function(self)
+        local CM = BNB.ContextMenu
+        if not CM then return end
+        if CM.IsOpen() then CM.Close(); return end
+        CM.Open(self, function(root)
+            local prevG
+            for _, o in ipairs(_overflow) do
+                if prevG and o.g ~= prevG then root:CreateDivider() end
+                local b = o.it[1]
+                root:CreateButton(L[o.it[3]], function()
+                    local fn = b:GetScript("OnClick")
+                    if fn then fn(b) end
+                end, { iconTex = ASSETS_WY .. o.it[2], disabled = not b:IsEnabled() })
+                prevG = o.g
+            end
+        end)
+    end)
+
+    -- A module switch changed what the right side holds
+    function BNB.ApplyWysiwygModuleBtns()
+        if bar._collapse then bar._collapse() end
+    end
 
     end   -- main (right side)
 
@@ -947,52 +1056,35 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- ── Collapse on a narrow window (Dukul, 2026-10-11) ───────────────────────
     -- At the smallest widths the two sides ran into each other. In order, until
-    -- the left side fits: the whole right side goes, then the font dropdown,
-    -- then the size dropdown (their neighbours move up, no gap). Measured on
-    -- the next frame after a size change, never inside OnSizeChanged.
-    -- The right side lives in its own frame, so hiding it never fights the
-    -- module switches that show / hide single buttons in it.
-    local rightGroup
-    if main then
-        rightGroup = CreateFrame("Frame", nil, bar)
-        rightGroup:SetAllPoints(bar)
-        for _, w in ipairs({ BNB._wysiwygMapBtn, BNB._wysiwygShareBtn, BNB._wysiwygCopyMoveBtn,
-                             BNB._wysiwygAlarmBtn, BNB._wysiwygHistoryBtn, BNB._wysiwygRestoreBtn }) do
-            w:SetParent(rightGroup)
-        end
-        shareDiv:SetParent(rightGroup)   -- the two dividers there
-        cmDiv:SetParent(rightGroup)
-    end
-
+    -- the left side fits: the right side's icons go into its overflow menu one
+    -- by one (LayoutRight, ALL-487), then the font dropdown, then the size
+    -- dropdown (their neighbours move up, no gap). Measured on the next frame
+    -- after a size change, never inside OnSizeChanged.
     local GAP = 8
-    -- Right edge of the left side, left edge of the right side (or the bar's)
-    local function Overlaps()
+    -- Room for the right side: from the left side's last button to the edge
+    local function Room()
         local lr = linkBtn:GetRight()
-        if not lr then return false end
-        local rl = bar:GetRight() - 6
-        if rightGroup and rightGroup:IsShown() then
-            for _, c in ipairs({ rightGroup:GetChildren() }) do
-                if c:IsShown() and c:GetLeft() and c:GetLeft() < rl then rl = c:GetLeft() end
-            end
-        end
-        return lr + GAP > rl
+        if not lr then return math.huge end
+        return bar:GetRight() - 6 - lr - GAP
+    end
+    -- Focus mode has no right side: the left side only has to fit the bar
+    local function Fits()
+        if LayoutRight then return LayoutRight(Room()) end
+        return Room() >= 0
     end
     local function Collapse()
         if not bar:IsVisible() or (bar:GetWidth() or 0) <= 0 then return end
         -- Everything back first, then take away until it fits
-        if rightGroup then rightGroup:Show() end
         fontDDBg:Show(); sizeBg:Show()
-        decBtn:ClearAllPoints();    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", 4, 0)
-        bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", 6, 0)
-        if rightGroup and Overlaps() then rightGroup:Hide() end
-        if Overlaps() then
-            fontDDBg:Hide()
-            decBtn:ClearAllPoints(); decBtn:SetPoint("LEFT", divFont, "RIGHT", 6, 0)
-        end
-        if Overlaps() then
-            sizeBg:Hide()
-            bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", incBtn, "RIGHT", 6, 0)
-        end
+        decBtn:ClearAllPoints();    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", ICON_GAP, 0)
+        bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", ICON_GAP, 0)
+        if Fits() then return end
+        fontDDBg:Hide()
+        decBtn:ClearAllPoints(); decBtn:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
+        if Fits() then return end
+        sizeBg:Hide()
+        bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", incBtn, "RIGHT", ICON_GAP, 0)
+        Fits()
     end
     bar._collapse = function() BNB.Debounce(main and "wyCollapseMain" or "wyCollapseFocus", 0, Collapse) end
     bar:HookScript("OnSizeChanged", bar._collapse)

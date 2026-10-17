@@ -22,7 +22,7 @@ local FADE_TIME = 0.18  -- seconds for cross-fade
 -- Fixed pixel offset for body scroll top anchor (relative to content top):
 --   36px titleBg + 1px gap + 1px underline + 2px gap + TSTAMP_H + 4px gap
 local BODY_TOP_OFFSET = -(36 + 1 + 1 + 2 + TSTAMP_H + 4)
-local FOCUS_MARKUP_H = 24  -- height of the rich note markup toolbar in focus mode
+local FOCUS_MARKUP_H = 28  -- height of the rich note markup toolbar in focus mode (= WYSIWYG_H)
 
 -- Module-level refs (all set inside BuildFocusFrame)
 local focusFrame
@@ -526,14 +526,16 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
 
     local MkBtn, Divider = BNB.MakeToolbarFactory(bar, 4)
 
-    MkBtn("H1", L["FE_MK_H1"], function() FocusInsertTagPair("{h1}", "{/h1}") end)
-    MkBtn("H2", L["FE_MK_H2"], function() FocusInsertTagPair("{h2}", "{/h2}") end)
-    MkBtn("H3", L["FE_MK_H3"], function() FocusInsertTagPair("{h3}", "{/h3}") end)
+    -- Icons: Dukul's tb-rich-* art (ALL-487): the pilcrow = {p}, "pl" = {p:l}
+    MkBtn("h1", L["FE_MK_H1"], function() FocusInsertTagPair("{h1}", "{/h1}") end)
+    MkBtn("h2", L["FE_MK_H2"], function() FocusInsertTagPair("{h2}", "{/h2}") end)
+    MkBtn("h3", L["FE_MK_H3"], function() FocusInsertTagPair("{h3}", "{/h3}") end)
     Divider()
-    MkBtn("P",  L["FE_MK_P"],          function() FocusInsertTagPair("{p}", "{/p}") end)
-    MkBtn("Pc", L["FE_MK_PC"], function() FocusInsertTagPair("{p:c}", "{/p}") end)
-    MkBtn("Pr", L["FE_MK_PR"],    function() FocusInsertTagPair("{p:r}", "{/p}") end)
-    MkBtn("Br", L["FE_MK_BR"], function() FocusInsertTag("{br}") end)
+    MkBtn("p",  L["FE_MK_P"],  function() FocusInsertTagPair("{p}", "{/p}") end)
+    MkBtn("pl", L["FE_MK_PL"], function() FocusInsertTagPair("{p:l}", "{/p}") end)
+    MkBtn("pc", L["FE_MK_PC"], function() FocusInsertTagPair("{p:c}", "{/p}") end)
+    MkBtn("pr", L["FE_MK_PR"], function() FocusInsertTagPair("{p:r}", "{/p}") end)
+    MkBtn("br", L["FE_MK_BR"], function() FocusInsertTag("{br}") end)
     Divider()
     -- Color picker state for Col button
     local _fColActive = false
@@ -542,7 +544,7 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     local _fColHooked = false
     local _fColSeat              -- ColorPickerFrame's parent / strata / scale before Col
 
-    MkBtn("Col", L["FE_MK_COL"],  function()
+    MkBtn("color", L["FE_MK_COL"],  function()
         if not focusBodyEb then return end
         _fColActive = true
         _fColCancelled = false
@@ -582,25 +584,17 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
             end
         end
     end)
-    MkBtn("Lnk", L["FE_MK_LNK"],       function() BNB.OpenLnkDialog(FocusInsertTag, BNB.PeekSelection(focusBodyEb, true)) end)
-    MkBtn("Ico", L["FE_MK_ICO"],       function() BNB.OpenIcoDialog(FocusInsertTag) end)
-    MkBtn("Img", L["FE_MK_IMG"],      function() BNB.OpenImgDialog(FocusInsertTag) end)
+    MkBtn("link", L["FE_MK_LNK"], function() BNB.OpenLnkDialog(FocusInsertTag, BNB.PeekSelection(focusBodyEb, true)) end)
+    MkBtn("ico", L["FE_MK_ICO"],  function() BNB.OpenIcoDialog(FocusInsertTag) end)
+    MkBtn("img", L["FE_MK_IMG"],  function() BNB.OpenImgDialog(FocusInsertTag) end)
 
-    -- "Live Preview" toggle — right-aligned, same pattern as main markup bar
-    local previewBtn = BNB.CreateBarTextButton(bar, L["MARKUP_PREVIEW_BTN"], 72, 18)
-    previewBtn:SetPoint("RIGHT", bar, "RIGHT", -4, 0)
-    previewBtn:SetAlpha(0.45)
+    -- Live Preview toggle, as on the main markup bar (ALL-487)
+    local previewBtn = BNB.CreatePreviewButton(bar, "markupPreviewFocus", 4)
     previewBtn:SetScript("OnClick", function()
         if BNB.RichPreviewFocus then
             BNB.RichPreviewFocus.Toggle(focusFrame)
         end
     end)
-    previewBtn:SetScript("OnEnter", function(self)
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(L["MARKUP_PREVIEW_TIP"], 1, 1, 1)
-        GameTooltip:Show()
-    end)
-    previewBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._focusMarkupPreviewBtn = previewBtn
 
     bar:Hide()

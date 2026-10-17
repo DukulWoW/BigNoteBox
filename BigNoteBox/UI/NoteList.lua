@@ -1559,7 +1559,7 @@ local function PreviewText(note)
             body = body:gsub("^%s*{h1[^}]*}.-{/h1}%s*", "", 1)
         end
         body = body:gsub("{/?h%d+:?[cr]?}", "")
-        body = body:gsub("{/?p:?[cr]?}", "")
+        body = body:gsub("{/?p:?[clr]?}", "")
         body = body:gsub("{img:[^}]+}", "")
         body = body:gsub("{icon:[^}]+}", "")
         body = body:gsub("{col:%x%x%x%x%x%x}", "")

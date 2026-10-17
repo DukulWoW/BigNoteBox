@@ -43,6 +43,7 @@ local STRUCT_OPEN = {
     ["{h3:c}"] = "<h3 align=\"center\">",
     ["{h3:r}"] = "<h3 align=\"right\">",
     ["{p}"]    = "<P>",
+    ["{p:l}"]  = "<P align=\"left\">",   -- the toolbar's left-aligned P (ALL-487)
     ["{p:c}"]  = "<P align=\"center\">",
     ["{p:r}"]  = "<P align=\"right\">",
 }
@@ -252,7 +253,7 @@ function AM.ToHTML(text, bodySize)
             carried = false
         end
         while true do
-            local st, en = line:find("{/?[hp]%d?:?[cr]?}", scan)
+            local st, en = line:find("{/?[hp]%d?:?[clr]?}", scan)
             if not st then break end
             local tag = line:sub(st, en)
             if STRUCT_OPEN[tag] or STRUCT_CLOSE[tag] then   -- else plain text
@@ -327,7 +328,7 @@ function AM.MarkupRepairs(text)
         lineNo = lineNo + 1
         local scan = 1
         while true do
-            local st, en = line:find("{/?[hp]%d?:?[cr]?}", scan)
+            local st, en = line:find("{/?[hp]%d?:?[clr]?}", scan)
             if not st then break end
             local tag = line:sub(st, en)
             local at = lineStart + st - 1
@@ -659,7 +660,7 @@ local TAG_PATTERNS = {
     "{br}",
     "{h%d+:?[cr]?}",   -- {h1} {h1:c} {h1:r}
     "{/h%d+}",          -- {/h1}
-    "{p:?[cr]?}",       -- {p} {p:c} {p:r}
+    "{p:?[clr]?}",      -- {p} {p:l} {p:c} {p:r}
     "{/p}",
     "{img:[^}]+}",
     "{icon:[^}]+}",

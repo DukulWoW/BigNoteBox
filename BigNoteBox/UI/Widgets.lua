@@ -44,46 +44,108 @@ function BNB.SetBackdropDark(frame)
     end
 end
 
--- BNB.CreateBarTextButton(parent, text, w, h) — small 10pt text button for the
--- markup bars (main and focus editor). Skin mode: a skin button (ALL-79);
--- normal mode: the panel button template with WoW's locale font.
-function BNB.CreateBarTextButton(parent, text, w, h)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-        return BNB.CreateSkinButton(nil, parent, text, w, h, 10)
+-- BNB.CreateToolbarIconButton(parent, tex, tip) — the editor toolbars' icon
+-- button (20x20): the bare icon in both modes (white art, Dukul 2026-10-08).
+-- Normal mode tints it the gold of the old art; skin mode the preset's accent
+-- colour, as the top bar icons (RegisterSkinAccentTex, follows preset
+-- changes), and a press nudges it 1 px down-right. Hover: ui-hover-64 over
+-- the icon, tinted the same. btn:SetIconEnabled(on) greys it out. Used by the
+-- formatting toolbar (UI/WysiwygBar.lua) and the rich markup bars (ALL-487).
+function BNB.CreateToolbarIconButton(parent, tex, tip)
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(20, 20)
+    local tx = btn:CreateTexture(nil, "ARTWORK")
+    tx:SetAllPoints()
+    tx:SetTexture(tex)
+    BNB.TintUIIcon(tx)
+    BNB.AddUIIconHover(btn, tx)
+    if skin then
+        btn:SetScript("OnMouseDown", function(self)
+            if not self:IsEnabled() then return end
+            tx:ClearAllPoints()
+            tx:SetPoint("TOPLEFT", btn, "TOPLEFT", 1, -1)
+            tx:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 1, -1)
+        end)
+        btn:SetScript("OnMouseUp", function()
+            tx:ClearAllPoints(); tx:SetAllPoints()
+        end)
     end
-    local btn = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
-    btn:SetSize(w, h)
-    btn:SetText(text)
-    local fs = btn:GetFontString()
-    if fs then pcall(function() fs:SetFont(BNB.GetLocaleFont(), 10, "") end) end
+    btn._tx = tx
+    btn.SetIconEnabled = function(self, en)
+        self:SetEnabled(en)
+        self:SetAlpha(en and 1.0 or 0.30)
+        pcall(function() tx:SetDesaturated(not en) end)
+    end
+    btn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(tip, 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     return btn
 end
 
--- BNB.MakeToolbarFactory(bar, startX) — shared MkBtn/Divider pair for an
--- editor toolbar strip. Returns MkBtn(label, tip, onClick) and Divider(),
--- both advancing a shared x-offset starting at startX.
+-- BNB.CreatePreviewButton(bar, key, inset) — the markup bars' Live Preview
+-- toggle: an icon like the rest of the bar, tb-rich-preview-off / -on
+-- (Dukul, 2026-10-17, ALL-487: "Looked weird with a button when everything
+-- else was icons"). btn:SetPreviewOn(on) shows whether its preview window is
+-- open (UI/RichPreview.lua). Sits at the bar's right edge (inset); on a bar
+-- too narrow for that it follows the last icon (bar._mkLast) instead, so it
+-- never covers one. Measured on the next frame after a size change, never
+-- inside OnSizeChanged; key = the Debounce key, one per bar.
+local TB_PREVIEW = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\tb-rich-preview-"
+function BNB.CreatePreviewButton(bar, key, inset)
+    local btn = BNB.CreateToolbarIconButton(bar, TB_PREVIEW .. "off", L["MARKUP_PREVIEW_TIP"])
+    btn.SetPreviewOn = function(self, on)
+        self._tx:SetTexture(TB_PREVIEW .. (on and "on" or "off"))
+    end
+    local function Place(follow)
+        btn:ClearAllPoints()
+        if follow and bar._mkLast then
+            btn:SetPoint("LEFT", bar._mkLast, "RIGHT", 4, 0)
+        else
+            btn:SetPoint("RIGHT", bar, "RIGHT", -(inset or 4), 0)
+        end
+    end
+    local function Fit()
+        if not bar:IsVisible() then return end
+        local last, right = bar._mkLast, bar:GetRight()
+        Place(last and last:GetRight() and right
+            and last:GetRight() + 4 > right - (inset or 4) - btn:GetWidth())
+    end
+    local function Later() BNB.Debounce(key, 0, Fit) end
+    bar:HookScript("OnSizeChanged", Later)
+    bar:HookScript("OnShow", Later)
+    Place(false)
+    return btn
+end
+
+-- BNB.MakeToolbarFactory(bar, startX) — shared MkBtn/Divider pair for a rich
+-- markup bar (main and focus editor). Returns MkBtn(icon, tip, onClick) and
+-- Divider(), both advancing a shared x-offset starting at startX. icon =
+-- Assets/Toolbar/tb-rich-<icon> (Dukul's art, ALL-487; the buttons were
+-- "H1" / "Pc" / "Col" text buttons until 2026-10-17). bar._mkLast = the
+-- last button made (the bar's collapse measures from it).
+local TB_RICH = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\tb-rich-"
 function BNB.MakeToolbarFactory(bar, startX)
     local btnX = startX or 0
-    local function MkBtn(label, tip, onClick)
-        local btn = BNB.CreateBarTextButton(bar, label, 28, 18)
+    local function MkBtn(icon, tip, onClick)
+        local btn = BNB.CreateToolbarIconButton(bar, TB_RICH .. icon, tip)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetScript("OnClick", onClick)
-        btn:SetScript("OnEnter", function(self)
-            GameTooltip:SetOwner(self, "ANCHOR_TOP")
-            GameTooltip:AddLine(tip, 1, 1, 1)
-            GameTooltip:Show()
-        end)
-        btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        btnX = btnX + 30
+        btnX = btnX + 20 + 6   -- 6 px to the next one (Dukul, 2026-10-17)
+        bar._mkLast = btn
         return btn
     end
     local function Divider()
         local d = bar:CreateTexture(nil, "ARTWORK")
         d:SetSize(1, 14)
-        d:SetPoint("LEFT", bar, "LEFT", btnX, 0)
+        -- 10 px on each side (btnX already holds the 6 after the last icon)
+        d:SetPoint("LEFT", bar, "LEFT", btnX + 4, 0)
         d:SetColorTexture(0.35, 0.35, 0.38, 1)
         if BigNoteBoxDB and BigNoteBoxDB.skinMode then BNB.RegisterSkinRule(d, 0.40) end
-        btnX = btnX + 6
+        btnX = btnX + 4 + 1 + 10
     end
     return MkBtn, Divider
 end

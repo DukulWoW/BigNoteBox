@@ -206,6 +206,7 @@ local function ConvertRichBody(body)
         ["{h3:r}"] = '<h3 style="text-align:right;">',
         ["{p}"]    = "<p>",        ["{p:c}"]  = '<p style="text-align:center;">',
         ["{p:r}"]  = '<p style="text-align:right;">',
+        ["{p:l}"]  = '<p style="text-align:left;">',
     }
     local STRUCT_C = {
         ["{/h1}"] = "</h1>", ["{/h2}"] = "</h2>",
