@@ -1641,6 +1641,17 @@ local function OpenInMainEditor(noteID)
     end)
 end
 
+-- The plain read view's text: markup taken out when a rich note is shown as
+-- plain text, live note tokens filled (ALL-481)
+local function ReadBody(note, cfg)
+    local body = note.body or ""
+    if cfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
+        body = BNB.AdvancedMode.StripMarkup(body)
+    end
+    if BNB.Tokens then body = BNB.Tokens.Fill(body) end
+    return body
+end
+
 local function EndInlineEdit(f)
     if not (f and f._inlineEditing) then return end
     f._inlineEditing = false   -- cleared first: ClearFocus below re-enters via OnEditFocusLost
@@ -1673,6 +1684,9 @@ local function EndInlineEdit(f)
             return
         end
     end
+    -- The read view shows live note tokens filled (ALL-481); text keeps them
+    local shown = BNB.Tokens and BNB.Tokens.Fill(text) or text
+    if shown ~= text then eb:SetText(shown) end
     if not note or text == (note.body or "") then return end
     BNB.UpdateNote(noteID, { body = text })
     -- Keep the main window in step when it holds this note
@@ -2259,6 +2273,8 @@ local function CreateStickyFrame(noteID)
     f._cursorFollow = bodyEb:GetScript("OnCursorChanged")
     bodyEb:SetScript("OnCursorChanged", nil)
     bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
+    -- Snapshot tokens expand as typed in an inline edit; no undo here (ALL-481)
+    if BNB.Tokens then BNB.Tokens.WireExpand(bodyEb) end
     -- Esc or Ctrl+Enter ends an inline edit, saved like a click outside
     -- (Dukul, 2026-10-02). Plain Enter stays a new line: a multi-line EditBox
     -- types the newline itself only while it has no OnEnterPressed, so with
@@ -2525,11 +2541,7 @@ local function CreateStickyFrame(noteID)
     local initIsRich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
                        and not initCfg.richPlainText
     if not initIsRich then
-        local body = note.body or ""
-        if initCfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
-            body = BNB.AdvancedMode.StripMarkup(body)
-        end
-        bodyEb:SetText(body)
+        bodyEb:SetText(ReadBody(note, initCfg))
     end
 
     ApplyConfig(f, noteID)
@@ -2597,11 +2609,7 @@ local function ReopenStickyFrame(f, noteID)
     local cfg = GetCfg(noteID)
     local isRich = BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note) and not cfg.richPlainText
     if not isRich then
-        local body = note.body or ""
-        if cfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
-            body = BNB.AdvancedMode.StripMarkup(body)
-        end
-        f._bodyEb:SetText(body)
+        f._bodyEb:SetText(ReadBody(note, cfg))
     end
     ApplyConfig(f, noteID)
     -- Start in note view, as a new frame does; the saved view is left alone
@@ -3100,10 +3108,7 @@ function SN.RefreshBodyLive(noteID)
             rs:SetVerticalScroll(math.min(y, rs:GetVerticalScrollRange() or y))
         end)
     elseif f._bodyScroll:IsShown() then
-        local body = note.body or ""
-        if GetCfg(noteID).richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
-            body = BNB.AdvancedMode.StripMarkup(body)
-        end
+        local body = ReadBody(note, GetCfg(noteID))
         if f._bodyEb:GetText() ~= body then
             local sf, y = f._bodyScroll, f._bodyScroll:GetVerticalScroll()
             f._bodyEb:SetText(body)
@@ -3245,11 +3250,7 @@ function SN.RefreshNote(noteID)
             f._richScroll:Hide()
             -- Strip markup tags when a rich note is being shown as plain text,
             -- so the user sees readable content rather than raw {h1}...{/h1} tags.
-            local body = note.body or ""
-            if stickyCfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
-                body = BNB.AdvancedMode.StripMarkup(body)
-            end
-            f._bodyEb:SetText(body)
+            f._bodyEb:SetText(ReadBody(note, stickyCfg))
             f._bodyEb:Show()
             f._bodyScroll:Show()
             local function ScrollTop()

@@ -144,6 +144,9 @@ end
 --------------------------------------------------------------------------------
 function AM.ToHTML(text, bodySize)
     if not text or text == "" then return "" end
+    -- Live note tokens ({{me}}...) filled from the reader's game (ALL-481).
+    -- First, so the values are escaped and can never make markup
+    if BNB.Tokens then text = BNB.Tokens.Fill(text) end
 
     local lines = {}
     -- Split on newlines

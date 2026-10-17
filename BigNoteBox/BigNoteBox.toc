@@ -130,6 +130,7 @@ Features\ChatCapture.lua
 Features\DragDrop.lua
 Features\NoteLinks.lua
 Features\InsertInfo.lua
+Features\Tokens.lua
 UI\ToastStyles.lua
 UI\Toast.lua
 UI\NoteToastWindow.lua

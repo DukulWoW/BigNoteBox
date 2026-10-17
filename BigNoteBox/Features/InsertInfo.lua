@@ -67,6 +67,9 @@ local function BuildLocationString()
     end
 end
 
+-- The {{coords}} note token (Features/Tokens.lua, ALL-481)
+BNB.PlayerWayString = BuildLocationString
+
 -- Attempt to set a TomTom waypoint programmatically.
 -- Returns true on success, false/nil on failure.
 local function SetTomTomWaypoint()

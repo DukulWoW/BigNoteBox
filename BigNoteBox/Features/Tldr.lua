@@ -54,6 +54,8 @@ end
 function BNB.NoteTldr(note)
     local t = note and note.tldr
     if not BNB.TldrEnabled() or type(t) ~= "string" or not t:find("%S") then return nil end
+    -- Shown, never edited, here: live note tokens filled (ALL-481)
+    if BNB.Tokens then t = BNB.Tokens.Fill(t) end
     return t
 end
 

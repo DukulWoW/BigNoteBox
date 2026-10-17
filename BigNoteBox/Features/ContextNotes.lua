@@ -416,6 +416,7 @@ local function Summary(note)
     local body = note.body or ""
     local AMode = BNB.AdvancedMode
     if note.richMode and AMode and AMode.StripMarkup then body = AMode.StripMarkup(body) end
+    if BNB.Tokens then body = BNB.Tokens.Fill(body) end   -- ALL-481
     for line in body:gmatch("[^\n]+") do
         line = line:gsub("^%s+", ""):gsub("%s+$", "")
         if line ~= "" then return line end
