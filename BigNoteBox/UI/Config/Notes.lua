@@ -205,6 +205,12 @@ local function BuildNotesTab(sf, ct)
     -- Which side the Tag Manager opens on (ALL-269)
     y = K.AddSideRow(ct, y, L["CFG_SIDE_TAGMGR"], "tagManagerSide", "BigNoteBoxTagManagerFrame")
 
+    -- Note templates (ALL-68 S2): their own page (UI/Config/Templates.lua)
+    do
+        local page = K.NewSubPage(L["CFG_TPL_TITLE"], K.BuildTemplatesPage, "templates")
+        y = K.AddOverviewRow(ct, sf, y - 4, page, L["CFG_TPL_TITLE"], L["CFG_TPL_ROW_DESC"])
+    end
+
     y = AddRule(ct, y) - 4
 
     -- ── Saving ───────────────────────────────────────────────────────────────

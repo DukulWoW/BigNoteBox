@@ -489,6 +489,20 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     sizeDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     SkinPickerBox(sizeBg, sizeDDBtn, sizeArrow, sizeLbl)
 
+    -- An undo point right before a toolbar insert (Dukul, 2026-10-17): typing
+    -- the idle timer has not pushed yet becomes its own step first, so one
+    -- undo takes away only the insert, never the words typed just before it.
+    -- Seeds the snapshot when the note was never typed in.
+    local function UndoPoint(id, text, cursor)
+        if not BNB._undoSnap[id] then
+            BNB._undoSnap[id]  = { text = text, cursor = cursor }
+            BNB._undoStack[id] = {}
+            BNB._redoStack[id] = {}
+        elseif BNB._undoSnap[id].text ~= text then
+            BNB.UndoPush(id, text, cursor)
+        end
+    end
+
     -- tb-bulletlist: insert "  · " at the start of the cursor's current line
     local bulletBtn = WyBtn("tb-bulletlist", L["NE_INSERT_BULLET_TIP"])
     bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", 6, 0)
@@ -510,12 +524,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         local BULLET = "  - "  -- two spaces + hyphen + space
         local newText   = text:sub(1, lineStart) .. BULLET .. text:sub(lineStart + 1)
         local newCursor = cursor + #BULLET
-        -- Seed snap with pre-bullet state if not yet initialised (note never typed in).
-        if not BNB._undoSnap[id] then
-            BNB._undoSnap[id]  = { text = text, cursor = cursor }
-            BNB._undoStack[id] = {}
-            BNB._redoStack[id] = {}
-        end
+        UndoPoint(id, text, cursor)
         -- Suppress OnTextChanged undo push during SetText, then push manually.
         BNB._undoActive = true
         eb:SetText(newText)
@@ -538,11 +547,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         local cursor = eb:GetCursorPosition() or 0
         local newText   = text:sub(1, cursor) .. snippet .. text:sub(cursor + 1)
         local newCursor = cursor + #snippet
-        if not BNB._undoSnap[id] then
-            BNB._undoSnap[id]  = { text = text, cursor = cursor }
-            BNB._undoStack[id] = {}
-            BNB._redoStack[id] = {}
-        end
+        UndoPoint(id, text, cursor)
         BNB._undoActive = true
         eb:SetText(newText)
         BNB._undoActive = false

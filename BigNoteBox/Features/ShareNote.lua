@@ -867,11 +867,21 @@ local function BuildShareWindow()
     local previewBtn = BNB.CreateButton(nil, f, L["SHARE_PREVIEW_BTN"], 90, 26)
     previewBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
-        if f._errLbl then f._errLbl:SetText("") end
+        -- Red again: a template import paints it green (ALL-68 S3)
+        if f._errLbl then f._errLbl:SetText(""); f._errLbl:SetTextColor(1, 0.35, 0.35) end
         local str = f._importEB and not f._importEB._showingPlaceholder
             and f._importEB:GetText() or ""
         if str == "" then
             if f._errLbl then f._errLbl:SetText(L["SHARE_PASTE_FIRST"]) end
+            return
+        end
+        -- A template code adds a template, not a note (ALL-68 S3)
+        local tplDone, tplMsg, tplOk = BNB.Templates.TryImport(str)
+        if tplDone then
+            if f._errLbl then
+                if tplOk then f._errLbl:SetTextColor(0.4, 0.85, 0.4) else f._errLbl:SetTextColor(1, 0.35, 0.35) end
+                f._errLbl:SetText(tplMsg)
+            end
             return
         end
         local data, err = BNB.ShareDecode(str)
@@ -1006,11 +1016,21 @@ local function BuildImportWindow()
     local previewBtn = BNB.CreateButton(nil, f, L["SHARE_PREVIEW_BTN"], 90, 26)
     previewBtn:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, y)
     previewBtn:SetScript("OnClick", function()
-        if f._errLbl then f._errLbl:SetText("") end
+        -- Red again: a template import paints it green (ALL-68 S3)
+        if f._errLbl then f._errLbl:SetText(""); f._errLbl:SetTextColor(1, 0.35, 0.35) end
         local str = f._importEB and not f._importEB._showingPlaceholder
             and f._importEB:GetText() or ""
         if str == "" then
             if f._errLbl then f._errLbl:SetText(L["SHARE_PASTE_FIRST"]) end
+            return
+        end
+        -- A template code adds a template, not a note (ALL-68 S3)
+        local tplDone, tplMsg, tplOk = BNB.Templates.TryImport(str)
+        if tplDone then
+            if f._errLbl then
+                if tplOk then f._errLbl:SetTextColor(0.4, 0.85, 0.4) else f._errLbl:SetTextColor(1, 0.35, 0.35) end
+                f._errLbl:SetText(tplMsg)
+            end
             return
         end
         local data, err = BNB.ShareDecode(str)

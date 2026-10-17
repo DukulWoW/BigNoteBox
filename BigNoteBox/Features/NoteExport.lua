@@ -665,13 +665,19 @@ end
 -- The backup wrapper around encoded note objects. Every JSON export goes
 -- through it, a single note too, so anything exported can be imported in
 -- Settings > Backup (a bare note object used to fail as "unrecognized").
-local function JsonEnvelope(noteParts)
+-- templates (optional): the player's note templates, the full backup only
+-- (ALL-68 S3); an older build reads past the key
+local function JsonEnvelope(noteParts, templates)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
         JSON_VERSION,
         JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
         #noteParts)
-    return header .. table.concat(noteParts, ",\n") .. "\n]}"
+    local tail = "\n]}"
+    if templates and #templates > 0 then
+        tail = "\n],\"templates\":" .. Json.Encode(templates) .. "}"
+    end
+    return header .. table.concat(noteParts, ",\n") .. tail
 end
 
 -- A list of note tables as one importable JSON export
@@ -701,7 +707,8 @@ local function SerializeNotes(fmt)
             if not seen[id] then noteParts[#noteParts + 1] = JsonEncodeNote(note) end
         end
 
-        return JsonEnvelope(noteParts), #noteParts
+        local tpls = BNB.Templates and BNB.Templates.BackupList() or nil
+        return JsonEnvelope(noteParts, tpls), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -997,6 +1004,9 @@ local function ParseJsonNotes(text)
             parsed[#parsed + 1] = note
         end
     end
+    -- The backup's templates ride along on the list; ImportNotes adds them
+    -- (cleaned there, BNB.Templates.ImportRecords)
+    if type(doc) == "table" and type(doc.templates) == "table" then parsed.templates = doc.templates end
     return #parsed > 0 and parsed or nil
 end
 
@@ -1190,6 +1200,11 @@ local function ImportNotes(noteList, remapScope)
         end
     end
     ReportImport(count, #noteList, stats)
+    -- Templates from a full backup (ALL-68 S3)
+    if noteList.templates and BNB.Templates then
+        local n = BNB.Templates.ImportRecords(noteList.templates)
+        if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["TPL_BACKUP_IMPORTED_FMT"], n) .. "|r") end
+    end
     return count
 end
 

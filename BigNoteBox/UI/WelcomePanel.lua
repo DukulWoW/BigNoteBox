@@ -254,6 +254,13 @@ local function GetImportFrame()
         text = text:match("^%s*(.-)%s*$")
         -- A share code (BNB2: / BNB1:) goes through the share preview, as from
         -- the Import shared note window (ALL-275); JSON as before
+        -- A template code adds a template (ALL-68 S3)
+        local tplDone, tplMsg, tplOk = BNB.Templates.TryImport(text)
+        if tplDone then
+            if tplOk then BNB:Print("|cff66bb6a" .. tplMsg .. "|r"); f:Hide()
+            else BNB:Print("|cffff4444" .. tplMsg .. "|r") end
+            return
+        end
         if text:find("^BNB%d:") then
             local data, err
             if BNB.ShareDecode then data, err = BNB.ShareDecode(text) end

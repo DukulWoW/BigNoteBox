@@ -307,6 +307,9 @@ end)
 --   HistoryRescueChanged ()        Features/NoteHistory.lua, after a rescue or a
 --                                  lost note's history dropped (ALL-466): the
 --                                  Rescue list and its buttons re-count
+--   TemplatesChanged ()            Features/NoteTemplates.lua, any write to the
+--                                  player's templates (ALL-68 S2): the Settings
+--                                  Templates page re-lists
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
 --   UIFontChanged ()               UI/Fonts.lua, end of ApplyFont: skin button
 --                                  labels and the welcome panel re-read

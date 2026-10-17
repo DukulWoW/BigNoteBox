@@ -83,6 +83,7 @@ UI\Config\DevTools.lua
 UI\Config\OracleSettings.lua
 UI\Config\ContextMenuSettings.lua
 UI\Config\Tldr.lua
+UI\Config\Templates.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
@@ -118,6 +119,7 @@ UI\FeatureList.lua
 UI\FeatureListData.lua
 UI\SetupWizard.lua
 UI\NewNoteDialog.lua
+UI\TemplateSave.lua
 UI\RichNote.xml
 
 # Features

@@ -53,7 +53,8 @@ BNB.NOTE_MENU_CLICKS = {
         { "alarm", "NL_CTX_CREATE_ALARM", "create-alarm" }, { "task", "NL_CTX_CREATE_TASK", "create-task" },
         { "situation", "NL_CM_CREATE_SITUATION", "create-situation" } } },
     { "actions", "NL_CM_ACTIONS", "action", {
-        { "duplicate", "NL_CTX_DUPLICATE", "duplicate" }, { "copyMove", "NL_CTX_COPY_MOVE", "copy-move" },
+        { "duplicate", "NL_CTX_DUPLICATE", "duplicate" }, { "saveTemplate", "NL_CM_SAVE_TEMPLATE", "save-template" },
+        { "copyMove", "NL_CTX_COPY_MOVE", "copy-move" },
         { "clipboard", "NL_CM_COPY_CLIPBOARD", "copy-clipboard" }, { "convert", "NL_CM_CONVERT", "rich-note" },
         { "share", "NL_CTX_SHARE", "share" }, { "sendChat", "SEND_TITLE", "chat" },
         { "exportJson", "NL_CM_EXPORT_JSON", "export-json" },
@@ -303,6 +304,11 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         Parent(root, L["NL_CM_ACTIONS"], "action", ClickKey("actions"), {
             { key = "duplicate", label = L["NL_CTX_DUPLICATE"], fn = function() K.DuplicateNote(noteID) end,
               opts = { icon = "duplicate" } },
+            -- Save as template (ALL-68 S2): the note's text plus the groups
+            -- ticked in the save window
+            { key = "saveTemplate", label = L["NL_CM_SAVE_TEMPLATE"], fn = function()
+                if BNB.OpenSaveTemplate then BNB.OpenSaveTemplate(noteID) end
+            end, opts = { icon = "save-template" } },
             -- Copy/Move to character: the only way to change a note's scope
             -- since Note Settings lost Note visibility, so shown with the
             -- sidebar off too (ALL-265)

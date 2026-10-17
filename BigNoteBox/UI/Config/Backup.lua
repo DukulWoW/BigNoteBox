@@ -193,6 +193,14 @@ local function BuildBackupTab(sf, ct)
         -- A share code (BNB2: / BNB1:) goes to the share preview, as on the
         -- Welcome panel (ALL-67): it is a note, not a broken backup
         local code = raw:match("^%s*(.-)%s*$")
+        -- A template code adds a template (ALL-68 S3)
+        local tplDone, tplMsg, tplOk = BNB.Templates.TryImport(code)
+        if tplDone then
+            if tplOk then importStatus:SetTextColor(0.55, 0.82, 0.55)
+            else importStatus:SetTextColor(0.82, 0.55, 0.55) end
+            importStatus:SetText(tplMsg)
+            return
+        end
         if code:find("^BNB%d:") then
             local data, err
             if BNB.ShareDecode then data, err = BNB.ShareDecode(code) end

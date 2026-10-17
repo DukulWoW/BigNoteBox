@@ -5,7 +5,9 @@
 -- on it. The main window is dimmed with a black overlay while the dialog is open.
 -- ESC / Cancel closes without creating. Create is disabled until a title is typed.
 -- Template cards under the title (ALL-68): Blank, Boss, Weekly, Journal, More;
--- More opens a second page in the dialog (f:AddPage "more") with the rest.
+-- More opens a second page in the dialog (f:AddPage "more") with the rest:
+-- the player's own templates on top, a line, then the built-ins (S2; the
+-- rows are refilled on every Open).
 -- Templates themselves: Features/NoteTemplates.lua.
 --
 -- Public API:
@@ -89,7 +91,9 @@ local _refreshLSM      = nil   -- LSM font dropdown closed-state refresh (ALL-41
 local _selTpl    = nil
 local _tplCards  = {}
 local _tplLine   = nil
-local _tplRows   = {}
+local _tplRows   = {}   -- the rows in use, rebuilt on every Open (the player's templates change)
+local _tplPool   = {}   -- every row ever made, reused
+local _tplMore   = nil  -- the More page's scroll frame, content and divider
 local _tplTitle  = nil
 local _tplSkin   = false
 
@@ -320,7 +324,7 @@ local function PaintTplCards()
     if _tplLine then
         local tpl = BNB.Templates.Get(_selTpl)
         _tplLine:SetText(string.format(L["NND_TPL_LINE_FMT"],
-            L[tpl and tpl.name or "TPL_BLANK_NAME"], L[tpl and tpl.desc or "TPL_BLANK_DESC"]))
+            BNB.Templates.Name(tpl), BNB.Templates.Desc(tpl)))
     end
 end
 BNB.RegisterMessage("NewNoteDialog.TplCards", "SkinChanged", function() PaintTplCards() end)
@@ -339,9 +343,10 @@ local function PickTemplate(key)
     local title = CurrentTitle()
     local ownTitle = title ~= "" and title ~= _tplTitle
     if tpl then
-        _selIcon  = tpl.icon
+        -- A player's template saved without its look has no icon
+        _selIcon  = tpl.icon or RandomNoteIcon()
         _selColor = tpl.color and { r = tpl.color.r, g = tpl.color.g, b = tpl.color.b } or nil
-        _selRich  = BNB.RichEnabled()
+        _selRich  = BNB.Templates.Rich(tpl)
         if not ownTitle then
             _tplTitle = BNB.Templates.Title(tpl)
             _titleEB:SetRealText(_tplTitle)
@@ -362,10 +367,10 @@ local function PickTemplate(key)
     PaintTplCards()
 end
 
-local function TplTooltip(owner, nameKey, descKey)
+local function TplTooltip(owner, name, desc)
     GameTooltip:SetOwner(owner, "ANCHOR_RIGHT")
-    GameTooltip:AddLine(L[nameKey], 1, 1, 1)
-    GameTooltip:AddLine(L[descKey], 0.8, 0.8, 0.8, true)
+    GameTooltip:AddLine(name, 1, 1, 1)
+    GameTooltip:AddLine(desc, 0.8, 0.8, 0.8, true)
     GameTooltip:Show()
 end
 
@@ -400,8 +405,8 @@ local function BuildTplCards(f, body, y, skinMode)
         local c = { key = key, btn = btn, art = tex, glow = glow, lbl = lbl }
         btn:SetScript("OnEnter", function(self)
             c._hover = true; PaintTplCards()
-            TplTooltip(self, tpl and tpl.name or ("TPL_" .. key:upper() .. "_NAME"),
-                tpl and tpl.desc or ("TPL_" .. key:upper() .. "_DESC"))
+            if tpl then BNB.TemplateTooltip(self, tpl)
+            else TplTooltip(self, L["TPL_" .. key:upper() .. "_NAME"], L["TPL_" .. key:upper() .. "_DESC"]) end
         end)
         btn:SetScript("OnLeave", function()
             c._hover = false; PaintTplCards(); GameTooltip:Hide()
@@ -439,51 +444,114 @@ local function BuildMorePage(f, top)
     local sf, ct = BNB.CreateAutoScrollPanel(page, DLG_CW - 24, DLG_CW)
     sf:SetPoint("TOPLEFT", page, "TOPLEFT", DLG_PAD, -(page.top + 20))
     sf:SetPoint("BOTTOMRIGHT", page, "BOTTOMRIGHT", -DLG_PAD, DLG_FOOT + 2)
+    -- Two headings, shown only once the player has templates of their own
+    -- (Dukul, 2026-10-17: a rule alone read as one list); the Settings
+    -- Templates page's words
+    local function Hdr(key)
+        local h = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        h:SetJustifyH("LEFT")
+        BNB.SetHeaderColor(h)
+        h:SetText(L[key])
+        return h
+    end
+    _tplMore = { f = f, sf = sf, ct = ct,
+                 userHdr = Hdr("CFG_TPL_HDR_USER"), builtHdr = Hdr("CFG_TPL_HDR_BUILTIN") }
+end
 
+local MORE_ICON = "Interface\\Icons\\INV_Misc_Note_01"   -- a player's template with no icon
+
+local function MoreRow(i)
+    local row = _tplPool[i]
+    if row then return row end
+    local ct = _tplMore.ct
+    row = BNB.CreateBackdropFrame("Button", nil, ct)
+    BNB.SetBackdrop(row, 0.06, 0.06, 0.08, 0.95, 0.28, 0.28, 0.30, 1)
+    row:SetHeight(TPL_ROW_H)
+
+    local icon = row:CreateTexture(nil, "ARTWORK")
+    icon:SetSize(TPL_ROW_H - 8, TPL_ROW_H - 8)
+    icon:SetPoint("LEFT", row, "LEFT", 4, 0)
+    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+
+    local nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    nameLbl:SetPoint("TOPLEFT",  icon, "TOPRIGHT", 8, -1)
+    nameLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+    nameLbl:SetJustifyH("LEFT"); nameLbl:SetWordWrap(false)
+
+    local descLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    descLbl:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 8, 1)
+    descLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+    descLbl:SetJustifyH("LEFT"); descLbl:SetWordWrap(false)
+    descLbl:SetTextColor(0.65, 0.65, 0.65, 1)
+
+    row.icon, row.nameLbl, row.descLbl = icon, nameLbl, descLbl
+    row:SetScript("OnEnter", function(self)
+        self._hover = true; PaintTplCards()
+        BNB.TemplateTooltip(self, BNB.Templates.Get(self.key), L["TPL_ROW_RIGHT_HINT"])
+    end)
+    row:SetScript("OnLeave", function(self)
+        self._hover = false; PaintTplCards(); GameTooltip:Hide()
+    end)
+    row:SetScript("OnHide", function(self) self._hover = false end)
+    -- Right-click: the template menu, the Settings page's (Dukul, 2026-10-17)
+    row:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    row:SetScript("OnClick", function(self, btn)
+        if btn == "RightButton" then
+            local f = _tplMore.f
+            BNB.ContextMenu.Open(self, function(root)
+                BNB.TemplateMenu(root, self.key, {
+                    row = self, window = f,
+                    onUse = function(key) PickTemplate(key); f:PageBack() end,
+                    manage = function()
+                        NND.Close()
+                        BNB.OpenSettingsPage("notes", "templates")
+                    end })
+            end)
+            return
+        end
+        PickTemplate(self.key)
+        _tplMore.f:PageBack()
+    end)
+    _tplPool[i] = row
+    return row
+end
+
+-- The More page rows: the player's own templates on top, then the built-ins
+-- not on a card, each under its heading while the player has any (Dukul,
+-- 2026-10-17). Rebuilt on every Open.
+local function FillMoreRows()
+    if not _tplMore then return end
+    local ct, TP = _tplMore.ct, BNB.Templates
+    local user, more = TP.User(), TP.More()
     _tplRows = {}
-    local y = 0
-    for _, tpl in ipairs(BNB.Templates.More()) do
-        local row = BNB.CreateBackdropFrame("Button", nil, ct)
-        BNB.SetBackdrop(row, 0.06, 0.06, 0.08, 0.95, 0.28, 0.28, 0.30, 1)
-        row:SetHeight(TPL_ROW_H)
+    local y, n = 0, 0
+    local function Add(tpl)
+        n = n + 1
+        local row = MoreRow(n)
+        row:ClearAllPoints()
         row:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
         row:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
-
-        local icon = row:CreateTexture(nil, "ARTWORK")
-        icon:SetSize(TPL_ROW_H - 8, TPL_ROW_H - 8)
-        icon:SetPoint("LEFT", row, "LEFT", 4, 0)
-        icon:SetTexture(tpl.icon)
-        icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-
-        local nameLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-        nameLbl:SetPoint("TOPLEFT",  icon, "TOPRIGHT", 8, -1)
-        nameLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
-        nameLbl:SetJustifyH("LEFT"); nameLbl:SetWordWrap(false)
-        nameLbl:SetText(L[tpl.name])
-
-        local descLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        descLbl:SetPoint("BOTTOMLEFT", icon, "BOTTOMRIGHT", 8, 1)
-        descLbl:SetPoint("RIGHT", row, "RIGHT", -6, 0)
-        descLbl:SetJustifyH("LEFT"); descLbl:SetWordWrap(false)
-        descLbl:SetTextColor(0.65, 0.65, 0.65, 1)
-        descLbl:SetText(L[tpl.desc])
-
-        row.key, row.nameLbl = tpl.key, nameLbl
-        row:SetScript("OnEnter", function(self)
-            self._hover = true; PaintTplCards()
-            TplTooltip(self, tpl.name, tpl.desc)
-        end)
-        row:SetScript("OnLeave", function(self)
-            self._hover = false; PaintTplCards(); GameTooltip:Hide()
-        end)
-        row:SetScript("OnClick", function()
-            PickTemplate(tpl.key)
-            f:PageBack()
-        end)
-        _tplRows[#_tplRows + 1] = row
+        row.key = tpl.key
+        row.icon:SetTexture(tpl.icon or MORE_ICON)
+        row.nameLbl:SetText(TP.Name(tpl))
+        row.descLbl:SetText(TP.Desc(tpl))
+        row:Show()
+        _tplRows[n] = row
         y = y - TPL_ROW_H - 2
     end
-    sf:FinaliseHeight(-y)
+    local function Heading(h, gap)
+        h:ClearAllPoints()
+        h:SetPoint("TOPLEFT", ct, "TOPLEFT", 2, y - gap)
+        h:Show()
+        y = y - gap - 20
+    end
+    local headed = #user > 0
+    if headed then Heading(_tplMore.userHdr, 0) else _tplMore.userHdr:Hide() end
+    for _, tpl in ipairs(user) do Add(tpl) end
+    if headed then Heading(_tplMore.builtHdr, 8) else _tplMore.builtHdr:Hide() end
+    for _, tpl in ipairs(more) do Add(tpl) end
+    for i = n + 1, #_tplPool do _tplPool[i]:Hide() end
+    _tplMore.sf:FinaliseHeight(-y)
 end
 
 -- ---------------------------------------------------------------------------
@@ -959,6 +1027,7 @@ function NND.Open()
     -- Blank picked, the main page shown (ALL-68)
     _selTpl, _tplTitle = nil, nil
     f:ShowPage("main")
+    FillMoreRows()
     PaintTplCards()
 
     -- Reset slider to global font size
@@ -997,10 +1066,26 @@ function NND.Open()
     end)
 end
 
+-- The dialog with a template already picked (Settings > Templates > Use)
+function NND.OpenWithTemplate(key)
+    NND.Open()
+    if _frame and _frame:IsShown() then PickTemplate(key) end
+end
+
+-- A template renamed, re-iconed, added or deleted while the dialog is open
+-- (the More page menu): rows refilled, a deleted pick falls back to Blank
+BNB.RegisterMessage("NewNoteDialog.Templates", "TemplatesChanged", function()
+    if not (_frame and _frame:IsShown()) then return end
+    if _selTpl and not BNB.Templates.Get(_selTpl) then PickTemplate(nil) end
+    FillMoreRows()
+    PaintTplCards()
+end)
+
 function NND.Close()
     if _frame then _frame:Hide() end
     ShowMainOverlay(false)
     BNB.IconPicker.Close(PICKER_KEY)
+    BNB.IconPicker.Close("templateIcon")   -- a More page row's Change icon
 end
 
 function NND.Confirm()
@@ -1028,9 +1113,11 @@ function NND.Confirm()
     local scope = _scopeDD and _scopeDD:GetSelected()
     if scope then updates.scope = scope end   -- ALL-267
     BNB.UpdateNote(id, updates)
-    -- Body, tags, tasks and situation from the picked template (ALL-68)
+    -- Body, tags, tasks and situation from the picked template (ALL-68); a
+    -- player's template also brings the rest of its look, except what the
+    -- dialog just wrote
     local tpl = BNB.Templates.Get(_selTpl)
-    if tpl then BNB.Templates.Fill(id, tpl, _selRich) end
+    if tpl then BNB.Templates.Fill(id, tpl, _selRich, updates) end
 
     if not BNB.mainFrame then BNB.CreateMainWindow() end
     if not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
