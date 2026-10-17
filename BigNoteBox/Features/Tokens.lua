@@ -18,6 +18,11 @@
 --              or data this client lacks shows as typed; an item / quest / spell
 --              still loading shows as typed until it arrives, then the open
 --              views redraw (message TokensChanged).
+--   Custom   = the player's own (S4): a name and a line of text that may use
+--              built-in tokens and other custom ones (3 deep at most, so a
+--              loop stops). Live: filled on every draw from the READER's own
+--              definitions; a reader without it sees it as typed. Kept with
+--              the notes (BigNoteBoxNotesDB.tokens), in the JSON backup.
 --   Time, money, lockouts (S3): {{gold}} (coins), {{reset:weekly}} /
 --              {{reset:daily}} (countdown, 2d 4h), {{lockout:name}} (the
 --              reader's progress per difficulty; any part of the name, any
@@ -53,6 +58,16 @@
 --   BNB.Tokens.HasSnapshot(text)        -- a snapshot token still in the text
 --   BNB.Tokens.WireExpand(eb, undoID)   -- expand snapshot tokens as typed
 --   BNB.Tokens.MENU / Preview(name, kind) -- the toolbar's token list (S2)
+--   BNB.Tokens.Custom()                  -- the player's tokens, by name (S4):
+--                                           { { key, name, text }, ... }
+--   BNB.Tokens.GetCustom(name)           -- one record or nil
+--   BNB.Tokens.SetCustom(name, text, oldName) -> true, or nil + error text
+--   BNB.Tokens.DeleteCustom(name)
+--   BNB.Tokens.CustomPreview(text)       -- what a definition gives right now
+--   BNB.Tokens.BackupList() / ImportRecords(list) -- the JSON full backup
+--   BNB.Tokens.WireAutocomplete(eb, undoID) -- the {{ list as typed (S4)
+--   BNB.Tokens.TrackCaret(eb)            -- again after a SetScript of
+--                                           OnCursorChanged (sticky edit)
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -512,6 +527,8 @@ end
 -- second colon-less word) is not a token and stays as typed.
 local TOKEN_PAT = "(\\?){{(%a[%w_]*)(:?)([^{}\n]*)}}"
 
+local CustomValue   -- the player's own tokens (S4), below
+
 local function Replace(text, set, unescape, plain)
     if not text or not text:find("{{", 1, true) then return text end
     return (text:gsub(TOKEN_PAT, function(bs, name, colon, arg)
@@ -521,12 +538,142 @@ local function Replace(text, set, unescape, plain)
         if colon ~= "" then return set == LIVE and ArgValue(name, arg, plain) or nil end
         if arg ~= "" then return nil end
         local v, known = Value(set, name, plain)
-        if not known then return nil end
+        if not known then
+            if set == LIVE then return CustomValue(name, plain) end
+            return nil
+        end
         if set == LIVE then used[name:lower()] = true end
         -- A live token with no value shows nothing; a snapshot one stays
         if v == nil then return set == LIVE and "" or nil end
         return v
     end))
+end
+
+-- ---------------------------------------------------------------------------
+-- CUSTOM TOKENS (S4)
+-- ---------------------------------------------------------------------------
+-- BigNoteBoxNotesDB.tokens[name:lower()] = { name, text, created, updated }:
+-- data only, never code. The name follows the token rule (a letter, then
+-- letters, digits, _) and may not be a built-in name; the text is one line
+-- without "|" (escape codes break chat; the built-in tokens inside make
+-- their own pictures and links).
+local MAX_DEPTH, MAX_NAME, MAX_TEXT = 3, 24, 255
+
+local function CustomStore(create)
+    local ndb = BNB.NotesDB and BNB.NotesDB()
+    if not ndb then return nil end
+    if not ndb.tokens and create then ndb.tokens = {} end
+    return ndb.tokens
+end
+
+local function Builtin(lname)
+    return SNAPSHOT[lname] or LIVE[lname] or IDTOK[lname] or ARGTOK[lname]
+end
+
+local function CleanText(t)
+    t = tostring(t or ""):gsub("[\r\n]+", " "):gsub("|", "")
+    t = t:match("^%s*(.-)%s*$") or ""
+    if #t > MAX_TEXT then t = t:sub(1, MAX_TEXT) end
+    return t
+end
+
+local depth = 0
+CustomValue = function(name, plain)
+    local s = CustomStore(false)
+    local rec = s and s[name:lower()]
+    if type(rec) ~= "table" or type(rec.text) ~= "string" or depth >= MAX_DEPTH then return nil end
+    depth = depth + 1
+    -- Snapshot tokens inside fill too, with today's values: the definition
+    -- is the writer's own, so "{{date}}" there means the day it is drawn
+    local ok, v = pcall(function()
+        return Replace(Replace(rec.text, SNAPSHOT, false, plain), LIVE, true, plain)
+    end)
+    depth = depth - 1
+    if not ok then return nil end
+    return v
+end
+
+local function CustomChanged()
+    BNB.SendMessage("CustomTokensChanged")
+    BNB.Debounce("tokensChanged", 0, SendChanged)
+end
+
+function T.Custom()
+    local out, s = {}, CustomStore(false)
+    for key, rec in pairs(s or {}) do
+        if type(rec) == "table" and type(rec.name) == "string" and type(rec.text) == "string" then
+            out[#out + 1] = { key = key, name = rec.name, text = rec.text }
+        end
+    end
+    table.sort(out, function(a, b) return a.key < b.key end)
+    return out
+end
+
+function T.GetCustom(name)
+    local s = CustomStore(false)
+    local rec = s and type(name) == "string" and s[name:lower()]
+    if type(rec) == "table" then return rec end
+end
+
+-- Returns true, or nil and the reason to show. Braces typed around the
+-- name ({{raidtime}}) are dropped.
+function T.SetCustom(name, text, oldName)
+    name = tostring(name or ""):gsub("[{}%s]", "")
+    if name == "" or #name > MAX_NAME or not name:match("^%a[%w_]*$") then
+        return nil, L["TOKEN_CUSTOM_ERR_NAME"]
+    end
+    local key = name:lower()
+    if Builtin(key) then return nil, string.format(L["TOKEN_CUSTOM_ERR_BUILTIN"], name) end
+    text = CleanText(text)
+    if text == "" then return nil, L["TOKEN_CUSTOM_ERR_TEXT"] end
+    local s = CustomStore(true)
+    if not s then return nil, L["TOKEN_CUSTOM_ERR_NAME"] end
+    local oldKey = type(oldName) == "string" and oldName:lower() or nil
+    if s[key] and key ~= oldKey then return nil, string.format(L["TOKEN_CUSTOM_ERR_TAKEN"], name) end
+    local now = time()
+    local prev = oldKey and s[oldKey]
+    if oldKey and oldKey ~= key then s[oldKey] = nil end
+    local created = now
+    if type(prev) == "table" and prev.created then created = prev.created end
+    s[key] = { name = name, text = text, created = created, updated = now }
+    CustomChanged()
+    return true
+end
+
+function T.DeleteCustom(name)
+    local s = CustomStore(false)
+    if not (s and type(name) == "string" and s[name:lower()]) then return end
+    s[name:lower()] = nil
+    CustomChanged()
+end
+
+-- What a definition gives right now (the settings page's preview)
+function T.CustomPreview(text)
+    text = CleanText(text)
+    local ok, v = pcall(function() return Replace(Replace(text, SNAPSHOT, false), LIVE, true) end)
+    if ok then return v end
+    return text
+end
+
+-- The JSON full backup (Features/NoteExport.lua), next to the templates
+function T.BackupList()
+    local out = {}
+    for _, e in ipairs(T.Custom()) do out[#out + 1] = { name = e.name, text = e.text } end
+    return out
+end
+
+-- Adds the backup's tokens whose name is free; returns how many
+function T.ImportRecords(list)
+    if type(list) ~= "table" then return 0 end
+    local n, s = 0, CustomStore(true)
+    if not s then return 0 end
+    for _, raw in ipairs(list) do
+        if type(raw) == "table" and type(raw.name) == "string" and type(raw.text) == "string"
+           and not s[raw.name:lower()] and T.SetCustom(raw.name, raw.text) then
+            n = n + 1
+        end
+    end
+    return n
 end
 
 -- ---------------------------------------------------------------------------
@@ -722,4 +869,312 @@ function T.WireExpand(eb, undoID)
             if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
         end
     end)
+end
+
+-- ---------------------------------------------------------------------------
+-- THE {{ LIST AS TYPED (S4)
+-- ---------------------------------------------------------------------------
+-- Typing {{ opens a list of tokens under the cursor: the player's own first,
+-- then the built-ins, narrowed by what follows the braces. Up / Down move,
+-- Enter, Tab or a click puts the token in and closes the }}, Esc or anything
+-- that is not part of a token name closes the list. Enter in a box of many
+-- lines types no new line then; in a one-line box (tl;dr) it also does what
+-- Enter does there (saves), since that cannot be held back. One shared list.
+-- undoID as in WireExpand; onChange() = the box's own "text changed" (mark
+-- dirty), since a SetText from here is not typing.
+local AC_ROWS, AC_ROW_H, AC_W = 8, 20, 300
+local _ac
+local _eat   -- { eb, text, cur }: the new line Enter types after a pick
+
+-- Every pick, in list order: { word, label, kind, now() }
+local function Entries()
+    local out = {}
+    for _, c in ipairs(T.Custom()) do
+        local text = c.text
+        out[#out + 1] = { word = c.name, kind = "custom", desc = text,
+                          now = function() return T.CustomPreview(text) end }
+    end
+    for _, g in ipairs(T.MENU) do
+        for _, name in ipairs(g.list) do
+            if T.Available(name) then
+                local base = name:gsub(":$", "")
+                local open = g.kind == "id" or base ~= name
+                local kind = g.kind
+                out[#out + 1] = { word = open and (base .. ":") or name, kind = kind, open = open,
+                                  base = base, name = name,
+                                  desc = L["TOKEN_DESC_" .. base:upper():gsub(":", "_")],
+                                  now = function() return (T.Preview(name, kind)) end }
+            end
+        end
+    end
+    return out
+end
+
+-- While the list shows, the box is in alt-arrow mode (as the chat box):
+-- plain arrows then go to OnArrowPressed and leave the cursor alone. A box
+-- of many lines moves its cursor on an arrow and never fires OnArrowPressed
+-- (Dukul, 2026-10-17: "The arrow keys don't work").
+local function ArrowMode(eb, on)
+    if not (eb and eb.SetAltArrowKeyMode) then return end
+    if on then
+        if eb._bnbAltPrev == nil then
+            eb._bnbAltPrev = eb:GetAltArrowKeyMode() and true or false
+            eb:SetAltArrowKeyMode(true)
+        end
+    elseif eb._bnbAltPrev ~= nil then
+        eb:SetAltArrowKeyMode(eb._bnbAltPrev)
+        eb._bnbAltPrev = nil
+    end
+end
+
+local function Hide()
+    if _ac then
+        ArrowMode(_ac._eb, false)
+        _ac:Hide()
+        _ac._eb = nil
+        if GameTooltip:IsOwned(_ac) then GameTooltip:Hide() end
+    end
+end
+
+local function ShowTip()
+    local e = _ac.matches[_ac.sel]
+    if not e then return end
+    GameTooltip:SetOwner(_ac, "ANCHOR_NONE")
+    GameTooltip:ClearAllPoints()
+    GameTooltip:SetPoint("TOPLEFT", _ac, "TOPRIGHT", 4, 0)
+    local hint = L["TOKEN_ARG_NAME"]
+    if e.kind == "id" then hint = "id" end
+    GameTooltip:AddLine("{{" .. e.word .. (e.open and hint or "") .. "}}", 1, 1, 1)
+    if e.kind == "custom" then
+        GameTooltip:AddLine(L["TOKEN_CUSTOM_KIND"], 0.6, 0.8, 1, true)
+    elseif e.desc then
+        GameTooltip:AddLine(e.desc, 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(L["TOKEN_KIND_" .. e.kind:upper()], 0.6, 0.6, 0.6, true)
+    end
+    if e.kind == "custom" then GameTooltip:AddLine(e.desc, 0.8, 0.8, 0.8, true) end
+    GameTooltip:AddLine(L["TOKEN_AC_HINT"], 0.4, 0.85, 0.4, true)
+    GameTooltip:Show()
+end
+
+local function Paint()
+    for i, r in ipairs(_ac.rows) do r._sel:SetShown(i == _ac.sel) end
+    ShowTip()
+end
+
+-- The token in: "{{" .. partial at the cursor becomes the whole token; an
+-- argument token leaves the cursor before its }}; a snapshot token with a
+-- value goes in as that value (one Undo brings the token back, as typing it)
+local function Accept(i)
+    local e = _ac and _ac.matches[i or _ac.sel]
+    local eb = _ac and _ac._eb
+    if not (e and eb) then return end
+    local opts = eb._bnbTokenAC
+    local text, cur, s = eb:GetText() or "", _ac._cur, _ac._start
+    local tail = cur + 1
+    if text:sub(tail, tail + 1) == "}}" then tail = tail + 2 end   -- already closed
+    local token = "{{" .. e.word .. "}}"
+    local back = e.open and 2 or 0
+    local value = e.kind == "snapshot" and not e.open and e.now() or nil
+    local id = opts.undoID and opts.undoID()
+    Hide()
+    local newText, newCur
+    local function Put(ins, b)
+        newText = text:sub(1, s - 1) .. ins .. text:sub(tail)
+        newCur  = s - 1 + #ins - b
+        BNB._undoActive = true
+        eb:SetText(newText)
+        BNB._undoActive = false
+        eb:SetCursorPosition(newCur)
+        if id then BNB.UndoPush(id, newText, newCur) end
+    end
+    if id then BNB.UndoPush(id, text, cur) end
+    Put(token, back)
+    if value then Put(value, 0) end
+    if id and BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
+    if opts.onChange then opts.onChange() end
+    return newText, newCur
+end
+
+local function Build()
+    if _ac then return end
+    local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
+    BNB.EnsureBackdrop(f)
+    BNB.SetBackdrop(f, 0.05, 0.05, 0.08, 0.97, 0.40, 0.40, 0.50, 1)
+    f:SetFrameStrata("TOOLTIP")   -- no keyboard here: the box keeps its keys
+    f:SetClampedToScreen(true)
+    f:SetWidth(AC_W)
+    f:EnableMouse(true)
+    f:Hide()
+    f.rows, f.matches, f.sel = {}, {}, 1
+    for i = 1, AC_ROWS do
+        local r = CreateFrame("Button", nil, f)
+        r:SetHeight(AC_ROW_H)
+        r:SetPoint("TOPLEFT",  f, "TOPLEFT",  4, -4 - (i - 1) * AC_ROW_H)
+        r:SetPoint("TOPRIGHT", f, "TOPRIGHT", -4, -4 - (i - 1) * AC_ROW_H)
+        local hl = r:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.08)
+        local sel = r:CreateTexture(nil, "BACKGROUND")
+        sel:SetAllPoints(); sel:SetColorTexture(0.2, 0.4, 0.7, 0.45)
+        sel:Hide()
+        r._sel = sel
+        local name = r:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+        name:SetPoint("LEFT", r, "LEFT", 6, 0)
+        name:SetJustifyH("LEFT"); name:SetWordWrap(false)
+        r._name = name
+        local now = r:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        now:SetPoint("LEFT", name, "RIGHT", 8, 0)
+        now:SetPoint("RIGHT", r, "RIGHT", -6, 0)
+        now:SetJustifyH("RIGHT"); now:SetWordWrap(false)
+        now:SetTextColor(0.55, 0.55, 0.55)
+        r._now = now
+        r:SetScript("OnEnter", function() f.sel = i; Paint() end)
+        r:SetScript("OnClick", function()
+            local eb = f._eb
+            local _, newCur = Accept(i)
+            if eb and newCur then eb:SetFocus(); eb:SetCursorPosition(newCur) end
+        end)
+        f.rows[i] = r
+    end
+    f:SetScript("OnHide", function(self)
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
+    _ac = f
+end
+
+-- The window the box sits in: the list goes on its parent chain's top so it
+-- shows where the box shows (Focus mode hides UIParent)
+local function TopOf(frame)
+    local f = frame
+    while f:GetParent() and f:GetParent() ~= UIParent and f:GetParent() ~= WorldFrame do
+        f = f:GetParent()
+    end
+    return f:GetParent() or UIParent
+end
+
+local function Open(eb, start, cur, partial)
+    Build()
+    local low, list = partial:lower(), {}
+    for _, e in ipairs(Entries()) do
+        if e.word:lower():sub(1, #low) == low and e.word:lower() ~= low then list[#list + 1] = e end
+    end
+    if #list == 0 then Hide(); return end
+    local f = _ac
+    if f._eb and f._eb ~= eb then ArrowMode(f._eb, false) end
+    if f._eb ~= eb or f._start ~= start then f.sel = 1 end
+    f._eb, f._start, f._cur, f.matches = eb, start, cur, list
+    if f.sel > math.min(#list, AC_ROWS) then f.sel = 1 end
+    for i, r in ipairs(f.rows) do
+        local e = list[i]
+        if e and i <= AC_ROWS then
+            local word = e.word
+            if e.open then word = word .. "|cff888888" .. (e.kind == "id" and "id" or L["TOKEN_ARG_NAME"]) .. "|r" end
+            local label = "{{" .. word .. "}}"
+            if e.kind == "custom" then label = "|cff99ccff{{" .. e.word .. "}}|r" end
+            r._name:SetText(label)
+            local ok, now = pcall(e.now)
+            r._now:SetText((ok and not e.open and now) or "")
+            r:Show()
+        else
+            r:Hide()
+        end
+    end
+    local shown = math.min(#list, AC_ROWS)
+    f:SetHeight(shown * AC_ROW_H + 8)
+    local parent = TopOf(eb)
+    if f:GetParent() ~= parent then f:SetParent(parent); f:SetFrameStrata("TOOLTIP") end
+    f:SetScale(eb:GetEffectiveScale() / parent:GetEffectiveScale())
+    f:ClearAllPoints()
+    local c = eb._bnbCaret
+    if c then
+        f:SetPoint("TOPLEFT", eb, "TOPLEFT", c.x, c.y - c.h - 2)
+    else
+        f:SetPoint("TOPLEFT", eb, "BOTTOMLEFT", 0, -2)
+    end
+    ArrowMode(eb, true)
+    f:Show()
+    Paint()
+end
+
+-- What is typed between {{ and the cursor, if the cursor is in a token name
+local function Partial(eb)
+    local text = eb:GetText() or ""
+    local cur = eb:GetCursorPosition() or 0
+    local head = text:sub(1, cur)
+    local s, _, partial = head:find("{{([%w_:]*)$")
+    if not s then return nil end
+    if s > 1 and head:sub(s - 1, s - 1) == "\\" then return nil end   -- \{{ = text
+    if partial ~= "" and not partial:match("^%a") then return nil end
+    return s, cur, partial
+end
+
+function T.TrackCaret(eb)
+    if not eb then return end
+    eb:HookScript("OnCursorChanged", function(self, x, y, _, h)
+        local c = self._bnbCaret or {}
+        c.x, c.y, c.h = x or 0, y or 0, h or 12
+        self._bnbCaret = c
+    end)
+end
+
+function T.WireAutocomplete(eb, undoID, onChange)
+    if not eb or eb._bnbTokenAC then return end
+    eb._bnbTokenAC = { undoID = undoID, onChange = onChange }
+    T.TrackCaret(eb)
+    eb:HookScript("OnTextChanged", function(self, userInput)
+        -- The new line after an Enter pick: taken out again
+        local eat = _eat
+        if eat and eat.eb == self then
+            _eat = nil
+            local text = self:GetText() or ""
+            if text == eat.text:sub(1, eat.cur) .. "\n" .. eat.text:sub(eat.cur + 1) then
+                BNB._undoActive = true
+                self:SetText(eat.text)
+                BNB._undoActive = false
+                self:SetCursorPosition(eat.cur)
+                return
+            end
+        end
+        if not userInput or self._showingPlaceholder then return end
+        local s, cur, partial = Partial(self)
+        if s then Open(self, s, cur, partial)
+        elseif _ac and _ac._eb == self then Hide() end
+    end)
+    eb:HookScript("OnTabPressed", function(self)
+        if _ac and _ac:IsShown() and _ac._eb == self then Accept() end
+    end)
+    eb:HookScript("OnArrowPressed", function(self, key)
+        if not (_ac and _ac:IsShown() and _ac._eb == self) then return end
+        if key == "UP" or key == "DOWN" then
+            local n = math.min(#_ac.matches, AC_ROWS)
+            if key == "DOWN" then _ac.sel = _ac.sel % n + 1
+            else _ac.sel = (_ac.sel <= 1) and n or (_ac.sel - 1) end
+            Paint()
+        else
+            -- Left / Right: the list closes and the cursor takes that step,
+            -- which alt-arrow mode held back
+            local pos = self:GetCursorPosition() or 0
+            Hide()
+            if key == "LEFT" then self:SetCursorPosition(math.max(0, pos - 1))
+            elseif key == "RIGHT" then self:SetCursorPosition(pos + 1) end
+        end
+    end)
+    -- Enter: OnKeyDown runs before the box acts on the key, so the token is
+    -- in before a one-line box's OnEnterPressed reads the text. Ctrl+Enter
+    -- stays the sticky's "end the edit".
+    eb:HookScript("OnKeyDown", function(self, key)
+        if not (_ac and _ac:IsShown() and _ac._eb == self) then return end
+        if (key == "ENTER" or key == "NUMPADENTER") and not IsControlKeyDown() then
+            local newText, newCur = Accept()
+            if newText and self:IsMultiLine() then _eat = { eb = self, text = newText, cur = newCur } end
+            C_Timer.After(0, function() if _eat and _eat.eb == self then _eat = nil end end)
+        end
+    end)
+    eb:HookScript("OnEscapePressed", function(self) if _ac and _ac._eb == self then Hide() end end)
+    -- A moment later, so a click on a row still lands
+    eb:HookScript("OnEditFocusLost", function(self)
+        C_Timer.After(0.15, function()
+            if _ac and _ac._eb == self and not self:HasFocus() then Hide() end
+        end)
+    end)
+    eb:HookScript("OnHide", function(self) if _ac and _ac._eb == self then Hide() end end)
 end

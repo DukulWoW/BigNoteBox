@@ -291,6 +291,12 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             function() A.fav(noteID) end, { icon = note.favorited and "unfavorite" or "favorite" })
         root:CreateButton(locked and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"],
             function() A.lock(noteID) end, { icon = locked and "unlocked" or "locked" })
+        -- This note's tags in their own small window (UI/NoteTags.lua, 2026-10-17)
+        local hasTags = note.tags and #note.tags > 0
+        local tagsLabel = L["NL_CTX_ADD_TAGS"]
+        if hasTags then tagsLabel = L["NL_CTX_EDIT_TAGS"] end
+        root:CreateButton(tagsLabel, function() BNB.OpenNoteTags(noteID) end,
+            { icon = hasTags and "tags-edit" or "tags-add", disabled = locked })
         -- A player note that updates itself (ALL-474): stop / start
         local UN = BNB.UnitNotes
         if note.source == "inspect" and note.unitAuto and UN and UN.SetAutoUpdate and BNB.UnitNotesEnabled() then

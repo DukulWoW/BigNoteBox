@@ -220,7 +220,9 @@ function BNB.RefreshTagTree()
         hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -totalH)
         -- Arrow symbol: down when expanded, right when collapsed
         if hdr._arrowBtn then hdr._arrowBtn:SetSymbol(expanded and "down" or "right") end
-        hdr._lbl:SetText(isUntagged and ("|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r") or tag)
+        local TC = BNB.TagColors   -- the tag's colour (ALL-106)
+        hdr._lbl:SetText(isUntagged and ("|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r")
+            or (TC and TC.Text(tag) or tag))
         hdr._count:SetText("(" .. #notes .. ")")
         hdr:SetScript("OnClick", function()
             if expanded then
@@ -330,3 +332,11 @@ function BNB.InitTagTree()
         if BNB.SetSortEnabled then BNB.SetSortEnabled(false) end
     end
 end
+
+-- A tag's colour changed (ALL-106): the headers take it
+BNB.RegisterMessage("TagTree", "TagColorChanged", function()
+    local db = DB()
+    if db and db.tagTreeMode and not BNB._listCollapsed then
+        BNB.Debounce("tagTreeColour", 0, BNB.RefreshTagTree)
+    end
+end)

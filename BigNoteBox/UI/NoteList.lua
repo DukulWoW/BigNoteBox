@@ -619,6 +619,12 @@ local function BuildSearchBar(parent)
                 row:SetHeight(ROW_H_AC)
                 row:SetPoint("TOPLEFT",  _tagAC, "TOPLEFT",  4, -2 - (i-1)*ROW_H_AC)
                 row:SetPoint("TOPRIGHT", _tagAC, "TOPRIGHT", -4, -2 - (i-1)*ROW_H_AC)
+                -- The tag's colour swatch (ALL-106), shown only for a coloured tag
+                local sw = row:CreateTexture(nil, "ARTWORK")
+                sw:SetSize(12, 12)
+                sw:SetPoint("LEFT", row, "LEFT", 4, 0)
+                sw:Hide()
+                row._sw = sw
                 local rowLbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
                 rowLbl:SetPoint("LEFT", row, "LEFT", 4, 0)
                 rowLbl:SetJustifyH("LEFT")
@@ -632,6 +638,10 @@ local function BuildSearchBar(parent)
             row:SetPoint("TOPLEFT",  _tagAC, "TOPLEFT",  4, -2 - (i-1)*ROW_H_AC)
             row:SetPoint("TOPRIGHT", _tagAC, "TOPRIGHT", -4, -2 - (i-1)*ROW_H_AC)
             local tag = matches[i]
+            local hasSw = BNB.TagColors and BNB.TagColors.Swatch(row._sw, tag)
+            if not hasSw then row._sw:Hide() end
+            row._lbl:ClearAllPoints()
+            row._lbl:SetPoint("LEFT", row, "LEFT", hasSw and 20 or 4, 0)
             row._lbl:SetText("#" .. tag)
             row:SetScript("OnClick", function()
                 currentTagFilter = tag

@@ -359,7 +359,7 @@ local function BuildTitleField(parent)
     combo:SetFrameLevel(line:GetFrameLevel() + 1)
     combo.eb:SetScript("OnEscapePressed", function(self) cancel = true; self:ClearFocus() end)
     -- {{date}} and the other snapshot tokens fill as typed (ALL-481); no undo here
-    if BNB.Tokens then BNB.Tokens.WireExpand(combo.eb) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(combo.eb); BNB.Tokens.WireAutocomplete(combo.eb) end
     do
         local dd = combo.eb:GetParent()
         if dd.OnMenuClosed then
@@ -848,6 +848,12 @@ local function BuildBodyField(parent, topAnchor)
             end
         end
     end)
+    -- Typing {{ lists the tokens (ALL-481 S4); after the box's own key
+    -- scripts, which a later SetScript would wipe
+    if BNB.Tokens then
+        BNB.Tokens.WireAutocomplete(eb, function() return BNB._currentNoteID end,
+            function() BNB.MarkDirty() end)
+    end
 
     return sf, eb
 end
@@ -1237,52 +1243,93 @@ local function RebuildTagChips(strip, tags)
 
     for _, tag in ipairs(tags or {}) do
         local chip = BNB.CreateBackdropFrame("Frame", nil, strip)
-        chip:SetHeight(16)
-        -- Chip backdrop: skin lifted colour + border when in skin mode, dark otherwise
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-            local p = BNB.GetSkinPreset()
-            local r, g, b = BNB.SkinButtonOf(p)
-            local br, bg_, bb, ba = BNB.SkinBorderOf(p)
-            BNB.SetBackdrop(chip, r, g, b, 0.92, br, bg_, bb, ba)
-        else
-            BNB.SetBackdrop(chip, 0.15, 0.15, 0.20, 1, 0.35, 0.35, 0.40, 1)
+        -- 18: at 16 the border corners overlapped (Dukul, 2026-10-17)
+        chip:SetHeight(18)
+        -- Chip backdrop: the tag's colour (ALL-106), else skin lifted colour +
+        -- border when in skin mode, dark otherwise
+        local TC = BNB.TagColors
+        local tinted = TC and TC.PaintChip(chip, tag)
+        if not tinted then
+            if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
+                local p = BNB.GetSkinPreset()
+                local r, g, b = BNB.SkinButtonOf(p)
+                local br, bg_, bb, ba = BNB.SkinBorderOf(p)
+                BNB.SetBackdrop(chip, r, g, b, 0.92, br, bg_, bb, ba)
+            else
+                BNB.SetBackdrop(chip, 0.15, 0.15, 0.20, 1, 0.35, 0.35, 0.40, 1)
+            end
         end
 
         local lblBtn = CreateFrame("Button", nil, chip)
-        lblBtn:SetHeight(16)
+        lblBtn:SetHeight(18)
         local lbl = lblBtn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        lbl:SetPoint("LEFT",  lblBtn, "LEFT",  4, 0)
+        -- 7 px in from the edge (Dukul, 2026-10-17: "a little more space")
+        lbl:SetPoint("LEFT",  lblBtn, "LEFT",  7, 0)
         lbl:SetPoint("RIGHT", lblBtn, "RIGHT", 0, 0)
-        -- White text in skin mode, gold otherwise
-        if BigNoteBoxDB and BigNoteBoxDB.skinMode then
-            BNB.SetTextWhite(lbl)
-        else
-            BNB.SetHeaderColor(lbl)
+        -- White text in skin mode and on a coloured chip, gold otherwise
+        local function RestColour()
+            if tinted or (BigNoteBoxDB and BigNoteBoxDB.skinMode) then
+                BNB.SetTextWhite(lbl)
+            else
+                BNB.SetHeaderColor(lbl)
+            end
         end
+        RestColour()
         lbl:SetText(tag)
         lbl:SetWordWrap(false)
         local capturedTag = tag
+        -- The x shows only while the pointer is on the chip (Dukul,
+        -- 2026-10-17); its room stays, so nothing moves. A leave can come
+        -- while IsMouseOver still says yes (the edge, the chip's own margin,
+        -- which takes no mouse), so a watcher runs while the x shows and
+        -- hides it once the pointer is off the chip ("The X in the chips stick")
+        local closeChip
+        local function Watch(self)
+            if not self:IsMouseOver() then
+                closeChip:SetAlpha(0)
+                self:SetScript("OnUpdate", nil)
+            end
+        end
+        local function XOn()
+            closeChip:SetAlpha(1)
+            chip:SetScript("OnUpdate", Watch)
+        end
         lblBtn:SetScript("OnEnter", function(self)
+            XOn()
             lbl:SetTextColor(1, 1, 0.4)
             GameTooltip:SetOwner(self, "ANCHOR_TOP")
             GameTooltip:AddLine(string.format(L["NE_FILTER_BY_TAG_FMT"], capturedTag), 1, 1, 1)
             GameTooltip:AddLine(L["NE_CLICK_CLEAR_FILTER_TIP"], 0.6, 0.6, 0.6)
+            GameTooltip:AddLine(L["NE_TAG_RCLICK_TIP"], 0.6, 0.6, 0.6)
             GameTooltip:Show()
         end)
         lblBtn:SetScript("OnLeave", function()
-            BNB.SetHeaderColor(lbl)
+            RestColour()
             GameTooltip:Hide()
         end)
-        lblBtn:SetScript("OnClick", function()
+        -- Right-click: this tag on this note, its colour, Edit tags (UI/NoteTags.lua)
+        lblBtn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+        lblBtn:SetScript("OnClick", function(self, button)
+            if button == "RightButton" then
+                GameTooltip:Hide()
+                local id = BNB._currentNoteID
+                if id and BNB.NoteTagMenu then
+                    BNB.ContextMenu.Open(self, function(root)
+                        BNB.NoteTagMenu(root, id, capturedTag, { filter = true, edit = true })
+                    end)
+                end
+                return
+            end
             if BNB.FilterByTag then BNB.FilterByTag(capturedTag) end
         end)
 
-        local closeChip = CreateFrame("Button", nil, chip)
+        closeChip = CreateFrame("Button", nil, chip)
         closeChip:SetSize(14, 14)
         closeChip:SetPoint("LEFT", lblBtn, "RIGHT", 2, 0)
+        closeChip:SetAlpha(0)
         local closeLbl = closeChip:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         closeLbl:SetAllPoints(); closeLbl:SetText("x"); closeLbl:SetTextColor(0.65, 0.65, 0.65)
-        closeChip:SetScript("OnEnter", function() closeLbl:SetTextColor(1, 0.3, 0.3) end)
+        closeChip:SetScript("OnEnter", function() XOn(); closeLbl:SetTextColor(1, 0.3, 0.3) end)
         closeChip:SetScript("OnLeave", function() closeLbl:SetTextColor(0.65, 0.65, 0.65) end)
         closeChip:SetScript("OnClick", function()
             local id = BNB._currentNoteID; if not id then return end
@@ -1296,9 +1343,9 @@ local function RebuildTagChips(strip, tags)
 
         -- GetStringWidth() can return 0 before layout — use string length as floor
         local strW = math.max(lbl:GetStringWidth(), #tag * 6)
-        local chipW = strW + 14 + 18
+        local chipW = strW + 14 + 21
         chip:SetWidth(chipW)
-        lblBtn:SetWidth(strW + 4)
+        lblBtn:SetWidth(strW + 7)
         lblBtn:SetPoint("LEFT", chip, "LEFT", 0, 0)
 
         -- On row 1, reserve 54px on the right for the collapse-toggle button and
@@ -1572,6 +1619,10 @@ BNB.RegisterMessage("NoteEditor", "NoteChanged", function(_, id, fields)
         if k == "tags" then touched = true end
     end
     if touched then BNB.Debounce("editorTagStrip", 0, BNB.RefreshTagStrip) end
+end)
+-- A tag's colour changed (ALL-106, Core/TagColors.lua): the chips repaint
+BNB.RegisterMessage("NoteEditor", "TagColorChanged", function()
+    BNB.Debounce("editorTagStrip", 0, BNB.RefreshTagStrip)
 end)
 
 -- The open note's title colour changed (Note Settings, New note): the editor

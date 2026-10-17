@@ -158,6 +158,7 @@ end
 local TIP_TYPES = { item = true, spell = true, achievement = true, quest = true, currency = true }
 local function OnLinkEnter(self, link)
     if GetCursorInfo() then return end   -- the drag hint owns the tooltip
+    if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self) end   -- ALL-489
     local NL = BNB.NoteLinks
     if NL and NL.OnEnter(self, link) then return end
     local linkType = link and link:match("^(%a+):")
@@ -293,7 +294,10 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
     if eb.SetHyperlinksEnabled then
         eb:SetHyperlinksEnabled(true)
         eb:HookScript("OnHyperlinkEnter", OnLinkEnter)
-        eb:HookScript("OnHyperlinkLeave", function() GameTooltip:Hide() end)
+        eb:HookScript("OnHyperlinkLeave", function(self)
+            GameTooltip:Hide()
+            if BNB.HideLinkCursor then BNB.HideLinkCursor(self) end
+        end)
         eb:HookScript("OnHyperlinkClick", function(_, link, _, button)
             local NL = BNB.NoteLinks
             if NL then NL.OnClick(link, button) end

@@ -235,7 +235,7 @@ PopulateTagManager = function()
         row.arrowLbl:SetText(isOpen
             and "|TInterface\\Buttons\\Arrow-Down-Up:12:12|t"
             or  "|TInterface\\Buttons\\Arrow-Right-Up:12:12|t")
-        row.nameLbl:SetText(tag)
+        row.nameLbl:SetText(BNB.TagColors and BNB.TagColors.Text(tag) or tag)   -- ALL-106
         row.countLbl:SetText(string.format(L["TAG_MGR_COUNT"], count))
 
         -- Selection highlight
@@ -252,6 +252,8 @@ PopulateTagManager = function()
                         _openTag = capturedTag
                         PopulateTagManager()
                     end)
+                    -- The tag's colour on every note (ALL-106)
+                    if BNB.TagColors then BNB.TagColors.AddMenu(root, capturedTag) end
                 end)
                 return
             end
@@ -713,3 +715,4 @@ BNB.RegisterMessage("TagManager", "NoteChanged", function(_, _, fields)
 end)
 BNB.RegisterMessage("TagManager", "NoteDeleted",  QueueTagManager)
 BNB.RegisterMessage("TagManager", "NoteRestored", QueueTagManager)
+BNB.RegisterMessage("TagManager", "TagColorChanged", QueueTagManager)   -- ALL-106

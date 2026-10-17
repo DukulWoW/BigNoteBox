@@ -11,13 +11,25 @@ local function NDB() return BNB.NotesDB() end
 
 --------------------------------------------------------------------------------
 -- TAG NORMALIZATION
--- Always stores tags in Title Case (first letter upper, rest lower).
--- "book", "BOOK", "bOoK" all become "Book".
--- Called at every tag write point so the index stays consistent.
+-- A tag is one tag whatever its case: "WARCRAFT", "warcraft" and "WarCraft"
+-- are the same (Dukul, 2026-10-17). A tag already in use keeps the spelling
+-- it has (typing "warcraft" adds the existing "WarCraft"); a new tag gets a
+-- capital first letter and keeps the rest as typed, so "NoteworthyII",
+-- "WoW Forever" and "Death Knight" stay readable (it used to lower-case the
+-- rest). UpdateNote runs every tag through here, so no path can add a second
+-- spelling; existing variants were merged once by NOTES v14.
+-- skip: a tag whose own spelling is not looked up (a rename that only
+-- changes the case, RenameTag).
 --------------------------------------------------------------------------------
-function BNB.NormalizeTag(s)
-    if not s or s == "" then return s end
-    return s:sub(1,1):upper() .. s:sub(2):lower()
+function BNB.NormalizeTag(s, skip)
+    if type(s) ~= "string" then return s end
+    s = s:match("^%s*(.-)%s*$")
+    if s == "" then return s end
+    local low = s:lower()
+    for tag, ids in pairs(BNB.TagIndex()) do
+        if tag ~= skip and tag:lower() == low and next(ids) then return tag end
+    end
+    return s:sub(1, 1):upper() .. s:sub(2)
 end
 
 --------------------------------------------------------------------------------
@@ -221,7 +233,7 @@ end
 function BNB.RenameTag(oldTag, newTag)
     newTag = newTag and newTag:match("^%s*(.-)%s*$") or ""
     if newTag == "" then return false end
-    newTag = BNB.NormalizeTag(newTag)
+    newTag = BNB.NormalizeTag(newTag, oldTag)
     if newTag == oldTag then return false end
     local idx = TagDB(); if not idx then return false end
     local ids = idx[oldTag]
@@ -251,6 +263,7 @@ function BNB.RenameTag(oldTag, newTag)
     end
     -- Remove old key entirely
     idx[oldTag] = nil
+    if BNB.TagColors then BNB.TagColors.Move(oldTag, newTag) end   -- ALL-106
     -- Written straight onto the notes (not an edit: `updated` stays), so the
     -- message is sent here (ARCH-02)
     for id in pairs(ids) do
@@ -278,6 +291,7 @@ function BNB.DeleteTag(tag)
         end
     end
     idx[tag] = nil
+    if BNB.TagColors then BNB.TagColors.Drop(tag) end   -- ALL-106
     for id in pairs(ids) do
         local note = ndb.notes[id]
         if note then BNB.SendMessage("NoteChanged", id, { tags = note.tags }) end
@@ -542,11 +556,17 @@ function BNB.UpdateNote(id, fields, opts)
     if not note then return end
     -- Capture old tags before mutation if tags are changing
     local oldTags = fields.tags and note.tags or nil
-    -- A note never carries the same tag twice, whichever caller built the list
+    -- A note never carries the same tag twice, whichever caller built the
+    -- list, and in no case but the tag's own spelling (NormalizeTag): this
+    -- covers templates, imports, player notes and migrations too
     if fields.tags then
         local seen, uniq = {}, {}
         for _, tag in ipairs(fields.tags) do
-            if not seen[tag] then seen[tag] = true; uniq[#uniq + 1] = tag end
+            if type(tag) == "string" then
+                tag = BNB.NormalizeTag(tag)
+                local low = tag:lower()
+                if tag ~= "" and not seen[low] then seen[low] = true; uniq[#uniq + 1] = tag end
+            end
         end
         fields.tags = uniq
     end

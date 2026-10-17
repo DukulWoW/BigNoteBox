@@ -822,6 +822,11 @@ local function BuildFocusFrame()
             end
         end
     end)
+    -- Typing {{ lists the tokens (ALL-481 S4), after the key scripts above
+    if BNB.Tokens then
+        BNB.Tokens.WireAutocomplete(eb, function() return BNB._currentNoteID end,
+            function() FOCUS_WY_CTX.markDirty() end)
+    end
 
     focusBodyScroll = sf
     focusBodyEb     = eb
@@ -1124,6 +1129,11 @@ local function BuildFocusFrameSkin()
             end
         end
     end)
+    -- Typing {{ lists the tokens (ALL-481 S4), after the key scripts above
+    if BNB.Tokens then
+        BNB.Tokens.WireAutocomplete(eb, function() return BNB._currentNoteID end,
+            function() FOCUS_WY_CTX.markDirty() end)
+    end
 
     focusBodyScroll = sf
     focusBodyEb     = eb

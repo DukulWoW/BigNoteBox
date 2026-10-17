@@ -1393,6 +1393,7 @@ local function AcquireRow(parent)
         self:SetBackdropColor(qr*0.08, qg*0.08, qb*0.08, 0.55)
         xBtn:SetAlpha(0); GameTooltip:Hide()
     end)
+    BNB.SetHoverCursor(row, "link")   -- ALL-489
     return row
 end
 

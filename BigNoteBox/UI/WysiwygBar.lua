@@ -596,6 +596,19 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         if CM.IsOpen() then CM.Close(); return end
         CM.Open(self, function(root)
             root:CreateTitle(L["TOKEN_MENU_TITLE"])
+            -- Your own tokens first (ALL-481 S4, Settings > Notes > Note tokens)
+            local mine = BNB.Tokens.Custom()
+            if #mine > 0 then
+                local sub = root:CreateButton(L["TOKEN_GROUP_MINE"], nil,
+                    { tip = L["TOKEN_GROUP_MINE"], tipSub = L["TOKEN_CUSTOM_KIND"] })
+                for _, e in ipairs(mine) do
+                    local now = BNB.Tokens.CustomPreview(e.text)
+                    sub:CreateButton("{{" .. e.name .. "}}  |cff888888" .. now .. "|r",
+                        function() InsertSnippet("{{" .. e.name .. "}}") end,
+                        { tip = "{{" .. e.name .. "}}", tipSub = e.text .. "\n\n"
+                            .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r") })
+                end
+            end
             for _, g in ipairs(BNB.Tokens.MENU) do
                 local sub = root:CreateButton(L["TOKEN_GROUP_" .. g.group], nil,
                     { tip = L["TOKEN_GROUP_" .. g.group], tipSub = L["TOKEN_KIND_" .. g.kind:upper()] })
@@ -603,6 +616,13 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                     if BNB.Tokens.Available(name) then TokenRow(sub, name, g.kind) end
                 end
             end
+            root:CreateDivider()
+            root:CreateButton(L["TOKEN_NEW"], function()
+                if BNB.OpenTokenEdit then BNB.OpenTokenEdit(nil) end
+            end, { icon = "create" })
+            root:CreateButton(L["TOKEN_MANAGE"], function()
+                if BNB.OpenSettingsPage then BNB.OpenSettingsPage("notes", "tokens") end
+            end, { icon = "note-settings" })
         end)
     end)
     tokenBtn:SetScript("OnEnter", function(self)

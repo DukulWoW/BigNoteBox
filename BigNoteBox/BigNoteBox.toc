@@ -33,6 +33,7 @@ Core\SlashCommands.lua
 Core\Json.lua
 Core\NoteFields.lua
 Core\NoteManager.lua
+Core\TagColors.lua
 Core\Initialize.lua
 
 # UI
@@ -84,6 +85,7 @@ UI\Config\OracleSettings.lua
 UI\Config\ContextMenuSettings.lua
 UI\Config\Tldr.lua
 UI\Config\Templates.lua
+UI\Config\Tokens.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua
@@ -120,6 +122,7 @@ UI\FeatureListData.lua
 UI\SetupWizard.lua
 UI\NewNoteDialog.lua
 UI\TemplateSave.lua
+UI\NoteTags.lua
 UI\RichNote.xml
 
 # Features

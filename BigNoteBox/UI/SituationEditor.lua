@@ -346,6 +346,7 @@ local function WireWaypointRows(rows, act)
                 act.toggle(e)
             end)
         end)
+        BNB.SetHoverCursor(row, "link")   -- ALL-489
     end
     return CancelPending
 end
@@ -587,7 +588,7 @@ function BNB.CreateSituationEditor(panel, opts)
     end)
     tldrCombo.eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
     -- {{date}} and the other snapshot tokens fill as typed (ALL-481); no undo here
-    if BNB.Tokens then BNB.Tokens.WireExpand(tldrCombo.eb) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(tldrCombo.eb); BNB.Tokens.WireAutocomplete(tldrCombo.eb) end
 
     local body = CreateFrame("Frame", nil, panel)
     body:SetHeight(1)

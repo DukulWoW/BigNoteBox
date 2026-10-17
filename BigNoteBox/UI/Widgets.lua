@@ -2377,6 +2377,13 @@ local function BuildTagAutocomplete()
         sel:Hide()
         row.selTex = sel
 
+        -- The tag's colour swatch (ALL-106), shown only for a coloured tag
+        local sw = row:CreateTexture(nil, "ARTWORK")
+        sw:SetSize(12, 12)
+        sw:SetPoint("LEFT", 6, 0)
+        sw:Hide()
+        row.swTex = sw
+
         -- Tag name (left)
         local nameLbl = row:CreateFontString(nil, "ARTWORK", "BNBFontHighlightSmall")
         nameLbl:SetPoint("LEFT", 8, 0)
@@ -2464,7 +2471,12 @@ local function BuildTagAutocomplete()
         self.selIdx  = visible   -- start selection at bottom (most-used)
         for i = 1, MAX_AC_ROWS do
             if i <= visible then
-                self.rows[i].nameLbl:SetText(found[i].tag)
+                local r = self.rows[i]
+                local hasSw = BNB.TagColors and BNB.TagColors.Swatch(r.swTex, found[i].tag)
+                if not hasSw then r.swTex:Hide() end
+                r.nameLbl:ClearAllPoints()
+                r.nameLbl:SetPoint("LEFT", hasSw and 24 or 8, 0)
+                r.nameLbl:SetText(found[i].tag)
                 self.rows[i].countLbl:SetText("(" .. found[i].count .. ")")
                 self.rows[i]:Show()
             else

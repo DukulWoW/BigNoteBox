@@ -210,6 +210,11 @@ local function BuildNotesTab(sf, ct)
         local page = K.NewSubPage(L["CFG_TPL_TITLE"], K.BuildTemplatesPage, "templates")
         y = K.AddOverviewRow(ct, sf, y - 4, page, L["CFG_TPL_TITLE"], L["CFG_TPL_ROW_DESC"])
     end
+    -- Note tokens of your own (ALL-481 S4): their own page (UI/Config/Tokens.lua)
+    do
+        local page = K.NewSubPage(L["CFG_TOKENS_TITLE"], K.BuildTokensPage, "tokens")
+        y = K.AddOverviewRow(ct, sf, y - 4, page, L["CFG_TOKENS_TITLE"], L["CFG_TOKENS_ROW_DESC"])
+    end
 
     y = AddRule(ct, y) - 4
 

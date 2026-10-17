@@ -1724,6 +1724,8 @@ local function StartInlineEdit(f)
     if eb:GetText() ~= (note.body or "") then eb:SetText(note.body or "") end
     eb:SetEnabled(true)
     if f._cursorFollow then eb:SetScript("OnCursorChanged", f._cursorFollow) end
+    -- That SetScript dropped the {{ list's caret hook (ALL-481 S4)
+    if BNB.Tokens then BNB.Tokens.TrackCaret(eb) end
     eb:SetFocus()
     eb:SetCursorPosition(#(eb:GetText() or ""))
     local lcg = GetEditLCG()
@@ -2275,7 +2277,7 @@ local function CreateStickyFrame(noteID)
     bodyEb:SetScript("OnCursorChanged", nil)
     bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
     -- Snapshot tokens expand as typed in an inline edit; no undo here (ALL-481)
-    if BNB.Tokens then BNB.Tokens.WireExpand(bodyEb) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(bodyEb); BNB.Tokens.WireAutocomplete(bodyEb) end
     -- Esc or Ctrl+Enter ends an inline edit, saved like a click outside
     -- (Dukul, 2026-10-02). Plain Enter stays a new line: a multi-line EditBox
     -- types the newline itself only while it has no OnEnterPressed, so with

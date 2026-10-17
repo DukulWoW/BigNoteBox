@@ -667,17 +667,26 @@ end
 -- through it, a single note too, so anything exported can be imported in
 -- Settings > Backup (a bare note object used to fail as "unrecognized").
 -- templates (optional): the player's note templates, the full backup only
--- (ALL-68 S3); an older build reads past the key
-local function JsonEnvelope(noteParts, templates)
+-- (ALL-68 S3); tokens (optional): the player's own note tokens (ALL-481 S4);
+-- tagColors (optional): tag -> colour key (ALL-106); an older build reads
+-- past these keys
+local function JsonEnvelope(noteParts, templates, tokens, tagColors)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
         JSON_VERSION,
         JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
         #noteParts)
-    local tail = "\n]}"
+    local tail = "\n]"
     if templates and #templates > 0 then
-        tail = "\n],\"templates\":" .. Json.Encode(templates) .. "}"
+        tail = tail .. ",\"templates\":" .. Json.Encode(templates)
     end
+    if tokens and #tokens > 0 then
+        tail = tail .. ",\"tokens\":" .. Json.Encode(tokens)
+    end
+    if tagColors and next(tagColors) then
+        tail = tail .. ",\"tagColors\":" .. Json.Encode(tagColors)
+    end
+    tail = tail .. "}"
     return header .. table.concat(noteParts, ",\n") .. tail
 end
 
@@ -709,7 +718,9 @@ local function SerializeNotes(fmt)
         end
 
         local tpls = BNB.Templates and BNB.Templates.BackupList() or nil
-        return JsonEnvelope(noteParts, tpls), #noteParts
+        local toks = BNB.Tokens and BNB.Tokens.BackupList() or nil
+        local cols = BNB.TagColors and BNB.TagColors.BackupMap() or nil
+        return JsonEnvelope(noteParts, tpls, toks, cols), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -1008,6 +1019,9 @@ local function ParseJsonNotes(text)
     -- The backup's templates ride along on the list; ImportNotes adds them
     -- (cleaned there, BNB.Templates.ImportRecords)
     if type(doc) == "table" and type(doc.templates) == "table" then parsed.templates = doc.templates end
+    -- and the player's own tokens (ALL-481 S4), BNB.Tokens.ImportRecords
+    if type(doc) == "table" and type(doc.tokens) == "table" then parsed.tokens = doc.tokens end
+    if type(doc) == "table" and type(doc.tagColors) == "table" then parsed.tagColors = doc.tagColors end
     return #parsed > 0 and parsed or nil
 end
 
@@ -1206,6 +1220,13 @@ local function ImportNotes(noteList, remapScope)
         local n = BNB.Templates.ImportRecords(noteList.templates)
         if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["TPL_BACKUP_IMPORTED_FMT"], n) .. "|r") end
     end
+    -- Custom tokens from a full backup (ALL-481 S4): names already taken are kept as they are
+    if noteList.tokens and BNB.Tokens then
+        local n = BNB.Tokens.ImportRecords(noteList.tokens)
+        if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["TOKEN_BACKUP_IMPORTED_FMT"], n) .. "|r") end
+    end
+    -- Tag colours from a full backup (ALL-106), for tags with no colour here
+    if noteList.tagColors and BNB.TagColors then BNB.TagColors.ImportMap(noteList.tagColors) end
     return count
 end
 

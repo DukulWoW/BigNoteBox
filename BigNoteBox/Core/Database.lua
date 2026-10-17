@@ -49,7 +49,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 13  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 14  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -670,6 +670,52 @@ function BNB.MigrateNotesDB()
         v = 13
     end
     BNB.MoveAutoHistory()
+
+    -- ── v13 → v14: one spelling per tag (Dukul, 2026-10-17) ─────────────────
+    -- Tags are one tag whatever their case, but templates, imports, player
+    -- notes and migrations wrote them as they came ("raid" next to "Raid").
+    -- Each case variant (live notes and trash) becomes the most-used
+    -- spelling with a capital first letter; a tie goes to the capitalised
+    -- one. A note left with the same tag twice keeps one.
+    if v < 14 then
+        local lists = { ndb.notes or {}, ndb.trash or {} }
+        local count = {}
+        for _, list in ipairs(lists) do
+            for _, note in pairs(list) do
+                for _, tag in ipairs(type(note.tags) == "table" and note.tags or {}) do
+                    if type(tag) == "string" and tag ~= "" then
+                        local low = tag:lower()
+                        count[low] = count[low] or {}
+                        count[low][tag] = (count[low][tag] or 0) + 1
+                    end
+                end
+            end
+        end
+        local best = {}
+        for low, spellings in pairs(count) do
+            local pick, n
+            for sp, c in pairs(spellings) do
+                if not pick or c > n or (c == n and sp < pick) then pick, n = sp, c end
+            end
+            best[low] = pick:sub(1, 1):upper() .. pick:sub(2)
+        end
+        for _, list in ipairs(lists) do
+            for _, note in pairs(list) do
+                if type(note.tags) == "table" then
+                    local seen, out = {}, {}
+                    for _, tag in ipairs(note.tags) do
+                        if type(tag) == "string" and tag ~= "" then
+                            local low = tag:lower()
+                            if not seen[low] then seen[low] = true; out[#out + 1] = best[low] or tag end
+                        end
+                    end
+                    note.tags = out
+                end
+            end
+        end
+        if BNB.TagIndexRebuild then BNB.TagIndexRebuild() end
+        v = 14
+    end
 
     -- Never lower the stored version: running an older build must not make the
     -- next upgrade run the migrations again (SV-10)

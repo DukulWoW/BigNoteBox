@@ -36,6 +36,8 @@
 --                                  that drags anywhere (normal-mode windows;
 --                                  called by BNB.SeatChrome)
 --   BNB.ShowCursor(kind) / BNB.ClearCursor()   set by code (the note drag)
+--   BNB.ShowLinkCursor(frame) / BNB.HideLinkCursor(frame)
+--                                  link cursor over a link in frame (ALL-489)
 --   BNB.OpenCursorTest()           test window, Developer Tools (debug mode)
 --------------------------------------------------------------------------------
 
@@ -73,6 +75,14 @@ local CURSORS = {
                   classic = GAME .. "OpenHand" },
     lock      = { gold = GAME .. "Lock", silver = GAME .. "Lock",
                   classic = GAME .. "PickLock" },
+    -- Links and objects in a note that open a tooltip or act on a click
+    -- (ALL-489, 2026-10-17); none on Classic yet (false). The atlas names
+    -- cursor_workorders_128 / cursor_unableworkorders_128 drew a black box:
+    -- SetCursor wants the cursor's own name, as the in-world ones (Mail,
+    -- Trainer). WorkOrders confirmed on Retail and Forever (Dukul, 2026-10-17)
+    link      = { gold = GAME .. "WorkOrders",
+                  silver = GAME .. "UnableWorkOrders",
+                  classic = false },
 }
 BNB.CURSORS = CURSORS
 
@@ -81,7 +91,7 @@ function BNB.CursorPath(kind)
     local c = type(kind) == "table" and kind or CURSORS[kind]
     if not c then return nil end
     if BNB.IsForever then return c.gold end
-    if BNB.IsClassic and c.classic then return c.classic end
+    if BNB.IsClassic and c.classic ~= nil then return c.classic or nil end
     return c.silver
 end
 
@@ -261,6 +271,24 @@ function BNB.ClearCursor()
     ClearFor(MANUAL)
 end
 
+-- The link cursor over one link inside a text frame (ALL-489): shown from
+-- OnHyperlinkEnter, taken away from OnHyperlinkLeave. The frame owns it, so
+-- the guard clears it when the mouse leaves the frame without a link leave.
+-- On leave the frame's own hover cursor (the lock on a locked note) returns.
+function BNB.ShowLinkCursor(frame)
+    local path = frame and BNB.CursorPath("link")
+    if not path then return end
+    SetCursor(path)
+    _owner = frame
+    guard:Show()
+end
+
+function BNB.HideLinkCursor(frame)
+    if not frame or _owner ~= frame then return end
+    ClearFor(frame)
+    if frame._bnbCursor and frame:IsMouseOver() then ShowFor(frame) end
+end
+
 --------------------------------------------------------------------------------
 -- TEST WINDOW (Developer Tools > Cursor Test)
 -- One row per game cursor name, a hover box for its gold and its silver cell.
@@ -282,9 +310,10 @@ local TEST_ROWS = {
     { "OpenHand .c",     "OpenHand.crosshair",            "UnableOpenHand.crosshair" },
     { "Lock .c",         "Lock.crosshair",                "UnableLock.crosshair" },
     { "Lock",            "Lock",                          "UnableLock" },
+    { "WorkOrders",      "WorkOrders",                    "UnableWorkOrders" },   -- ALL-489 link cursor
 }
 
-local T_W, T_H   = 400, 676
+local T_W, T_H   = 400, 708
 local T_PAD      = 20
 local LABEL_W    = 150
 local TILE_W     = 100

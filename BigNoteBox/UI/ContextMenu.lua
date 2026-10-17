@@ -24,7 +24,10 @@
 --   opts.keepOpen = true (a radio): the click leaves the menu open and the
 --     marks are read again, for lists where several get ticked in one go
 --   root:CreateButton(text, fn, { iconTex = path }): a picture instead of a
---     cm- symbol, no plate (tinted in the skin look)
+--     cm- symbol, no plate (tinted in the skin look); iconColor = { r, g, b }
+--     draws it in that colour in both looks (the tag colour swatch, ALL-106);
+--     iconW / iconH = its size (default the row icon's), iconCoord = { l, r,
+--     t, b } a part of it; a wider one moves the text of every row in the level
 --
 -- Building (names follow Blizzard's MenuUtil, so a menu moves over with few
 -- changes, e.g. the Tag Manager's extraTop):
@@ -200,8 +203,12 @@ local function DrawIcon(row, active)
         local sym = row._icon
         row._plate:Hide()
         sym:SetTexture(row._iconTex)
+        if row._iconCoord then sym:SetTexCoord(unpack(row._iconCoord)) end
+        local col = row._iconColor
         if row._disabled then
             sym:SetDesaturated(true); sym:SetVertexColor(0.45, 0.45, 0.45)
+        elseif col then   -- a colour swatch keeps its colour in both looks
+            sym:SetDesaturated(false); sym:SetVertexColor(col[1], col[2], col[3])
         elseif _skin then
             SkinTint(sym, active)
         else
@@ -418,11 +425,13 @@ end
 
 -- Fills level f from description d; returns its size
 local function Fill(f, d)
-    local hasIcons = false
+    local hasIcons, iconCol = false, ICON
     for _, it in ipairs(d.items) do
-        if (it.kind == "button" and (it.opts.icon or it.opts.iconTex)) or it.kind == "radio" then hasIcons = true; break end
+        if (it.kind == "button" and (it.opts.icon or it.opts.iconTex)) or it.kind == "radio" then hasIcons = true end
+        -- A wider picture (the tag colour swatches) moves every row's text
+        if it.kind == "button" and it.opts.iconTex and it.opts.iconW then iconCol = math.max(iconCol, it.opts.iconW) end
     end
-    local textX = hasIcons and (4 + ICON + 6) or 10
+    local textX = hasIcons and (4 + iconCol + 6) or 10
     if f._badge then f._badge:Hide() end
 
     -- First pass: rows set up and measured
@@ -430,7 +439,8 @@ local function Fill(f, d)
     for n, it in ipairs(d.items) do
         local r = f._rows[n] or NewRow(f)
         f._rows[n] = r
-        r._desc, r._active, r._iconKey, r._iconTex = it, nil, nil, nil
+        r._desc, r._active, r._iconKey, r._iconTex, r._iconColor = it, nil, nil, nil, nil
+        r._iconCoord = nil
         r._disabled, r._hasSub = false, false
         r._hl:Hide()
         r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide(); r._mark:Hide()
@@ -509,10 +519,17 @@ local function Fill(f, d)
             elseif it.opts.icon or it.opts.iconTex then
                 r._iconKey = it.opts.icon or "tex"
                 r._iconTex = it.opts.iconTex
-                r._icon:SetSize(ICON, ICON)
+                r._iconColor = it.opts.iconTex and it.opts.iconColor or nil
+                local o = it.opts
+                if o.iconTex then
+                    r._icon:SetSize(o.iconW or ICON, o.iconH or ICON)
+                else
+                    r._icon:SetSize(ICON, ICON)
+                end
                 r._icon:ClearAllPoints()
                 r._icon:SetPoint("LEFT", 4, 0)
                 r._icon:Show()
+                r._iconCoord = o.iconTex and o.iconCoord or nil
                 DrawIcon(r, false)   -- shows the plate in the normal look
             end
             local right = r._hasSub and (4 + ARROW_W + 4) or 10
