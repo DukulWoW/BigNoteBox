@@ -1,7 +1,7 @@
 -- BigNoteBox Features/NoteTemplates.lua
 -- Note templates (ALL-68). A template is the shareable part of a note
 -- (text, tags, tasks, look, an optional situation), never scope, pin, alarm,
--- unit or coords. S1: the 12 built-ins, picked in the New Note dialog
+-- unit or coords. S1: the 12 built-ins (13 since IOU, ALL-491), picked in the New Note dialog
 -- (UI/NewNoteDialog.lua: 5 cards, the rest on its More page). S2 adds the
 -- player's own (BigNoteBoxNotesDB.templates), S3 sharing.
 --
@@ -116,6 +116,10 @@ local LIST = {
       tasks = "TPL_GUIDE_TASKS" },
     { key = "alts", icon = ICONS .. "INV_Misc_Coin_02", color = MIKADO,
       title = "TPL_ALTS_TITLE", body = "TPL_ALTS_BODY", tags = "TPL_ALTS_TAGS" },
+    -- Debts both ways, gold or items / reagents (ALL-491, Dukul 2026-10-17)
+    { key = "iou", icon = ICONS .. "INV_Misc_Coin_01", color = MIKADO,
+      title = "TPL_IOU_TITLE", body = "TPL_IOU_BODY", tags = "TPL_IOU_TAGS",
+      tasks = "TPL_IOU_TASKS" },
     { key = "raidnight", icon = ICONS .. "Ability_Warrior_BattleShout", color = CARDINAL,
       title = "TPL_RAIDNIGHT_TITLE", body = "TPL_RAIDNIGHT_BODY", tags = "TPL_RAIDNIGHT_TAGS",
       tasks = "TPL_RAIDNIGHT_TASKS" },

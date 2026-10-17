@@ -433,6 +433,13 @@ L["TPL_ALTS_TITLE"]       = "Alt status"
 L["TPL_ALTS_TAGS"]        = "alts"
 L["TPL_ALTS_BODY"]        = "{h2}Characters{/h2}\n- Name: level, item level, professions\n- \n- \n\n{h2}To do{/h2}\n- "
 
+L["TPL_IOU_NAME"]         = "IOU"
+L["TPL_IOU_DESC"]         = "What you owe and what others owe you: gold, items or reagents, ticked off when settled."
+L["TPL_IOU_TITLE"]        = "IOU"
+L["TPL_IOU_TAGS"]         = "IOU"
+L["TPL_IOU_BODY"]         = "{h2}I owe{/h2}\n{col:999999}Who, what (gold, an item or reagents) and how many. Shift-click or drag an item in for its link.{/col}\n- \n\n{h2}Owed to me{/h2}\n- \n\n{h2}Settled{/h2}\n- {{date}}: "
+L["TPL_IOU_TASKS"]        = "I owe: who, what, how many\nOwed to me: who, what, how many"
+
 L["TPL_RAIDNIGHT_NAME"]   = "Raid night"
 L["TPL_RAIDNIGHT_DESC"]   = "The plan for tonight and a task list to get ready."
 L["TPL_RAIDNIGHT_TITLE"]  = "Raid night {{date}}"

@@ -346,7 +346,7 @@ local function WireWaypointRows(rows, act)
                 act.toggle(e)
             end)
         end)
-        BNB.SetHoverCursor(row, "link")   -- ALL-489
+        BNB.SetHoverCursor(row, "waypoint")   -- ALL-489 / ALL-492
     end
     return CancelPending
 end

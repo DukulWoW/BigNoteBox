@@ -158,7 +158,7 @@ end
 local TIP_TYPES = { item = true, spell = true, achievement = true, quest = true, currency = true }
 local function OnLinkEnter(self, link)
     if GetCursorInfo() then return end   -- the drag hint owns the tooltip
-    if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self) end   -- ALL-489
+    if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self, link) end   -- ALL-489 / ALL-492
     local NL = BNB.NoteLinks
     if NL and NL.OnEnter(self, link) then return end
     local linkType = link and link:match("^(%a+):")

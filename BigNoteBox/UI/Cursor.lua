@@ -37,7 +37,10 @@
 --                                  called by BNB.SeatChrome)
 --   BNB.ShowCursor(kind) / BNB.ClearCursor()   set by code (the note drag)
 --   BNB.ShowLinkCursor(frame) / BNB.HideLinkCursor(frame)
---                                  link cursor over a link in frame (ALL-489)
+--                                  link cursor over a link in frame (ALL-489);
+--                                  ShowLinkCursor(frame, link) shows the
+--                                  waypoint / item / note / url cursor for
+--                                  those links (ALL-492)
 --   BNB.OpenCursorTest()           test window, Developer Tools (debug mode)
 --------------------------------------------------------------------------------
 
@@ -68,10 +71,13 @@ local CURSORS = {
                   classic = GAME .. "UI-Cursor-Size" },
     grab      = { gold = GAME .. "GrabbingHand", silver = GAME .. "GrabbingHand",
                   classic = GAME .. "QuestInteract" },
-    hold      = { gold = GAME .. "HoldingHand.crosshair",
-                  silver = GAME .. "HoldingHand.crosshair",
+    -- Plain HoldingHand, not .crosshair, as the open hand (Dukul, 2026-10-17)
+    hold      = { gold = GAME .. "HoldingHand",
+                  silver = GAME .. "HoldingHand",
                   classic = GAME .. "UnableQuestInteract" },
-    open      = { gold = GAME .. "OpenHand.crosshair", silver = GAME .. "OpenHand.crosshair",
+    -- Plain OpenHand, not .crosshair: that one sat off the pointer (Dukul,
+    -- 2026-10-17)
+    open      = { gold = GAME .. "OpenHand", silver = GAME .. "OpenHand",
                   classic = GAME .. "OpenHand" },
     lock      = { gold = GAME .. "Lock", silver = GAME .. "Lock",
                   classic = GAME .. "PickLock" },
@@ -82,6 +88,35 @@ local CURSORS = {
     -- Trainer). WorkOrders confirmed on Retail and Forever (Dukul, 2026-10-17)
     link      = { gold = GAME .. "WorkOrders",
                   silver = GAME .. "UnableWorkOrders",
+                  classic = false },
+    -- These three use the gold cell on Retail too (Dukul, 2026-10-17); the
+    -- link cursor keeps its silver one.
+    -- Waypoint links and waypoint rows (ALL-492, Dukul 2026-10-17:
+    -- UIDirectionsCursor2x). None on Classic. Never the .crosshair cells
+    -- for these: that set's hot spot is the middle of the picture, so it
+    -- sat up and left of the pointer (Dukul, 2026-10-17, the Cast cursor
+    -- once tried on toolbar icons and taken off again as too distracting)
+    waypoint  = { gold = GAME .. "Directions",
+                  silver = GAME .. "Directions",
+                  classic = false },
+    -- Item links in notes and item entries in the Reference Box (Dukul,
+    -- 2026-10-17: UIInspectCursor2x). Name guessed as the others: the
+    -- Inspect row of the Cursor Test window. None on Classic
+    item      = { gold = GAME .. "Inspect",
+                  silver = GAME .. "Inspect",
+                  classic = false },
+    -- Links to other notes (bnbnote:, Dukul 2026-10-17: Crosshair/
+    -- UITrainerCrosshair2x). The plain Trainer cell, not .crosshair, for the
+    -- hot spot (see icon). None on Classic
+    note      = { gold = GAME .. "Trainer",
+                  silver = GAME .. "Trainer",
+                  classic = false },
+    -- External links (web addresses) in rich notes (Dukul, 2026-10-17:
+    -- UICursorMapPin2x, gold on Forever and silver on Retail, as the link
+    -- cursor). MapPin drew a black box; MapPinCursor is the name (Dukul,
+    -- 2026-10-17). None on Classic
+    url       = { gold = GAME .. "MapPinCursor",
+                  silver = GAME .. "UnableMapPinCursor",
                   classic = false },
 }
 BNB.CURSORS = CURSORS
@@ -275,8 +310,21 @@ end
 -- OnHyperlinkEnter, taken away from OnHyperlinkLeave. The frame owns it, so
 -- the guard clears it when the mouse leaves the frame without a link leave.
 -- On leave the frame's own hover cursor (the lock on a locked note) returns.
-function BNB.ShowLinkCursor(frame)
-    local path = frame and BNB.CursorPath("link")
+-- A waypoint link (bnbwp: from NoteLinks, bnbway: a /way line) gets the
+-- waypoint cursor instead (ALL-492), an item link the item cursor, a link
+-- to another note the note cursor, a web address the url cursor (a rich
+-- {link*url*text} link with no scheme has no "type:" at all).
+local function LinkKind(link)
+    if type(link) ~= "string" then return "link" end
+    if link:find("^bnbwp:") or link:find("^bnbway:") then return "waypoint" end
+    if link:find("^item:") then return "item" end
+    if link:find("^bnbnote:") then return "note" end
+    if link:find("^https?:") or not link:find("^%a+:") then return "url" end
+    return "link"
+end
+
+function BNB.ShowLinkCursor(frame, link)
+    local path = frame and BNB.CursorPath(LinkKind(link))
     if not path then return end
     SetCursor(path)
     _owner = frame
@@ -311,15 +359,27 @@ local TEST_ROWS = {
     { "Lock .c",         "Lock.crosshair",                "UnableLock.crosshair" },
     { "Lock",            "Lock",                          "UnableLock" },
     { "WorkOrders",      "WorkOrders",                    "UnableWorkOrders" },   -- ALL-489 link cursor
+    { "Directions",      "Directions",                    "UnableDirections" },   -- ALL-492 waypoint
+    { "Inspect",         "Inspect",                       "UnableInspect" },   -- item cursor
+    { "Trainer",         "Trainer",                       "UnableTrainer" },   -- note link cursor
+    { "OpenHand",        "OpenHand",                      "UnableOpenHand" },   -- open hand (2026-10-17)
+    { "HoldingHand",     "HoldingHand",                   "UnableHoldingHand" },   -- holding hand (2026-10-17)
+    { "MapPinCursor",    "MapPinCursor",                  "UnableMapPinCursor" },   -- external link cursor
 }
 
-local T_W, T_H   = 400, 708
+-- Two groups side by side (Dukul, 2026-10-17: too tall as one list): the
+-- first half of TEST_ROWS on the left, the rest on the right
 local T_PAD      = 20
 local LABEL_W    = 150
 local TILE_W     = 100
 local TILE_H     = 28
 local TILE_GAP   = 10
 local ROW_GAP    = 4
+local GROUP_W    = LABEL_W + TILE_W * 2 + TILE_GAP
+local GROUP_GAP  = 30
+local PER_GROUP  = math.ceil(#TEST_ROWS / 2)
+local T_W        = T_PAD * 2 + GROUP_W * 2 + GROUP_GAP
+local T_H        = 228 + PER_GROUP * (TILE_H + ROW_GAP)
 
 local _test
 
@@ -345,17 +405,21 @@ local function BuildTest()
     y = y - 50
 
     local cols = {
-        { key = "gold",   x = T_PAD + LABEL_W, head = L["DEV_WIN_CURSOR_GOLD"] },
-        { key = "silver", x = T_PAD + LABEL_W + TILE_W + TILE_GAP, head = L["DEV_WIN_CURSOR_SILVER"] },
+        { key = "gold",   x = LABEL_W, head = L["DEV_WIN_CURSOR_GOLD"] },
+        { key = "silver", x = LABEL_W + TILE_W + TILE_GAP, head = L["DEV_WIN_CURSOR_SILVER"] },
     }
     local mine = BNB.IsForever and "gold" or "silver"
-    for _, c in ipairs(cols) do
-        local h = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        h:SetPoint("TOPLEFT", f, "TOPLEFT", c.x, y)
-        h:SetWidth(TILE_W)
-        h:SetText(c.head)
+    for g = 0, 1 do
+        local gx = T_PAD + g * (GROUP_W + GROUP_GAP)
+        for _, c in ipairs(cols) do
+            local h = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+            h:SetPoint("TOPLEFT", f, "TOPLEFT", gx + c.x, y)
+            h:SetWidth(TILE_W)
+            h:SetText(c.head)
+        end
     end
     y = y - 20
+    local top = y
 
     local status = f:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
     status:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  T_PAD, 50)
@@ -363,9 +427,12 @@ local function BuildTest()
     status:SetJustifyH("LEFT")
     status:SetWordWrap(true)
 
-    for _, row in ipairs(TEST_ROWS) do
+    for i, row in ipairs(TEST_ROWS) do
+        local g = i > PER_GROUP and 1 or 0
+        if i == PER_GROUP + 1 then y = top end
+        local gx = T_PAD + g * (GROUP_W + GROUP_GAP)
         local lbl = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
-        lbl:SetPoint("LEFT", f, "TOPLEFT", T_PAD, y - TILE_H / 2)
+        lbl:SetPoint("LEFT", f, "TOPLEFT", gx, y - TILE_H / 2)
         lbl:SetWidth(LABEL_W - 8)
         lbl:SetJustifyH("LEFT")
         lbl:SetText(row[1])
@@ -374,7 +441,7 @@ local function BuildTest()
             local path = set[c.key]
             local tile = BNB.CreateBackdropFrame("Frame", nil, f)
             tile:SetSize(TILE_W, TILE_H)
-            tile:SetPoint("TOPLEFT", f, "TOPLEFT", c.x, y)
+            tile:SetPoint("TOPLEFT", f, "TOPLEFT", gx + c.x, y)
             BNB.SetBackdropDark(tile)
             if c.key == mine then tile:SetBackdropBorderColor(1, 0.82, 0, 1) end
             local txt = tile:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

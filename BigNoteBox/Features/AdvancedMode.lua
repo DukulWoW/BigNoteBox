@@ -562,7 +562,7 @@ function AM.CreateRenderFrame(name, parent)
 
     -- Item/spell hyperlink tooltip on hover
     f:SetScript("OnHyperlinkEnter", function(self, link)
-        if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self) end   -- ALL-489
+        if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self, link) end   -- ALL-489 / ALL-492
         -- Waypoint and note links (ALL-478, Features/NoteLinks.lua)
         local NL = BNB.NoteLinks
         if NL and NL.OnEnter(self, HtmlUnescape(link)) then return end
