@@ -197,7 +197,24 @@ end
 -- AddPlaceholder called ONCE at build time.
 --------------------------------------------------------------------------------
 local RICH_BADGE_SIZE = 22
-local TITLE_H, TLDR_LINE_H = 36, 12  -- the title box; what a tl;dr line under it adds (ALL-372)
+local TITLE_H, TLDR_LINE_H = 36, 18  -- the title box; what the tl;dr line above it adds (ALL-372)
+-- Where the title sits in its box: under the tl;dr line while that shows
+local titleTop = 0
+
+-- The title and the rich badge, under the tl;dr line when it shows
+local function PlaceTitle(rich)
+    local eb, badge = BNB._editorTitle, BNB._editorRichBadge
+    if not eb then return end
+    local bg = eb:GetParent()
+    if rich == nil then rich = badge and badge:IsShown() end
+    eb:ClearAllPoints()
+    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, titleTop)
+    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, titleTop)
+    if badge then
+        badge:ClearAllPoints()
+        badge:SetPoint("RIGHT", bg, "TOPRIGHT", -6, titleTop - TITLE_H / 2)
+    end
+end
 
 -- Shows the rich badge for a rich note and moves the title's right edge
 -- clear of it. Run by LoadNoteInEditor, which every rich/plain switch calls.
@@ -209,10 +226,7 @@ local function RefreshRichBadge(note)
     -- The title's own right edge (TOPRIGHT): a BOTTOMRIGHT point added on top
     -- of it left the title box over the badge, so a hover or click went to
     -- the title, never the badge's tooltip (ALL-452)
-    local bg = eb:GetParent()
-    eb:ClearAllPoints()
-    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, 0)
-    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, 0)
+    PlaceTitle(rich)
 end
 
 local function BuildTitleField(parent)
@@ -222,7 +236,7 @@ local function BuildTitleField(parent)
     bg:SetHeight(TITLE_H)
     BNB.SetBackdrop(bg, 0.06, 0.06, 0.09, 0, 0.30, 0.30, 0.32, 0)
 
-    -- The box keeps the title's height; a tl;dr line makes bg taller under it
+    -- The box keeps the title's height; the tl;dr line makes bg taller above it
     local eb = CreateFrame("EditBox", nil, bg)
     eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, 0)
     eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", -6, 0)
@@ -268,28 +282,111 @@ local function BuildTitleField(parent)
     richBadge:Hide()
     BNB._editorRichBadge = richBadge
 
-    -- tl;dr under the title (ALL-372): "tl;dr - <text>", 8 pt in the UI
-    -- font, not the title's (Dukul, 2026-10-08). Filled by RefreshEditorTldr
-    -- Pinned to the bottom of bg with a fixed height, so the underline (bg's
-    -- bottom) stays under it whatever the font's line height (it ran through
-    -- the text when hung from the title box, Dukul 2026-10-10)
-    local tldr = bg:CreateFontString(nil, "OVERLAY")
-    tldr:SetPoint("BOTTOMLEFT",  bg, "BOTTOMLEFT",  8, 2)
-    tldr:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -8, 2)
-    tldr:SetHeight(TLDR_LINE_H)
+    -- tl;dr line above the title (ALL-372): "tl;dr - <text>" with Dukul's
+    -- edit icon, or a faint "Add a tl;dr" with the add icon; the same size
+    -- as the dates row and lighter (Dukul, 2026-10-17: under the title at
+    -- 8 pt it was hard to see). A click edits it in place. Filled by
+    -- RefreshEditorTldr; bg grows by the line and the title moves down
+    local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
+    local line = CreateFrame("Button", nil, bg)
+    line:SetPoint("TOPLEFT", bg, "TOPLEFT", 8, -1)
+    line:SetHeight(TLDR_LINE_H)
+    line:SetFrameLevel(eb:GetFrameLevel() + 1)
+    local tldr = line:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    tldr:SetPoint("LEFT", line, "LEFT", 0, 0)
     tldr:SetJustifyH("LEFT")
-    tldr:SetJustifyV("MIDDLE")
     tldr:SetWordWrap(false)
-    BNB.SetFontSafe(tldr, BNB.GetUIFont(), 8, "BNBFontNormalSmall")
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
+    if skin then
         local br, bg_, bb = BNB.SkinBorderOf(BNB.GetSkinPreset())
-        tldr:SetTextColor(br * 0.90, bg_ * 0.90, bb * 0.90)
-        BNB.RegisterSkinLabel(tldr, 0.90)
+        tldr:SetTextColor(br * 1.3, bg_ * 1.3, bb * 1.3)
+        BNB.RegisterSkinLabel(tldr, 1.3)
     else
-        tldr:SetTextColor(0.65, 0.65, 0.65)
+        tldr:SetTextColor(0.82, 0.82, 0.82)
     end
-    tldr:Hide()
-    BNB._editorTldr = tldr
+    local icon = line:CreateTexture(nil, "OVERLAY")
+    icon:SetSize(12, 12)
+    icon:SetPoint("LEFT", tldr, "RIGHT", 4, 0)
+    if skin then BNB.RegisterSkinAccentTex(icon) else icon:SetVertexColor(0.82, 0.82, 0.82) end
+    line._fs, line._icon, line._assets = tldr, icon, ASSETS
+    line:SetScript("OnEnter", function(self)
+        icon:SetAlpha(1); tldr:SetAlpha(1)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine(L[self._has and "NE_TLDR_EDIT_TIP" or "NE_TLDR_ADD"], 1, 1, 1)
+        GameTooltip:AddLine(string.format(L["NE_TLDR_CLICK_TIP_FMT"], BNB.TLDR_MAX), 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["TLDR_TOKENS_TIP"], 0.78, 0.78, 0.78, true)
+        GameTooltip:Show()
+    end)
+    line:SetScript("OnLeave", function(self)
+        GameTooltip:Hide()
+        if not self._has then tldr:SetAlpha(0.6) end
+        icon:SetAlpha(0.8)
+    end)
+    line:SetScript("OnClick", function() BNB._EditTldrInPlace() end)
+    line:Hide()
+    BNB._editorTldr = line
+
+    -- The in-place edit box: the same combo as the Situations tab (snippets
+    -- on the arrow). Enter or clicking away saves, Esc cancels; it closes
+    -- once neither the box nor its snippet menu is in use
+    local editID, cancel, combo
+    local function Finish()
+        if not combo:IsShown() or combo.eb:HasFocus() then return end
+        local dd = combo.eb:GetParent()
+        if dd.IsMenuOpen and dd:IsMenuOpen() then return end
+        combo:Hide(); editID = nil; line._editing = nil
+        BNB.RefreshEditorTldr()
+    end
+    combo = BNB.CreateTextCombo(bg, 100, TLDR_LINE_H + 2, {
+        values = BNB.TldrSnippets, maxLetters = BNB.TLDR_MAX, placeholder = L["SIT_TLDR_HINT"],
+        onCommit = function(text)
+            local id = editID
+            local note = id and not cancel and BNB.GetNote(id)
+            if note then
+                local t = BNB.CleanTldr(text)
+                if t ~= note.tldr then
+                    if t then BNB.UpdateNote(id, { tldr = t })
+                    else BNB.UpdateNote(id, { _clear = { "tldr" } }) end
+                end
+            end
+            C_Timer.After(0, Finish)
+        end,
+    })
+    combo:ClearAllPoints()
+    combo:SetPoint("TOPLEFT",  bg, "TOPLEFT",  4, 0)
+    combo:SetPoint("TOPRIGHT", bg, "TOPRIGHT", -6, 0)
+    combo:SetFrameLevel(line:GetFrameLevel() + 1)
+    combo.eb:SetScript("OnEscapePressed", function(self) cancel = true; self:ClearFocus() end)
+    -- {{date}} and the other snapshot tokens fill as typed (ALL-481); no undo here
+    if BNB.Tokens then BNB.Tokens.WireExpand(combo.eb) end
+    do
+        local dd = combo.eb:GetParent()
+        if dd.OnMenuClosed then
+            hooksecurefunc(dd, "OnMenuClosed", function() C_Timer.After(0, Finish) end)
+        end
+    end
+    combo:Hide()
+    function BNB._EditTldrInPlace()
+        local id = BNB._currentNoteID
+        local note = id and BNB.GetNote(id)
+        if not note or BNB._editorLocked then return end
+        editID, cancel, line._editing = id, false, true
+        GameTooltip:Hide()
+        line:Hide()
+        combo:SetText(note.tldr or "")
+        combo:Show()
+        combo.eb:SetFocus()
+        combo.eb:HighlightText()
+    end
+    function BNB._CancelTldrEdit()
+        if not combo:IsShown() then return end
+        cancel = true
+        combo.eb:ClearFocus()
+        combo:Hide(); editID = nil; line._editing = nil
+    end
+    -- A FontString, not SimpleHTML: safe to fit inside OnSizeChanged
+    bg:HookScript("OnSizeChanged", function() BNB._FitEditorTldr() end)
 
     -- Underline (always visible)
     local underline = BNB.CreateNoteRule(parent)
@@ -1490,21 +1587,53 @@ BNB.RegisterMessage("NoteEditorTitleColor", "NoteChanged", function(_, id, field
     BNB._editorTitle:SetRealColor(note and note.titleColor)
 end)
 
--- The tl;dr line under the title (ALL-372): shown while the open note has
--- one and the module and its "Under the note title" box are on; the title
--- box grows by the line, so everything under it moves down
+-- The tl;dr line above the title (ALL-372): shown while the tl;dr module
+-- and its "Above the note title" box are on: the note's tl;dr with the edit
+-- icon, or a faint "Add a tl;dr" with the add icon (no icon, no click on a
+-- locked note). The title box grows by the line, the title moves down
+function BNB._FitEditorTldr()
+    local line, bg = BNB._editorTldr, BNB._editorTitleBg
+    if not (line and bg) then return end
+    local fs = line._fs
+    local iconW = line._icon:IsShown() and 16 or 0
+    local room = math.max(20, (bg:GetWidth() or 0) - 16 - iconW)
+    local w = math.min(fs:GetUnboundedStringWidth() + 2, room)
+    fs:SetWidth(w)
+    line:SetWidth(math.max(1, w + iconW))
+end
+
 function BNB.RefreshEditorTldr()
-    local fs, bg = BNB._editorTldr, BNB._editorTitleBg
-    if not fs or not bg then return end
+    local line, bg = BNB._editorTldr, BNB._editorTitleBg
+    if not line or not bg then return end
     local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    local t = BNB.TldrShows("tldrUnderTitle") and BNB.NoteTldr(note)
-    if t then
-        fs:SetText(string.format(L["NE_TLDR_FMT"], t))
-        fs:Show()
+    local on = note and BNB.TldrShows("tldrUnderTitle")
+    if on then
+        local t = BNB.NoteTldr(note)
+        local canEdit = not BNB._editorLocked
+        line._has = t ~= nil
+        if t then
+            line._fs:SetText(string.format(L["NE_TLDR_FMT"], t))
+            line._fs:SetAlpha(1)
+            line._icon:SetTexture(line._assets .. "ui-tldr-edit")
+        else
+            line._fs:SetText("")
+            if canEdit then line._fs:SetText(L["NE_TLDR_ADD"]) end
+            line._fs:SetAlpha(0.6)
+            line._icon:SetTexture(line._assets .. "ui-tldr-add")
+        end
+        line._icon:SetShown(canEdit)
+        line._icon:SetAlpha(0.8)
+        line:EnableMouse(canEdit)
+        -- Hidden under the open edit box (a save while editing refreshes too)
+        line:SetShown(not line._editing)
+        BNB._FitEditorTldr()
     else
-        fs:Hide()
+        line:Hide()
+        if BNB._CancelTldrEdit then BNB._CancelTldrEdit() end
     end
-    bg:SetHeight(t and TITLE_H + TLDR_LINE_H or TITLE_H)
+    titleTop = on and -TLDR_LINE_H or 0
+    PlaceTitle()
+    bg:SetHeight(on and TITLE_H + TLDR_LINE_H or TITLE_H)
 end
 
 BNB.RegisterMessage("NoteEditorTldr", "NoteChanged", function(_, id, fields)
@@ -1516,8 +1645,11 @@ BNB.RegisterMessage("NoteEditorTldr", "NoteChanged", function(_, id, fields)
     if touched then BNB.RefreshEditorTldr() end
 end)
 BNB.RegisterMessage("NoteEditorTldrSettings", "TldrSettings", function() BNB.RefreshEditorTldr() end)
+-- A token in the tl;dr ({{gold}}, {{item:id}} loading) changed (ALL-481)
+BNB.RegisterMessage("NoteEditorTldrTokens", "TokensChanged", function() BNB.RefreshEditorTldr() end)
+-- The line's width follows the font (BNBFontNormalSmall follows the UI font)
 BNB.RegisterMessage("NoteEditorTldrFont", "UIFontChanged", function()
-    BNB.SetFontSafe(BNB._editorTldr, BNB.GetUIFont(), 8, "BNBFontNormalSmall")
+    C_Timer.After(0, function() if BNB._FitEditorTldr then BNB._FitEditorTldr() end end)
 end)
 
 -- Public: rebuild chips for current note
@@ -1596,6 +1728,9 @@ local function SetEditorLocked(locked)
     if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
     RefreshFocusButton()
     RefreshMarkupWarn()   -- a locked note is never repaired (ALL-277)
+    -- tl;dr line: no add / edit icon on a locked note, an open edit box closes
+    if locked and BNB._CancelTldrEdit then BNB._CancelTldrEdit() end
+    BNB.RefreshEditorTldr()
 end
 
 --------------------------------------------------------------------------------
@@ -2299,19 +2434,25 @@ function BNB.AM_EnterViewMode(id)
         -- pass; a SetText there frees the SimpleHTML's lines while that pass is
         -- still walking them (Forever ACCESS_VIOLATION on a freed FontString,
         -- 2026-10-07: rich note -> click a plain note). Reflow on the next frame.
-        local function Reflow()
+        -- tokensOnly (TokensChanged): only while shown, and only when the
+        -- filled text reads differently from what the frame shows (rf._bnbHTML)
+        local function Reflow(tokensOnly)
             local w = rsf:GetWidth()
             if not w or w <= 0 then return end
+            if tokensOnly and not rsf:IsVisible() then return end
             rf:SetWidth(w)
             -- Re-render if view mode is currently active on a rich note
             if BNB._editorInViewMode and BNB._currentNoteID then
                 local rn = BNB.GetNote(BNB._currentNoteID)
                 if rn and BNB.AdvancedMode.IsRich(rn) then
                     local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+                    local html = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                    if tokensOnly and html == rf._bnbHTML then return end
                     local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                     BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
                     local rawST = getmetatable(rf).__index.SetText
-                    rawST(rf, BNB.AdvancedMode.ToHTML(rn.body or "", bs))
+                    rawST(rf, html)
+                    rf._bnbHTML = html
                     rf:SetHeight(rf:GetContentHeight())
                 end
             end
@@ -2319,9 +2460,10 @@ function BNB.AM_EnterViewMode(id)
         rsf:SetScript("OnSizeChanged", function()
             BNB.Debounce("editorRichReflow", 0, Reflow)
         end)
-        -- Data a note token waited for has arrived (ALL-481 S2): draw again
+        -- A note token's data arrived or its value changed (ALL-481 S2 / S3):
+        -- draw again. Its own debounce key: a size change must still reflow
         BNB.RegisterMessage("EditorRichTokens", "TokensChanged", function()
-            BNB.Debounce("editorRichReflow", 0, Reflow)
+            BNB.Debounce("editorRichTokens", 0, function() Reflow(true) end)
         end)
 
         -- Double-click the rendered text (or the empty area below it) opens the
@@ -2394,6 +2536,7 @@ function BNB.AM_EnterViewMode(id)
         local html = BNB.AdvancedMode.ToHTML(freshNote.body or "", bodySize)
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, html)
+        rf._bnbHTML = html
         rf:SetHeight(rf:GetContentHeight())
 
         -- Scroll to top

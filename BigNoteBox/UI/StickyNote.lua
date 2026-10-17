@@ -2369,7 +2369,8 @@ local function CreateStickyFrame(noteID)
                 local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(richRender, bs, fs)
                 local rawST = getmetatable(richRender).__index.SetText
-                rawST(richRender, BNB.AdvancedMode.ToHTML(rn.body or "", bs))
+                richRender._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                rawST(richRender, richRender._bnbHTML)
                 richRender:SetHeight(richRender:GetContentHeight())
             end
         end
@@ -3089,8 +3090,9 @@ end
 
 -- Autosave from the main window (ALL-52): update the title and body in place,
 -- keeping the scroll position. RefreshNote would scroll to the top and rebuild
--- the icon badge on every save while typing.
-function SN.RefreshBodyLive(noteID)
+-- the icon badge on every save while typing. tokensOnly (TokensChanged): the
+-- rich view is drawn only when the filled text reads differently (rf._bnbHTML).
+function SN.RefreshBodyLive(noteID, tokensOnly)
     local f = openFrames[noteID]; if not f then return end
     local note = BNB.GetNote(noteID); if not note then return end
     if f._titleLbl then
@@ -3101,9 +3103,12 @@ function SN.RefreshBodyLive(noteID)
         local rf, rs = f._richRender, f._richScroll
         local y  = rs:GetVerticalScroll()
         local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+        local html = BNB.AdvancedMode.ToHTML(note.body or "", bs)
+        if tokensOnly and html == rf._bnbHTML then return end
         BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, BNB.AdvancedMode.OutlineFlagStr(note.fontOutline))
         local rawST = getmetatable(rf).__index.SetText
-        rawST(rf, BNB.AdvancedMode.ToHTML(note.body or "", bs))
+        rawST(rf, html)
+        rf._bnbHTML = html
         rf:SetHeight(rf:GetContentHeight())
         C_Timer.After(0, function()
             rs:SetVerticalScroll(math.min(y, rs:GetVerticalScrollRange() or y))
@@ -3121,12 +3126,13 @@ function SN.RefreshBodyLive(noteID)
     end
 end
 
--- An item / quest / spell a note token waited for has arrived (ALL-481 S2):
--- stickies with a token in their text draw again, scroll kept
+-- An item / quest / spell a note token waited for has arrived, or a token's
+-- value changed (ALL-481 S2 / S3): stickies with a token in their text draw
+-- again when it reads differently, scroll kept
 BNB.RegisterMessage("StickyTokens", "TokensChanged", function()
     for id in pairs(openFrames) do
         local note = BNB.GetNote(id)
-        if note and note.body and note.body:find("{{", 1, true) then SN.RefreshBodyLive(id) end
+        if note and note.body and note.body:find("{{", 1, true) then SN.RefreshBodyLive(id, true) end
     end
 end)
 
@@ -3249,7 +3255,8 @@ function SN.RefreshNote(noteID)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
                 -- Use the raw SetText (bypasses SetHTML height-set) then set height
                 local rawST = getmetatable(rf).__index.SetText
-                rawST(rf, BNB.AdvancedMode.ToHTML(rn.body or "", bs))
+                rf._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                rawST(rf, rf._bnbHTML)
                 rf:SetHeight(rf:GetContentHeight())
                 f._richScroll:SetVerticalScroll(0)
             end)

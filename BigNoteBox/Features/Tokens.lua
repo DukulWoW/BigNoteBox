@@ -18,6 +18,16 @@
 --              or data this client lacks shows as typed; an item / quest / spell
 --              still loading shows as typed until it arrives, then the open
 --              views redraw (message TokensChanged).
+--   Time, money, lockouts (S3): {{gold}} (coins), {{reset:weekly}} /
+--              {{reset:daily}} (countdown, 2d 4h), {{lockout:name}} (the
+--              reader's progress per difficulty; any part of the name, any
+--              case, or the instance id) and {{lockouts}} (every lockout).
+--
+-- Redraw (S3): a live value that changes while a note stays open (level,
+-- {{here}}, gold, a quest turned in, a countdown) sends TokensChanged on its
+-- game event, debounced, and only when that token was drawn since the last
+-- redraw (the views fill again, which marks it again). Countdowns are checked
+-- every few seconds and redraw when their text changes.
 --
 -- Rules (Dukul, 2026-10-17):
 --   * An unknown token, or a snapshot token left in the text, shows as typed.
@@ -134,6 +144,7 @@ local LIVE = {
     guildrank = function() return select(2, GetGuildInfo("player")) end,
     -- Where the reader is now ({{zone}} is where the note was written)
     here  = function() return GetRealZoneText() end,
+    -- gold, lockouts: S3, further down (they need the id tokens' helpers)
 }
 
 -- ---------------------------------------------------------------------------
@@ -345,20 +356,152 @@ local IDTOK = {
     end,
 }
 
-local function IdValue(name, arg, plain)
-    local fn = IDTOK[name:lower()]
-    if not fn then return nil end
-    local id = tonumber(arg:match("^%s*(%d+)%s*$"))
-    if not id then return nil end
-    local ok, v = pcall(fn, id, plain)
+-- ---------------------------------------------------------------------------
+-- TIME, MONEY AND LOCKOUTS (S3)
+-- ---------------------------------------------------------------------------
+-- Tokens drawn since the last redraw (lower-case name, or the kind of a
+-- {{kind:arg}} token): game events only redraw when one of theirs is here.
+local used = {}
+-- The countdown text each {{reset:x}} showed last: the ticker redraws when
+-- the text would read differently now
+local shownReset = {}
+-- When the soonest lockout the views showed runs out (time())
+local lockExpire
+
+-- 2d 4h, then 4h 12m, then 12m, then < 1m
+local function Countdown(secs)
+    secs = math.max(0, math.floor(secs or 0))
+    local d, h, m = math.floor(secs / 86400), math.floor(secs % 86400 / 3600), math.floor(secs % 3600 / 60)
+    if d > 0 then return string.format(L["TOKEN_DUR_DH"], d, h) end
+    if h > 0 then return string.format(L["TOKEN_DUR_HM"], h, m) end
+    if m > 0 then return string.format(L["TOKEN_DUR_M"], m) end
+    return L["TOKEN_DUR_LT_M"]
+end
+
+-- From the client's own reset clock (the region's day and hour), as the
+-- task resets and reset alarms do
+local RESET_FN = { weekly = "GetSecondsUntilWeeklyReset", daily = "GetSecondsUntilDailyReset" }
+local function ResetText(kind)
+    local fn = RESET_FN[kind] and C_DateAndTime and C_DateAndTime[RESET_FN[kind]]
+    local secs = fn and fn()
+    if type(secs) ~= "number" then return nil end
+    return Countdown(secs)
+end
+
+-- 12,345 (g) 67 (s) 89 (c) with the game's coin pictures; plain 12,345g 67s 89c.
+-- A part that is 0 is left out, as the game's own money text does
+local COIN = "|TInterface\\MoneyFrame\\UI-%sIcon:0:0:2:0|t"
+local function Money(plain)
+    local m = GetMoney()
+    if issecretvalue and issecretvalue(m) then return "?" end
+    if type(m) ~= "number" then return nil end
+    local parts = {}
+    local function Add(n, coin, sym)
+        if plain then parts[#parts + 1] = Amount(n) .. (Clean(sym) or "")
+        else parts[#parts + 1] = Amount(n) .. " " .. COIN:format(coin) end
+    end
+    local g, s, c = math.floor(m / 10000), math.floor(m % 10000 / 100), m % 100
+    if g > 0 then Add(g, "Gold", GOLD_AMOUNT_SYMBOL or "g") end
+    if s > 0 then Add(s, "Silver", SILVER_AMOUNT_SYMBOL or "s") end
+    if c > 0 or #parts == 0 then Add(c, "Copper", COPPER_AMOUNT_SYMBOL or "c") end
+    return { raw = table.concat(parts, " ") }
+end
+
+-- The reader's lockouts, one entry per instance name with its difficulties
+-- in the game's order. The game fills the list after RequestRaidInfo: asked
+-- once, and again when a shown lockout runs out or a boss dies;
+-- UPDATE_INSTANCE_INFO then redraws.
+local raidInfoAsked
+local function AskRaidInfo() pcall(RequestRaidInfo) end
+local function SavedInstances()
+    if not raidInfoAsked then raidInfoAsked = true; AskRaidInfo() end
+    local list, byName, now = {}, {}, time()
+    for i = 1, (GetNumSavedInstances() or 0) do
+        local name, _, reset, _, locked, extended, _, _, _, diffName, numEnc, progress, _, instID
+            = GetSavedInstanceInfo(i)
+        if type(name) == "string" and name ~= "" and (locked or extended) then
+            local e = byName[name]
+            if not e then
+                e = { name = name, id = instID, diffs = {} }
+                byName[name] = e; list[#list + 1] = e
+            end
+            e.diffs[#e.diffs + 1] = { name = diffName, n = numEnc, done = progress }
+            if type(reset) == "number" and reset > 0 and (not lockExpire or now + reset < lockExpire) then
+                lockExpire = now + reset
+            end
+        end
+    end
+    return list
+end
+
+-- "Nerub-ar Palace: Heroic 5/8, Mythic 8/8" + a tick on a cleared one
+local function LockoutText(e, plain)
+    local parts = {}
+    for _, d in ipairs(e.diffs) do
+        local s = Clean(d.name) or "?"
+        local n, done = tonumber(d.n) or 0, tonumber(d.done) or 0
+        if n > 0 then
+            s = s .. " " .. done .. "/" .. n
+            if done >= n then s = s .. Mark(true, plain) end
+        end
+        parts[#parts + 1] = s
+    end
+    return Clean(e.name) .. ": " .. table.concat(parts, ", ")
+end
+
+LIVE.gold = Money
+-- Every lockout on one line, "none" when there is none (Dukul, 2026-10-17)
+LIVE.lockouts = function(plain)
+    local out = {}
+    for _, e in ipairs(SavedInstances()) do out[#out + 1] = LockoutText(e, plain) end
+    return { raw = #out > 0 and table.concat(out, ", ") or L["TOKEN_NONE"] }
+end
+
+-- {{kind:text}}: tokens whose argument is a word, not an id. Each gets the
+-- argument trimmed and returns the text, or nil = as typed.
+local ARGTOK = {
+    reset = function(arg)
+        local kind = arg:lower()
+        local v = ResetText(kind)
+        if v then shownReset[kind] = v end
+        return v
+    end,
+
+    -- Any part of the name, any case, or the instance id. Not saved: the
+    -- name as written + "not saved"
+    lockout = function(arg, plain)
+        local want, out = arg:lower(), {}
+        for _, e in ipairs(SavedInstances()) do
+            if e.name:lower():find(want, 1, true) or tostring(e.id) == arg then
+                out[#out + 1] = LockoutText(e, plain)
+            end
+        end
+        if #out == 0 then return (Clean(arg) or "") .. ": " .. L["TOKEN_NOT_SAVED"] end
+        return table.concat(out, ", ")
+    end,
+}
+
+-- {{kind:id}} and {{kind:text}}
+local function ArgValue(name, arg, plain)
+    local lname = name:lower()
+    local fn, a = IDTOK[lname]
+    if fn then
+        a = tonumber(arg:match("^%s*(%d+)%s*$"))
+    else
+        fn = ARGTOK[lname]
+        a = fn and arg:match("^%s*(.-)%s*$")
+    end
+    if not fn or not a or a == "" then return nil end
+    used[lname] = true
+    local ok, v = pcall(fn, a, plain)
     if not ok or v == "" then return nil end
     return v
 end
 
-local function Value(set, name)
+local function Value(set, name, plain)
     local fn = set[name:lower()]
     if not fn then return nil, false end
-    local ok, v = pcall(fn)
+    local ok, v = pcall(fn, plain)
     if not ok then return nil, true end
     if type(v) == "table" then v = v.raw else v = Clean(v) end
     if v == "" then v = nil end
@@ -374,16 +517,83 @@ local function Replace(text, set, unescape, plain)
     return (text:gsub(TOKEN_PAT, function(bs, name, colon, arg)
         local whole = "{{" .. name .. colon .. arg .. "}}"
         if bs ~= "" then return unescape and whole or nil end
-        -- {{kind:id}}: live id tokens only (S2)
-        if colon ~= "" then return set == LIVE and IdValue(name, arg, plain) or nil end
+        -- {{kind:id}} / {{kind:text}}: live only (S2, S3)
+        if colon ~= "" then return set == LIVE and ArgValue(name, arg, plain) or nil end
         if arg ~= "" then return nil end
-        local v, known = Value(set, name)
+        local v, known = Value(set, name, plain)
         if not known then return nil end
+        if set == LIVE then used[name:lower()] = true end
         -- A live token with no value shows nothing; a snapshot one stays
         if v == nil then return set == LIVE and "" or nil end
         return v
     end))
 end
+
+-- ---------------------------------------------------------------------------
+-- REDRAW ON GAME EVENTS (S3)
+-- ---------------------------------------------------------------------------
+-- Event -> the tokens it changes. TokensChanged goes out (debounced) only
+-- when one of them was drawn since the last redraw; sending clears the list
+-- and the redrawn views mark theirs again, so a note that was closed stops
+-- costing anything. An event this client lacks is skipped.
+local EVENTS = {
+    PLAYER_MONEY                  = { "gold" },
+    PLAYER_LEVEL_UP               = { "level" },
+    PLAYER_LEVEL_CHANGED          = { "level" },
+    ZONE_CHANGED_NEW_AREA         = { "here" },
+    PLAYER_ENTERING_WORLD         = { "here" },
+    PLAYER_GUILD_UPDATE           = { "guild", "guildrank" },
+    GUILD_RANKS_UPDATE            = { "guildrank" },
+    PLAYER_EQUIPMENT_CHANGED      = { "ilvl" },
+    PLAYER_AVG_ITEM_LEVEL_UPDATE  = { "ilvl" },
+    PLAYER_SPECIALIZATION_CHANGED = { "spec" },
+    ACTIVE_TALENT_GROUP_CHANGED   = { "spec" },
+    UPDATE_INSTANCE_INFO          = { "lockout", "lockouts" },
+    QUEST_TURNED_IN               = { "quest" },
+    CURRENCY_DISPLAY_UPDATE       = { "currency" },
+    UPDATE_FACTION                = { "rep" },
+    MAJOR_FACTION_RENOWN_LEVEL_CHANGED = { "rep" },
+    ACHIEVEMENT_EARNED            = { "achievement" },
+    NEW_MOUNT_ADDED               = { "mount" },
+    COMPANION_LEARNED             = { "mount", "pet" },
+    NEW_PET_ADDED                 = { "pet" },
+}
+
+local function Redraw()
+    used, shownReset, lockExpire = {}, {}, nil
+    BNB.Debounce("tokensChanged", 0.2, SendChanged)
+end
+
+local IsValid = C_EventUtils and C_EventUtils.IsEventValid
+for event, names in pairs(EVENTS) do
+    if not IsValid or IsValid(event) then
+        BNB.RegisterEvent(event, function()
+            for _, n in ipairs(names) do
+                if used[n] then Redraw(); return end
+            end
+        end)
+    end
+end
+
+-- A boss kill changes a lockout: ask the game again a moment later (the
+-- save is not there yet when the encounter ends)
+BNB.RegisterEvent("ENCOUNTER_END", function()
+    if used.lockout or used.lockouts then BNB.Debounce("tokensRaidInfo", 3, AskRaidInfo) end
+end)
+
+-- Countdowns: every 5 s while one was drawn, a redraw when its text would
+-- read differently now; a shown lockout that has run out asks the game again
+C_Timer.NewTicker(5, function()
+    if used.reset then
+        for kind, shown in pairs(shownReset) do
+            if ResetText(kind) ~= shown then Redraw(); return end
+        end
+    end
+    if (used.lockout or used.lockouts) and lockExpire and time() >= lockExpire then
+        lockExpire = nil
+        AskRaidInfo()
+    end
+end)
 
 -- Live tokens filled, escapes dropped: the text as the reader sees it.
 -- mode "plain": for an edit box or chat (see the header)
@@ -420,13 +630,17 @@ end
 -- ---------------------------------------------------------------------------
 -- Groups in menu order. Labels / tooltips: L["TOKEN_GROUP_<group>"],
 -- L["TOKEN_DESC_<NAME>"], one shared line per kind L["TOKEN_KIND_<KIND>"].
--- A new token goes in its set above AND here.
+-- A new token goes in its set above AND here. In a live group, "reset:weekly"
+-- is a whole token with its argument (TOKEN_DESC_RESET_WEEKLY) and "lockout:"
+-- one whose argument the writer types (inserted with the cursor before }}).
 T.MENU = {
     { group = "SNAPSHOT", kind = "snapshot",
       list = { "date", "time", "zone", "subzone", "instance", "target", "coords" } },
     { group = "LIVE", kind = "live",
       list = { "me", "name", "realm", "class", "race", "level", "faction", "spec", "ilvl",
-               "guild", "guildrank", "here" } },
+               "guild", "guildrank", "here", "gold" } },
+    { group = "TIME", kind = "live",
+      list = { "reset:weekly", "reset:daily", "lockout:", "lockouts" } },
     { group = "ID", kind = "id",
       list = { "item", "quest", "achievement", "currency", "rep", "spell", "mount", "pet" } },
 }
@@ -458,9 +672,20 @@ end
 -- or its data is still loading).
 function T.Preview(name, kind)
     if kind == "snapshot" then return (Value(SNAPSHOT, name)), "{{" .. name .. "}}" end
+    local base, arg = name:match("^(%a+):(.*)$")
+    if kind == "live" and base then
+        -- {{lockout:}}: the example is the reader's first lockout, if any
+        if arg == "" then
+            local ok, list = pcall(SavedInstances)
+            local first = ok and list[1]
+            if not first then return nil, "{{" .. base .. ":" .. L["TOKEN_EXAMPLE_INSTANCE"] .. "}}" end
+            arg = first.name
+        end
+        return ArgValue(base, arg, false), "{{" .. base .. ":" .. arg .. "}}"
+    end
     if kind == "live" then return (Value(LIVE, name)), "{{" .. name .. "}}" end
     local written = "{{" .. name .. ":" .. (EXAMPLE_ID[name] or 1) .. "}}"
-    local v = IdValue(name, tostring(EXAMPLE_ID[name] or 1), false)
+    local v = ArgValue(name, tostring(EXAMPLE_ID[name] or 1), false)
     return v, written
 end
 

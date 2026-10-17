@@ -567,23 +567,28 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     tokenBtn:SetPoint("LEFT", divInsert, "RIGHT", DIV_GAP, 0)
     tokenBtn:SetIconEnabled(true)
     tokenBtn._cmToggle = true
+    -- A name ending in ":" takes an argument the writer types ({{lockout:}},
+    -- S3); "reset:weekly" is a whole token (Features/Tokens.lua T.MENU)
     local function TokenRow(sub, name, kind)
         local Tk = BNB.Tokens
         local now, written = Tk.Preview(name, kind)
-        local label = kind == "id" and ("{{" .. name .. ":|cff888888id|r}}") or ("{{" .. name .. "}}")
-        if now and kind ~= "id" then label = label .. "  |cff888888" .. now .. "|r" end
-        local tipSub = L["TOKEN_DESC_" .. name:upper()] .. "\n" .. L["TOKEN_KIND_" .. kind:upper()]
+        local base = name:gsub(":$", "")
+        local open = kind == "id" or base ~= name
+        local hint = kind == "id" and "id" or L["TOKEN_ARG_NAME"]
+        local label = open and ("{{" .. base .. ":|cff888888" .. hint .. "|r}}") or ("{{" .. name .. "}}")
+        if now and not open then label = label .. "  |cff888888" .. now .. "|r" end
+        local tipSub = L["TOKEN_DESC_" .. base:upper():gsub(":", "_")] .. "\n" .. L["TOKEN_KIND_" .. kind:upper()]
             .. "\n\n" .. string.format(L["TOKEN_TIP_WRITE"], "|cffffffff" .. written .. "|r")
         if now then
             tipSub = tipSub .. "\n" .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r")
-        elseif kind == "live" then
+        elseif kind == "live" and not open then
             tipSub = tipSub .. "\n" .. L["TOKEN_TIP_EMPTY"]
         end
         sub:CreateButton(label, function()
-            if kind == "id" then InsertSnippet("{{" .. name .. ":}}", 2)
+            if open then InsertSnippet("{{" .. base .. ":}}", 2)
             elseif kind == "snapshot" and now then InsertSnippet("{{" .. name .. "}}", nil, now)
             else InsertSnippet("{{" .. name .. "}}") end
-        end, { tip = "{{" .. name .. (kind == "id" and ":id" or "") .. "}}", tipSub = tipSub })
+        end, { tip = "{{" .. base .. (open and (":" .. hint) or "") .. "}}", tipSub = tipSub })
     end
     tokenBtn:SetScript("OnClick", function(self)
         local CM = BNB.ContextMenu

@@ -581,9 +581,13 @@ function BNB.CreateSituationEditor(panel, opts)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["SIT_TLDR_LBL"], 1, 1, 1)
         GameTooltip:AddLine(string.format(L["SIT_TLDR_TIP_FMT"], BNB.TLDR_MAX), 0.78, 0.78, 0.78, true)
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["TLDR_TOKENS_TIP"], 0.78, 0.78, 0.78, true)
         GameTooltip:Show()
     end)
     tldrCombo.eb:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    -- {{date}} and the other snapshot tokens fill as typed (ALL-481); no undo here
+    if BNB.Tokens then BNB.Tokens.WireExpand(tldrCombo.eb) end
 
     local body = CreateFrame("Frame", nil, panel)
     body:SetHeight(1)
