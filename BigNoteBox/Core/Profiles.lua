@@ -87,12 +87,26 @@ function P.Exists(name)
     return type(db.profiles) == "table" and db.profiles[name] ~= nil
 end
 
+-- name cut to at most max bytes, never in the middle of a UTF-8 character
+-- (a broken byte blanks a WoW edit box)
+local function CutName(name, max)
+    if #name <= max then return name end
+    name = name:sub(1, max)
+    local lead = name:find("[\192-\255][\128-\191]*$")
+    if lead then
+        local b = name:byte(lead)
+        local need = (b >= 240 and 4) or (b >= 224 and 3) or 2
+        if #name - lead + 1 < need then name = name:sub(1, lead - 1) end
+    end
+    return name
+end
+
 -- A name the player typed: trimmed, or nil + the reason. Case does not make
 -- a name new, and neither does the shown name of Default.
 function P.CheckName(name, except)
     name = (name or ""):match("^%s*(.-)%s*$")
     if name == "" then return nil, L["PROFILE_ERR_EMPTY"] end
-    if #name > P.MAX_NAME then name = name:sub(1, P.MAX_NAME) end
+    name = CutName(name, P.MAX_NAME)
     local low = name:lower()
     if low == P.DEFAULT:lower() or low == L["PROFILE_DEFAULT"]:lower() then
         return nil, string.format(L["PROFILE_ERR_TAKEN"], name)
@@ -105,17 +119,24 @@ function P.CheckName(name, except)
     return name
 end
 
--- A free name based on name: "Bank", "Bank 2", ...
-function P.FreeName(name)
+-- A free name based on name: "Bank", "Bank (1)", "Bank (2)", ... Default
+-- becomes "Default (1)" in the player's language (Dukul, 2026-10-18). used =
+-- lower-case names already handed out but not added yet (the import picker).
+function P.FreeName(name, used)
     name = (name or ""):match("^%s*(.-)%s*$")
     if name == "" then name = L["PROFILE_IMPORTED_NAME"] end
-    name = name:sub(1, P.MAX_NAME - 3)
-    if P.CheckName(name) then return name end
-    for i = 2, 99 do
-        local n = name .. " " .. i
-        if P.CheckName(n) then return n end
+    if name == P.DEFAULT then name = L["PROFILE_DEFAULT"] end
+    local function Free(n)
+        return P.CheckName(n) ~= nil and not (used and used[n:lower()])
     end
-    return name
+    local whole = CutName(name, P.MAX_NAME)
+    if Free(whole) then return whole end
+    name = CutName(name, P.MAX_NAME - 5)
+    for i = 1, 99 do
+        local n = name .. " (" .. i .. ")"
+        if Free(n) then return n end
+    end
+    return whole
 end
 
 -- This character's key, as BNB.currentChar builds it (Core/Initialize.lua).
@@ -383,15 +404,19 @@ function P.BackupList()
     return out
 end
 
--- Adds the backup's profiles whose names are free here; a name already used
--- (Default always is) is skipped, never overwritten or renamed (Dukul,
--- 2026-10-18). Returns how many were added.
-function P.ImportBackup(list)
+-- Adds the backup's profiles. A name already used here (Default always is) is
+-- never overwritten: that profile comes in under a free name, "Default (1)"
+-- (Dukul, 2026-10-18; it was skipped before). names = the names the import
+-- picker showed, by position in list. Returns how many were added.
+function P.ImportBackup(list, names)
     if type(list) ~= "table" or not DB() then return 0 end
     local n = 0
-    for _, code in ipairs(list) do
+    for i, code in ipairs(list) do
         local payload = type(code) == "string" and P.Decode(code)
-        local name = payload and payload.name and P.CheckName(payload.name)
+        local name = payload and payload.name
+            and ((type(names) == "table" and names[i] and P.CheckName(names[i]))
+                 or P.FreeName(payload.name))
+        name = name and P.CheckName(name)   -- never over a profile already here
         if name then
             P.AddImported(name, payload)
             n = n + 1

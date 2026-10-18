@@ -2643,13 +2643,17 @@ end
 --   `content`, so a link button shows what it copies (ALL-222). Only for
 --   short text the player cannot see elsewhere: export windows leave it off.
 --
+--   `onCopy` (optional): runs (next frame) after Ctrl+C copied the text. Esc,
+--   a click on the box or a new copy box drop it without running it. "Back up
+--   first" carries on with the import this way (ALL-186, Dukul 2026-10-18).
+--
 -- IMPORTANT: The hint frame is at TOOLTIP strata. It MUST NOT have
 -- EnableKeyboard(true), because TOOLTIP strata beats editbox focus in WoW's
 -- keyboard routing priority — and Ctrl+C would be routed to the hint frame
 -- (a plain Frame, which cannot perform the engine-level copy) instead of the
 -- focused helper editbox. ESC dismissal is handled by the helper's OnKeyDown.
 --------------------------------------------------------------------------------
-function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
+function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview, onCopy)
     -- ── 1. Ensure the invisible text-selection editbox exists ─────────────────
     if not BNB._clipboardHelper then
         local helper = CreateFrame("EditBox", nil, UIParent)
@@ -2737,6 +2741,7 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
             f:Hide()
             BNB._clipboardHelper:ClearFocus()
             BNB._clipboardHelper:Hide()
+            f._onCopy = nil   -- closed without Ctrl+C: the caller's next step never runs
         end
 
         f._dismiss = Dismiss
@@ -2760,6 +2765,8 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
     -- ── 3. Load content into helper and focus it ──────────────────────────────
     local helper = BNB._clipboardHelper
     local hint   = BNB._clipboardHint
+    -- A new copy box replaces any step still waiting on the old one
+    hint._onCopy = onCopy
 
     -- On WorldFrame while Focus mode hides UIParent (ALL-506): a hidden
     -- parent would leave the box unseen and the helper unable to take focus
@@ -2796,7 +2803,10 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
     helper:SetScript("OnKeyDown", function(self, key)
         if key == "C" and IsControlKeyDown() then
             BNB.SetPropagate(self, false)         -- copy happens; swallow to block keybinds
+            local fn = hint._onCopy
             hint._dismiss()
+            -- Next frame, so the copy is done before anything takes focus
+            if fn then C_Timer.After(0, fn) end
         elseif key == "ESCAPE" then
             BNB.SetPropagate(self, false)
             hint._dismiss()

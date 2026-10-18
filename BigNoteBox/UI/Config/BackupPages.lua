@@ -271,9 +271,11 @@ function K.BuildSelectiveBackupPage(sf, ct, y)
         return search == "" or e.low:find(search, 1, true) ~= nil
     end
 
+    -- Only the notes in the list count and go into the backup: a note the
+    -- filter or search hides is left out, ticked or not (Dukul, 2026-10-18)
     function UpdateCount()
         local n = 0
-        for _, e in ipairs(entries) do if picked[e.id] then n = n + 1 end end
+        for _, e in ipairs(shown) do if picked[e.id] then n = n + 1 end end
         countLbl:SetText(string.format(L["BACKUP_SEL_COUNT"], n, #entries))
         return n
     end
@@ -336,7 +338,7 @@ function K.BuildSelectiveBackupPage(sf, ct, y)
 
     copyBtn:SetScript("OnClick", function()
         local ids = {}
-        for _, e in ipairs(entries) do if picked[e.id] then ids[#ids + 1] = e.id end end
+        for _, e in ipairs(shown) do if picked[e.id] then ids[#ids + 1] = e.id end end
         local opts = { ids = ids, fmt = isMd and BNB.NoteExport.FMT_MARKDOWN or BNB.NoteExport.FMT_JSON }
         local anyPart = false
         if not isMd then
@@ -441,11 +443,16 @@ function K.BuildImportPickerPage(sf, ct, y, page)
     local function Layout()
         local P = BNB.Profiles
         wipe(profs)
+        -- A name already here gets a free one, "Default (1)" (Dukul,
+        -- 2026-10-18); used keeps two rows of this backup from sharing one
+        local used = {}
         for _, code in ipairs(type(data.profiles) == "table" and data.profiles or {}) do
             local payload = type(code) == "string" and P and P.Decode(code)
             if payload and payload.name then
-                profs[#profs + 1] = { code = code, name = payload.name,
-                                      free = P.CheckName(payload.name) ~= nil }
+                local as = P.FreeName(payload.name, used)
+                used[as:lower()] = true
+                profs[#profs + 1] = { code = code, name = payload.name, as = as,
+                                      free = P.CheckName(payload.name) == as }
             end
         end
         for _, part in ipairs(PARTS) do
@@ -463,14 +470,16 @@ function K.BuildImportPickerPage(sf, ct, y, page)
             cb:ClearAllPoints()
             cb:SetPoint("TOPLEFT", holder, "TOPLEFT", -2, yy + 2)
             local shownName = P.DisplayName(p.name)
-            cb._lbl:SetText(p.free and shownName or string.format(L["BACKUP_PICK_TAKEN"], shownName))
-            if p.free then cb._tip = L["BACKUP_PICK_PROFILE_TIP"]
-            else cb._tip = L["BACKUP_PICK_TAKEN_TIP"] end
-            cb:SetChecked(p.free)
-            -- A taken name is never overwritten (Dukul, 2026-10-18): greyed,
-            -- but still hovered for its tooltip
-            cb:SetEnabled(p.free)
-            cb:SetAlpha(p.free and 1 or GREY); cb._lbl:SetAlpha(p.free and 1 or GREY)
+            if p.free then
+                cb._lbl:SetText(shownName)
+                cb._tip = L["BACKUP_PICK_PROFILE_TIP"]
+            else
+                cb._lbl:SetText(string.format(L["BACKUP_PICK_RENAMED"], shownName, p.as))
+                cb._tip = L["BACKUP_PICK_RENAMED_TIP"]
+            end
+            cb:SetChecked(true)
+            cb:SetEnabled(true)
+            cb:SetAlpha(1); cb._lbl:SetAlpha(1)
             p.cb = cb
             cb:Show(); cb._lbl:Show()
             BNB.LabelHit(cb, cb._lbl)
@@ -505,11 +514,14 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         for _, key in ipairs({ "templates", "tokens", "tagColors" }) do
             if On(key) then out[key] = data[key]; any = true end
         end
-        local codes = {}
+        local codes, names = {}, {}
         for _, p in ipairs(profs) do
-            if p.free and p.cb and p.cb:GetChecked() then codes[#codes + 1] = p.code end
+            if p.cb and p.cb:GetChecked() then
+                codes[#codes + 1] = p.code
+                names[#codes] = p.as
+            end
         end
-        if #codes > 0 then out.profiles = codes; any = true end
+        if #codes > 0 then out.profiles = codes; out.profileNames = names; any = true end
         if not any then status:Say(L["BACKUP_PICK_NOTHING"], false); return end
         local fn = onImport
         data, onImport = nil, nil

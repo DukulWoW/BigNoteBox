@@ -806,8 +806,8 @@ L["BACKUP_PICK_TOKENS_TIP"] = "添加名称尚未被占用的变量；您现有�
 L["BACKUP_PICK_TAGCOLORS_TIP"] = "为此处尚未设置颜色的标签添加颜色。"
 L["BACKUP_PICK_HDR_PROFILES"] = "设置配置文件"
 L["BACKUP_PICK_PROFILE_TIP"] = "作为配置文件添加。可在设置 > 高级中选择使用。"
-L["BACKUP_PICK_TAKEN"] = "%s（已存在）"
-L["BACKUP_PICK_TAKEN_TIP"] = "此处已有同名配置文件，且不会被覆盖。请先重命名或删除现有配置文件，才能导入这个配置文件。"
+L["BACKUP_PICK_RENAMED"] = "%s，将添加为 %s"
+L["BACKUP_PICK_RENAMED_TIP"] = "此处已有同名配置文件，且不会被覆盖，因此这个配置文件将以新名称添加。可在设置 > 高级中选择使用。"
 L["BACKUP_PICK_NOTHING"] = "未勾选任何内容。"
 L["BACKUP_IMPORT_PARTS_OK"] = "备份已导入。"
 L["BACKUP_PREVIEW_JSON"] = "JSON 备份："
@@ -2631,8 +2631,8 @@ L["SB_COPY_MOVE_DEST_TIP"] = "勾选笔记应放置的所有位置，然后点�
 L["SEND_LINE_BY_LINE_TIP"] = "开启：笔记的每一行会单独作为一条聊天消息发送，空行会跳过。\n\n关闭：整篇笔记作为一段文字发送，仅在消息过长时拆分。"
 
 -- Backup / Export-Import
-L["BACKUP_FIRST_TEXT"] = "您有 %d 篇笔记。\n\n添加更多笔记前，先备份现有笔记吗？备份内容会在窗口中打开供您复制，随后继续导入。"
-L["BACKUP_FIRST_TEXT_ONE"] = "您有 1 篇笔记。\n\n添加更多笔记前，先备份这篇笔记吗？备份内容会在窗口中打开供您复制，随后继续导入。"
+L["BACKUP_FIRST_TEXT"] = "您有 %d 篇笔记。\n\n添加更多笔记前，先备份现有笔记吗？按 Ctrl+C 复制备份后，将继续导入。"
+L["BACKUP_FIRST_TEXT_ONE"] = "您有 1 篇笔记。\n\n添加更多笔记前，先备份这篇笔记吗？按 Ctrl+C 复制备份后，将继续导入。"
 L["BACKUP_FIRST_BTN"] = "先备份"
 L["BACKUP_FIRST_SKIP"] = "跳过"
 

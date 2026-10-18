@@ -1239,9 +1239,10 @@ local function ImportNotes(noteList, remapScope)
     end
     -- Tag colours from a full backup (ALL-106), for tags with no colour here
     if noteList.tagColors and BNB.TagColors then BNB.TagColors.ImportMap(noteList.tagColors) end
-    -- Settings profiles from a full backup (ALL-496 S2): a name already used here is skipped
+    -- Settings profiles from a full backup (ALL-496 S2): a name already used here
+    -- comes in under a free one, "Default (1)"; profileNames = the import picker's names
     if noteList.profiles and BNB.Profiles then
-        local n = BNB.Profiles.ImportBackup(noteList.profiles)
+        local n = BNB.Profiles.ImportBackup(noteList.profiles, noteList.profileNames)
         if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["PROFILE_BACKUP_IMPORTED_FMT"], n) .. "|r") end
     end
     return count

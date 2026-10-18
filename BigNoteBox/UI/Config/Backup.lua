@@ -587,9 +587,10 @@ end
 local _exportWin = nil
 
 -- Before an import or a migration adds notes (ALL-186): while there are notes
--- already, offer a JSON backup of them first. "Back up first" opens the export
--- window with the notes as they are now, then carries on (the text in the
--- window is taken before anything changes); "Skip" carries on; Esc stops.
+-- already, offer a JSON backup of them first. "Back up first" opens the copy
+-- popup with the notes as they are now and carries on after Ctrl+C (the text
+-- is taken before anything changes); Esc there stops; "Skip" carries on; Esc
+-- on this popup stops.
 function BNB.OfferBackupFirst(proceed)
     local ndb, n = BNB.NotesDB(), 0
     for _ in pairs(ndb and ndb.notes or {}) do n = n + 1 end
@@ -602,8 +603,12 @@ function BNB.OfferBackupFirst(proceed)
             OnAccept = function(_, data)
                 local NE = BNB.NoteExport
                 local text = NE and NE.SerializeNotes(NE.FMT_JSON)
-                if text then BNB.OpenExportWindow(text) end
-                if data then data() end
+                -- The copy popup, as the Backup buttons use: Ctrl+C copies and
+                -- carries on, Esc stops (Dukul, 2026-10-18). Nothing else opens
+                -- until then, so the character remap never lands on top of it.
+                -- Focus deferred: this popup is still closing
+                if text then BNB.ShowClipboardHint(text, nil, true, nil, data)
+                elseif data then data() end
             end,
             -- reason "clicked" = Skip; Esc does not call OnCancel (noCancelOnEscape)
             OnCancel = function(_, data, reason)
