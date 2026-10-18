@@ -1042,7 +1042,9 @@ function BNB.CreateScrolledEditBox(name, parent, fontSize)
             if bottom > offset then target = bottom end
         end
         if not target then return end
-        if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
+        -- Never UpdateScrollChildRect here: called on each caret move it hid
+        -- the caret in every scrolled box (Dukul, 2026-10-18, found with
+        -- OnCursorChanged switched off). The next-frame pass sees the new range.
         target = math.max(0, math.min(target, sf:GetVerticalScrollRange() or target))
         if math.abs(target - offset) < 1 then return end
         _following = true
