@@ -210,6 +210,7 @@ local function PlaceTitle(rich)
     eb:ClearAllPoints()
     eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, titleTop)
     eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, titleTop)
+    if bg._focusBox then bg._focusBox:SetPoint("TOPLEFT", bg, "TOPLEFT", 0, titleTop) end
     if badge then
         badge:ClearAllPoints()
         badge:SetPoint("RIGHT", bg, "TOPRIGHT", -6, titleTop - TITLE_H / 2)
@@ -235,9 +236,18 @@ local function BuildTitleField(parent)
     bg:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -PAD, -PAD)
     bg:SetHeight(TITLE_H)
     BNB.SetBackdrop(bg, 0.06, 0.06, 0.09, 0, 0.30, 0.30, 0.32, 0)
+    -- The frame drawn while the title is edited: the title's own part of bg,
+    -- under the tl;dr line (it framed the tl;dr too, 2026-10-18). PlaceTitle
+    -- moves its top with the title.
+    local fb = BNB.CreateBackdropFrame("Frame", nil, bg)
+    fb:SetPoint("TOPLEFT", bg, "TOPLEFT", 0, 0)
+    fb:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", 0, 0)
+    BNB.SetBackdrop(fb, 0.06, 0.06, 0.09, 0, 0.30, 0.30, 0.32, 0)
+    bg._focusBox = fb
 
     -- The box keeps the title's height; the tl;dr line makes bg taller above it
     local eb = CreateFrame("EditBox", nil, bg)
+    eb:SetFrameLevel(fb:GetFrameLevel() + 1)
     eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, 0)
     eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", -6, 0)
     eb:SetHeight(TITLE_H)
@@ -502,16 +512,16 @@ local function BuildTitleField(parent)
     local phFocusGained, phFocusLost
 
     eb:SetScript("OnEditFocusGained", function(self)
-        if bg.SetBackdropColor then
-            bg:SetBackdropColor(0.06, 0.06, 0.09, 0.85)
-            bg:SetBackdropBorderColor(0.35, 0.35, 0.38, 1)
+        if fb.SetBackdropColor then
+            fb:SetBackdropColor(0.06, 0.06, 0.09, 0.85)
+            fb:SetBackdropBorderColor(0.35, 0.35, 0.38, 1)
         end
         if phFocusGained then phFocusGained(self) end
     end)
     eb:SetScript("OnEditFocusLost", function(self)
-        if bg.SetBackdropColor then
-            bg:SetBackdropColor(0.06, 0.06, 0.09, 0)
-            bg:SetBackdropBorderColor(0.30, 0.30, 0.32, 0)
+        if fb.SetBackdropColor then
+            fb:SetBackdropColor(0.06, 0.06, 0.09, 0)
+            fb:SetBackdropBorderColor(0.30, 0.30, 0.32, 0)
         end
         if phFocusLost then phFocusLost(self) end
     end)
@@ -521,9 +531,9 @@ local function BuildTitleField(parent)
     phFocusGained = eb:GetScript("OnEditFocusGained")
     phFocusLost   = eb:GetScript("OnEditFocusLost")
     eb:SetScript("OnEditFocusGained", function(self)
-        if bg.SetBackdropColor then
-            bg:SetBackdropColor(0.06, 0.06, 0.09, 0.85)
-            bg:SetBackdropBorderColor(0.35, 0.35, 0.38, 1)
+        if fb.SetBackdropColor then
+            fb:SetBackdropColor(0.06, 0.06, 0.09, 0.85)
+            fb:SetBackdropBorderColor(0.35, 0.35, 0.38, 1)
         end
         if phFocusGained then phFocusGained(self) end
     end)
@@ -589,9 +599,9 @@ local function BuildTitleField(parent)
     end
 
     eb:SetScript("OnEditFocusLost", function(self)
-        if bg.SetBackdropColor then
-            bg:SetBackdropColor(0.06, 0.06, 0.09, 0)
-            bg:SetBackdropBorderColor(0.30, 0.30, 0.32, 0)
+        if fb.SetBackdropColor then
+            fb:SetBackdropColor(0.06, 0.06, 0.09, 0)
+            fb:SetBackdropBorderColor(0.30, 0.30, 0.32, 0)
         end
         if phFocusLost then phFocusLost(self) end
         -- Defer so a click on the body editbox or NoteConfig registers first

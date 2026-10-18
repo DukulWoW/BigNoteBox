@@ -910,26 +910,19 @@ local function Entries()
     return out
 end
 
--- While the list shows, the box is in alt-arrow mode (as the chat box):
--- plain arrows then go to OnArrowPressed and leave the cursor alone. A box
--- of many lines moves its cursor on an arrow and never fires OnArrowPressed
--- (Dukul, 2026-10-17: "The arrow keys don't work").
-local function ArrowMode(eb, on)
-    if not (eb and eb.SetAltArrowKeyMode) then return end
-    if on then
-        if eb._bnbAltPrev == nil then
-            eb._bnbAltPrev = eb:GetAltArrowKeyMode() and true or false
-            eb:SetAltArrowKeyMode(true)
-        end
-    elseif eb._bnbAltPrev ~= nil then
-        eb:SetAltArrowKeyMode(eb._bnbAltPrev)
-        eb._bnbAltPrev = nil
-    end
-end
+-- Arrow keys (ALL-494): a box of many lines uses them itself and fires
+-- neither OnArrowPressed nor OnKeyDown for them, in alt-arrow mode or not
+-- (Dukul, 2026-10-17 and 2026-10-18: "Still can't use arrow keys"). So the
+-- list reads the keys itself while it shows (IsKeyDown, every client, in
+-- its OnUpdate, with key repeat). Up / Down move the pick and the caret is
+-- put back where the box moved it; Left / Right close the list and the box
+-- has already moved the caret.
+local ARROWS = { "UP", "DOWN", "LEFT", "RIGHT" }
+local REPEAT_DELAY, REPEAT_RATE = 0.35, 0.07
 
 local function Hide()
     if _ac then
-        ArrowMode(_ac._eb, false)
+        _ac._held = {}
         _ac:Hide()
         _ac._eb = nil
         if GameTooltip:IsOwned(_ac) then GameTooltip:Hide() end
@@ -995,6 +988,19 @@ local function Accept(i)
     return newText, newCur
 end
 
+-- One arrow step (repeats while held)
+local function ArrowStep(eb, key)
+    if key == "UP" or key == "DOWN" then
+        local n = math.min(#_ac.matches, AC_ROWS)
+        if key == "DOWN" then _ac.sel = _ac.sel % n + 1
+        else _ac.sel = (_ac.sel <= 1) and n or (_ac.sel - 1) end
+        Paint()
+        if eb:GetCursorPosition() ~= _ac._cur then eb:SetCursorPosition(_ac._cur) end
+    else
+        Hide()
+    end
+end
+
 local function Build()
     if _ac then return end
     local f = CreateFrame("Frame", nil, UIParent, "BackdropTemplate")
@@ -1038,6 +1044,27 @@ local function Build()
     f:SetScript("OnHide", function(self)
         if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
     end)
+    f._held = {}
+    f:SetScript("OnUpdate", function(self, elapsed)
+        local eb = self._eb
+        if not (eb and eb:HasFocus()) then return end
+        for _, key in ipairs(ARROWS) do
+            if not self:IsShown() then return end   -- Left / Right closed it
+            if IsKeyDown(key) then
+                local wait = self._held[key]
+                if not wait then
+                    self._held[key] = REPEAT_DELAY
+                    ArrowStep(eb, key)
+                else
+                    wait = wait - elapsed
+                    if wait <= 0 then wait = REPEAT_RATE; ArrowStep(eb, key) end
+                    self._held[key] = wait
+                end
+            else
+                self._held[key] = nil
+            end
+        end
+    end)
     _ac = f
 end
 
@@ -1059,7 +1086,6 @@ local function Open(eb, start, cur, partial)
     end
     if #list == 0 then Hide(); return end
     local f = _ac
-    if f._eb and f._eb ~= eb then ArrowMode(f._eb, false) end
     if f._eb ~= eb or f._start ~= start then f.sel = 1 end
     f._eb, f._start, f._cur, f.matches = eb, start, cur, list
     if f.sel > math.min(#list, AC_ROWS) then f.sel = 1 end
@@ -1090,7 +1116,6 @@ local function Open(eb, start, cur, partial)
     else
         f:SetPoint("TOPLEFT", eb, "BOTTOMLEFT", 0, -2)
     end
-    ArrowMode(eb, true)
     f:Show()
     Paint()
 end
@@ -1105,34 +1130,6 @@ local function Partial(eb)
     if s > 1 and head:sub(s - 1, s - 1) == "\\" then return nil end   -- \{{ = text
     if partial ~= "" and not partial:match("^%a") then return nil end
     return s, cur, partial
-end
-
--- One arrow press, from OnKeyDown or OnArrowPressed (whichever comes first).
--- Up / Down move the pick and the cursor stays where it was (put back next
--- frame if the box moved it anyway); Left / Right close the list and the
--- cursor takes that step (by hand if alt-arrow mode held it back).
-local _arrowDone
-local function ArrowKey(eb, key)
-    if not (_ac and _ac:IsShown() and _ac._eb == eb) or _arrowDone then return end
-    _arrowDone = true
-    C_Timer.After(0, function() _arrowDone = nil end)
-    local pos = eb:GetCursorPosition() or 0
-    if key == "UP" or key == "DOWN" then
-        local n = math.min(#_ac.matches, AC_ROWS)
-        if key == "DOWN" then _ac.sel = _ac.sel % n + 1
-        else _ac.sel = (_ac.sel <= 1) and n or (_ac.sel - 1) end
-        Paint()
-        C_Timer.After(0, function()
-            if eb:GetCursorPosition() ~= pos then eb:SetCursorPosition(pos) end
-        end)
-    elseif key == "LEFT" or key == "RIGHT" then
-        Hide()
-        C_Timer.After(0, function()
-            if eb:GetCursorPosition() ~= pos then return end   -- the box stepped
-            if key == "LEFT" then eb:SetCursorPosition(math.max(0, pos - 1))
-            else eb:SetCursorPosition(math.min(#(eb:GetText() or ""), pos + 1)) end
-        end)
-    end
 end
 
 function T.TrackCaret(eb)
@@ -1170,18 +1167,22 @@ function T.WireAutocomplete(eb, undoID, onChange)
     eb:HookScript("OnTabPressed", function(self)
         if _ac and _ac:IsShown() and _ac._eb == self then Accept() end
     end)
-    -- Arrows: taken at OnKeyDown, which every box fires (alt-arrow mode alone
-    -- still left a note's box moving its cursor: ALL-494). OnArrowPressed
-    -- stays as a second way in; one press is handled once (_arrowDone).
-    eb:HookScript("OnArrowPressed", function(self, key) ArrowKey(self, key) end)
+    -- Up / Down while the list shows: the caret goes straight back, before
+    -- the list's OnUpdate moves the pick (no jump to see, no scroll)
+    eb:HookScript("OnCursorChanged", function(self)
+        if not (_ac and _ac:IsShown() and _ac._eb == self) or _ac._restoring then return end
+        if (IsKeyDown("UP") or IsKeyDown("DOWN")) and self:GetCursorPosition() ~= _ac._cur then
+            _ac._restoring = true
+            self:SetCursorPosition(_ac._cur)
+            _ac._restoring = false
+        end
+    end)
     -- Enter: OnKeyDown runs before the box acts on the key, so the token is
     -- in before a one-line box's OnEnterPressed reads the text. Ctrl+Enter
     -- stays the sticky's "end the edit".
     eb:HookScript("OnKeyDown", function(self, key)
         if not (_ac and _ac:IsShown() and _ac._eb == self) then return end
-        if key == "UP" or key == "DOWN" or key == "LEFT" or key == "RIGHT" then
-            ArrowKey(self, key)
-        elseif (key == "ENTER" or key == "NUMPADENTER") and not IsControlKeyDown() then
+        if (key == "ENTER" or key == "NUMPADENTER") and not IsControlKeyDown() then
             local newText, newCur = Accept()
             if newText and self:IsMultiLine() then _eat = { eb = self, text = newText, cur = newCur } end
             C_Timer.After(0, function() if _eat and _eat.eb == self then _eat = nil end end)
