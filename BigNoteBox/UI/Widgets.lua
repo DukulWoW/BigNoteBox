@@ -1051,8 +1051,15 @@ function BNB.CreateScrolledEditBox(name, parent, fontSize)
         sf:SetVerticalScroll(target)
         _following = false
     end
-    eb:SetScript("OnCursorChanged", function(self, _, y, _, h)
+    -- Only a caret that really moved is followed: the scroll raises
+    -- OnCursorChanged again a frame later with the same caret, which ran the
+    -- follow on every frame (~52 a second, Dukul's probe 2026-10-18) and
+    -- the caret never blinked.
+    local lastX, lastY, lastH
+    eb:SetScript("OnCursorChanged", function(self, x, y, _, h)
         if _following then return end
+        if x == lastX and y == lastY and h == lastH then return end
+        lastX, lastY, lastH = x, y, h
         y = -y
         Follow(y, h)
         -- Next frame: where the caret is then (it may have been put back since)
