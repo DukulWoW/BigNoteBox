@@ -907,6 +907,14 @@ function T.Available(name)
     return ok and yes and true or false
 end
 
+-- In the token lists for this note? plain = a normal note, where {{here}}
+-- gives what {{zone}} gives and is left out (Dukul, 2026-10-18; typed, it
+-- still works)
+function T.Listed(name, plain)
+    if plain and name == "here" then return false end
+    return T.Available(name)
+end
+
 -- For the tooltip: what the token gives right now, and how it is written.
 -- An id token's example is filled from EXAMPLE_ID (nil value = no example,
 -- or its data is still loading).
@@ -996,7 +1004,7 @@ local _ac
 local _eat   -- { eb, text, cur }: the new line Enter types after a pick
 
 -- Every pick, in list order: { word, label, kind, now() }
-local function Entries()
+local function Entries(plain)
     local out = {}
     for _, c in ipairs(T.Custom()) do
         local text = c.text
@@ -1005,7 +1013,7 @@ local function Entries()
     end
     for _, g in ipairs(T.MENU) do
         for _, name in ipairs(g.list) do
-            if T.Available(name) then
+            if T.Listed(name, plain) then
                 local base = name:gsub(":$", "")
                 local open = g.kind == "id" or base ~= name
                 local kind = g.kind
@@ -1196,7 +1204,7 @@ end
 local function Open(eb, start, cur, partial)
     Build()
     local low, list = partial:lower(), {}
-    for _, e in ipairs(Entries()) do
+    for _, e in ipairs(Entries(eb._bnbPlainFn and eb._bnbPlainFn())) do
         if e.word:lower():sub(1, #low) == low and e.word:lower() ~= low then list[#list + 1] = e end
     end
     if #list == 0 then Hide(); return end

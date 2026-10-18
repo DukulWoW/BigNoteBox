@@ -406,7 +406,8 @@ end
 local function LineText(text, rich)
     if rich then
         local toks = {}
-        text = text:gsub("{{(%a[%w_]*:?[^{}\n]*)}}", function(inner)
+        -- An already escaped \{{x}} is taken as it is (one backslash, not two)
+        text = text:gsub("\\?{{(%a[%w_]*:?[^{}\n]*)}}", function(inner)
             toks[#toks + 1] = inner
             return "@@BNBTOK" .. #toks .. "@@"
         end)

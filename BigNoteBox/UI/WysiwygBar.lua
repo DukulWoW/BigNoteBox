@@ -624,7 +624,9 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 local sub = root:CreateButton(L["TOKEN_GROUP_" .. g.group], nil,
                     { tip = L["TOKEN_GROUP_" .. g.group], tipSub = L["TOKEN_KIND_" .. g.kind:upper()] })
                 for _, name in ipairs(g.list) do
-                    if BNB.Tokens.Available(name) then TokenRow(sub, name, g.kind) end
+                    if BNB.Tokens.Listed(name, BNB.Tokens.NotePlain(BNB._currentNoteID)) then
+                        TokenRow(sub, name, g.kind)
+                    end
                 end
             end
             root:CreateDivider()
