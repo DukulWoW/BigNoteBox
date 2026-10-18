@@ -811,7 +811,7 @@ local function BuildBodyField(parent, topAnchor)
         end
     end)
     -- {{date}} and the other snapshot tokens expand as typed (ALL-481)
-    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end, function() return BNB.Tokens.NotePlain(BNB._currentNoteID) end) end
 
     -- Ctrl+Z = undo, Ctrl+Shift+Z or Ctrl+Y = redo.
     -- We only call SetPropagateKeyboardInput(false) for keys we consume.

@@ -2276,8 +2276,12 @@ local function CreateStickyFrame(noteID)
     f._cursorFollow = bodyEb:GetScript("OnCursorChanged")
     bodyEb:SetScript("OnCursorChanged", nil)
     bodyEb:HookScript("OnEditFocusLost", function() EndInlineEdit(f) end)
-    -- Snapshot tokens expand as typed in an inline edit; no undo here (ALL-481)
-    if BNB.Tokens then BNB.Tokens.WireExpand(bodyEb); BNB.Tokens.WireAutocomplete(bodyEb) end
+    -- Snapshot tokens expand as typed in an inline edit; no undo here (ALL-481);
+    -- a normal note's every token (ALL-503)
+    if BNB.Tokens then
+        BNB.Tokens.WireExpand(bodyEb, nil, function() return BNB.Tokens.NotePlain(f._noteID) end)
+        BNB.Tokens.WireAutocomplete(bodyEb)
+    end
     -- Esc or Ctrl+Enter ends an inline edit, saved like a click outside
     -- (Dukul, 2026-10-02). Plain Enter stays a new line: a multi-line EditBox
     -- types the newline itself only while it has no OnEnterPressed, so with

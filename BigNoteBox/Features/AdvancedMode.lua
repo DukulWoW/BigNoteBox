@@ -688,6 +688,9 @@ function AM.StripToPlain(noteID)
     -- Create a history snapshot before stripping so user can revert
     if BNB.HistorySnapshotNote then BNB.HistorySnapshotNote(noteID) end
     local stripped = StripMarkup(note.body or "")
+    -- A normal note's tokens are values (ALL-503): live ones become what they
+    -- show now (the history snapshot above keeps the tokens)
+    if BNB.Tokens then stripped = BNB.Tokens.FreezeText(stripped) end
     BNB.UpdateNote(noteID, { body = stripped, richMode = false })
     if BNB._currentNoteID == noteID and BNB.LoadNoteInEditor then
         BNB.LoadNoteInEditor(noteID)

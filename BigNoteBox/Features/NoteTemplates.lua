@@ -241,7 +241,11 @@ local function Body(tpl, rich)
         for _, line in ipairs(Lines(L[tpl.tasks], "\n")) do list[#list + 1] = "- " .. line end
         body = body .. "\n\n" .. table.concat(list, "\n")
     end
-    return BNB.Tokens and BNB.Tokens.Snapshot(body, true) or body
+    if not BNB.Tokens then return body end
+    body = BNB.Tokens.Snapshot(body, true)
+    -- A normal note: every token a value now (ALL-503)
+    if not rich then body = BNB.Tokens.FreezeText(body) end
+    return body
 end
 
 -- Fills a note just made (CreateNote) from a template: body, tags, tasks with
@@ -289,6 +293,7 @@ local function FillUser(id, rec, rich, own)
         body = AM and AM.StripMarkup and AM.StripMarkup(body) or body
     end
     updates.body = Snap(body)
+    if not rich and BNB.Tokens then updates.body = BNB.Tokens.FreezeText(updates.body) end   -- ALL-503
     if updates.tldr then updates.tldr = BNB.CleanTldr(Snap(updates.tldr)) end
     if type(f.tasks) == "table" then updates.tasks = CopyTasks(f.tasks) end
     if rec.instance then updates.situations = InstanceSituation() or updates.situations end

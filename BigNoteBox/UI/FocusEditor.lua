@@ -779,7 +779,7 @@ local function BuildFocusFrame()
         end
     end)
     -- {{date}} and the other snapshot tokens expand as typed (ALL-481)
-    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end, function() return BNB.Tokens.NotePlain(BNB._currentNoteID) end) end
 
     eb:SetScript("OnKeyDown", function(self, key)
         local ctrl  = IsControlKeyDown()
@@ -1086,7 +1086,7 @@ local function BuildFocusFrameSkin()
         end
     end)
     -- {{date}} and the other snapshot tokens expand as typed (ALL-481)
-    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end) end
+    if BNB.Tokens then BNB.Tokens.WireExpand(eb, function() return BNB._currentNoteID end, function() return BNB.Tokens.NotePlain(BNB._currentNoteID) end) end
 
     eb:SetScript("OnKeyDown", function(self, key)
         local ctrl  = IsControlKeyDown()

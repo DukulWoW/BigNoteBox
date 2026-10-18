@@ -558,8 +558,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Note tokens (ALL-481 S2, Dukul's tb-syntax art): a menu of every token
     -- by kind; hover tells what it does, how it is written and what it gives
-    -- right now. Plain notes too: they fill in stickies, toasts, tl;dr and
-    -- Send to Chat, the plain editor shows them as typed. BNB.ContextMenu in
+    -- right now. A normal note gets the value at once (ALL-503), a rich note
+    -- the token, filled each time it is shown. BNB.ContextMenu in
     -- both editors (it has the sub-menus and row tooltips).
     local tokenBtn = WyBtn("tb-syntax", L["NE_INSERT_TOKEN_TIP"])
     -- A divider between the bullet list and the inserts (Dukul, 2026-10-17)
@@ -585,7 +585,14 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             tipSub = tipSub .. "\n" .. L["TOKEN_TIP_EMPTY"]
         end
         sub:CreateButton(label, function()
-            if open then InsertSnippet("{{" .. base .. ":}}", 2)
+            -- A normal note gets the value now; a token taking an id goes in
+            -- open, typing the id and }} fills it (ALL-503)
+            local plain = Tk.NotePlain(BNB._currentNoteID)
+            if open and plain then InsertSnippet("{{" .. base .. ":")
+            elseif open then InsertSnippet("{{" .. base .. ":}}", 2)
+            elseif plain then
+                local token = "{{" .. name .. "}}"
+                InsertSnippet(token, nil, Tk.FreezeToken(token))
             elseif kind == "snapshot" and now then InsertSnippet("{{" .. name .. "}}", nil, now)
             else InsertSnippet("{{" .. name .. "}}") end
         end, { tip = "{{" .. base .. (open and (":" .. hint) or "") .. "}}", tipSub = tipSub })
@@ -604,7 +611,11 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
                 for _, e in ipairs(mine) do
                     local now = BNB.Tokens.CustomPreview(e.text)
                     sub:CreateButton("{{" .. e.name .. "}}  |cff888888" .. now .. "|r",
-                        function() InsertSnippet("{{" .. e.name .. "}}") end,
+                        function()
+                            local token = "{{" .. e.name .. "}}"
+                            InsertSnippet(token, nil, BNB.Tokens.NotePlain(BNB._currentNoteID)
+                                and BNB.Tokens.FreezeToken(token) or nil)
+                        end,
                         { tip = "{{" .. e.name .. "}}", tipSub = e.text .. "\n\n"
                             .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r") })
                 end

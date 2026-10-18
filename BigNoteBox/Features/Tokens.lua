@@ -38,7 +38,8 @@
 --   * An unknown token, or a snapshot token left in the text, shows as typed.
 --   * \{{me}} shows {{me}} as text (the backslash is dropped on display).
 --   * A live token with no value right now (no guild) shows nothing.
---   * The plain editor shows tokens raw: the text being edited is what was typed.
+--   * A normal (plain) note turns every token into its value when typed or
+--     picked (ALL-503, below); a rich note keeps live tokens in its text.
 --   * Tokens are data only. Never Lua from a note, share string or definition:
 --     a shared note would run someone else's code.
 --   * Names are case-insensitive. An id is digits only ({{item: 6948 }} is
@@ -773,6 +774,98 @@ function T.HasSnapshot(text)
 end
 
 -- ---------------------------------------------------------------------------
+-- NORMAL NOTES: EVERY TOKEN A SNAPSHOT (ALL-503)
+-- ---------------------------------------------------------------------------
+-- Rich notes keep tokens live (filled each time they are shown). A normal
+-- (plain) note gets each token's value at the moment it is typed or picked,
+-- in the "plain" form: game links, ticks as words, no pictures (Dukul,
+-- 2026-10-18: "rich notes update, but normal notes becoming static"). A token
+-- with no value now (no guild, an unknown name) stays as typed; an item /
+-- quest / spell still loading fills in once it arrives, while the box still
+-- holds that note. The tl;dr stays live on both (Dukul). A normal note that
+-- already holds live tokens keeps them (filled in stickies, toasts...); a
+-- rich note made normal, or a normal note from a template, gets values.
+
+-- true = the note fills its tokens once (not rich, or Rich Notes is off)
+function T.NotePlain(id)
+    local note = id and BNB.GetNote(id)
+    if not note then return false end
+    return not (BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note))
+end
+
+-- One token's value now, plain form, or nil (stays as typed)
+local function FreezeOne(name, colon, arg)
+    if colon == "" and arg == "" then
+        local v, known = Value(SNAPSHOT, name)
+        if known then return v end
+    end
+    local whole = "{{" .. name .. colon .. arg .. "}}"
+    local v = Replace(whole, LIVE, false, true)
+    if not v or v == whole or v == "" then return nil end
+    return v
+end
+
+-- A whole token ("{{gold}}", "{{item:6948}}") as its value now, or nil
+function T.FreezeToken(token)
+    local name, colon, arg = (token or ""):match("^{{(%a[%w_]*)(:?)([^{}\n]*)}}$")
+    if not name then return nil end
+    return FreezeOne(name, colon, arg)
+end
+
+-- Every token in a text as its value now; escaped ones and those with no
+-- value stay as typed
+function T.FreezeText(text)
+    if not text or not text:find("{{", 1, true) then return text end
+    return (text:gsub(TOKEN_PAT, function(bs, name, colon, arg)
+        if bs ~= "" then return nil end
+        return FreezeOne(name, colon, arg)
+    end))
+end
+
+-- Tokens typed into a normal note while their data was loading:
+-- [box] = { [token] = true }. A note loaded into the box (a SetText that is
+-- not ours or an undo step) forgets them.
+local waiting = setmetatable({}, { __mode = "k" })
+
+local function FillWaiting()
+    for eb, list in pairs(waiting) do
+        if not (eb:IsShown() and eb._bnbPlainFn and eb._bnbPlainFn()) then
+            waiting[eb] = nil
+        else
+            local text = eb:GetText() or ""
+            local cur = eb:GetCursorPosition() or 0
+            local changed
+            for token in pairs(list) do
+                local v = T.FreezeToken(token)
+                if v then
+                    list[token] = nil
+                    local s, e = text:find(token, 1, true)
+                    if s then
+                        text = text:sub(1, s - 1) .. v .. text:sub(e + 1)
+                        if cur >= e then cur = cur + #v - #token
+                        elseif cur >= s then cur = s - 1 + #v end
+                        changed = true
+                    end
+                end
+            end
+            if not next(list) then waiting[eb] = nil end
+            if changed then
+                BNB._undoActive = true
+                eb:SetText(text)
+                BNB._undoActive = false
+                eb:SetCursorPosition(cur)
+                -- Not typing: the box's own "changed" (main editor: mark dirty)
+                local opts = eb._bnbTokenAC
+                if opts and opts.onChange then opts.onChange() end
+            end
+        end
+    end
+end
+BNB.RegisterMessage("TokensFreeze", "TokensChanged", function()
+    if next(waiting) then FillWaiting() end
+end)
+
+-- ---------------------------------------------------------------------------
 -- THE TOOLBAR'S TOKEN LIST (S2, UI/WysiwygBar.lua)
 -- ---------------------------------------------------------------------------
 -- Groups in menu order. Labels / tooltips: L["TOKEN_GROUP_<group>"],
@@ -841,19 +934,35 @@ end
 -- ---------------------------------------------------------------------------
 -- The closing }} of a snapshot token turns it into its value. undoID returns
 -- the note id whose undo stack the box uses (main editor, Focus mode), or is
--- nil (sticky inline edit: no undo there). Hooked, so call it after the box's
--- own OnTextChanged is set.
-function T.WireExpand(eb, undoID)
+-- nil (sticky inline edit: no undo there). plainFn() true = the box holds a
+-- normal note right now: every token expands (ALL-503); nil = only snapshot
+-- tokens (tl;dr boxes, always live). Hooked, so call it after the box's own
+-- OnTextChanged is set.
+function T.WireExpand(eb, undoID, plainFn)
     if not eb or eb._bnbTokenExpand then return end
     eb._bnbTokenExpand = true
+    eb._bnbPlainFn = plainFn
+    hooksecurefunc(eb, "SetText", function(self)
+        if not BNB._undoActive then waiting[self] = nil end
+    end)
     eb:HookScript("OnTextChanged", function(self, userInput)
         if not userInput or self._showingPlaceholder then return end
         local text = self:GetText() or ""
         local cur  = self:GetCursorPosition() or 0
         if cur < 6 or text:sub(cur - 1, cur) ~= "}}" then return end
-        local s, _, bs, name = text:sub(1, cur):find("(\\?){{(%a[%w_]*)}}$")
+        local s, _, bs, name, colon, arg = text:sub(1, cur):find("(\\?){{(%a[%w_]*)(:?)([^{}\n]*)}}$")
         if not s or bs ~= "" then return end
-        local v = Value(SNAPSHOT, name)
+        local v
+        if plainFn and plainFn() then
+            v = FreezeOne(name, colon, arg)
+            -- An id still loading: filled in when it arrives (FillWaiting)
+            if not v and colon ~= "" then
+                waiting[self] = waiting[self] or {}
+                waiting[self]["{{" .. name .. colon .. arg .. "}}"] = true
+            end
+        elseif colon == "" and arg == "" then
+            v = Value(SNAPSHOT, name)
+        end
         if not v then return end
         local newText = text:sub(1, s - 1) .. v .. text:sub(cur + 1)
         local newCur  = s - 1 + #v
@@ -968,6 +1077,12 @@ local function Accept(i)
     local token = "{{" .. e.word .. "}}"
     local back = e.open and 2 or 0
     local value = e.kind == "snapshot" and not e.open and e.now() or nil
+    -- A normal note (ALL-503): the value now; a token that takes an argument
+    -- goes in open ("{{item:"), so typing the id and }} expands it
+    if eb._bnbPlainFn and eb._bnbPlainFn() then
+        if e.open then token, back = "{{" .. e.word, 0
+        else value = T.FreezeToken(token) end
+    end
     local id = opts.undoID and opts.undoID()
     Hide()
     local newText, newCur
