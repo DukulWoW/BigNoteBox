@@ -1026,20 +1026,31 @@ function BNB.CreateScrolledEditBox(name, parent, fontSize)
     -- The box's own text insets count too, plus a little room under the line
     -- (descenders of a large font): without them the last line showed only
     -- its top half (Dukul, 2026-10-18)
+    -- The target is held to the real scroll range and set only when it moves:
+    -- asking past the end every call scrolled (and moved the caret) every
+    -- frame, and the caret never showed (Dukul, 2026-10-18: "Now the text
+    -- cursor is gone"). A follow's own OnCursorChanged starts no new round.
+    local _following = false
     local function Follow(y, h)
         local offset = sf:GetVerticalScroll()
         local _, _, top, bottomInset = eb:GetTextInsets()
+        local target
         if y - (top or 0) < offset then
-            sf:SetVerticalScroll(math.max(0, y - (top or 0)))
+            target = y - (top or 0)
         else
             local bottom = y + (h or 16) + (bottomInset or 0) + 4 - sf:GetHeight()
-            if bottom > offset then
-                if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
-                sf:SetVerticalScroll(bottom)
-            end
+            if bottom > offset then target = bottom end
         end
+        if not target then return end
+        if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
+        target = math.max(0, math.min(target, sf:GetVerticalScrollRange() or target))
+        if math.abs(target - offset) < 1 then return end
+        _following = true
+        sf:SetVerticalScroll(target)
+        _following = false
     end
     eb:SetScript("OnCursorChanged", function(self, _, y, _, h)
+        if _following then return end
         y = -y
         Follow(y, h)
         -- Next frame: where the caret is then (it may have been put back since)
