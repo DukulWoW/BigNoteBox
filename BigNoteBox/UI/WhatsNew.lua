@@ -401,9 +401,17 @@ end
 -- Colour codes in a line: markup for a rich note, gone from a plain one.
 -- Braces become parentheses first in a rich note, so text such as "{p}" in
 -- a patch line is never read as a tag (a repair would change the body).
+-- A note token ({{me}}, {{item:6948}}) is kept and escaped instead, so it
+-- shows as written and is never filled (ALL-493: it read "((me))").
 local function LineText(text, rich)
     if rich then
+        local toks = {}
+        text = text:gsub("{{(%a[%w_]*:?[^{}\n]*)}}", function(inner)
+            toks[#toks + 1] = inner
+            return "@@BNBTOK" .. #toks .. "@@"
+        end)
         text = text:gsub("{", "("):gsub("}", ")")
+        text = text:gsub("@@BNBTOK(%d+)@@", function(n) return "\\{{" .. toks[tonumber(n)] .. "}}" end)
         text = text:gsub("|c%x%x(%x%x%x%x%x%x)", "{col:%1}"):gsub("|r", "{/col}")
     else
         text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")

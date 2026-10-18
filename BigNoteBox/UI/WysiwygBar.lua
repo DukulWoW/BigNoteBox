@@ -917,12 +917,12 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- (ALL-343: Alarms off = no alarm button, Note History off = no history /
     -- restore buttons and no divider before them)
     local RIGHT = {
-        { { restoreBtn, "tb-restore", "HISTORY_RESTORE_BTN_TIP", BNB.HistoryEnabled },
-          { histBtn,    "tb-history", "HISTORY_VIEW_BTN_TIP",    BNB.HistoryEnabled } },
-        { { alarmBtn,    "tb-alarm",    "STICKY_SET_ALARM_TIP", BNB.AlarmsEnabled },
-          { copyMoveBtn, "tb-copymove", "NE_COPY_MOVE_TIP" },
-          { shareBtn,    "tb-share",    "NE_SHARE_NOTE_TIP" } },
-        { { mapBtn, "tb-notemap", "NE_WP_OPEN_TIP_TITLE" } },
+        { { restoreBtn, "tb-restore", "HISTORY_RESTORE_BTN_TIP", BNB.HistoryEnabled, "NE_TB_MENU_RESTORE" },
+          { histBtn,    "tb-history", "HISTORY_VIEW_BTN_TIP",    BNB.HistoryEnabled, "NE_TB_MENU_HISTORY" } },
+        { { alarmBtn,    "tb-alarm",    "STICKY_SET_ALARM_TIP", BNB.AlarmsEnabled, "NE_TB_MENU_ALARM" },
+          { copyMoveBtn, "tb-copymove", "NE_COPY_MOVE_TIP", nil, "NE_TB_MENU_COPYMOVE" },
+          { shareBtn,    "tb-share",    "NE_SHARE_NOTE_TIP", nil, "NE_TB_MENU_SHARE" } },
+        { { mapBtn, "tb-notemap", "NE_WP_OPEN_TIP_TITLE", nil, "NE_TB_MENU_MAP" } },
     }
     local RIGHT_DIVS = { cmDiv, shareDiv }   -- after group 1, after group 2
     local _overflow = {}                     -- the items in the menu, left to right
@@ -985,10 +985,11 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             for _, o in ipairs(_overflow) do
                 if prevG and o.g ~= prevG then root:CreateDivider() end
                 local b = o.it[1]
-                root:CreateButton(L[o.it[3]], function()
+                -- A short name in the menu, the long text as its tooltip (ALL-487)
+                root:CreateButton(L[o.it[5]], function()
                     local fn = b:GetScript("OnClick")
                     if fn then fn(b) end
-                end, { iconTex = ASSETS_WY .. o.it[2], disabled = not b:IsEnabled() })
+                end, { iconTex = ASSETS_WY .. o.it[2], disabled = not b:IsEnabled(), tip = L[o.it[3]] })
                 prevG = o.g
             end
         end)

@@ -1019,17 +1019,28 @@ function BNB.CreateScrolledEditBox(name, parent, fontSize)
     end)
 
     -- Cursor follow — scroll the parent to keep the caret visible as the user types.
-    eb:SetScript("OnCursorChanged", function(self, _, y, _, h)
-        y = -y
+    -- Enter on the last line moves the caret before the box has grown, so the
+    -- scroll is held to the old range there: the same step runs again next
+    -- frame, once the range has grown (ALL-499). Not after a SetText (note
+    -- load scrolls to the top, above).
+    local function Follow(y, h)
         local offset = sf:GetVerticalScroll()
         if y < offset then
             sf:SetVerticalScroll(y)
         else
             local bottom = y + (h or 16) - sf:GetHeight()
             if bottom > offset then
+                if sf.UpdateScrollChildRect then sf:UpdateScrollChildRect() end
                 sf:SetVerticalScroll(bottom)
             end
         end
+    end
+    eb:SetScript("OnCursorChanged", function(self, _, y, _, h)
+        y = -y
+        Follow(y, h)
+        C_Timer.After(0, function()
+            if not _isSetTextCall and self:HasFocus() then Follow(y, h) end
+        end)
     end)
 
     return sf, eb

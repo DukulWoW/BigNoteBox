@@ -1107,6 +1107,34 @@ local function Partial(eb)
     return s, cur, partial
 end
 
+-- One arrow press, from OnKeyDown or OnArrowPressed (whichever comes first).
+-- Up / Down move the pick and the cursor stays where it was (put back next
+-- frame if the box moved it anyway); Left / Right close the list and the
+-- cursor takes that step (by hand if alt-arrow mode held it back).
+local _arrowDone
+local function ArrowKey(eb, key)
+    if not (_ac and _ac:IsShown() and _ac._eb == eb) or _arrowDone then return end
+    _arrowDone = true
+    C_Timer.After(0, function() _arrowDone = nil end)
+    local pos = eb:GetCursorPosition() or 0
+    if key == "UP" or key == "DOWN" then
+        local n = math.min(#_ac.matches, AC_ROWS)
+        if key == "DOWN" then _ac.sel = _ac.sel % n + 1
+        else _ac.sel = (_ac.sel <= 1) and n or (_ac.sel - 1) end
+        Paint()
+        C_Timer.After(0, function()
+            if eb:GetCursorPosition() ~= pos then eb:SetCursorPosition(pos) end
+        end)
+    elseif key == "LEFT" or key == "RIGHT" then
+        Hide()
+        C_Timer.After(0, function()
+            if eb:GetCursorPosition() ~= pos then return end   -- the box stepped
+            if key == "LEFT" then eb:SetCursorPosition(math.max(0, pos - 1))
+            else eb:SetCursorPosition(math.min(#(eb:GetText() or ""), pos + 1)) end
+        end)
+    end
+end
+
 function T.TrackCaret(eb)
     if not eb then return end
     eb:HookScript("OnCursorChanged", function(self, x, y, _, h)
@@ -1142,28 +1170,18 @@ function T.WireAutocomplete(eb, undoID, onChange)
     eb:HookScript("OnTabPressed", function(self)
         if _ac and _ac:IsShown() and _ac._eb == self then Accept() end
     end)
-    eb:HookScript("OnArrowPressed", function(self, key)
-        if not (_ac and _ac:IsShown() and _ac._eb == self) then return end
-        if key == "UP" or key == "DOWN" then
-            local n = math.min(#_ac.matches, AC_ROWS)
-            if key == "DOWN" then _ac.sel = _ac.sel % n + 1
-            else _ac.sel = (_ac.sel <= 1) and n or (_ac.sel - 1) end
-            Paint()
-        else
-            -- Left / Right: the list closes and the cursor takes that step,
-            -- which alt-arrow mode held back
-            local pos = self:GetCursorPosition() or 0
-            Hide()
-            if key == "LEFT" then self:SetCursorPosition(math.max(0, pos - 1))
-            elseif key == "RIGHT" then self:SetCursorPosition(pos + 1) end
-        end
-    end)
+    -- Arrows: taken at OnKeyDown, which every box fires (alt-arrow mode alone
+    -- still left a note's box moving its cursor: ALL-494). OnArrowPressed
+    -- stays as a second way in; one press is handled once (_arrowDone).
+    eb:HookScript("OnArrowPressed", function(self, key) ArrowKey(self, key) end)
     -- Enter: OnKeyDown runs before the box acts on the key, so the token is
     -- in before a one-line box's OnEnterPressed reads the text. Ctrl+Enter
     -- stays the sticky's "end the edit".
     eb:HookScript("OnKeyDown", function(self, key)
         if not (_ac and _ac:IsShown() and _ac._eb == self) then return end
-        if (key == "ENTER" or key == "NUMPADENTER") and not IsControlKeyDown() then
+        if key == "UP" or key == "DOWN" or key == "LEFT" or key == "RIGHT" then
+            ArrowKey(self, key)
+        elseif (key == "ENTER" or key == "NUMPADENTER") and not IsControlKeyDown() then
             local newText, newCur = Accept()
             if newText and self:IsMultiLine() then _eat = { eb = self, text = newText, cur = newCur } end
             C_Timer.After(0, function() if _eat and _eat.eb == self then _eat = nil end end)

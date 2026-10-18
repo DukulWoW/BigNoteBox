@@ -144,7 +144,7 @@ function BNB.NoteTagMenu(root, noteID, tag, opts)
             local d = StaticPopup_Show("BNB_NOTE_TAG_RENAME",
                 string.format(L["NT_RENAME_PROMPT"], tag), nil, { id = noteID, tag = tag })
             if d and _f and _f:IsShown() then d:Raise() end
-        end, { icon = "tags-edit", disabled = locked, tip = L["NT_MENU_RENAME"], tipSub = L["NT_MENU_RENAME_TIP"] })
+        end, { icon = "rename", disabled = locked, tip = L["NT_MENU_RENAME"], tipSub = L["NT_MENU_RENAME_TIP"] })
         root:CreateButton(L["NT_MENU_REMOVE"], function() RemoveTag(noteID, tag) end,
             { icon = "clear-note-history", danger = true, disabled = locked })
     else
