@@ -58,6 +58,7 @@ local function BuildRenderPair(name, parent, titleH)
     end
 
     local rf = AM.CreateRenderFrame(name .. "RF", rsf)
+    rf._bnbEditorPreview = true   -- the link menu's Add to Reference Box (NoteLinks.lua)
     rf:SetWidth(rsf:GetWidth() > 0 and rsf:GetWidth() or (PREVIEW_W - CONTENT_PAD * 2 - 16))
     rf:SetHeight(1)
     rsf:SetScrollChild(rf)

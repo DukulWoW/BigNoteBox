@@ -282,6 +282,7 @@ local function ShowConfirm(lines, chanType, target, ch)
         f._chanLbl:SetText(string.format(L["STC_CONFIRM_CHANNEL_FMT"], ChanColor(ch), ch.label,
             (chanType == "WHISPER" and target and target ~= "") and ("  ->  " .. target) or ""))
     end
+    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (ALL-506)
     f:ClearAllPoints(); f:SetPoint("CENTER", UIParent, "CENTER", 0, 80)
     f:Show(); f:Raise()
 end
@@ -727,6 +728,8 @@ function BNB.OpenSendToChat(noteID)
         BNB.AddPlaceholder(dlgFrame._targetEb, L["STC_TARGET_PLACEHOLDER"], 0.38, 0.38, 0.38)
     end
 
+    -- Also over Focus mode (a note link's menu there, ALL-506)
+    BNB.SeatWindow(dlgFrame, dlgFrame._strata)
     dlgFrame:ClearAllPoints()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         dlgFrame:SetPoint("BOTTOM", BNB.mainFrame, "BOTTOM", 0, 40)

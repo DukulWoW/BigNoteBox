@@ -411,6 +411,48 @@ end
 
 local function IsWeb(kind) return not kind or kind == "http" or kind == "https" end
 
+-- The icon of an item or spell link, for the link menu's title (Dukul,
+-- 2026-10-18); nil for anything else
+local function LinkIcon(link)
+    local kind, id = link:match("^(%a+):(%d+)")
+    id = tonumber(id)
+    if not id then return nil end
+    local ok, icon
+    if kind == "item" and C_Item and C_Item.GetItemIconByID then
+        ok, icon = pcall(C_Item.GetItemIconByID, id)
+    elseif kind == "spell" and C_Spell and C_Spell.GetSpellTexture then
+        ok, icon = pcall(C_Spell.GetSpellTexture, id)
+    end
+    return ok and icon or nil
+end
+
+-- The web link menu's title symbol: the toolbar's link art, gold in the
+-- normal look, the skin accent in skin mode. Tinted here, not registered
+-- with RegisterSkinAccentTex: the menu row's texture is reused for other icons
+local WEB_ICON = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\tb-rich-link"
+local function WebIcon(tex)
+    tex:SetTexture(WEB_ICON)
+    tex:SetTexCoord(0, 1, 0, 1)
+    local r, g, b
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        r, g, b = BNB.SkinAccentOf(BNB.GetSkinPreset())
+    else
+        r, g, b = BNB.ICON_GOLD[1], BNB.ICON_GOLD[2], BNB.ICON_GOLD[3]
+    end
+    tex:SetVertexColor(r, g, b)
+end
+
+-- The note an "Add to Reference Box" goes to: only for the editor's text,
+-- its rich view and Focus mode (text and rich preview), which show the
+-- current note; nil elsewhere (stickies, chat)
+local function EditorNoteOf(owner)
+    if not owner then return nil end
+    if owner == BNB._editorBody or owner == BNB._focusEditorBody
+        or owner == BNB._editorRenderFrame or owner._bnbEditorPreview then
+        return BNB._currentNoteID
+    end
+end
+
 -- A left click on a link that is not one of ours (NL.OnClick said no)
 function NL.GameLinkClick(owner, link, text, button)
     if button ~= "LeftButton" or not link then return end
@@ -422,6 +464,21 @@ function NL.GameLinkClick(owner, link, text, button)
     local full = FullLink(link, text)
     if IsShiftKeyDown() then IntoChat(full); return end
     if SetItemRef then pcall(SetItemRef, link, full, button, owner) end
+end
+
+-- Rows that need a game window (map, chat line, item card, dressing room)
+-- or the main window / a sticky: in Focus mode they close it first, then act
+-- once it has faded (Dukul, 2026-10-18). Our own windows open over Focus
+-- mode instead (BNB.SeatWindow), so those rows are not wrapped.
+local function OutOfFocus(fn)
+    return function()
+        if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then
+            BNB.CloseFocusMode()
+            C_Timer.After(0.25, fn)
+        else
+            fn()
+        end
+    end
 end
 
 -- The right-click menu for a link. owner._bnbLinkMenuT tells a box's own
@@ -442,8 +499,8 @@ function NL.LinkMenu(owner, link, text)
             root:CreateTitle(Clean(wp.name) or L["LINK_MENU_WAYPOINT"])
             root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.NavigateWaypoints(nil, { wp }) end,
                 { icon = "create-situation" })
-            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.ShowWaypointOnMap(wp) end, { icon = "map" })
-            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(MapPinLink(wp)) end, { icon = "send-chat" })
+            root:CreateButton(L["LINK_MENU_MAP"], OutOfFocus(function() BNB.ShowWaypointOnMap(wp) end), { icon = "map" })
+            root:CreateButton(L["LINK_MENU_CHAT"], OutOfFocus(function() IntoChat(MapPinLink(wp)) end), { icon = "send-chat" })
             root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
                 BNB.ShowClipboardHint(WayText(wp), nil, nil, true)
             end, { icon = "copy-clipboard" })
@@ -452,36 +509,72 @@ function NL.LinkMenu(owner, link, text)
             root:CreateTitle(line)
             root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.FollowWayLine(line, false) end,
                 { icon = "create-situation" })
-            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.FollowWayLine(line, true) end, { icon = "map" })
+            root:CreateButton(L["LINK_MENU_MAP"], OutOfFocus(function() BNB.FollowWayLine(line, true) end), { icon = "map" })
             root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
                 BNB.ShowClipboardHint(line, nil, nil, true)
             end, { icon = "copy-clipboard" })
         elseif kind == "bnbnote" then
             local note = NoteState(link:sub(9))
             root:CreateTitle(note and (Clean(note.title) or L["UNTITLED"]) or L["NOTELINK_GONE"])
-            root:CreateButton(L["LINK_MENU_OPEN_NOTE"], function() NL.OnClick(link, "LeftButton") end,
+            root:CreateButton(L["LINK_MENU_OPEN_NOTE"], OutOfFocus(function() NL.OnClick(link, "LeftButton") end),
                 { icon = "note", disabled = not note })
+            -- The rest act on a live note only, not one in the Trash
+            local id = link:sub(9)
+            local live = BNB.GetNote(id)
+            -- As the note list's menu (Dukul, 2026-10-18)
+            if BNB.StickiesEnabled() then
+                root:CreateButton(L["NL_CTX_OPEN_STICKY"], OutOfFocus(function()
+                    local SN, K = BNB.Sticky, BNB._NoteListKit
+                    if not (BNB.GetNote(id) and SN and K) then return end
+                    if SN.IsOpen(id) then SN.Open(id) else K.NOTE_ACTIONS.sticky(id) end
+                end), { icon = "sticky-note", disabled = not live })
+            end
             -- The linked note's text to a chat channel (Send to Chat window;
-            -- Dukul, 2026-10-18); not for a note in the Trash
-            local live = BNB.GetNote(link:sub(9))
+            -- Dukul, 2026-10-18)
             root:CreateButton(L["LINK_MENU_SHARE_CHAT"], function()
-                if BNB.OpenSendToChat then BNB.OpenSendToChat(link:sub(9)) end
+                if BNB.OpenSendToChat then BNB.OpenSendToChat(id) end
             end, { icon = "send-chat", disabled = not live })
+            root:CreateButton(L["NL_CTX_SHARE"], function()
+                if BNB.OpenShareWindow then BNB.OpenShareWindow(id) end
+            end, { icon = "share", disabled = not live })
+            root:CreateButton(L["NL_CM_COPY_CLIPBOARD"], function()
+                local n = BNB.GetNote(id)
+                if not n then return end
+                BNB:Print(L["BTN_COPY_NOTE_CLASSIC"])
+                BNB.ShowClipboardHint((n.title and n.title ~= "" and (n.title .. "\n") or "") .. (n.body or ""))
+            end, { icon = "copy-clipboard", disabled = not live })
+            root:CreateButton(L["NL_CTX_COPY_MOVE"], function()
+                if BNB.OpenCopyMovePopup then BNB.OpenCopyMovePopup(id, "copy") end
+            end, { icon = "copy-move", disabled = not live })
         elseif IsWeb(kind) then
-            root:CreateTitle(link)
-            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(link) end, { icon = "send-chat" })
+            -- Without https:// and www., so more of the address fits (Dukul, 2026-10-18)
+            -- The external link symbol in front, gold / the skin accent (Dukul, 2026-10-18)
+            root:CreateTitle((link:gsub("^%a+://", ""):gsub("^[Ww][Ww][Ww]%.", "")),
+                { iconSetup = WebIcon })
+            root:CreateButton(L["LINK_MENU_CHAT"], OutOfFocus(function() IntoChat(link) end), { icon = "send-chat" })
             root:CreateButton(L["LINK_MENU_COPY"], function()
                 BNB.ShowClipboardHint(link, nil, nil, true)
             end, { icon = "copy-clipboard" })
         else
             local full = FullLink(link, text)
-            root:CreateTitle(full)
-            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(full) end, { icon = "send-chat" })
-            root:CreateButton(L["LINK_MENU_SHOW"], function()
+            root:CreateTitle(full, { icon = LinkIcon(link) })
+            -- Into the Reference Box of the note the editor, its rich view or
+            -- Focus mode shows; greyed once it is there (Dukul, 2026-10-18)
+            local noteID = EditorNoteOf(owner)
+            local has = BNB.RefBoxLinkState and BNB.RefBoxLinkState(noteID, link)
+            if has ~= nil then
+                local opts = { icon = "reference-box", disabled = has }
+                if has then opts.tip = L["LINK_MENU_IN_REFBOX"] end   -- why it is greyed
+                root:CreateButton(L["LINK_MENU_ADD_REFBOX"], function()
+                    BNB.RefBoxAddLink(noteID, link, full)
+                end, opts)
+            end
+            root:CreateButton(L["LINK_MENU_CHAT"], OutOfFocus(function() IntoChat(full) end), { icon = "send-chat" })
+            root:CreateButton(L["LINK_MENU_SHOW"], OutOfFocus(function()
                 if SetItemRef then pcall(SetItemRef, link, full, "LeftButton", owner) end
-            end, { icon = "show" })
+            end), { icon = "show" })
             if kind == "item" and DressUpItemLink then
-                root:CreateButton(L["LINK_MENU_TRYON"], function() pcall(DressUpItemLink, full) end,
+                root:CreateButton(L["LINK_MENU_TRYON"], OutOfFocus(function() pcall(DressUpItemLink, full) end),
                     { icon = "dressing-room" })
             end
         end

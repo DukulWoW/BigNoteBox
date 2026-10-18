@@ -2761,6 +2761,14 @@ function BNB.ShowClipboardHint(content, anchorFrame, deferFocus, preview)
     local helper = BNB._clipboardHelper
     local hint   = BNB._clipboardHint
 
+    -- On WorldFrame while Focus mode hides UIParent (ALL-506): a hidden
+    -- parent would leave the box unseen and the helper unable to take focus
+    if BNB.SeatWindow then
+        BNB.SeatWindow(hint, "TOOLTIP")
+        hint:SetFrameLevel(200)
+        if helper:GetParent() ~= hint:GetParent() then helper:SetParent(hint:GetParent()) end
+    end
+
     helper:Show()
     helper:SetText(content)
     if deferFocus then

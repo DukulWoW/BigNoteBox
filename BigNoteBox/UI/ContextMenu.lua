@@ -673,6 +673,9 @@ function CM.Open(owner, build, after)
     if not HasSub(root) then return end
     _skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false
     _owner, _after = owner, after
+    -- The owner's hover tooltip sits in a higher strata and would cover the
+    -- menu (Reference Box entries, Dukul, 2026-10-18)
+    if owner and GameTooltip:IsOwned(owner) then GameTooltip:Hide() end
     if owner and owner.HookScript and not _hideHooked[owner] then
         _hideHooked[owner] = true
         owner:HookScript("OnHide", function(self)

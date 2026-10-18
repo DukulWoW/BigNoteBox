@@ -939,6 +939,7 @@ function BNB.OpenShareWindow(noteID)
     -- Close preview if it's open from a previous session
     BNB.CloseSharePreview()
 
+    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
     f:ClearAllPoints()
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
         f:SetPoint("TOPRIGHT", BNB.mainFrame, "TOPLEFT", -8, 0)

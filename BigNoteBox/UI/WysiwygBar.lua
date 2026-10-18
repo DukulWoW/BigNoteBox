@@ -54,11 +54,25 @@ BNB._refreshWysiwygRefBox = function() for _, fn in ipairs(_refRefreshers) do fn
 
 -- Each bar's insert at the cursor ("main" / "focus", ALL-447): a Reference
 -- Box Alt+click goes into Focus mode while it is open, else the main editor
+-- atEnd = at the bottom of the note, on a line of its own (no text cursor yet)
 local _inserters = {}
-function BNB.InsertIntoEditor(snippet, back, value)
+function BNB.InsertIntoEditor(snippet, back, value, atEnd)
     local fb = BNB._focusEditorBody
-    if _inserters.focus and fb and fb:IsVisible() then return _inserters.focus(snippet, back, value) end
-    if _inserters.main then return _inserters.main(snippet, back, value) end
+    if _inserters.focus and fb and fb:IsVisible() then return _inserters.focus(snippet, back, value, atEnd) end
+    if _inserters.main then return _inserters.main(snippet, back, value, atEnd) end
+end
+
+-- True once the writer has clicked into the text of the note shown (the box
+-- an insert goes into, as above); rich View mode has no cursor
+function BNB.EditorHasCursor()
+    local eb = BNB._focusEditorBody
+    if not (_inserters.focus and eb and eb:IsVisible()) then
+        if BNB._editorInViewMode then return false end
+        eb = BNB._editorBody
+    end
+    if not (eb and eb:IsVisible() and BNB._currentNoteID) then return false end
+    if eb:HasFocus() then return true end   -- still in the box from the last note
+    return eb._bnbCursorNote == BNB._currentNoteID
 end
 
 -- The note token menu (ALL-481): your own tokens, then each group, then New /
@@ -585,12 +599,19 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- back = the cursor ends that many bytes before the snippet's end ({{item:|}}).
     -- value = a filled-when-typed note token goes in as its value, the token
     -- itself one undo step back, as when typed (ALL-481 S2, Dukul: "Agree")
-    local function InsertAtCursor(snippet, back, value)
+    local function InsertAtCursor(snippet, back, value, atEnd)
         local eb = Body()
         if not eb or BNB._editorLocked or not eb:IsVisible() then return end
         local id = BNB._currentNoteID; if not id then return end
         local text   = eb:GetText() or ""
         local cursor = eb:GetCursorPosition() or 0
+        if atEnd then
+            cursor = #text
+            if text ~= "" and text:sub(-1) ~= "\n" then
+                snippet = "\n" .. snippet
+                if value then value = "\n" .. value end
+            end
+        end
         local newText   = text:sub(1, cursor) .. snippet .. text:sub(cursor + 1)
         local newCursor = cursor + #snippet - (back or 0)
         UndoPoint(id, text, cursor)
@@ -613,18 +634,18 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Main editor in rich View mode has no cursor: switch to Edit and put the
     -- snippet at the end (Dukul, 2026-10-11)
-    local function InsertSnippet(snippet, back, value)
+    local function InsertSnippet(snippet, back, value, atEnd)
         if main and BNB._editorInViewMode and BNB.AM_EnterEditMode then
             BNB.AM_EnterEditMode()
             C_Timer.After(0, function()
                 local eb = Body()
                 if not eb or BNB._editorInViewMode then return end
                 eb:SetCursorPosition(#(eb:GetText() or ""))
-                InsertAtCursor(snippet, back, value)
+                InsertAtCursor(snippet, back, value, atEnd)
             end)
             return
         end
-        InsertAtCursor(snippet, back, value)
+        InsertAtCursor(snippet, back, value, atEnd)
     end
     _inserters[main and "main" or "focus"] = InsertSnippet
 

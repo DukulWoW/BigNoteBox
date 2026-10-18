@@ -225,11 +225,73 @@ local SaveFocusNote   -- below; the autosave in UpdateFocusSaveBtn calls it
 -- automatic mode an edit schedules a save after the editor's idle delay, as
 -- the main editor does: Focus mode saved only on Save or close before, and
 -- the logout save reads the main editor, not this one.
+-- The Reference Box and Tasks buttons, as on the editor's action bar (Dukul,
+-- 2026-10-18): the box opens beside the Focus window (ALL-506). Packed from
+-- the left after Save (which automatic saving hides); a button whose module
+-- is off is hidden and closes its slot, as on the editor's bar.
+local focusRefBtn, focusTaskBtn, focusBarPad
+local function LayoutFocusBar()
+    if not focusRefBtn then return end
+    local x = focusBarPad + 6
+    if focusSaveBtn and focusSaveBtn:IsShown() then x = x + 32 end
+    local db = BigNoteBoxDB
+    local shown = {
+        { focusRefBtn,  not (db and db.referenceBoxEnabled == false) },
+        { focusTaskBtn, BNB.TasksEnabled == nil or BNB.TasksEnabled() },
+    }
+    for _, e in ipairs(shown) do
+        local b, on = e[1], e[2]
+        b:SetShown(on)
+        if on then
+            b:ClearAllPoints()
+            b:SetPoint("LEFT", b:GetParent(), "LEFT", x, 0)
+            x = x + 32
+        end
+    end
+end
+
+local function FocusBarBtn(toolbar, icon, tip, onClick)
+    local b = CreateFrame("Button", nil, toolbar)
+    b:SetSize(26, 26)
+    local tx = b:CreateTexture(nil, "ARTWORK"); tx:SetAllPoints()
+    tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon(icon))
+    local hi = b:CreateTexture(nil, "HIGHLIGHT"); hi:SetAllPoints()
+    hi:SetColorTexture(1, 1, 1, 0.25)   -- as the Save button beside it
+    b:SetScript("OnClick", onClick)
+    b:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(tip(), 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return b
+end
+
+local function BuildFocusBarBtns(toolbar, pad)
+    focusRefBtn = FocusBarBtn(toolbar, "refbox", function() return L["NE_TOGGLE_REFBOX_TIP"] end, function()
+        if BNB.ToggleReferenceBox then BNB.ToggleReferenceBox() end
+    end)
+    -- Adds a task and types it in the Reference Box; with the box module off
+    -- it opens / closes the tasks view on a note with tasks (as the editor's)
+    focusTaskBtn = FocusBarBtn(toolbar, "tasks", function()
+        local id = BNB._currentNoteID
+        local rbOff = BigNoteBoxDB and BigNoteBoxDB.referenceBoxEnabled == false
+        if rbOff and id and BNB.Task and BNB.Task.HasTasks(id) then return L["NE_TOGGLE_TASKS_TIP"] end
+        return L["NE_ADD_TASK_TIP"]
+    end, function()
+        if focusDirty then SaveFocusNote() end
+        if BNB.OnTasksBarButton then BNB.OnTasksBarButton(BNB._currentNoteID) end
+    end)
+    focusBarPad = pad
+    LayoutFocusBar()
+end
+
 local function UpdateFocusSaveBtn()
     if not focusSaveBtn then return end
     local auto = BNB.IsAutoSave()
     local en = focusDirty == true
     focusSaveBtn:SetShown(not auto)
+    LayoutFocusBar()
     focusSaveBtn:SetEnabled(en)
     focusSaveBtn:SetAlpha(en and 1.0 or 0.4)
     if auto and en then
@@ -869,6 +931,7 @@ local function BuildFocusFrame()
     end)
     sBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     focusSaveBtn = sBtn
+    BuildFocusBarBtns(toolbar, PAD)
 
     BNB.AttachEscClose(f, function()
         -- If AFK overlay is up, ESC only dismisses it — focus mode stays open
@@ -1182,6 +1245,7 @@ local function BuildFocusFrameSkin()
     end)
     sBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     focusSaveBtn = sBtn
+    BuildFocusBarBtns(toolbar, SK_FOCUS_PAD)
 
     BNB.AttachEscClose(f, function()
         -- If AFK overlay is up, ESC only dismisses it — focus mode stays open
@@ -1271,6 +1335,7 @@ function BNB.OpenFocusMode()
     end
 
     LoadNoteInFocus(BNB._currentNoteID)
+    LayoutFocusBar()   -- the Reference Box module may have changed since
 
     -- Cross-fade: main out, focus in
     if BNB.mainFrame and BNB.mainFrame:IsShown() then
@@ -1343,6 +1408,8 @@ function BNB.CloseFocusMode()
 
     -- Always restore UIParent in case full-UI-hide was active
     UIParent:Show()
+    -- A Reference Box opened over Focus mode goes back beside the main window
+    if BNB.RefBoxLeaveFocus then BNB.RefBoxLeaveFocus() end
 
     -- Cross-fade: focus out, main in
     local fa = focusFrame:GetAlpha()
@@ -1378,4 +1445,9 @@ end
 --------------------------------------------------------------------------------
 function BNB.IsFocusModeOpen()
     return focusFrame and focusFrame:IsShown()
+end
+
+-- The Focus window (nil before it is built): the Reference Box sits beside it
+function BNB.GetFocusFrame()
+    return focusFrame
 end

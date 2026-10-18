@@ -668,8 +668,9 @@ local function BuildWowheadURL(att)
     return nil
 end
 
--- Insert the attachment link at the text cursor in the active note body editor.
-local function InsertAttachmentIntoNote(att, noteID)
+-- Insert the attachment link at the text cursor in the active note body
+-- editor; atEnd = at the bottom of the note (no cursor placed yet)
+local function InsertAttachmentIntoNote(att, noteID, atEnd)
     if IsLocked(noteID) then
         BNB:Print(L["REFBOX_LOCKED"])
         return
@@ -681,7 +682,7 @@ local function InsertAttachmentIntoNote(att, noteID)
     end
     -- The editor toolbar's insert (ALL-447): one undo step, the note marked
     -- changed, rich View mode switched to Edit; the old path is the fallback
-    if BNB.InsertIntoEditor then BNB.InsertIntoEditor(link); return end
+    if BNB.InsertIntoEditor then BNB.InsertIntoEditor(link, nil, nil, atEnd); return end
     local eb = nil
     if BNB._focusEditorBody and BNB._focusEditorBody:HasFocus() then
         eb = BNB._focusEditorBody
@@ -1059,16 +1060,24 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
         local nTitle = NDB() and NDB().notes and NDB().notes[noteID]
         local aTitle = nTitle and nTitle.attachments and nTitle.attachments[attIndex]
         local titleLink = aTitle and BuildAttachmentLink(aTitle)
-        if titleLink or (aTitle and aTitle.name) then root:CreateTitle(titleLink or aTitle.name) end
+        -- The entry's icon left of its name (Dukul, 2026-10-18)
+        local info = aTitle and ResolveAttachment(aTitle)
+        if titleLink or (aTitle and aTitle.name) then
+            root:CreateTitle(titleLink or aTitle.name, { icon = info and info.icon })
+        end
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
             if att2 then SendAttachmentToChat(att2) end
         end, { icon = "send-chat" })
-        root:CreateButton(L["REFBOX_CTX_INSERT"], function()
+        -- No text cursor yet: at the bottom of the note (Dukul, 2026-10-18)
+        local atEnd = not BNB.EditorHasCursor()
+        local insLabel = L["REFBOX_CTX_INSERT"]
+        if atEnd then insLabel = L["REFBOX_CTX_INSERT_END"] end
+        root:CreateButton(insLabel, function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
-            if att2 then InsertAttachmentIntoNote(att2, noteID) end
+            if att2 then InsertAttachmentIntoNote(att2, noteID, atEnd) end
         end, { icon = "insert-text" })
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
@@ -1113,18 +1122,23 @@ end
 local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listIdx)
     BNB.ContextMenu.Open(anchorRow, function(root)
         local titleLink = BuildAttachmentLink({ type = "item", id = gearEntry.id })
-        if titleLink then root:CreateTitle(titleLink) end
+        local info = ResolveAttachment({ type = "item", id = gearEntry.id })
+        if titleLink then root:CreateTitle(titleLink, { icon = info and info.icon }) end
         -- Send to chat
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local att = {type = "item", id = gearEntry.id}
             SendAttachmentToChat(att)
         end, { icon = "send-chat" })
 
-        -- Insert at text cursor — greyed out in rich note view mode
-        root:CreateButton(L["REFBOX_CTX_INSERT"], function()
+        -- Insert at text cursor; no cursor yet (rich View mode included) =
+        -- at the bottom of the note, not greyed (Dukul, 2026-10-18)
+        local atEnd = not BNB.EditorHasCursor()
+        local insLabel = L["REFBOX_CTX_INSERT"]
+        if atEnd then insLabel = L["REFBOX_CTX_INSERT_END"] end
+        root:CreateButton(insLabel, function()
             local att = {type = "item", id = gearEntry.id}
-            InsertAttachmentIntoNote(att, noteID)
-        end, { disabled = BNB._editorInViewMode == true, icon = "insert-text" })
+            InsertAttachmentIntoNote(att, noteID, atEnd)
+        end, { icon = "insert-text" })
 
         -- Copy Wowhead URL
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
@@ -1394,7 +1408,8 @@ local function AcquireRow(parent)
         self:SetBackdropColor(qr*0.20+0.06, qg*0.20+0.06, qb*0.20+0.08, 0.90)
         -- No X on a row that cannot be removed (it showed, but did not work)
         if not self._noX then xBtn:SetAlpha(1) end
-        if self._att then ShowTooltip(self, self._att) end
+        -- Not while a right-click menu is open: the tooltip would cover it
+        if self._att and not BNB.ContextMenu.IsOpen() then ShowTooltip(self, self._att) end
     end)
     row:SetScript("OnLeave", function(self)
         local qr = self._qr or 0; local qg = self._qg or 0; local qb = self._qb or 0
@@ -3161,11 +3176,40 @@ UpdateModelViewer = function()
         if gearLbl then gearLbl:Hide() end
     end
 end
-local function PositionFrame()
+-- Over Focus mode (ALL-506, Dukul, 2026-10-18): the window goes on Focus
+-- mode's strata (on WorldFrame while it hides UIParent) and to the left of
+-- the Focus window, its rich preview being on the right. inFocus false puts
+-- it back on UIParent at its own strata (Focus mode closing).
+local function FocusWindow()
+    local ff = BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() and BNB.GetFocusFrame and BNB.GetFocusFrame()
+    return ff or nil
+end
+local function SeatBox(inFocus)
+    if not rbFrame then return end
+    if inFocus then
+        BNB.SeatWindow(rbFrame, rbFrame._strata)
+    else
+        if rbFrame:GetParent() ~= UIParent then rbFrame:SetParent(UIParent) end
+        rbFrame:SetScale(1)
+        rbFrame:SetFrameStrata(rbFrame._strata or "DIALOG")
+    end
+    -- The bar under the box (no side tabs) is not its child: it follows
+    local strip = _modeStrip
+    if strip and not strip._sideTabs then
+        if strip:GetParent() ~= rbFrame:GetParent() then strip:SetParent(rbFrame:GetParent()) end
+        strip:SetScale(rbFrame:GetScale())
+        strip:SetFrameStrata(rbFrame:GetFrameStrata())
+    end
+end
+
+local function PositionFrame(noFocus)
     if not rbFrame then return end
     rbFrame:ClearAllPoints()
     local side = (BigNoteBoxDB and BigNoteBoxDB.refboxSide) or BNB.DEFAULTS.refboxSide
-    if BNB.mainFrame and BNB.mainFrame:IsShown() then
+    local ff = not noFocus and FocusWindow()
+    if ff then
+        rbFrame:SetPoint("TOPRIGHT", ff, "TOPLEFT", -8, 0)
+    elseif BNB.mainFrame and BNB.mainFrame:IsShown() then
         if side == "right" then
             rbFrame:SetPoint("TOPLEFT", BNB.mainFrame, "TOPRIGHT", 8, 0)
         else
@@ -3273,8 +3317,9 @@ function BNB.OpenReferenceBox(noteID, mode)
     local listView = mode == "attachments" and BNB.TasksEnabled()
     _rbMode = (not listView and HasModel(_noteID)) and "model" or "attachments"
     SetTitle(_noteID)
-    PositionFrame()
     BuildExternalModeStrip()
+    SeatBox(FocusWindow() ~= nil)
+    PositionFrame()
     PositionModeStrip()
     UpdateModeStrip()
     if not rbFrame:IsShown() then rbFrame:Show() else RenderList() end
@@ -3407,6 +3452,46 @@ K.UpdateModeStrip, K.UpdateModelViewer, K.UpdateDynamicTitle =
 --------------------------------------------------------------------------------
 function BNB.RBAddAttachment(noteID, att)
     AddAttachment(noteID, att)
+end
+
+-- Focus mode closing (UI/FocusEditor.lua CloseFocusMode): a box opened over
+-- it goes back on UIParent at its own strata, beside the main window
+function BNB.RefBoxLeaveFocus()
+    if not (rbFrame and rbFrame:GetFrameStrata() ~= (rbFrame._strata or "DIALOG")) then return end
+    SeatBox(false)
+    PositionFrame(true)
+    PositionModeStrip()
+end
+
+-- The link menu's "Add to Reference Box" (Features/NoteLinks.lua, Dukul,
+-- 2026-10-18). RefBoxLinkState: nil = not offered (module off, not a kind
+-- the box holds), else true when the note has it already
+function BNB.RefBoxLinkState(noteID, link)
+    if not (noteID and link and RBOn()) then return nil end
+    local att = LinkAttachment(link)
+    local note = att and NDB().notes[noteID]
+    if not note then return nil end
+    for _, ex in ipairs(note.attachments or {}) do
+        if ex.type == att.type and ex.id == att.id then return true end
+    end
+    return false
+end
+
+function BNB.RefBoxAddLink(noteID, link, label)
+    local att = link and LinkAttachment(link)
+    if not att then return end
+    local note = NDB().notes[noteID]
+    local before = note and note.attachments and #note.attachments or 0
+    AddAttachment(noteID, att)
+    local after = note and note.attachments and #note.attachments or 0
+    if after > before then
+        BNB:Print(string.format(L["REFBOX_ADDED_FMT"], label or link))
+        -- In Focus mode the chat line is out of sight: the box opens over
+        -- it, left of the Focus window, to show the new entry
+        if FocusWindow() and not (rbFrame and rbFrame:IsShown() and _noteID == noteID) then
+            BNB.OpenReferenceBox(noteID, "attachments")
+        end
+    end
 end
 
 --------------------------------------------------------------------------------

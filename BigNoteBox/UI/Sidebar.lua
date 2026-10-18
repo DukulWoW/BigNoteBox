@@ -965,6 +965,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
         f:Hide(); SB.Refresh()
     end)
 
+    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
     f:ClearAllPoints()
     local cx, cy = GetCursorPosition()
     local s = UIParent:GetEffectiveScale()
@@ -1109,6 +1110,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     end)
 
     -- Anchor to mouse
+    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
     f:ClearAllPoints()
     local cx, cy = GetCursorPosition()
     local s = UIParent:GetEffectiveScale()

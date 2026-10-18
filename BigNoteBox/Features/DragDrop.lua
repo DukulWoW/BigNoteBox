@@ -241,6 +241,13 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
     -- The box has no OnMouseDown / OnEnter of its own today; if one is added,
     -- it runs first and the drag checks below still act on GetCursorInfo().
 
+    -- The note this box last had a text cursor in: the Reference Box menu
+    -- reads "Insert at bottom of note" until the writer clicks into the text
+    -- (BNB.EditorHasCursor, UI/WysiwygBar.lua; Dukul, 2026-10-18)
+    eb:HookScript("OnEditFocusGained", function(self)
+        self._bnbCursorNote = self._bnbNoteOf and self._bnbNoteOf() or BNB._currentNoteID
+    end)
+
     -- OnReceiveDrag fires when the player releases a cursor object over the frame
     eb:HookScript("OnReceiveDrag", HandleDrop)
 
