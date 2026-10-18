@@ -28,6 +28,7 @@ Locales\zhCN.lua
 
 # Core systems (order matters!)
 Core\Database.lua
+Core\Profiles.lua
 Core\Events.lua
 Core\SlashCommands.lua
 Core\Json.lua
@@ -80,6 +81,7 @@ UI\Config\Notes.lua
 UI\Config\NotePages.lua
 UI\Config\Backup.lua
 UI\Config\Advanced.lua
+UI\Config\Profiles.lua
 UI\Config\DevTools.lua
 UI\Config\OracleSettings.lua
 UI\Config\ContextMenuSettings.lua

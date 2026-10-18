@@ -362,6 +362,10 @@ end)
 -- PLAYER_LOGIN — main startup trigger
 --------------------------------------------------------------------------------
 BNB.RegisterEvent("PLAYER_LOGIN", function()
+    -- The character's settings profile, when its name was not known at
+    -- ADDON_LOADED (ALL-496; normally done there, Core/Profiles.lua)
+    if BNB.Profiles then xpcall(BNB.Profiles.OnLogin, geterrorhandler()) end
+
     -- Randomize skin preset on login/reload if enabled (before window creation)
     local db = BigNoteBoxDB
     if db and db.skinMode and db.skinRandomize then

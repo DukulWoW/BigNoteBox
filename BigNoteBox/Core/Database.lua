@@ -819,8 +819,10 @@ end
 --   1. Bump SETTINGS_SCHEMA_VERSION at the top of this file.
 --   2. Add a block here following the same guarded-block pattern.
 --------------------------------------------------------------------------------
-local function MigrateSettingsDB()
-    local db = BigNoteBoxDB
+-- db = the live settings, or a stored profile (ALL-496, Core/Profiles.lua):
+-- each has its own dbVersion. The blocks that walk shared tables (postits,
+-- knownChars) find nothing in a profile, which holds none of them.
+local function MigrateSettingsDB(db)
     local v  = db.dbVersion or 1
 
     -- Blocks that only filled a default for a new key (v2, v3's second half,
@@ -960,10 +962,9 @@ local function ApplyDefaults(db, def)
     end
 end
 
-local function InitSettingsDB()
-    BigNoteBoxDB = BigNoteBoxDB or {}
-    local db = BigNoteBoxDB
-
+-- Every default, plus the font that suits the client language. Also run on a
+-- profile moved in at load (Core/Profiles.lua): a blank one is all nil.
+local function FillSettings(db)
     ApplyDefaults(db, BNB.DEFAULTS)
 
     if db.fontChoice == nil then
@@ -983,6 +984,13 @@ local function InitSettingsDB()
             db.fontChoice = "notoserif"
         end
     end
+end
+
+local function InitSettingsDB()
+    BigNoteBoxDB = BigNoteBoxDB or {}
+    local db = BigNoteBoxDB
+
+    FillSettings(db)
 
     -- What's New window: last version string acknowledged by the user.
     -- Intentionally NOT defaulted to any value: nil means "never seen",
@@ -996,6 +1004,9 @@ local function InitSettingsDB()
     BNB._debugImmersionPos = nil
 end
 
+-- For Core/Profiles.lua (ALL-496)
+BNB._SettingsKit = { Fill = FillSettings, Migrate = MigrateSettingsDB }
+
 --------------------------------------------------------------------------------
 -- PUBLIC ENTRY POINT — called from Events.lua on ADDON_LOADED
 --------------------------------------------------------------------------------
@@ -1003,7 +1014,11 @@ function BNB.InitializeDB()
     -- Settings DB must be initialised first so BigNoteBoxDB exists
     -- before any settings are read.
     InitSettingsDB()
-    MigrateSettingsDB()
+    MigrateSettingsDB(BigNoteBoxDB)
+    -- Settings profiles (ALL-496): the stored ones are migrated, then this
+    -- character's profile is moved in (a switch, a delete or a reset asked for
+    -- before the reload). xpcall: a failure reaches BugSack, the load goes on
+    xpcall(BNB.Profiles.OnLoad, geterrorhandler())
 
     -- Notes DB is owned by BigNoteBoxDB companion addon.
     -- BigNoteBoxNotesDB_Loaded is set at file-load time by BigNoteBoxDB.lua,

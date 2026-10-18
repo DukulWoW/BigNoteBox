@@ -69,6 +69,7 @@ local function DoRemove(charKey, dest)
     end
     BNB.RescopeTrash(scope, dest, charKey)
     db.knownChars[charKey] = nil
+    if db.profileChars then db.profileChars[charKey] = nil end   -- its settings profile (ALL-496)
 
     local SB = BNB.Sidebar
     if SB then

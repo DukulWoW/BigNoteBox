@@ -131,7 +131,12 @@ local function BuildAdvancedTab(sf, ct)
     local db = BigNoteBoxDB
     local y  = -8
 
-    -- ── Addon integrations (ALL-315), first on the tab (Dukul, 2026-10-10):
+    -- ── Settings profiles (ALL-496), first on the tab (Dukul, 2026-10-18):
+    -- UI/Config/Profiles.lua
+    y = K.AddProfileRow(ct, y)
+    AddRule(ct, y); y = y - 18
+
+    -- ── Addon integrations (ALL-315), second on the tab (first until ALL-496):
     -- how many are active, and a button to the page that lists them (ALL-422)
     y = AddHeader(ct, y, L["CFG_HDR_INTEGRATIONS"])
     do
@@ -140,14 +145,17 @@ local function BuildAdvancedTab(sf, ct)
         for _, a in ipairs(INTEG) do
             if IntegState(a) == 2 then active = active + 1 end
         end
+        -- Count line and button on one row, button on the right (Dukul,
+        -- 2026-10-18: the tab scrolled once Profiles came first)
+        local open = BNB.CreateButton(nil, ct, L["CFG_INTEG_OPEN_BTN"], 140, 24)
+        open:SetPoint("TOPRIGHT", ct, "TOPLEFT", CONTENT_W, y + 2)
+        open:SetScript("OnClick", page.Open)
         local cnt = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-        cnt:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        cnt:SetPoint("LEFT", ct, "TOPLEFT", 0, y - 10)
+        cnt:SetPoint("RIGHT", open, "LEFT", -8, 0)
+        cnt:SetJustifyH("LEFT"); cnt:SetWordWrap(true)
         cnt:SetTextColor(0.8, 0.8, 0.8)
         cnt:SetText(string.format(L["CFG_INTEG_COUNT_FMT"], active, #INTEG))
-        y = y - 22
-        local open = BNB.CreateButton(nil, ct, L["CFG_INTEG_OPEN_BTN"], 180, 24)
-        open:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y + 2)
-        open:SetScript("OnClick", page.Open)
         y = y - 34
     end
 
@@ -224,7 +232,8 @@ local function BuildAdvancedTab(sf, ct)
     -- Debug mode works without the dev addon, for this session only (ALL-395).
     -- In dev mode it is always on: checked and greyed.
     local devMode = BNB.IsDevMode()
-    local dbgCb
+    local dbgCb, pseudoCb
+    local devRowY = y   -- both checkboxes on one row, as Behavior (Dukul, 2026-10-18)
     y, dbgCb = AddCheck(ct, y, L["CFG_DEBUG_MODE_LABEL"],
         function() return BNB.IsDebugMode() end,
         function(v)
@@ -240,10 +249,13 @@ local function BuildAdvancedTab(sf, ct)
     -- Pseudo-locale stays here, not on the dev page, so translators can use it
     -- without the dev addon (Dukul, 2026-10-08). Not tied to debug mode: it
     -- takes a reload, and debug mode is cleared on every load.
-    y = AddCheck(ct, y, L["CFG_DEV_PSEUDOLOC_LABEL"],
+    _, pseudoCb = AddCheck(ct, devRowY, L["CFG_DEV_PSEUDOLOC_LABEL"],
         function() return BigNoteBoxDB.debugPseudoLocale == true end,
         function(v) BigNoteBoxDB.debugPseudoLocale = v or nil end,
         L["CFG_DEV_PSEUDOLOC_TIP_BODY"])
+    pseudoCb:ClearAllPoints()
+    pseudoCb:SetPoint("TOPLEFT", ct, "TOPLEFT", HALF - 2, devRowY + 2)
+    dbgCb._lbl:SetPoint("RIGHT", ct, "LEFT", HALF - 8, 0)
     y = y - 6
 
     -- The tools are a sub-page (UI/Config/DevTools.lua, also /bnb debug), only
@@ -288,7 +300,9 @@ local function BuildAdvancedTab(sf, ct)
     dzDesc:SetWidth(CONTENT_W); dzDesc:SetJustifyH("LEFT"); dzDesc:SetWordWrap(true)
     dzDesc:SetTextColor(0.75, 0.40, 0.40)
     dzDesc:SetText(L["CFG_DANGERZONE_DESC"])
-    local dzDescH = 32
+    -- Its own text height (was a fixed 32 for one line): the tab fits without
+    -- a scrollbar since Profiles came first (Dukul, 2026-10-18)
+    local dzDescH = math.ceil(dzDesc:GetStringHeight()) + 2
     dzDesc:SetHeight(dzDescH)
     y = y - (dzDescH + 6)
 
@@ -314,7 +328,7 @@ local function BuildAdvancedTab(sf, ct)
     end)
     y = y - 34
 
-    sf:FinaliseHeight(math.abs(y) + 20)
+    sf:FinaliseHeight(math.abs(y) + 4)
 end
 
 K.BUILDERS.advanced = BuildAdvancedTab

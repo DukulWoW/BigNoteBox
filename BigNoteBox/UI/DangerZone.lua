@@ -315,9 +315,20 @@ local function PopulateContent(ct, sf)
 
     -- ── 1. Reset Settings ────────────────────────────────────────────────────
     y = MakeHeader(ct, y, L["DZ_RESETSET_HDR"])
+    -- Two buttons since settings profiles (ALL-496, Dukul 2026-10-18): the
+    -- profile in use (back to defaults at the load, Core/Profiles.lua), or
+    -- the whole settings file with every profile, as before
     y = MakeDesc(ct, y, L["DZ_RESETSET_DESC"])
     y = MakeActionRow(ct, y,
-        L["DZ_RESETSET_BTN"], 140,
+        L["DZ_RESETSET_BTN"], 160,
+        L["DZ_CONFIRM_RESET"], 160,
+        function()
+            BNB.Profiles.ResetActive()
+            C_UI.Reload()
+        end)
+    y = MakeDesc(ct, y, L["DZ_RESETALL_DESC"])
+    y = MakeActionRow(ct, y,
+        L["DZ_RESETALL_BTN"], 160,
         L["DZ_CONFIRM_RESET"], 160,
         function()
             BigNoteBoxDB = nil
