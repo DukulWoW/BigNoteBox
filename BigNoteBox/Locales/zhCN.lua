@@ -813,12 +813,8 @@ L["DROP_INSERT_TIP"]      = "拖放以插入链接"
 
 -- ── Insert Game Info ──────────────────────────────────────────────────────────
 L["INSERT_INFO_TITLE"]    = "插入信息"
-L["INSERT_LOCATION"]      = "当前位置"
 L["INSERT_TOMTOM"]        = "设置 TomTom 路径点"
 L["INSERT_TOMTOM_FAIL"]   = "无法设置 TomTom 路径点。"
-L["INSERT_CHARNAME"]      = "角色名称"
-L["INSERT_TARGET"]        = "目标名称"
-L["INSERT_NO_TARGET"]     = "无目标"
 L["INSERT_DATE"]          = "日期"
 L["INSERT_DATETIME"]      = "日期和时间"
 

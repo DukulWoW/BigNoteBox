@@ -3,14 +3,11 @@
 -- Adds a right-click context menu to the NoteEditor body EditBox (and Focus
 -- Mode body) with the following insert actions:
 --
---   Insert Info ▶
---     • Current location      — zone + coords in TomTom /way format
+--   Insert Info
 --     • Set TomTom waypoint   — (shown only when TomTom is loaded)
---     • Character name        — "Playername-Realm"
---     • Target name           — name of current target (or "No target")
---     • Date / Time / Date and time — in the Appearance timestamp format,
---       the same three choices as the toolbar stamp button (ALL-66)
---     • Note tokens >  the toolbar token button's groups (BNB.BuildTokenMenu)
+--     • The note token groups, as the toolbar's token button
+--       (BNB.BuildTokenMenu): they took over the old rows (location, name,
+--       target, date, time, date and time), Dukul 2026-10-18
 --   A right-click on a link opens the link menu instead (NoteLinks.lua).
 --
 -- Location format:
@@ -90,103 +87,29 @@ local function SetTomTomWaypoint()
     return true
 end
 
--- ── Character / target helpers ────────────────────────────────────────────────
-
-local function GetCharacterName()
-    local name   = UnitName("player") or "Unknown"
-    local realm  = GetNormalizedRealmName() or ""
-    if realm ~= "" then
-        return name .. "-" .. realm
-    end
-    return name
-end
-
-local function GetTargetName()
-    if not UnitExists("target") then
-        return L["INSERT_NO_TARGET"]
-    end
-    return (BNB.UnitNameRealm("target")) or "Unknown"
-end
-
--- ── Insert into EditBox ───────────────────────────────────────────────────────
-
-local function InsertIntoEditBox(eb, text)
-    if not eb or not eb:IsEnabled() then return end
-    eb:SetFocus()
-    eb:Insert(text)
-    BNB.MarkDirty()
-end
-
 -- ── Menu (BNB.ContextMenu, ALL-148) ──────────────────────────────────────────
 
 local function ShowInsertInfoMenu(eb)
     BNB.ContextMenu.Open(eb, function(root)
         root:CreateTitle(L["INSERT_INFO_TITLE"])
 
-        -- Location
-        root:CreateButton(
-            L["INSERT_LOCATION"],
-            function()
-                InsertIntoEditBox(eb, BuildLocationString())
-            end
-        )
-
-        -- TomTom waypoint — only shown when TomTom is loaded
+        -- TomTom waypoint here: an action, not text (only with TomTom)
         if BNB.HasTomTom() then
             local x, y = GetPlayerCoords()
             if x and y then
-                root:CreateButton(
-                    L["INSERT_TOMTOM"],
-                    function()
-                        if not SetTomTomWaypoint() then
-                            BNB:Print(L["INSERT_TOMTOM_FAIL"])
-                        end
-                    end
-                )
+                root:CreateButton(L["INSERT_TOMTOM"], function()
+                    if not SetTomTomWaypoint() then BNB:Print(L["INSERT_TOMTOM_FAIL"]) end
+                end, { icon = "create-situation" })
+                root:CreateDivider()
             end
         end
 
-        root:CreateDivider()
-
-        -- Character name
-        root:CreateButton(
-            L["INSERT_CHARNAME"],
-            function()
-                InsertIntoEditBox(eb, GetCharacterName())
-            end
-        )
-
-        -- Target name
-        root:CreateButton(
-            L["INSERT_TARGET"],
-            function()
-                InsertIntoEditBox(eb, GetTargetName())
-            end
-        )
-
-        root:CreateDivider()
-
-        -- Date / Time / Date and time: same choices and format as the
-        -- toolbar stamp menu (UI/WysiwygBar.lua), value previewed in grey
-        local now = time()
-        local d, t = BNB.FmtDate(now), BNB.FmtClock(now)
-        for _, it in ipairs({
-            { L["INSERT_DATE"],     d },
-            { L["INSERT_TIME"],     t },
-            { L["INSERT_DATETIME"], d .. " " .. t },
-        }) do
-            local value = it[2]
-            root:CreateButton(it[1] .. "  |cff888888" .. value .. "|r",
-                function() InsertIntoEditBox(eb, value) end)
-        end
-
-        -- Note tokens, the same groups as the toolbar's token button
-        -- (Dukul, 2026-10-18), into this editor at the cursor
+        -- The note token groups right in this menu (Dukul, 2026-10-18): they
+        -- hold what the old rows did (location = {{coords}}, name = {{me}},
+        -- target, date, time, date and time) and the rest, into this editor
+        -- at the cursor, a normal note getting the values (ALL-503)
         if BNB.BuildTokenMenu and BNB.Tokens and BNB._currentNoteID then
-            root:CreateDivider()
-            local sub = root:CreateButton(L["TOKEN_MENU_TITLE"], nil,
-                { tip = L["NE_INSERT_TOKEN_TIP"], tipSub = L["NE_INSERT_TOKEN_BODY"] })
-            BNB.BuildTokenMenu(sub, function(snippet, back, value)
+            BNB.BuildTokenMenu(root, function(snippet, back, value)
                 BNB.InsertIntoEditor(snippet, back, value)
             end)
         end

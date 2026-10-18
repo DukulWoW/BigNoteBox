@@ -102,6 +102,16 @@ end
 -- focused note body takes those (DragDrop's shift-click hook)
 local function IntoChat(text)
     pcall(function()
+        -- BigChatBox: straight into its own chat line, as the Reference Box
+        -- does (through the game's chat line it flashed the Blizzard box and
+        -- opened an empty BCB line, Dukul 2026-10-18)
+        local B = BigChatBox
+        if B and B.frame and B.editBox then
+            B.frame:Show()
+            B.editBox:SetFocus()
+            if B.InsertLinkIntoBCB then B.InsertLinkIntoBCB(text) else B.editBox:Insert(text) end
+            return
+        end
         local CU = ChatFrameUtil
         local eb = (CU and CU.GetActiveWindow and CU.GetActiveWindow())
                    or (ChatEdit_GetActiveWindow and ChatEdit_GetActiveWindow())
@@ -128,11 +138,20 @@ end
 
 local function GoneSuffix() return " " .. L["NOTELINK_DELETED"] end
 
+-- A link to a note takes that note's title colour, the default blue when it
+-- has none (Dukul, 2026-10-18)
+local function TitleCol(note)
+    local c = note and note.titleColor
+    if type(c) ~= "table" or not c.r then return NOTE_COL end
+    local function B(v) return math.max(0, math.min(255, math.floor((tonumber(v) or 1) * 255 + 0.5))) end
+    return string.format("ff%02x%02x%02x", B(c.r), B(c.g), B(c.b))
+end
+
 -- oldText: what the link said, the title of last resort for a note gone for good
 local function NoteLabel(id, oldText)
     local note, gone = NoteState(id)
     local title = note and Clean(note.title)
-    if not gone then return NOTE_COL, title or L["UNTITLED"] end
+    if not gone then return TitleCol(note), title or L["UNTITLED"] end
     if not title and oldText then
         local sfx = GoneSuffix()
         if oldText:sub(-#sfx) == sfx then oldText = oldText:sub(1, -#sfx - 1) end
@@ -186,11 +205,22 @@ local function Schedule(id)
     BNB.Debounce("noteLinks:" .. id, 1, function() NL.RefreshLinksTo(id) end)
 end
 
--- Every save sends the title along: only a real change rewrites anything
+-- Every save sends the title along: only a real change of the title or its
+-- colour rewrites anything
 local _titles = {}
+local function ColourTouched(fields)
+    if fields.titleColor ~= nil then return true end
+    for _, k in ipairs(fields._clear or {}) do
+        if k == "titleColor" then return true end
+    end
+    return false
+end
 BNB.RegisterMessage("NoteLinks", "NoteChanged", function(_, id, fields)
-    if not (id and fields and fields.title ~= nil) or _titles[id] == fields.title then return end
-    _titles[id] = fields.title
+    if not (id and fields and (fields.title ~= nil or ColourTouched(fields))) then return end
+    local note = BNB.GetNote(id)
+    local sig = (note and note.title or "") .. "@@" .. TitleCol(note)
+    if _titles[id] == sig then return end
+    _titles[id] = sig
     Schedule(id)
 end)
 BNB.RegisterMessage("NoteLinks", "NoteDeleted", function(_, ids)
@@ -392,17 +422,19 @@ function NL.LinkMenu(owner, link, text)
             end
             wp.name = wp.name or BNB.WaypointZone(wp)
             root:CreateTitle(Clean(wp.name) or L["LINK_MENU_WAYPOINT"])
-            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.NavigateWaypoints(nil, { wp }) end)
-            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.ShowWaypointOnMap(wp) end)
-            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(MapPinLink(wp)) end, { icon = "chat" })
+            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.NavigateWaypoints(nil, { wp }) end,
+                { icon = "create-situation" })
+            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.ShowWaypointOnMap(wp) end, { icon = "map" })
+            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(MapPinLink(wp)) end, { icon = "send-chat" })
             root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
                 BNB.ShowClipboardHint(WayText(wp), nil, nil, true)
             end, { icon = "copy-clipboard" })
         elseif kind == "bnbway" then
             local line = link:sub(8)
             root:CreateTitle(line)
-            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.FollowWayLine(line, false) end)
-            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.FollowWayLine(line, true) end)
+            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.FollowWayLine(line, false) end,
+                { icon = "create-situation" })
+            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.FollowWayLine(line, true) end, { icon = "map" })
             root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
                 BNB.ShowClipboardHint(line, nil, nil, true)
             end, { icon = "copy-clipboard" })
@@ -413,18 +445,20 @@ function NL.LinkMenu(owner, link, text)
                 { icon = "note", disabled = not note })
         elseif IsWeb(kind) then
             root:CreateTitle(link)
+            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(link) end, { icon = "send-chat" })
             root:CreateButton(L["LINK_MENU_COPY"], function()
                 BNB.ShowClipboardHint(link, nil, nil, true)
             end, { icon = "copy-clipboard" })
         else
             local full = FullLink(link, text)
             root:CreateTitle(full)
-            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(full) end, { icon = "chat" })
+            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(full) end, { icon = "send-chat" })
             root:CreateButton(L["LINK_MENU_SHOW"], function()
                 if SetItemRef then pcall(SetItemRef, link, full, "LeftButton", owner) end
-            end)
+            end, { icon = "show" })
             if kind == "item" and DressUpItemLink then
-                root:CreateButton(L["LINK_MENU_TRYON"], function() pcall(DressUpItemLink, full) end)
+                root:CreateButton(L["LINK_MENU_TRYON"], function() pcall(DressUpItemLink, full) end,
+                    { icon = "dressing-room" })
             end
         end
     end)

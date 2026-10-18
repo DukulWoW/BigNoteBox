@@ -5,7 +5,7 @@
 --   Snapshot = filled once, when typed (the closing }} expands it, one undo
 --              step brings the token back) or when a note is made from a
 --              template (ALL-68). After that it is plain text:
---              {{date}} {{time}} {{zone}} {{subzone}} {{instance}} {{target}} {{coords}}
+--              {{date}} {{time}} {{datetime}} {{zone}} {{subzone}} {{instance}} {{target}} {{coords}}
 --   Live     = stay in the text and are filled each time the note is drawn,
 --              from the READER's game (a shared "Hey, {{me}}!" greets whoever
 --              reads it): {{me}} {{name}} {{realm}} {{class}} {{race}} {{level}}
@@ -99,6 +99,7 @@ end
 local SNAPSHOT = {
     date = function() return BNB.FmtDate(time()) end,
     time = function() return BNB.FmtClock(time()) end,
+    datetime = function() local n = time(); return BNB.FmtDate(n) .. " " .. BNB.FmtClock(n) end,
     zone = function() return GetRealZoneText() end,
     subzone = function() return GetSubZoneText() end,
     -- nil outside an instance: the token stays as typed
@@ -875,7 +876,7 @@ end)
 -- one whose argument the writer types (inserted with the cursor before }}).
 T.MENU = {
     { group = "SNAPSHOT", kind = "snapshot",
-      list = { "date", "time", "zone", "subzone", "instance", "target", "coords" } },
+      list = { "date", "time", "datetime", "zone", "subzone", "instance", "target", "coords" } },
     { group = "LIVE", kind = "live",
       list = { "me", "name", "realm", "class", "race", "level", "faction", "spec", "ilvl",
                "guild", "guildrank", "here", "gold" } },

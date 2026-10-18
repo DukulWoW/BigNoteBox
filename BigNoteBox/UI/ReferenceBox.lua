@@ -1052,25 +1052,31 @@ local function OpenPicker(anchorFrame, noteID, attIndex)
 end
 
 -- ── Context menu (BNB.ContextMenu, ALL-148) ──────────────────────────────────
+-- Both entry menus: the entry's name at the top and an icon on every row,
+-- as the other menus (Dukul, 2026-10-18)
 local function OpenContextMenu(anchorRow, noteID, attIndex)
     BNB.ContextMenu.Open(anchorRow, function(root)
+        local nTitle = NDB() and NDB().notes and NDB().notes[noteID]
+        local aTitle = nTitle and nTitle.attachments and nTitle.attachments[attIndex]
+        local titleLink = aTitle and BuildAttachmentLink(aTitle)
+        if titleLink or (aTitle and aTitle.name) then root:CreateTitle(titleLink or aTitle.name) end
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
             if att2 then SendAttachmentToChat(att2) end
-        end)
+        end, { icon = "send-chat" })
         root:CreateButton(L["REFBOX_CTX_INSERT"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
             if att2 then InsertAttachmentIntoNote(att2, noteID) end
-        end)
+        end, { icon = "insert-text" })
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
             if not att2 then return end
             local url = BuildWowheadURL(att2)
             if url then BNB.ShowClipboardHint(url, nil, nil, true) end
-        end)
+        end, { icon = "wowhead" })
         -- Dressing room — items only
         local noteCheck = NDB() and NDB().notes and NDB().notes[noteID]
         local attCheck  = noteCheck and noteCheck.attachments and noteCheck.attachments[attIndex]
@@ -1081,7 +1087,7 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
                 if not att2 then return end
                 local _, link = C_Item.GetItemInfo(att2.id)
                 if link then DressUpItemLink(link) end
-            end)
+            end, { icon = "dressing-room" })
         end
         -- Show model, beside the dressing room (ALL-206): only for entries
         -- the viewer can draw
@@ -1090,40 +1096,42 @@ local function OpenContextMenu(anchorRow, noteID, attIndex)
                 local note2 = NDB() and NDB().notes and NDB().notes[noteID]
                 local att2  = note2 and note2.attachments and note2.attachments[attIndex]
                 if att2 then ShowInViewer(att2) end
-            end)
+            end, { icon = "model-view" })
         end
         root:CreateButton(L["REFBOX_CTX_MOVE_COPY"], function()
             local note = NDB() and NDB().notes and NDB().notes[noteID]
             local att2 = note and note.attachments and note.attachments[attIndex]
             if att2 then OpenPicker(anchorRow, noteID, attIndex) end
-        end)
+        end, { icon = "copy-move" })
         root:CreateDivider()
         root:CreateButton(L["REFBOX_CTX_REMOVE"], function()
             RemoveAttachment(noteID, attIndex)
-        end, { danger = true })   -- irreversible = red (Dukul)
+        end, { danger = true, icon = "trash" })   -- irreversible = red (Dukul)
     end)
 end
 
 local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listIdx)
     BNB.ContextMenu.Open(anchorRow, function(root)
+        local titleLink = BuildAttachmentLink({ type = "item", id = gearEntry.id })
+        if titleLink then root:CreateTitle(titleLink) end
         -- Send to chat
         root:CreateButton(L["REFBOX_CTX_SEND"], function()
             local att = {type = "item", id = gearEntry.id}
             SendAttachmentToChat(att)
-        end)
+        end, { icon = "send-chat" })
 
         -- Insert at text cursor — greyed out in rich note view mode
         root:CreateButton(L["REFBOX_CTX_INSERT"], function()
             local att = {type = "item", id = gearEntry.id}
             InsertAttachmentIntoNote(att, noteID)
-        end, { disabled = BNB._editorInViewMode == true })
+        end, { disabled = BNB._editorInViewMode == true, icon = "insert-text" })
 
         -- Copy Wowhead URL
         root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
             local att = {type = "item", id = gearEntry.id}
             local url = BuildWowheadURL(att)
             if url then BNB.ShowClipboardHint(url, nil, nil, true) end
-        end)
+        end, { icon = "wowhead" })
 
         -- Show model (ALL-206) and the dressing room; a transmog card's own
         -- appearance (appearanceID there is the transmog source)
@@ -1132,11 +1140,11 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
         -- Try in dressing room
         root:CreateButton(L["REFBOX_CTX_DRESSUP"], function()
             DressUpEntry(gearAtt)
-        end)
+        end, { icon = "dressing-room" })
         if ModelSpec(gearAtt) then
             root:CreateButton(L["REFBOX_CTX_SHOW_MODEL"], function()
                 ShowInViewer(gearAtt)
-            end)
+            end, { icon = "model-view" })
         end
 
         root:CreateDivider()
@@ -1148,7 +1156,7 @@ local function OpenGearContextMenu(anchorRow, noteID, gearEntry, listRef, listId
                 BNB.UpdateNote(noteID, {})
                 RenderList()
             end
-        end, { danger = true })
+        end, { danger = true, icon = "trash" })
     end)
 end
 
