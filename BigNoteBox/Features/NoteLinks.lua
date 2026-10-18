@@ -223,6 +223,24 @@ BNB.RegisterMessage("NoteLinks", "NoteChanged", function(_, id, fields)
     _titles[id] = sig
     Schedule(id)
 end)
+-- Links written before they took the note's colour (2026-10-18) are brought
+-- up to date once a session, a moment after login: only links to notes that
+-- have a title colour, and a body is written only when its text changes
+BNB.RegisterEvent("PLAYER_LOGIN", function()
+    C_Timer.After(5, function()
+        local ndb = BNB.NotesDB()
+        if not (ndb and ndb.notes) then return end
+        local any = false
+        for _, n in pairs(ndb.notes) do
+            if type(n.body) == "string" and n.body:find("|Hbnbnote:", 1, true) then any = true; break end
+        end
+        if not any then return end
+        for id, n in pairs(ndb.notes) do
+            if type(n.titleColor) == "table" then xpcall(NL.RefreshLinksTo, geterrorhandler(), id) end
+        end
+    end)
+end)
+
 BNB.RegisterMessage("NoteLinks", "NoteDeleted", function(_, ids)
     for _, id in ipairs(ids or {}) do Schedule(id) end
 end)
@@ -443,6 +461,12 @@ function NL.LinkMenu(owner, link, text)
             root:CreateTitle(note and (Clean(note.title) or L["UNTITLED"]) or L["NOTELINK_GONE"])
             root:CreateButton(L["LINK_MENU_OPEN_NOTE"], function() NL.OnClick(link, "LeftButton") end,
                 { icon = "note", disabled = not note })
+            -- The linked note's text to a chat channel (Send to Chat window;
+            -- Dukul, 2026-10-18); not for a note in the Trash
+            local live = BNB.GetNote(link:sub(9))
+            root:CreateButton(L["LINK_MENU_SHARE_CHAT"], function()
+                if BNB.OpenSendToChat then BNB.OpenSendToChat(link:sub(9)) end
+            end, { icon = "send-chat", disabled = not live })
         elseif IsWeb(kind) then
             root:CreateTitle(link)
             root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(link) end, { icon = "send-chat" })
