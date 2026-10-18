@@ -335,6 +335,101 @@ function NL.OnClick(link, button)
     return false
 end
 
+-- ── Game links and the link menu (rich view and normal notes) ───────────────
+-- A click on a game link in a note, rich or normal, acts as in chat: the card,
+-- Ctrl = dressing room (SetItemRef, every client); Shift sends it to chat,
+-- opening the chat line when none is open (Dukul, 2026-10-18: sending to
+-- chat was missing in both). A right-click opens the link menu.
+
+-- The whole link as chat wants it. A normal note's box hands the link as it
+-- is written; the rich view only its shown text, so it is rebuilt (an item
+-- from the game's own link, else GetFixedLink puts the colour back)
+local function FullLink(link, text)
+    if text and text:find("|H", 1, true) then return text end
+    local name = text or ""
+    name = name:match("|h(.-)|h") or name
+    name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[%w_]+:", ""):gsub("|r", "")
+    local full = "|H" .. link .. "|h" .. name .. "|h"
+    if link:match("^item:") then
+        local ok, _, il = pcall(C_Item.GetItemInfo, link)
+        if ok and type(il) == "string" then return il end
+    end
+    if GetFixedLink then
+        local ok, fixed = pcall(GetFixedLink, full)
+        if ok and type(fixed) == "string" then full = fixed end
+    end
+    return full
+end
+
+local function IsWeb(kind) return not kind or kind == "http" or kind == "https" end
+
+-- A left click on a link that is not one of ours (NL.OnClick said no)
+function NL.GameLinkClick(owner, link, text, button)
+    if button ~= "LeftButton" or not link then return end
+    local kind = link:match("^(%a+):")
+    if IsWeb(kind) then
+        if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link, nil, nil, true) end
+        return
+    end
+    local full = FullLink(link, text)
+    if IsShiftKeyDown() then IntoChat(full); return end
+    if SetItemRef then pcall(SetItemRef, link, full, button, owner) end
+end
+
+-- The right-click menu for a link. owner._bnbLinkMenuT tells a box's own
+-- right-click menu (Features/InsertInfo.lua) to stand aside this time.
+function NL.LinkMenu(owner, link, text)
+    local CM = BNB.ContextMenu
+    if not (CM and link) then return end
+    if owner then owner._bnbLinkMenuT = GetTime() end
+    local kind = link:match("^(%a+):")
+    CM.Open(owner, function(root)
+        if kind == "bnbwp" then
+            local wp = ParseWay(link)
+            if not (wp and C_Map and C_Map.GetMapInfo(wp.mapID)) then
+                root:CreateTitle(string.format(L["WAYLINK_BAD_MAP"], tostring(wp and wp.mapID)))
+                return
+            end
+            wp.name = wp.name or BNB.WaypointZone(wp)
+            root:CreateTitle(Clean(wp.name) or L["LINK_MENU_WAYPOINT"])
+            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.NavigateWaypoints(nil, { wp }) end)
+            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.ShowWaypointOnMap(wp) end)
+            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(MapPinLink(wp)) end, { icon = "chat" })
+            root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
+                BNB.ShowClipboardHint(WayText(wp), nil, nil, true)
+            end, { icon = "copy-clipboard" })
+        elseif kind == "bnbway" then
+            local line = link:sub(8)
+            root:CreateTitle(line)
+            root:CreateButton(L["LINK_MENU_NAVIGATE"], function() BNB.FollowWayLine(line, false) end)
+            root:CreateButton(L["LINK_MENU_MAP"], function() BNB.FollowWayLine(line, true) end)
+            root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
+                BNB.ShowClipboardHint(line, nil, nil, true)
+            end, { icon = "copy-clipboard" })
+        elseif kind == "bnbnote" then
+            local note = NoteState(link:sub(9))
+            root:CreateTitle(note and (Clean(note.title) or L["UNTITLED"]) or L["NOTELINK_GONE"])
+            root:CreateButton(L["LINK_MENU_OPEN_NOTE"], function() NL.OnClick(link, "LeftButton") end,
+                { icon = "note", disabled = not note })
+        elseif IsWeb(kind) then
+            root:CreateTitle(link)
+            root:CreateButton(L["LINK_MENU_COPY"], function()
+                BNB.ShowClipboardHint(link, nil, nil, true)
+            end, { icon = "copy-clipboard" })
+        else
+            local full = FullLink(link, text)
+            root:CreateTitle(full)
+            root:CreateButton(L["LINK_MENU_CHAT"], function() IntoChat(full) end, { icon = "chat" })
+            root:CreateButton(L["LINK_MENU_SHOW"], function()
+                if SetItemRef then pcall(SetItemRef, link, full, "LeftButton", owner) end
+            end)
+            if kind == "item" and DressUpItemLink then
+                root:CreateButton(L["LINK_MENU_TRYON"], function() pcall(DressUpItemLink, full) end)
+            end
+        end
+    end)
+end
+
 -- ── Text that leaves BNB ─────────────────────────────────────────────────────
 
 local WAY_PAT  = "|c%x%x%x%x%x%x%x%x|H(bnbwp:[^|]*)|h(.-)|h|r"

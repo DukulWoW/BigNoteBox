@@ -590,8 +590,10 @@ function AM.CreateRenderFrame(name, parent)
 
     -- Clickable links: WoW item/spell links are informational; plain URLs copy
     f:SetScript("OnHyperlinkClick", function(self, link, text, button)
-        if button ~= "LeftButton" then return end
         local NL = BNB.NoteLinks
+        -- Right-click: the link menu, Send to chat and the rest (2026-10-18)
+        if button == "RightButton" and NL then NL.LinkMenu(self, HtmlUnescape(link), text); return end
+        if button ~= "LeftButton" then return end
         if NL and NL.OnClick(HtmlUnescape(link), button) then return end   -- ALL-478
         local linkType = link:match("^(%a+):")
         -- A /way line: placed and tracked; Shift = shown on the map (ALL-381)
@@ -599,20 +601,9 @@ function AM.CreateRenderFrame(name, parent)
             if BNB.FollowWayLine then BNB.FollowWayLine(HtmlUnescape(link:sub(8)), IsShiftKeyDown()) end
             return
         end
-        -- Plain http/https URLs or unknown types → clipboard hint
-        if not linkType or linkType == "https" or linkType == "http" then
-            if BNB.ShowClipboardHint then BNB.ShowClipboardHint(link, nil, nil, true) end
-            return
-        end
-        -- Game links act as in chat: click = the item card, Shift = into the
-        -- chat line, Ctrl = dressing room (SetItemRef, every client)
-        -- text is the <a>'s shown text: rebuilt into a whole link for Shift
-        -- (GetFixedLink puts the quality colour back on an item)
-        local name = text or ""
-        name = name:match("|h(.-)|h") or name
-        name = name:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|cn[%w_]+:", ""):gsub("|r", "")
-        local full = "|H" .. link .. "|h" .. name .. "|h"
-        if SetItemRef then pcall(SetItemRef, link, full, button, self) end
+        -- Web links copy; game links act as in chat, Shift sends to chat
+        -- (NL.GameLinkClick, shared with normal notes)
+        if NL then NL.GameLinkClick(self, link, text, button) end
     end)
 
     return f

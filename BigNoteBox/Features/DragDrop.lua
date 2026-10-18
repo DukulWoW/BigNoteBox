@@ -298,9 +298,15 @@ function BNB.WireDropTarget(eb, ownSave, noteOf)
             GameTooltip:Hide()
             if BNB.HideLinkCursor then BNB.HideLinkCursor(self) end
         end)
-        eb:HookScript("OnHyperlinkClick", function(_, link, _, button)
+        -- A link is one piece of the box: a click on it places no cursor, so
+        -- it acts as in a rich note (Dukul, 2026-10-18); right-click = the
+        -- link menu (Features/NoteLinks.lua)
+        eb:HookScript("OnHyperlinkClick", function(self, link, text, button)
             local NL = BNB.NoteLinks
-            if NL then NL.OnClick(link, button) end
+            if not NL then return end
+            if button == "RightButton" then NL.LinkMenu(self, link, text); return end
+            if NL.OnClick(link, button) then return end
+            NL.GameLinkClick(self, link, text, button)
         end)
     end
     wired[eb] = true

@@ -10,6 +10,8 @@
 --     • Target name           — name of current target (or "No target")
 --     • Date / Time / Date and time — in the Appearance timestamp format,
 --       the same three choices as the toolbar stamp button (ALL-66)
+--     • Note tokens >  the toolbar token button's groups (BNB.BuildTokenMenu)
+--   A right-click on a link opens the link menu instead (NoteLinks.lua).
 --
 -- Location format:
 --   /way Zone XX.X YY.Y
@@ -177,6 +179,26 @@ local function ShowInsertInfoMenu(eb)
             root:CreateButton(it[1] .. "  |cff888888" .. value .. "|r",
                 function() InsertIntoEditBox(eb, value) end)
         end
+
+        -- Note tokens, the same groups as the toolbar's token button
+        -- (Dukul, 2026-10-18), into this editor at the cursor
+        if BNB.BuildTokenMenu and BNB.Tokens and BNB._currentNoteID then
+            root:CreateDivider()
+            local sub = root:CreateButton(L["TOKEN_MENU_TITLE"], nil,
+                { tip = L["NE_INSERT_TOKEN_TIP"], tipSub = L["NE_INSERT_TOKEN_BODY"] })
+            BNB.BuildTokenMenu(sub, function(snippet, back, value)
+                BNB.InsertIntoEditor(snippet, back, value)
+            end)
+        end
+    end)
+end
+
+-- A right-click on a link opens the link menu instead (Features/NoteLinks.lua
+-- marks the box); both run on the same click, so this one waits a frame
+local function ShowUnlessLinkMenu(eb)
+    C_Timer.After(0, function()
+        if eb._bnbLinkMenuT and GetTime() - eb._bnbLinkMenuT < 0.3 then return end
+        ShowInsertInfoMenu(eb)
     end)
 end
 
@@ -190,7 +212,7 @@ function BNB.WireInsertInfoTarget(eb)
     eb:HookScript("OnMouseUp", function(self, btn)
         -- Only show our menu when the editor is not locked / disabled
         if btn == "RightButton" and self:IsEnabled() then
-            ShowInsertInfoMenu(self)
+            ShowUnlessLinkMenu(self)
         end
     end)
 

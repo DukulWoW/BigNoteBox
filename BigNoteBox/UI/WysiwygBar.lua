@@ -55,10 +55,82 @@ BNB._refreshWysiwygRefBox = function() for _, fn in ipairs(_refRefreshers) do fn
 -- Each bar's insert at the cursor ("main" / "focus", ALL-447): a Reference
 -- Box Alt+click goes into Focus mode while it is open, else the main editor
 local _inserters = {}
-function BNB.InsertIntoEditor(snippet)
+function BNB.InsertIntoEditor(snippet, back, value)
     local fb = BNB._focusEditorBody
-    if _inserters.focus and fb and fb:IsVisible() then return _inserters.focus(snippet) end
-    if _inserters.main then return _inserters.main(snippet) end
+    if _inserters.focus and fb and fb:IsVisible() then return _inserters.focus(snippet, back, value) end
+    if _inserters.main then return _inserters.main(snippet, back, value) end
+end
+
+-- The note token menu (ALL-481): your own tokens, then each group, then New /
+-- Manage. Built into the toolbar's token button and the note's right-click
+-- menu (Features/InsertInfo.lua). insert(snippet, back, value) puts it into
+-- the editor: back = the cursor that many bytes before the end ({{lockout:|}}),
+-- value = what replaces the token as one undo step.
+-- A name ending in ":" takes an argument the writer types ({{lockout:}},
+-- S3); "reset:weekly" is a whole token (Features/Tokens.lua T.MENU)
+local function TokenRow(sub, name, kind, insert)
+    local Tk = BNB.Tokens
+    local now, written = Tk.Preview(name, kind)
+    local base = name:gsub(":$", "")
+    local open = kind == "id" or base ~= name
+    local hint = kind == "id" and "id" or L["TOKEN_ARG_NAME"]
+    local label = open and ("{{" .. base .. ":|cff888888" .. hint .. "|r}}") or ("{{" .. name .. "}}")
+    if now and not open then label = label .. "  |cff888888" .. now .. "|r" end
+    local tipSub = L["TOKEN_DESC_" .. base:upper():gsub(":", "_")] .. "\n" .. L["TOKEN_KIND_" .. kind:upper()]
+        .. "\n\n" .. string.format(L["TOKEN_TIP_WRITE"], "|cffffffff" .. written .. "|r")
+    if now then
+        tipSub = tipSub .. "\n" .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r")
+    elseif kind == "live" and not open then
+        tipSub = tipSub .. "\n" .. L["TOKEN_TIP_EMPTY"]
+    end
+    sub:CreateButton(label, function()
+        -- A normal note gets the value now; a token taking an id goes in
+        -- open, typing the id and }} fills it (ALL-503)
+        local plain = Tk.NotePlain(BNB._currentNoteID)
+        if open and plain then insert("{{" .. base .. ":")
+        elseif open then insert("{{" .. base .. ":}}", 2)
+        elseif plain then
+            local token = "{{" .. name .. "}}"
+            insert(token, nil, Tk.FreezeToken(token))
+        elseif kind == "snapshot" and now then insert("{{" .. name .. "}}", nil, now)
+        else insert("{{" .. name .. "}}") end
+    end, { tip = "{{" .. base .. (open and (":" .. hint) or "") .. "}}", tipSub = tipSub })
+end
+
+function BNB.BuildTokenMenu(root, insert)
+    local Tk = BNB.Tokens
+    if not Tk then return end
+    local plain = Tk.NotePlain(BNB._currentNoteID)
+    -- Your own tokens first (ALL-481 S4, Settings > Notes > Note tokens)
+    local mine = Tk.Custom()
+    if #mine > 0 then
+        local sub = root:CreateButton(L["TOKEN_GROUP_MINE"], nil,
+            { tip = L["TOKEN_GROUP_MINE"], tipSub = L["TOKEN_CUSTOM_KIND"] })
+        for _, e in ipairs(mine) do
+            local now = Tk.CustomPreview(e.text)
+            sub:CreateButton("{{" .. e.name .. "}}  |cff888888" .. now .. "|r",
+                function()
+                    local token = "{{" .. e.name .. "}}"
+                    insert(token, nil, Tk.NotePlain(BNB._currentNoteID) and Tk.FreezeToken(token) or nil)
+                end,
+                { tip = "{{" .. e.name .. "}}", tipSub = e.text .. "\n\n"
+                    .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r") })
+        end
+    end
+    for _, g in ipairs(Tk.MENU) do
+        local sub = root:CreateButton(L["TOKEN_GROUP_" .. g.group], nil,
+            { tip = L["TOKEN_GROUP_" .. g.group], tipSub = L["TOKEN_KIND_" .. g.kind:upper()] })
+        for _, name in ipairs(g.list) do
+            if Tk.Listed(name, plain) then TokenRow(sub, name, g.kind, insert) end
+        end
+    end
+    root:CreateDivider()
+    root:CreateButton(L["TOKEN_NEW"], function()
+        if BNB.OpenTokenEdit then BNB.OpenTokenEdit(nil) end
+    end, { icon = "create" })
+    root:CreateButton(L["TOKEN_MANAGE"], function()
+        if BNB.OpenSettingsPage then BNB.OpenSettingsPage("notes", "tokens") end
+    end, { icon = "note-settings" })
 end
 
 local function BuildWysiwygBar(parent, tsStrip, ctx)
@@ -567,75 +639,13 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     tokenBtn:SetPoint("LEFT", divInsert, "RIGHT", DIV_GAP, 0)
     tokenBtn:SetIconEnabled(true)
     tokenBtn._cmToggle = true
-    -- A name ending in ":" takes an argument the writer types ({{lockout:}},
-    -- S3); "reset:weekly" is a whole token (Features/Tokens.lua T.MENU)
-    local function TokenRow(sub, name, kind)
-        local Tk = BNB.Tokens
-        local now, written = Tk.Preview(name, kind)
-        local base = name:gsub(":$", "")
-        local open = kind == "id" or base ~= name
-        local hint = kind == "id" and "id" or L["TOKEN_ARG_NAME"]
-        local label = open and ("{{" .. base .. ":|cff888888" .. hint .. "|r}}") or ("{{" .. name .. "}}")
-        if now and not open then label = label .. "  |cff888888" .. now .. "|r" end
-        local tipSub = L["TOKEN_DESC_" .. base:upper():gsub(":", "_")] .. "\n" .. L["TOKEN_KIND_" .. kind:upper()]
-            .. "\n\n" .. string.format(L["TOKEN_TIP_WRITE"], "|cffffffff" .. written .. "|r")
-        if now then
-            tipSub = tipSub .. "\n" .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r")
-        elseif kind == "live" and not open then
-            tipSub = tipSub .. "\n" .. L["TOKEN_TIP_EMPTY"]
-        end
-        sub:CreateButton(label, function()
-            -- A normal note gets the value now; a token taking an id goes in
-            -- open, typing the id and }} fills it (ALL-503)
-            local plain = Tk.NotePlain(BNB._currentNoteID)
-            if open and plain then InsertSnippet("{{" .. base .. ":")
-            elseif open then InsertSnippet("{{" .. base .. ":}}", 2)
-            elseif plain then
-                local token = "{{" .. name .. "}}"
-                InsertSnippet(token, nil, Tk.FreezeToken(token))
-            elseif kind == "snapshot" and now then InsertSnippet("{{" .. name .. "}}", nil, now)
-            else InsertSnippet("{{" .. name .. "}}") end
-        end, { tip = "{{" .. base .. (open and (":" .. hint) or "") .. "}}", tipSub = tipSub })
-    end
     tokenBtn:SetScript("OnClick", function(self)
         local CM = BNB.ContextMenu
         if not (CM and BNB.Tokens and Body() and BNB._currentNoteID) or BNB._editorLocked then return end
         if CM.IsOpen() then CM.Close(); return end
         CM.Open(self, function(root)
             root:CreateTitle(L["TOKEN_MENU_TITLE"])
-            -- Your own tokens first (ALL-481 S4, Settings > Notes > Note tokens)
-            local mine = BNB.Tokens.Custom()
-            if #mine > 0 then
-                local sub = root:CreateButton(L["TOKEN_GROUP_MINE"], nil,
-                    { tip = L["TOKEN_GROUP_MINE"], tipSub = L["TOKEN_CUSTOM_KIND"] })
-                for _, e in ipairs(mine) do
-                    local now = BNB.Tokens.CustomPreview(e.text)
-                    sub:CreateButton("{{" .. e.name .. "}}  |cff888888" .. now .. "|r",
-                        function()
-                            local token = "{{" .. e.name .. "}}"
-                            InsertSnippet(token, nil, BNB.Tokens.NotePlain(BNB._currentNoteID)
-                                and BNB.Tokens.FreezeToken(token) or nil)
-                        end,
-                        { tip = "{{" .. e.name .. "}}", tipSub = e.text .. "\n\n"
-                            .. string.format(L["TOKEN_TIP_NOW"], "|cffffffff" .. now .. "|r") })
-                end
-            end
-            for _, g in ipairs(BNB.Tokens.MENU) do
-                local sub = root:CreateButton(L["TOKEN_GROUP_" .. g.group], nil,
-                    { tip = L["TOKEN_GROUP_" .. g.group], tipSub = L["TOKEN_KIND_" .. g.kind:upper()] })
-                for _, name in ipairs(g.list) do
-                    if BNB.Tokens.Listed(name, BNB.Tokens.NotePlain(BNB._currentNoteID)) then
-                        TokenRow(sub, name, g.kind)
-                    end
-                end
-            end
-            root:CreateDivider()
-            root:CreateButton(L["TOKEN_NEW"], function()
-                if BNB.OpenTokenEdit then BNB.OpenTokenEdit(nil) end
-            end, { icon = "create" })
-            root:CreateButton(L["TOKEN_MANAGE"], function()
-                if BNB.OpenSettingsPage then BNB.OpenSettingsPage("notes", "tokens") end
-            end, { icon = "note-settings" })
+            BNB.BuildTokenMenu(root, InsertSnippet)
         end)
     end)
     tokenBtn:SetScript("OnEnter", function(self)
