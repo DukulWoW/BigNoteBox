@@ -80,6 +80,7 @@ UI\Config\Modules.lua
 UI\Config\Notes.lua
 UI\Config\NotePages.lua
 UI\Config\Backup.lua
+UI\Config\BackupPages.lua
 UI\Config\Advanced.lua
 UI\Config\Profiles.lua
 UI\Config\DevTools.lua

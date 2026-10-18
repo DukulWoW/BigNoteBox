@@ -35,6 +35,36 @@ function BNB.DeepCopy(v)
     return out
 end
 
+-- A capital first letter, a-z only. WoW's string.upper / lower also change
+-- bytes 128-255 as Latin-1 letters (0xE5 -> 0xC5), which breaks the first
+-- byte of a UTF-8 character: a Chinese tag became invalid text, and a WoW
+-- edit box shows nothing of a text with invalid UTF-8 in it, so the full
+-- backup came up empty (Dukul, 2026-10-18, ALL-507). Never s:sub(1, 1):upper()
+-- on player text.
+function BNB.UpperFirst(s)
+    local b = type(s) == "string" and s:byte(1)
+    if b and b >= 97 and b <= 122 then return string.char(b - 32) .. s:sub(2) end
+    return s
+end
+
+-- True when s is valid UTF-8 (plain ASCII is)
+function BNB.IsValidUtf8(s)
+    if not s:find("[\128-\255]") then return true end
+    local i, n = 1, #s
+    while i <= n do
+        local b = s:byte(i)
+        local len = (b < 0x80 and 1) or (b >= 0xC2 and b <= 0xDF and 2)
+            or (b >= 0xE0 and b <= 0xEF and 3) or (b >= 0xF0 and b <= 0xF4 and 4) or 0
+        if len == 0 or i + len - 1 > n then return false end
+        for k = i + 1, i + len - 1 do
+            local c = s:byte(k)
+            if c < 0x80 or c > 0xBF then return false end
+        end
+        i = i + len
+    end
+    return true
+end
+
 -- BigChatBox's multi-line box, the target of every "Send to BCB" (toolbar,
 -- Send to Chat, Share). BCB on the Classic clients has none: its
 -- BCB_OpenMultiline is an empty stub there, and a player can switch the box

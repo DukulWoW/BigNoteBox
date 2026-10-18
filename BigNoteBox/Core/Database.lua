@@ -49,7 +49,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 14  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 15  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 
 --------------------------------------------------------------------------------
@@ -697,7 +697,7 @@ function BNB.MigrateNotesDB()
             for sp, c in pairs(spellings) do
                 if not pick or c > n or (c == n and sp < pick) then pick, n = sp, c end
             end
-            best[low] = pick:sub(1, 1):upper() .. pick:sub(2)
+            best[low] = BNB.UpperFirst(pick)   -- a-z only (ALL-507, see v15)
         end
         for _, list in ipairs(lists) do
             for _, note in pairs(list) do
@@ -715,6 +715,48 @@ function BNB.MigrateNotesDB()
         end
         if BNB.TagIndexRebuild then BNB.TagIndexRebuild() end
         v = 14
+    end
+
+    -- v14 -> v15 (ALL-507, 2026-10-18): tags whose first byte upper() broke.
+    -- v14 and NormalizeTag capitalised with string.upper, which in WoW turns
+    -- a UTF-8 lead byte 0xE0-0xFE into 0xC0-0xDE (Latin-1 upper case), so a
+    -- tag starting with a Chinese (or other non-Latin) character became
+    -- invalid UTF-8 and a full backup showed an empty box. Put the byte back
+    -- (+0x20), only when that makes the tag valid again. Notes, trash, each
+    -- note's restore point and the tag colours.
+    if v < 15 then
+        local function Fix(tag)
+            if type(tag) ~= "string" or BNB.IsValidUtf8(tag) then return tag end
+            local b = tag:byte(1)
+            if b and b >= 0xC0 and b <= 0xDE and b ~= 0xD7 then
+                local back = string.char(b + 0x20) .. tag:sub(2)
+                if BNB.IsValidUtf8(back) then return back end
+            end
+            return tag
+        end
+        local function FixList(tags)
+            if type(tags) ~= "table" then return end
+            for i, tag in ipairs(tags) do tags[i] = Fix(tag) end
+        end
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                FixList(note.tags)
+                if type(note.manualSnapshot) == "table" then FixList(note.manualSnapshot.tags) end
+            end
+        end
+        if type(ndb.tagColors) == "table" then
+            local moved = {}
+            for tag, col in pairs(ndb.tagColors) do
+                local fixed = Fix(tag)
+                if fixed ~= tag then moved[#moved + 1] = { tag, fixed, col } end
+            end
+            for _, m in ipairs(moved) do
+                ndb.tagColors[m[1]] = nil
+                if ndb.tagColors[m[2]] == nil then ndb.tagColors[m[2]] = m[3] end
+            end
+        end
+        if BNB.TagIndexRebuild then BNB.TagIndexRebuild() end
+        v = 15
     end
 
     -- Never lower the stored version: running an older build must not make the

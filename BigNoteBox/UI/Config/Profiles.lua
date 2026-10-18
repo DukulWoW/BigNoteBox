@@ -136,6 +136,15 @@ local function TryImport(text)
     end)
 end
 
+-- A profile code pasted into Settings > Backup > Import (ALL-507): the same
+-- name prompt as the row's Import. False when it is not a valid code.
+function BNB.ImportProfileCode(text)
+    local payload = P.Decode(text)
+    if not payload then return false end
+    ShowName({ mode = "import", payload = payload }, P.FreeName(payload.name))
+    return true
+end
+
 StaticPopupDialogs["BNB_PROFILE_IMPORT"] = {
     preferredIndex = 3,
     text = L["PROFILE_IMPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,

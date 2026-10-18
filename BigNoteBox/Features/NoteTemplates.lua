@@ -561,6 +561,16 @@ function TPL.TryImport(str)
     return true, string.format(L["TPL_IMPORTED_FMT"], rec.name), true
 end
 
+-- The template a code holds, without adding it (the Backup tab's preview
+-- line, ALL-507): the record, false for a broken code, nil when it is not a
+-- template code
+function TPL.PeekCode(str)
+    if type(str) ~= "string" then return nil end
+    str = str:match("^%s*(.-)%s*$")
+    if str:sub(1, #SHARE_PREFIX) ~= SHARE_PREFIX then return nil end
+    return Decode(str) or false
+end
+
 function TPL.BackupList()
     local out = {}
     for _, v in ipairs(TPL.User()) do

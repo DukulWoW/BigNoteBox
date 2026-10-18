@@ -29,7 +29,8 @@ function BNB.NormalizeTag(s, skip)
     for tag, ids in pairs(BNB.TagIndex()) do
         if tag ~= skip and tag:lower() == low and next(ids) then return tag end
     end
-    return s:sub(1, 1):upper() .. s:sub(2)
+    -- a-z only: upper() broke the first byte of a Chinese tag (ALL-507)
+    return BNB.UpperFirst(s)
 end
 
 --------------------------------------------------------------------------------

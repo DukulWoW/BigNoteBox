@@ -93,7 +93,12 @@ local function BuildBackupTab(sf, page)
         Layout()
     end)
 
-    -- ── Export section ────────────────────────────────────────────────────────
+    -- ── Back up (ALL-507) ───────────────────────────────────────────────────
+    -- Three backups, each straight to the copy popup (C_System.SetClipboard
+    -- is nil on Retail and Forever, ALL-21): Full = everything as JSON,
+    -- Settings = every profile and no notes, Selective = a sub-page with the
+    -- format and the parts. Markdown is notes only, so it lives on that page
+    -- (Dukul, 2026-10-18).
     y = AddHeader(ct, y, L["BACKUP_EXPORT_HEADER"])
 
     local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -104,76 +109,53 @@ local function BuildBackupTab(sf, page)
     desc:SetText(L["BACKUP_EXPORT_DESC"])
     y = y - 38
 
-    -- Format radio buttons
-    local _exportFmt = NE.FMT_JSON   -- local state for this tab instance; JSON by default (ALL-220)
+    local selPage = K.NewSubPage(L["BACKUP_SEL_TITLE"], K.BuildSelectiveBackupPage, "selectivebackup")
 
-    local function MakeRadio(label, fmt, xOff, tip)
-        local rb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
-        BNB.LabelHit(rb)   -- the tooltip and click reach over its label too
-        rb:SetSize(20, 20)
-        rb:SetPoint("TOPLEFT", ct, "TOPLEFT", xOff, y + 2)
-        rb:SetChecked(_exportFmt == fmt)
-        local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-        lbl:SetPoint("LEFT", rb, "RIGHT", 4, 0)
-        lbl:SetText(label)
-        BNB.CheckTip(rb, tip)
-        return rb
+    local BTN_GAP = 8
+    local BTN_W = math.floor((CONTENT_W - 2 * BTN_GAP) / 3)
+    local function TipBtn(btn, title, tip)
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(title, 1, 1, 1)
+            GameTooltip:AddLine(tip, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        btn:HookScript("OnLeave", function() GameTooltip:Hide() end)
     end
-
-    local rbMd   = MakeRadio(L["BACKUP_FORMAT_MARKDOWN"], NE.FMT_MARKDOWN, 0, L["BACKUP_FMT_DESC_MARKDOWN"])
-    local rbJson = MakeRadio(L["BACKUP_FORMAT_JSON"],     NE.FMT_JSON,     CONTENT_W / 2, L["BACKUP_FMT_DESC_JSON"])
-    -- Explicitly sync state after both buttons exist so neither is stuck visually checked
-    rbJson:SetChecked(true); rbMd:SetChecked(false)
-
-    -- Format description (single label, swaps text with the radio selection)
-    y = y - 26
-    local fmtDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    fmtDesc:SetPoint("TOPLEFT",  ct, "TOPLEFT",  0, y)
-    fmtDesc:SetPoint("TOPRIGHT", ct, "TOPRIGHT", 0, y)
-    fmtDesc:SetJustifyH("LEFT")
-    fmtDesc:SetWordWrap(true)
-    fmtDesc:SetHeight(32)   -- two wrapped lines at GameFontNormalSmall ≈ 13px each + gap
-    fmtDesc:SetTextColor(0.60, 0.60, 0.60)
-    fmtDesc:SetText(L["BACKUP_FMT_DESC_JSON"])
-    y = y - 38
-
-    rbMd:SetScript("OnClick", function()
-        _exportFmt = NE.FMT_MARKDOWN
-        rbMd:SetChecked(true); rbJson:SetChecked(false)
-        fmtDesc:SetText(L["BACKUP_FMT_DESC_MARKDOWN"])
-    end)
-    rbJson:SetScript("OnClick", function()
-        _exportFmt = NE.FMT_JSON
-        rbJson:SetChecked(true); rbMd:SetChecked(false)
-        fmtDesc:SetText(L["BACKUP_FMT_DESC_JSON"])
-    end)
-
-    -- Export button + status label
-    local exportBtn = BNB.CreateButton(nil, ct, L["BACKUP_BTN_EXPORT"], 180, 26)
-    exportBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    local fullBtn = BNB.CreateButton(nil, ct, L["BACKUP_BTN_FULL"], BTN_W, 26)
+    fullBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    TipBtn(fullBtn, L["BACKUP_BTN_FULL"], L["BACKUP_BTN_FULL_TIP"])
+    local setBtn = BNB.CreateButton(nil, ct, L["BACKUP_BTN_SETTINGS"], BTN_W, 26)
+    setBtn:SetPoint("LEFT", fullBtn, "RIGHT", BTN_GAP, 0)
+    TipBtn(setBtn, L["BACKUP_BTN_SETTINGS"], L["BACKUP_BTN_SETTINGS_TIP"])
+    local selBtn = BNB.CreateButton(nil, ct, L["BACKUP_BTN_SELECTIVE"], BTN_W, 26)
+    selBtn:SetPoint("LEFT", setBtn, "RIGHT", BTN_GAP, 0)
+    TipBtn(selBtn, L["BACKUP_BTN_SELECTIVE"], L["BACKUP_BTN_SELECTIVE_TIP"])
+    y = y - 26 - 4
 
     local exportStatus = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    exportStatus:SetPoint("LEFT", exportBtn, "RIGHT", 10, 0)
-    exportStatus:SetPoint("RIGHT", ct, "RIGHT", 0, 0)
-    exportStatus:SetJustifyH("LEFT")
-    exportStatus:SetHeight(26)
-    exportStatus:SetTextColor(0.55, 0.82, 0.55)
+    exportStatus:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    exportStatus:SetWidth(CONTENT_W)
+    exportStatus:SetJustifyH("LEFT"); exportStatus:SetWordWrap(false)
+    exportStatus:SetHeight(16)
+    exportStatus:SetTextColor(0.78, 0.78, 0.78)
     exportStatus:SetText("")
+    sf:HookScript("OnShow", function() exportStatus:SetText("") end)
+    y = y - 16 - 8
 
-    exportBtn:SetScript("OnClick", function()
-        local text, n = NE.SerializeNotes(_exportFmt)
-        if not text or n == 0 then
-            exportStatus:SetTextColor(0.82, 0.55, 0.55)
-            exportStatus:SetText(L["BACKUP_IMPORT_NONE"])
-            return
-        end
-        -- C_System.SetClipboard is nil on retail and Forever (ALL-21), so the
-        -- export always goes to the scrollable editbox window for a manual copy
-        BNB.OpenExportWindow(text)
-        exportStatus:SetTextColor(0.78, 0.78, 0.78)
+    local function CopyBackup(btn, opts)
+        local text = NE.BuildBackup(opts)
+        if not text then return end
+        BNB.ShowClipboardHint(text, btn)
         exportStatus:SetText(L["BACKUP_BTN_COPY_FALLBACK"])
+    end
+    fullBtn:SetScript("OnClick", function(self)
+        CopyBackup(self, { templates = true, tokens = true, tagColors = true, profiles = true })
     end)
-    y = y - 40
+    setBtn:SetScript("OnClick", function(self)
+        CopyBackup(self, { ids = {}, profiles = true })
+    end)
+    selBtn:SetScript("OnClick", function() selPage.Open() end)
 
     y = AddRule(ct, y) - 4
 
@@ -227,6 +209,63 @@ local function BuildBackupTab(sf, page)
 
     y = y - PASTE_H - 6
 
+    -- What the paste holds, before Import (Dukul, 2026-10-18, ALL-507). Read
+    -- once the text has rested a moment: a big backup is parsed only once.
+    local pastePreview = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    pastePreview:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    pastePreview:SetWidth(CONTENT_W)
+    pastePreview:SetJustifyH("LEFT"); pastePreview:SetWordWrap(false)
+    pastePreview:SetHeight(16)
+    pastePreview:SetText("")
+    local function Describe(raw)
+        local code = raw:match("^%s*(.-)%s*$")
+        if code == "" then return "" end
+        local function Bad(text) return "|cffd18c8c" .. text .. "|r" end
+        local function Good(text) return "|cff8cd18c" .. text .. "|r" end
+        if code:find("^BNBP%d:") then
+            local pl = BNB.Profiles and BNB.Profiles.Decode(code)
+            if not pl then return Bad(L["PROFILE_IMPORT_BAD"]) end
+            return Good(string.format(L["BACKUP_PREVIEW_PROFILE"], BNB.Profiles.DisplayName(pl.name or "?")))
+        end
+        local tpl = BNB.Templates.PeekCode and BNB.Templates.PeekCode(code)
+        if tpl == false then return Bad(L["TPL_IMPORT_ERR"]) end
+        if tpl then return Good(string.format(L["BACKUP_PREVIEW_TEMPLATE"], tpl.name or "?")) end
+        if code:find("^BNB%d:") then
+            local data, err
+            if BNB.ShareDecode then data, err = BNB.ShareDecode(code) end
+            if not data then return Bad(err or L["SHARE_ERR_INVALID"]) end
+            local title = (data.title and data.title ~= "") and data.title or "-"
+            return Good(string.format(L["BACKUP_PREVIEW_SHARE"], title))
+        end
+        local list, err = NE.ParseJsonNotes(raw, true)
+        local kind = "BACKUP_PREVIEW_JSON"
+        if not list and not err then
+            list = NE.ParseMarkdownNotes(raw, true)
+            kind = "BACKUP_PREVIEW_MD"
+        end
+        if not list then return Bad(err or L["BACKUP_IMPORT_ERR"]) end
+        local parts = { string.format(L["BACKUP_PREVIEW_NOTES"], #list) }
+        local function Add(t, key)
+            local n = 0
+            for _ in pairs(type(t) == "table" and t or {}) do n = n + 1 end
+            if n > 0 then parts[#parts + 1] = string.format(L[key], n) end
+        end
+        Add(list.templates, "BACKUP_PREVIEW_TEMPLATES")
+        Add(list.tokens, "BACKUP_PREVIEW_TOKENS")
+        Add(list.tagColors, "BACKUP_PREVIEW_TAGCOLORS")
+        Add(list.profiles, "BACKUP_PREVIEW_PROFILES")
+        return Good(L[kind] .. " " .. table.concat(parts, ", "))
+    end
+    local function UpdatePreview()
+        local raw = pasteEb._showingPlaceholder and "" or pasteEb:GetText()
+        local ok, text = pcall(Describe, raw or "")
+        pastePreview:SetText(ok and text or "")
+    end
+    pasteEb:HookScript("OnTextChanged", function()
+        BNB.Debounce("backupPastePreview", 0.3, UpdatePreview)
+    end)
+    y = y - 16 - 4
+
     -- Import button + status label
     local importBtn = BNB.CreateButton(nil, ct, L["BACKUP_BTN_IMPORT"], 120, 26)
     importBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -257,6 +296,44 @@ local function BuildBackupTab(sf, page)
         importStatus:SetText("")
     end)
 
+    -- The import picker (ALL-507): built with the tab, opened by Import
+    local pickPage = K.NewSubPage(L["BACKUP_PICK_TITLE"], K.BuildImportPickerPage, "importpicker")
+
+    -- notes: a parsed backup (maybe filtered by the picker). confirmed: the
+    -- picker was the confirm step, so no "Import N notes?" popup
+    local function StartImport(notes, confirmed)
+        local function Say(text, ok)
+            if ok then importStatus:SetTextColor(0.55, 0.82, 0.55)
+            else importStatus:SetTextColor(0.82, 0.55, 0.55) end
+            importStatus:SetText(text)
+        end
+        -- Only templates / tokens / tag colours / profiles: nothing to back up first
+        if #notes == 0 then
+            BNB._DoImport(notes, false)
+            Say(L["BACKUP_IMPORT_PARTS_OK"], true)
+            pasteEb:SetRealText("")
+            return
+        end
+        -- Check if any notes are scoped to a different character
+        local foreignChar = BNB.ForeignScopeChar(notes)
+        BNB.OfferBackupFirst(function()   -- ALL-186
+            -- Stored for the popup callbacks
+            BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
+            if foreignChar and BNB.currentChar then
+                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
+            elseif confirmed then
+                BNB._pendingImport = nil
+                local n = BNB._DoImport(notes, false) or 0
+                if n > 0 then Say(string.format(L["BACKUP_IMPORT_OK"], n), true)
+                else Say(L["BACKUP_IMPORT_NONE"], false) end
+                pasteEb:SetRealText("")
+            else
+                -- Same-character or scope-less path: confirm count before importing
+                StaticPopup_Show("BNB_IMPORT_CONFIRM", #notes)
+            end
+        end)
+    end
+
     importBtn:SetScript("OnClick", function()
         local raw = pasteEb._showingPlaceholder and "" or pasteEb:GetText()
         if not raw or raw:match("^%s*$") then
@@ -274,6 +351,17 @@ local function BuildBackupTab(sf, page)
             if tplOk then importStatus:SetTextColor(0.55, 0.82, 0.55)
             else importStatus:SetTextColor(0.82, 0.55, 0.55) end
             importStatus:SetText(tplMsg)
+            return
+        end
+        -- A profile code (BNBP1:) gets the Profiles row's name prompt (ALL-507)
+        if code:find("^BNBP%d:") then
+            if BNB.ImportProfileCode(code) then
+                importStatus:SetText("")
+                pasteEb:SetRealText("")
+            else
+                importStatus:SetTextColor(0.82, 0.55, 0.55)
+                importStatus:SetText(L["PROFILE_IMPORT_BAD"])
+            end
             return
         end
         if code:find("^BNB%d:") then
@@ -298,21 +386,21 @@ local function BuildBackupTab(sf, page)
             importStatus:SetText(jsonErr or L["BACKUP_IMPORT_ERR"])
             return
         end
+        importStatus:SetText("")
 
-        -- Check if any notes are scoped to a different character
-        local foreignChar = BNB.ForeignScopeChar(notes)
-
-        BNB.OfferBackupFirst(function()   -- ALL-186
-            if foreignChar and BNB.currentChar then
-                -- Store pending data for the popup callbacks
-                BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
-                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
-            else
-                -- Same-character or scope-less path — confirm count before importing
-                BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
-                StaticPopup_Show("BNB_IMPORT_CONFIRM", #notes)
-            end
-        end)
+        -- More than notes (a full or settings backup, ALL-507): the picker
+        -- shows what it holds and is the confirm step. Notes only: as before.
+        local extra = (notes.templates and #notes.templates > 0) or (notes.tokens and #notes.tokens > 0)
+            or (notes.tagColors and next(notes.tagColors) ~= nil) or (notes.profiles and #notes.profiles > 0)
+        if extra then
+            pickPage.SetData(notes, function(picked)
+                BNB.ConfigSubPageBack()
+                StartImport(picked, true)
+            end)
+            pickPage.Open()
+        else
+            StartImport(notes, false)
+        end
     end)
     y = y - 40
 
@@ -542,7 +630,9 @@ function BNB.OpenExportWindow(text, warningText, htmlNoteID)
 
         local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
         copyBtn:SetPoint("TOP", f, "TOP", 0, -copyY)
-        copyBtn:SetScript("OnClick", function() BNB.ShowClipboardHint(f._eb:GetText()) end)
+        -- Selects the text already in this box for Ctrl+C, rather than
+        -- copying it into the copy popup's hidden box a second time (ALL-507)
+        copyBtn:SetScript("OnClick", function() f._eb:SetFocus(); f._eb:HighlightText() end)
         f._copyBtn = copyBtn
 
         local sf = BNB.CreateScrollFrame(nil, f)

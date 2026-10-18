@@ -668,9 +668,10 @@ end
 -- Settings > Backup (a bare note object used to fail as "unrecognized").
 -- templates (optional): the player's note templates, the full backup only
 -- (ALL-68 S3); tokens (optional): the player's own note tokens (ALL-481 S4);
--- tagColors (optional): tag -> colour key (ALL-106); an older build reads
+-- tagColors (optional): tag -> colour key (ALL-106); profiles (optional):
+-- every settings profile as a profile code (ALL-496 S2); an older build reads
 -- past these keys
-local function JsonEnvelope(noteParts, templates, tokens, tagColors)
+local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
         JSON_VERSION,
@@ -685,6 +686,9 @@ local function JsonEnvelope(noteParts, templates, tokens, tagColors)
     end
     if tagColors and next(tagColors) then
         tail = tail .. ",\"tagColors\":" .. Json.Encode(tagColors)
+    end
+    if profiles and #profiles > 0 then
+        tail = tail .. ",\"profiles\":" .. Json.Encode(profiles)
     end
     tail = tail .. "}"
     return header .. table.concat(noteParts, ",\n") .. tail
@@ -720,7 +724,8 @@ local function SerializeNotes(fmt)
         local tpls = BNB.Templates and BNB.Templates.BackupList() or nil
         local toks = BNB.Tokens and BNB.Tokens.BackupList() or nil
         local cols = BNB.TagColors and BNB.TagColors.BackupMap() or nil
-        return JsonEnvelope(noteParts, tpls, toks, cols), #noteParts
+        local profs = BNB.Profiles and BNB.Profiles.BackupList() or nil
+        return JsonEnvelope(noteParts, tpls, toks, cols, profs), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -976,7 +981,8 @@ end
 -- JSON export. Every note goes through BNB.CleanNoteFields, so only schema
 -- fields of the right type and shape come back. A note without a title stays
 -- in the list (title nil) so the import can count it as skipped (ALL-180).
-local function ParseJsonNotes(text)
+-- quiet: the Backup tab's preview line (ALL-507) reads it without the chat warning
+local function ParseJsonNotes(text, quiet)
     -- A bare note object (the single-note export before ALL-136.2 wrote one)
     -- is wrapped in the envelope so it imports like any other export
     if not text:find("\"export_version\"") and text:find("^%s*{")
@@ -989,7 +995,7 @@ local function ParseJsonNotes(text)
 
     local expVer = tonumber(text:match("\"export_version\"%s*:%s*(%d+)"))
     if not expVer then return nil end
-    if expVer > JSON_VERSION then
+    if expVer > JSON_VERSION and not quiet then
         BNB:Print(string.format(L["BACKUP_IMPORT_VERSION_WARN"], expVer, JSON_VERSION))
     end
 
@@ -1022,18 +1028,22 @@ local function ParseJsonNotes(text)
     -- and the player's own tokens (ALL-481 S4), BNB.Tokens.ImportRecords
     if type(doc) == "table" and type(doc.tokens) == "table" then parsed.tokens = doc.tokens end
     if type(doc) == "table" and type(doc.tagColors) == "table" then parsed.tagColors = doc.tagColors end
-    return #parsed > 0 and parsed or nil
+    -- and the settings profiles (ALL-496 S2), BNB.Profiles.ImportBackup
+    if type(doc) == "table" and type(doc.profiles) == "table" then parsed.profiles = doc.profiles end
+    -- A settings backup has no notes (ALL-507): kept while it holds anything
+    local any = #parsed > 0 or parsed.templates or parsed.tokens or parsed.tagColors or parsed.profiles
+    return any and parsed or nil
 end
 
 -- ── Deserialize — Markdown ────────────────────────────────────────────────────
 
-local function ParseMarkdownNotes(text)
+local function ParseMarkdownNotes(text, quiet)
     -- Must start with our header line
     if not text:find("^# BigNoteBox Export v") then return nil end
 
     local expVer = tonumber(text:match("^# BigNoteBox Export v(%d+)"))
     if not expVer then return nil end
-    if expVer > EXPORT_VERSION then
+    if expVer > EXPORT_VERSION and not quiet then
         BNB:Print(string.format(L["BACKUP_IMPORT_VERSION_WARN"], expVer, EXPORT_VERSION))
     end
 
@@ -1183,7 +1193,7 @@ end
 -- replaced dropped tasks and every field added after it.
 -- remapScope: if true, any note with scope "char:X" is rewritten to current char.
 local function ImportNotes(noteList, remapScope)
-    if not noteList or #noteList == 0 then return 0 end
+    if not noteList then return 0 end
     local now = time()
     local count = 0
     local stats = { tasks = 0, alarms = 0, attachments = 0 }
@@ -1214,7 +1224,9 @@ local function ImportNotes(noteList, remapScope)
             if src.attachments and #src.attachments > 0 then stats.attachments = stats.attachments + 1 end
         end
     end
-    ReportImport(count, #noteList, stats)
+    -- A backup with only templates / tokens / colours / profiles (ALL-507)
+    -- says nothing about notes
+    if #noteList > 0 then ReportImport(count, #noteList, stats) end
     -- Templates from a full backup (ALL-68 S3)
     if noteList.templates and BNB.Templates then
         local n = BNB.Templates.ImportRecords(noteList.templates)
@@ -1227,6 +1239,11 @@ local function ImportNotes(noteList, remapScope)
     end
     -- Tag colours from a full backup (ALL-106), for tags with no colour here
     if noteList.tagColors and BNB.TagColors then BNB.TagColors.ImportMap(noteList.tagColors) end
+    -- Settings profiles from a full backup (ALL-496 S2): a name already used here is skipped
+    if noteList.profiles and BNB.Profiles then
+        local n = BNB.Profiles.ImportBackup(noteList.profiles)
+        if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["PROFILE_BACKUP_IMPORTED_FMT"], n) .. "|r") end
+    end
     return count
 end
 
@@ -1297,6 +1314,36 @@ function BNB.ExportMultiHTML(ids)
     BNB.OpenExportWindow(table.concat(parts, "\n<hr>\n"), anyImages and L["CFG_EXPORT_IMG_WARN"] or nil)
 end
 
+-- The backups of Settings > Backup (ALL-507). opts:
+--   fmt        NE.FMT_JSON (default) or NE.FMT_MARKDOWN (notes only)
+--   ids        note ids to include, in list order; nil = every note
+--   templates, tokens, tagColors, profiles   true = include (JSON only)
+-- Returns the text and the number of notes in it.
+local function BuildBackup(opts)
+    opts = opts or {}
+    local list
+    if opts.ids then
+        list = NotesInOrder(opts.ids)
+    else
+        local ndb, all = BNB.NotesDB(), {}
+        for id in pairs(ndb and ndb.notes or {}) do all[#all + 1] = id end
+        list = NotesInOrder(all)
+    end
+    if opts.fmt == FMT_MARKDOWN then
+        local chunks = { string.format("# BigNoteBox Export v%d | %s | %d note(s)\n",
+            EXPORT_VERSION, BNB.Date("%Y-%m-%d %H:%M"), #list) }
+        for _, note in ipairs(list) do chunks[#chunks + 1] = "===\n" .. MdEncodeNote(note) end
+        return table.concat(chunks, "\n"), #list
+    end
+    local parts = {}
+    for _, note in ipairs(list) do parts[#parts + 1] = JsonEncodeNote(note) end
+    local tpls  = opts.templates and BNB.Templates and BNB.Templates.BackupList() or nil
+    local toks  = opts.tokens    and BNB.Tokens    and BNB.Tokens.BackupList()    or nil
+    local cols  = opts.tagColors and BNB.TagColors and BNB.TagColors.BackupMap()  or nil
+    local profs = opts.profiles  and BNB.Profiles  and BNB.Profiles.BackupList()  or nil
+    return JsonEnvelope(parts, tpls, toks, cols, profs), #list
+end
+
 -- Public wrapper so the BNB_IMPORT_SCOPE_REMAP popup callback (defined in
 -- SlashCommands.lua, which loads before this file) can call ImportNotes.
 -- Set after the local is defined so the closure captures the correct function.
@@ -1313,6 +1360,7 @@ BNB.NoteExport = {
     MdEncodeNote      = MdEncodeNote,
     HtmlEncodeNote     = HtmlEncodeNote,
     SerializeNotes     = SerializeNotes,
+    BuildBackup        = BuildBackup,
     ParseJsonNotes     = ParseJsonNotes,
     ParseMarkdownNotes = ParseMarkdownNotes,
 }

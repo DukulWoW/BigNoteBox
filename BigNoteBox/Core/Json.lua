@@ -36,8 +36,39 @@ local function EscChar(c)
     return ESC[c] or format("\\u%04x", byte(c))
 end
 
+-- "|" goes out as | (ALL-507): a backup is shown and copied in a WoW
+-- edit box, which reads |c / |H / |h as escape codes; a full backup with
+-- item links in its notes showed an empty box and copied nothing (Dukul,
+-- 2026-10-18). Decode gives the same "|" back, as does every older build
+-- (\u has been read since ALL-136.5).
+-- Invalid UTF-8 (a byte that starts no character, or a character cut short)
+-- goes out as \u00XX, the byte read as Latin-1, so the text stays valid: a WoW
+-- edit box shows nothing at all of a text with one bad byte in it, and a full
+-- backup with one broken tag came up empty (ALL-507, 2026-10-18). Valid text
+-- is left as it is.
+local function FixUtf8(s)
+    if not find(s, "[\128-\255]") then return s end
+    local out, n, i, len, bad = {}, 0, 1, #s, false
+    while i <= len do
+        local b = byte(s, i)
+        local w = (b < 0x80 and 1) or (b >= 0xC2 and b <= 0xDF and 2)
+            or (b >= 0xE0 and b <= 0xEF and 3) or (b >= 0xF0 and b <= 0xF4 and 4) or 0
+        local ok = w > 0 and i + w - 1 <= len
+        for k = i + 1, ok and (i + w - 1) or 0 do
+            local c = byte(s, k)
+            if c < 0x80 or c > 0xBF then ok = false; break end
+        end
+        n = n + 1
+        if ok then out[n] = sub(s, i, i + w - 1); i = i + w
+        else out[n] = format("\\u%04x", b); i = i + 1; bad = true end
+    end
+    return bad and concat(out) or s
+end
+
+-- Control characters by byte range, not %c, whose meaning follows the
+-- client's locale
 local function EncodeString(s)
-    return '"' .. s:gsub('[%c"\\]', EscChar) .. '"'
+    return '"' .. FixUtf8((s:gsub('[%z\1-\31\127"\\|]', EscChar))) .. '"'
 end
 Json.EncodeString = EncodeString
 

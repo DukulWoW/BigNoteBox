@@ -316,13 +316,22 @@ end
 --------------------------------------------------------------------------------
 local function GetLibSerialize() return LibStub and LibStub("LibSerialize", true) end
 
-function P.Export()
+-- name: a stored profile (the full backup), or nil = the one in use
+function P.Export(name)
     local ls, ld = GetLibSerialize(), BNB.GetDeflate()
     if not (ls and ld) then return nil end
-    local settings = Snapshot(true)
+    local db = DB()
+    local settings, ver
+    if name == nil or name == P.Active() then
+        name, settings, ver = P.Active(), Snapshot(true), db.dbVersion
+    else
+        local t = type(db.profiles) == "table" and db.profiles[name]
+        if type(t) ~= "table" then return nil end
+        settings, ver = BNB.DeepCopy(t), t.dbVersion or db.dbVersion
+    end
     settings.dbVersion = nil
-    local payload = { kind = "bnbprofile", v = 1, name = P.Active(),
-                      dbVersion = DB().dbVersion, settings = settings }
+    local payload = { kind = "bnbprofile", v = 1, name = name,
+                      dbVersion = ver, settings = settings }
     local ok, ser = pcall(ls.Serialize, ls, payload)
     if not ok or not ser then return nil end
     return CODE_PREFIX .. ld:EncodeForPrint(ld:CompressDeflate(ser))
@@ -354,4 +363,39 @@ function P.AddImported(name, payload)
     local t = payload.settings
     Kit().Migrate(t)
     DB().profiles[name] = t
+end
+
+--------------------------------------------------------------------------------
+-- FULL JSON BACKUP (Features/NoteExport.lua, ALL-496 S2): every profile as a
+-- profile code, so the JSON round trip never changes a setting
+--------------------------------------------------------------------------------
+
+-- The codes of every profile, the one in use included (not one deleted and
+-- waiting for the reload)
+function P.BackupList()
+    local out = {}
+    for _, n in ipairs(P.List()) do
+        if P.Exists(n) then
+            local code = P.Export(n)
+            if code then out[#out + 1] = code end
+        end
+    end
+    return out
+end
+
+-- Adds the backup's profiles whose names are free here; a name already used
+-- (Default always is) is skipped, never overwritten or renamed (Dukul,
+-- 2026-10-18). Returns how many were added.
+function P.ImportBackup(list)
+    if type(list) ~= "table" or not DB() then return 0 end
+    local n = 0
+    for _, code in ipairs(list) do
+        local payload = type(code) == "string" and P.Decode(code)
+        local name = payload and payload.name and P.CheckName(payload.name)
+        if name then
+            P.AddImported(name, payload)
+            n = n + 1
+        end
+    end
+    return n
 end
