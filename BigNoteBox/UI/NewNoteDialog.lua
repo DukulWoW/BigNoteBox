@@ -1115,7 +1115,7 @@ function NND.Confirm()
     if _selRich then updates.richMode = true end
     local scope = _scopeDD and _scopeDD:GetSelected()
     if scope then updates.scope = scope end   -- ALL-267
-    if _selFolder and BNB.Folders and BNB.Folders.Get(_selFolder) then
+    if _selFolder and BNB.Folders and BNB.FoldersEnabled() and BNB.Folders.Get(_selFolder) then
         updates.folder = _selFolder           -- ALL-510
         BNB.Folders.SetOpen(_selFolder, true)
     end

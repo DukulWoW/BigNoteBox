@@ -1122,6 +1122,7 @@ local function BuildToolbar(parent)
     lockBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id); if not note then return end
+        if note.system then BNB:Print(L["SYS_NOTE_READONLY"]); return end   -- ALL-511
         local isLocked = NoteIsLocked(note)
         if isLocked then
             -- Unlock persistently (same as right-click "Unlock note")
@@ -1142,8 +1143,12 @@ local function BuildToolbar(parent)
         local note = id and BNB.GetNote(id)
         local isLocked = note and NoteIsLocked(note)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        GameTooltip:AddLine(isLocked and L["NE_CLICK_UNLOCK_TIP"]
-                                      or L["NE_CLICK_LOCK_TIP"], 1, 1, 1)
+        if note and note.system then   -- ALL-511
+            GameTooltip:AddLine(L["SYS_NOTE_READONLY"], 1, 1, 1, true)
+        else
+            GameTooltip:AddLine(isLocked and L["NE_CLICK_UNLOCK_TIP"]
+                                          or L["NE_CLICK_LOCK_TIP"], 1, 1, 1)
+        end
         GameTooltip:Show()
     end)
     lockBtn:SetScript("OnLeave", function(self)
@@ -1196,6 +1201,7 @@ local function BuildToolbar(parent)
     BNB.ApplyEditorStickyBtn()
     -- Send to Chat button (right side) — icon-only using send.tga
     local sendBtn, _ = MakeIconBtn(bar, BNB.AbIcon("send"), L["SEND_TITLE"], 28 + AB_GROW, 28 + AB_GROW)
+    BNB._editorSendBtn = sendBtn   -- off for a system note (ALL-511)
     -- -26 keeps it clear of the main window's 16 px resize grip (BOTTOMRIGHT -2, 2)
     sendBtn:SetPoint("RIGHT", bar, "RIGHT", -26, 0)
     -- Override OnEnter to add the sub-line tooltip
@@ -1745,6 +1751,30 @@ end
 -- lock while the open note is locked (ALL-95, ALL-239)
 function BNB.EditorLockKind() if BNB._editorLocked then return "lock" end end
 
+-- A system note (ALL-511) is read only: the buttons that would change it,
+-- stick it, give it attachments or tasks, share or send it are off. Duplicate
+-- and Copy stay (a copy is a normal note). The formatting toolbar's right
+-- side is set again on every load (LoadNoteInEditor, before this runs); the
+-- action bar buttons are put back here.
+local function ApplySystemNote()
+    local id   = BNB._currentNoteID
+    local note = id and BNB.GetNote(id)
+    local sys  = note ~= nil and note.system ~= nil
+    for _, b in ipairs({ BNB._editorPinBtn, BNB._editorRefBoxBtn, BNB._editorTasksBtn, BNB._editorSendBtn }) do
+        if sys then
+            b:SetEnabled(false); b:SetAlpha(0.35); b._sysOff = true
+        elseif b._sysOff then
+            b:SetEnabled(true); b:SetAlpha(1); b._sysOff = nil
+        end
+    end
+    if sys then
+        for _, b in ipairs({ BNB._wysiwygShareBtn, BNB._wysiwygCopyMoveBtn, BNB._wysiwygAlarmBtn,
+                             BNB._wysiwygHistoryBtn, BNB._wysiwygRestoreBtn }) do
+            b:SetIconEnabled(false)
+        end
+    end
+end
+
 local function SetEditorLocked(locked)
     BNB._editorLocked = locked
 
@@ -1792,6 +1822,7 @@ local function SetEditorLocked(locked)
     -- tl;dr line: no add / edit icon on a locked note, an open edit box closes
     if locked and BNB._CancelTldrEdit then BNB._CancelTldrEdit() end
     BNB.RefreshEditorTldr()
+    ApplySystemNote()
 end
 
 --------------------------------------------------------------------------------

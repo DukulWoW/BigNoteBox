@@ -41,6 +41,7 @@
 --   F.ImportList(list)   a backup's folders in; -> backup id -> id here
 --   F.ImportID(id, map)  a note's folder id on import, or nil
 --   F.MAX_NAME
+--   BNB.FoldersEnabled() / BNB.ApplyFoldersModule(on)   the module switch (ALL-514)
 -- Every change sends "FoldersChanged" (the list redraws on it); moving notes
 -- sends the usual NoteChanged per note.
 --------------------------------------------------------------------------------
@@ -310,4 +311,28 @@ end
 function F.OpenFor(noteID)
     local id = F.Of(BNB.GetNote(noteID))
     if id and not F.IsOpen(id) then F.SetOpen(id, true) end
+end
+
+-- ── Module switch (ALL-514, Dukul 2026-10-19) ────────────────────────────────
+-- `foldersEnabled` (DEFAULTS true; off in the setup wizard's Minimal), read
+-- only through BNB.FoldersEnabled(). Off = every way to make, see or fill a
+-- folder is gone: folder headers (notes in a folder show under Notes), the
+-- folder view and its button, Move to folder, drag onto headers, New folder,
+-- Copy / Move into a folder, the New note dialog's folder. The data stays
+-- (note.folder, BigNoteBoxNotesDB.folders, backups, copies), so switching
+-- back on brings the filing back. The system folders (Patch notes) are not
+-- part of it: they keep their own setting.
+function BNB.FoldersEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.foldersEnabled ~= false
+end
+
+-- After the switch changed: out of the folder view, then everything that
+-- shows folders redraws from FoldersChanged / FoldersModule
+function BNB.ApplyFoldersModule(on)
+    local db = BigNoteBoxDB
+    if not on and db and db.tagTreeMode and db.treeSource == "folders" and BNB.SetTagTreeMode then
+        BNB.SetTagTreeMode(false)
+    end
+    BNB.SendMessage("FoldersModule", on)
+    Changed(nil)
 end

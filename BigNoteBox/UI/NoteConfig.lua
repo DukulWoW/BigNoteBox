@@ -875,6 +875,7 @@ function BNB.OpenNoteConfig(noteID, tab)
     if InCombatLockdown() then BNB:Print(L["COMBAT_BLOCKED"]); return end
     local note=noteID and BNB.GetNote(noteID)
     if not note then BNB:Print(L["NC_NO_NOTE_SELECTED"]); return end
+    if note.system then BNB:Print(L["SYS_NOTE_READONLY"]); return end   -- ALL-511
     local tabIdx = tab and TAB_KEYS[tab]
 
     if ncFrame and ncFrame:IsShown() and _noteID==noteID then
@@ -925,7 +926,7 @@ function BNB.SyncNoteConfig(noteID)
     if not ncFrame or not ncFrame:IsShown() then return end
     if not noteID then ncFrame:Hide(); return end
     local note = BNB.GetNote(noteID)
-    if not note then ncFrame:Hide(); return end
+    if not note or note.system then ncFrame:Hide(); return end   -- a system note: read only (ALL-511)
 
     _noteID = noteID
     RefreshTitle()

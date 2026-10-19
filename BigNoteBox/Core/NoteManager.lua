@@ -518,6 +518,11 @@ local DeepCopy = BNB.DeepCopy
 -- fields after the copy, e.g. { title = "...", scope = "char:X" }.
 function BNB.CopyNote(srcID, overrides)
     local src = NDB() and NDB().notes[srcID]
+    -- A system note (ALL-511): its text only, as a normal Global note
+    if not src and BNB.SystemNotes then
+        local sys = BNB.SystemNotes.Get(srcID)
+        if sys then src = { title = sys.title, body = sys.body, richMode = sys.richMode, scope = "global" } end
+    end
     if not src then return nil end
     local newID = BNB.CreateNote(src.title, src.body)
     if not newID then return nil end
@@ -938,9 +943,15 @@ end
 --------------------------------------------------------------------------------
 -- GET NOTE
 --------------------------------------------------------------------------------
+-- A system note (ALL-511, "sys-" id, Core/SystemNotes.lua) is found here and
+-- nowhere else: every write reads ndb.notes itself, so it refuses one.
 function BNB.GetNote(id)
     local ndb = id and NDB()
-    return ndb and ndb.notes and ndb.notes[id] or nil   -- notes nil: Factory Reset before its reload (ALL-284)
+    local note = ndb and ndb.notes and ndb.notes[id]   -- notes nil: Factory Reset before its reload (ALL-284)
+    if note then return note end
+    local SYS = id and BNB.SystemNotes
+    if SYS and SYS.IsSystem(id) then return SYS.Get(id) end
+    return nil
 end
 
 --------------------------------------------------------------------------------

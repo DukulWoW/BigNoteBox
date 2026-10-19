@@ -253,14 +253,15 @@ function K.BuildDevToolsPage(sf, ct, y)
                 BNB:Print(string.format("|cff88bbff%d note(s) matched - toast should appear.|r", #matches))
             end
         end },
-        -- The patch note + toast as after an update (ALL-409): the stamped
-        -- version is cleared, id / checksum kept, so the replace rule runs too
+        -- The toast as after an update (ALL-409; it opens the release in the
+        -- Patch notes folder since ALL-511): the stamped version is cleared,
+        -- id / checksum kept, so an old pinned patch note is removed too
         { L["CFG_DEV_PATCHNOTE_BTN"], L["CFG_DEV_PATCHNOTE_TIP_BODY"], function()
             local ndb = BNB.NotesDB()
             if type(ndb) == "table" and type(ndb.patchNote) == "table" then ndb.patchNote.version = nil end
             BNB.WhatsNew.CheckAndShow(false)
             if not (BNB.ToastsEnabled() and BNB.ToastSourceOn("patchnotes")) then
-                BNB:Print("|cffff9900Patch note made; the toast is off in Settings > Modules > Toasts.|r")
+                BNB:Print("|cffff9900The patch notes toast is off in Settings > Modules > Toasts.|r")
             end
         end },
         -- The fresh-install welcome note (ALL-242), for this character's faction

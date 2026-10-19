@@ -503,11 +503,22 @@ L["OPT_OPEN_SETTINGS_BTN"]= "Open Settings"
 
 -- ── What's New window ─────────────────────────────────────────────────────────
 L["WN_TITLE_FMT"]         = "What's new in BigNoteBox v%s"
--- The patch note and its toast after an update (ALL-409)
+-- The patch notes and the toast after an update (ALL-409; the Patch notes folder since ALL-511)
 L["PN_NOTE_TITLE"]        = "BigNoteBox v%s patch notes"
 L["PN_NOTE_HEADING"]      = "Changes in v%s"
 L["PN_TOAST_TITLE"]       = "BigNoteBox updated"
-L["PN_TOAST_TEXT"]        = "v%s: the patch notes are in a pinned note. Click to read them."
+L["PN_TOAST_TEXT"]        = "v%s: the patch notes are in the Patch notes folder of your note list. Click to read them."
+-- System folders (ALL-511): folders from BigNoteBox itself, at the bottom of the note list
+L["SYS_FOLDER_PATCHNOTES"] = "Patch notes"
+L["SYS_CM_COPY"]           = "Copy to my notes"
+L["SYS_CM_COPY_TIP"]       = "Makes a normal note with this text, one you can change."
+L["SYS_CM_HIDE_RELEASE"]   = "Hide this release"
+L["SYS_CM_HIDE_RELEASE_TIP"] = "Takes this release out of the Patch notes folder. Right-click the folder to show hidden releases again."
+L["SYS_CM_SHOW_HIDDEN_FMT"] = "Show hidden releases (%d)"
+L["SYS_CM_HIDE_FOLDER"]    = "Hide this folder"
+L["SYS_CM_HIDE_FOLDER_TIP"] = "Settings > Modules > Folders shows it again."
+L["SYS_HIDE_FOLDER_PRINT_FMT"] = "The %s folder is hidden. Settings > Modules > Folders shows it again."
+L["SYS_NOTE_READONLY"]     = "This note comes with BigNoteBox and cannot be changed. Right-click > Copy to my notes makes one you can edit."
 -- The welcome note on a fresh install (ALL-242), written by Dukul. Keep
 -- "BigNoteBox", "GitHub", "CurseForge", "Wago.io" and "WoWInterface" exactly
 -- as written: the note colours the name and turns the site names into links.
@@ -844,6 +855,7 @@ L["SW_MOD_REFBOX_TIP"]     = "A panel beside the editor for the items, spells an
 L["SW_MOD_RICH_TIP"]       = "Notes with headings, colours, pictures and links, with a live preview beside the editor. Switched off, every note is plain text."
 L["SW_MOD_STICKY_TIP"]     = "Pin a note to your screen as a small window that stays up while you play."
 L["SW_MOD_TRASH_TIP"]      = "Deleted notes are kept in the Trash for a while, so you can get them back. Switched off, deleting a note is permanent."
+L["SW_MOD_FOLDERS_TIP"]    = "Put notes into folders of your own in the note list, and see them grouped in the folder view."
 L["SW_MOD_TLDR_TIP"]       = "Give a note one short line, a \"too long; didn't read\" like \"KOS\". It shows under the note title, in the tooltip when you hover the player or NPC the note is about, and on the note's toast."
 L["SW_MOD_TOASTS_TIP"]     ="Small pop-ups on your screen when a note's situation matches, or a task's. Switched off, nothing pops up; notes still match where they are set."
 L["MODE_TIP_MINIMAL"]      = "Only what you need to write notes: the note list, the editor, Trash and the note button in quest windows."
@@ -1721,8 +1733,14 @@ L["FOLDER_TREE_NONE"]             = "(no folder)"
 
 -- Config: Features tab — Tag Tree
 L["CFG_FOLDERS_HEADER"]           = "Folders"
+L["CFG_SUB_FOLDERS_DESC"]         = "Folders of your own in the note list, between Pinned and your notes, and the folder view."
+L["CFG_FOLDERS_ENABLE_LABEL"]     = "Use folders"
+L["CFG_FOLDERS_ENABLE_TIP"]       = "Put notes into folders of your own. Off: no folders in the note list, no folder view and no Move to folder. Notes in a folder show under Notes and keep their folder, so switching this back on puts them back."
+L["CFG_SYS_FOLDERS_HEADER"]       = "From BigNoteBox"
 L["CFG_FOLDER_START_OPEN"]        = "New folders start open"
 L["CFG_FOLDER_START_OPEN_TIP"]    = "Each folder remembers whether you left it open or closed. This decides how a new folder starts."
+L["CFG_SYS_PATCHNOTES"]           = "Show the Patch notes folder"
+L["CFG_SYS_PATCHNOTES_TIP"]       = "A folder after your notes with the patch notes of every BigNoteBox release. They can be read and copied, not changed."
 L["CFG_TAGTREE_HEADER"]           = "Tag Tree"
 L["CFG_TAGTREE_STAY_OPEN"]        = "Stay in the tag tree or folder view after selecting a note"
 L["CFG_TAGTREE_STAY_OPEN_TIP"]    = "When enabled, selecting a note keeps the tag tree or folder view open. Disable to return to list view automatically."
@@ -2005,7 +2023,7 @@ L["CFG_DEV_TOAST_TIP_BODY"]         = "Triggers CheckContextualNotes as if you j
 L["CFG_DEV_WELCOMENOTE_BTN"]        = "Fire Welcome Note"
 L["CFG_DEV_WELCOMENOTE_TIP_BODY"]   = "Makes the welcome note a fresh install gets, for this character's faction (Horde, Alliance or Neutral). Every click makes another one, with its toast."
 L["CFG_DEV_PATCHNOTE_BTN"]          = "Fire Patch Note"
-L["CFG_DEV_PATCHNOTE_TIP_BODY"]     = "Does what an update does: makes the patch note for this version and shows its toast. The last patch note is replaced unless it was edited or lost its Bnb tag."
+L["CFG_DEV_PATCHNOTE_TIP_BODY"]     = "Does what an update does: shows the patch notes toast for this version, which opens it in the Patch notes folder. An old pinned patch note is removed unless it was edited or lost its Bnb tag."
 L["CFG_DEV_IMM_LABEL"]              = "Debug Immersion button position"
 L["CFG_DEV_IMM_TIP"]                = "When enabled, prints the saved X/Y offset to chat every time you shift-drag and release the button."
 L["CFG_DEV_CTX_TRACE_LABEL"]        = "Trace situation checks"

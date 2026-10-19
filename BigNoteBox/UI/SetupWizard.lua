@@ -550,6 +550,12 @@ local MODULES = {
           SetDB("contextSurface", v)
           if BNB.ApplySituationsModule then BNB.ApplySituationsModule(v) end
       end },
+    { key = "folders", label = "CFG_FOLDERS_HEADER", tip = "SW_MOD_FOLDERS_TIP",   -- ALL-514: off in Minimal
+      get = function() return BNB.FoldersEnabled() end,
+      set = function(v)
+          SetDB("foldersEnabled", v)
+          if BNB.ApplyFoldersModule then BNB.ApplyFoldersModule(v) end
+      end },
     { key = "focus", label = "CFG_FOCUS_ORBIT_HEADER", tip = "SW_MOD_FOCUS_TIP",
       get = function() return BNB.FocusEnabled() end,
       set = function(v)

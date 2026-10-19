@@ -1,13 +1,15 @@
 -- BigNoteBox UI/WhatsNew.lua
 --
 -- "What's New?" window, opened from the version button in Settings > General
--- (and /bnb whatsnew). Since ALL-409 an update no longer opens it: the release
--- becomes a pinned patch note plus a toast (see "Patch note" below).
+-- (and /bnb whatsnew). Since ALL-409 an update no longer opens it: a toast
+-- opens the release in the Patch notes system folder (ALL-511, see "Patch
+-- note" below).
 --
 -- PUBLIC API:
 --   BNB.WhatsNew.Open(showOverlay)   -- showOverlay: true = dimmer behind it, false = none
 --   BNB.WhatsNew.Close()
---   BNB.WhatsNew.CheckAndShow(newInstall)  -- called on login; the patch note + toast if the version is new
+--   BNB.WhatsNew.CheckAndShow(newInstall)  -- called on login; the toast if the version is new
+--   BNB.WhatsNew.PatchNoteID(version)      -- that release's note in the Patch notes folder
 --
 -- DATA:
 --   BNB.PATCH_NOTES  (defined in UI/WhatsNewData.lua)
@@ -19,7 +21,8 @@
 --
 -- PERSISTENCE:
 --   BigNoteBoxDB.lastSeenWhatsNewVersion  -- set to version on close (no longer read)
---   NotesDB().patchNote = { version, id, sum }  -- the patch note made for a version
+--   NotesDB().patchNote = { version, id, sum }  -- the version seen; id / sum = the
+--                         last pinned patch note (before ALL-511), until it is gone
 --
 -- WINDOW SIZING:
 --   Width  : CFG_W (480px) -- same as ConfigWindow
@@ -353,28 +356,23 @@ function WN.Close()
     end
 end
 
--- ── Patch note (ALL-409) ─────────────────────────────────────────────────────
--- An update no longer opens the window: the release's lines become a pinned,
--- favourite, Global note (rich while Rich Notes is on) tagged Bnb / V1.23.0 /
--- V1.23, plus a toast that waits for a click (source "patchnotes", so it
--- follows the Toasts module). The window stays on the version button.
+-- ── Patch note (ALL-409, ALL-511) ────────────────────────────────────────────
+-- An update no longer opens the window: a toast that waits for a click
+-- (source "patchnotes", so it follows the Toasts module) opens the release in
+-- the Patch notes system folder (below; Dukul, 2026-10-19: the folder
+-- replaces the pinned patch note). The window stays on the version button,
+-- and the toast opens it while the Patch notes folder is switched off.
 --
--- Bookkeeping lives in the active notes set, so dev mode (its own notes DB)
--- gets its own note: NotesDB().patchNote = { version, id, sum }. sum is a
--- checksum of the title and body as written; the next version's note replaces
--- the old one only while that still matches and the Bnb tag is on it (the
--- player did not edit it or untag it). Pin / favourite do not count.
+-- From ALL-409 to ALL-511 the release became a pinned, favourite, Global
+-- note tagged Bnb / V1.23.0 / V1.23. That last note goes at the next update
+-- unless the player made it theirs: NotesDB().patchNote = { version, id, sum }
+-- (in the active notes set, so dev mode has its own), sum = a checksum of the
+-- title and body as written; it is deleted only while that still matches and
+-- the Bnb tag is on it. Pin / favourite do not count.
 local PN_TAG    = "BNB"
 local PN_GREEN  = "66bb6a"
 local PN_ORDER  = { "New", "Change", "Fixed" }   -- other labels follow, as found
-local PN_LABELS = { Changed = "Change" }          -- spellings WhatsNewData allows
-
-local function PatchTags(version)
-    local minor = version:match("^(%d+%.%d+)")
-    local tags = { BNB.NormalizeTag(PN_TAG), BNB.NormalizeTag("v" .. version) }
-    if minor and minor ~= version then tags[#tags + 1] = BNB.NormalizeTag("v" .. minor) end
-    return tags
-end
+local PN_LABELS = { Changed = "Change", Added = "New" }   -- spellings WhatsNewData allows (Added: 1.6.9 to 1.7.x)
 
 local function Checksum(note)
     local s = (note.title or "") .. "\n" .. (note.body or "")
@@ -460,17 +458,70 @@ local function PatchBody(version, entries, rich)
     return table.concat(out, "\n")
 end
 
--- The previous version's note goes, unless the player made it theirs
-local function RemoveOldPatchNote(ndb)
-    local pn = ndb.patchNote
-    local old = pn and pn.id and ndb.notes and ndb.notes[pn.id]
-    if not old then return end
-    if not HasTag(old, BNB.NormalizeTag(PN_TAG)) then return end
-    if Checksum(old) ~= pn.sum then return end
-    BNB.DeleteNote(pn.id, true)
+-- ── Patch notes system folder (ALL-511) ──────────────────────────────────────
+-- Every release in UI/PatchHistory.lua (newest first, made from the release
+-- tags by _work/tools/patch-history.lua) as a read-only note in the Patch
+-- notes folder (Core/SystemNotes.lua), built the way the patch note above is.
+-- The release in WhatsNewData.lua goes on top while the history file does not
+-- have it yet; a release with no lines for this client is left out. Hide
+-- saves the version (sysItem).
+local PN_SYS_PREFIX = "sys-pn-"
+
+function WN.PatchNoteID(version) return PN_SYS_PREFIX .. version end
+
+local function BuildPatchFolder(rich)
+    local list, seen = {}, {}
+    local function Add(version, entries, when)
+        if seen[version] then return end
+        seen[version] = true
+        local lines = ClientEntries(entries)
+        if #lines == 0 then return end
+        list[#list + 1] = {
+            id      = PN_SYS_PREFIX .. version,
+            title   = string.format(L["PN_NOTE_TITLE"], version),
+            body    = PatchBody(version, lines, rich),
+            created = when or time(),
+            sysItem = version,
+        }
+    end
+    local cur  = BNB.PATCH_NOTES
+    local hist = BNB.PATCH_HISTORY or {}
+    if cur and cur.version and not (hist[1] and hist[1].version == cur.version) then
+        local inHist
+        for _, r in ipairs(hist) do
+            if r.version == cur.version then inHist = true; break end
+        end
+        if not inHist then Add(cur.version, cur.entries, nil) end
+    end
+    for _, r in ipairs(hist) do Add(r.version, r.entries, r.time) end
+    return list
 end
 
--- A note from BigNoteBox itself (patch note, welcome note): Global, pinned,
+if BNB.SystemNotes then
+    BNB.SystemNotes.Register({
+        key = "patchnotes", order = 10, name = "SYS_FOLDER_PATCHNOTES",
+        setting = "sysPatchNotes", prefix = PN_SYS_PREFIX, canHide = true,
+        r = 0x66 / 255, g = 0xbb / 255, b = 0x6a / 255,   -- BNB green
+        icon = "Interface\\AddOns\\BigNoteBox\\Assets\\icon",   -- the addon icon (Dukul, 2026-10-19)
+        Build = BuildPatchFolder,
+    })
+end
+
+-- The last pinned patch note goes, unless the player made it theirs; either
+-- way its bookkeeping is done with (no new one is made since ALL-511)
+local function RemoveOldPatchNote(ndb)
+    local pn = ndb.patchNote
+    if type(pn) ~= "table" then return end
+    local id, sum = pn.id, pn.sum
+    pn.id, pn.sum = nil, nil
+    local old = id and ndb.notes and ndb.notes[id]
+    if not old then return end
+    if not HasTag(old, BNB.NormalizeTag(PN_TAG)) then return end
+    if Checksum(old) ~= sum then return end
+    BNB.DeleteNote(id, true)
+end
+
+-- A note from BigNoteBox itself (the welcome note; the patch note until ALL-511): Global, pinned,
 -- favourite, and made nowhere, so no creation spot
 local function MakeAddonNote(title, body, rich, tags)
     local id = BNB.CreateNote(title, body)
@@ -483,13 +534,7 @@ local function MakeAddonNote(title, body, rich, tags)
     return id
 end
 
-local function CreatePatchNote(version, entries)
-    local rich = BNB.RichEnabled and BNB.RichEnabled() or false
-    return MakeAddonNote(string.format(L["PN_NOTE_TITLE"], version),
-        PatchBody(version, entries, rich), rich, PatchTags(version))
-end
-
-local function ShowPatchToast(version, id)
+local function ShowPatchToast(version)
     if not (BNB.Toast and BNB.Toast.Show) then return end
     BNB.Toast.Show({
         key    = "patchnotes",
@@ -498,16 +543,20 @@ local function ShowPatchToast(version, id)
         text   = string.format(L["PN_TOAST_TEXT"], version),
         hold   = 0,   -- waits for a click
         onClick = function()
-            if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id) end
+            -- The release in the Patch notes folder; the window while the
+            -- folder is switched off
+            local id = WN.PatchNoteID(version)
+            if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id)
+            else WN.Open(false) end
         end,
     })
 end
 
 -- ── Public: CheckAndShow ──────────────────────────────────────────────────────
--- Called on login after Initialize(). Once per version per notes set: makes
--- the patch note and shows its toast (ALL-409). newInstall = setup not done
--- yet: the version is only stamped, a new player gets no patch note for the
--- version they installed. The window opens from the version button only.
+-- Called on login after Initialize(). Once per version per notes set: removes
+-- the last pinned patch note (from before ALL-511) and shows the toast.
+-- newInstall = setup not done yet: the version is only stamped, a new player
+-- gets no toast for the version they installed.
 function WN.CheckAndShow(newInstall)
     local data = BNB.PATCH_NOTES
     if not data or not data.version then return end
@@ -524,10 +573,7 @@ function WN.CheckAndShow(newInstall)
     local entries = ClientEntries(data.entries)
     if #entries == 0 then return end
     RemoveOldPatchNote(ndb)
-    local id = CreatePatchNote(data.version, entries)
-    if not id then return end
-    pn.id, pn.sum = id, Checksum(BNB.GetNote(id))
-    ShowPatchToast(data.version, id)
+    ShowPatchToast(data.version)
 end
 
 -- ── Welcome note (ALL-242) ───────────────────────────────────────────────────

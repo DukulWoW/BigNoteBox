@@ -142,8 +142,11 @@ BNB.DEFAULTS = {
     tagTreeStartExpanded = false,
     tagTreeStayOpen      = true,
 
-    -- Note folders (ALL-510): how a new folder starts in the list
+    -- Note folders (ALL-510): the module (ALL-514) and how a new folder starts in the list
+    foldersEnabled       = true,
     folderStartOpen      = true,
+    -- System folders (ALL-511): the Patch notes folder shows in the list
+    sysPatchNotes        = true,
 
     -- Reference Box and Tasks (ALL-102)
     referenceBoxEnabled = true,

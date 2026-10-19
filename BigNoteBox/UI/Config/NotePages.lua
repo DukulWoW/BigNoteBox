@@ -3,7 +3,7 @@
 -- off the Notes and General tabs (ALL-290, Dukul 2026-10-05). Listed on the
 -- Modules tab (UI/Config/Modules.lua), built by K.NewSubPage; open one from
 -- outside with BNB.OpenSettingsPage("modules", "richNotes" | "history" |
--- "undo" | "trash" | "alarms" | "placement"). Window placement (ALL-291) holds a copy
+-- "undo" | "trash" | "alarms" | "placement" | "folders"). Window placement (ALL-291) holds a copy
 -- of every placement setting; the originals stay where they are.
 
 local BNB = BigNoteBox
@@ -727,6 +727,55 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TRASH: the checkbox is the page's master switch (twin on the overview row)
 -- ─────────────────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- FOLDERS (ALL-514): the module switch, how a new folder starts, and the
+-- Patch notes system folder (ALL-511), which is not part of the module and
+-- works with it off
+-- ─────────────────────────────────────────────────────────────────────────────
+function K.BuildFoldersPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
+    local startCb
+    local function Sync()
+        local on = BNB.FoldersEnabled()
+        if startCb then
+            startCb:SetEnabled(on); startCb:SetAlpha(on and 1 or 0.35)
+            if startCb._lbl then startCb._lbl:SetAlpha(on and 1 or 0.35) end
+        end
+    end
+
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_FOLDERS_ENABLE_LABEL"],
+        function() return BNB.FoldersEnabled() end,
+        function(v)
+            db.foldersEnabled = v
+            BNB.ApplyFoldersModule(v)
+            Sync()
+        end,
+        L["CFG_FOLDERS_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
+    -- Each folder keeps its own open / closed; this is how a new one starts
+    -- (ALL-510, Dukul 2026-10-19)
+    y, startCb = AddCheck(ct, y, L["CFG_FOLDER_START_OPEN"],
+        function() return db.folderStartOpen ~= false end,
+        function(v) db.folderStartOpen = v end,
+        L["CFG_FOLDER_START_OPEN_TIP"])
+    startCb:HookScript("OnShow", Sync)
+
+    -- System folders (ALL-511): from BigNoteBox itself, after your notes
+    y = AddRule(ct, y - 4) - 6
+    y = AddHeader(ct, y, L["CFG_SYS_FOLDERS_HEADER"])
+    y = AddCheck(ct, y, L["CFG_SYS_PATCHNOTES"],
+        function() return db.sysPatchNotes ~= false end,
+        function(v)
+            db.sysPatchNotes = v
+            BNB.SendMessage("SystemNotesChanged", "patchnotes")
+        end,
+        L["CFG_SYS_PATCHNOTES_TIP"])
+    Sync()
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
 function K.BuildTrashPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     -- ── Trash enable/disable checkbox ─────────────────────────────────────────

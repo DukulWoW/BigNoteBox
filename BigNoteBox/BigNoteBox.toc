@@ -36,6 +36,7 @@ Core\NoteFields.lua
 Core\NoteManager.lua
 Core\TagColors.lua
 Core\Folders.lua
+Core\SystemNotes.lua
 Core\Initialize.lua
 
 # UI
@@ -122,6 +123,7 @@ UI\OkPhrases.lua
 UI\WhatsNew.lua
 UI\BugReport.lua
 UI\WhatsNewData.lua
+UI\PatchHistory.lua
 UI\FeatureList.lua
 UI\FeatureListData.lua
 UI\SetupWizard.lua

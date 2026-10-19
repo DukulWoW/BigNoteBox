@@ -152,6 +152,11 @@ end
 -- extraBottom(root), optional: entries after the last one, below a divider
 -- (Focus mode's Close Focus Mode, ALL-163).
 function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
+    -- A system note (ALL-511) has its own short menu (UI/FolderMenus.lua)
+    if BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID) then
+        if BNB.ShowSystemNoteMenu then BNB.ShowSystemNoteMenu(owner, noteID) end
+        return
+    end
     local note = BNB.GetNote(noteID)
     if not note then return end
     local K = BNB._NoteListKit

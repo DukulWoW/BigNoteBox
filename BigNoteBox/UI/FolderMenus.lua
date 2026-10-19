@@ -25,9 +25,8 @@ local function PopupEditBox(self) return (self.GetEditBox and self:GetEditBox())
 
 local function Err(msg) BNB:Print("|cffff5555" .. msg .. "|r") end
 
--- Dukul's folder art is in colour: white = drawn as it is, in both looks
--- (an iconTex without iconColor is tinted in the skin look)
-local AS_DRAWN = { 1, 1, 1 }
+-- Menu rows about folders use Dukul's cm-folder symbol (2026-10-19), one for
+-- every row: the list shows open / closed, a menu row only says "folder"
 
 -- Notes into a folder (nil = out of folders); the folder opens
 local function MoveInto(ids, id)
@@ -65,11 +64,14 @@ StaticPopupDialogs["BNB_FOLDER_NAME"] = {
         local eb = PopupEditBox(self)
         SubmitName(eb and eb:GetText(), data)
     end,
+    -- Read the name before hiding: hiding the popup clears its edit box, so
+    -- Enter always sent an empty name ("A folder needs a name", Dukul,
+    -- 2026-10-19); OK reads it in OnAccept, before the hide
     EditBoxOnEnterPressed = function(eb)
         local p = eb:GetParent()
-        local data = p.data
+        local data, text = p.data, eb:GetText()
         p:Hide()
-        SubmitName(eb:GetText(), data)
+        SubmitName(text, data)
     end,
     EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
     timeout = 0, whileDead = true, hideOnEscape = true,
@@ -121,6 +123,7 @@ local function NewFolder()
 end
 
 function BNB.ShowFolderMenu(owner, id)
+    if not BNB.FoldersEnabled() then return end   -- module off (ALL-514): catch-all
     local FD = F()
     local rec = FD.Get(id)
     if not rec then return end
@@ -133,8 +136,7 @@ function BNB.ShowFolderMenu(owner, id)
         end, { icon = "rename" })
         AddColorMenu(root, id)
         root:CreateDivider()
-        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder,
-            { iconTex = FD.ART_OPEN, iconColor = AS_DRAWN })
+        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder" })
         root:CreateDivider()
         root:CreateButton(L["FOLDER_CM_DELETE"], function()
             local n = FD.CountAll(id)
@@ -146,9 +148,9 @@ function BNB.ShowFolderMenu(owner, id)
 end
 
 function BNB.ShowNotesHeaderMenu(owner)
+    if not BNB.FoldersEnabled() then return end   -- its only row is New folder (ALL-514)
     BNB.ContextMenu.Open(owner, function(root)
-        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder,
-            { iconTex = F().ART_OPEN, iconColor = AS_DRAWN })
+        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder" })
     end)
 end
 
@@ -156,7 +158,7 @@ end
 -- ids = the notes; after() runs once they moved (Select mode ends itself)
 function BNB.AddMoveToFolderMenu(root, ids, after)
     local FD = F()
-    if not FD or not ids or #ids == 0 then return end
+    if not FD or not BNB.FoldersEnabled() or not ids or #ids == 0 then return end   -- ALL-514
     -- The folder every note is in, false when they differ
     local common, anyIn = nil, false
     for i, noteID in ipairs(ids) do
@@ -170,14 +172,13 @@ function BNB.AddMoveToFolderMenu(root, ids, after)
             if after then after() end
         end
     end
-    local sub = root:CreateButton(L["FOLDER_CM_MOVE"], nil,
-        { iconTex = FD.ART_OPEN, iconColor = AS_DRAWN })
+    local sub = root:CreateButton(L["FOLDER_CM_MOVE"], nil, { icon = "folder" })
     local list = FD.List()
     for _, f in ipairs(list) do
         local label = FD.Text(f.id)   -- the name in the folder's colour
         if common == f.id then label = string.format(L["TAGCOL_CURRENT_FMT"], label) end
         sub:CreateButton(label, Done(f.id),
-            { iconTex = FD.ART_CLOSED, iconColor = AS_DRAWN, disabled = common == f.id })
+            { icon = "folder", disabled = common == f.id })
     end
     if #list > 0 then sub:CreateDivider() end
     sub:CreateButton(L["FOLDER_CM_NEW_FOLDER"], function()
@@ -186,5 +187,65 @@ function BNB.AddMoveToFolderMenu(root, ids, after)
             if after then after() end
         end })
     end, { icon = "create" })
-    sub:CreateButton(L["FOLDER_CM_NO_FOLDER"], Done(nil), { disabled = not anyIn })
+    sub:CreateButton(L["FOLDER_CM_NO_FOLDER"], Done(nil), { icon = "folder-no", disabled = not anyIn })   -- Dukul's cm-folder-no
+end
+
+-- ── System folders (ALL-511) ────────────────────────────────────────────────
+-- A system note's right-click (list row, editor, anywhere ShowNoteContextMenu
+-- is asked for one): Open, Copy to my notes, Hide this release. A system
+-- folder header's: Show hidden releases, Hide this folder (its setting).
+local function SYS() return BNB.SystemNotes end
+
+-- A normal Global note with the system note's text, opened in the editor
+function BNB.CopySystemNote(id)
+    local newID = BNB.CopyNote(id)
+    if not newID then return end
+    if BNB.OpenNoteInMain then BNB.OpenNoteInMain(newID) end
+    return newID
+end
+
+function BNB.ShowSystemNoteMenu(owner, id)
+    local S = SYS()
+    local note = S and S.Get(id)
+    if not note then return end
+    local p = S.Provider(note.system)
+    BNB.ContextMenu.Open(owner, function(root)
+        root:CreateTitle(note.title)
+        root:CreateDivider()
+        if BNB._currentNoteID ~= id then
+            root:CreateButton(L["NL_CM_OPEN_EDITOR"], function()
+                if BNB.OpenNoteInMain then BNB.OpenNoteInMain(id) end
+            end, { icon = "editor" })
+        end
+        root:CreateButton(L["SYS_CM_COPY"], function() BNB.CopySystemNote(id) end,
+            { icon = "duplicate", tip = L["SYS_CM_COPY"], tipSub = L["SYS_CM_COPY_TIP"] })
+        if p and p.canHide then
+            root:CreateDivider()
+            root:CreateButton(L["SYS_CM_HIDE_RELEASE"], function() S.Hide(id) end,
+                { tip = L["SYS_CM_HIDE_RELEASE"], tipSub = L["SYS_CM_HIDE_RELEASE_TIP"] })
+        end
+    end)
+end
+
+function BNB.ShowSystemFolderMenu(owner, key)
+    local S = SYS()
+    local p = S and S.Provider(key)
+    if not p then return end
+    BNB.ContextMenu.Open(owner, function(root)
+        root:CreateTitle(L[p.name], { icon = F().ART_OPEN, crop = false,
+            color = p.r and { r = p.r, g = p.g, b = p.b } or nil })
+        root:CreateDivider()
+        if p.canHide then
+            local n = S.HiddenCount(key)
+            root:CreateButton(string.format(L["SYS_CM_SHOW_HIDDEN_FMT"], n), function() S.ShowHidden(key) end,
+                { disabled = n == 0 })
+        end
+        if p.setting then
+            root:CreateButton(L["SYS_CM_HIDE_FOLDER"], function()
+                if BigNoteBoxDB then BigNoteBoxDB[p.setting] = false end
+                BNB:Print(string.format(L["SYS_HIDE_FOLDER_PRINT_FMT"], L[p.name]))
+                BNB.SendMessage("SystemNotesChanged", key)
+            end, { tip = L["SYS_CM_HIDE_FOLDER"], tipSub = L["SYS_CM_HIDE_FOLDER_TIP"] })
+        end
+    end)
 end

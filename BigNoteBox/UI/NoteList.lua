@@ -254,8 +254,8 @@ function BNB.SetListCollapsed(collapsed)
     if BNB._tagTreeBtn then
         if collapsed then BNB._tagTreeBtn:Hide() else BNB._tagTreeBtn:Show() end
     end
-    if BNB._folderTreeBtn then   -- ALL-510 S4
-        if collapsed then BNB._folderTreeBtn:Hide() else BNB._folderTreeBtn:Show() end
+    if BNB._folderTreeBtn then   -- ALL-510 S4; hidden while the Folders module is off (ALL-514)
+        if collapsed or not BNB.FoldersEnabled() then BNB._folderTreeBtn:Hide() else BNB._folderTreeBtn:Show() end
     end
     if BNB._searchOuterClear then
         if collapsed then BNB._searchOuterClear:Hide() else BNB._searchOuterClear:Show() end
@@ -379,9 +379,10 @@ local function BuildSearchBar(parent)
         btn:SetAlpha(on and 1.0 or 0.35)
         pcall(function() tx:SetDesaturated(not on) end)
     end
-    -- tint = the search row's white art (gold / skin accent); the folder
-    -- picture is Dukul's art in colour, drawn as it is
-    local function TreeButton(tex, source, tint, tipOn, tipOff)
+    -- tint = the search row's white art (gold / skin accent). texOn = the
+    -- picture while its source is shown (the folder button shows the list
+    -- view icon in the folder view, Dukul 2026-10-19, ALL-514)
+    local function TreeButton(tex, source, tint, tipOn, tipOff, texOn)
         local tb = CreateFrame("Button", nil, parent)
         tb:SetSize(TREE_BTN, TREE_BTN)
         tb:SetFrameLevel(parent:GetFrameLevel() + 10)
@@ -394,7 +395,11 @@ local function BuildSearchBar(parent)
         if tint then BNB.TintUIIcon(tx) end
         BNB.AddUIIconHover(tb, tx)
         tb._tx = tx
-        tb._apply = function() ApplyLit(tb, tx, TreeOn(source)) end
+        tb._apply = function()
+            local on = TreeOn(source)
+            if texOn then tx:SetTexture(on and texOn or tex) end
+            ApplyLit(tb, tx, on)
+        end
         tb._apply()
         tb:SetScript("OnClick", function()
             if BNB.SetTagTreeMode then BNB.SetTagTreeMode(not TreeOn(source), source) end
@@ -411,10 +416,13 @@ local function BuildSearchBar(parent)
         end)
         return tb
     end
+    -- Both tree buttons show the list view icon while their view is on
+    -- (Dukul, 2026-10-19, ALL-514)
     local treeBtn = TreeButton(ASSETS .. "UI\\ui-treeview", nil, true,
-        "TAGTREE_TOGGLE_TIP_ON", "TAGTREE_TOGGLE_TIP_OFF")
-    local folderBtn = TreeButton(BNB.Folders and BNB.Folders.ART_CLOSED or (ASSETS .. "UI\\ui-folder-closed"),
-        "folders", false, "FOLDER_TREE_TIP_ON", "FOLDER_TREE_TIP_OFF")
+        "TAGTREE_TOGGLE_TIP_ON", "TAGTREE_TOGGLE_TIP_OFF", ASSETS .. "UI\\ui-list-view")
+    -- Dukul's white folder / list view icons (ALL-514), tinted like the rest
+    local folderBtn = TreeButton(ASSETS .. "UI\\ui-folder", "folders", true,
+        "FOLDER_TREE_TIP_ON", "FOLDER_TREE_TIP_OFF", ASSETS .. "UI\\ui-list-view")
     BNB._tagTreeBtn    = treeBtn
     BNB._folderTreeBtn = folderBtn
     -- Called by SetTagTreeMode / InitTagTree to sync both buttons with the saved state
@@ -430,6 +438,16 @@ local function BuildSearchBar(parent)
     -- Anchor the tree buttons left of the bar, vertically centred to bar height
     treeBtn:SetPoint("RIGHT", bar, "LEFT", -TREE_GAP, 0)
     folderBtn:SetPoint("RIGHT", treeBtn, "LEFT", -TREE_GAP, 0)
+    -- Folders module off (ALL-514): no folder button, the bar one button wider
+    local function PlaceFolderBtn()
+        local on = BNB.FoldersEnabled()
+        local n = on and 2 or 1
+        bar:SetPoint("TOPLEFT", parent, "TOPLEFT", PAD_L + n * (TREE_BTN + TREE_GAP) + 2, -2)
+        if on and not BNB._listCollapsed then folderBtn:Show() else folderBtn:Hide() end
+        folderBtn._apply()
+    end
+    PlaceFolderBtn()
+    BNB.RegisterMessage("NoteListFolderBtn", "FoldersModule", PlaceFolderBtn)
 
     -- Search bar backdrop: skin-aware or plain dark
     local function ApplySearchBarSkin()
@@ -908,19 +926,28 @@ BNB._NoteListKit = {
 -- DRAG HELPERS
 -- Reordering (a drop between rows) needs Custom sort and an unfiltered list.
 -- A drop on a folder header (into it) or the Notes header (out of folders)
--- works in every sort mode (ALL-510 S3, Dukul 2026-10-19). No drag in the
--- tag tree.
+-- works in every sort mode (ALL-510 S3, Dukul 2026-10-19). The folder view
+-- takes drops on its folder headers and No folder only, no reordering (its
+-- notes are A-Z); the tag tree has no drag (Dukul, 2026-10-19: a drag there
+-- reordered the list and filed by a list row's old section).
 --------------------------------------------------------------------------------
+local function FolderView()
+    local db = BigNoteBoxDB
+    return db and db.tagTreeMode and db.treeSource == "folders" or false
+end
+
 local function CanDragReorder()
     local db = BigNoteBoxDB
     return (db.sortBy == "custom")
+        and not db.tagTreeMode
         and (currentFilter == "")
         and (currentTagFilter == nil)
 end
 
 local function CanDragToFolder()
     local db = BigNoteBoxDB
-    return not (db and db.tagTreeMode) and BNB.Folders ~= nil and BNB.Folders.Any()
+    if db and db.tagTreeMode and not FolderView() then return false end
+    return BNB.Folders ~= nil and BNB.FoldersEnabled() and BNB.Folders.Any()
 end
 
 -- Ghost and drop line in BNB green, the Sidebar's ACTIVE_R/G/B (ALL-98)
@@ -978,6 +1005,11 @@ end
 local function HeaderUnderCursor()
     local child, sf = BNB._listScrollChild, BNB._listScrollFrame
     if not child or (sf and not sf:IsMouseOver()) then return nil end
+    -- The folder view: its own headers (Features/TagTree.lua)
+    if FolderView() then
+        if BNB.TagTreeDropHeader then return BNB.TagTreeDropHeader() end
+        return nil
+    end
     for _, hdr in ipairs(child._folderHdrs or {}) do
         if hdr:IsShown() and hdr._folderID and hdr:IsMouseOver() then return hdr, hdr._folderID end
     end
@@ -985,10 +1017,12 @@ local function HeaderUnderCursor()
     if nh and nh:IsShown() and nh:IsMouseOver() then return nh, false end
 end
 
+local _dragScroll = nil   -- the list's scroll before a folder view drag closed every header
+
 local function EndDrag(commit)
     BNB.ClearCursor()   -- ALL-95
     local ghost = _dragGhost
-    if ghost then ghost:Hide() end
+    if ghost then ghost:Hide(); ghost:SetScript("OnUpdate", nil) end
     local dl = _dropLine; if dl then dl:Hide() end
     local folder, ids = _dragFolder, _dragIDs
     LightHeader(nil)
@@ -1038,6 +1072,20 @@ local function EndDrag(commit)
     _dragFolder   = nil
     _dragSection  = nil
     _dragIDs      = nil
+    -- A folder view drag: headers back as they were (the target folder was
+    -- opened by the move), then the scroll where it was
+    if _dragScroll then
+        local sc = _dragScroll
+        _dragScroll = nil
+        if BNB.TagTreeDragCollapse then BNB.TagTreeDragCollapse(false) end
+        local sf = BNB._listScrollFrame
+        if sf then
+            C_Timer.After(0, function()
+                local max = sf:GetVerticalScrollRange() or 0
+                sf:SetVerticalScroll(math.min(sc, max))
+            end)
+        end
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -1447,6 +1495,16 @@ local function CreateListEntry(parent)
 
     -- Double-click -> the action picked in Settings > Notes (ALL-100)
     btn:SetScript("OnClick", function(self, mouseBtn)
+        -- A system note (ALL-511): opened to read, never picked in Select
+        -- mode, no double-click action; right-click is its own short menu
+        if self._sys then
+            if mouseBtn == "RightButton" then
+                if BNB.ShowSystemNoteMenu then BNB.ShowSystemNoteMenu(self, self._noteID) end
+            elseif BNB._currentNoteID ~= self._noteID then
+                BNB.SaveCurrentNote(); BNB.SelectNote(self._noteID)
+            end
+            return
+        end
         if mouseBtn == "RightButton" then
             -- Select mode: the menu for the whole selection (ALL-234); a row
             -- not yet picked is added first, so the menu covers what you clicked
@@ -1528,7 +1586,7 @@ local function CreateListEntry(parent)
     btn:SetScript("OnMouseDown", function(self, mouseBtn)
         HideTip(self)   -- out of the way of a drag or the right-click menu
         if mouseBtn ~= "LeftButton" then return end
-        local noteID = self._noteID; if not noteID then return end
+        local noteID = self._noteID; if not noteID or self._sys then return end
         local noteCheck = BNB.GetNote(noteID)
         -- Pinned notes are not reordered (they sort A-Z), but can be filed
         local reorder  = CanDragReorder() and not (noteCheck and noteCheck.pinned)
@@ -1557,6 +1615,14 @@ local function CreateListEntry(parent)
                 if i == 1 then same = fid or false elseif same ~= (fid or false) then same = nil end
             end
             BNB.ShowCursor("hold")
+            -- Folder view: every header closes while the note is carried, so
+            -- the folders fit as targets (Dukul, 2026-10-19); EndDrag reopens
+            if FolderView() and BNB.TagTreeDragCollapse then
+                local sf = BNB._listScrollFrame
+                _dragScroll = sf and sf:GetVerticalScroll() or 0
+                BNB.TagTreeDragCollapse(true)
+                if sf then sf:SetVerticalScroll(0) end
+            end
             local note  = BNB.GetNote(noteID)
             local ghost = GetOrCreateDragGhost()
             if ghost._lbl then
@@ -1574,6 +1640,14 @@ local function CreateListEntry(parent)
             ghost:Show()
             ghost:SetScript("OnUpdate", function()
                 if not _dragNoteID then ghost:SetScript("OnUpdate", nil); return end
+                -- Released where the row's own OnMouseUp cannot see it (the
+                -- row was hidden by a redraw, e.g. the folder view closing
+                -- its headers): the drop happens here
+                if not IsMouseButtonDown("LeftButton") then
+                    _dropAt = GetTime()
+                    EndDrag(true)
+                    return
+                end
                 local cx, cy = GetCursorPosition()
                 local s2 = UIParent:GetEffectiveScale()
                 ghost:ClearAllPoints()
@@ -1610,7 +1684,7 @@ local function CreateListEntry(parent)
                 -- Pinned rows are not targets.
                 local rows = {}
                 for _, b in ipairs(listEntries) do
-                    if b:IsShown() and b._noteID and b:GetTop() then
+                    if b:IsShown() and b._noteID and not b._sys and b:GetTop() then
                         local nt = BNB.GetNote(b._noteID)
                         if nt and not nt.pinned then rows[#rows + 1] = b end
                     end
@@ -2086,6 +2160,15 @@ local function GetFolderHeader(child, i)
     hdr._rule = rule
     hdr:HookScript("OnSizeChanged", FitFolderLabel)
     hdr:SetScript("OnClick", function(self, button)
+        local sys = self._sysKey   -- a system folder (ALL-511): no drops, its own menu
+        if sys then
+            if button == "RightButton" then
+                if BNB.ShowSystemFolderMenu then BNB.ShowSystemFolderMenu(self, sys) end
+            elseif not self._forcedOpen then
+                BNB.SystemNotes.SetOpen(sys, not BNB.SystemNotes.IsOpen(sys))
+            end
+            return
+        end
         local id = self._folderID
         if not id then return end
         if button == "RightButton" then
@@ -2097,7 +2180,8 @@ local function GetFolderHeader(child, i)
     hdr:SetScript("OnEnter", function(self)
         if not self._iconRow or _dragNoteID then return end
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:AddLine(BNB.Folders.Text(self._folderID) .. " (" .. (self._count or 0) .. ")")
+        local name = self._sysKey and self._sysName or BNB.Folders.Text(self._folderID)
+        GameTooltip:AddLine(name .. " (" .. (self._count or 0) .. ")")
         GameTooltip:AddLine(L["FOLDER_ROW_TIP"], 0.85, 0.85, 0.85, true)
         GameTooltip:Show()
     end)
@@ -2107,12 +2191,16 @@ local function GetFolderHeader(child, i)
 end
 
 -- f = a BNB.Folders.List() entry; n = its notes on this tab; forced = drawn
--- open by a search or filter, whatever its saved state
+-- open by a search or filter, whatever its saved state. A system folder
+-- (ALL-511) is f = { sys = key, name, r, g, b }: no _folderID, so it is never
+-- a drop target (HeaderUnderCursor)
 local function LayoutFolderHeader(hdr, f, n, open, forced, iconRow, rowH)
     local FD = BNB.Folders
     hdr._folderID, hdr._count, hdr._forcedOpen, hdr._iconRow = f.id, n, forced, iconRow
+    hdr._sysKey, hdr._sysName = f.sys, f.sys and f.name or nil
     local hr, hg, hb = BNB.HeaderColor()
-    local r, g, b = FD.Color(f.id)
+    local r, g, b
+    if f.sys then r, g, b = f.r, f.g, f.b else r, g, b = FD.Color(f.id) end
     r, g, b = r or hr, g or hg, b or hb
     hdr._icon:SetTexture(FD.Art(open, n > 0))   -- Dukul's art, in colour: never tinted
     hdr._icon:ClearAllPoints(); hdr._text:ClearAllPoints(); hdr._rule:ClearAllPoints()
@@ -2142,6 +2230,14 @@ local function RefreshNoteList()
     -- Every filter change ends here, typing included (ALL-194: the reset
     -- icon only lit up for the favourite and task buttons)
     if BNB._applyOuterClearState then BNB._applyOuterClearState() end
+    -- A folder view saved while the Folders module is now off (a profile, the
+    -- setup wizard): back to the list (ALL-514)
+    local db = BigNoteBoxDB
+    if db and db.tagTreeMode and db.treeSource == "folders" and not BNB.FoldersEnabled()
+       and BNB.SetTagTreeMode then
+        BNB.SetTagTreeMode(false)   -- redraws the list itself
+        return
+    end
     -- Delegate to tag tree when that mode is active
     if BigNoteBoxDB and BigNoteBoxDB.tagTreeMode and BNB.RefreshTagTree then
         BNB.RefreshTagTree()
@@ -2164,7 +2260,8 @@ local function RefreshNoteList()
     -- Folders (ALL-510): a note in a folder is drawn under its folder, after
     -- Pinned and before the regular notes; a pinned one stays under Pinned and
     -- the folder still counts it (Dukul, 2026-10-19)
-    local FD = BNB.Folders
+    -- Folders module off (ALL-514): no folder sections, every note under Notes
+    local FD = BNB.FoldersEnabled() and BNB.Folders or nil
     local pinned, regular, inFolder, folderN = {}, {}, {}, {}
     for _, note in ipairs(notes) do
         local fid = FD and FD.Of(note)
@@ -2241,6 +2338,7 @@ local function RefreshNoteList()
         btn:SetPoint("TOPLEFT",  child, "TOPLEFT",  indent, -totalH)
         btn:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -totalH)
         btn._section = section
+        btn._sys = note.system   -- a system note (ALL-511): read only, never dragged or picked
         PopulateEntry(btn, note, note.id == selID, collapsed)
         btn:Show()
         totalH = totalH + entryH
@@ -2310,8 +2408,42 @@ local function RefreshNoteList()
 
     for _, note in ipairs(regular) do AddRow(note, 0, "notes") end
 
+    -- ── System folders (ALL-511) ──────────────────────────────────────────────
+    -- After the Notes, every tab. Their notes are not in GetOrderedNotes: the
+    -- search text is matched here (title and text, as GetOrderedNotes does),
+    -- a folder with matches drawn open. Tag, favourite and task filters hide
+    -- them (a system note has none of those).
+    local SYS = BNB.SystemNotes
+    local sysShown = 0
+    local otherFilter = currentTagFilter ~= nil or BNB._favFilterActive == true
+        or BNB._taskFilterActive == true
+    if SYS and not otherFilter then
+        local lower = currentFilter ~= "" and currentFilter:lower() or nil
+        if #regular > 0 and not collapsed then totalH = totalH + 4 end
+        for _, p in ipairs(SYS.Folders()) do
+            local sysNotes = SYS.Search(p.key, lower)
+            if #sysNotes > 0 then
+                sysShown = sysShown + 1
+                local open = lower ~= nil or SYS.IsOpen(p.key)
+                local hdr = GetFolderHeader(child, #folders + sysShown)
+                LayoutFolderHeader(hdr, { sys = p.key, name = L[p.name], r = p.r, g = p.g, b = p.b },
+                    #sysNotes, open, lower ~= nil, collapsed, entryH)
+                hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  collapsed and 0 or PAD_L, -totalH)
+                hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", collapsed and 0 or -4, -totalH)
+                hdr:Show()
+                totalH = totalH + hdr:GetHeight()
+                if open then
+                    for _, note in ipairs(sysNotes) do
+                        AddRow(note, collapsed and 0 or FOLDER_INDENT, "sys:" .. p.key)
+                    end
+                end
+                if not collapsed then totalH = totalH + 2 end
+            end
+        end
+    end
+
     -- Empty state (empty folders on show are not "no notes" to look at)
-    if #notes == 0 and #folders == 0 then
+    if #notes == 0 and #folders == 0 and sysShown == 0 then
         if not BNB._listEmptyLabel then
             local lbl = child:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
             lbl:SetPoint("TOP", child, "TOP", 0, -24)
@@ -2459,6 +2591,7 @@ BNB.RegisterMessage("NoteList", "NoteCreated",  QueueFull)
 BNB.RegisterMessage("NoteList", "NoteDeleted",  QueueFull)
 BNB.RegisterMessage("NoteList", "NoteRestored", QueueFull)
 BNB.RegisterMessage("NoteList", "FoldersChanged", QueueFull)   -- ALL-510
+BNB.RegisterMessage("NoteList", "SystemNotesChanged", QueueFull)   -- ALL-511
 BNB.RegisterMessage("NoteList", "NoteChanged", function(_, id, fields)
     if not RowOnly(fields) then return QueueFull() end
     _seq = _seq + 1; _pendingRows[id] = _seq
@@ -2472,6 +2605,21 @@ end)
 -- tag, favourite and task filters cleared (the reset button's own action).
 --------------------------------------------------------------------------------
 function BNB.RevealNoteInList(id)
+    -- A system note (ALL-511): its folder opens; a search or filter hides
+    -- the system folders, so it is cleared
+    local SYS = BNB.SystemNotes
+    if SYS and SYS.IsSystem(id) then
+        local key = SYS.FolderOf(id)
+        if key then SYS.SetOpen(key, true) end
+        -- Tag, favourite and task filters hide the system folders; so may a
+        -- search, so it is cleared too
+        local filtering = currentFilter ~= "" or currentTagFilter ~= nil
+            or BNB._favFilterActive == true or BNB._taskFilterActive == true
+        local oc = BNB._searchOuterClear
+        local reset = filtering and oc and oc:GetScript("OnClick")
+        if reset then reset(oc) end
+        return
+    end
     -- A note in a closed folder: the folder opens (ALL-510)
     if BNB.Folders then BNB.Folders.OpenFor(id) end
     for _, n in ipairs(BNB.GetOrderedNotes(currentFilter, currentTagFilter)) do

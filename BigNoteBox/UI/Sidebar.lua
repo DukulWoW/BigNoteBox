@@ -908,7 +908,7 @@ end
 local function ShowCopyMove(f, noteIDs, dests, multi)
     local ndb = BNB.NotesDB()
     local FD  = BNB.Folders
-    local folders = FD and FD.List() or {}
+    local folders = FD and BNB.FoldersEnabled() and FD.List() or {}   -- no folder part while the module is off (ALL-514)
     if #dests == 0 and #folders == 0 then
         f:Hide()
         BNB:Print(L["SB_NO_DESTINATIONS"])

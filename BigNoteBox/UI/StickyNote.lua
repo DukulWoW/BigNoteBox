@@ -2732,6 +2732,7 @@ end
 -- login restore loop so reloading doesn't pop open the ESC menu.
 function SN.Open(noteID, noESCOpen)
     if not BNB.StickiesEnabled() then return end   -- module off (ALL-343): catch-all
+    if BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID) then return end   -- never a sticky (ALL-511)
     if InCombatLockdown() then BNB:Print(L["STICKY_COMBAT"]); return end
     if not BNB.GetNote(noteID) then return end
     -- noESCOpen is the login restore (RestoreSession), not an open.
@@ -3055,6 +3056,7 @@ function SN.EnsureMinimizedForAlarm(noteID)
 end
 
 function SN.Toggle(noteID)
+    if BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID) then return end   -- ALL-511: before GetCfg writes
     if SN.IsOpen(noteID) then
         SN.Close(noteID)
     else

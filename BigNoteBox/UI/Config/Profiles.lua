@@ -89,11 +89,13 @@ StaticPopupDialogs["BNB_PROFILE_NAME"] = {
         local eb = PopupEditBox(self)
         SubmitName(eb and eb:GetText(), data)
     end,
+    -- Read the text before hiding: hiding the popup clears its edit box
+    -- (ALL-515: Enter always sent an empty name)
     EditBoxOnEnterPressed = function(eb)
         local p = eb:GetParent()
-        local data = p.data
+        local data, text = p.data, eb:GetText()
         p:Hide()
-        SubmitName(eb:GetText(), data)
+        SubmitName(text, data)
     end,
     EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
     timeout = 0, whileDead = true, hideOnEscape = true,
@@ -151,7 +153,11 @@ StaticPopupDialogs["BNB_PROFILE_IMPORT"] = {
     button1 = L["PROFILE_IMPORT_BTN"], button2 = CANCEL,
     OnShow = function(self) local eb = PopupEditBox(self); if eb then eb:SetText(""); eb:SetFocus() end end,
     OnAccept = function(self) local eb = PopupEditBox(self); TryImport(eb and eb:GetText()) end,
-    EditBoxOnEnterPressed = function(eb) eb:GetParent():Hide(); TryImport(eb:GetText()) end,
+    EditBoxOnEnterPressed = function(eb)   -- the code read before the hide clears it (ALL-515)
+        local text = eb:GetText()
+        eb:GetParent():Hide()
+        TryImport(text)
+    end,
     EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
     timeout = 0, whileDead = true, hideOnEscape = true,
 }

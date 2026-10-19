@@ -331,13 +331,14 @@ end
 -- While the note page is open it switches to the note selected in the main
 -- window (NoteSelected from SelectNote)
 BNB.RegisterMessage("NoteHistoryPanel", "NoteSelected", function(_, id)
-    if _page and _page:IsVisible() and id and id ~= _page._noteID then
+    if _page and _page:IsVisible() and id and id ~= _page._noteID
+       and not (BNB.SystemNotes and BNB.SystemNotes.IsSystem(id)) then   -- no history (ALL-511)
         _hwFrame:ShowPage("note", id)
     end
 end)
 
 function BNB.OpenNoteHistoryPanel(noteID)
-    if not noteID then return end
+    if not noteID or (BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID)) then return end
     BNB.ShowHistoryWindow("note", noteID)
 end
 

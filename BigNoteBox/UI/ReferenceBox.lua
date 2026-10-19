@@ -3277,6 +3277,8 @@ end
 -- The window can show this note at all: the Reference part is always there
 -- (its add strip), else the note's model or the tasks view (ALL-388)
 local function CanShow(noteID)
+    -- A system note (ALL-511) is read only: no attachments, no tasks
+    if BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID) then return false end
     return RBOn() or BNB.TasksEnabled() or IsInspectNote(noteID)
 end
 
@@ -3382,7 +3384,7 @@ end
 BNB.RegisterMessage("ReferenceBox", "NoteSelected", function(_, id) BNB.SyncReferenceBox(id) end)
 
 function BNB.SyncReferenceBox(noteID)
-    if not noteID then
+    if not noteID or (BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID)) then   -- ALL-511
         if rbFrame and rbFrame:IsShown() then rbFrame:Hide() end
         return
     end

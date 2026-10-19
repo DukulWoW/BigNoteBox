@@ -19,6 +19,7 @@ local L   = BNB.L
 --------------------------------------------------------------------------------
 local _expandedTags  = {}   -- { [tagName] = true } when that header is expanded
 local _tagHeaders    = {}   -- reused header frames { btn, arrow, label, count }
+local _dragCollapsed = false   -- a note carried in the folder view: every header drawn closed
 local _collapseAllBtn, _expandAllBtn  -- pinned control buttons inside scroll child
 local UNTAGGED  = "__untagged__"
 local NO_FOLDER = "__nofolder__"
@@ -37,7 +38,7 @@ local function DB()  return BigNoteBoxDB          end
 
 local function FolderView()
     local db = DB()
-    return db and db.treeSource == "folders" and BNB.Folders ~= nil
+    return db and db.treeSource == "folders" and BNB.Folders ~= nil and BNB.FoldersEnabled()   -- ALL-514
 end
 
 local function ByTitle(a, b)
@@ -134,9 +135,29 @@ local function BuildFolderBuckets()
         label = "|cff888888" .. L["FOLDER_TREE_NONE"] .. "|r" }
 end
 
+-- The system folders (ALL-511), after No folder: their notes newest first,
+-- matched to the search text; the favourite filter hides them
+local function BuildSystemBuckets()
+    local SYS, out = BNB.SystemNotes, {}
+    if not SYS or BNB._favFilterActive then return out end
+    local text = BNB.GetCurrentFilter and BNB.GetCurrentFilter() or ""
+    local lower = text ~= "" and text:lower() or nil
+    for _, p in ipairs(SYS.Folders()) do
+        local notes = SYS.Search(p.key, lower)
+        if #notes > 0 then
+            local label = L[p.name]
+            if p.r then label = string.format("|cff%02x%02x%02x%s|r", p.r * 255, p.g * 255, p.b * 255, label) end
+            out[#out + 1] = { key = p.key, sys = true, notes = notes, label = label, forced = lower ~= nil }
+        end
+    end
+    return out
+end
+
 -- Open / closed of a header, and the change
 local function IsExpanded(b)
+    if _dragCollapsed then return false end   -- while a note is carried (BNB.TagTreeDragCollapse)
     if b.folder then return BNB.Folders.IsOpen(b.key) end
+    if b.sys then return b.forced or BNB.SystemNotes.IsOpen(b.key) end
     if b.key == NO_FOLDER then
         if _noFolderOpen == nil then
             local db = DB()
@@ -149,6 +170,7 @@ end
 
 local function SetExpanded(b, on)
     if b.folder then BNB.Folders.SetOpen(b.key, on)   -- FoldersChanged redraws
+    elseif b.sys then BNB.SystemNotes.SetOpen(b.key, on)   -- SystemNotesChanged redraws
     elseif b.key == NO_FOLDER then _noFolderOpen = on
     elseif on then _expandedTags[b.key] = true
     else _expandedTags[b.key] = nil end
@@ -281,6 +303,9 @@ function BNB.RefreshTagTree()
     local all = {}
     for _, b in ipairs(buckets) do all[#all + 1] = b end
     if #rest.notes > 0 then all[#all + 1] = rest end
+    if folderView then
+        for _, b in ipairs(BuildSystemBuckets()) do all[#all + 1] = b end
+    end
 
     -- Collapse/expand controls
     local colBtn, expBtn = GetOrCreateCollapseControls(child)
@@ -319,10 +344,16 @@ function BNB.RefreshTagTree()
         end
         hdr._lbl:SetText(b.label)
         hdr._count:SetText("(" .. #notes .. ")")
+        -- A drop target in the folder view (UI/NoteList.lua HeaderUnderCursor):
+        -- a folder's id, false = No folder (out of folders), nil = none
+        if folderView and b.folder then hdr._dropFolder = b.key
+        elseif folderView and b.key == NO_FOLDER then hdr._dropFolder = false
+        else hdr._dropFolder = nil end
         hdr:SetScript("OnClick", function(_, button)
             -- A folder's right-click is its menu, as in the list
             if button == "RightButton" then
                 if b.folder and BNB.ShowFolderMenu then BNB.ShowFolderMenu(hdr, b.key) end
+                if b.sys and BNB.ShowSystemFolderMenu then BNB.ShowSystemFolderMenu(hdr, b.key) end
                 return
             end
             SetExpanded(b, not expanded)
@@ -341,6 +372,8 @@ function BNB.RefreshTagTree()
                 btn:SetHeight(ENTRY_H)
                 btn:SetPoint("TOPLEFT",  child, "TOPLEFT",  ENTRY_INDENT, -totalH)
                 btn:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0,            -totalH)
+                btn._sys = note.system   -- a system note's row (ALL-511): no drag, its own menu
+                btn._section = nil       -- not a list section: never filed by a drop between rows
                 BNB.PopulateListEntry(btn, note, note.id == selID, false)
                 -- Override OnClick to respect tagTreeStayOpen setting
                 -- Hook left-click for tagTreeStayOpen behaviour — once per entry.
@@ -373,6 +406,26 @@ function BNB.RefreshTagTree()
     end
 end
 
+-- Dragging notes in the folder view (Dukul, 2026-10-19): every header is
+-- drawn closed while a note is carried, so the folders fit on screen as
+-- targets; the saved open / closed states are untouched and come back on drop
+function BNB.TagTreeDragCollapse(on)
+    on = on and true or false
+    if _dragCollapsed == on then return end
+    _dragCollapsed = on
+    BNB.RefreshTagTree()
+end
+
+-- The shown folder view header under the pointer and its drop value (a
+-- folder id, or false = No folder), or nil
+function BNB.TagTreeDropHeader()
+    for _, hdr in ipairs(_tagHeaders) do
+        if hdr:IsShown() and hdr._dropFolder ~= nil and hdr:IsMouseOver() then
+            return hdr, hdr._dropFolder
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
 -- Mode toggle
 --------------------------------------------------------------------------------
@@ -381,6 +434,8 @@ end
 function BNB.SetTagTreeMode(enabled, source)
     local db = DB()
     if not db then return end
+    -- No folder view while the Folders module is off (ALL-514)
+    if enabled and source == "folders" and not BNB.FoldersEnabled() then return end
 
     db.tagTreeMode = enabled
     if enabled then db.treeSource = (source == "folders") and "folders" or nil end
