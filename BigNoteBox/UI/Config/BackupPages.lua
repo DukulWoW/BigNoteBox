@@ -424,8 +424,10 @@ function K.BuildImportPickerPage(sf, ct, y, page)
     status:SetPoint("LEFT", cancelBtn, "RIGHT", 10, 0)
     status:SetWidth(CONTENT_W - 120 - 8 - 80 - 10)
 
-    -- One row per profile code: { code, name, cb }
+    -- One row per profile code: { code, name, as, taken, cb }. A name taken
+    -- here gets a dropdown: replace the one here, or add as "Name (1)" (ALL-509)
     local profs, pool = {}, {}
+    local DD_X = 200
     local function ProfRow(i)
         if pool[i] then return pool[i] end
         local cb = CreateFrame("CheckButton", nil, holder, "UICheckButtonTemplate")
@@ -433,9 +435,14 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         local lbl = holder:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         lbl:SetPoint("LEFT", cb, "RIGHT", 4, 0)
         lbl:SetJustifyH("LEFT")
+        lbl:SetWordWrap(false)
         cb._lbl = lbl
         BNB.LabelHit(cb, lbl)
         BNB.CheckTip(cb, function() return cb._tip end)
+        cb._ddEntries = {}   -- refilled per backup; the menu reads it when opened
+        cb._dd = BNB.CreateValueDropdown(holder, cb._ddEntries, "copy", nil,
+                                         math.min(260, CONTENT_W - DD_X), 24)
+        cb._dd:SetPoint("LEFT", cb, "LEFT", DD_X, 0)
         pool[i] = cb
         return cb
     end
@@ -452,7 +459,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
                 local as = P.FreeName(payload.name, used)
                 used[as:lower()] = true
                 profs[#profs + 1] = { code = code, name = payload.name, as = as,
-                                      free = P.CheckName(payload.name) == as }
+                                      taken = P.TakenBy(payload.name) }
             end
         end
         for _, part in ipairs(PARTS) do
@@ -469,13 +476,22 @@ function K.BuildImportPickerPage(sf, ct, y, page)
             local cb = ProfRow(i)
             cb:ClearAllPoints()
             cb:SetPoint("TOPLEFT", holder, "TOPLEFT", -2, yy + 2)
-            local shownName = P.DisplayName(p.name)
-            if p.free then
-                cb._lbl:SetText(shownName)
-                cb._tip = L["BACKUP_PICK_PROFILE_TIP"]
+            cb._lbl:SetText(P.DisplayName(p.name))
+            wipe(cb._ddEntries)
+            if p.taken then
+                -- Default comes back as Default; other names as a copy (Dukul, 2026-10-19)
+                cb._lbl:SetWidth(DD_X - 32)
+                cb._tip = L["BACKUP_PICK_TAKEN_TIP"]
+                cb._ddEntries[1] = { value = "replace",
+                    label = string.format(L["BACKUP_PICK_REPLACE"], P.DisplayName(p.taken)) }
+                cb._ddEntries[2] = { value = "copy",
+                    label = string.format(L["BACKUP_PICK_ADD_AS"], p.as) }
+                cb._dd:SetSelected(p.taken == P.DEFAULT and "replace" or "copy")
+                cb._dd:Show()
             else
-                cb._lbl:SetText(string.format(L["BACKUP_PICK_RENAMED"], shownName, p.as))
-                cb._tip = L["BACKUP_PICK_RENAMED_TIP"]
+                cb._lbl:SetWidth(CONTENT_W - 32)
+                cb._tip = L["BACKUP_PICK_PROFILE_TIP"]
+                cb._dd:Hide()
             end
             cb:SetChecked(true)
             cb:SetEnabled(true)
@@ -485,7 +501,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
             BNB.LabelHit(cb, cb._lbl)
             yy = yy - (26 + ROW_GAP)
         end
-        for i = #profs + 1, #pool do pool[i]:Hide(); pool[i]._lbl:Hide() end
+        for i = #profs + 1, #pool do pool[i]:Hide(); pool[i]._lbl:Hide(); pool[i]._dd:Hide() end
         local any = #profs > 0
         if any then profHdr:Show() else profHdr:Hide() end
         local bottom = any and (profHdrY - 26 + yy - 8) or profHdrY
@@ -514,14 +530,18 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         for _, key in ipairs({ "templates", "tokens", "tagColors" }) do
             if On(key) then out[key] = data[key]; any = true end
         end
-        local codes, names = {}, {}
+        local codes, names, replace = {}, {}, {}
         for _, p in ipairs(profs) do
             if p.cb and p.cb:GetChecked() then
                 codes[#codes + 1] = p.code
                 names[#codes] = p.as
+                replace[#codes] = (p.taken and p.cb._dd:GetSelected() == "replace") or nil
             end
         end
-        if #codes > 0 then out.profiles = codes; out.profileNames = names; any = true end
+        if #codes > 0 then
+            out.profiles, out.profileNames, out.profileReplace = codes, names, replace
+            any = true
+        end
         if not any then status:Say(L["BACKUP_PICK_NOTHING"], false); return end
         local fn = onImport
         data, onImport = nil, nil

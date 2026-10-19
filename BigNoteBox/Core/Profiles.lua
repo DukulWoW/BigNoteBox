@@ -12,6 +12,8 @@
 --   BigNoteBoxDB.profileChars   { [charKey] = name } (nil = Default)
 --   BigNoteBoxDB.profileDrop    the one in use was deleted: dropped at the next load
 --   BigNoteBoxDB.profileReset   the one in use goes back to defaults at the next load
+--   BigNoteBoxDB.profileReplace { [name] = settings }: the one in use, replaced from
+--                               a backup, gets these settings at the next load (ALL-509)
 --
 -- A switch only ever happens at load (P.OnLoad, from BNB.InitializeDB): the
 -- choice is saved, the UI reloads, and the load stores the live values under
@@ -38,7 +40,7 @@ local CODE_PREFIX = "BNBP1:"   -- profile codes (Export / Import)
 -- shared). Keys starting with "debug" are shared too (dev tools).
 local SHARED = {
     dbVersion = true, profiles = true, profileActive = true, profileChars = true,
-    profileDrop = true, profileReset = true,
+    profileDrop = true, profileReset = true, profileReplace = true,
     knownChars = true, lastSeenWhatsNewVersion = true, minimapIcon = true,
     postits = true, stickiesHidden = true, taskSplitRatio = true, mpePins = true,
     selectedNoteID = true, welcomeToastPending = true, migrationDone = true,
@@ -99,6 +101,17 @@ local function CutName(name, max)
         if #name - lead + 1 < need then name = name:sub(1, lead - 1) end
     end
     return name
+end
+
+-- The profile here that name clashes with (case, or Default's shown name), or nil
+function P.TakenBy(name)
+    name = (name or ""):match("^%s*(.-)%s*$")
+    local low = name:lower()
+    if low == "" then return nil end
+    if low == P.DEFAULT:lower() or low == L["PROFILE_DEFAULT"]:lower() then return P.DEFAULT end
+    for _, n in ipairs(P.List()) do
+        if n:lower() == low and P.Exists(n) then return n end
+    end
 end
 
 -- A name the player typed: trimmed, or nil + the reason. Case does not make
@@ -238,6 +251,25 @@ function P.OnLoad()
         ClearLive()
         changed = true
     end
+    -- Replaced from a backup while in use (ALL-509): after the reset, so the
+    -- backup's settings win. A stored one was replaced at the import already.
+    if type(db.profileReplace) == "table" then
+        for n, t in pairs(db.profileReplace) do
+            if type(t) == "table" then
+                Kit().Migrate(t)
+                if n == P.Active() then
+                    ClearLive()
+                    for k, v in pairs(t) do
+                        if IsProfileKey(k) then db[k] = v end
+                    end
+                    changed = true
+                elseif db.profiles[n] then
+                    db.profiles[n] = t
+                end
+            end
+        end
+        db.profileReplace = nil
+    end
     _charKey = CharKey()
     if _charKey then
         changed = ApplyForChar() or changed
@@ -343,7 +375,12 @@ function P.Export(name)
     if not (ls and ld) then return nil end
     local db = DB()
     local settings, ver
-    if name == nil or name == P.Active() then
+    local pending = type(db.profileReplace) == "table" and db.profileReplace[name or P.Active()]
+    if type(pending) == "table" then
+        -- replaced from a backup, waiting for the reload (ALL-509): that is the profile now
+        name = name or P.Active()
+        settings, ver = BNB.DeepCopy(pending), pending.dbVersion or db.dbVersion
+    elseif name == nil or name == P.Active() then
         name, settings, ver = P.Active(), Snapshot(true), db.dbVersion
     else
         local t = type(db.profiles) == "table" and db.profiles[name]
@@ -404,23 +441,61 @@ function P.BackupList()
     return out
 end
 
--- Adds the backup's profiles. A name already used here (Default always is) is
--- never overwritten: that profile comes in under a free name, "Default (1)"
--- (Dukul, 2026-10-18; it was skipped before). names = the names the import
--- picker showed, by position in list. Returns how many were added.
-function P.ImportBackup(list, names)
+-- The backup's settings take the place of the profile name here (ALL-509).
+-- Characters on it stay on it. The one in use is never swapped in a click:
+-- its settings wait in profileReplace for the next load. True = that one.
+function P.Replace(name, payload)
+    local db = DB()
+    local t = payload.settings
+    Kit().Migrate(t)
+    if name == P.Active() then
+        if type(db.profileReplace) ~= "table" then db.profileReplace = {} end
+        db.profileReplace[name] = t
+        return true
+    end
+    db.profiles[name] = t
+    return false
+end
+
+-- Adds the backup's profiles. A name already used here (Default always is)
+-- comes in under a free name, "Default (1)" (Dukul, 2026-10-18), unless the
+-- import picker set it to replace the one here (replace[i], ALL-509).
+-- names = the names the picker showed, by position in list. Returns how many
+-- came in, and the name of the profile in use when it was replaced.
+function P.ImportBackup(list, names, replace)
     if type(list) ~= "table" or not DB() then return 0 end
-    local n = 0
+    local n, inUse = 0, nil
     for i, code in ipairs(list) do
         local payload = type(code) == "string" and P.Decode(code)
-        local name = payload and payload.name
-            and ((type(names) == "table" and names[i] and P.CheckName(names[i]))
-                 or P.FreeName(payload.name))
-        name = name and P.CheckName(name)   -- never over a profile already here
-        if name then
-            P.AddImported(name, payload)
+        local over = payload and payload.name and type(replace) == "table" and replace[i]
+                     and P.TakenBy(payload.name)
+        if over then
+            if P.Replace(over, payload) then inUse = over end
             n = n + 1
+        else
+            local name = payload and payload.name
+                and ((type(names) == "table" and names[i] and P.CheckName(names[i]))
+                     or P.FreeName(payload.name))
+            name = name and P.CheckName(name)   -- never over a profile already here
+            if name then
+                P.AddImported(name, payload)
+                n = n + 1
+            end
         end
     end
-    return n
+    return n, inUse
+end
+
+-- After an import replaced the profile in use (ALL-509): reload now or later
+function P.ShowReplacedReload(name)
+    if not StaticPopupDialogs["BNB_PROFILE_REPLACED"] then
+        StaticPopupDialogs["BNB_PROFILE_REPLACED"] = {
+            preferredIndex = 3,
+            text = L["PROFILE_REPLACED_TEXT"],
+            button1 = L["CFG_RELOAD_NOW_BTN"], button2 = L["CFG_LATER_BTN"],
+            OnAccept = function() C_UI.Reload() end,
+            timeout = 0, whileDead = true, hideOnEscape = true,
+        }
+    end
+    StaticPopup_Show("BNB_PROFILE_REPLACED", P.DisplayName(name))
 end
