@@ -136,7 +136,7 @@ function BNB.ShowFolderMenu(owner, id)
         end, { icon = "rename" })
         AddColorMenu(root, id)
         root:CreateDivider()
-        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder" })
+        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder-add" })   -- Dukul's cm-folder-add
         root:CreateDivider()
         root:CreateButton(L["FOLDER_CM_DELETE"], function()
             local n = FD.CountAll(id)
@@ -150,7 +150,7 @@ end
 function BNB.ShowNotesHeaderMenu(owner)
     if not BNB.FoldersEnabled() then return end   -- its only row is New folder (ALL-514)
     BNB.ContextMenu.Open(owner, function(root)
-        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder" })
+        root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], NewFolder, { icon = "folder-add" })   -- Dukul's cm-folder-add
     end)
 end
 
@@ -186,7 +186,7 @@ function BNB.AddMoveToFolderMenu(root, ids, after)
             MoveInto(ids, id)
             if after then after() end
         end })
-    end, { icon = "create" })
+    end, { icon = "folder-add" })
     sub:CreateButton(L["FOLDER_CM_NO_FOLDER"], Done(nil), { icon = "folder-no", disabled = not anyIn })   -- Dukul's cm-folder-no
 end
 
@@ -243,6 +243,7 @@ function BNB.ShowSystemFolderMenu(owner, key)
         if p.setting then
             root:CreateButton(L["SYS_CM_HIDE_FOLDER"], function()
                 if BigNoteBoxDB then BigNoteBoxDB[p.setting] = false end
+                S.Reveal(key, false)   -- shown by a help link this session (ALL-512)
                 BNB:Print(string.format(L["SYS_HIDE_FOLDER_PRINT_FMT"], L[p.name]))
                 BNB.SendMessage("SystemNotesChanged", key)
             end, { tip = L["SYS_CM_HIDE_FOLDER"], tipSub = L["SYS_CM_HIDE_FOLDER_TIP"] })

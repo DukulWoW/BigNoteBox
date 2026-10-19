@@ -126,13 +126,14 @@ local function BuildFolderBuckets()
         if notes or (not filtering and not total[f.id]) then
             notes = notes or {}
             table.sort(notes, ByTitle)
+            local r, g, b = FD.Color(f.id)
             buckets[#buckets + 1] = { key = f.id, folder = true, notes = notes,
-                label = FD.Text(f.id) }
+                label = FD.Text(f.id), r = r, g = g, b = b }
         end
     end
     table.sort(loose, ByTitle)
     return buckets, { key = NO_FOLDER, notes = loose,
-        label = "|cff888888" .. L["FOLDER_TREE_NONE"] .. "|r" }
+        label = "|cff888888" .. L["FOLDER_TREE_NONE"] .. "|r", r = 0.53, g = 0.53, b = 0.53 }
 end
 
 -- The system folders (ALL-511), after No folder: their notes newest first,
@@ -147,7 +148,8 @@ local function BuildSystemBuckets()
         if #notes > 0 then
             local label = L[p.name]
             if p.r then label = string.format("|cff%02x%02x%02x%s|r", p.r * 255, p.g * 255, p.b * 255, label) end
-            out[#out + 1] = { key = p.key, sys = true, notes = notes, label = label, forced = lower ~= nil }
+            out[#out + 1] = { key = p.key, sys = true, notes = notes, label = label, forced = lower ~= nil,
+                r = p.r, g = p.g, b = p.b }
         end
     end
     return out
@@ -335,7 +337,7 @@ function BNB.RefreshTagTree()
         hdr._lbl:ClearAllPoints()
         hdr._lbl:SetPoint("RIGHT", hdr, "RIGHT", -40, 0)
         if folderView then
-            hdr._pic:SetTexture(BNB.Folders.Art(expanded, #notes > 0))
+            BNB.Folders.PaintArt(hdr._pic, expanded, #notes > 0, b.r, b.g, b.b)
             hdr._pic:Show()
             hdr._lbl:SetPoint("LEFT", hdr._pic, "RIGHT", 4, 0)
         else

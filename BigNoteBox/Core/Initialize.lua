@@ -248,7 +248,12 @@ function BNB.Initialize()
     end
     -- Dev mode (ALL-129) always says so, whatever the login message setting:
     -- it decides which notes are on screen
-    if BNB.IsDevMode() then
+    if BNB.IsDocMode() then   -- the help topics (ALL-512)
+        local n = 0
+        for _ in pairs(BNB.NotesDB().notes or {}) do n = n + 1 end
+        BNB:Print(string.format(L["CFG_DEV_DOC_LOGIN_FMT"], n))
+        if BNB._docSeedCount then BNB:Print(string.format(L["CFG_DEV_DOC_SEEDED_FMT"], BNB._docSeedCount)) end
+    elseif BNB.IsDevMode() then
         if BNB._devNotesCopied then
             BNB:Print(string.format(L["CFG_DEV_MODE_COPIED_FMT"], BNB._devNotesCopied))
         else

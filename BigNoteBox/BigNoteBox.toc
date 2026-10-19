@@ -124,6 +124,8 @@ UI\WhatsNew.lua
 UI\BugReport.lua
 UI\WhatsNewData.lua
 UI\PatchHistory.lua
+UI\HelpData.lua
+UI\Help.lua
 UI\FeatureList.lua
 UI\FeatureListData.lua
 UI\SetupWizard.lua
@@ -140,6 +142,7 @@ Features\NoteHistory.lua
 Features\ContextNotes.lua
 Features\ChatCapture.lua
 Features\DragDrop.lua
+Features\UILinks.lua
 Features\NoteLinks.lua
 Features\InsertInfo.lua
 Features\Tokens.lua

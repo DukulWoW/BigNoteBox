@@ -1885,7 +1885,9 @@ local function BuildModulesTab(sf, ct)
             y = AddRule(ct, y - 4) - 6
             y = AddHeader(ct, y, L["CFG_MODULES_OTHER_HDR"])
         end
-        local page = K.NewSubPage(m[1], m[3], m[4])
+        -- A page without its own key goes by its mode key, so a UI link can
+        -- open it (Features/UILinks.lua, ALL-513)
+        local page = K.NewSubPage(m[1], m[3], m[4] or m[5])
         y = K.AddOverviewRow(ct, sf, y, page, m[1], m[2])
         if m[5] then
             pages[m[5]] = page

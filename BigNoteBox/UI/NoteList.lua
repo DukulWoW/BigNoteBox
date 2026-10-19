@@ -1774,6 +1774,7 @@ local function PreviewText(note)
         body = body:gsub("{/?p:?[clr]?}", "")
         body = body:gsub("{img:[^}]+}", "")
         body = body:gsub("{icon:[^}]+}", "")
+        body = body:gsub("{atlas:[^}]+}", "")
         body = body:gsub("{col:%x%x%x%x%x%x}", "")
         body = body:gsub("{/col}", "")
         body = body:gsub("{br}", "")
@@ -2202,7 +2203,7 @@ local function LayoutFolderHeader(hdr, f, n, open, forced, iconRow, rowH)
     local r, g, b
     if f.sys then r, g, b = f.r, f.g, f.b else r, g, b = FD.Color(f.id) end
     r, g, b = r or hr, g or hg, b or hb
-    hdr._icon:SetTexture(FD.Art(open, n > 0))   -- Dukul's art, in colour: never tinted
+    FD.PaintArt(hdr._icon, open, n > 0, r, g, b)   -- skin mode: tinted like the name
     hdr._icon:ClearAllPoints(); hdr._text:ClearAllPoints(); hdr._rule:ClearAllPoints()
     if iconRow then
         hdr:SetHeight(rowH)
@@ -2258,20 +2259,21 @@ local function RefreshNoteList()
     -- GetOrderedNotes already sorts the pinned notes A-Z by title (PERF-07:
     -- they were sorted a second time here).
     -- Folders (ALL-510): a note in a folder is drawn under its folder, after
-    -- Pinned and before the regular notes; a pinned one stays under Pinned and
-    -- the folder still counts it (Dukul, 2026-10-19)
+    -- Pinned and before the regular notes; a pinned one shows under Pinned and
+    -- in its folder too, as the folder view does (Dukul, 2026-10-19: the folder
+    -- counted it but opened empty)
     -- Folders module off (ALL-514): no folder sections, every note under Notes
     local FD = BNB.FoldersEnabled() and BNB.Folders or nil
     local pinned, regular, inFolder, folderN = {}, {}, {}, {}
     for _, note in ipairs(notes) do
         local fid = FD and FD.Of(note)
         if fid then folderN[fid] = (folderN[fid] or 0) + 1 end
-        if note.pinned then pinned[#pinned + 1] = note
-        elseif fid then
+        if note.pinned then pinned[#pinned + 1] = note end
+        if fid then
             local t = inFolder[fid]
             if not t then t = {}; inFolder[fid] = t end
             t[#t + 1] = note
-        else regular[#regular + 1] = note end
+        elseif not note.pinned then regular[#regular + 1] = note end
     end
     -- Which folders show: one holding a note on this tab, and an empty one on
     -- every tab so it can be filled. A search or filter shows only folders
@@ -2534,7 +2536,12 @@ function BNB.RefreshNoteListEntry(id, opts)
         return
     end
     _seq = _seq + 1; _rowAt[id] = _seq
-    PopulateEntry(btn, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
+    -- A pinned note in a folder has two rows (Pinned and its folder)
+    for _, b in ipairs(listEntries) do
+        if b:IsShown() and b._noteID == id then
+            PopulateEntry(b, note, note.id == BNB._currentNoteID, BNB._listCollapsed)
+        end
+    end
 end
 
 -- Fields that only change how a note's own row looks. A change to anything
@@ -2592,6 +2599,7 @@ BNB.RegisterMessage("NoteList", "NoteDeleted",  QueueFull)
 BNB.RegisterMessage("NoteList", "NoteRestored", QueueFull)
 BNB.RegisterMessage("NoteList", "FoldersChanged", QueueFull)   -- ALL-510
 BNB.RegisterMessage("NoteList", "SystemNotesChanged", QueueFull)   -- ALL-511
+BNB.RegisterMessage("NoteList", "SkinChanged", QueueFull)   -- the folder art follows the look
 BNB.RegisterMessage("NoteList", "NoteChanged", function(_, id, fields)
     if not RowOnly(fields) then return QueueFull() end
     _seq = _seq + 1; _pendingRows[id] = _seq

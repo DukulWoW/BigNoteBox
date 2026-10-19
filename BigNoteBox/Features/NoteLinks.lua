@@ -25,6 +25,8 @@
 --   NL.OnEnter(owner, link)         tooltip; true when it was one of ours
 --   NL.OnClick(link, button)        click;   true when it was one of ours
 --   NL.ToChat(text) / NL.ToText(text)
+-- UI links (bnbui:<key>, ALL-513) open a part of BigNoteBox: the keys and what
+-- they open live in Features/UILinks.lua; hover, click and the link menu here.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -323,6 +325,17 @@ function NL.OnEnter(owner, link)
         end
         GameTooltip:Show()
         return true
+    elseif kind == "bnbui" then   -- ALL-513
+        local UL = BNB.UILinks
+        if not UL then return false end
+        local key = link:sub(7)
+        local ok, why = UL.State(key)
+        GameTooltip:SetOwner(owner, "ANCHOR_CURSOR")
+        GameTooltip:AddLine(UL.Label(key), ok and 1 or 0.6, ok and 0.8 or 0.6, ok and 0.2 or 0.6)
+        if ok then Hint(L["UILINK_TIP_CLICK"])
+        else GameTooltip:AddLine(why, 1, 0.35, 0.35, true) end
+        GameTooltip:Show()
+        return true
     end
     return false
 end
@@ -332,7 +345,10 @@ end
 -- the map (ALL-319). A note link opens the note; Shift as a sticky.
 function NL.OnClick(link, button)
     local kind = link and link:match("^(bnb%a+):")
-    if kind == "bnbwp" then
+    if kind == "bnbui" then   -- ALL-513: open that part of BigNoteBox
+        if button == "LeftButton" and BNB.UILinks then BNB.UILinks.Open(link:sub(7)) end
+        return true
+    elseif kind == "bnbwp" then
         if button ~= "LeftButton" then return true end
         local wp = ParseWay(link)
         if not (wp and C_Map and C_Map.GetMapInfo(wp.mapID)) then
@@ -489,7 +505,14 @@ function NL.LinkMenu(owner, link, text)
     if owner then owner._bnbLinkMenuT = GetTime() end
     local kind = link:match("^(%a+):")
     CM.Open(owner, function(root)
-        if kind == "bnbwp" then
+        if kind == "bnbui" and BNB.UILinks then   -- ALL-513
+            local UL, key = BNB.UILinks, link:sub(7)
+            local ok, why = UL.State(key)
+            root:CreateTitle(UL.Label(key))
+            local opts = { icon = "show", disabled = not ok }
+            if not ok then opts.tip, opts.tipSub = UL.Label(key), why end   -- why it is greyed
+            root:CreateButton(L["UILINK_MENU_OPEN"], function() UL.Open(key) end, opts)
+        elseif kind == "bnbwp" then
             local wp = ParseWay(link)
             if not (wp and C_Map and C_Map.GetMapInfo(wp.mapID)) then
                 root:CreateTitle(string.format(L["WAYLINK_BAD_MAP"], tostring(wp and wp.mapID)))
@@ -585,6 +608,7 @@ end
 
 local WAY_PAT  = "|c%x%x%x%x%x%x%x%x|H(bnbwp:[^|]*)|h(.-)|h|r"
 local NOTE_PAT = "|c%x%x%x%x%x%x%x%x|Hbnbnote:[^|]*|h(.-)|h|r"
+local UI_PAT   = "|c%x%x%x%x%x%x%x%x|Hbnbui:[^|]*|h(.-)|h|r"   -- ALL-513: its text
 local BARE_PAT = "|Hbnb%a+:[^|]*|h(.-)|h"   -- a link whose colour was edited away
 
 -- For chat: a waypoint becomes the game's map pin link, a note link its title
@@ -594,11 +618,11 @@ function NL.ToChat(text)
         local wp = ParseWay(data)
         return wp and MapPinLink(wp) or label
     end)
-    return (text:gsub(NOTE_PAT, "%1"):gsub(BARE_PAT, "%1"))
+    return (text:gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(BARE_PAT, "%1"))
 end
 
 -- Outside the game (HTML export): the shown text only
 function NL.ToText(text)
     if not (text and text:find("|Hbnb", 1, true)) then return text end
-    return (text:gsub(WAY_PAT, "%2"):gsub(NOTE_PAT, "%1"):gsub(BARE_PAT, "%1"))
+    return (text:gsub(WAY_PAT, "%2"):gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(BARE_PAT, "%1"))
 end

@@ -244,6 +244,9 @@ local function ConvertRichBody(body)
                 HTML_ICON_CDN, lname, size, size, name)
         end)
 
+        -- {atlas:...}: game art with no web copy, left out
+        line = line:gsub("{atlas:[^}]+}", "")
+
         -- {col:rrggbb}/{/col}
         line = line:gsub("{col:(%x%x%x%x%x%x)}", function(hex) return '<span style="color:#' .. hex .. ';">' end)
         line = line:gsub("{/col}", "</span>")

@@ -803,6 +803,9 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             onPick      = function(id) InsertSnippet(NL.NoteLink(id)) end,
             exclude     = BNB._currentNoteID,
             placeholder = L["NOTELINK_PICK_PH"],
+            -- The BigNoteBox list: a link that opens a Settings page, a
+            -- window or a help topic (ALL-513, Features/UILinks.lua)
+            onPlace     = BNB.UILinks and function(key) InsertSnippet(BNB.UILinks.Link(key)) end,
         })
     end)
 

@@ -68,6 +68,24 @@ function F.Art(open, hasNotes)
     return hasNotes and F.ART_FULL or F.ART_EMPTY
 end
 
+-- Skin mode's note list folder (Dukul, 2026-10-19): white art, tinted in the
+-- folder's name colour; open / closed only
+F.ART_SKIN_OPEN   = ART .. "ui-note-list-folder-open"
+F.ART_SKIN_CLOSED = ART .. "ui-note-list-folder-closed"
+
+-- Draws a folder picture on tex: the normal look = Dukul's colour art as it is
+-- drawn, skin mode = the white art in r, g, b (the folder name's colour)
+function F.PaintArt(tex, open, hasNotes, r, g, b)
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        tex:SetTexture(open and F.ART_SKIN_OPEN or F.ART_SKIN_CLOSED)
+        if not r then r, g, b = BNB.HeaderColor() end
+        tex:SetVertexColor(r, g, b)
+    else
+        tex:SetTexture(F.Art(open, hasNotes))
+        tex:SetVertexColor(1, 1, 1)
+    end
+end
+
 local function Store(create)
     local ndb = BNB.NotesDB and BNB.NotesDB()
     if not ndb then return nil end

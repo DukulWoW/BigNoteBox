@@ -1,8 +1,8 @@
 -- BigNoteBox Core/SystemNotes.lua -- System folders (ALL-511)
 --
 -- Folders every player has, built from files the addon ships: Patch notes
--- first (UI/WhatsNew.lua registers it from UI/PatchHistory.lua), Help later
--- (ALL-512). Decided with Dukul, 2026-10-19: their notes are made at draw
+-- (UI/WhatsNew.lua registers it from UI/PatchHistory.lua) and Help (UI/Help.lua,
+-- from UI/HelpData.lua, ALL-512) Decided with Dukul, 2026-10-19: their notes are made at draw
 -- time and never saved, so no migration per release and nothing in backups,
 -- history or the trash. They sit after the Notes section, open read-only in
 -- the editor (locked, cannot be unlocked) and can be copied to a normal note.
@@ -38,6 +38,9 @@
 --   SYS.ShowHidden(key)   brings every hidden one back
 --   SYS.HiddenCount(key)
 --   SYS.Invalidate()      rebuild on next read (Rich Notes switched)
+--   SYS.Reveal(key, on)   shows a folder whose setting is off for this session
+--                         (on = false takes that back); a help link opens a
+--                         topic while the Help folder is hidden (ALL-512)
 -- Every change sends "SystemNotesChanged" (the list redraws on it).
 --------------------------------------------------------------------------------
 
@@ -52,6 +55,7 @@ local _providers = {}   -- key -> provider
 local _order     = {}   -- providers by order
 local _built     = {}   -- key -> { rich = bool, list = { note, ... } }
 local _byID      = {}   -- id -> note (every built note, hidden included)
+local _revealed  = {}   -- key -> true: shown this session although switched off
 
 local function Changed(key) BNB.SendMessage("SystemNotesChanged", key) end
 
@@ -83,7 +87,7 @@ function SYS.IsSystem(id)
 end
 
 local function Enabled(p)
-    if not p.setting then return true end
+    if not p.setting or _revealed[p.key] then return true end
     local v = BigNoteBoxDB and BigNoteBoxDB[p.setting]
     if v == nil then v = BNB.DEFAULTS and BNB.DEFAULTS[p.setting] end
     return v ~= false
@@ -106,7 +110,8 @@ local function Built(p)
         n.scope, n.tags, n.locked, n.pinned = "global", n.tags or {}, true, false
         n.system = p.key
         n.icon = n.icon or p.icon
-        n.richMode = rich
+        -- A provider may say a note is plain (a Help topic written plain)
+        if n.richMode == nil then n.richMode = rich end
         n.updated = n.updated or n.created
         _byID[n.id] = n
     end
@@ -210,4 +215,11 @@ end
 function SYS.Invalidate()
     wipe(_built); wipe(_byID)
     Changed(nil)
+end
+
+function SYS.Reveal(key, on)
+    on = on ~= false or nil
+    if _revealed[key] == on then return end
+    _revealed[key] = on
+    Changed(key)
 end

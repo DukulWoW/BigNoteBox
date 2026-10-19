@@ -67,7 +67,10 @@ local function ChatBody(note)
     local body = note.body or ""
     if note.richMode then
         body = body:gsub("{link%*([^*}]+)%*([^}]*)}", function(url, text)
-            return text ~= "" and text or url
+            if text ~= "" then return text end
+            -- A UI link with no text: the place's name (ALL-513)
+            if url:sub(1, 6) == "bnbui:" and BNB.UILinks then return BNB.UILinks.Label(url:sub(7)) end
+            return url
         end)
         body = body:gsub("{br}", "\n")
         local AM = BNB.AdvancedMode

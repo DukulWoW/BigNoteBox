@@ -147,6 +147,7 @@ BNB.DEFAULTS = {
     folderStartOpen      = true,
     -- System folders (ALL-511): the Patch notes folder shows in the list
     sysPatchNotes        = true,
+    sysHelp              = true,   -- the Help system folder (ALL-512)
 
     -- Reference Box and Tasks (ALL-102)
     referenceBoxEnabled = true,
@@ -358,18 +359,26 @@ BNB.DEFAULTS = {
 -- Settings stay shared. Nothing swaps tables at logout: every reader goes
 -- through BNB.NotesDB() / BNB.LabDB(), so each file saves only its own set.
 -- Never read the BigNoteBoxNotesDB global directly outside this file.
+-- Doc mode (ALL-512) is a third set inside the dev addon, BigNoteBoxDevDB.docsDB:
+-- the help topics, written with the normal editor. Switched by the Developer
+-- tools checkbox (BigNoteBoxDevDB.docMode) and a reload; _work/tools/docs-build.lua
+-- reads it from the SavedVariables file and writes UI/HelpData.lua.
 --------------------------------------------------------------------------------
 function BNB.IsDevMode() return BNB._devMode == true end
+function BNB.IsDocMode() return BNB._docMode == true end
+
+-- The dev addon's key for the set in use: docsDB in doc mode, else notesDB
+local function DevSetKey() return BNB._docMode and "docsDB" or "notesDB" end
 
 -- The active notes set: { notes, noteOrder, trash, dbVersion }
 function BNB.NotesDB()
-    if BNB._devMode then return BigNoteBoxDevDB.notesDB end
+    if BNB._devMode then return BigNoteBoxDevDB[DevSetKey()] end
     return BigNoteBoxNotesDB
 end
 
 -- Replace the active notes set (Factory Reset)
 function BNB.SetNotesDB(t)
-    if BNB._devMode then BigNoteBoxDevDB.notesDB = t else BigNoteBoxNotesDB = t end
+    if BNB._devMode then BigNoteBoxDevDB[DevSetKey()] = t else BigNoteBoxNotesDB = t end
 end
 
 -- Where the developer labs (Background Lab, Icon Lab, search layout tool) keep
@@ -406,8 +415,9 @@ function BNB.HistoryDB()
     return BigNoteBoxHistoryDB
 end
 
--- "notes" or "dev": which notes set the history file entries belong to
+-- "notes", "dev" or "docs": which notes set the history file entries belong to
 function BNB.HistorySetKey()
+    if BNB._docMode then return "docs" end
     return BNB._devMode and "dev" or "notes"
 end
 
@@ -459,6 +469,57 @@ local function InitDevMode()
         end
         dev.labsCopied = true
     end
+    -- Doc mode (ALL-512): the help topics. The first doc-mode load starts it
+    -- with Claude's first topics (BigNoteBox_Dev/DocsSeed.lua, Dukul
+    -- 2026-10-19: "You can start making the documents, and I'll edit what you
+    -- write"), else the Feature list, one rich note per section
+    if dev.docMode == true then
+        BNB._docMode = true
+        if dev.docsDB == nil then
+            dev.docsDB = { notes = {}, noteOrder = {}, dbVersion = NOTES_SCHEMA_VERSION }
+            BNB._docSeedCount = BNB.SeedDocsFromFeatureList and BNB.SeedDocsFromFeatureList(dev.docsDB) or 0
+        end
+    end
+end
+
+-- The first topics: BigNoteBox_Dev/DocsSeed.lua ({ title, body, rich }), or
+-- one rich note per Feature list section (UI/FeatureListData.lua: the header
+-- as title, the blurb as a paragraph, the items as "- " lines). Runs once,
+-- into the empty doc set; returns the number of notes made.
+local function DocSeedList()
+    local seed = BigNoteBoxDevDocsSeed
+    if type(seed) == "table" and #seed > 0 then return seed end
+    local out = {}
+    for i, sec in ipairs(type(BNB.FEATURE_LIST) == "table" and BNB.FEATURE_LIST or {}) do
+        local lines = {}
+        if type(sec.blurb) == "string" and sec.blurb ~= "" then
+            lines[#lines + 1] = "{p}" .. sec.blurb .. "{/p}"
+        end
+        for _, item in ipairs(type(sec.items) == "table" and sec.items or {}) do
+            lines[#lines + 1] = "- " .. tostring(item)
+        end
+        out[#out + 1] = { title = tostring(sec.header or ("Topic " .. i)), body = table.concat(lines, "\n") }
+    end
+    return out
+end
+
+function BNB.SeedDocsFromFeatureList(set)
+    local now, n = time(), 0
+    for i, t in ipairs(DocSeedList()) do
+        local id
+        repeat
+            id = string.format("bnb-%08x%04x%04x", now, math.random(0, 0xFFFF), math.random(0, 0xFFFF))
+        until not set.notes[id]
+        set.notes[id] = {
+            id = id, title = tostring(t.title or ("Topic " .. i)),
+            body = tostring(t.body or ""):gsub("^\n", ""):gsub("\n$", ""), richMode = t.rich ~= false,
+            tags = {}, scope = "global", pinned = false,
+            created = now - i, updated = now - i,   -- keeps the Feature list order in date sorts
+        }
+        set.noteOrder[#set.noteOrder + 1] = id
+        n = n + 1
+    end
+    return n
 end
 
 --------------------------------------------------------------------------------

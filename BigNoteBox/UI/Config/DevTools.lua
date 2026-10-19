@@ -142,6 +142,52 @@ function BNB.OpenContextMenuTest(owner)
     end)
 end
 
+-- A plain note listing every UI link: the gold link to click, then the
+-- form to type in a rich note. Tagged Draft, so the help build leaves it out.
+-- Its id is kept in the lab DB, so a second click rewrites the same note.
+function BNB.MakeUILinkListNote()
+    local UL = BNB.UILinks
+    if not UL then return end
+    local groups = { { "Settings", {} }, { "Windows", {} }, { "Help topics", {} } }
+    for _, p in ipairs(UL.List()) do
+        local g = p.key:find("^settings%.") and 1 or p.key:find("^help%.") and 3 or 2
+        local t = groups[g][2]
+        t[#t + 1] = "- " .. UL.Link(p.key) .. "    {link*bnbui:" .. p.key .. "*}"
+    end
+    local lines = {
+        "Every BigNoteBox link (bnbui), made by Developer tools > UI link list. Click a gold link to try it.",
+        "In a rich note, type the form on the right. With nothing after the second *, the link shows the place's name;",
+        "put your own text or an {icon:Name:16} there for a button: {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:16}}.",
+        "Help topics link as bnbui:help.<key> (the key is made from the title on the first help build).",
+        "Made " .. BNB.Date("%Y-%m-%d %H:%M", time()) .. ". Tagged Draft: the help build leaves this note out.",
+    }
+    for _, g in ipairs(groups) do
+        lines[#lines + 1] = ""
+        lines[#lines + 1] = g[1] .. " (" .. #g[2] .. ")"
+        if #g[2] == 0 then lines[#lines + 1] = "- none yet: Help topics come with the first help build" end
+        for _, l in ipairs(g[2]) do lines[#lines + 1] = l end
+    end
+    local title, body = "UI links (every key)", table.concat(lines, "\n")
+    local lab = BNB.LabDB()
+    local id = lab and lab.devUILinkNote
+    local ndb = BNB.NotesDB()
+    if not (id and ndb and ndb.notes and ndb.notes[id]) then
+        id = BNB.CreateNote(title, body)
+        if not id then return end
+        if lab then lab.devUILinkNote = id end
+    end
+    BNB.UpdateNote(id, { title = title, body = body, richMode = false, scope = "global", tags = { "Draft" } })
+    if BNB.OpenNoteInMain then BNB.OpenNoteInMain(id) end
+    BNB:Print("|cff88bbffUI link list note written (" .. #UL.List() .. " links).|r")
+end
+
+StaticPopupDialogs["BNB_DOC_MODE_RELOAD"] = {
+    text = L["CFG_DEV_DOC_RELOAD"],
+    button1 = RELOADUI or "Reload", button2 = LATER or "Later",
+    OnAccept = function() C_UI.Reload() end,   -- in the click itself (protected)
+    timeout = 0, whileDead = true, hideOnEscape = true,
+}
+
 -- The page body, built by K.NewSubPage from the Advanced tab.
 function K.BuildDevToolsPage(sf, ct, y)
     local db = BigNoteBoxDB
@@ -218,6 +264,18 @@ function K.BuildDevToolsPage(sf, ct, y)
         function(v) db.debugEncounterGap = v or nil end,
         L["CFG_DEV_ENC_GAP_TIP"])
     K.ReadOnShow(encCb, function() return db.debugEncounterGap == true end)
+    -- Doc mode (ALL-512): the help topics set, switched at the next load
+    -- (Core/Database.lua InitDevMode); the popup's own click reloads
+    if BNB.IsDevMode() and type(BigNoteBoxDevDB) == "table" then
+        local docCb = OptCheck(L["CFG_DEV_DOC_LABEL"],
+            function() return BigNoteBoxDevDB.docMode == true end,
+            function(v)
+                BigNoteBoxDevDB.docMode = v or nil
+                if (v == true) ~= BNB.IsDocMode() then StaticPopup_Show("BNB_DOC_MODE_RELOAD") end
+            end,
+            L["CFG_DEV_DOC_TIP"])
+        K.ReadOnShow(docCb, function() return BigNoteBoxDevDB.docMode == true end)
+    end
     y = y + math.min(colY[1], colY[2])
 
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────
@@ -264,6 +322,12 @@ function K.BuildDevToolsPage(sf, ct, y)
                 BNB:Print("|cffff9900The patch notes toast is off in Settings > Modules > Toasts.|r")
             end
         end },
+        -- Every UI link key as a note (ALL-513, Dukul 2026-10-19: "Easier to work
+        -- with if I know what they all are"): made from the registry, so it is
+        -- never out of date; the same note is rewritten on the next click
+        { L["CFG_DEV_UILINKS_BTN"], L["CFG_DEV_UILINKS_TIP_BODY"], function()
+            if BNB.MakeUILinkListNote then BNB.MakeUILinkListNote() end
+        end, BNB.UILinks ~= nil },
         -- The fresh-install welcome note (ALL-242), for this character's faction
         { L["CFG_DEV_WELCOMENOTE_BTN"], L["CFG_DEV_WELCOMENOTE_TIP_BODY"], function()
             BNB.WhatsNew.CheckWelcome(true, true)

@@ -26,7 +26,7 @@
 --   TOTAL_CAP for the whole file (oldest entries dropped first).
 --
 -- Store layout: BigNoteBoxHistoryDB.notes = { [id] = entry }, .dev = { [id] =
--- entry } ("dev" = dev mode's own notes set). The rest of the file is the
+-- entry } ("dev" = dev mode's own notes set, "docs" = doc mode's, ALL-512). The rest of the file is the
 -- automatic note history (Core/Database.lua, ALL-466).
 
 local BNB = BigNoteBox
@@ -106,7 +106,7 @@ end
 --------------------------------------------------------------------------------
 local function Prune()
     local cutoff = time() - KeepDays() * 86400
-    for _, k in ipairs({ "notes", "dev" }) do
+    for _, k in ipairs({ "notes", "dev", "docs" }) do
         local b = _store[k]
         if type(b) == "table" then
             for id, e in pairs(b) do
@@ -290,7 +290,7 @@ BNB.RegisterEvent("PLAYER_LOGOUT", function()
 
     -- Whole file over its cap: oldest entries go first
     local list, total = {}, 0
-    for _, k in ipairs({ "notes", "dev" }) do
+    for _, k in ipairs({ "notes", "dev", "docs" }) do
         for id, e in pairs(_store[k] or {}) do
             list[#list + 1] = { k = k, id = id, t = e.t or 0, n = #e.d }
             total = total + #e.d

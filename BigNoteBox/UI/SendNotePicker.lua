@@ -10,22 +10,30 @@
 -- The same search picks a note for a note link and for "From another note"
 -- in the waypoint link popup (ALL-478): BNB.ToggleNotePicker with opts.
 --
+-- The note link button also lists the places a UI link can open (ALL-513,
+-- Features/UILinks.lua): opts.onPlace turns on a Notes / BigNoteBox switch
+-- under the search box.
+--
 -- Public API:
 --   BNB.ToggleSendNotePicker(anchor)
 --   BNB.ToggleNotePicker(anchor, opts)   opts: onPick(id), filter(note) -> bool,
---       exclude = id, placeholder, noneText (no note passes the filter)
+--       exclude = id, placeholder, noneText (no note passes the filter),
+--       onPlace(key) = also list BigNoteBox places, placesPlaceholder
 --   BNB.NotePickerShown()
 
 local BNB = BigNoteBox
 local L   = BNB.L
 
 local W, PAD, EB_H, ROW_H, MAX_ROWS = 260, 6, 22, 20, 8
+local TAB_H, MAX_PLACES = 18, 12
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_Note_06"   -- as the Oracle's rows
 
 local picker, eb, placeholder, list, emptyFS, nav
 local rows = {}
 local _anchor
 local _opts = {}   -- the open picker's options (empty = Send)
+local _mode = "notes"   -- "places" = the BigNoteBox list (opts.onPlace)
+local tabRow, tabBtns
 
 local function AllNotes()
     local ndb = BNB.NotesDB()
@@ -65,6 +73,21 @@ local function Results(text)
     return out, #notes
 end
 
+-- The places matching the text: label or key holds it (any case)
+local function PlaceResults(text)
+    local UL = BNB.UILinks
+    local all = UL and UL.List() or {}
+    local want = text:lower():match("^%s*(.-)%s*$")
+    local out = {}
+    for _, p in ipairs(all) do
+        if want == "" or p.label:lower():find(want, 1, true) or p.key:lower():find(want, 1, true) then
+            out[#out + 1] = p
+            if #out == MAX_PLACES then break end
+        end
+    end
+    return out, #all
+end
+
 local function Close()
     if picker then picker:Hide() end
 end
@@ -92,18 +115,54 @@ local function Row(i)
     r._title:SetPoint("LEFT",  r._icon, "RIGHT", 5, 0)
     r._title:SetPoint("RIGHT", r, "RIGHT", -4, 0)
     r._title:SetJustifyH("LEFT"); r._title:SetWordWrap(false)
-    r:SetScript("OnClick", function(self) if self._id then Send(self._id) end end)
+    r:SetScript("OnClick", function(self)
+        if self._place then
+            local onPlace = _opts.onPlace
+            Close()
+            if onPlace then onPlace(self._place) end
+        elseif self._id then
+            Send(self._id)
+        end
+    end)
     rows[i] = r
     return r
+end
+
+local function RefreshPlaces(text)
+    local places = PlaceResults(text)
+    local UL = BNB.UILinks
+    for i, p in ipairs(places) do
+        local r = Row(i)
+        r._id, r._place = nil, p.key
+        r._icon:SetTexture(p.icon or DEFAULT_ICON)
+        r._title:SetText(p.label)
+        if UL and UL.State(p.key) then BNB.SetTextWhite(r._title) else r._title:SetTextColor(0.5, 0.5, 0.5) end
+        r:Show()
+    end
+    for i = #places + 1, #rows do rows[i]:Hide() end
+    if #places == 0 then
+        emptyFS:SetText(L["SEND_PICK_EMPTY"])
+        emptyFS:Show()
+    else
+        emptyFS:Hide()
+    end
+    return #places
 end
 
 local function Refresh()
     local text = eb:GetText() or ""
     if text == "" then placeholder:Show() else placeholder:Hide() end
+    local tabsH = (tabRow and tabRow:IsShown()) and (TAB_H + 4) or 0
+    if _mode == "places" then
+        local n = math.max(1, RefreshPlaces(text))
+        list:SetHeight(n * ROW_H)
+        picker:SetHeight(PAD + EB_H + 4 + tabsH + n * ROW_H + PAD)
+        return
+    end
     local notes, total = Results(text)
     for i, note in ipairs(notes) do
         local r = Row(i)
-        r._id = note.id
+        r._id, r._place = note.id, nil
         local icon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
         r._icon:SetTexture((icon and icon ~= "") and icon or DEFAULT_ICON)
         r._title:SetText((note.title and note.title ~= "") and note.title or L["UNTITLED"])
@@ -121,7 +180,27 @@ local function Refresh()
     end
     local n = math.max(1, #notes)
     list:SetHeight(n * ROW_H)
-    picker:SetHeight(PAD + EB_H + 4 + n * ROW_H + PAD)
+    picker:SetHeight(PAD + EB_H + 4 + tabsH + n * ROW_H + PAD)
+end
+
+-- The Notes / BigNoteBox switch (opts.onPlace): the picked one gold, the
+-- other grey; the placeholder follows
+local function SetMode(mode)
+    _mode = mode
+    local hr, hg, hb = BNB.HeaderColor()   -- gold, the skin's header colour in skin mode
+    for key, b in pairs(tabBtns or {}) do
+        if key == mode then
+            b._fs:SetTextColor(hr, hg, hb)
+            b._line:SetVertexColor(hr, hg, hb)
+            b._line:Show()
+        else
+            b._fs:SetTextColor(0.55, 0.55, 0.55)
+            b._line:Hide()
+        end
+    end
+    placeholder:SetText(mode == "places" and (_opts.placesPlaceholder or L["UILINK_PICK_PH"])
+        or (_opts.placeholder or L["SEND_PICK_PLACEHOLDER"]))
+    if picker:IsShown() then Refresh() end
 end
 
 local function Build()
@@ -151,6 +230,31 @@ local function Build()
     placeholder:SetPoint("LEFT", ebBg, "LEFT", 6, 0)
     placeholder:SetTextColor(0.45, 0.45, 0.45)
     placeholder:SetText(L["SEND_PICK_PLACEHOLDER"])
+
+    -- Notes / BigNoteBox (ALL-513), shown only for a picker with onPlace
+    tabRow = CreateFrame("Frame", nil, picker)
+    tabRow:SetPoint("TOPLEFT",  ebBg, "BOTTOMLEFT",  0, -4)
+    tabRow:SetPoint("TOPRIGHT", ebBg, "BOTTOMRIGHT", 0, -4)
+    tabRow:SetHeight(TAB_H)
+    tabRow:Hide()
+    tabBtns = {}
+    local prev
+    for _, t in ipairs({ { "notes", "UILINK_PICK_NOTES" }, { "places", "UILINK_PICK_PLACES" } }) do
+        local b = CreateFrame("Button", nil, tabRow)
+        b._fs = b:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        b._fs:SetPoint("CENTER")
+        b._fs:SetText(L[t[2]])
+        b:SetSize(math.ceil(b._fs:GetStringWidth()) + 16, TAB_H)
+        b._line = b:CreateTexture(nil, "ARTWORK")
+        b._line:SetColorTexture(1, 1, 1, 0.8)   -- tinted to the header colour in SetMode
+        b._line:SetHeight(1)
+        b._line:SetPoint("BOTTOMLEFT", 4, 0); b._line:SetPoint("BOTTOMRIGHT", -4, 0)
+        if prev then b:SetPoint("LEFT", prev, "RIGHT", 4, 0) else b:SetPoint("LEFT", tabRow, "LEFT", 0, 0) end
+        local mode = t[1]
+        b:SetScript("OnClick", function() SetMode(mode); eb:SetFocus() end)
+        tabBtns[mode] = b
+        prev = b
+    end
 
     list = CreateFrame("Frame", nil, picker)
     list:SetPoint("TOPLEFT",  ebBg, "BOTTOMLEFT",  0, -4)
@@ -200,7 +304,13 @@ function BNB.ToggleNotePicker(anchor, opts)
     end
     _anchor = anchor
     _opts = opts or {}
-    placeholder:SetText(_opts.placeholder or L["SEND_PICK_PLACEHOLDER"])
+    -- The Notes / BigNoteBox switch: the list moves down under it
+    tabRow:SetShown(_opts.onPlace ~= nil)
+    list:ClearAllPoints()
+    local over = _opts.onPlace and tabRow or eb:GetParent()
+    list:SetPoint("TOPLEFT",  over, "BOTTOMLEFT",  0, -4)
+    list:SetPoint("TOPRIGHT", over, "BOTTOMRIGHT", 0, -4)
+    SetMode("notes")
     if not anchor._bnbSendPickHooked then
         anchor._bnbSendPickHooked = true
         -- The button hides with the main window: the search goes with it

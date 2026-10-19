@@ -438,6 +438,9 @@ local DEV_BG = "Interface\\AddOns\\BigNoteBox_Dev\\Assets\\ui-bg-devmode"
 
 -- Main window title, both chromes: "BigNoteBox (Development Mode Enabled)" in dev mode
 function BNB.MainWindowTitle()
+    if BNB.IsDocMode and BNB.IsDocMode() then   -- the help topics (ALL-512)
+        return string.format(L["CFG_DEV_DOC_TITLE_FMT"], L["WINDOW_TITLE"])
+    end
     if BNB.IsDevMode and BNB.IsDevMode() then
         return string.format(L["CFG_DEV_WINDOW_TITLE_FMT"], L["WINDOW_TITLE"])
     end

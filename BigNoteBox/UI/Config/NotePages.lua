@@ -772,6 +772,15 @@ function K.BuildFoldersPage(sf, ct, y, page)
             BNB.SendMessage("SystemNotesChanged", "patchnotes")
         end,
         L["CFG_SYS_PATCHNOTES_TIP"])
+    -- The Help folder (ALL-512): a help link still opens a topic while it is off
+    y = AddCheck(ct, y, L["CFG_SYS_HELP"],
+        function() return db.sysHelp ~= false end,
+        function(v)
+            db.sysHelp = v
+            if BNB.SystemNotes then BNB.SystemNotes.Reveal("help", false) end
+            BNB.SendMessage("SystemNotesChanged", "help")
+        end,
+        L["CFG_SYS_HELP_TIP"])
     Sync()
     sf:FinaliseHeight(math.abs(y) + 12)
 end

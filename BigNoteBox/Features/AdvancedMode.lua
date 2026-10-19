@@ -122,15 +122,38 @@ end
 -- |H...|h link in SimpleHTML text drew as plain text on Forever (Dukul,
 -- 2026-10-11: no hover), while the <a> /way links worked. The colour goes
 -- inside the <a>, so it is kept; the href is the link data, as in chat.
+-- A UI link (bnbui:, ALL-513) gets the colour of its state now: grey when
+-- this client or setup does not have that place
+local function UIColour(data, color)
+    local UL = BNB.UILinks
+    if UL and data:sub(1, 6) == "bnbui:" then return "|c" .. UL.Colour(data:sub(7)) end
+    return color
+end
+
 local function GameLinks(line)
     if not line:find("|H", 1, true) then return line end
     local function a(color, data, text)
+        color = UIColour(data, color)
         return string.format("<a href=\"%s\">%s%s%s</a>", data, color, text, color ~= "" and "|r" or "")
     end
     line = line:gsub("(|c%x%x%x%x%x%x%x%x)|H([^|]+)|h(.-)|h|r", a)
     line = line:gsub("(|cn[%w_]+:)|H([^|]+)|h(.-)|h|r", a)
     line = line:gsub("|H([^|]+)|h(.-)|h", function(data, text) return a("", data, text) end)
     return line
+end
+
+-- Pictures from BigNoteBox's own Assets folder, for the help topics only
+-- (Dukul, 2026-10-19: "Only for docs, not for regular note use"):
+-- {img:@UI/ui-folder:64:64} = Interface\AddOns\BigNoteBox\Assets\UI\ui-folder.
+-- Expanded by UI/Help.lua when it builds a topic, and here while doc mode is
+-- on (to see them while writing); in any other note an @ path stays as it is
+-- and draws nothing.
+local ASSET_PREFIX = "Interface\\AddOns\\BigNoteBox\\Assets\\"
+function AM.ExpandAssetImages(text)
+    if type(text) ~= "string" or not text:find("{img:@", 1, true) then return text end
+    return (text:gsub("{img:@([^:}]+)", function(rel)
+        return "{img:" .. ASSET_PREFIX .. rel:gsub("/", "\\")
+    end))
 end
 
 -- The escaped text back as typed (an href is read as it was written)
@@ -148,6 +171,8 @@ function AM.ToHTML(text, bodySize)
     -- Live note tokens ({{me}}...) filled from the reader's game (ALL-481).
     -- First, so the values are escaped and can never make markup
     if BNB.Tokens then text = BNB.Tokens.Fill(text) end
+    -- Doc mode (ALL-512): the help topics' {img:@...} Assets pictures
+    if BNB.IsDocMode and BNB.IsDocMode() then text = AM.ExpandAssetImages(text) end
 
     local lines = {}
     -- Split on newlines
@@ -209,6 +234,27 @@ function AM.ToHTML(text, bodySize)
             return iconTex(name, size)
         end)
 
+        -- 2b. {atlas:name:height[:width][:l/c/r]} -> the game's |A atlas code
+        --     (Dukul, 2026-10-19: every note). Game art that is a named part
+        --     of a bigger file, which {img} cannot show. No width = the same
+        --     as the height. Aligned = its own <P>, as {icon}.
+        local function atlasTex(name, h, w)
+            h = math.min(tonumber(h) or 32, 1024)
+            w = math.min(tonumber(w) or h, 1024)
+            return string.format("|A:%s:%d:%d|a", name, h, w)
+        end
+        local function atlasAlign(align)
+            return (align == "c") and "center" or (align == "r") and "right" or "left"
+        end
+        line = line:gsub("{atlas:([^:}]+):(%d+):(%d+):([lcr])}", function(name, h, w, align)
+            return string.format("<P align=\"%s\">%s</P>", atlasAlign(align), atlasTex(name, h, w))
+        end)
+        line = line:gsub("{atlas:([^:}]+):(%d+):([lcr])}", function(name, h, align)
+            return string.format("<P align=\"%s\">%s</P>", atlasAlign(align), atlasTex(name, h))
+        end)
+        line = line:gsub("{atlas:([^:}]+):(%d+):(%d+)}", function(name, h, w) return atlasTex(name, h, w) end)
+        line = line:gsub("{atlas:([^:}]+):(%d+)}", function(name, h) return atlasTex(name, h) end)
+
         -- 3. {col:rrggbb}...{/col} -> WoW color codes
         line = line:gsub("{col:(%x%x%x%x%x%x)}", function(hex)
             return "|cff" .. hex
@@ -219,9 +265,15 @@ function AM.ToHTML(text, bodySize)
         -- SimpleHTML has no API to set <a> tag colour at runtime, so we wrap
         -- the visible text in a WoW colour code (BNB green: 0.40, 0.85, 0.40
         -- = #66d966) so links stand out from body text without underline support.
+        -- A UI link {link*bnbui:key*text} (ALL-513): gold, grey when not here;
+        -- no text = the place's name
         line = line:gsub("{link%*([^*}]+)%*([^}]*)}", function(url, linkText)
-            if linkText == "" then linkText = url end
-            return string.format("<a href=\"%s\">|cff66d966%s|r</a>", url, linkText)
+            local col = UIColour(url, "|cff66d966")
+            if linkText == "" then
+                linkText = (url:sub(1, 6) == "bnbui:" and BNB.UILinks)
+                    and HtmlEscape(BNB.UILinks.Label(url:sub(7))) or url
+            end
+            return string.format("<a href=\"%s\">%s%s|r</a>", url, col, linkText)
         end)
 
         -- 5. {br} -> <BR/> — inline line break with no paragraph margin
@@ -657,6 +709,7 @@ local TAG_PATTERNS = {
     "{/p}",
     "{img:[^}]+}",
     "{icon:[^}]+}",
+    "{atlas:[^}]+}",
     "{col:%x%x%x%x%x%x}",
     "{/col}",
     "{link%*[^*}]+%*[^}]*}",
