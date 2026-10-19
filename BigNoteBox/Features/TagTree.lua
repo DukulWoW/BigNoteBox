@@ -1,7 +1,15 @@
 -- BigNoteBox Features/TagTree.lua
--- Tag tree view: groups notes by tag in the note list scroll area.
--- Activated via the tag tree button left of the search bar.
+-- Tree view: groups notes under headers in the note list scroll area, by tag
+-- (the tag tree) or by folder (the folder view, ALL-510 S4). One view, two
+-- sources: BigNoteBoxDB.tagTreeMode = a tree is shown, BigNoteBoxDB.treeSource
+-- = nil (tags) or "folders". Opened from the two buttons left of the search
+-- bar (UI/NoteList.lua); BNB.SetTagTreeMode(enabled, source).
 -- Shares the scroll frame / scroll child / listEntries pool with NoteList.lua.
+--
+-- Tags: every tag A-Z, then Untagged; open / closed is per session
+-- (tagTreeStartExpanded). Folders: every folder A-Z, then No folder; a folder's
+-- open / closed is its saved state (BNB.Folders, the same as in the list),
+-- No folder per session. Notes A-Z by title inside a header, every tab.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -12,40 +20,56 @@ local L   = BNB.L
 local _expandedTags  = {}   -- { [tagName] = true } when that header is expanded
 local _tagHeaders    = {}   -- reused header frames { btn, arrow, label, count }
 local _collapseAllBtn, _expandAllBtn  -- pinned control buttons inside scroll child
+local UNTAGGED  = "__untagged__"
+local NO_FOLDER = "__nofolder__"
+local _noFolderOpen = nil   -- the folder view's No folder header (nil = start state)
 
 local HEADER_H   = 24
 local ENTRY_INDENT = 8      -- px left indent for notes under a tag header
 local PAD_L      = 8
 local BTN_SZ     = 18   -- arrow button size, matches AlarmWindow calendar nav buttons
+local FOLDER_PIC = 18   -- the folder picture in a folder view header
 
 --------------------------------------------------------------------------------
 -- Helpers
 --------------------------------------------------------------------------------
 local function DB()  return BigNoteBoxDB          end
 
--- Returns ordered list of { tag, notes[] } sorted A-Z.
--- "notes" is the filtered set for that tag (respects text + fav filter).
--- Also returns a separate list of untagged notes.
-local function BuildTagBuckets()
-    local tagIndex = BNB.TagIndex()
+local function FolderView()
+    local db = DB()
+    return db and db.treeSource == "folders" and BNB.Folders ~= nil
+end
 
-    -- Get filtered notes using NoteList current filter state
+local function ByTitle(a, b)
+    return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
+end
+
+-- The notes the view shows: the text filter and favourite filter, every tab
+local function FilteredSet()
     local textFilter = BNB.GetCurrentFilter and BNB.GetCurrentFilter() or ""
     local filtered = BNB.GetOrderedNotes(textFilter, nil, false, true)
     local filteredSet = {}
     for _, note in ipairs(filtered) do
         filteredSet[note.id] = note
     end
-
     -- Apply fav filter on top if active
     if BNB._favFilterActive then
         for id, note in pairs(filteredSet) do
             if not note.favorited then filteredSet[id] = nil end
         end
     end
+    return filteredSet, textFilter ~= "" or BNB._favFilterActive == true
+end
+
+-- Returns ordered list of { key, label, notes[] } sorted A-Z, and the
+-- leftover bucket (Untagged / No folder) as { key, label, notes[] }.
+local function BuildTagBuckets()
+    local tagIndex = BNB.TagIndex()
+    local filteredSet = FilteredSet()
 
     -- Collect all known tags A-Z
     local tagList = BNB.GetAllTags()  -- { {tag, count} } already sorted A-Z
+    local TC = BNB.TagColors   -- the tag's colour (ALL-106)
 
     local buckets  = {}
     local untagged = {}
@@ -59,11 +83,10 @@ local function BuildTagBuckets()
             if note then notes[#notes + 1] = note end
         end
         -- Sort notes within bucket A-Z by title
-        table.sort(notes, function(a, b)
-            return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
-        end)
+        table.sort(notes, ByTitle)
         if #notes > 0 then
-            buckets[#buckets + 1] = { tag = tag, notes = notes }
+            buckets[#buckets + 1] = { key = tag, notes = notes,
+                label = TC and TC.Text(tag) or tag }
         end
     end
 
@@ -73,11 +96,62 @@ local function BuildTagBuckets()
             untagged[#untagged + 1] = note
         end
     end
-    table.sort(untagged, function(a, b)
-        return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
-    end)
+    table.sort(untagged, ByTitle)
 
-    return buckets, untagged
+    return buckets, { key = UNTAGGED, notes = untagged,
+        label = "|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r" }
+end
+
+-- Folders A-Z: one with a shown note, and an empty one while nothing is
+-- filtered (as in the list, so it can be found); then No folder
+local function BuildFolderBuckets()
+    local FD = BNB.Folders
+    local filteredSet, filtering = FilteredSet()
+    local byFolder, loose = {}, {}
+    for _, note in pairs(filteredSet) do
+        local fid = FD.Of(note)
+        if fid then
+            local t = byFolder[fid]
+            if not t then t = {}; byFolder[fid] = t end
+            t[#t + 1] = note
+        else
+            loose[#loose + 1] = note
+        end
+    end
+    local total = FD.Counts()
+    local buckets = {}
+    for _, f in ipairs(FD.List()) do
+        local notes = byFolder[f.id]
+        if notes or (not filtering and not total[f.id]) then
+            notes = notes or {}
+            table.sort(notes, ByTitle)
+            buckets[#buckets + 1] = { key = f.id, folder = true, notes = notes,
+                label = FD.Text(f.id) }
+        end
+    end
+    table.sort(loose, ByTitle)
+    return buckets, { key = NO_FOLDER, notes = loose,
+        label = "|cff888888" .. L["FOLDER_TREE_NONE"] .. "|r" }
+end
+
+-- Open / closed of a header, and the change
+local function IsExpanded(b)
+    if b.folder then return BNB.Folders.IsOpen(b.key) end
+    if b.key == NO_FOLDER then
+        if _noFolderOpen == nil then
+            local db = DB()
+            _noFolderOpen = db and db.tagTreeStartExpanded == true or false
+        end
+        return _noFolderOpen
+    end
+    return _expandedTags[b.key] or false
+end
+
+local function SetExpanded(b, on)
+    if b.folder then BNB.Folders.SetOpen(b.key, on)   -- FoldersChanged redraws
+    elseif b.key == NO_FOLDER then _noFolderOpen = on
+    elseif on then _expandedTags[b.key] = true
+    else _expandedTags[b.key] = nil end
 end
 
 --------------------------------------------------------------------------------
@@ -88,7 +162,7 @@ local function GetOrCreateTagHeader(child, idx)
 
     local btn = CreateFrame("Button", nil, child)
     btn:SetHeight(HEADER_H)
-    btn:RegisterForClicks("LeftButtonUp")
+    btn:RegisterForClicks("LeftButtonUp", "RightButtonUp")
 
     local hiBg = btn:CreateTexture(nil, "HIGHLIGHT")
     hiBg:SetAllPoints(); hiBg:SetColorTexture(1, 1, 1, 0.05)
@@ -100,8 +174,14 @@ local function GetOrCreateTagHeader(child, idx)
     arrowBtn:SetPoint("LEFT", btn, "LEFT", PAD_L, 0)
     btn._arrowBtn  = arrowBtn
 
+    -- The folder view's picture (Dukul's art, never tinted), between arrow and name
+    local pic = btn:CreateTexture(nil, "ARTWORK")
+    pic:SetSize(FOLDER_PIC, FOLDER_PIC)
+    pic:SetPoint("LEFT", arrowBtn, "RIGHT", 2, 0)
+    pic:Hide()
+    btn._pic = pic
+
     local lbl = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    lbl:SetPoint("LEFT", arrowBtn, "RIGHT", 4, 0)
     lbl:SetPoint("RIGHT", btn, "RIGHT", -40, 0)
     lbl:SetJustifyH("LEFT")
     BNB.SetTextWhite(lbl)
@@ -167,6 +247,7 @@ function BNB.RefreshTagTree()
     if child._pinnedHdr  then child._pinnedHdr:Hide()  end
     -- (_pinnedDiv is gone since ALL-328: the headers carry their own rule)
     if child._regularHdr then child._regularHdr:Hide()  end
+    for _, hdr in ipairs(child._folderHdrs or {}) do hdr:Hide() end   -- ALL-510
 
     -- Hide all existing list entries first
     for _, btn in ipairs(entries) do
@@ -193,18 +274,23 @@ function BNB.RefreshTagTree()
     end
 
     local ENTRY_H = 52  -- normal entry height; TagTree always uses normal mode
-    local buckets, untagged = BuildTagBuckets()
+    local folderView = FolderView()
+    local buckets, rest
+    if folderView then buckets, rest = BuildFolderBuckets()
+    else buckets, rest = BuildTagBuckets() end
+    local all = {}
+    for _, b in ipairs(buckets) do all[#all + 1] = b end
+    if #rest.notes > 0 then all[#all + 1] = rest end
 
     -- Collapse/expand controls
     local colBtn, expBtn = GetOrCreateCollapseControls(child)
     colBtn:Show(); expBtn:Show()
     colBtn:SetScript("OnClick", function()
-        _expandedTags = {}
+        for _, b in ipairs(all) do SetExpanded(b, false) end
         BNB.RefreshTagTree()
     end)
     expBtn:SetScript("OnClick", function()
-        for _, b in ipairs(buckets) do _expandedTags[b.tag] = true end
-        _expandedTags["__untagged__"] = true
+        for _, b in ipairs(all) do SetExpanded(b, true) end
         BNB.RefreshTagTree()
     end)
 
@@ -212,24 +298,34 @@ function BNB.RefreshTagTree()
     local entryIdx = 0
     local hdrIdx   = 0
 
-    local function RenderBucket(tag, notes, isUntagged)
-        local expanded = _expandedTags[tag] or false
+    local function RenderBucket(b)
+        local expanded = IsExpanded(b)
+        local notes = b.notes
         hdrIdx = hdrIdx + 1
         local hdr = GetOrCreateTagHeader(child, hdrIdx)
         hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  0, -totalH)
         hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -totalH)
         -- Arrow symbol: down when expanded, right when collapsed
         if hdr._arrowBtn then hdr._arrowBtn:SetSymbol(expanded and "down" or "right") end
-        local TC = BNB.TagColors   -- the tag's colour (ALL-106)
-        hdr._lbl:SetText(isUntagged and ("|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r")
-            or (TC and TC.Text(tag) or tag))
+        hdr._lbl:ClearAllPoints()
+        hdr._lbl:SetPoint("RIGHT", hdr, "RIGHT", -40, 0)
+        if folderView then
+            hdr._pic:SetTexture(BNB.Folders.Art(expanded, #notes > 0))
+            hdr._pic:Show()
+            hdr._lbl:SetPoint("LEFT", hdr._pic, "RIGHT", 4, 0)
+        else
+            hdr._pic:Hide()
+            hdr._lbl:SetPoint("LEFT", hdr._arrowBtn, "RIGHT", 4, 0)
+        end
+        hdr._lbl:SetText(b.label)
         hdr._count:SetText("(" .. #notes .. ")")
-        hdr:SetScript("OnClick", function()
-            if expanded then
-                _expandedTags[tag] = nil
-            else
-                _expandedTags[tag] = true
+        hdr:SetScript("OnClick", function(_, button)
+            -- A folder's right-click is its menu, as in the list
+            if button == "RightButton" then
+                if b.folder and BNB.ShowFolderMenu then BNB.ShowFolderMenu(hdr, b.key) end
+                return
             end
+            SetExpanded(b, not expanded)
             BNB.RefreshTagTree()
         end)
         hdr:Show()
@@ -264,13 +360,7 @@ function BNB.RefreshTagTree()
         end
     end
 
-    for _, bucket in ipairs(buckets) do
-        RenderBucket(bucket.tag, bucket.notes, false)
-    end
-
-    if #untagged > 0 then
-        RenderBucket("__untagged__", untagged, true)
-    end
+    for _, b in ipairs(all) do RenderBucket(b) end
 
     -- Hide any unused headers
     for i = hdrIdx + 1, #_tagHeaders do
@@ -286,14 +376,17 @@ end
 --------------------------------------------------------------------------------
 -- Mode toggle
 --------------------------------------------------------------------------------
-function BNB.SetTagTreeMode(enabled)
+-- source = "folders" for the folder view, nil for the tag tree (ALL-510 S4);
+-- only read when switching on
+function BNB.SetTagTreeMode(enabled, source)
     local db = DB()
     if not db then return end
 
     db.tagTreeMode = enabled
+    if enabled then db.treeSource = (source == "folders") and "folders" or nil end
 
-    -- Sync button visual (uses the setter that also updates the closure local)
-    if BNB._setTagTreeBtnActive then BNB._setTagTreeBtnActive(enabled) end
+    -- Sync both buttons' look
+    if BNB._syncTreeBtns then BNB._syncTreeBtns() end
 
     -- Disable/enable sort dropdown
     if BNB.SetSortEnabled then
@@ -301,14 +394,16 @@ function BNB.SetTagTreeMode(enabled)
     end
 
     if enabled then
-        -- Apply start-expanded preference
+        -- Apply start-expanded preference (tags and No folder; a folder
+        -- keeps its own saved state)
+        _noFolderOpen = nil
         if db.tagTreeStartExpanded then
             _expandedTags = {}
             local tagList = BNB.GetAllTags()
             for _, entry in ipairs(tagList) do
                 _expandedTags[entry.tag] = true
             end
-            _expandedTags["__untagged__"] = true
+            _expandedTags[UNTAGGED] = true
         else
             _expandedTags = {}
         end
@@ -328,7 +423,7 @@ function BNB.InitTagTree()
     local db = DB()
     if not db then return end
     if db.tagTreeMode then
-        if BNB._setTagTreeBtnActive then BNB._setTagTreeBtnActive(true) end
+        if BNB._syncTreeBtns then BNB._syncTreeBtns() end
         if BNB.SetSortEnabled then BNB.SetSortEnabled(false) end
     end
 end

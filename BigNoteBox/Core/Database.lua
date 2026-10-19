@@ -142,6 +142,9 @@ BNB.DEFAULTS = {
     tagTreeStartExpanded = false,
     tagTreeStayOpen      = true,
 
+    -- Note folders (ALL-510): how a new folder starts in the list
+    folderStartOpen      = true,
+
     -- Reference Box and Tasks (ALL-102)
     referenceBoxEnabled = true,
     tasksEnabled        = true,

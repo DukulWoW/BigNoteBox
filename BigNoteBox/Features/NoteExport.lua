@@ -669,15 +669,19 @@ end
 -- templates (optional): the player's note templates, the full backup only
 -- (ALL-68 S3); tokens (optional): the player's own note tokens (ALL-481 S4);
 -- tagColors (optional): tag -> colour key (ALL-106); profiles (optional):
--- every settings profile as a profile code (ALL-496 S2); an older build reads
+-- every settings profile as a profile code (ALL-496 S2); folders (optional):
+-- the note folders, BNB.Folders.BackupList (ALL-510 S2); an older build reads
 -- past these keys
-local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles)
+local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles, folders)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
         JSON_VERSION,
         JsonEscapeStr(BNB.ADDON_VERSION or "1.0.0"),
         #noteParts)
     local tail = "\n]"
+    if folders and #folders > 0 then
+        tail = tail .. ",\"folders\":" .. Json.Encode(folders)
+    end
     if templates and #templates > 0 then
         tail = tail .. ",\"templates\":" .. Json.Encode(templates)
     end
@@ -694,11 +698,13 @@ local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles)
     return header .. table.concat(noteParts, ",\n") .. tail
 end
 
--- A list of note tables as one importable JSON export
+-- A list of note tables as one importable JSON export, with the folders
+-- they are in (ALL-510 S2)
 local function JsonEncodeNotes(list)
     local parts = {}
     for _, note in ipairs(list) do parts[#parts + 1] = JsonEncodeNote(note) end
-    return JsonEnvelope(parts)
+    local folders = BNB.Folders and BNB.Folders.BackupList(list) or nil
+    return JsonEnvelope(parts, nil, nil, nil, nil, folders)
 end
 
 local function SerializeNotes(fmt)
@@ -725,7 +731,8 @@ local function SerializeNotes(fmt)
         local toks = BNB.Tokens and BNB.Tokens.BackupList() or nil
         local cols = BNB.TagColors and BNB.TagColors.BackupMap() or nil
         local profs = BNB.Profiles and BNB.Profiles.BackupList() or nil
-        return JsonEnvelope(noteParts, tpls, toks, cols, profs), #noteParts
+        local fold = BNB.Folders and BNB.Folders.BackupList() or nil   -- every folder (ALL-510)
+        return JsonEnvelope(noteParts, tpls, toks, cols, profs, fold), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -1028,6 +1035,8 @@ local function ParseJsonNotes(text, quiet)
     -- and the player's own tokens (ALL-481 S4), BNB.Tokens.ImportRecords
     if type(doc) == "table" and type(doc.tokens) == "table" then parsed.tokens = doc.tokens end
     if type(doc) == "table" and type(doc.tagColors) == "table" then parsed.tagColors = doc.tagColors end
+    -- and the note folders (ALL-510 S2), part of the notes: BNB.Folders.ImportList
+    if type(doc) == "table" and type(doc.folders) == "table" then parsed.folders = doc.folders end
     -- and the settings profiles (ALL-496 S2), BNB.Profiles.ImportBackup
     if type(doc) == "table" and type(doc.profiles) == "table" then parsed.profiles = doc.profiles end
     -- A settings backup has no notes (ALL-507): kept while it holds anything
@@ -1197,6 +1206,10 @@ local function ImportNotes(noteList, remapScope)
     local now = time()
     local count = 0
     local stats = { tasks = 0, alarms = 0, attachments = 0 }
+    -- The backup's folders first (ALL-510 S2): a name already here is that
+    -- folder; each note's folder id is mapped to the one here
+    local FD = BNB.Folders
+    local fmap = (FD and #noteList > 0 and noteList.folders) and FD.ImportList(noteList.folders) or nil
     for _, raw in ipairs(noteList) do
         local src = BNB.CleanNoteFields(raw)
         local id = src.title and src.title ~= "" and BNB.CreateNote(src.title, src.body or "")
@@ -1210,6 +1223,7 @@ local function ImportNotes(noteList, remapScope)
             if remapScope and fields.scope and fields.scope:find("^char:") then
                 fields.scope = "char:" .. (BNB.currentChar or fields.scope:sub(6))
             end
+            fields.folder  = FD and FD.ImportID(fields.folder, fmap) or nil
             fields.tags    = fields.tags or {}
             fields.pinned  = fields.pinned or false
             fields.created = fields.created or now
@@ -1345,7 +1359,10 @@ local function BuildBackup(opts)
     local toks  = opts.tokens    and BNB.Tokens    and BNB.Tokens.BackupList()    or nil
     local cols  = opts.tagColors and BNB.TagColors and BNB.TagColors.BackupMap()  or nil
     local profs = opts.profiles  and BNB.Profiles  and BNB.Profiles.BackupList()  or nil
-    return JsonEnvelope(parts, tpls, toks, cols, profs), #list
+    -- Folders ride with the notes (ALL-510 S2): every one in a full backup,
+    -- only those in use when notes were picked (none for ids = {})
+    local fold  = BNB.Folders and BNB.Folders.BackupList(opts.ids and list or nil) or nil
+    return JsonEnvelope(parts, tpls, toks, cols, profs, fold), #list
 end
 
 -- Public wrapper so the BNB_IMPORT_SCOPE_REMAP popup callback (defined in

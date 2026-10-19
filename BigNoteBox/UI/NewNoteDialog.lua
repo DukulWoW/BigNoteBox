@@ -11,7 +11,8 @@
 -- Templates themselves: Features/NoteTemplates.lua.
 --
 -- Public API:
---   BNB.NewNoteDialog.Open()
+--   BNB.NewNoteDialog.Open(opts)   opts.folder = the new note goes in that
+--                                  folder (a folder's "New note here", ALL-510)
 --   BNB.NewNoteDialog.Close()
 
 local BNB = BigNoteBox
@@ -71,6 +72,7 @@ local _selColor = nil
 local _selFrame, _selBorder = nil, nil
 local _selSize  = 12
 local _selRich  = false  -- whether "Rich note" checkbox is ticked
+local _selFolder = nil   -- Open({ folder = id }): written on Create (ALL-510)
 
 local _iconBtn    = nil
 local _titleEB    = nil
@@ -979,8 +981,9 @@ end
 -- ---------------------------------------------------------------------------
 -- PUBLIC API
 -- ---------------------------------------------------------------------------
-function NND.Open()
+function NND.Open(opts)
     local f = BuildDialog()
+    _selFolder = opts and opts.folder or nil
 
     local mf = BNB.mainFrame
 
@@ -1112,6 +1115,10 @@ function NND.Confirm()
     if _selRich then updates.richMode = true end
     local scope = _scopeDD and _scopeDD:GetSelected()
     if scope then updates.scope = scope end   -- ALL-267
+    if _selFolder and BNB.Folders and BNB.Folders.Get(_selFolder) then
+        updates.folder = _selFolder           -- ALL-510
+        BNB.Folders.SetOpen(_selFolder, true)
+    end
     BNB.UpdateNote(id, updates)
     -- Body, tags, tasks and situation from the picked template (ALL-68); a
     -- player's template also brings the rest of its look, except what the

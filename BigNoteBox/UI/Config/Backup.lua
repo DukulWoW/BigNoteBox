@@ -250,6 +250,7 @@ local function BuildBackupTab(sf, page)
             for _ in pairs(type(t) == "table" and t or {}) do n = n + 1 end
             if n > 0 then parts[#parts + 1] = string.format(L[key], n) end
         end
+        Add(list.folders, "BACKUP_PREVIEW_FOLDERS")   -- ALL-510 S2
         Add(list.templates, "BACKUP_PREVIEW_TEMPLATES")
         Add(list.tokens, "BACKUP_PREVIEW_TOKENS")
         Add(list.tagColors, "BACKUP_PREVIEW_TAGCOLORS")

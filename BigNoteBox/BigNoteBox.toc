@@ -35,6 +35,7 @@ Core\Json.lua
 Core\NoteFields.lua
 Core\NoteManager.lua
 Core\TagColors.lua
+Core\Folders.lua
 Core\Initialize.lua
 
 # UI
@@ -53,6 +54,7 @@ UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
 UI\NoteContextMenu.lua
+UI\FolderMenus.lua
 UI\NoteEditor.lua
 UI\WelcomePanel.lua
 UI\WysiwygBar.lua

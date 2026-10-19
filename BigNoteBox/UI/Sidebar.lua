@@ -822,7 +822,7 @@ end
 local function BuildCopyMovePopup()
     if _cmPopup then return _cmPopup end
 
-    local PW, PH_BASE = 260, 280
+    local PW, PH_BASE = 260, 320
     local PAD = 12
 
     local BTN_H = 26
@@ -861,6 +861,199 @@ local function BuildCopyMovePopup()
     return f
 end
 
+-- ── Rows ─────────────────────────────────────────────────────────────────────
+-- Character checkboxes (sc._row1..), then, while there are folders, a Folder
+-- part (ALL-510, Dukul 2026-10-19: "Copy / move should also allow to copy /
+-- move notes into a folder"): Keep its folder / No folder / each folder, one
+-- picked (sc._frow1..). Rows are reused; each label is its row's own child,
+-- so it hides with the row: on sc it stayed when the list got shorter, a
+-- name with no checkbox (ALL-309)
+local CM_ROW_H = 26
+local KEEP, NONE = "__keep", "__none"
+
+local function CheckRow(sc, key, y)
+    local row = sc[key] or CreateFrame("CheckButton", nil, sc, "UICheckButtonTemplate")
+    sc[key] = row
+    row:SetSize(24, 24)
+    row:ClearAllPoints()
+    row:SetPoint("TOPLEFT", sc, "TOPLEFT", -2, y + 2)
+    row:SetChecked(false)
+    if not row._lbl then
+        local lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
+        lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
+        lbl:SetJustifyH("LEFT"); lbl:SetHeight(CM_ROW_H)
+        row._lbl = lbl
+    end
+    row:Show()
+    return row
+end
+
+local function PartLabel(sc, key, text, y)
+    local fs = sc[key]
+    if not fs then
+        fs = sc:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        fs:SetJustifyH("LEFT")
+        sc[key] = fs
+    end
+    fs:ClearAllPoints()
+    fs:SetPoint("TOPLEFT", sc, "TOPLEFT", 0, y - 4)
+    fs:SetText(text)
+    BNB.SetHeaderColor(fs)
+    fs:Show()
+end
+
+-- noteIDs = the notes; dests = { { key = scope, label } }; multi = Select
+-- mode, which ends after a copy or move
+local function ShowCopyMove(f, noteIDs, dests, multi)
+    local ndb = BNB.NotesDB()
+    local FD  = BNB.Folders
+    local folders = FD and FD.List() or {}
+    if #dests == 0 and #folders == 0 then
+        f:Hide()
+        BNB:Print(L["SB_NO_DESTINATIONS"])
+        return
+    end
+
+    local sc = f._scrollChild
+    for i = 1, sc._rowCount or 0 do
+        local row = sc["_row" .. i]
+        if row then row:Hide() end
+    end
+    for i = 1, sc._fRowCount or 0 do
+        local row = sc["_frow" .. i]
+        if row then row:Hide() end
+    end
+    if sc._partChars  then sc._partChars:Hide()  end
+    if sc._partFolder then sc._partFolder:Hide() end
+
+    local y = 0
+    if #folders > 0 and #dests > 0 then
+        PartLabel(sc, "_partChars", L["CM_PART_CHARS"], y)
+        y = y - 20
+    end
+    local checks = {}
+    for i, dest in ipairs(dests) do
+        local row = CheckRow(sc, "_row" .. i, y)
+        row._lbl:SetText(dest.label)
+        BNB.LabelHit(row, row._lbl)   -- the tooltip and click reach over its label too
+        BNB.CheckTip(row, L["SB_COPY_MOVE_DEST_TIP"])
+        row._destKey = dest.key
+        checks[#checks + 1] = row
+        y = y - CM_ROW_H
+    end
+    sc._rowCount = #dests
+
+    local choices = {}
+    if #folders > 0 then
+        if #dests > 0 then y = y - 6 end
+        PartLabel(sc, "_partFolder", L["CM_PART_FOLDER"], y)
+        y = y - 20
+        local opts = { { key = KEEP, label = L["CM_FOLDER_KEEP"] },
+                       { key = NONE, label = L["FOLDER_CM_NO_FOLDER"] } }
+        for _, fo in ipairs(folders) do opts[#opts + 1] = { key = fo.id, label = FD.Text(fo.id) } end
+        for i, o in ipairs(opts) do
+            local row = CheckRow(sc, "_frow" .. i, y)
+            row._lbl:SetText(o.label)
+            BNB.LabelHit(row, row._lbl)
+            BNB.CheckTip(row, L["CM_FOLDER_TIP"])
+            row._folderKey = o.key
+            row:SetChecked(o.key == KEEP)
+            choices[#choices + 1] = row
+            y = y - CM_ROW_H
+        end
+    end
+    sc._fRowCount = #choices
+    sc:SetHeight(math.max(-y, 1))
+
+    local function Selected()
+        local selected = {}
+        for _, cb in ipairs(checks) do
+            if cb:GetChecked() then selected[#selected + 1] = cb._destKey end
+        end
+        return selected
+    end
+    local function Folder()
+        for _, cb in ipairs(choices) do
+            if cb:GetChecked() then return cb._folderKey end
+        end
+        return KEEP
+    end
+    local function UpdateButtons()
+        local any = #Selected() > 0 or Folder() ~= KEEP
+        f._copyBtn:SetEnabled(any)
+        f._moveBtn:SetEnabled(any)
+    end
+    for _, cb in ipairs(checks) do cb:SetScript("OnClick", UpdateButtons) end
+    for _, cb in ipairs(choices) do
+        cb:SetScript("OnClick", function(self)   -- one picked, a click never unpicks
+            for _, o in ipairs(choices) do o:SetChecked(o == self) end
+            UpdateButtons()
+        end)
+    end
+    UpdateButtons()
+
+    -- The folder part of what a copy or move writes. A copy keeps the
+    -- source's folder unless told otherwise (BNB.CopyNote)
+    local function WithFolder(fields)
+        local fk = Folder()
+        if fk == NONE then fields._clear = { "folder" }
+        elseif fk ~= KEEP then fields.folder = fk end
+        return fields
+    end
+    local function Finish()
+        local fk = Folder()
+        if fk ~= KEEP and fk ~= NONE and FD then FD.SetOpen(fk, true) end
+        f:Hide()
+        SB.Refresh()
+        if multi and BNB.SetMultiMode then BNB.SetMultiMode(false) end
+    end
+
+    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote. No
+    -- character ticked = a copy beside the note, in the picked folder
+    f._copyBtn:SetScript("OnClick", function()
+        local selected = Selected()
+        for _, id in ipairs(noteIDs) do
+            if ndb.notes[id] then
+                if #selected == 0 then
+                    BNB.CopyNote(id, WithFolder({}))
+                else
+                    for _, destScope in ipairs(selected) do
+                        BNB.CopyNote(id, WithFolder({ scope = destScope }))
+                    end
+                end
+            end
+        end
+        Finish()
+    end)
+
+    -- No character ticked = only the folder changes (filing, not editing)
+    f._moveBtn:SetScript("OnClick", function()
+        local selected = Selected()
+        local fk = Folder()
+        for _, id in ipairs(noteIDs) do
+            if ndb.notes[id] then
+                if #selected == 0 then
+                    if FD then FD.Move({ id }, fk ~= NONE and fk or nil) end
+                else
+                    BNB.UpdateNote(id, WithFolder({ scope = selected[1] }))
+                    for i = 2, #selected do
+                        BNB.CopyNote(id, WithFolder({ scope = selected[i] }))
+                    end
+                end
+            end
+        end
+        Finish()
+    end)
+
+    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
+    f:ClearAllPoints()
+    local cx, cy = GetCursorPosition()
+    local s = UIParent:GetEffectiveScale()
+    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)   -- top-left on the pointer (ALL-130); clamped to screen by the builder
+    f:Show(); f:Raise()
+end
+
 -- Opens with the sidebar off too: Copy/Move is the only way to change a
 -- note's scope since ALL-265, and returning here opened nothing (ALL-281)
 function BNB.OpenCopyMovePopup(noteID, mode)
@@ -873,13 +1066,6 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     local f = BuildCopyMovePopup()
     f:SetWindowTitle(L["SB_COPY_MOVE_TITLE"])
 
-    local sc = f._scrollChild
-    for i = 1, sc._rowCount or 0 do
-        local row = sc["_row" .. i]
-        if row then row:Hide() end
-    end
-    sc._rowCount = 0
-
     local dests = {}
     local noteScope = note.scope or "global"
     if noteScope ~= "global" then
@@ -888,89 +1074,7 @@ function BNB.OpenCopyMovePopup(noteID, mode)
     AddCharDests(dests, function(slotKey) return slotKey == noteScope end)
     table.sort(dests, function(a, b) return a.label < b.label end)
 
-    if #dests == 0 then
-        f:Hide()
-        BNB:Print(L["SB_NO_DESTINATIONS"])
-        return
-    end
-
-    local ROW_H  = 26
-    local checks = {}
-    for i, dest in ipairs(dests) do
-        local row = sc["_row" .. i] or CreateFrame("CheckButton", nil, sc,
-            "UICheckButtonTemplate")
-        sc["_row" .. i] = row
-        row:SetSize(24, 24)
-        row:SetPoint("TOPLEFT", sc, "TOPLEFT", -2, -(i - 1) * ROW_H + 2)
-        row:SetChecked(false)
-        local lbl = row._lbl
-        if not lbl then
-            -- The row's own child, so it hides with the row: on sc it stayed
-            -- when the list got shorter, a name with no checkbox (ALL-309)
-            lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-            lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
-            lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
-            lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)
-            row._lbl = lbl
-        end
-        lbl:SetText(dest.label)
-        BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
-        BNB.CheckTip(row, L["SB_COPY_MOVE_DEST_TIP"])
-        row._destKey = dest.key
-        row:Show()
-        checks[#checks + 1] = row
-    end
-    sc._rowCount = #dests
-    sc:SetHeight(math.max(#dests * ROW_H, 1))
-
-    local function UpdateButtons()
-        local anyChecked = false
-        for _, cb in ipairs(checks) do
-            if cb:GetChecked() then anyChecked = true; break end
-        end
-        f._copyBtn:SetEnabled(anyChecked)
-        f._moveBtn:SetEnabled(anyChecked)
-    end
-    f._copyBtn:SetEnabled(false)
-    f._moveBtn:SetEnabled(false)
-    for _, cb in ipairs(checks) do
-        cb:SetScript("OnClick", UpdateButtons)
-    end
-
-    local function GetSelected()
-        local selected = {}
-        for _, cb in ipairs(checks) do
-            if cb:GetChecked() then selected[#selected + 1] = cb._destKey end
-        end
-        return selected
-    end
-
-    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
-    local function CopyNoteToScope(destScope)
-        BNB.CopyNote(noteID, { scope = destScope })
-    end
-
-    f._copyBtn:SetScript("OnClick", function()
-        local selected = GetSelected()
-        if #selected == 0 then return end
-        for _, destScope in ipairs(selected) do CopyNoteToScope(destScope) end
-        f:Hide(); SB.Refresh()
-    end)
-
-    f._moveBtn:SetScript("OnClick", function()
-        local selected = GetSelected()
-        if #selected == 0 then return end
-        BNB.UpdateNote(noteID, { scope = selected[1] })
-        for i = 2, #selected do CopyNoteToScope(selected[i]) end
-        f:Hide(); SB.Refresh()
-    end)
-
-    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
-    f:ClearAllPoints()
-    local cx, cy = GetCursorPosition()
-    local s = UIParent:GetEffectiveScale()
-    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)   -- top-left on the pointer (ALL-130); clamped to screen by the builder
-    f:Show(); f:Raise()
+    ShowCopyMove(f, { noteID }, dests, false)
 end
 
 --------------------------------------------------------------------------------
@@ -992,14 +1096,6 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
         or  string.format(L["SB_COPY_MOVE_MULTI_ONE_FMT"], #noteIDs)
     f:SetWindowTitle(cmTitle)
 
-    -- Rebuild scroll child
-    local sc = f._scrollChild
-    for i = 1, sc._rowCount or 0 do
-        local row = sc["_row" .. i]
-        if row then row:Hide() end
-    end
-    sc._rowCount = 0
-
     -- Collect all unique scopes across the selected notes
     local scopeSet = {}
     for _, id in ipairs(noteIDs) do
@@ -1015,109 +1111,7 @@ function BNB.OpenCopyMovePopupMulti(noteIDs)
     AddCharDests(dests, function(slotKey) return scopeSet[slotKey] end)
     table.sort(dests, function(a, b) return a.label < b.label end)
 
-    if #dests == 0 then
-        f:Hide()
-        BNB:Print(L["SB_NO_DESTINATIONS"])
-        return
-    end
-
-    local ROW_H  = 26
-    local checks = {}
-    for i, dest in ipairs(dests) do
-        local row = sc["_row" .. i] or CreateFrame("CheckButton", nil, sc,
-            "UICheckButtonTemplate")
-        sc["_row" .. i] = row
-        row:SetSize(24, 24)
-        row:SetPoint("TOPLEFT", sc, "TOPLEFT", -2, -(i - 1) * ROW_H + 2)
-        row:SetChecked(false)
-        local lbl = row._lbl
-        if not lbl then
-            -- The row's own child, so it hides with the row: on sc it stayed
-            -- when the list got shorter, a name with no checkbox (ALL-309)
-            lbl = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-            lbl:SetPoint("LEFT",  row, "RIGHT",  4, 0)
-            lbl:SetPoint("RIGHT", sc,  "RIGHT", -4, 0)
-            lbl:SetJustifyH("LEFT"); lbl:SetHeight(ROW_H)
-            row._lbl = lbl
-        end
-        lbl:SetText(dest.label)
-        BNB.LabelHit(row, lbl)   -- the tooltip and click reach over its label too
-        BNB.CheckTip(row, L["SB_COPY_MOVE_DEST_TIP"])
-        row._destKey = dest.key
-        row:Show()
-        checks[#checks + 1] = row
-    end
-    sc._rowCount = #dests
-    sc:SetHeight(math.max(#dests * ROW_H, 1))
-
-    local function UpdateButtons()
-        local anyChecked = false
-        for _, cb in ipairs(checks) do
-            if cb:GetChecked() then anyChecked = true; break end
-        end
-        f._copyBtn:SetEnabled(anyChecked)
-        f._moveBtn:SetEnabled(anyChecked)
-    end
-    f._copyBtn:SetEnabled(false)
-    f._moveBtn:SetEnabled(false)
-    for _, cb in ipairs(checks) do
-        cb:SetScript("OnClick", UpdateButtons)
-    end
-
-    local function GetSelected()
-        local selected = {}
-        for _, cb in ipairs(checks) do
-            if cb:GetChecked() then selected[#selected + 1] = cb._destKey end
-        end
-        return selected
-    end
-
-    -- Full copy (rich mode, tasks, attachments...): see BNB.CopyNote
-    local function CopyNoteToScope(id, destScope)
-        BNB.CopyNote(id, { scope = destScope })
-    end
-
-    f._copyBtn:SetScript("OnClick", function()
-        local selected = GetSelected()
-        if #selected == 0 then return end
-        for _, id in ipairs(noteIDs) do
-            if ndb.notes[id] then
-                for _, destScope in ipairs(selected) do
-                    CopyNoteToScope(id, destScope)
-                end
-            end
-        end
-        f:Hide()
-        SB.Refresh()
-        if BNB.SetMultiMode  then BNB.SetMultiMode(false) end
-    end)
-
-    f._moveBtn:SetScript("OnClick", function()
-        local selected = GetSelected()
-        if #selected == 0 then return end
-        for _, id in ipairs(noteIDs) do
-            local note = ndb.notes[id]
-            if note then
-                BNB.UpdateNote(id, { scope = selected[1] })
-                for i = 2, #selected do
-                    CopyNoteToScope(id, selected[i])
-                end
-            end
-        end
-        f:Hide()
-        SB.Refresh()
-        if BNB.SetMultiMode  then BNB.SetMultiMode(false) end
-    end)
-
-    -- Anchor to mouse
-    BNB.SeatWindow(f, f._strata)   -- also over Focus mode (a note link's menu, ALL-506)
-    f:ClearAllPoints()
-    local cx, cy = GetCursorPosition()
-    local s = UIParent:GetEffectiveScale()
-    f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", cx / s, cy / s)   -- top-left on the pointer (ALL-130); clamped to screen by the builder
-
-    f:Show()
-    f:Raise()
+    ShowCopyMove(f, noteIDs, dests, true)
 end
 
 -- A note created, deleted, restored or moved to another character changes

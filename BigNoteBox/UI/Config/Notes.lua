@@ -191,6 +191,14 @@ local function BuildNotesTab(sf, ct)
         end)
     end
 
+    -- Note folders (ALL-510): each folder keeps its own open / closed; this is
+    -- how a new one starts (Dukul, 2026-10-19)
+    y = AddSubHeader(ct, y, L["CFG_FOLDERS_HEADER"])
+    y = AddCheck(ct, y, L["CFG_FOLDER_START_OPEN"],
+        function() return db.folderStartOpen ~= false end,
+        function(v) db.folderStartOpen = v end,
+        L["CFG_FOLDER_START_OPEN_TIP"])
+
     y = AddSubHeader(ct, y, L["CFG_TAGTREE_HEADER"])
     y = AddCheck(ct, y, L["CFG_TAGTREE_STAY_OPEN"],
         function() return db.tagTreeStayOpen ~= false end,

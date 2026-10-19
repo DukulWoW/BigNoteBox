@@ -297,6 +297,8 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         if hasTags then tagsLabel = L["NL_CTX_EDIT_TAGS"] end
         root:CreateButton(tagsLabel, function() BNB.OpenNoteTags(noteID) end,
             { icon = hasTags and "tags-edit" or "tags-add", disabled = locked })
+        -- Folders (ALL-510): filing, not editing, so a locked note moves too
+        if BNB.AddMoveToFolderMenu then BNB.AddMoveToFolderMenu(root, { noteID }) end
         -- A player note that updates itself (ALL-474): stop / start
         local UN = BNB.UnitNotes
         if note.source == "inspect" and note.unitAuto and UN and UN.SetAutoUpdate and BNB.UnitNotesEnabled() then
@@ -554,6 +556,8 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         if c.locked > 0 then
             root:CreateButton(L["MULTI_CM_UNLOCK_ALL"], function() LockAll(false) end, { icon = "unlocked" })
         end
+        -- Folders (ALL-510); Select mode stays on, as for Pin all
+        if BNB.AddMoveToFolderMenu then BNB.AddMoveToFolderMenu(root, ids) end
 
         local act = root:CreateButton(L["NL_CM_ACTIONS"], nil, { icon = "action" })
         act:CreateButton(L["MULTI_CM_DUPLICATE"], Duplicate, { icon = "duplicate" })

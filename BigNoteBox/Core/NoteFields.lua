@@ -106,6 +106,10 @@ local FIELDS = {
     { "scope",     "s" },
     { "pinned",    "b" },
     { "favorited", "b" },
+    -- The folder it is filed in (ALL-510, Core/Folders.lua): a folder id of
+    -- BigNoteBoxNotesDB.folders; a copy stays in the same folder, a shared
+    -- note leaves it behind (the receiver has its own folders)
+    { "folder",    "s" },
     { "locked",    "b" },
     { "alarm",     "t", nocopy = true },   -- a copy would ring twice
     -- A player note that updates itself (ALL-474, Features/PlayerNoteAuto.lua):

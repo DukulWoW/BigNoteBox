@@ -525,6 +525,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         end
         if On("notes") then
             for i, note in ipairs(data) do out[i] = note end
+            out.folders = data.folders   -- the notes' folders come with them (ALL-510 S2)
             any = any or #out > 0
         end
         for _, key in ipairs({ "templates", "tokens", "tagColors" }) do
