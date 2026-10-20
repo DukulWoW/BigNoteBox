@@ -62,6 +62,13 @@ local debounceTimer = nil
 
 -- Expose filter state for TagTree.lua
 function BNB.GetCurrentFilter()    return currentFilter    end
+function BNB.GetCurrentTagFilter() return currentTagFilter end
+-- Any search text, tag, favourite or task filter on (the explorer view's
+-- flat search results, ALL-414)
+function BNB.IsListFiltering()
+    return currentFilter ~= "" or currentTagFilter ~= nil
+        or BNB._favFilterActive == true or BNB._taskFilterActive == true
+end
 
 -- Drag-reorder state
 local _dragNoteID   = nil   -- noteID being dragged
@@ -82,6 +89,10 @@ local _multiSel     = {}             -- { [noteID]=true }
 
 -- Module-level refs set in BuildNoteList, used by collapse toggle
 local _newBtn, _qBtn, _collapseBtn, _searchBar, _sf = nil,nil,nil,nil,nil
+-- The search row lent to the explorer view's tool row (BNB.DockListSearch):
+-- nil = in the list; else { host, width }
+local _searchDock = nil
+local _searchParts = nil   -- { bar, ac, parent, place } once the row is built
 
 -- The collapse button's arrow: right while collapsed, left while open, with
 -- Dukul's -hover art under the pointer (2026-09-28).
@@ -247,15 +258,50 @@ function BNB.SetListTopInset(px)
     end
 end
 
--- Clears the search text and the tag, favourite and task filters when any
--- is on (the reset button's own action). The explorer view (ALL-414) calls
--- it on the way in: the grid has no search row in stage 1
+-- Clears the search text and the tag, favourite and task filters when any is
+-- on (the reset button's own action): the explorer view's search field on close
 function BNB.ResetListFilters()
-    local filtering = currentFilter ~= "" or currentTagFilter ~= nil
-        or BNB._favFilterActive == true or BNB._taskFilterActive == true
     local oc = BNB._searchOuterClear
-    local reset = filtering and oc and oc:GetScript("OnClick")
+    local reset = BNB.IsListFiltering() and oc and oc:GetScript("OnClick")
     if reset then reset(oc) end
+end
+
+-- The explorer view borrows the list's search row (ALL-414 S2): one search,
+-- one set of filters, the same text in both views. host = the frame it fills
+-- (the filter buttons at its right end), onEscape = what Esc in the box does
+-- there; nil gives it back to the list, where a collapsed list hides it and
+-- clears what it was filtering.
+function BNB.DockListSearch(host, onEscape)
+    local P = _searchParts
+    if not P then return end
+    local parts = { P.bar, BNB._favBtn, BNB._taskFilterBtn, BNB._searchOuterClear, P.ac }
+    if host then
+        local moved = not _searchDock
+        _searchDock = { host = host, onEscape = onEscape }
+        if moved then
+            for _, fr in ipairs(parts) do if fr then fr:SetParent(host) end end
+            P.ac:SetFrameLevel(host:GetFrameLevel() + 100)   -- the tag list over the tiles
+        end
+        P.bar:Show(); BNB._favBtn:Show(); BNB._searchOuterClear:Show()
+        BNB.ApplyTaskFilterButton()
+        return
+    end
+    if not _searchDock then return end
+    _searchDock = nil
+    for _, fr in ipairs(parts) do if fr then fr:SetParent(P.parent) end end
+    P.ac:SetFrameLevel(P.bar:GetFrameLevel() + 20)
+    P.bar:ClearAllPoints()
+    P.bar:SetHeight(SEARCH_H)
+    P.place()
+    BNB.ApplyTaskFilterButton()
+    -- The list's own rules again: collapsed hides the row and clears it
+    BNB.SetListCollapsed(BNB._listCollapsed and true or false)
+end
+
+-- Puts the cursor in the search box (the explorer view's search icon)
+function BNB.FocusListSearch()
+    local eb = _searchParts and _searchParts.eb
+    if eb and eb:IsVisible() then eb:SetFocus() end
 end
 
 function BNB.SetListCollapsed(collapsed)
@@ -267,14 +313,15 @@ function BNB.SetListCollapsed(collapsed)
         PaintCollapseArrow(_collapseBtn, _collapseBtn:IsMouseOver())
     end
 
-    -- Show/hide expanded-only elements
-    if _searchBar then
+    -- Show/hide expanded-only elements (not while the explorer view has the
+    -- search row: it stays in its tool row)
+    if _searchBar and not _searchDock then
         if collapsed then _searchBar:Hide() else _searchBar:Show() end
     end
-    if BNB._favBtn then
+    if BNB._favBtn and not _searchDock then
         if collapsed then BNB._favBtn:Hide() else BNB._favBtn:Show() end
     end
-    if BNB._taskFilterBtn then
+    if BNB._taskFilterBtn and not _searchDock then
         -- Stays hidden while the Tasks module is off (ALL-102)
         local show = not collapsed and BNB.TasksEnabled()
         if show then BNB._taskFilterBtn:Show() else BNB._taskFilterBtn:Hide() end
@@ -285,7 +332,7 @@ function BNB.SetListCollapsed(collapsed)
     if BNB._folderTreeBtn then   -- ALL-510 S4; hidden while the Folders module is off (ALL-514)
         if collapsed or not BNB.FoldersEnabled() then BNB._folderTreeBtn:Hide() else BNB._folderTreeBtn:Show() end
     end
-    if BNB._searchOuterClear then
+    if BNB._searchOuterClear and not _searchDock then
         if collapsed then BNB._searchOuterClear:Hide() else BNB._searchOuterClear:Show() end
     end
     -- New Note stays in both modes: collapsed it is a narrow "NN" left of the arrow
@@ -297,7 +344,7 @@ function BNB.SetListCollapsed(collapsed)
     -- Collapsing hides the search row, so a search or filter left on would be
     -- stuck until the list is opened again: collapsing resets them, as the
     -- reset button does (Dukul, 2026-10-20)
-    if collapsed then
+    if collapsed and not _searchDock then
         local filtering = currentFilter ~= "" or currentTagFilter ~= nil
             or BNB._favFilterActive == true or BNB._taskFilterActive == true
         local oc = BNB._searchOuterClear
@@ -480,7 +527,9 @@ local function BuildSearchBar(parent)
     local function PlaceFolderBtn()
         local on = BNB.FoldersEnabled()
         local n = on and 2 or 1
-        bar:SetPoint("TOPLEFT", parent, "TOPLEFT", PAD_L + n * (TREE_BTN + TREE_GAP) + 2, -2)
+        if not _searchDock then
+            bar:SetPoint("TOPLEFT", parent, "TOPLEFT", PAD_L + n * (TREE_BTN + TREE_GAP) + 2, -2)
+        end
         if on and not BNB._listCollapsed then folderBtn:Show() else folderBtn:Hide() end
         folderBtn._apply()
     end
@@ -653,11 +702,21 @@ local function BuildSearchBar(parent)
     function BNB.ApplyTaskFilterButton()
         local on = BNB.TasksEnabled()
         if not on and _taskFilterActive then SetTaskFilter(false) end
-        taskFilterBtn:SetShown(on and not BNB._listCollapsed)
+        taskFilterBtn:SetShown(on and (_searchDock ~= nil or not BNB._listCollapsed))
         outerClear:ClearAllPoints()
         outerClear:SetPoint("LEFT", on and taskFilterBtn or favBtn, "RIGHT", OUTER_GAP, 0)
         local room = OUTER_ROOM - (on and 0 or (OUTER_BTN + OUTER_GAP))
-        bar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -(2 + room), -2)
+        if _searchDock then
+            -- Lent to the explorer view: its search field, the filter
+            -- buttons at the right end
+            local host = _searchDock.host
+            bar:ClearAllPoints()
+            bar:SetPoint("LEFT", host, "LEFT", 0, 0)
+            bar:SetPoint("RIGHT", host, "RIGHT", -(2 + room), 0)
+            bar:SetHeight(host:GetHeight())
+        else
+            bar:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -(2 + room), -2)
+        end
     end
     BNB.ApplyTaskFilterButton()
 
@@ -674,6 +733,8 @@ local function BuildSearchBar(parent)
     _tagAC:SetPoint("TOPLEFT",  bar, "BOTTOMLEFT",  0, -2)
     _tagAC:SetPoint("TOPRIGHT", bar, "BOTTOMRIGHT", 0, -2)
     _tagAC:Hide()
+    -- What BNB.DockListSearch moves (the explorer view's tool row, ALL-414)
+    _searchParts = { bar = bar, ac = _tagAC, parent = parent, place = PlaceFolderBtn, eb = eb }
 
     local _tagACRows = {}
 
@@ -780,6 +841,10 @@ local function BuildSearchBar(parent)
     eb:SetScript("OnEscapePressed", function(self)
         if _tagAC:IsShown() then
             HideTagAC()
+        elseif _searchDock and _searchDock.onEscape then
+            -- Lent to the explorer view: Esc closes its search field
+            self:ClearFocus()
+            _searchDock.onEscape()
         else
             self:ClearFocus()
         end
@@ -1057,6 +1122,45 @@ end
 
 local _dragScroll = nil   -- the list's scroll before a folder view drag closed every header
 
+-- The custom order: carried (note ids, in the order carried) go as one block
+-- before targetID, or after it when after is true. Placed by id, not index:
+-- noteOrder also holds pinned notes and notes the sidebar / favourite / task
+-- filters hide, anywhere in the sequence (ALL-98). Shared with the explorer
+-- view's tile drag (ALL-414). Changes noteOrder only, redraws nothing.
+function BNB.MoveNotesInOrder(carried, targetID, after)
+    local order = (BNB.NotesDB() or {}).noteOrder
+    if not (order and carried and targetID) then return end
+    local isCarried = {}
+    for _, id in ipairs(carried) do isCarried[id] = true end
+    if isCarried[targetID] then return end
+    local kept, fromIdx = {}, nil
+    for _, id in ipairs(order) do
+        if isCarried[id] then fromIdx = fromIdx or (#kept + 1)
+        else kept[#kept + 1] = id end
+    end
+    if not fromIdx then return end
+    local toIdx = nil
+    for i, id in ipairs(kept) do
+        if id == targetID then toIdx = i; break end
+    end
+    if toIdx then
+        if after then toIdx = toIdx + 1 end
+    else
+        toIdx = fromIdx   -- target gone: put them back
+    end
+    local block = {}
+    for _, id in ipairs(carried) do
+        if (BNB.NotesDB().notes or {})[id] then block[#block + 1] = id end
+    end
+    -- Rebuilt in place: noteOrder is the saved table itself
+    local out = {}
+    for i = 1, toIdx - 1 do out[#out + 1] = kept[i] end
+    for _, id in ipairs(block) do out[#out + 1] = id end
+    for i = toIdx, #kept do out[#out + 1] = kept[i] end
+    for i = #order, 1, -1 do order[i] = nil end
+    for i, id in ipairs(out) do order[i] = id end
+end
+
 local function EndDrag(commit)
     BNB.ClearCursor()   -- ALL-95
     local ghost = _dragGhost
@@ -1081,37 +1185,7 @@ local function EndDrag(commit)
         -- three carried into a folder's rows, one moved; the header drop
         -- above already took all)
         local carried = ids or { _dragNoteID }
-        local isCarried = {}
-        for _, id in ipairs(carried) do isCarried[id] = true end
-        if order and not isCarried[_dragTargetID] then
-            local kept, fromIdx = {}, nil
-            for _, id in ipairs(order) do
-                if isCarried[id] then fromIdx = fromIdx or (#kept + 1)
-                else kept[#kept + 1] = id end
-            end
-            if fromIdx then
-                local toIdx = nil
-                for i, id in ipairs(kept) do
-                    if id == _dragTargetID then toIdx = i; break end
-                end
-                if toIdx then
-                    if _dragAfter then toIdx = toIdx + 1 end
-                else
-                    toIdx = fromIdx   -- target gone: put them back
-                end
-                local block = {}
-                for _, id in ipairs(carried) do
-                    if (BNB.NotesDB().notes or {})[id] then block[#block + 1] = id end
-                end
-                -- Rebuilt in place: noteOrder is the saved table itself
-                local out = {}
-                for i = 1, toIdx - 1 do out[#out + 1] = kept[i] end
-                for _, id in ipairs(block) do out[#out + 1] = id end
-                for i = toIdx, #kept do out[#out + 1] = kept[i] end
-                for i = #order, 1, -1 do order[i] = nil end
-                for i, id in ipairs(out) do order[i] = id end
-            end
-        end
+        BNB.MoveNotesInOrder(carried, _dragTargetID, _dragAfter)
         if order then
             -- Dropped among a folder's rows or the Notes rows: filed there
             -- too, so they stay where they were dropped (ALL-510 S3)
@@ -1287,8 +1361,13 @@ end
 -- right-click menu's "Delete permanently", ALL-234)
 function BNB.DeleteMultiSelected(permanent)
     -- Selected ids in note order (so the confirm lists them as the list does)
-    local ids = BNB.GetMultiSelectedOrdered()
-    if #ids == 0 then return end
+    BNB.ConfirmDeleteNotes(BNB.GetMultiSelectedOrdered(), permanent)
+end
+
+-- The bulk delete with its confirm, for any ids in display order (Select
+-- mode, the explorer view's Delete button, ALL-414)
+function BNB.ConfirmDeleteNotes(ids, permanent)
+    if not ids or #ids == 0 then return end
     local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
     -- A single note follows "Warn before delete"; two or more always confirm
     if #ids == 1 and not warn then

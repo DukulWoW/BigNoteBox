@@ -155,8 +155,10 @@ function BNB.ShowNotesHeaderMenu(owner)
 end
 
 -- ── Move to folder ──────────────────────────────────────────────────────────
--- ids = the notes; after() runs once they moved (Select mode ends itself)
-function BNB.AddMoveToFolderMenu(root, ids, after)
+-- ids = the notes; after() runs once they moved (Select mode ends itself).
+-- flat = the folder rows straight into root, no "Move to folder" item (the
+-- explorer view's Move button menu, ALL-414)
+function BNB.AddMoveToFolderMenu(root, ids, after, flat)
     local FD = F()
     if not FD or not BNB.FoldersEnabled() or not ids or #ids == 0 then return end   -- ALL-514
     -- The folder every note is in, false when they differ
@@ -172,7 +174,7 @@ function BNB.AddMoveToFolderMenu(root, ids, after)
             if after then after() end
         end
     end
-    local sub = root:CreateButton(L["FOLDER_CM_MOVE"], nil, { icon = "folder" })
+    local sub = flat and root or root:CreateButton(L["FOLDER_CM_MOVE"], nil, { icon = "folder" })
     local list = FD.List()
     for _, f in ipairs(list) do
         local label = FD.Text(f.id)   -- the name in the folder's colour

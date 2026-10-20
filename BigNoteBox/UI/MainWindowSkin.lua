@@ -15,8 +15,11 @@ local L   = BNB.L
 -- ── Layout constants ──────────────────────────────────────────────────────────
 -- Title bar 28 like every other skin window (Dukul 2026-10-03; it was 20)
 local SK_TITLE_H     = 28    -- top row: window title + X / lock / focus buttons
-local SK_TOOLBAR_H   = 35    -- sort dropdowns + topbar icons strip
-local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 63
+local SK_TOOLBAR_H   = 44    -- sort dropdowns + topbar icons strip (35 until 2026-10-20: Dukul wanted air above and below)
+local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 72
+local SK_TOOLBAR_SHADE = 0.6  -- the toolbar strip band: body colour x this
+local SK_FILL_INSET  = 3     -- BNB.SetBackdrop's fill stops this far in (BACKDROP_FRAME insets)
+local SK_ICON        = 20    -- the top bar icons
 local SORT_BTN_H     = 22
 
 --------------------------------------------------------------------------------
@@ -33,6 +36,28 @@ function BNB.BuildMainWindowSkinChrome()
     titleBar:SetPoint("TOPRIGHT", f, "TOPRIGHT", 0,  0)
     titleBar:SetHeight(SK_TITLE_H)
     titleBar:EnableMouse(true)
+
+    -- ── Toolbar strip band: a flat colour darker than the title bar, so the
+    -- row reads as its own part as in normal mode (Dukul, 2026-10-20). The
+    -- body colour shaded, re-tinted with the preset; under the strip's
+    -- controls. A plain texture, not a backdrop: a backdrop's fill stops
+    -- SK_FILL_INSET in, and with the title bar's own inset that left a gap.
+    -- It reaches up into the title bar's inset and stays inside the border.
+    -- On the window itself, BACKGROUND sub-level 7: over the backdrop's fill,
+    -- under every child frame. A child frame at the window's own level had
+    -- no fixed draw order against the backdrop: it vanished and flickered
+    -- back while the brightness slider moved (Dukul, 2026-10-20)
+    local toolbarFill = f:CreateTexture(nil, "BACKGROUND", nil, 7)
+    toolbarFill:SetPoint("TOPLEFT",  titleBar, "BOTTOMLEFT",   SK_FILL_INSET, SK_FILL_INSET)
+    toolbarFill:SetPoint("TOPRIGHT", titleBar, "BOTTOMRIGHT", -SK_FILL_INSET, SK_FILL_INSET)
+    toolbarFill:SetHeight(SK_TOOLBAR_H + SK_FILL_INSET)
+    local function PaintToolbarBg()
+        local r, g, b = BNB.SkinColourOf(BNB.GetSkinPreset(), false)
+        toolbarFill:SetColorTexture(r * SK_TOOLBAR_SHADE, g * SK_TOOLBAR_SHADE, b * SK_TOOLBAR_SHADE,
+            BNB.GetSkinBgAlpha())
+    end
+    PaintToolbarBg()
+    BNB.RegisterSkinBackdrop(PaintToolbarBg)
 
     local titleLbl = titleBar:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
     -- Offset left by ~40px so it centres in the space left of the buttons
@@ -59,7 +84,7 @@ function BNB.BuildMainWindowSkinChrome()
         sortY     = btnY,
         selY      = btnY,
         iconX     = -8,
-        iconY     = -(SK_CHROME_H - 8 - 20),   -- icon bottom 8px above the panes
+        iconY     = -(SK_TITLE_H + (SK_TOOLBAR_H - SK_ICON) / 2),   -- centred in the strip, as the dropdowns
 
         -- Skin randomise button, left of the lock
         AddTitleButtons = function(lockBtn)

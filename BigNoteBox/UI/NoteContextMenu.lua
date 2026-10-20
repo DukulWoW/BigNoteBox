@@ -640,10 +640,12 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         end, { icon = "remove-situation", danger = true, disabled = c.situations == 0 })
 
         root:CreateDivider()
+        -- The ids given, not the list's Select mode: the explorer view's
+        -- picked tiles open this menu too (ALL-414)
         if BNB.TrashEnabled and BNB.TrashEnabled() then
-            root:CreateButton(L["NL_CTX_TRASH"], function() BNB.DeleteMultiSelected(false) end, { icon = "trash" })
+            root:CreateButton(L["NL_CTX_TRASH"], function() BNB.ConfirmDeleteNotes(ids, false) end, { icon = "trash" })
         end
-        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), function() BNB.DeleteMultiSelected(true) end,
+        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), function() BNB.ConfirmDeleteNotes(ids, true) end,
             { icon = "danger" })
     end)
 end

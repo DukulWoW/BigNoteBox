@@ -74,6 +74,8 @@ BNB.DEFAULTS = {
     -- Explorer view (ALL-414): notes as an icon grid over the list and editor
     explorerView = false,
     explorerTile = "medium",     -- "small" / "medium" / "large"
+    explorerPinnedClosed = false,   -- the grid's Pinned / Notes headers closed (ALL-414)
+    explorerNotesClosed  = false,
 
     -- Font / display (fontChoice depends on the client language: InitSettingsDB)
     fontSize   = 13,

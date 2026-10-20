@@ -92,12 +92,17 @@ end
 -- Called after drag, resize, collapse and on window show.
 local function ApplySplit(f)
     local lw, top = BNB._listPaneW, -f._headerH
+    -- Always, the explorer view too: the list pane has no right anchor, so
+    -- without a width its rect never resolves, and the explorer's grid pane
+    -- (anchored to its top left) was 0 x 0 after a reload (2026-10-20)
+    BNB.listPane:SetWidth(lw)
     -- Explorer view (ALL-414, UI/ExplorerView.lua): no list, no splitter; the
     -- grid pane fills the window, or the editor does while a note is open
     local ex = BNB.Explorer and BNB.Explorer.Mode()
     BNB.listPane:SetShown(not ex)
     f._splitter:SetShown(not ex)
     BNB.editorPane:SetShown(ex ~= "grid")
+    if BNB.Explorer then BNB.Explorer.SyncPane() end
     if ex then
         -- 6 px in from the left: the editor's tag row and toolbar sit flush
         -- with their pane, and without the list the window border covered them
@@ -105,7 +110,6 @@ local function ApplySplit(f)
         BNB.editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
         return
     end
-    BNB.listPane:SetWidth(lw)
     f._splitter:SetPoint("TOPLEFT",    f, "TOPLEFT",    lw - 3, top)
     f._splitter:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", lw - 3, 0)
     BNB.editorPane:SetPoint("TOPLEFT",     f, "TOPLEFT",     lw + 1, top)
@@ -990,6 +994,9 @@ function BNB.CreateMainWindow()
     tagsBtn._tbKey, shareTopBtn._tbKey = "tags", "import"
     alarmOvBtn._tbKey, sendBtn._tbKey = "alarms", "send"
     f._tbLeftFrames = { selBtn, dirDD, sortDD }
+    -- The explorer switch and back arrow, which stand alone there while the
+    -- explorer view hides the rest (ALL-414)
+    if BNB.Explorer then BNB.Explorer.AddLeftFrames(f._tbLeftFrames) end
     BNB.InitToolbarIconRow({
         configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, sendBtn,
     })
@@ -1168,12 +1175,13 @@ function BNB.CreateMainWindow()
 
     if chrome.StylePanes then chrome.StylePanes(listPane, editorPane) end
 
-    -- Apply initial split (sets widths and anchors splitter/editorPane)
-    ApplySplit(f)
     -- The explorer view (ALL-414) lays the panes out again on a view change,
-    -- and styles its grid pane as the list pane (Forever glow)
+    -- and styles its grid pane as the list pane (Forever glow); set before the
+    -- first ApplySplit, which can make that pane
     BNB._applyMainSplit = function() ApplySplit(f) end
     f._stylePane = chrome.StylePanes
+    -- Apply initial split (sets widths and anchors splitter/editorPane)
+    ApplySplit(f)
 
     -- ── Lifecycle ────────────────────────────────────────────────────────────
     f:SetScript("OnShow", function(self)
@@ -1211,6 +1219,10 @@ function BNB.CreateMainWindow()
         end
         -- Apply scale lock state from saved DB
         BNB._applyScaleLock()
+        -- The explorer view (ALL-414) opens on its grid, after the note above
+        -- is selected again. Called here, not hooked: a HookScript made before
+        -- this SetScript was thrown away (an empty window after a reload)
+        if BNB.Explorer then BNB.Explorer.OnWindowShow() end
     end)
 
     f:SetScript("OnHide", function(self)
@@ -1219,6 +1231,7 @@ function BNB.CreateMainWindow()
         -- over the saved position whenever the UI was already visible while the
         -- window was built (ALL-97 J4, 2026-10-03: "moves back to the center")
         if not self._built then return end
+        if BNB.Explorer then BNB.Explorer.OnWindowHide(self) end   -- ALL-414, before Focus mode's return
         -- Focus mode hides the main window silently — skip confirm/save.
         if self._focusHide then
             -- Focus mode also leaves multi-select, same as a close
