@@ -141,6 +141,9 @@ local function Parent(root, label, icon, defaultKey, entries)
     local p = root:CreateButton(def and def.label or label, def and def.fn or nil, { icon = icon })
     for _, e in ipairs(entries) do
         if e == DIV then p:CreateDivider()
+        elseif e and e.sub then   -- a sub-menu of its own: { label, fn } rows
+            local b = p:CreateButton(e.label, e.fn, e.opts)
+            for _, s in ipairs(e.sub) do b:CreateButton(s.label, s.fn) end
         elseif e then p:CreateButton(e.label, e.fn, e.opts) end
     end
     return p
@@ -350,9 +353,15 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             { key = "exportMd", label = L["NL_CM_EXPORT_MD"], fn = function()
                 if BNB.ExportNoteMD then BNB.ExportNoteMD(noteID) end
             end, opts = { icon = "export-markdown" } },
-            { key = "exportHtml", label = L["NL_CM_EXPORT_HTML"], fn = function()
-                if BNB.ExportNoteHTML then BNB.ExportNoteHTML(noteID) end
-            end, opts = { icon = "export-html" } },
+            -- The three HTML styles as a sub-menu, each straight to the copy
+            -- popup (Dukul, 2026-10-20: no window showing the code)
+            -- fn = the last style picked, for Actions' click default (ClickKey)
+            { key = "exportHtml", label = L["NL_CM_EXPORT_HTML"], opts = { icon = "export-html" },
+              fn = function() BNB.ExportNoteHTML(noteID) end, sub = {
+                { label = L["CFG_EXPORT_HTML_NOTEONLY"], fn = function() BNB.ExportNoteHTML(noteID, "noteonly") end },
+                { label = L["CFG_EXPORT_HTML_PLAIN"],    fn = function() BNB.ExportNoteHTML(noteID, "plain") end },
+                { label = L["CFG_EXPORT_HTML_STYLIZED"], fn = function() BNB.ExportNoteHTML(noteID, "stylized") end },
+            } },
         })
 
         -- History: Dukul's sketch plus the restore point on top, which reads

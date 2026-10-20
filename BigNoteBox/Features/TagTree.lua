@@ -9,7 +9,7 @@
 -- Tags: every tag A-Z, then Untagged; open / closed is per session
 -- (tagTreeStartExpanded). Folders: every folder A-Z, then No folder; a folder's
 -- open / closed is its saved state (BNB.Folders, the same as in the list),
--- No folder per session. Notes A-Z by title inside a header, every tab.
+-- No folder per session. Notes inside a header follow the sort dropdown (2026-10-20), every tab.
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -20,7 +20,8 @@ local L   = BNB.L
 local _expandedTags  = {}   -- { [tagName] = true } when that header is expanded
 local _tagHeaders    = {}   -- reused header frames { btn, arrow, label, count }
 local _dragCollapsed = false   -- a note carried in the folder view: every header drawn closed
-local _collapseAllBtn, _expandAllBtn  -- pinned control buttons inside scroll child
+local _collapseAllBtn, _expandAllBtn  -- the control buttons, on _ctrlRow
+local _ctrlRow = nil   -- their row, above the scrolling rows (it stays while they scroll)
 local UNTAGGED  = "__untagged__"
 local NO_FOLDER = "__nofolder__"
 local _noFolderOpen = nil   -- the folder view's No folder header (nil = start state)
@@ -41,17 +42,26 @@ local function FolderView()
     return db and db.treeSource == "folders" and BNB.Folders ~= nil and BNB.FoldersEnabled()   -- ALL-514
 end
 
-local function ByTitle(a, b)
-    return BNB.NoteTitleKey(a) < BNB.NoteTitleKey(b)
+-- Notes inside a header follow the list's sort dropdown, as the list does
+-- (Dukul, 2026-10-20; A-Z by title until then): _rank = each note's place in
+-- GetOrderedNotes, filled by FilteredSet before the buckets are sorted
+local _rank = {}
+local function BySort(a, b)
+    local ra, rb = _rank[a.id] or math.huge, _rank[b.id] or math.huge
+    if ra ~= rb then return ra < rb end
+    return (a.id or "") < (b.id or "")
 end
 
 -- The notes the view shows: the text filter and favourite filter, every tab
 local function FilteredSet()
     local textFilter = BNB.GetCurrentFilter and BNB.GetCurrentFilter() or ""
-    local filtered = BNB.GetOrderedNotes(textFilter, nil, false, true)
+    -- noFloat: pinned notes are sorted like the rest, as in the list
+    local filtered = BNB.GetOrderedNotes(textFilter, nil, true, true)
     local filteredSet = {}
-    for _, note in ipairs(filtered) do
+    _rank = {}
+    for i, note in ipairs(filtered) do
         filteredSet[note.id] = note
+        _rank[note.id] = i
     end
     -- Apply fav filter on top if active
     if BNB._favFilterActive then
@@ -61,6 +71,8 @@ local function FilteredSet()
     end
     return filteredSet, textFilter ~= "" or BNB._favFilterActive == true
 end
+-- Select mode's Select all picks these, closed headers included
+BNB.TagTreeNoteSet = FilteredSet
 
 -- Returns ordered list of { key, label, notes[] } sorted A-Z, and the
 -- leftover bucket (Untagged / No folder) as { key, label, notes[] }.
@@ -83,8 +95,8 @@ local function BuildTagBuckets()
             local note = filteredSet[id]
             if note then notes[#notes + 1] = note end
         end
-        -- Sort notes within bucket A-Z by title
-        table.sort(notes, ByTitle)
+        -- Sort notes within the bucket by the list sort
+        table.sort(notes, BySort)
         if #notes > 0 then
             buckets[#buckets + 1] = { key = tag, notes = notes,
                 label = TC and TC.Text(tag) or tag }
@@ -97,7 +109,7 @@ local function BuildTagBuckets()
             untagged[#untagged + 1] = note
         end
     end
-    table.sort(untagged, ByTitle)
+    table.sort(untagged, BySort)
 
     return buckets, { key = UNTAGGED, notes = untagged,
         label = "|cff888888" .. L["TAGTREE_UNTAGGED"] .. "|r" }
@@ -125,13 +137,13 @@ local function BuildFolderBuckets()
         local notes = byFolder[f.id]
         if notes or (not filtering and not total[f.id]) then
             notes = notes or {}
-            table.sort(notes, ByTitle)
+            table.sort(notes, BySort)
             local r, g, b = FD.Color(f.id)
             buckets[#buckets + 1] = { key = f.id, folder = true, notes = notes,
                 label = FD.Text(f.id), r = r, g = g, b = b }
         end
     end
-    table.sort(loose, ByTitle)
+    table.sort(loose, BySort)
     return buckets, { key = NO_FOLDER, notes = loose,
         label = "|cff888888" .. L["FOLDER_TREE_NONE"] .. "|r", r = 0.53, g = 0.53, b = 0.53 }
 end
@@ -233,18 +245,28 @@ end
 --------------------------------------------------------------------------------
 local CTRL_H = 22   -- matches Select button height in the topbar
 
+-- Shows or hides the control row and the room kept for it
+local function ShowControls(on)
+    if _ctrlRow then _ctrlRow:SetShown(on) end
+    if BNB.SetListTopInset then BNB.SetListTopInset(on and (CTRL_H + 6) or 0) end
+end
+
 local function GetOrCreateCollapseControls(child)
     if _collapseAllBtn and _expandAllBtn then
         return _collapseAllBtn, _expandAllBtn
     end
 
-    -- Two equal-width buttons filling the full width of the scroll child.
-    -- A thin container row is sized to child width via OnSizeChanged so both
-    -- buttons always split 50/50 regardless of pane resize.
-    local ctrlRow = CreateFrame("Frame", nil, child)
+    -- Two equal-width buttons as wide as the scroll frame, split 50/50.
+    -- The row sits on the list pane just above the scroll frame, which is
+    -- moved down to make room (BNB.SetListTopInset), so it never scrolls
+    -- away (Dukul, 2026-10-20); it was the first thing in the scroll child
+    local sf = BNB._listScrollFrame
+    local ctrlRow = CreateFrame("Frame", nil, sf and sf:GetParent() or child)
     ctrlRow:SetHeight(CTRL_H)
-    ctrlRow:SetPoint("TOPLEFT",  child, "TOPLEFT",  0, -4)
-    ctrlRow:SetPoint("TOPRIGHT", child, "TOPRIGHT", 0, -4)
+    local top = sf or child
+    ctrlRow:SetPoint("BOTTOMLEFT",  top, "TOPLEFT",  0, 4)
+    ctrlRow:SetPoint("BOTTOMRIGHT", top, "TOPRIGHT", 0, 4)
+    _ctrlRow = ctrlRow
 
     _collapseAllBtn = BNB.CreateButton(nil, ctrlRow, L["TAGTREE_COLLAPSE_ALL"], 80, CTRL_H)
     _collapseAllBtn:SetPoint("TOPLEFT",  ctrlRow, "TOPLEFT",  0, 0)
@@ -289,6 +311,7 @@ function BNB.RefreshTagTree()
 
     -- In collapsed (icon-only) mode just fall through to normal list
     if collapsed then
+        ShowControls(false)   -- the icon list has no room for them
         -- Delegate back — temporarily disable tag tree so RefreshNoteList works
         local prev = db.tagTreeMode
         db.tagTreeMode = false
@@ -312,6 +335,7 @@ function BNB.RefreshTagTree()
     -- Collapse/expand controls
     local colBtn, expBtn = GetOrCreateCollapseControls(child)
     colBtn:Show(); expBtn:Show()
+    ShowControls(true)
     colBtn:SetScript("OnClick", function()
         for _, b in ipairs(all) do SetExpanded(b, false) end
         BNB.RefreshTagTree()
@@ -321,7 +345,7 @@ function BNB.RefreshTagTree()
         BNB.RefreshTagTree()
     end)
 
-    local totalH   = CTRL_H + 8   -- room for collapse/expand controls row (height + top pad + gap)
+    local totalH   = 4   -- the controls row is above the scroll frame now
     local entryIdx = 0
     local hdrIdx   = 0
 
@@ -337,7 +361,11 @@ function BNB.RefreshTagTree()
         hdr._lbl:ClearAllPoints()
         hdr._lbl:SetPoint("RIGHT", hdr, "RIGHT", -40, 0)
         if folderView then
-            BNB.Folders.PaintArt(hdr._pic, expanded, #notes > 0, b.r, b.g, b.b)
+            if b.key == NO_FOLDER then   -- the Notes picture, as in the list (Dukul, 2026-10-20)
+                BNB.Folders.PaintSectionArt(hdr._pic, "notes", b.r, b.g, b.b)
+            else
+                BNB.Folders.PaintArt(hdr._pic, expanded, #notes > 0, b.r, b.g, b.b)
+            end
             hdr._pic:Show()
             hdr._lbl:SetPoint("LEFT", hdr._pic, "RIGHT", 4, 0)
         else
@@ -446,8 +474,9 @@ function BNB.SetTagTreeMode(enabled, source)
     if BNB._syncTreeBtns then BNB._syncTreeBtns() end
 
     -- Disable/enable sort dropdown
+    -- The sort works in the tree views too (2026-10-20): always on
     if BNB.SetSortEnabled then
-        BNB.SetSortEnabled(not enabled)
+        BNB.SetSortEnabled(true)
     end
 
     if enabled then
@@ -468,8 +497,7 @@ function BNB.SetTagTreeMode(enabled, source)
     else
         -- Hide tag headers and controls before switching back to list
         for _, hdr in ipairs(_tagHeaders) do hdr:Hide() end
-        if _collapseAllBtn then _collapseAllBtn:Hide() end
-        if _expandAllBtn   then _expandAllBtn:Hide()   end
+        ShowControls(false)
         BNB.RefreshNoteList()
     end
 end
@@ -481,7 +509,6 @@ function BNB.InitTagTree()
     if not db then return end
     if db.tagTreeMode then
         if BNB._syncTreeBtns then BNB._syncTreeBtns() end
-        if BNB.SetSortEnabled then BNB.SetSortEnabled(false) end
     end
 end
 

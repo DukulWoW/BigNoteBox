@@ -10,8 +10,9 @@ local K = BNB._ConfigKit
 local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader = K.AddRule, K.AddHeader
 
--- Export window HTML mode: "noteonly", "plain", "stylized". Kept for the
--- session, so the per-note HTML export reuses the last choice.
+-- HTML export style: "noteonly", "plain", "stylized". Kept for the session:
+-- the last one picked in the Export HTML sub-menu, used when Export HTML
+-- itself is clicked (the Actions click default)
 local _htmlExportMode = "plain"
 
 -- ── Rescue (ALL-466 stage 3): the way to the Rescue list on the Note History
@@ -581,12 +582,6 @@ local function BuildBackupTab(sf, page)
     SyncRescue()   -- places ct and reports the page height
 end
 
--- ── Fallback export window (clipboard unavailable or oversized payload) ───────
--- A simple resizable frame with a scrollable read-only editbox.
--- User selects all with Ctrl+A and copies manually.
-
-local _exportWin = nil
-
 -- Before an import or a migration adds notes (ALL-186): while there are notes
 -- already, offer a JSON backup of them first. "Back up first" opens the copy
 -- popup with the notes as they are now and carries on after Ctrl+C (the text
@@ -623,169 +618,39 @@ function BNB.OfferBackupFirst(proceed)
     StaticPopup_Show("BNB_BACKUP_FIRST", n, nil, proceed)
 end
 
-function BNB.OpenExportWindow(text, warningText, htmlNoteID)
-    local NE = BNB.NoteExport
-    if not _exportWin then
-        -- Shared chrome (CMP-02); one body for both modes, the old offsets kept
-        local f = BNB.CreateToolWindow({
-            name = "BigNoteBoxExportFrame", w = 520, h = 440, title = L["CFG_EXPORT_TITLE"],
-            toplevel = true, escClose = true,
-        })
-        f:SetPoint("CENTER")
-        local copyY = f._isSkin and (BNB.TOOL_SKIN_TITLE_H + 8) or 58
-
-        local copyBtn = BNB.CreateButton(nil, f, L["HISTORY_EXPORT_COPY"], 140, 24)
-        copyBtn:SetPoint("TOP", f, "TOP", 0, -copyY)
-        -- Selects the text already in this box for Ctrl+C, rather than
-        -- copying it into the copy popup's hidden box a second time (ALL-507)
-        copyBtn:SetScript("OnClick", function() f._eb:SetFocus(); f._eb:HighlightText() end)
-        f._copyBtn = copyBtn
-
-        local sf = BNB.CreateScrollFrame(nil, f)
-        sf:SetPoint("TOPLEFT",     f, "TOPLEFT",     16, -(f._isSkin and (copyY + 24 + 6) or 90))
-        sf:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -24, 16)
-        if sf.ScrollBar then
-            sf.ScrollBar:SetAlpha(0)
-            sf:HookScript("OnScrollRangeChanged", function(_, _, yRange)
-                sf.ScrollBar:SetAlpha((yRange or 0) > 1 and 1.0 or 0)
-            end)
-        end
-
-        local child = CreateFrame("Frame", nil, sf)
-        child:SetSize(460, 1)
-        sf:SetScrollChild(child)
-
-        local eb = CreateFrame("EditBox", nil, child)
-        eb:SetPoint("TOPLEFT",     child, "TOPLEFT",     0, 0)
-        eb:SetPoint("BOTTOMRIGHT", child, "BOTTOMRIGHT", 0, 0)
-        eb:SetFontObject("BNBFontNormalSmall")
-        eb:SetMultiLine(true); eb:SetAutoFocus(true)
-        eb:SetMaxLetters(0)
-        eb:SetScript("OnEscapePressed", function() f:Hide() end)
-
-        f._eb = eb; f._child = child; f._sf = sf
-        _exportWin = f
-    end
-
-    -- Lazy-create the warning label (anchored above the copy button)
-    if not _exportWin._warnLbl then
-        local wl = _exportWin:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-        wl:SetPoint("BOTTOMLEFT",  _exportWin._copyBtn, "TOPLEFT",  0, 4)
-        wl:SetPoint("BOTTOMRIGHT", _exportWin._copyBtn, "TOPRIGHT", 0, 4)
-        wl:SetJustifyH("CENTER")
-        wl:SetWordWrap(true)
-        wl:SetTextColor(1, 0.75, 0.25)
-        wl:Hide()
-        _exportWin._warnLbl = wl
-    end
-
-    -- Lazy-create the HTML mode dropdown (anchored to the right of the copy button)
-    if not _exportWin._htmlDD then
-        local HTML_MODES = {
-            { key = "noteonly",  label = L["CFG_EXPORT_HTML_NOTEONLY"] },
-            { key = "plain",    label = L["CFG_EXPORT_HTML_PLAIN"] },
-            { key = "stylized", label = L["CFG_EXPORT_HTML_STYLIZED"] },
-        }
-        local dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, _exportWin, "WowStyle1DropdownTemplate"))
-        dd:SetPoint("LEFT", _exportWin._copyBtn, "RIGHT", 8, 0)
-        dd:SetWidth(150)
-        dd:SetHeight(24)
-        local function SetupHtmlDD()
-            dd:SetupMenu(function(_, root)
-                for _, opt in ipairs(HTML_MODES) do
-                    root:CreateRadio(opt.label,
-                        function() return _htmlExportMode == opt.key end,
-                        function()
-                            _htmlExportMode = opt.key
-                            dd:GenerateMenu()
-                            -- Regenerate with the new mode
-                            if _exportWin._htmlNoteID then
-                                local note = BNB.GetNote(_exportWin._htmlNoteID)
-                                if note then
-                                    local html, hasImages = NE.HtmlEncodeNote(note, _htmlExportMode)
-                                    _exportWin._eb:SetText(html)
-                                    if hasImages then
-                                        _exportWin._warnLbl:SetText(L["CFG_EXPORT_IMG_WARN"])
-                                        _exportWin._warnLbl:Show()
-                                    else
-                                        _exportWin._warnLbl:SetText("")
-                                        _exportWin._warnLbl:Hide()
-                                    end
-                                    C_Timer.After(0.05, function()
-                                        if _exportWin then
-                                            _exportWin._child:SetHeight(math.max(_exportWin._eb:GetHeight() + 20, 400))
-                                        end
-                                    end)
-                                end
-                            end
-                        end)
-                end
-            end)
-        end
-        SetupHtmlDD()
-        dd:Hide()
-        _exportWin._htmlDD = dd
-        _exportWin._setupHtmlDD = SetupHtmlDD
-    end
-
-    -- Show or hide the HTML mode dropdown
-    _exportWin._htmlNoteID = htmlNoteID
-    if htmlNoteID then
-        if _exportWin._setupHtmlDD then _exportWin._setupHtmlDD() end
-        _exportWin._htmlDD:Show()
-    else
-        _exportWin._htmlDD:Hide()
-    end
-
-    -- Show or hide the warning
-    if warningText and warningText ~= "" then
-        _exportWin._warnLbl:SetText(warningText)
-        _exportWin._warnLbl:Show()
-    else
-        _exportWin._warnLbl:SetText("")
-        _exportWin._warnLbl:Hide()
-    end
-
-    _exportWin._eb:SetText(text or "")
-    -- Size child to content -- use a generous fixed height; scroll handles the rest
-    C_Timer.After(0.05, function()
-        if not _exportWin then return end
-        _exportWin._child:SetHeight(math.max(_exportWin._eb:GetHeight() + 20, 400))
-    end)
-    _exportWin:Show()
-    _exportWin._eb:SetFocus()
-    _exportWin._eb:HighlightText()
+-- ── Export to the copy popup ───────────────────────────────────────────────
+-- Every note export goes straight to the copy popup, as the Backup buttons do
+-- (Dukul, 2026-10-20: the export window showed the text first). Focus is
+-- deferred: the menu that asked is still closing. HTML with pictures says
+-- where the image files go, in chat (the popup has one short line).
+function BNB.CopyExport(text, hasImages)
+    if not text or text == "" then return end
+    BNB.ShowClipboardHint(text, nil, true)
+    if hasImages then BNB:Print(L["CFG_EXPORT_IMG_WARN"]) end
 end
-
--- ── Per-note export helpers (called from the note context menu) ───────────────
--- C_System.SetClipboard is restricted on retail — always use the export window
--- with ShowClipboardHint for the Ctrl+C copy flow.
 
 function BNB.ExportNoteJSON(noteID)
     local NE = BNB.NoteExport
     local note = BNB.GetNote(noteID)
     if not note then return end
     -- Wrapped like a backup, so it imports in Settings > Backup
-    BNB.OpenExportWindow(NE.JsonEncodeNotes({ note }))
+    BNB.CopyExport(NE.JsonEncodeNotes({ note }))
 end
 
 function BNB.ExportNoteMD(noteID)
     local NE = BNB.NoteExport
     local note = BNB.GetNote(noteID)
     if not note then return end
-    BNB.OpenExportWindow(NE.MdEncodeNote(note))
+    BNB.CopyExport(NE.MdEncodeNote(note))
 end
 
-function BNB.ExportNoteHTML(noteID)
+-- mode nil = the last style picked this session
+function BNB.ExportNoteHTML(noteID, mode)
     local NE = BNB.NoteExport
     local note = BNB.GetNote(noteID)
     if not note then return end
-    _htmlExportMode = _htmlExportMode or "plain"
-    local html, hasImages = NE.HtmlEncodeNote(note, _htmlExportMode)
-    local warn = hasImages
-        and L["CFG_EXPORT_IMG_WARN"]
-        or nil
-    BNB.OpenExportWindow(html, warn, noteID)
+    if mode then _htmlExportMode = mode end
+    BNB.CopyExport(NE.HtmlEncodeNote(note, _htmlExportMode))
 end
 
 K.BUILDERS.backup = BuildBackupTab

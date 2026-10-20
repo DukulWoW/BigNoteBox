@@ -1299,11 +1299,11 @@ local function NotesInOrder(ids)
 end
 
 -- Multi-select "Export (N)" (BUG-12): the selected notes as one JSON export,
--- in list order, in the same export window as Settings > Backup.
+-- in list order, to the copy popup as Settings > Backup does.
 function BNB.ExportMultiJSON(ids)
     local list = NotesInOrder(ids)
-    if #list > 0 and BNB.OpenExportWindow then
-        BNB.OpenExportWindow(JsonEncodeNotes(list))
+    if #list > 0 and BNB.CopyExport then
+        BNB.CopyExport(JsonEncodeNotes(list))
     end
 end
 
@@ -1312,27 +1312,26 @@ end
 -- (ALL-234)
 function BNB.ExportMultiMD(ids)
     local list = NotesInOrder(ids)
-    if #list == 0 or not BNB.OpenExportWindow then return end
+    if #list == 0 or not BNB.CopyExport then return end
     local chunks = { string.format("# BigNoteBox Export v%d | %s | %d note(s)\n",
         EXPORT_VERSION, BNB.Date("%Y-%m-%d %H:%M"), #list) }
     for _, note in ipairs(list) do chunks[#chunks + 1] = "===\n" .. MdEncodeNote(note) end
-    BNB.OpenExportWindow(table.concat(chunks, "\n"))
+    BNB.CopyExport(table.concat(chunks, "\n"))
 end
 
 -- Several notes as HTML: the "Note only" fragment of each, a rule between
--- them, to paste into a page (a full page per note cannot be joined). The
--- export window's HTML style dropdown is for one note, so it stays hidden
--- (ALL-234)
+-- them, to paste into a page (a full page per note cannot be joined), so
+-- no style sub-menu here (ALL-234)
 function BNB.ExportMultiHTML(ids)
     local list = NotesInOrder(ids)
-    if #list == 0 or not BNB.OpenExportWindow then return end
+    if #list == 0 or not BNB.CopyExport then return end
     local parts, anyImages = {}, false
     for _, note in ipairs(list) do
         local html, hasImages = HtmlExportNoteOnly(note)
         parts[#parts + 1] = html
         anyImages = anyImages or hasImages
     end
-    BNB.OpenExportWindow(table.concat(parts, "\n<hr>\n"), anyImages and L["CFG_EXPORT_IMG_WARN"] or nil)
+    BNB.CopyExport(table.concat(parts, "\n<hr>\n"), anyImages)
 end
 
 -- The backups of Settings > Backup (ALL-507). opts:

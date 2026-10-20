@@ -86,6 +86,22 @@ function F.PaintArt(tex, open, hasNotes, r, g, b)
     end
 end
 
+-- The Pinned / Notes headers' pictures (Dukul, 2026-10-20): art = "pinned"
+-- or "notes"; normal = ui-note-list-<art> in colour, skin mode = its -skin
+-- art tinted in r, g, b (the header colour when none). The folder view's No
+-- folder header uses "notes" too
+function F.PaintSectionArt(tex, art, r, g, b)
+    local path = ART .. "ui-note-list-" .. art
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        tex:SetTexture(path .. "-skin")
+        if not r then r, g, b = BNB.HeaderColor() end
+        tex:SetVertexColor(r, g, b)
+    else
+        tex:SetTexture(path)
+        tex:SetVertexColor(1, 1, 1)
+    end
+end
+
 local function Store(create)
     local ndb = BNB.NotesDB and BNB.NotesDB()
     if not ndb then return nil end

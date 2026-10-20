@@ -230,6 +230,23 @@ BNB.ApplyListMode = ApplyListMode
 -- Stores state in BNB._listCollapsed and BigNoteBoxDB.listCollapsed.
 -- Notifies MainWindow to adjust the split position.
 --------------------------------------------------------------------------------
+-- Room kept above the scrolling rows (expanded list only): the tag tree /
+-- folder view's Collapse all / Expand all row stays there while the rows
+-- scroll (Dukul, 2026-10-20). Set by Features/TagTree.lua, 0 = none
+local _sfTopExtra = 0
+function BNB.SetListTopInset(px)
+    px = px or 0
+    if px == _sfTopExtra then return end
+    _sfTopExtra = px
+    if _sf and not BNB._listCollapsed then
+        local pane = _sf:GetParent()
+        local BTNS_H = NEWBTN_H + PAD_BOT + 2
+        _sf:ClearAllPoints()
+        _sf:SetPoint("TOPLEFT",     pane, "TOPLEFT",     PAD_L, -(SEARCH_H + PAD_TOP + 4 + px))
+        _sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -22,   BTNS_H)
+    end
+end
+
 function BNB.SetListCollapsed(collapsed)
     BNB._listCollapsed = collapsed
     BigNoteBoxDB.listCollapsed = collapsed
@@ -266,6 +283,16 @@ function BNB.SetListCollapsed(collapsed)
     if _qBtn then
         if collapsed then _qBtn:Hide() else _qBtn:Show() end
     end
+    -- Collapsing hides the search row, so a search or filter left on would be
+    -- stuck until the list is opened again: collapsing resets them, as the
+    -- reset button does (Dukul, 2026-10-20)
+    if collapsed then
+        local filtering = currentFilter ~= "" or currentTagFilter ~= nil
+            or BNB._favFilterActive == true or BNB._taskFilterActive == true
+        local oc = BNB._searchOuterClear
+        local reset = filtering and oc and oc:GetScript("OnClick")
+        if reset then reset(oc) end
+    end
 
     -- Re-anchor scroll frame:
     --   Expanded: left-pad PAD_L, right -22 for scrollbar, top below search bar
@@ -277,7 +304,7 @@ function BNB.SetListCollapsed(collapsed)
             _sf:SetPoint("TOPLEFT",     _sf:GetParent(), "TOPLEFT",     PAD_L, -4)
             _sf:SetPoint("BOTTOMRIGHT", _sf:GetParent(), "BOTTOMRIGHT", -22,   BTNS_H)
         else
-            _sf:SetPoint("TOPLEFT",     _sf:GetParent(), "TOPLEFT",     PAD_L, -(SEARCH_H + PAD_TOP + 4))
+            _sf:SetPoint("TOPLEFT",     _sf:GetParent(), "TOPLEFT",     PAD_L, -(SEARCH_H + PAD_TOP + 4 + _sfTopExtra))
             _sf:SetPoint("BOTTOMRIGHT", _sf:GetParent(), "BOTTOMRIGHT", -22,   BTNS_H)
         end
     end
@@ -1038,31 +1065,55 @@ local function EndDrag(commit)
     -- sidebar / favourite / task filters hide, anywhere in the sequence (ALL-98).
     elseif commit and _dragNoteID and _dragTargetID and _dragTargetID ~= _dragNoteID then
         local order = (BNB.NotesDB() or {}).noteOrder
-        if order then
-            local fromIdx = nil
-            for i, id in ipairs(order) do
-                if id == _dragNoteID then fromIdx = i; break end
+        -- Every carried note goes, as one block in the order carried: Select
+        -- mode's picks too, not only the grabbed one (Dukul, 2026-10-20, IS9:
+        -- three carried into a folder's rows, one moved; the header drop
+        -- above already took all)
+        local carried = ids or { _dragNoteID }
+        local isCarried = {}
+        for _, id in ipairs(carried) do isCarried[id] = true end
+        if order and not isCarried[_dragTargetID] then
+            local kept, fromIdx = {}, nil
+            for _, id in ipairs(order) do
+                if isCarried[id] then fromIdx = fromIdx or (#kept + 1)
+                else kept[#kept + 1] = id end
             end
             if fromIdx then
-                table.remove(order, fromIdx)
                 local toIdx = nil
-                for i, id in ipairs(order) do
+                for i, id in ipairs(kept) do
                     if id == _dragTargetID then toIdx = i; break end
                 end
                 if toIdx then
                     if _dragAfter then toIdx = toIdx + 1 end
-                    table.insert(order, toIdx, _dragNoteID)
                 else
-                    table.insert(order, fromIdx, _dragNoteID)   -- target gone: put it back
+                    toIdx = fromIdx   -- target gone: put them back
                 end
-                -- Dropped among a folder's rows or the Notes rows: filed there
-                -- too, so it stays where it was dropped (ALL-510 S3)
-                if FD and _dragSection ~= nil and _dragSection ~= "pinned" then
-                    local want = (_dragSection ~= "notes") and _dragSection or nil
-                    if FD.Of(BNB.GetNote(_dragNoteID)) ~= want then FD.Move({ _dragNoteID }, want) end
+                local block = {}
+                for _, id in ipairs(carried) do
+                    if (BNB.NotesDB().notes or {})[id] then block[#block + 1] = id end
                 end
-                if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+                -- Rebuilt in place: noteOrder is the saved table itself
+                local out = {}
+                for i = 1, toIdx - 1 do out[#out + 1] = kept[i] end
+                for _, id in ipairs(block) do out[#out + 1] = id end
+                for i = toIdx, #kept do out[#out + 1] = kept[i] end
+                for i = #order, 1, -1 do order[i] = nil end
+                for i, id in ipairs(out) do order[i] = id end
             end
+        end
+        if order then
+            -- Dropped among a folder's rows or the Notes rows: filed there
+            -- too, so they stay where they were dropped (ALL-510 S3)
+            if FD and _dragSection ~= nil and _dragSection ~= "pinned" then
+                local want = (_dragSection ~= "notes") and _dragSection or nil
+                local move = {}
+                for _, id in ipairs(carried) do
+                    local n = BNB.GetNote(id)
+                    if n and FD.Of(n) ~= want then move[#move + 1] = id end
+                end
+                if #move > 0 then FD.Move(move, want) end
+            end
+            if BNB.RefreshNoteList then BNB.RefreshNoteList() end
         end
     end
 
@@ -1253,10 +1304,15 @@ function BNB.SelectAll()
     if not _multiMode then return end
     _multiSel = {}
     local n = 0
-    for _, btn in ipairs(listEntries) do
-        if btn:IsShown() and btn._noteID and not _multiSel[btn._noteID] then
-            _multiSel[btn._noteID] = true
-            n = n + 1
+    -- Every note the view holds, closed folders and tag headers included
+    -- (Dukul, 2026-10-20: it picked only the rows drawn); system notes are
+    -- never in these lists, so they are never picked
+    local db = BigNoteBoxDB
+    if db and db.tagTreeMode and BNB.TagTreeNoteSet then
+        for id in pairs((BNB.TagTreeNoteSet())) do _multiSel[id] = true; n = n + 1 end
+    else
+        for _, note in ipairs(BNB.GetOrderedNotes(currentFilter, currentTagFilter)) do
+            if not _multiSel[note.id] then _multiSel[note.id] = true; n = n + 1 end
         end
     end
     UpdateMultiActionBtns(n)
@@ -2228,6 +2284,8 @@ end
 
 local function RefreshNoteList()
     if not BNB._listScrollChild then return end
+    -- The collapsed list's section dividers: drawn again below when collapsed
+    for _, d in ipairs(BNB._listScrollChild._colDivs or {}) do d:Hide() end
     -- Every filter change ends here, typing included (ALL-194: the reset
     -- icon only lit up for the favourite and task buttons)
     if BNB._applyOuterClearState then BNB._applyOuterClearState() end
@@ -2247,17 +2305,19 @@ local function RefreshNoteList()
 
     ApplyListMode()
 
-    local notes    = BNB.GetOrderedNotes(currentFilter, currentTagFilter)
+    -- noFloat: the list splits Pinned off itself below, so pinned notes are
+    -- not floated and sorted A-Z first; they follow the chosen sort as every
+    -- other section does (Dukul, 2026-10-20: the sort left Pinned alone)
+    local notes    = BNB.GetOrderedNotes(currentFilter, currentTagFilter, true)
     local selID    = BNB._currentNoteID
     local child    = BNB._listScrollChild
     local collapsed = BNB._listCollapsed
     local entryH   = collapsed and (ICON_SIZE + 12) or ENTRY_H
     local totalH   = 0
 
-    -- Always split pinned vs regular. In non-custom modes pinned notes are
-    -- sorted A-Z among themselves; regular notes follow the active sort.
-    -- GetOrderedNotes already sorts the pinned notes A-Z by title (PERF-07:
-    -- they were sorted a second time here).
+    -- Always split pinned vs regular. Every section keeps the active sort's
+    -- order (pinned A-Z only until 2026-10-20; never sort a second time
+    -- here, PERF-07).
     -- Folders (ALL-510): a note in a folder is drawn under its folder, after
     -- Pinned and before the regular notes; a pinned one shows under Pinned and
     -- in its folder too, as the folder view does (Dukul, 2026-10-19: the folder
@@ -2298,13 +2358,23 @@ local function RefreshNoteList()
     -- frame holding the label and a rule in the header colour running from its right to the
     -- edge, as the Reference Box "Done (N)" title (ALL-328, Dukul 2026-10-06);
     -- hiding the frame hides both (TagTree hides them by these keys).
-    local function GetSectionHeader(key, labelText)
+    -- A picture left of the label as the folder headers have (Dukul,
+    -- 2026-10-20): art = "pinned" / "notes", ui-note-list-<art> in colour,
+    -- -skin in skin mode, white art tinted in the header colour
+    -- iconRow = the collapsed list: one row of the list's row height with
+    -- only the picture in the middle, the label in its tooltip, as a folder
+    -- header there (Dukul, 2026-10-20)
+    local function GetSectionHeader(key, labelText, art, iconRow)
         local hdr = child[key]
         if not hdr then
             hdr = CreateFrame("Frame", nil, child)
-            hdr:SetHeight(16)
+            hdr:SetHeight(FOLDER_HDR_H)
+            local pic = hdr:CreateTexture(nil, "ARTWORK")
+            pic:SetSize(FOLDER_ICON, FOLDER_ICON)
+            pic:SetPoint("LEFT", hdr, "LEFT", 0, 0)
+            hdr._pic = pic
             local fs = hdr:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-            fs:SetPoint("LEFT", hdr, "LEFT", 0, 0)
+            fs:SetPoint("LEFT", pic, "RIGHT", 4, 0)
             fs:SetJustifyH("LEFT")
             local rule = hdr:CreateTexture(nil, "ARTWORK")
             if rule.SetSnapToPixelGrid then   -- one exact pixel (ALL-246)
@@ -2316,15 +2386,61 @@ local function RefreshNoteList()
             rule:SetPoint("LEFT",  fs,  "RIGHT", 6, 0)
             rule:SetPoint("RIGHT", hdr, "RIGHT", 0, 0)
             hdr._text, hdr._rule = fs, rule
+            hdr:EnableMouse(true)   -- the collapsed row's tooltip
+            hdr:SetScript("OnEnter", function(self)
+                if not self._iconRow then return end
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:AddLine(self._text:GetText() or "")
+                GameTooltip:Show()
+            end)
+            hdr:SetScript("OnLeave", function() GameTooltip:Hide() end)
             child[key] = hdr
         end
         hdr._text:SetText(labelText)
+        hdr._iconRow = iconRow
+        hdr._pic:ClearAllPoints()
+        if iconRow then
+            hdr:SetHeight(entryH)
+            hdr._pic:SetSize(ICON_SIZE, ICON_SIZE)
+            hdr._pic:SetPoint("CENTER", hdr, "CENTER", 0, 0)
+            hdr._text:Hide(); hdr._rule:Hide()
+        else
+            hdr:SetHeight(FOLDER_HDR_H)
+            hdr._pic:SetSize(FOLDER_ICON, FOLDER_ICON)
+            hdr._pic:SetPoint("LEFT", hdr, "LEFT", 0, 0)
+            hdr._text:Show(); hdr._rule:Show()
+        end
         -- Text follows the BNBFontNormalSmall colour; the rule is set on every
         -- layout so it follows a preset change too (ALL-402)
         local hr, hg, hb = BNB.HeaderColor()
         hdr._rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
+        BNB.Folders.PaintSectionArt(hdr._pic, art, hr, hg, hb)
         hdr:ClearAllPoints()
         return hdr
+    end
+
+    -- A thin line between the sections in the collapsed list only: Pinned,
+    -- the folders, Notes, the system folders (Dukul, 2026-10-20). Nothing
+    -- before the first section drawn
+    local divIdx = 0
+    local function SectionDivider()
+        if not collapsed or totalH <= 0 then return end
+        divIdx = divIdx + 1
+        child._colDivs = child._colDivs or {}
+        local d = child._colDivs[divIdx]
+        if not d then
+            d = child:CreateTexture(nil, "ARTWORK")
+            if d.SetSnapToPixelGrid then d:SetSnapToPixelGrid(false); d:SetTexelSnappingBias(0) end
+            if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(d, 1, 1) else d:SetHeight(1) end
+            child._colDivs[divIdx] = d
+        end
+        local hr, hg, hb = BNB.HeaderColor()
+        d:SetColorTexture(hr, hg, hb, HDR_RULE_A)
+        d:ClearAllPoints()
+        d:SetPoint("TOPLEFT",  child, "TOPLEFT",  6, -(totalH + 2))
+        d:SetPoint("TOPRIGHT", child, "TOPRIGHT", -6, -(totalH + 2))
+        d:Show()
+        totalH = totalH + 5
     end
 
     -- One note row; section = "pinned", a folder id or "notes" (the "edited"
@@ -2348,16 +2464,12 @@ local function RefreshNoteList()
 
     -- ── Pinned section ────────────────────────────────────────────────────────
     if #pinned > 0 then
-        if not collapsed then
-            local hdr = GetSectionHeader("_pinnedHdr",
-                string.format(L["NL_HDR_PINNED_FMT"], #pinned))
-            hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -totalH)
-            hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -totalH)
-            hdr:Show()
-            totalH = totalH + 18
-        else
-            if child._pinnedHdr then child._pinnedHdr:Hide() end
-        end
+        local hdr = GetSectionHeader("_pinnedHdr",
+            string.format(L["NL_HDR_PINNED_FMT"], #pinned), "pinned", collapsed)
+        hdr:SetPoint("TOPLEFT",  child, "TOPLEFT",  collapsed and 0 or PAD_L, -totalH)
+        hdr:SetPoint("TOPRIGHT", child, "TOPRIGHT", collapsed and 0 or -4,    -totalH)
+        hdr:Show()
+        totalH = totalH + hdr:GetHeight()
 
         for _, note in ipairs(pinned) do AddRow(note, 0, "pinned") end
 
@@ -2370,6 +2482,7 @@ local function RefreshNoteList()
 
     -- ── Folders (ALL-510) ─────────────────────────────────────────────────────
     for i, f in ipairs(folders) do
+        if i == 1 then SectionDivider() end
         local open = filtering or f.open
         local hdr = GetFolderHeader(child, i)
         LayoutFolderHeader(hdr, f, folderN[f.id] or 0, open, filtering, collapsed, entryH)
@@ -2388,12 +2501,14 @@ local function RefreshNoteList()
     if #folders > 0 and not collapsed then totalH = totalH + 2 end
 
     -- ── Regular section ───────────────────────────────────────────────────────
-    -- Always show the "Notes (X)" header
-    if not collapsed then
+    -- Always show the "Notes (X)" header; the collapsed list only when
+    -- Pinned or a folder is above, to tell these notes apart from theirs
+    if not collapsed or #pinned > 0 or #folders > 0 then
+        SectionDivider()
         local hdr2 = GetSectionHeader("_regularHdr",
-            string.format(L["NL_HDR_REGULAR_FMT"], #regular))
-        hdr2:SetPoint("TOPLEFT",  child, "TOPLEFT",  PAD_L, -totalH)
-        hdr2:SetPoint("TOPRIGHT", child, "TOPRIGHT", -4,    -totalH)
+            string.format(L["NL_HDR_REGULAR_FMT"], #regular), "notes", collapsed)
+        hdr2:SetPoint("TOPLEFT",  child, "TOPLEFT",  collapsed and 0 or PAD_L, -totalH)
+        hdr2:SetPoint("TOPRIGHT", child, "TOPRIGHT", collapsed and 0 or -4,    -totalH)
         hdr2:Show()
         -- Right-click: New folder (ALL-510)
         if not hdr2._folderMenu then
@@ -2403,7 +2518,7 @@ local function RefreshNoteList()
                 if button == "RightButton" and BNB.ShowNotesHeaderMenu then BNB.ShowNotesHeaderMenu(self) end
             end)
         end
-        totalH = totalH + 18
+        totalH = totalH + hdr2:GetHeight()
     else
         if child._regularHdr then child._regularHdr:Hide() end
     end
@@ -2425,6 +2540,7 @@ local function RefreshNoteList()
         for _, p in ipairs(SYS.Folders()) do
             local sysNotes = SYS.Search(p.key, lower)
             if #sysNotes > 0 then
+                if sysShown == 0 then SectionDivider() end
                 sysShown = sysShown + 1
                 local open = lower ~= nil or SYS.IsOpen(p.key)
                 local hdr = GetFolderHeader(child, #folders + sysShown)
@@ -2927,6 +3043,12 @@ function BNB.BuildNoteList()
     if BNB._listCollapsed then
         searchBar:Hide()
         _qBtn:Hide()
+        -- The buttons beside the search bar too: they sit on the pane, not
+        -- the bar, and were left over the collapsed list (Dukul, 2026-10-20)
+        for _, b in ipairs({ BNB._favBtn, BNB._taskFilterBtn, BNB._tagTreeBtn,
+                             BNB._folderTreeBtn, BNB._searchOuterClear }) do
+            if b then b:Hide() end
+        end
         sf:ClearAllPoints()
         sf:SetPoint("TOPLEFT",     pane, "TOPLEFT",     PAD_L, -4)
         sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -22,   NEWBTN_H + PAD_BOT + 2)
