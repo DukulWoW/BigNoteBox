@@ -1748,6 +1748,17 @@ L["FOLDER_TREE_TIP_ON"]           = "Switch to folder view"
 L["FOLDER_TREE_TIP_OFF"]          = "Switch to list view"
 L["FOLDER_TREE_NONE"]             = "(no folder)"
 
+-- Explorer view (ALL-414)
+L["EXPLORER_TIP_ON"]              = "Switch to explorer view"
+L["EXPLORER_TIP_SUB"]             = "Your notes as a grid of icons. Click a folder to open it and a note to read it; the arrow at the top left goes back."
+L["EXPLORER_FOLDER_TIP"]          = "Click to open. Right-click for the folder menu."
+L["EXPLORER_FOLDER_EMPTY"]        = "This folder is empty."
+L["EXPLORER_CM_TILE_SIZE"]        = "Tile size"
+L["EXPLORER_CM_SORT_BY"]          = "Sort by"
+L["EXPLORER_TILE_SMALL"]          = "Small"
+L["EXPLORER_TILE_MEDIUM"]         = "Medium"
+L["EXPLORER_TILE_LARGE"]          = "Large"
+
 -- Config: Features tab — Tag Tree
 L["CFG_FOLDERS_HEADER"]           = "Folders"
 L["CFG_SUB_FOLDERS_DESC"]         = "Folders of your own in the note list, between Pinned and your notes, and the folder view."

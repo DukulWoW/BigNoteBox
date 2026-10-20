@@ -71,6 +71,9 @@ BNB.DEFAULTS = {
     splitX        = 240,
     listCollapsed = false,
     listAutoCollapsed = false,   -- collapsed by a narrow window, not by hand (ALL-115)
+    -- Explorer view (ALL-414): notes as an icon grid over the list and editor
+    explorerView = false,
+    explorerTile = "medium",     -- "small" / "medium" / "large"
 
     -- Font / display (fontChoice depends on the client language: InitSettingsDB)
     fontSize   = 13,

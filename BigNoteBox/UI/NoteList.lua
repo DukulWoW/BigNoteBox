@@ -247,6 +247,17 @@ function BNB.SetListTopInset(px)
     end
 end
 
+-- Clears the search text and the tag, favourite and task filters when any
+-- is on (the reset button's own action). The explorer view (ALL-414) calls
+-- it on the way in: the grid has no search row in stage 1
+function BNB.ResetListFilters()
+    local filtering = currentFilter ~= "" or currentTagFilter ~= nil
+        or BNB._favFilterActive == true or BNB._taskFilterActive == true
+    local oc = BNB._searchOuterClear
+    local reset = filtering and oc and oc:GetScript("OnClick")
+    if reset then reset(oc) end
+end
+
 function BNB.SetListCollapsed(collapsed)
     BNB._listCollapsed = collapsed
     BigNoteBoxDB.listCollapsed = collapsed
@@ -1890,29 +1901,29 @@ local function PlayerNoteFaction(note)
     return nil
 end
 
-local function PopulateEntry(btn, note, selected, collapsed)
-    btn._noteID = note.id
-    btn._title  = note.title   -- RefreshNoteListEntry: did a save change it?
+-- A note's icon as the list draws it: its picture (NPC face, live target
+-- portrait), then its icon frame or LSM edge border, else the default
+-- tooltip edge. host owns the border frame (host._borderFrame); size = the
+-- icon's size for the icon frame (nil = its width). The explorer view's
+-- tiles use it too (ALL-414), so a tile looks like the row.
+local function PaintNoteIcon(host, icon, note, size)
     local noteIcon = BNB.NpcNoteIcon and BNB.NpcNoteIcon(note) or note.icon
     local iconPath = (noteIcon and noteIcon ~= "") and noteIcon or DEFAULT_ICON
-    btn._icon:SetTexture(iconPath)
+    icon:SetTexture(iconPath)
     -- NPC notes: the NPC's face from its saved display ID, no target needed
     -- (ALL-46, Features/TargetNote.lua). Falls back to iconPath until resolved.
-    if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(btn._icon, note) end
+    if BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(icon, note) end
 
     -- Live portrait: if this is a target or inspect note and that unit is
     -- currently targeted, replace the icon with the actual unit portrait.
     -- SetPortraitTexture renders the live unit face/model into the texture widget.
     -- Players only get this live: a saved ID cannot carry their customizations.
     if BNB.NoteMatchesTarget(note) then
-        pcall(SetPortraitTexture, btn._icon, "target")
+        pcall(SetPortraitTexture, icon, "target")
     end
 
-    -- Icon border always hidden (user sets per-note border via LSM; WhiteIconFrame removed)
-    if btn._iconBorder then btn._iconBorder:Hide() end
-
     -- Icon frame (ALL-127) takes over from the LSM edge border below when set
-    local hasIconFrame = BNB.ApplyIconFrame and BNB.ApplyIconFrame(btn._icon, note)
+    local hasIconFrame = BNB.ApplyIconFrame and BNB.ApplyIconFrame(icon, note, size)
 
     -- Per-note LSM border — rendered on a separate overlay Frame around the icon.
     -- edgeSize controls thickness; the overlay grows outward so the border never
@@ -1921,40 +1932,50 @@ local function PopulateEntry(btn, note, selected, collapsed)
     local bordScale = note.borderScale or 100
     local bordOffset = note.borderOffset or 2
     if hasIconFrame then
-        if btn._borderFrame then btn._borderFrame:Hide() end
+        if host._borderFrame then host._borderFrame:Hide() end
     elseif bord and bord ~= "" then
         local LSM = LibStub and LibStub("LibSharedMedia-3.0", true)
         local path = LSM and LSM:Fetch("border", bord)
         if path then
-            if not btn._borderFrame then
-                local bf = BNB.CreateBackdropFrame("Frame", nil, btn)
-                bf:SetFrameLevel(btn:GetFrameLevel() + 2)
+            if not host._borderFrame then
+                local bf = BNB.CreateBackdropFrame("Frame", nil, host)
+                bf:SetFrameLevel(host:GetFrameLevel() + 2)
                 bf:EnableMouse(false)
-                btn._borderFrame = bf
+                host._borderFrame = bf
             end
-            local bf = btn._borderFrame
+            local bf = host._borderFrame
             local es = math.max(1, math.floor(12 * bordScale / 100 + 0.5))
             bf:ClearAllPoints()
-            bf:SetPoint("TOPLEFT",     btn._icon, "TOPLEFT",     -bordOffset,  bordOffset)
-            bf:SetPoint("BOTTOMRIGHT", btn._icon, "BOTTOMRIGHT",  bordOffset, -bordOffset)
+            bf:SetPoint("TOPLEFT",     icon, "TOPLEFT",     -bordOffset,  bordOffset)
+            bf:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT",  bordOffset, -bordOffset)
             SetRowBorder(bf, path, es, 0.70, 0.70, 0.75, 0.85, note.borderBrightness)
             bf:Show()
         end
     else
         -- No custom border: show the Blizzard tooltip border as default
-        if not btn._borderFrame then
-            local bf = BNB.CreateBackdropFrame("Frame", nil, btn)
-            bf:SetFrameLevel(btn:GetFrameLevel() + 2)
+        if not host._borderFrame then
+            local bf = BNB.CreateBackdropFrame("Frame", nil, host)
+            bf:SetFrameLevel(host:GetFrameLevel() + 2)
             bf:EnableMouse(false)
-            btn._borderFrame = bf
+            host._borderFrame = bf
         end
-        local bf = btn._borderFrame
+        local bf = host._borderFrame
         bf:ClearAllPoints()
-        bf:SetPoint("TOPLEFT",     btn._icon, "TOPLEFT",     -2,  2)
-        bf:SetPoint("BOTTOMRIGHT", btn._icon, "BOTTOMRIGHT",  2, -2)
+        bf:SetPoint("TOPLEFT",     icon, "TOPLEFT",     -2,  2)
+        bf:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT",  2, -2)
         SetRowBorder(bf, "Interface\\Tooltips\\UI-Tooltip-Border", 12, 0.35, 0.35, 0.38, 0.75)
         bf:Show()
     end
+end
+BNB.PaintNoteIcon = PaintNoteIcon
+
+local function PopulateEntry(btn, note, selected, collapsed)
+    btn._noteID = note.id
+    btn._title  = note.title   -- RefreshNoteListEntry: did a save change it?
+    -- Icon border always hidden (user sets per-note border via LSM; WhiteIconFrame removed)
+    if btn._iconBorder then btn._iconBorder:Hide() end
+
+    PaintNoteIcon(btn, btn._icon, note)
 
     -- Multi-select highlight
     if btn._multiSelBg then

@@ -92,6 +92,19 @@ end
 -- Called after drag, resize, collapse and on window show.
 local function ApplySplit(f)
     local lw, top = BNB._listPaneW, -f._headerH
+    -- Explorer view (ALL-414, UI/ExplorerView.lua): no list, no splitter; the
+    -- grid pane fills the window, or the editor does while a note is open
+    local ex = BNB.Explorer and BNB.Explorer.Mode()
+    BNB.listPane:SetShown(not ex)
+    f._splitter:SetShown(not ex)
+    BNB.editorPane:SetShown(ex ~= "grid")
+    if ex then
+        -- 6 px in from the left: the editor's tag row and toolbar sit flush
+        -- with their pane, and without the list the window border covered them
+        BNB.editorPane:SetPoint("TOPLEFT",     f, "TOPLEFT",     6, top)
+        BNB.editorPane:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+        return
+    end
     BNB.listPane:SetWidth(lw)
     f._splitter:SetPoint("TOPLEFT",    f, "TOPLEFT",    lw - 3, top)
     f._splitter:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", lw - 3, 0)
@@ -426,6 +439,9 @@ local function OnEscapeKey()
         if topE.esc == true then top:Hide() else topE.esc(top) end
         return
     end
+    -- The explorer view goes back a step first: open note -> grid, a folder
+    -- -> the level above (ALL-414); after every window, as a page back
+    if BNB.Explorer and BNB.Explorer.Back() then return end
     -- Otherwise close main window (with confirm if enabled)
     BNB.RequestCloseMainWindow()
 end
@@ -882,6 +898,16 @@ function BNB.CreateMainWindow()
         end
     end)
 
+    -- Sort from elsewhere (the explorer view's empty-space menu, ALL-414):
+    -- key nil = keep the sort, asc nil = keep the order; the dropdowns follow
+    BNB.NOTE_SORT_MODES = SORT_MODES
+    function BNB.SetNoteSort(key, asc)
+        if key then BigNoteBoxDB.sortBy = key end
+        if asc ~= nil then BigNoteBoxDB.sortAsc = asc end
+        sortDD:GenerateMenu()
+        ApplySort()
+    end
+
     -- Exposed so TagTree can disable sorting while tree view is active.
     -- Also disables the direction control, which has no meaning without sort
     -- either; re-enabling defers to UpdateDirEnabled so "custom" sort still
@@ -912,6 +938,9 @@ function BNB.CreateMainWindow()
         if BNB._setToolbarMultiMode then BNB._setToolbarMultiMode(entering) end
     end)
     BNB._multiSelBtn = selBtn
+    -- Explorer view switch between the order dropdown and Select, plus its
+    -- back arrow left of the sort dropdown (ALL-414, UI/ExplorerView.lua)
+    if BNB.Explorer then BNB.Explorer.BuildHeader(f, sortDD, dirDD, selBtn) end
 
     -- Action buttons, hidden until multi-select mode is on; each sits right of
     -- the previous one
@@ -1141,6 +1170,10 @@ function BNB.CreateMainWindow()
 
     -- Apply initial split (sets widths and anchors splitter/editorPane)
     ApplySplit(f)
+    -- The explorer view (ALL-414) lays the panes out again on a view change,
+    -- and styles its grid pane as the list pane (Forever glow)
+    BNB._applyMainSplit = function() ApplySplit(f) end
+    f._stylePane = chrome.StylePanes
 
     -- ── Lifecycle ────────────────────────────────────────────────────────────
     f:SetScript("OnShow", function(self)
