@@ -64,7 +64,9 @@ local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 --------------------------------------------------------------------------------
 BNB.DEFAULTS = {
     -- Window position / size, main window and Focus mode
-    windowPos = { x = 0, y = 0, w = 820, h = 640 },
+    -- No w: the default width follows the screen (BNB.DefaultWindowSize,
+    -- UI/MainWindow.lua, ALL-536); a saved width is kept
+    windowPos = { x = 0, y = 0, h = 640 },
     focusPos  = { x = 0, y = 0, w = 620, h = 540 },
 
     -- Splitter and collapse state
@@ -211,6 +213,9 @@ BNB.DEFAULTS = {
     -- Note list sort
     sortBy  = "creation",
     sortAsc = false,
+    -- What the sort menus' Reset sort goes back to; Make this the default sets them (ALL-535)
+    sortDefaultBy  = "creation",
+    sortDefaultAsc = false,
 
     -- Toast anchor position (the first toast's centre, CENTER-relative) and hold time
     -- (seconds; 0 = stay until manually closed). Upper left since SETTINGS v21

@@ -169,13 +169,15 @@ end
 
 -- The note list row's hover. Collapsed: the title, then the details; expanded:
 -- the details, nothing when the note has none
-function BNB.ShowNoteListTooltip(row, noteID, collapsed)
+-- place(tooltip), optional: positions the tooltip itself (the explorer's
+-- full-width rows, ALL-533); otherwise right of the row
+function BNB.ShowNoteListTooltip(row, noteID, collapsed, place)
     local note = noteID and BNB.GetNote(noteID)
     if not note then return end
     local details = not BigNoteBoxDB or BigNoteBoxDB.noteHoverDetails ~= false
     local lines = details and Collect(note, noteID) or {}
     if not collapsed and not lines[1] then return end
-    GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
+    if place then place(GameTooltip) else GameTooltip:SetOwner(row, "ANCHOR_RIGHT") end
     if collapsed then TitleLine(GameTooltip, note) end
     Render(GameTooltip, lines)
     GameTooltip:Show()

@@ -11,8 +11,17 @@ local MIN_W      = 500
 local MIN_H      = 400
 local MAX_W      = 1400
 local MAX_H      = 1000
-local DEFAULT_W  = 820
 local DEFAULT_H  = 640
+
+-- The default width follows the screen's shape (Dukul, 2026-10-21): 1080 on an
+-- ultrawide or wider screen (width / height 2.0 or more), 820 on 16:9 / 16:10.
+-- UIParent has the screen's shape at any UI scale. Used for a new user (no
+-- saved width), the lock button's right-click and Reset size on load (ALL-536)
+local function DefaultWindowW()
+    local w, h = UIParent:GetWidth(), UIParent:GetHeight()
+    return (h and h > 0 and w / h >= 2.0) and 1080 or 820
+end
+function BNB.DefaultWindowSize() return DefaultWindowW(), DEFAULT_H end
 
 -- Initial left pane width — user can drag the splitter to change it.
 -- Saved in BigNoteBoxDB.splitX between sessions.
@@ -75,7 +84,7 @@ end
 local function RestoreWindowPos(f)
     local pos = BigNoteBoxDB.windowPos
     -- Capped at the screen, so a size saved at a smaller UI scale still fits (ALL-97)
-    local w = math.max(math.min(pos.w or DEFAULT_W, UIParent:GetWidth()),  MIN_W)
+    local w = math.max(math.min(pos.w or DefaultWindowW(), UIParent:GetWidth()),  MIN_W)
     local h = math.max(math.min(pos.h or DEFAULT_H, UIParent:GetHeight()), MIN_H)
     f:SetSize(w, h)
     if pos.x and pos.x ~= 0 then
@@ -103,6 +112,8 @@ local function ApplySplit(f)
     f._splitter:SetShown(not ex)
     BNB.editorPane:SetShown(ex ~= "grid")
     if BNB.Explorer then BNB.Explorer.SyncPane() end
+    -- The rich Markup / Note tabs follow the editor's left edge (ALL-537)
+    if BNB._reanchorRichTabs then BNB._reanchorRichTabs() end
     if ex then
         -- 6 px in from the left: the editor's tag row and toolbar sit flush
         -- with their pane, and without the list the window border covered them
@@ -265,7 +276,7 @@ local function MakeLockBtn(f, parent, size)
     lockBtn:SetScript("OnClick", function(_, btn)
         if btn == "RightButton" then
             -- Reset window to default size and position
-            f:SetSize(DEFAULT_W, DEFAULT_H)
+            f:SetSize(DefaultWindowW(), DEFAULT_H)
             f:ClearAllPoints()
             f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
             SaveWindowPos(f)
@@ -422,6 +433,8 @@ end
 local STRATA_RANK = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5,
     FULLSCREEN = 6, FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
 local function OnEscapeKey()
+    -- The Esc that just closed Focus mode, still held (UI/FocusEditor.lua)
+    if BNB._focusEscHold then return end
     local top, topE, topR, topL
     for _, e in ipairs(WINDOWS) do
         local esc = e.esc
@@ -617,7 +630,7 @@ local function BuildClassicChrome()
     local TITLE_H = 60
 
     local f = CreateFrame("Frame", "BigNoteBoxFrame", UIParent, "ButtonFrameTemplate")
-    f:SetSize(DEFAULT_W, DEFAULT_H)
+    f:SetSize(DefaultWindowW(), DEFAULT_H)
     ButtonFrameTemplate_HidePortrait(f)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
@@ -691,7 +704,7 @@ function BNB.CreateMainWindow()
     f._headerH = chrome.headerH
     AddDevModeOverlay(f)
 
-    f:SetSize(DEFAULT_W, DEFAULT_H)
+    f:SetSize(DefaultWindowW(), DEFAULT_H)
     f:SetPoint("CENTER")
     f:SetToplevel(true)
     f:EnableMouse(true)
@@ -891,6 +904,9 @@ function BNB.CreateMainWindow()
                 function() return (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) == key end,
                 function() BigNoteBoxDB.sortBy = key; sortDD:GenerateMenu(); ApplySort() end)
         end
+        -- SetupMenu builds the menu at once, before the helper below exists;
+        -- every later open has it
+        if BNB.AddSortDefaultItems then BNB.AddSortDefaultItems(root, true) end
     end)
 
     dirDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, f, "WowStyle1DropdownTemplate"))
@@ -913,6 +929,43 @@ function BNB.CreateMainWindow()
         if asc ~= nil then BigNoteBoxDB.sortAsc = asc end
         sortDD:GenerateMenu()
         ApplySort()
+    end
+
+    -- Reset sort / Make this the default, the end of both sort menus (this
+    -- one and the explorer's, ALL-535). The default starts as BNB's own
+    local function DefaultSort()
+        local db = BigNoteBoxDB
+        local asc = db.sortDefaultAsc
+        if asc == nil then asc = BNB.DEFAULTS.sortDefaultAsc end
+        return db.sortDefaultBy or BNB.DEFAULTS.sortDefaultBy, asc
+    end
+    local function SortText(by, asc)
+        local label = by
+        for _, m in ipairs(SORT_MODES) do if m.key == by then label = m.label end end
+        if by == "custom" then return label end   -- custom has no order
+        return string.format(L["SORT_PAIR_FMT"], label, L[asc and "DIR_MODE_ASC" or "DIR_MODE_DESC"])
+    end
+    -- blizz = a WowStyle1 dropdown's menu; otherwise BNB.ContextMenu
+    function BNB.AddSortDefaultItems(root, blizz)
+        local by, asc = DefaultSort()
+        local curBy  = BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy
+        local curAsc = BigNoteBoxDB.sortAsc == true
+        local same = curBy == by and (by == "custom" or curAsc == asc)
+        local function Reset() BNB.SetNoteSort(by, asc) end
+        local function Save()
+            BigNoteBoxDB.sortDefaultBy, BigNoteBoxDB.sortDefaultAsc = curBy, curAsc
+            sortDD:GenerateMenu()
+        end
+        local resetText = string.format(L["SORT_RESET_FMT"], SortText(by, asc))
+        root:CreateDivider()
+        if blizz then
+            local b1 = root:CreateButton(resetText, Reset)
+            local b2 = root:CreateButton(L["SORT_MAKE_DEFAULT"], Save)
+            if same and b1.SetEnabled then b1:SetEnabled(false); b2:SetEnabled(false) end
+        else
+            root:CreateButton(resetText, Reset, { disabled = same })
+            root:CreateButton(L["SORT_MAKE_DEFAULT"], Save, { disabled = same })
+        end
     end
 
     -- Exposed so TagTree can disable sorting while tree view is active.

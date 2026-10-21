@@ -419,6 +419,7 @@ function K.FillSortMenu(menu)
     menu:CreateRadio(L["DIR_MODE_ASC"], function() return BigNoteBoxDB.sortAsc == true end,
         function() BNB.SetNoteSort(nil, true) end,
         { disabled = custom, iconGold = true, iconTex = ART .. "ex-sort-ascending" })
+    if BNB.AddSortDefaultItems then BNB.AddSortDefaultItems(menu) end   -- ALL-535
 end
 
 -- View radios, each with its picture: the toolbar's View menu and the
@@ -1041,16 +1042,45 @@ local function TileDoubleClick(self, button)
     if self._noteID then OpenNote(self._noteID) end
 end
 
+-- List / Details / Flat rows run the width of the window, so a tooltip right
+-- of the row lands outside it: under the row at the pointer instead (ALL-533,
+-- Dukul 2026-10-21), moved left so it ends inside the row
+local function RowTipX(self)
+    local left = self:GetLeft()
+    if not left then return 0 end
+    return GetCursorPosition() / self:GetEffectiveScale() - left
+end
+local function PlaceRowTip(self)
+    if TILE_VIEW[ViewKey()] then return nil end
+    return function(tip)
+        tip:SetOwner(self, "ANCHOR_NONE")
+        tip:SetPoint("TOPLEFT", self, "BOTTOMLEFT", RowTipX(self), -2)
+    end
+end
+-- After Show, when the tooltip's width is known
+local function FitRowTip(self)
+    if not GameTooltip:IsShown() or GameTooltip:GetOwner() ~= self then return end
+    local x = RowTipX(self)
+    local over = x + GameTooltip:GetWidth() - self:GetWidth()
+    if over > 0 then
+        GameTooltip:ClearAllPoints()
+        GameTooltip:SetPoint("TOPLEFT", self, "BOTTOMLEFT", math.max(0, x - over), -2)
+    end
+end
+
 local function TileEnter(self)
     if _drag or _boxState then return end
+    local place = PlaceRowTip(self)
     if self._noteID then
-        BNB.ShowNoteListTooltip(self, self._noteID, true)   -- title on top: names wrap
+        BNB.ShowNoteListTooltip(self, self._noteID, true, place)   -- title on top: names wrap
+        if place then FitRowTip(self) end
         return
     end
-    GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+    if place then place(GameTooltip) else GameTooltip:SetOwner(self, "ANCHOR_RIGHT") end
     GameTooltip:AddLine((self._folderName or "") .. " (" .. (self._count or 0) .. ")")
     GameTooltip:AddLine(L["EXPLORER_FOLDER_TIP"], 0.85, 0.85, 0.85, true)
     GameTooltip:Show()
+    if place then FitRowTip(self) end
 end
 
 local function TileLeave(self)
@@ -1129,9 +1159,6 @@ local function GetTile(i)
         t._selL, t._hoverL = t._selT, t._hoverT
     end
     t._sel, t._hover = t._selT, t._hoverT   -- the pair in use, set by ShapeTile
-    t:HookScript("OnEnter", function(self) self._hover:Show() end)
-    t:HookScript("OnLeave", function(self) self._hover:Hide() end)
-    t:HookScript("OnHide",  function(self) self._hover:Hide() end)
     local fs = t:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     fs:SetJustifyH("CENTER"); fs:SetJustifyV("TOP")
     fs:SetWordWrap(true)
@@ -1159,6 +1186,11 @@ local function GetTile(i)
     t:SetScript("OnLeave", TileLeave)
     t:SetScript("OnMouseDown", TileMouseDown)
     t:SetScript("OnMouseUp", TileMouseUp)
+    -- Hover art: hooked after the SetScripts above, which drop any hook made
+    -- before them (the hover never showed, ALL-534)
+    t:HookScript("OnEnter", function(self) self._hover:Show() end)
+    t:HookScript("OnLeave", function(self) self._hover:Hide() end)
+    t:HookScript("OnHide",  function(self) self._hover:Hide() end)
     _tiles[i] = t
     return t
 end
@@ -1194,9 +1226,12 @@ local function ShapeListTile(t, size, w, h, edge)
         tex:SetPoint("LEFT", t, "LEFT", 4, 0)
     end
     local x = -4 - edge
+    -- Normal mode's marker art is hard to read at 12 px (Dukul, 2026-10-21)
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local big = skin and 12 or math.min(16, h - 6)
     for _, key in ipairs(LIST_MARKERS) do
         local mk = t[key]
-        local ms = key == "_mLock" and 10 or 12
+        local ms = key == "_mLock" and big - 2 or big
         mk:SetSize(ms, ms)
         mk:ClearAllPoints()
         if mk:IsShown() then

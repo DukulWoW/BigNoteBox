@@ -106,6 +106,11 @@ L["SORT_MODE_TYPE"]        = "Type"
 L["SORT_MODE_FOLDER"]      = "Folder"
 L["DIR_MODE_DESC"]         = "Descending"
 L["DIR_MODE_ASC"]          = "Ascending"
+L["SORT_PAIR_FMT"]         = "%s, %s"
+L["SORT_RESET_FMT"]        = "Reset sort (%s)"
+L["SORT_MAKE_DEFAULT"]     = "Make this the default"
+L["NE_NOTE_SETTINGS_TIP"]  = "Open or close Note Settings for this note"
+L["NE_TB_MENU_NOTE"]       = "Note settings"
 
 -- ── Main window: multi-select mode ───────────────────────────────────────────
 L["MW_SELECT_BTN"]         = "Select"

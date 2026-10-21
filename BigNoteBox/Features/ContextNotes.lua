@@ -1485,6 +1485,7 @@ function BNB.ApplySituationsModule(on)
         UpdateMinimapBadge(0)
     end
     BNB.SendMessage("SituationsModule", on)
+    if BNB.ApplySaveMode then BNB.ApplySaveMode() end                  -- the action bar's Situation button (ALL-538)
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end              -- row markers
     local ndb = BNB.NotesDB()
     if BNB.Sticky and BNB.Sticky.RefreshMarkers and ndb and ndb.notes then   -- icon badge markers

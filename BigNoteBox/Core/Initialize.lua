@@ -168,7 +168,7 @@ function BNB.Initialize()
         if pos then
             if db.resetWindowPosOnLoad == true then pos.x, pos.y = 0, 0 end
             if db.resetWindowSizeOnLoad == true then
-                pos.w, pos.h = BNB.DEFAULTS.windowPos.w, BNB.DEFAULTS.windowPos.h
+                pos.w, pos.h = BNB.DefaultWindowSize()   -- by screen shape (ALL-536)
             end
         end
     end

@@ -113,6 +113,18 @@ local function ShowInsertInfoMenu(eb)
                 BNB.InsertIntoEditor(snippet, back, value)
             end)
         end
+
+        -- Note settings from the open note (ALL-538, Dukul 2026-10-21: only
+        -- this; alarm, task and the rest are on the action bar). Not in Focus
+        -- mode: the window would open under it
+        local id = BNB._currentNoteID
+        local focus = BNB.IsFocusModeOpen and BNB.IsFocusModeOpen()
+        local sys = BNB.SystemNotes and id and BNB.SystemNotes.IsSystem(id)
+        if id and not focus and not sys and BNB.OpenNoteConfig then
+            root:CreateDivider()
+            local key = BNB.NoteConfigOpenFor(id) and "NL_CM_CLOSE_SETTINGS" or "NL_CTX_OPEN_SETTINGS"
+            root:CreateButton(L[key], function() BNB.OpenNoteConfig(id) end, { icon = "note-settings" })
+        end
     end)
 end
 

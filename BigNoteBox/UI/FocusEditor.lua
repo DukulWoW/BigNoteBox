@@ -1321,6 +1321,7 @@ function BNB.OpenFocusMode()
     focusFrame:ClearAllPoints()
     focusFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
 
+    focusFrame._closing = nil
     focusFrame:SetAlpha(0)
     focusFrame:Show()
     focusFrame:Raise()
@@ -1379,8 +1380,25 @@ end
 --------------------------------------------------------------------------------
 -- PUBLIC: CLOSE FOCUS MODE
 --------------------------------------------------------------------------------
+-- The Esc that closed Focus mode is still down (or repeating) when the main
+-- window is back: the main window ignores Esc until it is let go, or the
+-- explorer view took it as "back" and left the open note (ALL-531)
+local function HoldEscUntilReleased()
+    if not IsKeyDown("ESCAPE") then return end
+    BNB._focusEscHold = true
+    local n, t = 0, nil
+    t = C_Timer.NewTicker(0.05, function()
+        n = n + 1
+        if not IsKeyDown("ESCAPE") or n >= 40 then BNB._focusEscHold = nil; t:Cancel() end
+    end)
+end
+
 function BNB.CloseFocusMode()
     if not focusFrame or not focusFrame:IsShown() then return end
+    -- Still fading out: a repeated Esc must not run the close again
+    if focusFrame._closing then return end
+    focusFrame._closing = true
+    HoldEscUntilReleased()
     if focusDirty then SaveFocusNote() end
 
     if BNB.FocusOrbit then
@@ -1414,7 +1432,7 @@ function BNB.CloseFocusMode()
     -- Cross-fade: focus out, main in
     local fa = focusFrame:GetAlpha()
     FadeTo(focusFrame, fa, 0, FADE_TIME, function()
-        if focusFrame then focusFrame:Hide() end
+        if focusFrame then focusFrame._closing = nil; focusFrame:Hide() end
     end)
     if BNB.mainFrame then
         FadeTo(BNB.mainFrame, 0, BNB.WindowAlpha(BNB.mainFrame), FADE_TIME)

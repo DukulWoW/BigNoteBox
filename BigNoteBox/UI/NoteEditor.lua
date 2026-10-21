@@ -106,6 +106,9 @@ function BNB.ApplySaveMode()
     local pb    = BNB._editorPinBtn   -- Sticky Notes module off (ALL-343, ALL-458)
     local pbOff = not BNB.StickiesEnabled()
     if pb then pb:SetShown(not pbOff); if pbOff then hidden[#hidden + 1] = pb end end
+    local sb    = BNB._editorSitBtn   -- Situations module off (ALL-538)
+    local sbOff = BNB.SituationsEnabled and not BNB.SituationsEnabled()
+    if sb then sb:SetShown(not sbOff); if sbOff then hidden[#hidden + 1] = sb end end
     for _, c in ipairs({ bar:GetChildren() }) do
         if c._baseX then
             local shift = auto and SAVE_SLOT_W or 0
@@ -1059,9 +1062,28 @@ local function BuildToolbar(parent)
         BNB._editorTasksBtn = tasksBtn
     end
 
+    -- Situation: Note Settings on its Situation tab (ALL-538, Dukul 2026-10-21:
+    -- the explorer view has no list to right-click); hidden while Situations
+    -- is off. ab-situation / ab-forever-situation are placeholder copies of
+    -- the menu symbol until Dukul draws them
+    do
+        local function SitTip()
+            local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+            local has = note and BNB.HasSituation and BNB.HasSituation(note, true)
+            return L[has and "NL_CM_EDIT_SITUATION" or "NL_CM_CREATE_SITUATION"]
+        end
+        local sitBtn = MakeIconBtn(bar, BNB.AbIcon("situation"), SitTip)
+        sitBtn:SetPoint("LEFT", bar, "LEFT", SlotX(3), 0)
+        sitBtn:SetScript("OnClick", function()
+            local id = BNB._currentNoteID
+            if id and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id, "situation") end
+        end)
+        BNB._editorSitBtn = sitBtn
+    end
+
     -- Delete
     local delBtn = MakeIconBtn(bar, BNB.AbIcon("delete"), L["BTN_DELETE_NOTE"])
-    delBtn:SetPoint("LEFT", bar, "LEFT", SlotX(3), 0)
+    delBtn:SetPoint("LEFT", bar, "LEFT", SlotX(4), 0)
     delBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -1086,7 +1108,7 @@ local function BuildToolbar(parent)
 
     -- Duplicate
     local dupBtn = MakeIconBtn(bar, BNB.AbIcon("duplicate"), L["NE_DUPLICATE_NOTE_TIP"])
-    dupBtn:SetPoint("LEFT", bar, "LEFT", SlotX(4), 0)
+    dupBtn:SetPoint("LEFT", bar, "LEFT", SlotX(5), 0)
     dupBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local src = BNB.GetNote(id);   if not src then return end
@@ -1100,7 +1122,7 @@ local function BuildToolbar(parent)
 
     -- Copy to clipboard — copies title + body silently via editbox trick
     local copyBtn = MakeIconBtn(bar, BNB.AbIcon("copy"), L["BTN_COPY_NOTE"])
-    copyBtn:SetPoint("LEFT", bar, "LEFT", SlotX(5), 0)
+    copyBtn:SetPoint("LEFT", bar, "LEFT", SlotX(6), 0)
     copyBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
         local note = BNB.GetNote(id);  if not note then return end
@@ -1117,7 +1139,7 @@ local function BuildToolbar(parent)
     -- lock.tga   = note is locked (shows current state); click unlocks it.
     -- unlock.tga = note is unlocked; click locks it.
     local lockBtn, lockTx = MakeIconBtn(bar, BNB.AbIcon("unlock"), "")   -- tip set dynamically below
-    lockBtn:SetPoint("LEFT", bar, "LEFT", SlotX(7) - 2, 0)
+    lockBtn:SetPoint("LEFT", bar, "LEFT", SlotX(8) - 2, 0)
     lockBtn:Hide()
     lockBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
@@ -1161,7 +1183,7 @@ local function BuildToolbar(parent)
     -- Sticky Note pin button — offset 132, always visible
     local pinBtn = CreateFrame("Button", nil, bar)
     pinBtn:SetSize(24 + AB_GROW, 24 + AB_GROW)
-    pinBtn:SetPoint("LEFT", bar, "LEFT", SlotX(6), 0)
+    pinBtn:SetPoint("LEFT", bar, "LEFT", SlotX(7), 0)
     local pinTx = pinBtn:CreateTexture(nil, "ARTWORK")
     pinTx:SetAllPoints()
     pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("stickynote"))
@@ -1760,7 +1782,8 @@ local function ApplySystemNote()
     local id   = BNB._currentNoteID
     local note = id and BNB.GetNote(id)
     local sys  = note ~= nil and note.system ~= nil
-    for _, b in ipairs({ BNB._editorPinBtn, BNB._editorRefBoxBtn, BNB._editorTasksBtn, BNB._editorSendBtn }) do
+    for _, b in ipairs({ BNB._editorPinBtn, BNB._editorRefBoxBtn, BNB._editorTasksBtn, BNB._editorSendBtn,
+                         BNB._editorSitBtn }) do
         if sys then
             b:SetEnabled(false); b:SetAlpha(0.35); b._sysOff = true
         elseif b._sysOff then
@@ -1769,7 +1792,7 @@ local function ApplySystemNote()
     end
     if sys then
         for _, b in ipairs({ BNB._wysiwygShareBtn, BNB._wysiwygCopyMoveBtn, BNB._wysiwygAlarmBtn,
-                             BNB._wysiwygHistoryBtn, BNB._wysiwygRestoreBtn }) do
+                             BNB._wysiwygHistoryBtn, BNB._wysiwygRestoreBtn, BNB._wysiwygNoteSetBtn }) do
             b:SetIconEnabled(false)
         end
     end
@@ -2406,14 +2429,18 @@ local function BuildRichTabStrip()
     local strip = CreateFrame("Frame", nil, mf)
     strip:SetHeight(TAB_H)
     -- Anchored below editorPane right portion; left edge at list/editor split
+    -- The explorer view has no list: the editor starts 6 px in from the left
+    -- (ApplySplit, UI/MainWindow.lua), and the tabs with it (ALL-537)
     local function ReAnchor()
-        local lw = BNB._listPaneW or 256
+        local ex = BNB.Explorer and BNB.Explorer.Mode()
+        local x = ex and 6 or (BNB._listPaneW or 256) + 1
         strip:ClearAllPoints()
-        strip:SetPoint("TOPLEFT",    mf, "BOTTOMLEFT",  lw + 1, 0)
-        strip:SetPoint("TOPRIGHT",   mf, "BOTTOMRIGHT", 0,      0)
+        strip:SetPoint("TOPLEFT",    mf, "BOTTOMLEFT",  x, 0)
+        strip:SetPoint("TOPRIGHT",   mf, "BOTTOMRIGHT", 0, 0)
     end
     ReAnchor()
     mf:HookScript("OnSizeChanged", function() ReAnchor() end)
+    BNB._reanchorRichTabs = ReAnchor
 
     -- Fallback tab buttons: icon buttons for the Editor/View toggle (UI/IconButton.lua).
     -- The current mode is drawn at full alpha, the other dimmed (AM_RefreshTabs).

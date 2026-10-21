@@ -152,7 +152,7 @@ end
 -- load: a skin mode switch takes a reload.
 local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,
                      send = true, tasks = true, unlock = true, duplicate = true,
-                     stickynote = true }
+                     stickynote = true, situation = true }
 local abDetailed
 function BNB.AbDetailed()
     if abDetailed ~= nil then return abDetailed end

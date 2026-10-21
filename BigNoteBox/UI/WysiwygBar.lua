@@ -866,6 +866,17 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
     BNB._wysiwygMapBtn = mapBtn
 
+    -- Note settings for the open note (ALL-538, Dukul 2026-10-21: the explorer
+    -- view has no list to right-click). tb-notesettings is a placeholder copy
+    -- of the menu symbol until Dukul draws it
+    local noteSetBtn = WyBtn("tb-notesettings", L["NE_NOTE_SETTINGS_TIP"])
+    noteSetBtn:SetIconEnabled(true)
+    noteSetBtn:SetScript("OnClick", function()
+        local id = BNB._currentNoteID
+        if id and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id) end
+    end)
+    BNB._wysiwygNoteSetBtn = noteSetBtn
+
     -- Divider: share | waypoint
     shareDiv = bar:CreateTexture(nil, "ARTWORK")
     shareDiv:SetSize(1, 16)
@@ -969,7 +980,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         { { alarmBtn,    "tb-alarm",    "STICKY_SET_ALARM_TIP", BNB.AlarmsEnabled, "NE_TB_MENU_ALARM" },
           { copyMoveBtn, "tb-copymove", "NE_COPY_MOVE_TIP", nil, "NE_TB_MENU_COPYMOVE" },
           { shareBtn,    "tb-share",    "NE_SHARE_NOTE_TIP", nil, "NE_TB_MENU_SHARE" } },
-        { { mapBtn, "tb-notemap", "NE_WP_OPEN_TIP_TITLE", nil, "NE_TB_MENU_MAP" } },
+        { { mapBtn, "tb-notemap", "NE_WP_OPEN_TIP_TITLE", nil, "NE_TB_MENU_MAP" },
+          { noteSetBtn, "tb-notesettings", "NE_NOTE_SETTINGS_TIP", nil, "NE_TB_MENU_NOTE" } },
     }
     local RIGHT_DIVS = { cmDiv, shareDiv }   -- after group 1, after group 2
     local _overflow = {}                     -- the items in the menu, left to right
