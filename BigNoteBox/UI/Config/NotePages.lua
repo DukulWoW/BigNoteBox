@@ -785,6 +785,59 @@ function K.BuildFoldersPage(sf, ct, y, page)
     sf:FinaliseHeight(math.abs(y) + 12)
 end
 
+-- ─────────────────────────────────────────────────────────────────────────────
+-- EXPLORER VIEW (ALL-414, Dukul 2026-10-21): the module switch and the view
+-- the main window opens on after each login
+-- ─────────────────────────────────────────────────────────────────────────────
+function K.BuildExplorerPage(sf, ct, y, page)
+    local db = BigNoteBoxDB
+    local dd, ddLbl
+    local function Sync()
+        local on = BNB.ExplorerEnabled()
+        if dd then dd:SetEnabled(on); dd:SetAlpha(on and 1 or 0.35) end
+        if ddLbl then ddLbl:SetAlpha(on and 1 or 0.35) end
+    end
+
+    local enableCb
+    y, enableCb = AddCheck(ct, y, L["CFG_EXPLORER_ENABLE_LABEL"],
+        function() return BNB.ExplorerEnabled() end,
+        function(v)
+            db.explorerEnabled = v
+            if BNB.ApplyExplorerModule then BNB.ApplyExplorerModule(v) end
+            Sync()
+        end,
+        L["CFG_EXPLORER_ENABLE_TIP"])
+    page.enableCb = enableCb   -- twin on the Modules overview row
+
+    ddLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    ddLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    ddLbl:SetHeight(ROW_H); ddLbl:SetJustifyH("LEFT")
+    ddLbl:SetText(L["CFG_EXPLORER_DEFAULT"])
+    y = y - (ROW_H + 2)
+    dd = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, ct, "WowStyle1DropdownTemplate"))
+    dd:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    dd:SetWidth(220)
+    dd:SetupMenu(function(_, root)
+        for _, c in ipairs({ { "explorer", "CFG_EXPLORER_DEFAULT_EXPLORER" }, { "list", "CFG_EXPLORER_DEFAULT_LIST" } }) do
+            local key = c[1]
+            root:CreateRadio(L[c[2]],
+                function() return (db.explorerDefault or "explorer") == key end,
+                function() db.explorerDefault = key end)
+        end
+    end)
+    dd:HookScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_EXPLORER_DEFAULT"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_EXPLORER_DEFAULT_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    dd:HookScript("OnLeave", function() GameTooltip:Hide() end)
+    dd:HookScript("OnShow", Sync)
+    y = y - 32
+    Sync()
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
 function K.BuildTrashPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     -- ── Trash enable/disable checkbox ─────────────────────────────────────────

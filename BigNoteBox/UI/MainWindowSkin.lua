@@ -15,8 +15,8 @@ local L   = BNB.L
 -- ── Layout constants ──────────────────────────────────────────────────────────
 -- Title bar 28 like every other skin window (Dukul 2026-10-03; it was 20)
 local SK_TITLE_H     = 28    -- top row: window title + X / lock / focus buttons
-local SK_TOOLBAR_H   = 44    -- sort dropdowns + topbar icons strip (35 until 2026-10-20: Dukul wanted air above and below)
-local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 72
+local SK_TOOLBAR_H   = 40    -- sort dropdowns + topbar icons strip (35 until 2026-10-20: Dukul wanted air above and below; 44 until 2026-10-21: as tall as the normal look's)
+local SK_CHROME_H    = SK_TITLE_H + SK_TOOLBAR_H   -- 68
 local SK_TOOLBAR_SHADE = 0.6  -- the toolbar strip band: body colour x this
 local SK_FILL_INSET  = 3     -- BNB.SetBackdrop's fill stops this far in (BACKDROP_FRAME insets)
 local SK_ICON        = 20    -- the top bar icons

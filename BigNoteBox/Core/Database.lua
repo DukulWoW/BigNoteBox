@@ -72,8 +72,14 @@ BNB.DEFAULTS = {
     listCollapsed = false,
     listAutoCollapsed = false,   -- collapsed by a narrow window, not by hand (ALL-115)
     -- Explorer view (ALL-414): notes as an icon grid over the list and editor
+    -- The module (Dukul, 2026-10-21: on for everyone, off in Minimal) and the
+    -- view the window opens on after each login; explorerView = the view in
+    -- use this session, set from explorerDefault when the window is built
+    explorerEnabled = true,
+    explorerDefault = "explorer",   -- "explorer" / "list"
     explorerView = false,
-    explorerTile = "medium",     -- "small" / "medium" / "large"
+    explorerTile = "medium",     -- "small" / "medium" / "large" / "list"
+    explorerLastTile = "medium", -- the last tile size, for the status bar's tiles button
     explorerPinnedClosed = false,   -- the grid's Pinned / Notes headers closed (ALL-414)
     explorerNotesClosed  = false,
 

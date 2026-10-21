@@ -556,6 +556,12 @@ local MODULES = {
           SetDB("foldersEnabled", v)
           if BNB.ApplyFoldersModule then BNB.ApplyFoldersModule(v) end
       end },
+    { key = "explorer", label = "CFG_EXPLORER_HEADER", tip = "SW_MOD_EXPLORER_TIP",   -- ALL-414: off in Minimal
+      get = function() return BNB.ExplorerEnabled() end,
+      set = function(v)
+          SetDB("explorerEnabled", v)
+          if BNB.ApplyExplorerModule then BNB.ApplyExplorerModule(v) end
+      end },
     { key = "focus", label = "CFG_FOCUS_ORBIT_HEADER", tip = "SW_MOD_FOCUS_TIP",
       get = function() return BNB.FocusEnabled() end,
       set = function(v)

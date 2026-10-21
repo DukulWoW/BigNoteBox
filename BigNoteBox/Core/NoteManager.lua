@@ -896,6 +896,16 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
         return out
     end
 
+    -- Type: 1 = rich, 0 = normal; Folder: the folder's name, lower case
+    local AM = BNB.AdvancedMode
+    local function RichOf(n) return (AM and AM.IsRich and AM.IsRich(n)) and 1 or 0 end
+    local FD = BNB.FoldersEnabled and BNB.FoldersEnabled() and BNB.Folders or nil
+    local function FolderLower(n)
+        local fid = FD and FD.Of(n)
+        local rec = fid and FD.Get(fid)
+        return rec and rec.name and rec.name:lower() or nil
+    end
+
     local function cmp(a, b)
         -- Pinned always floats to top (skipped for noFloat/drag path)
         if not noFloat then
@@ -925,12 +935,27 @@ function BNB.GetOrderedNotes(filterText, tagFilter, noFloat, allScopes)
             -- Notes with no situation sort to the end regardless of direction.
             av = SituationLower(a) or "\255"
             bv = SituationLower(b) or "\255"
+        -- Size / Type / Folder (Dukul, 2026-10-21: the explorer's Details
+        -- columns); Type and Folder fall back to A-Z inside one value
+        elseif sortBy == "size" then
+            av = #(a.title or "") + #(a.body or "")
+            bv = #(b.title or "") + #(b.body or "")
+        elseif sortBy == "type" then
+            av, bv = RichOf(a), RichOf(b)
+        elseif sortBy == "folder" then
+            -- Notes in no folder sort to the end regardless of direction
+            av = FolderLower(a) or "\255"
+            bv = FolderLower(b) or "\255"
         else
             av, bv = a.created or 0, b.created or 0
         end
 
         if av ~= bv then
             if asc then return av < bv else return av > bv end
+        end
+        if sortBy == "type" or sortBy == "folder" then
+            local at, bt = LowerOf(a, "title") or "\255", LowerOf(b, "title") or "\255"
+            if at ~= bt then return at < bt end
         end
         -- Stable tiebreaker: consistent order for notes with identical sort values
         return (a.id or "") > (b.id or "")

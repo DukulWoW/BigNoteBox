@@ -21,11 +21,15 @@
 --     (a press on it does not count as a click outside)
 --   owner._cmDropLeft = true: the menu opens under the owner, right edges
 --     lined up, and its sub-menus open to the left
+--   owner._cmDropDown = true: the menu opens under the owner, left edges
+--     lined up, down and to the right (a dropdown button)
 --   opts.keepOpen = true (a radio): the click leaves the menu open and the
 --     marks are read again, for lists where several get ticked in one go
 --   root:CreateButton(text, fn, { iconTex = path }): a picture instead of a
 --     cm- symbol, no plate (tinted in the skin look); iconColor = { r, g, b }
 --     draws it in that colour in both looks (the tag colour swatch, ALL-106);
+--     iconGold = true: white art drawn in the toolbar icons' gold in the
+--     normal look (skin look: tinted as always);
 --     iconW / iconH = its size (default the row icon's), iconCoord = { l, r,
 --     t, b } a part of it; a wider one moves the text of every row in the level
 --
@@ -46,7 +50,10 @@
 --   item:CreateButton(...) / item:CreateDivider()   makes item a sub-menu
 --   root:CreateRadio(text, isSelected, onSelect, opts) -> item
 --     a choice with a round mark, filled while isSelected() returns true;
---     a click runs onSelect and closes the menu (the task Reset / Situation)
+--     a click runs onSelect and closes the menu (the task Reset / Situation);
+--     opts.iconTex = a picture after the mark (the explorer's View menu;
+--     iconGold = true draws white art gold in the normal look, as on buttons),
+--     every row's text in that level moves over to make room
 --   root:CreateDivider()
 --
 -- Closes on: a click on an item, a click outside every open level, ESC
@@ -211,6 +218,9 @@ local function DrawIcon(row, active)
             sym:SetDesaturated(false); sym:SetVertexColor(col[1], col[2], col[3])
         elseif _skin then
             SkinTint(sym, active)
+        elseif row._iconGold then   -- white art in the toolbar icons' gold
+            local g = BNB.ICON_GOLD
+            sym:SetDesaturated(false); sym:SetVertexColor(g[1], g[2], g[3])
         else
             sym:SetDesaturated(false); sym:SetVertexColor(1, 1, 1)
         end
@@ -425,13 +435,16 @@ end
 
 -- Fills level f from description d; returns its size
 local function Fill(f, d)
-    local hasIcons, iconCol = false, ICON
+    local hasIcons, iconCol, radioPic = false, ICON, false
     for _, it in ipairs(d.items) do
         if (it.kind == "button" and (it.opts.icon or it.opts.iconTex)) or it.kind == "radio" then hasIcons = true end
         -- A wider picture (the tag colour swatches) moves every row's text
         if it.kind == "button" and it.opts.iconTex and it.opts.iconW then iconCol = math.max(iconCol, it.opts.iconW) end
+        if it.kind == "radio" and it.opts.iconTex then radioPic = true end
     end
     local textX = hasIcons and (4 + iconCol + 6) or 10
+    local radioPicX = textX   -- a radio's picture sits where the text would start
+    if radioPic then textX = textX + ICON + 6 end
     if f._badge then f._badge:Hide() end
 
     -- First pass: rows set up and measured
@@ -440,6 +453,7 @@ local function Fill(f, d)
         local r = f._rows[n] or NewRow(f)
         f._rows[n] = r
         r._desc, r._active, r._iconKey, r._iconTex, r._iconColor = it, nil, nil, nil, nil
+        r._iconGold = it.opts and it.opts.iconGold or nil
         r._iconCoord = nil
         r._disabled, r._hasSub = false, false
         r._hl:Hide()
@@ -516,6 +530,14 @@ local function Fill(f, d)
                     r._mark:SetDesaturated(false); r._mark:SetVertexColor(1, 1, 1)
                 end
                 r._mark:Show()
+                if it.opts.iconTex then
+                    r._iconKey, r._iconTex = "tex", it.opts.iconTex
+                    r._icon:SetSize(ICON, ICON)
+                    r._icon:ClearAllPoints()
+                    r._icon:SetPoint("LEFT", radioPicX, 0)
+                    r._icon:Show()
+                    DrawIcon(r, false)
+                end
             elseif it.opts.icon or it.opts.iconTex then
                 r._iconKey = it.opts.icon or "tex"
                 r._iconTex = it.opts.iconTex
@@ -561,7 +583,14 @@ local function Place(f, w, h, row)
     local sw, sh = UIParent:GetWidth(), UIParent:GetHeight()
     local left, top
     local dropLeft = _owner and _owner._cmDropLeft
-    if not row and dropLeft and _owner:GetRight() then
+    local dropDown = _owner and _owner._cmDropDown
+    if not row and dropDown and _owner:GetLeft() then
+        -- Under its owner, left edges lined up, opening down and to the right
+        -- (the explorer's tool buttons, Dukul 2026-10-21); kept on screen
+        local k = _owner:GetEffectiveScale() / f:GetEffectiveScale()
+        left, top = _owner:GetLeft() * k, _owner:GetBottom() * k - 2
+        if left + w > sw then left = sw - w end
+    elseif not row and dropLeft and _owner:GetRight() then
         -- Under its owner, right edges lined up, so it opens down and to the
         -- left, into the window (the top bar menu, ALL-112)
         local k = _owner:GetEffectiveScale() / f:GetEffectiveScale()

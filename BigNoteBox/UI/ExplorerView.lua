@@ -27,8 +27,8 @@
 -- "Notes" part of a folder's header = out of folders, between tiles in Custom
 -- sort = the custom order.
 --
--- Saved: BigNoteBoxDB.explorerView (the view is on), explorerTile (tile size
--- "small" / "medium" / "large"), explorerPinnedClosed / explorerNotesClosed
+-- Saved: BigNoteBoxDB.explorerView (the view is on), explorerTile (the view:
+-- "small" / "medium" / "large" tiles or "list"), explorerPinnedClosed / explorerNotesClosed
 -- (the two top-level headers closed). Which folder is open, the picks and whether
 -- a note is open are per session; the window always opens on the grid,
 -- except back from Focus mode.
@@ -60,7 +60,35 @@ local ART        = "Interface\\AddOns\\BigNoteBox\\Assets\\Explorer\\"
 local VIEW_TEX   = ART .. "ex-explorer-mode"   -- Dukul's art (2026-10-20)
 local LIST_TEX   = ART .. "ex-list-mode"
 local DEFAULT_ICON_SIZE = "medium"
-local TILE_ICON  = { small = 40, medium = 56, large = 72 }
+local TILE_ICON  = { small = 40, medium = 56, large = 72, list = 20, details = 16, flat = 16 }
+-- List (Dukul, 2026-10-21): a small icon and the title on one line, in rows of
+-- columns as wide as fit (never narrower than LIST_MIN_W), markers at the end
+local LIST_MIN_W = 190
+local LIST_H     = 26
+local LIST_GAP   = 2     -- between list rows
+-- The View menu's choices; each has its own picture (Assets/Explorer/ex-view-<key>)
+local VIEWS = { { "small", "EXPLORER_TILE_SMALL" }, { "medium", "EXPLORER_TILE_MEDIUM" },
+                { "large", "EXPLORER_TILE_LARGE" }, { "list", "EXPLORER_VIEW_LIST" },
+                { "details", "EXPLORER_VIEW_DETAILS" }, { "flat", "EXPLORER_VIEW_FLAT" } }
+-- Flat (Dukul, 2026-10-21): the Details rows, every note in one run, no
+-- folder tiles to open (the Folder column says where each one lives)
+-- Details (Dukul, 2026-10-21): one row per note with columns, as Windows
+-- Explorer's. Fixed widths (Name takes the rest, never under NAME_MIN);
+-- columns drop off from the right when the window is narrow. sort = the
+-- note sort a header click picks (a second click flips the order).
+local DETAILS_H  = 22
+local COLHDR_H   = 20
+local NAME_MIN   = 180
+local COL_GAP    = 8
+local COLUMNS = {
+    { key = "name",     title = "EXPLORER_COL_NAME",     sort = "alpha" },
+    { key = "modified", title = "EXPLORER_COL_MODIFIED", sort = "edited",   w = 120 },
+    { key = "created",  title = "EXPLORER_COL_CREATED",  sort = "creation", w = 120 },
+    { key = "size",     title = "EXPLORER_COL_SIZE",     sort = "size",   w = 64, right = true },
+    { key = "type",     title = "EXPLORER_COL_TYPE",     sort = "type",   w = 90 },
+    { key = "folder",   title = "EXPLORER_COL_FOLDER",   sort = "folder", w = 100 },
+    { key = "tags",     title = "EXPLORER_COL_TAGS",     w = 130 },
+}
 local TILE_EXTRA = 36    -- tile width = icon + this: room for the name
 local LABEL_H    = 26    -- two lines of the name under the icon
 local PAD        = 10    -- the grid's inner margin
@@ -69,10 +97,13 @@ local HDR_H      = 22    -- section header row
 local HDR_ICON   = 20
 local HDR_RULE_A = 0.35  -- the note list's header rule alpha (ALL-328)
 local HDR_ARROW  = 12    -- Pinned / Notes: the open / closed arrow
-local UI_ART     = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
 local VIEW_BTN   = 18    -- the switch, as the list's tree buttons
 local BACK_BTN   = 22
 local SCROLL_W   = 22    -- room for the scroll bar (it draws outside its frame)
+local STATUS_H   = 22    -- the status bar under the grid (Dukul, 2026-10-21)
+local STATUS_SHADE = 0.6 -- skin mode: its band = the body colour x this, as the toolbar band
+local STATUS_SKIN_INSET = 3   -- skin mode: in from the window edge (MainWindowSkin SK_FILL_INSET)
+local STATUS_GRIP_W = 14      -- the window's resize grip in the bottom right corner
 local BOX_START  = 4     -- px the pointer moves before the picking box shows
                          -- or a pressed tile is carried
 local GHOST      = 36    -- the carried tile's picture
@@ -80,19 +111,29 @@ local GHOST      = 36    -- the carried tile's picture
 local REFRESH_KEY = "explorerRefresh"
 
 local _main, _sortDD, _dirDD, _selBtn, _viewBtn, _viewTx, _backBtn
+local _lead, _sortAnchor   -- the switch's place; whether the sort dropdown hangs off the switch
 local _path               -- "Notes > Folder > Note" right of the back arrow in a note
 local PATH_TITLE_MAX = 320
 local _pane, _sf, _child, _emptyLbl
+local _status, _statusFs           -- the status bar under the grid
+local _sbDetails, _sbTiles         -- its two view buttons (Windows 11)
+local _colHdr, _colLayout          -- Details: the column header row, the columns that fit
+local _sfDetails                   -- the scroll frame's top is set for Details
+local LayoutColumns, ShapeDetailsTile, SyncDetailsHeader   -- Details, defined with the tile shapes
+local _count = { notes = 0, folders = 0 }   -- what the last draw listed
 local _crumbHdr           -- the open folder's header (its "Notes" part is a drop target)
 local _tiles, _hdrs = {}, {}
 local _mode   = "grid"    -- "grid" | "note", only while the view is on
 local _folder             -- nil = top level, a folder id, or "sys:<key>"
 local _keepNote           -- Focus mode hid the window while a note was open
 
--- Picks: _pick[id] = true; _order = the pickable notes as drawn; _shown =
--- their tiles; _anchor = the last plain / Ctrl click (Shift+click range)
-local _pick, _order, _orderIdx, _shown = {}, {}, {}, {}
-local _anchor
+-- Picks: _pick[key] = true; key = a note id or "folder:<id>" (Dukul,
+-- 2026-10-21: folders are picked like notes, double-click opens); _kind[key]
+-- = "note" / "folder"; _order = the pickable keys as drawn; _shown = their
+-- tiles; _anchor = the last plain / Ctrl click (Shift+click range). A system
+-- tile (Patch notes / Help folder or note) is only lit, alone: _sysPick
+local _pick, _order, _orderIdx, _shown, _kind = {}, {}, {}, {}, {}
+local _anchor, _sysPick
 local _box, _boxState     -- the picking box and its drag
 local _drag, _ghost, _dropLine, _dropAt   -- carrying tiles
 -- Clicks are ignored until then: just after a drop, and just after a folder
@@ -102,9 +143,15 @@ local QUIET = 0.35
 local function Quiet() return _dropAt and GetTime() - _dropAt < QUIET end
 
 -- ── State ───────────────────────────────────────────────────────────────────
+-- The Explorer module (Dukul, 2026-10-21): off = no switch button, the main
+-- window is always the note list; the tile view is kept
+function BNB.ExplorerEnabled()
+    return not BigNoteBoxDB or BigNoteBoxDB.explorerEnabled ~= false
+end
+
 function EX.IsActive()
     return BNB._notesAvailable and BigNoteBoxDB and BigNoteBoxDB.explorerView == true
-        and _main ~= nil or false
+        and BNB.ExplorerEnabled() and _main ~= nil or false
 end
 
 function EX.Mode()
@@ -112,10 +159,18 @@ function EX.Mode()
     return _mode
 end
 
-local function TileIcon()
+local function ViewKey()
     local db = BigNoteBoxDB
-    return TILE_ICON[db and db.explorerTile or DEFAULT_ICON_SIZE] or TILE_ICON[DEFAULT_ICON_SIZE]
+    local k = db and db.explorerTile or DEFAULT_ICON_SIZE
+    return TILE_ICON[k] and k or DEFAULT_ICON_SIZE
 end
+local function TileIcon() return TILE_ICON[ViewKey()] end
+local function IsList() return ViewKey() == "list" end
+local function IsDetails() return ViewKey() == "details" end
+local function IsFlat() return ViewKey() == "flat" end
+local TILE_VIEW = { small = true, medium = true, large = true }   -- the tile sizes
+-- The View button's picture: the view in use
+function K.ViewIcon() return "ex-view-" .. ViewKey() end
 
 local function SysKey(folder)
     return type(folder) == "string" and folder:match("^sys:(.+)$") or nil
@@ -133,8 +188,16 @@ local function UpdateHeader()
     local on = EX.IsActive()
     if _viewTx then _viewTx:SetTexture(on and LIST_TEX or VIEW_TEX) end
     local back = on and (_mode == "note" or _folder ~= nil)
+    local modOn = BNB.ExplorerEnabled()
     if _backBtn then _backBtn:SetShown(back) end
-    if _viewBtn then _viewBtn:SetShown(not back) end
+    if _viewBtn then _viewBtn:SetShown(modOn and not back) end
+    -- Module off: no switch, the sort dropdown takes its place
+    if _sortDD and _lead and _sortAnchor ~= modOn then
+        _sortAnchor = modOn
+        _sortDD:ClearAllPoints()
+        if modOn then _sortDD:SetPoint("LEFT", _viewBtn, "RIGHT", 6, 0)
+        else _sortDD:SetPoint("LEFT", _lead, "LEFT", 0, 0) end
+    end
     if _path then _path.Update(on and _mode == "note") end
     if _sortDD then
         _sortDD:SetShown(not on)
@@ -151,29 +214,154 @@ local Refresh   -- forward: tiles and the pane call it
 
 local function Queue() BNB.Debounce(REFRESH_KEY, 0, function() Refresh() end) end
 
+-- -- Status bar ----------------------------------------------------------------
+-- As Windows Explorer's (Dukul, 2026-10-21): "4 notes   3 folders   3 notes
+-- selected (1 rich note, 2 normal notes)   4.2 KB". The selection part only
+-- while notes are picked; rich / normal only while Rich Notes is on.
+local function Plural(n, one, many)
+    if n == 1 then return L[one] end
+    return string.format(L[many], n)
+end
+
+-- Same units as Settings > Backup's data summary
+local function SizeText(bytes)
+    if bytes >= 1024 * 1024 then return string.format(L["CFG_SIZE_MB_FMT"], bytes / (1024 * 1024)) end
+    if bytes >= 1024 then return string.format(L["CFG_SIZE_KB_FMT"], bytes / 1024) end
+    return string.format(L["CFG_SIZE_B_FMT"], bytes)
+end
+
+local STATUS_SEP = "     "
+
+-- The status bar's view buttons (Windows 11, Dukul 2026-10-21): Details, and
+-- tiles at the last tile size; the one in use full, the other dimmed (both
+-- dimmed in List)
+local function LastTile()
+    local k = BigNoteBoxDB and BigNoteBoxDB.explorerLastTile
+    return (k and TILE_VIEW[k]) and k or DEFAULT_ICON_SIZE
+end
+local function PaintViewButtons()
+    if not _sbDetails then return end
+    _sbTiles._tx:SetTexture(ART .. "ex-view-" .. LastTile())
+    _sbDetails:SetAlpha(IsDetails() and 1 or 0.45)
+    _sbTiles:SetAlpha(TILE_VIEW[ViewKey()] and 1 or 0.45)
+end
+
+local function UpdateStatus()
+    if not _statusFs then return end
+    PaintViewButtons()
+    local parts = { Plural(_count.notes, "EXPLORER_SB_NOTE_1", "EXPLORER_SB_NOTES_FMT") }
+    if _count.folders > 0 then
+        parts[#parts + 1] = Plural(_count.folders, "EXPLORER_SB_FOLDER_1", "EXPLORER_SB_FOLDERS_FMT")
+    end
+    local n, nf, rich, bytes = 0, 0, 0, 0
+    local AM = BNB.AdvancedMode
+    for _, key in ipairs(_order) do
+        if _pick[key] then
+            if _kind[key] == "folder" then
+                nf = nf + 1
+            else
+                local note = BNB.GetNote(key)
+                if note then
+                    n = n + 1
+                    if AM and AM.IsRich and AM.IsRich(note) then rich = rich + 1 end
+                    bytes = bytes + #(note.title or "") + #(note.body or "")
+                end
+            end
+        end
+    end
+    if n > 0 or nf > 0 then
+        local sel
+        if nf == 0 then
+            sel = Plural(n, "EXPLORER_SB_SEL_1", "EXPLORER_SB_SEL_FMT")
+        elseif n == 0 then
+            sel = Plural(nf, "EXPLORER_SB_SELF_1", "EXPLORER_SB_SELF_FMT")
+        else
+            sel = string.format(L["EXPLORER_SB_SEL_BOTH_FMT"],
+                Plural(n, "EXPLORER_SB_NOTE_1", "EXPLORER_SB_NOTES_FMT"),
+                Plural(nf, "EXPLORER_SB_FOLDER_1", "EXPLORER_SB_FOLDERS_FMT"))
+        end
+        if n > 0 and BNB.RichEnabled and BNB.RichEnabled() then
+            sel = sel .. " (" .. Plural(rich, "EXPLORER_SB_RICH_1", "EXPLORER_SB_RICH_FMT") .. ", "
+                .. Plural(n - rich, "EXPLORER_SB_NORMAL_1", "EXPLORER_SB_NORMAL_FMT") .. ")"
+        end
+        parts[#parts + 1] = sel
+        if n > 0 then parts[#parts + 1] = SizeText(bytes) end   -- the notes' size only
+    end
+    _statusFs:SetText(table.concat(parts, STATUS_SEP))
+end
+
 local function PaintPicks()
-    for _, t in ipairs(_shown) do t._sel:SetShown(_pick[t._noteID] == true) end
+    for _, t in ipairs(_tiles) do
+        if t:IsShown() then
+            t._sel:SetShown((t._pickKey ~= nil and _pick[t._pickKey] == true)
+                or (t._sysKey ~= nil and t._sysKey == _sysPick))
+        end
+    end
+    UpdateStatus()
     if K.OnPicks then K.OnPicks() end
 end
 
 local function ClearPicks()
-    wipe(_pick); _anchor = nil
+    wipe(_pick); _anchor, _sysPick = nil, nil
 end
 
 -- The picked notes in display order
+-- The picked notes (never folders), in display order
 function K.Picked()
     local ids = {}
-    for _, id in ipairs(_order) do
-        if _pick[id] then ids[#ids + 1] = id end
+    for _, key in ipairs(_order) do
+        if _pick[key] and _kind[key] == "note" then ids[#ids + 1] = key end
+    end
+    return ids
+end
+
+-- The picked folders' ids, in display order
+function K.PickedFolders()
+    local ids = {}
+    for _, key in ipairs(_order) do
+        if _pick[key] and _kind[key] == "folder" then ids[#ids + 1] = key:sub(8) end
+    end
+    return ids
+end
+
+-- Share / Export: the picked notes, then the notes in the picked folders
+-- (list order), each once (Dukul, 2026-10-21: like copying a folder)
+function K.PickedNotesDeep()
+    local ids, seen = K.Picked(), {}
+    for _, id in ipairs(ids) do seen[id] = true end
+    local fids = K.PickedFolders()
+    local FD = FoldersOn()
+    if #fids == 0 or not FD then return ids end
+    local want = {}
+    for _, fid in ipairs(fids) do want[fid] = true end
+    for _, n in ipairs(BNB.GetOrderedNotes("", nil, true)) do
+        if not seen[n.id] and want[FD.Of(n) or ""] then
+            seen[n.id] = true
+            ids[#ids + 1] = n.id
+        end
     end
     return ids
 end
 
 function K.CanPick() return #_order > 0 end
 
+-- Every note shown is picked
+function K.AllPicked()
+    if #_order == 0 then return false end
+    for _, id in ipairs(_order) do
+        if not _pick[id] then return false end
+    end
+    return true
+end
+
+-- Select all; with everything picked already it clears the picks (Dukul, 2026-10-21)
 function K.SelectAll()
-    for _, id in ipairs(_order) do _pick[id] = true end
+    if K.AllPicked() then ClearPicks()
+    else for _, id in ipairs(_order) do _pick[id] = true end end
     PaintPicks()
+end
+function K.SelectAllText()
+    return L[K.AllPicked() and "EXPLORER_DESELECT_ALL" or "MW_SELECT_ALL_BTN"]
 end
 
 function K.Folder() return _folder end
@@ -207,33 +395,47 @@ end
 function K.NewFolder() BNB.PromptFolderName({ mode = "new" }) end
 
 -- The five sorts, a line, then Descending / Ascending (greyed in Custom)
+-- Each sort's picture (Dukul's art, 2026-10-21): Assets/Explorer/ex-sort-<name>
+local SORT_ICON = { custom = "custom", creation = "created", edited = "edited",
+                    alpha = "az", location = "location", size = "size", type = "type",
+                    folder = "folder" }
+local function SortKey() return BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy end
+-- The Sort button's picture: the sort in use
+function K.SortIcon() return "ex-sort-" .. (SORT_ICON[SortKey()] or "custom") end
+
 function K.FillSortMenu(menu)
     if not (BNB.SetNoteSort and BNB.NOTE_SORT_MODES) then return end
-    local function Sort() return BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy end
     for _, m in ipairs(BNB.NOTE_SORT_MODES) do
         local key = m.key
-        menu:CreateRadio(m.label, function() return Sort() == key end,
-            function() BNB.SetNoteSort(key, nil) end)
+        menu:CreateRadio(m.label, function() return SortKey() == key end,
+            function() BNB.SetNoteSort(key, nil) end,
+            { iconGold = true, iconTex = ART .. "ex-sort-" .. (SORT_ICON[key] or "custom") })
     end
     menu:CreateDivider()
-    local custom = Sort() == "custom"
+    local custom = SortKey() == "custom"
     menu:CreateRadio(L["DIR_MODE_DESC"], function() return not BigNoteBoxDB.sortAsc end,
-        function() BNB.SetNoteSort(nil, false) end, { disabled = custom })
+        function() BNB.SetNoteSort(nil, false) end,
+        { disabled = custom, iconGold = true, iconTex = ART .. "ex-sort-descending" })
     menu:CreateRadio(L["DIR_MODE_ASC"], function() return BigNoteBoxDB.sortAsc == true end,
-        function() BNB.SetNoteSort(nil, true) end, { disabled = custom })
+        function() BNB.SetNoteSort(nil, true) end,
+        { disabled = custom, iconGold = true, iconTex = ART .. "ex-sort-ascending" })
 end
 
--- Tile size radios, a line, back to the list view
+-- View radios, each with its picture: the toolbar's View menu and the
+-- empty-space menu's View sub-menu. No Switch to list view here: the switch
+-- button at the far left does it (Dukul, 2026-10-21)
 function K.FillViewMenu(menu)
-    for _, s in ipairs({ { "small", "EXPLORER_TILE_SMALL" }, { "medium", "EXPLORER_TILE_MEDIUM" },
-                         { "large", "EXPLORER_TILE_LARGE" } }) do
+    for _, s in ipairs(VIEWS) do
         local k = s[1]
         menu:CreateRadio(L[s[2]],
-            function() return (BigNoteBoxDB.explorerTile or DEFAULT_ICON_SIZE) == k end,
-            function() BigNoteBoxDB.explorerTile = k; Refresh() end)
+            function() return ViewKey() == k end,
+            function()
+                BigNoteBoxDB.explorerTile = k
+                if TILE_VIEW[k] then BigNoteBoxDB.explorerLastTile = k end
+                Refresh()
+            end,
+            { iconGold = true, iconTex = ART .. "ex-view-" .. k })
     end
-    menu:CreateDivider()
-    menu:CreateButton(L["FOLDER_TREE_TIP_OFF"], function() EX.SetActive(false) end)
 end
 
 local function ShowEmptyMenu(owner)
@@ -244,19 +446,12 @@ local function ShowEmptyMenu(owner)
             root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder, { icon = "folder-add" })
         end
         root:CreateDivider()
-        root:CreateButton(L["MW_SELECT_ALL_BTN"], K.SelectAll, { disabled = not K.CanPick() })
+        root:CreateButton(K.SelectAllText(), K.SelectAll, { disabled = not K.CanPick() })
         root:CreateDivider()
         -- Sort by: the toolbar strip's two dropdowns in one sub-menu (Dukul,
         -- 2026-10-20); the order means nothing in Custom, so it is greyed there
         K.FillSortMenu(root:CreateButton(L["EXPLORER_CM_SORT_BY"]))
-        local sub = root:CreateButton(L["EXPLORER_CM_TILE_SIZE"])
-        for _, s in ipairs({ { "small", "EXPLORER_TILE_SMALL" }, { "medium", "EXPLORER_TILE_MEDIUM" },
-                             { "large", "EXPLORER_TILE_LARGE" } }) do
-            local k = s[1]
-            sub:CreateRadio(L[s[2]],
-                function() return (BigNoteBoxDB.explorerTile or DEFAULT_ICON_SIZE) == k end,
-                function() BigNoteBoxDB.explorerTile = k; Refresh() end)
-        end
+        K.FillViewMenu(root:CreateButton(L["EXPLORER_TB_VIEW"]))
         root:CreateDivider()
         root:CreateButton(L["FOLDER_TREE_TIP_OFF"], function() EX.SetActive(false) end)
     end)
@@ -307,6 +502,7 @@ local function BoxUpdate(_, elapsed)
     if not st.moved then
         if math.abs(x - st.x) < BOX_START and math.abs(y - st.y) < BOX_START then return end
         st.moved = true
+        _sysPick = nil
     end
     local cw, ch = _child:GetWidth() or 0, _child:GetHeight() or 0
     x = math.max(0, math.min(cw, x)); y = math.max(0, math.min(ch, y))
@@ -328,9 +524,10 @@ local function BoxUpdate(_, elapsed)
             l, r, tt, bb = l - cl, r - cl, ct - tt, ct - bb
             hit = r >= x1 and l <= x2 and bb >= y1 and tt <= y2
         end
-        local want = hit or (st.add and st.base[t._noteID]) or nil
-        if (_pick[t._noteID] or nil) ~= want then
-            _pick[t._noteID] = want
+        local key = t._pickKey
+        local want = hit or (st.add and st.base[key]) or nil
+        if (_pick[key] or nil) ~= want then
+            _pick[key] = want
             changed = true
         end
     end
@@ -440,7 +637,7 @@ local function DragUpdate()
     local cx, cy = mx / cs, my / cs
     local best, bestDist
     for _, t in ipairs(_shown) do
-        if t._section ~= "pinned" and not d.carried[t._noteID] then
+        if t._noteID and t._section ~= "pinned" and not d.carried[t._noteID] then
             local tt, bb = t:GetTop(), t:GetBottom()
             if tt and bb and cy <= tt + GAP / 2 and cy >= bb - GAP / 2 then
                 local mid = (t:GetLeft() + t:GetRight()) / 2
@@ -511,8 +708,74 @@ local function EnsurePane()
 
     local sf = BNB.CreateScrollFrame(nil, pane)
     sf:SetPoint("TOPLEFT", pane, "TOPLEFT", PAD, -PAD)
-    sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -SCROLL_W, PAD)
+    sf:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -SCROLL_W, STATUS_H + 4)
     _sf = sf
+
+    -- The status bar: a thin rule over it (the headers' rule); skin mode adds
+    -- a darker band like the toolbar strip's
+    -- Skin mode: inside the window's border, as the toolbar band (the
+    -- backdrop's fill stops 3 px in; at 0 the band covered the border line)
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local inset = skin and STATUS_SKIN_INSET or 0
+    local st = CreateFrame("Frame", nil, pane)
+    st:SetPoint("BOTTOMLEFT", pane, "BOTTOMLEFT", inset, inset)
+    st:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -inset, inset)
+    st:SetHeight(STATUS_H)
+    if skin and BNB.SkinColourOf then
+        local band = st:CreateTexture(nil, "BACKGROUND")
+        band:SetAllPoints()
+        local function PaintBand()
+            local r, g, b = BNB.SkinColourOf(BNB.GetSkinPreset(), false)
+            band:SetColorTexture(r * STATUS_SHADE, g * STATUS_SHADE, b * STATUS_SHADE, BNB.GetSkinBgAlpha())
+        end
+        PaintBand()
+        if BNB.RegisterSkinBackdrop then BNB.RegisterSkinBackdrop(PaintBand) end
+    end
+    local rule = st:CreateTexture(nil, "ARTWORK")
+    if rule.SetSnapToPixelGrid then rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0) end
+    rule:SetPoint("TOPLEFT", st, "TOPLEFT", PAD, 0)
+    rule:SetPoint("TOPRIGHT", st, "TOPRIGHT", -PAD, 0)
+    if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(rule, 1, 1) else rule:SetHeight(1) end
+    local hr, hg, hb = BNB.HeaderColor()
+    rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
+    st._rule = rule
+    -- Two view buttons at the right end, as Windows 11's status bar
+    local function ViewBtn(onClick, tipKey)
+        local b = CreateFrame("Button", nil, st)
+        b:SetSize(16, 16)
+        local tx = b:CreateTexture(nil, "ARTWORK")
+        tx:SetAllPoints()
+        BNB.TintUIIcon(tx)
+        BNB.AddUIIconHover(b, tx)
+        b._tx = tx
+        b:SetScript("OnClick", onClick)
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L[tipKey()], 1, 1, 1)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        return b
+    end
+    local function SetView(k)
+        BigNoteBoxDB.explorerTile = k
+        Refresh()
+    end
+    _sbTiles = ViewBtn(function() SetView(LastTile()) end, function()
+        for _, v in ipairs(VIEWS) do if v[1] == LastTile() then return v[2] end end
+        return "EXPLORER_TILE_MEDIUM"
+    end)
+    _sbTiles:SetPoint("RIGHT", st, "RIGHT", -(PAD + STATUS_GRIP_W), 0)   -- clear of the resize grip
+    _sbDetails = ViewBtn(function() SetView("details") end, function() return "EXPLORER_VIEW_DETAILS" end)
+    _sbDetails._tx:SetTexture(ART .. "ex-view-details")
+    _sbDetails:SetPoint("RIGHT", _sbTiles, "LEFT", -6, 0)
+
+    local sfs = st:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    sfs:SetPoint("LEFT", st, "LEFT", PAD, 0)
+    sfs:SetPoint("RIGHT", _sbDetails, "LEFT", -8, 0)
+    sfs:SetJustifyH("LEFT"); sfs:SetWordWrap(false)
+    sfs:SetTextColor(BNB.TextWhite(0.75))
+    _status, _statusFs = st, sfs
     local bar = sf.ScrollBar
     if bar then bar:SetAlpha(0) end
     local child = CreateFrame("Frame", nil, sf)
@@ -565,8 +828,9 @@ local function PaintCrumb(hdr, lit)
 end
 
 local function PaintArrow(hdr, hover)
-    local name = hdr._closed and "ui-arrow-up" or "ui-arrow-down"
-    hdr._arrow:SetTexture(UI_ART .. name .. (hover and "-hover" or ""))
+    -- Dukul's chevrons (2026-10-21), the toolbar menus' arrow; white on hover
+    hdr._arrow:SetTexture(ART .. (hdr._closed and "ex-chevron-up" or "ex-chevron-down"))
+    if hover then hdr._arrow:SetVertexColor(1, 1, 1) else BNB.TintUIIcon(hdr._arrow) end
 end
 
 local function GetHeader(i)
@@ -659,7 +923,7 @@ local function PaintHeader(hdr, text, art, r, g, b, opts)
     hdr._rule:ClearAllPoints()
     hdr._rule:SetPoint("LEFT", hdr._text, "RIGHT", 6, 0)
     if opts.toggle then
-        PaintArrow(hdr, hdr:IsMouseOver())   -- the list's collapse arrow art, untinted
+        PaintArrow(hdr, hdr:IsMouseOver())
         hdr._arrow:Show()
         hdr._rule:SetPoint("RIGHT", hdr._arrow, "LEFT", -4, 0)
     else
@@ -694,6 +958,7 @@ local function OpenNote(id)
 end
 
 local function PickClick(id)
+    _sysPick = nil
     if IsShiftKeyDown() and _anchor and _orderIdx[_anchor] then
         -- Every note between the last click and this one; Ctrl keeps the rest
         if not IsControlKeyDown() then wipe(_pick) end
@@ -711,19 +976,42 @@ local function PickClick(id)
     PaintPicks()
 end
 
+-- A system tile is lit alone: nothing else stays picked
+local function SysClick(key)
+    wipe(_pick); _anchor = nil
+    _sysPick = key
+    PaintPicks()
+end
+
+-- Right-click on a pick when other things are picked too: the notes' menu
+-- (Dukul, 2026-10-21: a mixed pick gets the menu for its notes)
+local function PickMenu(self, key)
+    if not _pick[key] then return false end
+    local notes = K.Picked()
+    if #notes > 1 then BNB.ShowMultiNoteContextMenu(self, notes); return true end
+    if #notes == 1 and #K.PickedFolders() > 0 then BNB.ShowNoteContextMenu(self, notes[1]); return true end
+    return false
+end
+
+-- One click picks (Ctrl / Shift as for files), a double-click opens: notes,
+-- folders and the system tiles alike (Dukul, 2026-10-21)
 local function TileClick(self, button)
     if self._folderKey then
         if Quiet() then return end
+        local sys = SysKey(self._folderKey)
         if button == "RightButton" then
-            local sys = SysKey(self._folderKey)
             if sys then
                 if BNB.ShowSystemFolderMenu then BNB.ShowSystemFolderMenu(self, sys) end
-            elseif BNB.ShowFolderMenu then
-                BNB.ShowFolderMenu(self, self._folderKey)
+            elseif not PickMenu(self, self._pickKey) then
+                if not _pick[self._pickKey] then
+                    wipe(_pick); _pick[self._pickKey] = true; _anchor = self._pickKey; _sysPick = nil
+                    PaintPicks()
+                end
+                if BNB.ShowFolderMenu then BNB.ShowFolderMenu(self, self._folderKey) end
             end
             return
         end
-        K.OpenFolder(self._folderKey)
+        if sys then SysClick(self._sysKey) else PickClick(self._pickKey) end
         return
     end
     local id = self._noteID
@@ -735,25 +1023,22 @@ local function TileClick(self, button)
         end
         -- On a pick with others picked: the menu for all of them; else this
         -- note alone is picked (Windows)
-        local ids = K.Picked()
-        if _pick[id] and #ids > 1 then
-            BNB.ShowMultiNoteContextMenu(self, ids)
-        else
-            wipe(_pick); _pick[id] = true; _anchor = id
+        if not PickMenu(self, id) then
+            wipe(_pick); _pick[id] = true; _anchor = id; _sysPick = nil
             PaintPicks()
             BNB.ShowNoteContextMenu(self, id)
         end
         return
     end
     if Quiet() then return end   -- the end of a carry, a folder just opened
-    if self._sys then OpenNote(id); return end
+    if self._sys then SysClick(self._sysKey); return end
     PickClick(id)
 end
 
 local function TileDoubleClick(self, button)
-    if button ~= "LeftButton" or not self._noteID or self._sys then return end
-    if Quiet() then return end
-    OpenNote(self._noteID)
+    if button ~= "LeftButton" or Quiet() then return end
+    if self._folderKey then K.OpenFolder(self._folderKey); return end
+    if self._noteID then OpenNote(self._noteID) end
 end
 
 local function TileEnter(self)
@@ -832,8 +1117,18 @@ local function GetTile(i)
     t:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     t._icon = t:CreateTexture(nil, "ARTWORK")
     t._folderTex = t:CreateTexture(nil, "ARTWORK")
-    t._sel   = TileArt(t, "selection", 2, { 0.40, 0.85, 0.40, 0.18 })
-    t._hover = TileArt(t, "hover", 4, { 1, 1, 1, 0.06 })
+    local selFill, hoverFill = { 0.40, 0.85, 0.40, 0.18 }, { 1, 1, 1, 0.06 }
+    t._selT   = TileArt(t, "selection", 2, selFill)
+    t._hoverT = TileArt(t, "hover", 4, hoverFill)
+    -- List view: the note list's row art over the whole row (skin mode's tile
+    -- art already is)
+    if t._selT._square then
+        t._selL   = BNB.CreateListRowArt(t, "selection", selFill)
+        t._hoverL = BNB.CreateListRowArt(t, "hover", hoverFill)
+    else
+        t._selL, t._hoverL = t._selT, t._hoverT
+    end
+    t._sel, t._hover = t._selT, t._hoverT   -- the pair in use, set by ShapeTile
     t:HookScript("OnEnter", function(self) self._hover:Show() end)
     t:HookScript("OnLeave", function(self) self._hover:Hide() end)
     t:HookScript("OnHide",  function(self) self._hover:Hide() end)
@@ -868,7 +1163,60 @@ local function GetTile(i)
     return t
 end
 
+-- The hover / pick pair for this view; the pick is shown again on a swap
+local function UseArt(t, sel, hover)
+    if t._sel == sel then return end
+    t._sel:Hide(); t._hover:Hide()
+    t._sel, t._hover = sel, hover
+    t._sel:SetShown((t._pickKey ~= nil and _pick[t._pickKey] == true)
+        or (t._sysKey ~= nil and t._sysKey == _sysPick))
+    if t:IsMouseOver() then t._hover:Show() end
+end
+
+-- List view: icon left, title after it, the shown markers in a row at the
+-- right end (lock first from the right), the title stopping before them.
+-- Called after the tile was filled, so the markers' shown state is known.
+local LIST_MARKERS = { "_mLock", "_mFav", "_mAlarm", "_mSitu", "_mLoc" }
+local function HideCells(t)
+    if t._cells then for _, fs in pairs(t._cells) do fs:Hide() end end
+end
+
+-- h = the row height (List / Details); edge = room kept at the right for the
+-- Details columns, so the markers end the Name column
+local function ShapeListTile(t, size, w, h, edge)
+    h, edge = h or LIST_H, edge or 0
+    UseArt(t, t._selL, t._hoverL)
+    t:SetSize(w, h)
+    if edge == 0 then HideCells(t) end
+    for _, tex in ipairs({ t._icon, t._folderTex }) do
+        tex:SetSize(size, size)
+        tex:ClearAllPoints()
+        tex:SetPoint("LEFT", t, "LEFT", 4, 0)
+    end
+    local x = -4 - edge
+    for _, key in ipairs(LIST_MARKERS) do
+        local mk = t[key]
+        local ms = key == "_mLock" and 10 or 12
+        mk:SetSize(ms, ms)
+        mk:ClearAllPoints()
+        if mk:IsShown() then
+            mk:SetPoint("RIGHT", t, "RIGHT", x, 0)
+            x = x - ms - 2
+        end
+    end
+    local fs = t._label
+    fs:ClearAllPoints()
+    fs:SetPoint("LEFT", t._icon, "RIGHT", 6, 0)
+    fs:SetPoint("RIGHT", t, "RIGHT", x - 2, 0)
+    fs:SetHeight(h)
+    fs:SetJustifyH("LEFT"); fs:SetJustifyV("MIDDLE")
+    fs:SetWordWrap(false)
+    if fs.SetMaxLines then fs:SetMaxLines(1) end
+end
+
 local function ShapeTile(t, size)
+    UseArt(t, t._selT, t._hoverT)
+    HideCells(t)
     local w = size + TILE_EXTRA
     t:SetSize(w, 6 + size + 4 + LABEL_H + 4)
     for _, tex in ipairs({ t._icon, t._folderTex }) do
@@ -876,16 +1224,191 @@ local function ShapeTile(t, size)
         tex:ClearAllPoints()
         tex:SetPoint("TOP", t, "TOP", 0, -6)
     end
-    t._label:ClearAllPoints()
-    t._label:SetPoint("TOP", t._icon, "BOTTOM", 0, -4)
-    t._label:SetWidth(w - 6)
-    t._label:SetHeight(LABEL_H)
+    local fs = t._label
+    fs:ClearAllPoints()
+    fs:SetPoint("TOP", t._icon, "BOTTOM", 0, -4)
+    fs:SetWidth(w - 6)
+    fs:SetHeight(LABEL_H)
+    fs:SetJustifyH("CENTER"); fs:SetJustifyV("TOP")
+    fs:SetWordWrap(true)
+    if fs.SetMaxLines then fs:SetMaxLines(2) end
     for _, tex in ipairs({ t._sel, t._hover }) do
         if tex._square then tex:SetSize(size + SQ_GROW, size + SQ_GROW) end
     end
     local ms = math.max(12, math.floor(size * 0.36))
-    for _, m in ipairs(MARKERS) do t[m[1]]:SetSize(ms, ms) end
+    for _, m in ipairs(MARKERS) do
+        local mk = t[m[1]]
+        mk:SetSize(ms, ms)
+        mk:ClearAllPoints()   -- a list row moved it to the row's end
+        mk:SetPoint(m[3], t._ov, m[3], m[4], m[5])
+    end
     t._mLock:SetSize(math.floor(ms * 0.8), math.floor(ms * 0.8))
+    t._mLock:ClearAllPoints()
+    t._mLock:SetPoint("BOTTOMLEFT", t._ov, "BOTTOMLEFT", -2, -2)
+end
+
+-- -- Details view ----------------------------------------------------------------
+-- The columns that fit in width: Name first (the rest of the room), then
+-- each column while Name keeps NAME_MIN. _colLayout = { { col, x, w }, ... }
+LayoutColumns = function(width)
+    local used, keep = 0, {}
+    for i = 2, #COLUMNS do
+        local c = COLUMNS[i]
+        if width - (used + c.w + COL_GAP) < NAME_MIN then break end
+        used = used + c.w + COL_GAP
+        keep[#keep + 1] = c
+    end
+    local layout = { { col = COLUMNS[1], x = 0, w = width - used } }
+    local x = width - used
+    for _, c in ipairs(keep) do
+        layout[#layout + 1] = { col = c, x = x + COL_GAP, w = c.w }
+        x = x + COL_GAP + c.w
+    end
+    _colLayout = layout
+    if _colHdr then _colHdr.Layout(layout) end
+end
+
+local function FolderName(note)
+    local FD = FoldersOn()
+    local fid = FD and FD.Of(note)
+    local rec = fid and FD.Get(fid)
+    return rec and rec.name or ""
+end
+
+-- One column's text for a row (a note tile, or a folder tile: note = nil)
+local function CellText(t, key)
+    local note = t._note
+    if key == "type" then
+        if not note then return L["EXPLORER_TYPE_FOLDER"] end
+        local AM = BNB.AdvancedMode
+        return L[(AM and AM.IsRich and AM.IsRich(note)) and "EXPLORER_TYPE_RICH" or "EXPLORER_TYPE_NORMAL"]
+    end
+    if not note then return "" end
+    if key == "modified" then return BNB.FmtTime and BNB.FmtTime(note.updated) or "" end
+    if key == "created"  then return BNB.FmtTime and BNB.FmtTime(note.created) or "" end
+    if key == "size"     then return SizeText(#(note.title or "") + #(note.body or "")) end
+    if key == "folder"   then return FolderName(note) end
+    if key == "tags" and type(note.tags) == "table" then return table.concat(note.tags, ", ") end
+    return ""
+end
+
+ShapeDetailsTile = function(t, size, w)
+    local layout = _colLayout or { { col = COLUMNS[1], x = 0, w = w } }
+    ShapeListTile(t, size, w, DETAILS_H, w - layout[1].w)
+    t._cells = t._cells or {}
+    local shown = {}
+    for i = 2, #layout do
+        local c = layout[i]
+        local key = c.col.key
+        local fs = t._cells[key]
+        if not fs then
+            fs = t:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+            fs:SetWordWrap(false)
+            t._cells[key] = fs
+        end
+        fs:ClearAllPoints()
+        fs:SetPoint("LEFT", t, "LEFT", c.x, 0)
+        fs:SetWidth(c.w)
+        fs:SetHeight(DETAILS_H)
+        fs:SetJustifyH(c.col.right and "RIGHT" or "LEFT")
+        fs:SetTextColor(BNB.TextWhite(0.7))
+        fs:SetText(CellText(t, key))
+        fs:Show()
+        shown[key] = true
+    end
+    for key, fs in pairs(t._cells) do
+        if not shown[key] then fs:Hide() end
+    end
+end
+
+-- The header row over the grid: one button per column, the sort arrow on the
+-- column whose sort is in use (Windows); a click sorts, again flips the order
+local function BuildColumnHeader()
+    local hdr = CreateFrame("Frame", nil, _pane)
+    hdr:SetPoint("TOPLEFT", _pane, "TOPLEFT", PAD, -PAD)
+    hdr:SetPoint("TOPRIGHT", _pane, "TOPRIGHT", -SCROLL_W, -PAD)
+    hdr:SetHeight(COLHDR_H)
+    hdr:Hide()
+    local rule = hdr:CreateTexture(nil, "ARTWORK")
+    if rule.SetSnapToPixelGrid then rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0) end
+    rule:SetPoint("BOTTOMLEFT", hdr, "BOTTOMLEFT", 0, 0)
+    rule:SetPoint("BOTTOMRIGHT", hdr, "BOTTOMRIGHT", 0, 0)
+    if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(rule, 1, 1) else rule:SetHeight(1) end
+    hdr._rule = rule
+    local btns = {}
+    for _, c in ipairs(COLUMNS) do
+        local b = CreateFrame("Button", nil, hdr)
+        b:SetHeight(COLHDR_H)
+        local hl = b:CreateTexture(nil, "BACKGROUND")
+        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06); hl:Hide()
+        local fs = b:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        fs:SetWordWrap(false)
+        fs:SetText(L[c.title])
+        b._fs = fs
+        local ar = b:CreateTexture(nil, "ARTWORK")
+        ar:SetSize(10, 10)
+        BNB.TintUIIcon(ar)
+        ar:Hide()
+        b._ar = ar
+        b._col = c
+        if c.sort then
+            b:SetScript("OnClick", function()
+                local db = BigNoteBoxDB
+                if (db.sortBy or BNB.DEFAULTS.sortBy) == c.sort then BNB.SetNoteSort(nil, not db.sortAsc)
+                else BNB.SetNoteSort(c.sort, nil) end
+            end)
+            b:SetScript("OnEnter", function() hl:Show() end)
+            b:SetScript("OnLeave", function() hl:Hide() end)
+        end
+        btns[c.key] = b
+    end
+    function hdr.Layout(layout)
+        local hr, hg, hb = BNB.HeaderColor()
+        rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
+        local db = BigNoteBoxDB
+        local sortBy = db.sortBy or BNB.DEFAULTS.sortBy
+        local shown = {}
+        for _, e in ipairs(layout) do
+            local b = btns[e.col.key]
+            shown[e.col.key] = true
+            b:ClearAllPoints()
+            b:SetPoint("TOPLEFT", hdr, "TOPLEFT", e.x, 0)
+            b:SetWidth(e.w)
+            b._fs:ClearAllPoints()
+            -- Name starts over the titles (after the row icon), the rest over their text
+            local lx = e.col.key == "name" and (4 + TILE_ICON.details + 6) or 0
+            if e.col.right then
+                b._fs:SetPoint("RIGHT", b, "RIGHT", 0, 0); b._fs:SetJustifyH("RIGHT")
+            else
+                b._fs:SetPoint("LEFT", b, "LEFT", lx, 0); b._fs:SetJustifyH("LEFT")
+            end
+            b._fs:SetTextColor(hr, hg, hb)
+            local on = e.col.sort ~= nil and e.col.sort == sortBy
+            b._ar:ClearAllPoints()
+            if on then
+                b._ar:SetTexture(ART .. (db.sortAsc and "ex-chevron-up" or "ex-chevron-down"))
+                b._ar:SetPoint("LEFT", b._fs, "RIGHT", 4, 0)
+            end
+            b._ar:SetShown(on)
+            b:Show()
+        end
+        for key, b in pairs(btns) do
+            if not shown[key] then b:Hide() end
+        end
+    end
+    _colHdr = hdr
+end
+
+-- Details on: the header shows and the grid starts under it; off: back
+SyncDetailsHeader = function(on)
+    if not _pane then return end
+    if on and not _colHdr then BuildColumnHeader() end
+    if _colHdr then _colHdr:SetShown(on) end
+    if _sfDetails == on then return end
+    _sfDetails = on
+    _sf:ClearAllPoints()
+    _sf:SetPoint("TOPLEFT", _pane, "TOPLEFT", PAD, on and -(PAD + COLHDR_H + 4) or -PAD)
+    _sf:SetPoint("BOTTOMRIGHT", _pane, "BOTTOMRIGHT", -SCROLL_W, STATUS_H + 4)
 end
 
 local function HideMarkers(t)
@@ -895,6 +1418,9 @@ end
 
 local function FillNoteTile(t, note, size, section)
     t._noteID, t._sys, t._folderKey, t._folderName = note.id, note.system, nil, nil
+    t._pickKey = (not note.system) and note.id or nil
+    t._note = note
+    t._sysKey = note.system and ("sysnote:" .. note.id) or nil
     t._section = section
     t._folderTex:Hide()
     t._icon:Show()
@@ -918,6 +1444,10 @@ end
 -- key = a folder id or "sys:<key>"; name already plain text; r, g, b = its colour
 local function FillFolderTile(t, key, name, n, r, g, b)
     t._noteID, t._sys, t._folderKey, t._folderName, t._count = nil, nil, key, name, n
+    local sys = SysKey(key) ~= nil
+    t._pickKey = (not sys) and ("folder:" .. key) or nil
+    t._note = nil
+    t._sysKey = sys and key or nil
     t._section = nil
     t._icon:Hide()
     BNB.ApplyIconFrame(t._icon, nil)   -- a note's frame art left on a reused tile
@@ -963,19 +1493,33 @@ Draw = function()
     local FD  = FoldersOn()
     local SYS = BNB.SystemNotes
     local size = TileIcon()
-    local tileW = size + TILE_EXTRA
-    local tileH = 6 + size + 4 + LABEL_H + 4
+    local flat = IsFlat()
+    local details = IsDetails() or flat   -- Flat draws Details rows
+    local list = IsList()
+    SyncDetailsHeader(details)
+    local tileW = list and LIST_MIN_W or size + TILE_EXTRA
+    local tileH = list and LIST_H or 6 + size + 4 + LABEL_H + 4
+    local rowGap = list and LIST_GAP or GAP
     local width = _child:GetWidth()
     if not width or width < tileW then width = tileW end
     local cols = math.max(1, math.floor((width + GAP) / (tileW + GAP)))
+    -- List rows share the width out, so the columns fill it
+    if list then tileW = math.floor((width - (cols - 1) * GAP) / cols) end
+    if details then
+        cols, tileW, tileH, rowGap = 1, width, DETAILS_H, 0
+        LayoutColumns(width)
+    end
 
     for _, t in ipairs(_tiles) do t:Hide() end
     for _, h in ipairs(_hdrs) do h:Hide() end
     _emptyLbl:Hide()
-    wipe(_order); wipe(_orderIdx); wipe(_shown)
+    wipe(_order); wipe(_orderIdx); wipe(_shown); wipe(_kind)
+    local sysSeen = {}
     _crumbHdr = nil
 
-    -- An open folder that is gone (deleted, module or setting off): top level
+    -- Flat has no folders to be in; an open folder that is gone (deleted,
+    -- module or setting off): top level
+    if flat then _folder = nil end
     local sys = SysKey(_folder)
     if _folder and not sys and not (FD and FD.Get(_folder)) then _folder = nil end
     if sys then
@@ -988,6 +1532,11 @@ Draw = function()
     UpdateHeader()
 
     local y, ti, hi = 0, 0, 0
+    _count.notes, _count.folders = 0, 0
+    if _status then   -- the header colour may have changed (skin preset)
+        local hr, hg, hb = BNB.HeaderColor()
+        _status._rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
+    end
     local function Header(text, art, r, g, b, opts)
         hi = hi + 1
         local hdr = GetHeader(hi)
@@ -1001,15 +1550,17 @@ Draw = function()
     -- Tiles flow left to right; col carries on across Flow calls in one part
     local col = 0
     local function Place(t)
-        ShapeTile(t, size)
+        if details then ShapeDetailsTile(t, size, tileW)
+        elseif list then ShapeListTile(t, size, tileW)
+        else ShapeTile(t, size) end
         t:ClearAllPoints()
         t:SetPoint("TOPLEFT", _child, "TOPLEFT", col * (tileW + GAP), -y)
         t:Show()
         col = col + 1
-        if col >= cols then col = 0; y = y + tileH + GAP end
+        if col >= cols then col = 0; y = y + tileH + rowGap end
     end
     local function EndRow()
-        if col > 0 then col = 0; y = y + tileH + GAP end
+        if col > 0 then col = 0; y = y + tileH + rowGap end
     end
     local function NoteTile(note, section)
         ti = ti + 1
@@ -1017,16 +1568,28 @@ Draw = function()
         if not note.system and not _orderIdx[note.id] then
             _order[#_order + 1] = note.id
             _orderIdx[note.id] = #_order
+            _kind[note.id] = "note"
             _shown[#_shown + 1] = t
         end
         FillNoteTile(t, note, size, section)
+        if t._sysKey then sysSeen[t._sysKey] = true end
         Place(t)
+        _count.notes = _count.notes + 1
     end
     local function FolderTile(key, name, n, r, g, b)
         ti = ti + 1
         local t = GetTile(ti)
         FillFolderTile(t, key, name, n, r, g, b)
+        local pk = t._pickKey
+        if pk and not _orderIdx[pk] then
+            _order[#_order + 1] = pk
+            _orderIdx[pk] = #_order
+            _kind[pk] = "folder"
+            _shown[#_shown + 1] = t
+        end
+        if t._sysKey then sysSeen[t._sysKey] = true end
         Place(t)
+        _count.folders = _count.folders + 1
     end
     local function Empty(key)
         _emptyLbl:SetText(L[key]); _emptyLbl:Show()
@@ -1046,7 +1609,14 @@ Draw = function()
         return SYS.Notes(key)
     end
 
-    if sys then
+    if flat and not filtering then
+        -- ── Flat: every note in the sort, pinned ones too, no folders and
+        -- no section headers: the column row on top, the notes under it
+        -- (Dukul, 2026-10-21)
+        for _, n in ipairs(notes) do NoteTile(n, "results") end
+        EndRow()
+        if #notes == 0 then Empty("NOTE_LIST_EMPTY"); y = 80 end
+    elseif sys then
         -- ── A system folder ─────────────────────────────────────────────────
         local p = SYS.Provider(sys)
         local list = SysList(sys)
@@ -1109,6 +1679,8 @@ Draw = function()
             if not closed then
                 for _, n in ipairs(pinned) do NoteTile(n, "pinned") end
                 EndRow()
+            else
+                _count.notes = _count.notes + #pinned   -- a closed part still counts
             end
             y = y + 4
         end
@@ -1130,6 +1702,9 @@ Draw = function()
             end
             for _, n in ipairs(regular) do NoteTile(n, "notes") end
             EndRow()
+        else
+            _count.notes = _count.notes + #regular
+            _count.folders = _count.folders + #folders + #sysFolders
         end
         if #notes == 0 and #folders == 0 and #sysFolders == 0 then
             Empty("NOTE_LIST_EMPTY")
@@ -1142,6 +1717,7 @@ Draw = function()
         if not _orderIdx[id] then _pick[id] = nil end
     end
     if _anchor and not _orderIdx[_anchor] then _anchor = nil end
+    if _sysPick and not sysSeen[_sysPick] then _sysPick = nil end
     PaintPicks()
 
     _child:SetHeight(math.max(y, _sf:GetHeight() or 1))
@@ -1194,8 +1770,27 @@ function EX.Apply()
     end
 end
 
+-- After the module switch changed (Settings > Modules, the setup wizard):
+-- off leaves the explorer for the note list; on shows the switch only
+function BNB.ApplyExplorerModule(on)
+    local db = BigNoteBoxDB
+    if not (db and _main) then return end
+    if not on and db.explorerView then
+        if _boxState then FinishBox() end
+        if _drag then EndDrag(false) end
+        BNB.SaveCurrentNote()
+        db.explorerView = false
+        EX.Apply()
+        if BNB.DockListSearch then BNB.DockListSearch(nil) end
+        if BNB.RefreshNoteList then BNB.RefreshNoteList() end
+    else
+        UpdateHeader()
+    end
+end
+
 function EX.SetActive(on)
     on = on and true or false
+    if on and not BNB.ExplorerEnabled() then return end
     if not (BigNoteBoxDB and _main) or on == EX.IsActive() then return end
     if _boxState then FinishBox() end
     if _drag then EndDrag(false) end
@@ -1241,6 +1836,10 @@ end
 -- ── Toolbar strip: the switch and the back arrow ────────────────────────────
 function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     _main, _sortDD, _dirDD, _selBtn = f, sortDD, dirDD, selBtn
+    -- Built once per session: the window opens on the default view (Dukul,
+    -- 2026-10-21); the switch changes it until the next login or reload
+    local db = BigNoteBoxDB
+    if db then db.explorerView = BNB.ExplorerEnabled() and db.explorerDefault ~= "list" end
 
     -- The switch and the back arrow sit where the sort dropdown was, which
     -- moves right of the switch (Dukul, 2026-10-20: the switch is always first)
@@ -1256,6 +1855,7 @@ function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     vb:SetPoint("LEFT", lead, "LEFT", 0, 0)
     sortDD:ClearAllPoints()
     sortDD:SetPoint("LEFT", vb, "RIGHT", 6, 0)
+    _lead, _sortAnchor = lead, true
     local tx = vb:CreateTexture(nil, "ARTWORK")
     tx:SetAllPoints()
     BNB.TintUIIcon(tx)

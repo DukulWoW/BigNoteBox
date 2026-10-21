@@ -28,7 +28,7 @@ local K   = BNB._ExplorerKit
 local EX  = BNB.Explorer
 
 local ART      = "Interface\\AddOns\\BigNoteBox\\Assets\\Explorer\\"
-local ARROW    = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-arrow-down"
+local ARROW    = ART .. "ex-chevron-down"
 local BTN_H    = 24
 local ICON     = 18
 local BTN_PAD  = 5
@@ -46,11 +46,45 @@ local _overflow = {}     -- specs that did not fit (the More menu)
 local _searchOpen = false
 
 -- ── The picks ───────────────────────────────────────────────────────────────
+-- Notes only (Copy, Move, Pin, Favorite); folders join Delete and Rename;
+-- Share / Export take the notes in picked folders too (Dukul, 2026-10-21)
 local function Ids() return K.Picked() end
 local function Count() return #K.Picked() end
+local function FolderCount() return #K.PickedFolders() end
+local function AnyPick() return Count() + FolderCount() > 0 end
 local function OnlyOne()
     local ids = K.Picked()
+    return #ids == 1 and FolderCount() == 0 and ids[1] or nil
+end
+local function OnlyFolder()
+    local f = K.PickedFolders()
+    return #f == 1 and Count() == 0 and f[1] or nil
+end
+local function DeepOne()
+    local ids = K.PickedNotesDeep()
     return #ids == 1 and ids[1] or nil
+end
+
+-- Delete: notes alone keep their own confirm; with folders one confirm for
+-- all (folders deleted, their notes back to the list; notes as the trash says)
+local function DeletePicked()
+    local notes, fids = K.Picked(), K.PickedFolders()
+    if #fids == 0 then BNB.ConfirmDeleteNotes(notes, false); return end
+    local FD = BNB.Folders
+    if not FD then return end
+    local text
+    if #notes == 0 and #fids == 1 then
+        text = string.format(L["FOLDER_DELETE_CONFIRM"], FD.Text(fids[1]), FD.CountAll(fids[1]))
+    elseif #notes == 0 then
+        text = string.format(L["EXPLORER_DEL_FOLDERS_FMT"], #fids)
+    else
+        local trash = BNB.TrashEnabled and BNB.TrashEnabled()
+        text = string.format(L[trash and "EXPLORER_DEL_MIXED_TRASH_FMT" or "EXPLORER_DEL_MIXED_FMT"], #fids, #notes)
+    end
+    StaticPopup_Show("BNB_MULTI_CONFIRM", text, nil, function()
+        for _, fid in ipairs(fids) do FD.Delete(fid) end
+        if #notes > 0 and BNB.DeleteNotes then BNB.DeleteNotes(notes, false) end
+    end)
 end
 local function Locked(id)
     local NK = BNB._NoteListKit
@@ -116,6 +150,8 @@ StaticPopupDialogs["BNB_EXPLORER_RENAME"] = {
 }
 
 local function Rename()
+    local fid = OnlyFolder()
+    if fid then BNB.PromptFolderName({ mode = "rename", id = fid }); return end
     local id = OnlyOne()
     local n = id and BNB.GetNote(id)
     if not n then return end
@@ -131,9 +167,9 @@ local SPECS = {
     { icon = "ex-new", title = "EXPLORER_TB_NEW", sub = "EXPLORER_TB_NEW_TIP", label = true,
       menu = function(root)
         root:CreateButton(L[K.UserFolder() and "FOLDER_CM_NEW_NOTE" or "EXPLORER_TB_NEW_NOTE"],
-            K.NewNoteHere, { icon = "create" })
+            K.NewNoteHere, { iconTex = ART .. "ex-new-note", iconGold = true })
         if BNB.FoldersEnabled() then
-            root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder, { icon = "folder-add" })
+            root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder, { iconTex = ART .. "ex-new-folder", iconGold = true })
         end
       end },
     { icon = "ex-quick-note", title = "NL_QUICK_NOTE_BTN", sub = "NL_QUICK_NOTE_TIP_SUB",
@@ -159,14 +195,17 @@ local SPECS = {
             { icon = "copy-move" })
       end },
     { icon = "ex-delete", title = "EXPLORER_TB_DELETE", sub = "EXPLORER_TB_DELETE_TIP",
-      enabled = function() return Count() > 0 end, needs = "EXPLORER_TB_NEED_PICK",
-      fn = function() BNB.ConfirmDeleteNotes(Ids(), false) end },
+      enabled = AnyPick, needs = "EXPLORER_TB_NEED_PICK",
+      fn = DeletePicked },
     { icon = "ex-rename", title = "EXPLORER_TB_RENAME", sub = "EXPLORER_TB_RENAME_TIP",
-      enabled = function() local id = OnlyOne(); return id ~= nil and not Locked(id) end,
+      enabled = function()
+        if OnlyFolder() then return true end
+        local id = OnlyOne(); return id ~= nil and not Locked(id)
+      end,
       needs = function()
         local id = OnlyOne()
         if id and Locked(id) then return L["EXPLORER_TB_LOCKED"] end
-        return L["EXPLORER_TB_NEED_ONE"]
+        return L["EXPLORER_TB_NEED_ONE_ITEM"]
       end,
       fn = Rename },
     { icon = "ex-pin", title = function() return L[AllHave("pinned") and "EXPLORER_TB_UNPIN" or "EXPLORER_TB_PIN"] end,
@@ -179,9 +218,9 @@ local SPECS = {
       fn = function() SetAll("favorited", not AllHave("favorited")) end },
     "sep",
     { icon = "ex-share", title = "EXPLORER_TB_SHARE", sub = "EXPLORER_TB_SHARE_TIP",
-      enabled = function() return OnlyOne() ~= nil end, needs = "EXPLORER_TB_NEED_ONE",
+      enabled = function() return DeepOne() ~= nil end, needs = "EXPLORER_TB_NEED_ONE",
       menu = function(root)
-        local id = OnlyOne()
+        local id = DeepOne()
         if not id then return end
         root:CreateButton(L["NL_CTX_SHARE"], function()
             if BNB.OpenShareWindow then BNB.OpenShareWindow(id) end
@@ -191,9 +230,9 @@ local SPECS = {
         end, { icon = "chat" })
       end },
     { icon = "ex-export", title = "EXPLORER_TB_EXPORT", sub = "EXPLORER_TB_EXPORT_TIP",
-      enabled = function() return Count() > 0 end, needs = "EXPLORER_TB_NEED_PICK",
+      enabled = function() return #K.PickedNotesDeep() > 0 end, needs = "EXPLORER_TB_NEED_PICK",
       menu = function(root)
-        local ids = Ids()
+        local ids = K.PickedNotesDeep()
         local one = #ids == 1 and ids[1] or nil
         root:CreateButton(L["NL_CM_EXPORT_JSON"], function()
             if one then BNB.ExportNoteJSON(one) else BNB.ExportMultiJSON(ids) end
@@ -213,7 +252,7 @@ local SPECS = {
         end
       end },
     "sep",
-    { icon = "ex-sort", title = "EXPLORER_TB_SORT", sub = "EXPLORER_TB_SORT_TIP", label = true,
+    { icon = function() return K.SortIcon() end, title = "EXPLORER_TB_SORT", sub = "EXPLORER_TB_SORT_TIP", label = true,
       menu = function(root) K.FillSortMenu(root) end },
     { icon = function() return BigNoteBoxDB.sortAsc and "ex-sort-ascending" or "ex-sort-descending" end,
       title = "EXPLORER_TB_ORDER",
@@ -224,9 +263,9 @@ local SPECS = {
       enabled = function() return (BigNoteBoxDB.sortBy or BNB.DEFAULTS.sortBy) ~= "custom" end,
       needs = "EXPLORER_TB_ORDER_CUSTOM",
       fn = function() BNB.SetNoteSort(nil, not BigNoteBoxDB.sortAsc) end },
-    { icon = "ex-view", title = "EXPLORER_TB_VIEW", sub = "EXPLORER_TB_VIEW_TIP", label = true,
+    { icon = function() return K.ViewIcon() end, title = "EXPLORER_TB_VIEW", sub = "EXPLORER_TB_VIEW_TIP", label = true,
       menu = function(root) K.FillViewMenu(root) end },
-    { icon = "ex-select-all", title = "MW_SELECT_ALL_BTN", sub = "EXPLORER_TB_SELECT_ALL_TIP",
+    { icon = "ex-select-all", title = function() return K.SelectAllText() end, sub = "EXPLORER_TB_SELECT_ALL_TIP",
       enabled = function() return K.CanPick() end,
       fn = function() K.SelectAll() end },
 }
@@ -320,6 +359,7 @@ local function MakeButton(parent, spec)
         if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
     end)
     b:SetScript("OnClick", function(self) Run(self._spec, self) end)
+    b._cmDropDown = true   -- a menu opens under the button, not at the pointer
     PaintButton(b)
     SizeButton(b)
     return b

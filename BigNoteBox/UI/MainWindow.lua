@@ -855,6 +855,9 @@ function BNB.CreateMainWindow()
         { key="edited",   label=L["SORT_MODE_EDITED"]   },
         { key="alpha",    label=L["SORT_MODE_ALPHA"]    },
         { key="location", label=L["SORT_MODE_LOCATION"] },
+        { key="size",     label=L["SORT_MODE_SIZE"]     },   -- ALL-414 (explorer Details columns)
+        { key="type",     label=L["SORT_MODE_TYPE"]     },
+        { key="folder",   label=L["SORT_MODE_FOLDER"]   },
     }
     local DIR_MODES = {
         { key="desc", label=L["DIR_MODE_DESC"] },
