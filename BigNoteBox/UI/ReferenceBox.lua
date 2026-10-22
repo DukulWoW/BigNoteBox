@@ -1399,6 +1399,7 @@ local function AcquireRow(parent)
     lockTex:SetSize(12, 12)
     lockTex:SetPoint("CENTER", xBtn, "CENTER", 0, 0)
     lockTex:SetTexture(ASSETS .. BNB.AbIcon("lock"))
+    BNB.TintAbIcon(lockTex)
     lockTex:SetAlpha(0.65)
     lockTex:Hide()
     row._lockTex = lockTex

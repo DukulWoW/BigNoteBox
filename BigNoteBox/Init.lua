@@ -152,7 +152,7 @@ end
 -- load: a skin mode switch takes a reload.
 local FOREVER_AB = { copy = true, delete = true, lock = true, refbox = true,
                      send = true, tasks = true, unlock = true, duplicate = true,
-                     stickynote = true, situation = true }
+                     stickynote = true, situation = true, save = true }
 local abDetailed
 function BNB.AbDetailed()
     if abDetailed ~= nil then return abDetailed end
@@ -163,6 +163,11 @@ end
 function BNB.AbIcon(name)
     if FOREVER_AB[name] and BNB.AbDetailed() then return "Actionbar\\ab-forever-" .. name end
     return "Actionbar\\ab-" .. name
+end
+-- Skin mode's plain ab- art is drawn white (Dukul, 2026-10-22) and takes the
+-- skin accent like every other white icon; the detailed art keeps its own colours
+function BNB.TintAbIcon(tx)
+    if tx and not BNB.AbDetailed() and BNB.TintUIIcon then BNB.TintUIIcon(tx) end
 end
 
 -- A unit's name and realm, for note titles and player keys (FOR-23). Forever

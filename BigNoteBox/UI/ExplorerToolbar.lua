@@ -170,6 +170,15 @@ local SPECS = {
             K.NewNoteHere, { iconTex = ART .. "ex-new-note", iconGold = true })
         if BNB.FoldersEnabled() then
             root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder, { iconTex = ART .. "ex-new-folder", iconGold = true })
+            -- With notes picked: a new folder holding them (Dukul, 2026-10-22)
+            local n = #K.Picked()
+            if n > 0 then
+                root:CreateDivider()
+                root:CreateButton(string.format(L["EXPLORER_NEW_FOLDER_PICKS_FMT"], n), K.NewFolderWithPicks,
+                    { iconTex = ART .. "ex-new-folder", iconGold = true,
+                      tip = string.format(L["EXPLORER_NEW_FOLDER_PICKS_FMT"], n),
+                      tipSub = string.format(L["EXPLORER_NEW_FOLDER_PICKS_TIP"], n) })
+            end
         end
       end },
     { icon = "ex-quick-note", title = "NL_QUICK_NOTE_BTN", sub = "NL_QUICK_NOTE_TIP_SUB",

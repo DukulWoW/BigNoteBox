@@ -203,6 +203,8 @@ local RICH_BADGE_SIZE = 22
 local TITLE_H, TLDR_LINE_H = 36, 18  -- the title box; what the tl;dr line above it adds (ALL-372)
 -- Where the title sits in its box: under the tl;dr line while that shows
 local titleTop = 0
+-- How far the title and tl;dr move right for the note icon (explorer view only)
+local titleLeft = 0
 
 -- The title and the rich badge, under the tl;dr line when it shows
 local function PlaceTitle(rich)
@@ -211,9 +213,14 @@ local function PlaceTitle(rich)
     local bg = eb:GetParent()
     if rich == nil then rich = badge and badge:IsShown() end
     eb:ClearAllPoints()
-    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6, titleTop)
+    eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6 + titleLeft, titleTop)
     eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, titleTop)
-    if bg._focusBox then bg._focusBox:SetPoint("TOPLEFT", bg, "TOPLEFT", 0, titleTop) end
+    if bg._focusBox then bg._focusBox:SetPoint("TOPLEFT", bg, "TOPLEFT", titleLeft, titleTop) end
+    local line = BNB._editorTldr
+    if line then
+        line:SetPoint("TOPLEFT", bg, "TOPLEFT", 8 + titleLeft, -1)
+        if line._combo then line._combo:SetPoint("TOPLEFT", bg, "TOPLEFT", 4 + titleLeft, 0) end
+    end
     if badge then
         badge:ClearAllPoints()
         badge:SetPoint("RIGHT", bg, "TOPRIGHT", -6, titleTop - TITLE_H / 2)
@@ -340,6 +347,30 @@ local function BuildTitleField(parent)
     line:Hide()
     BNB._editorTldr = line
 
+    -- The note's icon left of the tl;dr and title, in the explorer view only
+    -- (Dukul, 2026-10-22: no list beside the open note shows it). Painted
+    -- with the list's own BNB.PaintNoteIcon (icon frame or border included)
+    -- by BNB._SyncEditorNoteIcon. A click opens Note Settings on its
+    -- Appearance tab (Dukul, 2026-10-22); not on system notes (read-only)
+    local iconHost = CreateFrame("Frame", nil, bg)
+    iconHost:SetFrameLevel(eb:GetFrameLevel() + 1)
+    iconHost:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
+        GameTooltip:AddLine(L["NE_NOTE_ICON_TIP"], 1, 1, 1)
+        GameTooltip:Show()
+    end)
+    iconHost:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    iconHost:SetScript("OnMouseUp", function(self, button)
+        if button ~= "LeftButton" or not self:IsMouseOver() then return end
+        local id = BNB._currentNoteID
+        if id and BNB.OpenNoteConfig then BNB.OpenNoteConfig(id, "appearance") end
+    end)
+    local noteIcon = iconHost:CreateTexture(nil, "ARTWORK")
+    noteIcon:SetAllPoints()
+    iconHost._icon = noteIcon
+    iconHost:Hide()
+    BNB._editorNoteIcon = iconHost
+
     -- The in-place edit box: the same combo as the Situations tab (snippets
     -- on the arrow). Enter or clicking away saves, Esc cancels; it closes
     -- once neither the box nor its snippet menu is in use
@@ -370,6 +401,7 @@ local function BuildTitleField(parent)
     combo:SetPoint("TOPLEFT",  bg, "TOPLEFT",  4, 0)
     combo:SetPoint("TOPRIGHT", bg, "TOPRIGHT", -6, 0)
     combo:SetFrameLevel(line:GetFrameLevel() + 1)
+    line._combo = combo   -- PlaceTitle moves its left edge clear of the note icon
     combo.eb:SetScript("OnEscapePressed", function(self) cancel = true; self:ClearFocus() end)
     -- {{date}} and the other snapshot tokens fill as typed (ALL-481); no undo here
     if BNB.Tokens then BNB.Tokens.WireExpand(combo.eb); BNB.Tokens.WireAutocomplete(combo.eb) end
@@ -999,6 +1031,7 @@ local function BuildToolbar(parent)
         local tx = btn:CreateTexture(nil, "ARTWORK")
         tx:SetAllPoints()
         tx:SetTexture(ASSETS .. texName)
+        BNB.TintAbIcon(tx)
         AddHoverBg(btn)
         btn:SetScript("OnEnter", function(self)
             HoverOn(self)
@@ -1022,7 +1055,7 @@ local function BuildToolbar(parent)
     end
 
     -- Save
-    saveBtn = MakeIconBtn(bar, "Actionbar\\ab-save", L["BTN_SAVE_NOTE"])
+    saveBtn = MakeIconBtn(bar, BNB.AbIcon("save"), L["BTN_SAVE_NOTE"])
     saveBtn:SetPoint("LEFT", bar, "LEFT", SlotX(0), 0)
     saveBtn:SetEnabled(false)
     saveBtn:SetAlpha(0.4)
@@ -1064,8 +1097,7 @@ local function BuildToolbar(parent)
 
     -- Situation: Note Settings on its Situation tab (ALL-538, Dukul 2026-10-21:
     -- the explorer view has no list to right-click); hidden while Situations
-    -- is off. ab-situation / ab-forever-situation are placeholder copies of
-    -- the menu symbol until Dukul draws them
+    -- is off
     do
         local function SitTip()
             local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
@@ -1187,6 +1219,7 @@ local function BuildToolbar(parent)
     local pinTx = pinBtn:CreateTexture(nil, "ARTWORK")
     pinTx:SetAllPoints()
     pinTx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("stickynote"))
+    BNB.TintAbIcon(pinTx)
     AddHoverBg(pinBtn)
     pinBtn:SetScript("OnClick", function()
         local id = BNB._currentNoteID; if not id then return end
@@ -1685,7 +1718,7 @@ function BNB._FitEditorTldr()
     if not (line and bg) then return end
     local fs = line._fs
     local iconW = line._icon:IsShown() and 16 or 0
-    local room = math.max(20, (bg:GetWidth() or 0) - 16 - iconW)
+    local room = math.max(20, (bg:GetWidth() or 0) - 16 - iconW - titleLeft)
     local w = math.min(fs:GetUnboundedStringWidth() + 2, room)
     fs:SetWidth(w)
     line:SetWidth(math.max(1, w + iconW))
@@ -1721,9 +1754,46 @@ function BNB.RefreshEditorTldr()
         if BNB._CancelTldrEdit then BNB._CancelTldrEdit() end
     end
     titleTop = on and -TLDR_LINE_H or 0
-    PlaceTitle()
     bg:SetHeight(on and TITLE_H + TLDR_LINE_H or TITLE_H)
+    -- The note icon is sized by the block's height, so it follows the tl;dr
+    -- line; it places the title (PlaceTitle) itself
+    BNB._SyncEditorNoteIcon()
 end
+
+-- The note icon left of the tl;dr and title (explorer view, a note open):
+-- a square the height of the title block less EDITOR_ICON_PAD above and
+-- below; the title, tl;dr line and edit frame move right by it. Run on every
+-- tl;dr refresh (note load, lock), from ApplySplit (view switches) and when
+-- the open note changes
+local EDITOR_ICON_PAD = 4
+function BNB._SyncEditorNoteIcon()
+    local host, bg = BNB._editorNoteIcon, BNB._editorTitleBg
+    if not (host and bg) then return end
+    local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    local on = note and BNB.Explorer and BNB.Explorer.Mode() == "note"
+    if on then
+        local size = math.max(16, bg:GetHeight() - EDITOR_ICON_PAD * 2)
+        host:ClearAllPoints()
+        host:SetPoint("TOPLEFT", bg, "TOPLEFT", EDITOR_ICON_PAD + 2, -EDITOR_ICON_PAD)
+        host:SetSize(size, size)
+        host:EnableMouse(not note.system)   -- system notes have no Note Settings
+        host:Show()
+        BNB.PaintNoteIcon(host, host._icon, note, size)
+        titleLeft = size + EDITOR_ICON_PAD + 6
+    else
+        host:Hide()
+        titleLeft = 0
+    end
+    PlaceTitle()
+    BNB._FitEditorTldr()
+end
+
+-- The open note's icon, frame or border changed: repaint it
+BNB.RegisterMessage("NoteEditorIcon", "NoteChanged", function(_, id)
+    if id == BNB._currentNoteID and BNB._editorNoteIcon and BNB._editorNoteIcon:IsShown() then
+        BNB._SyncEditorNoteIcon()
+    end
+end)
 
 BNB.RegisterMessage("NoteEditorTldr", "NoteChanged", function(_, id, fields)
     if id ~= BNB._currentNoteID or not fields then return end

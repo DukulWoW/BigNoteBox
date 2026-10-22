@@ -180,6 +180,19 @@ local function FoldersOn() return BNB.FoldersEnabled() and BNB.Folders or nil en
 
 local function Filtering() return BNB.IsListFiltering and BNB.IsListFiltering() or false end
 
+-- Favorites first (View menu, Dukul 2026-10-22, off by default): the
+-- favourite notes of a list moved to its top, each part keeping the sort.
+-- No section of their own; used at the top level and inside a folder
+local function FavFirst(list)
+    if not (BigNoteBoxDB and BigNoteBoxDB.explorerFavFirst == true) then return list end
+    local fav, rest = {}, {}
+    for _, n in ipairs(list) do
+        if n.favorited then fav[#fav + 1] = n else rest[#rest + 1] = n end
+    end
+    for _, n in ipairs(rest) do fav[#fav + 1] = n end
+    return fav
+end
+
 -- ── Header controls (toolbar strip) ─────────────────────────────────────────
 -- The first button is always the switch (list view: then sort, order,
 -- Select; the explorer grid: then the tool buttons). Inside a folder or a
@@ -393,6 +406,15 @@ function K.NewNoteHere()
 end
 
 function K.NewFolder() BNB.PromptFolderName({ mode = "new" }) end
+-- A new folder with the picked notes moved into it (the New menu, Dukul
+-- 2026-10-22); the ids are taken when the name popup opens
+function K.NewFolderWithPicks()
+    local ids = K.Picked()
+    if not ids[1] then return end
+    BNB.PromptFolderName({ mode = "new", after = function(id)
+        if id and BNB.Folders then BNB.Folders.Move(ids, id) end
+    end })
+end
 
 -- The five sorts, a line, then Descending / Ascending (greyed in Custom)
 -- Each sort's picture (Dukul's art, 2026-10-21): Assets/Explorer/ex-sort-<name>
@@ -437,6 +459,22 @@ function K.FillViewMenu(menu)
             end,
             { iconGold = true, iconTex = ART .. "ex-view-" .. k })
     end
+    -- No Pinned / Notes sections (Dukul, 2026-10-22), under its own divider
+    menu:CreateDivider()
+    menu:CreateCheckbox(L["EXPLORER_PINNED_FIRST"],
+        function() return BigNoteBoxDB.explorerPinnedFirst == true end,
+        function()
+            BigNoteBoxDB.explorerPinnedFirst = BigNoteBoxDB.explorerPinnedFirst ~= true
+            Refresh()
+        end,
+        { keepOpen = true, tip = L["EXPLORER_PINNED_FIRST"], tipSub = L["EXPLORER_PINNED_FIRST_TIP"] })
+    menu:CreateCheckbox(L["EXPLORER_FAV_FIRST"],
+        function() return BigNoteBoxDB.explorerFavFirst == true end,
+        function()
+            BigNoteBoxDB.explorerFavFirst = BigNoteBoxDB.explorerFavFirst ~= true
+            Refresh()
+        end,
+        { keepOpen = true, tip = L["EXPLORER_FAV_FIRST"], tipSub = L["EXPLORER_FAV_FIRST_TIP"] })
 end
 
 local function ShowEmptyMenu(owner)
@@ -1114,11 +1152,17 @@ end
 -- Status markers on the icon's corners, the list rows' pictures: favourite
 -- top right, alarm bottom right, situation top left, location left, lock
 -- bottom left
+-- MARK_OUT = how far the markers sit out past the icon's edge (Dukul,
+-- 2026-10-22: a little further out and smaller, MARK_SCALE of the icon)
+local MARK_OUT, MARK_SCALE = 5, 0.30
 local MARKERS = {
-    { "_mFav",  "favorite",  "TOPRIGHT",    2,  2 },
-    { "_mAlarm", "alarm",    "BOTTOMRIGHT", 2, -2 },
-    { "_mSitu", "situation", "TOPLEFT",    -2,  2 },
-    { "_mLoc",  "location",  "LEFT",       -2,  0 },
+    { "_mFav",  "favorite",  "TOPRIGHT",     MARK_OUT,  MARK_OUT },
+    { "_mAlarm", "alarm",    "BOTTOMRIGHT",  MARK_OUT, -MARK_OUT },
+    { "_mSitu", "situation", "TOPLEFT",     -MARK_OUT,  MARK_OUT },
+    { "_mLoc",  "location",  "LEFT",        -MARK_OUT,  0 },
+    -- Pinned, where the Pinned section does not already say so: top middle,
+    -- between the situation and favourite markers (Dukul, 2026-10-22)
+    { "_mPin",  "pin",       "TOP",          0,         MARK_OUT },
 }
 
 -- Hover and pick art. Normal look: the collapsed note list's square pictures
@@ -1177,7 +1221,8 @@ local function GetTile(i)
     end
     local lock = ov:CreateTexture(nil, "OVERLAY")
     lock:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("lock"))
-    lock:SetPoint("BOTTOMLEFT", ov, "BOTTOMLEFT", -2, -2)
+    BNB.TintAbIcon(lock)
+    lock:SetPoint("BOTTOMLEFT", ov, "BOTTOMLEFT", -MARK_OUT, -MARK_OUT)
     lock:Hide()
     t._mLock = lock
     t:SetScript("OnClick", TileClick)
@@ -1208,7 +1253,7 @@ end
 -- List view: icon left, title after it, the shown markers in a row at the
 -- right end (lock first from the right), the title stopping before them.
 -- Called after the tile was filled, so the markers' shown state is known.
-local LIST_MARKERS = { "_mLock", "_mFav", "_mAlarm", "_mSitu", "_mLoc" }
+local LIST_MARKERS = { "_mLock", "_mPin", "_mFav", "_mAlarm", "_mSitu", "_mLoc" }
 local function HideCells(t)
     if t._cells then for _, fs in pairs(t._cells) do fs:Hide() end end
 end
@@ -1270,7 +1315,7 @@ local function ShapeTile(t, size)
     for _, tex in ipairs({ t._sel, t._hover }) do
         if tex._square then tex:SetSize(size + SQ_GROW, size + SQ_GROW) end
     end
-    local ms = math.max(12, math.floor(size * 0.36))
+    local ms = math.max(12, math.floor(size * MARK_SCALE))
     for _, m in ipairs(MARKERS) do
         local mk = t[m[1]]
         mk:SetSize(ms, ms)
@@ -1279,7 +1324,7 @@ local function ShapeTile(t, size)
     end
     t._mLock:SetSize(math.floor(ms * 0.8), math.floor(ms * 0.8))
     t._mLock:ClearAllPoints()
-    t._mLock:SetPoint("BOTTOMLEFT", t._ov, "BOTTOMLEFT", -2, -2)
+    t._mLock:SetPoint("BOTTOMLEFT", t._ov, "BOTTOMLEFT", -MARK_OUT, -MARK_OUT)
 end
 
 -- -- Details view ----------------------------------------------------------------
@@ -1472,6 +1517,9 @@ local function FillNoteTile(t, note, size, section)
     t._mAlarm:SetShown(BNB.AlarmsEnabled() and note.alarm ~= nil)
     t._mSitu:SetShown(situ and true or false)
     t._mLoc:SetShown(situ and BNB.HasActiveWaypoint(note) and true or false)
+    -- Not on a tile under the Pinned header, which says it already
+    local pinFirst = BigNoteBoxDB and BigNoteBoxDB.explorerPinnedFirst == true
+    t._mPin:SetShown(note.pinned and (pinFirst or section ~= "pinned") and true or false)
     local NK = BNB._NoteListKit
     t._mLock:SetShown(NK and NK.NoteIsLocked and NK.NoteIsLocked(note) and true or false)
 end
@@ -1668,7 +1716,7 @@ Draw = function()
         local r, g, b = FD.Color(_folder)
         local rec = FD.Get(_folder)
         Header((rec.name or "") .. " (" .. #list .. ")", { hasNotes = #list > 0 }, r, g, b, { crumb = true })
-        for _, n in ipairs(list) do NoteTile(n, _folder) end
+        for _, n in ipairs(FavFirst(list)) do NoteTile(n, _folder) end
         EndRow()
         if #list == 0 then Empty(filtering and "NL_NO_MATCHES" or "EXPLORER_FOLDER_EMPTY") end
     elseif filtering then
@@ -1707,7 +1755,25 @@ Draw = function()
         end
 
         local db = BigNoteBoxDB
-        if #pinned > 0 then
+        -- Pinned notes first, no sections (View menu, Dukul 2026-10-22): no
+        -- headers, nothing closed; folders, then the pinned notes that are in
+        -- no folder (a pinned note in a folder stays in its folder), then the rest
+        local pinFirst = db.explorerPinnedFirst == true
+        if pinFirst then
+            for _, f in ipairs(folders) do
+                local r, g, b = FD.Color(f.id)
+                FolderTile(f.id, f.name, folderN[f.id] or 0, r, g, b)
+            end
+            for _, s in ipairs(sysFolders) do
+                FolderTile("sys:" .. s.p.key, L[s.p.name], s.n, s.p.r, s.p.g, s.p.b)
+            end
+            for _, n in ipairs(pinned) do
+                if not (FD and FD.Of(n)) then NoteTile(n, "pinned") end
+            end
+            for _, n in ipairs(FavFirst(regular)) do NoteTile(n, "notes") end
+            EndRow()
+        end
+        if not pinFirst and #pinned > 0 then
             local closed = db.explorerPinnedClosed == true
             Header(string.format(L["NL_HDR_PINNED_FMT"], #pinned), "pinned", nil, nil, nil,
                 { toggle = "explorerPinnedClosed", closed = closed })
@@ -1719,8 +1785,8 @@ Draw = function()
             end
             y = y + 4
         end
-        local notesClosed = false
-        if #pinned > 0 or #folders > 0 or #regular > 0 then
+        local notesClosed = pinFirst   -- drawn above already
+        if not pinFirst and (#pinned > 0 or #folders > 0 or #regular > 0) then
             notesClosed = db.explorerNotesClosed == true
             Header(string.format(L["NL_HDR_REGULAR_FMT"], #regular), "notes", nil, nil, nil,
                 { toggle = "explorerNotesClosed", closed = notesClosed })
@@ -1735,9 +1801,9 @@ Draw = function()
             for _, s in ipairs(sysFolders) do
                 FolderTile("sys:" .. s.p.key, L[s.p.name], s.n, s.p.r, s.p.g, s.p.b)
             end
-            for _, n in ipairs(regular) do NoteTile(n, "notes") end
+            for _, n in ipairs(FavFirst(regular)) do NoteTile(n, "notes") end
             EndRow()
-        else
+        elseif not pinFirst then
             _count.notes = _count.notes + #regular
             _count.folders = _count.folders + #folders + #sysFolders
         end

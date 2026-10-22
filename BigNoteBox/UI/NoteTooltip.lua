@@ -135,8 +135,20 @@ local function WaypointLines(out, note)
     More(out, #list - MAX_ITEMS)
 end
 
+-- "Pinned, Favorited, Locked": the states the markers show (Dukul, 2026-10-22)
+local function StateLine(out, note)
+    local NK = BNB._NoteListKit
+    local locked = NK and NK.NoteIsLocked and NK.NoteIsLocked(note) or note.locked
+    local s = {}
+    if note.pinned then s[#s + 1] = L["NT_STATE_PINNED"] end
+    if note.favorited then s[#s + 1] = L["NT_STATE_FAVORITED"] end
+    if locked then s[#s + 1] = L["NT_STATE_LOCKED"] end
+    if s[1] then out[#out + 1] = { table.concat(s, ", "), DIM } end
+end
+
 local function Collect(note, noteID)
     local out = {}
+    if not note.system then StateLine(out, note) end
     TldrLines(out, note)
     AlarmLines(out, note, noteID)
     SituationLines(out, note)

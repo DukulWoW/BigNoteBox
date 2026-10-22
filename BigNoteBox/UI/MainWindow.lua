@@ -114,6 +114,8 @@ local function ApplySplit(f)
     if BNB.Explorer then BNB.Explorer.SyncPane() end
     -- The rich Markup / Note tabs follow the editor's left edge (ALL-537)
     if BNB._reanchorRichTabs then BNB._reanchorRichTabs() end
+    -- The open note's icon beside its title shows in the explorer view only
+    if BNB._SyncEditorNoteIcon then BNB._SyncEditorNoteIcon() end
     if ex then
         -- 6 px in from the left: the editor's tag row and toolbar sit flush
         -- with their pane, and without the list the window border covered them

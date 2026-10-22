@@ -865,7 +865,7 @@ end
 -- ── Public API ────────────────────────────────────────────────────────────────
 -- tab, optional: "situation" opens on that tab, and only switches to it when
 -- the window is already open for this note (no toggle). Context menu, ALL-148.
-local TAB_KEYS = { situation = TAB_SIT }
+local TAB_KEYS = { situation = TAB_SIT, appearance = TAB_APP }
 
 function BNB.NoteConfigOpenFor(noteID)
     return ncFrame and ncFrame:IsShown() and _noteID == noteID or false

@@ -54,6 +54,8 @@
 --     opts.iconTex = a picture after the mark (the explorer's View menu;
 --     iconGold = true draws white art gold in the normal look, as on buttons),
 --     every row's text in that level moves over to make room
+--   root:CreateCheckbox(text, isSelected, onSelect, opts) -> item
+--     a radio with a check mark: an on / off setting (onSelect flips it)
 --   root:CreateDivider()
 --
 -- Closes on: a click on an item, a click outside every open level, ESC
@@ -133,6 +135,20 @@ function Desc:CreateRadio(text, isSelected, onSelect, opts)
     d.isSelected = isSelected
     self.items[#self.items + 1] = d
     return d
+end
+
+-- A radio with a check mark (the bottom half of RADIO) instead of the round
+-- one: an on / off setting (the explorer's Pinned notes first, 2026-10-22)
+function Desc:CreateCheckbox(text, isSelected, onSelect, opts)
+    local d = self:CreateRadio(text, isSelected, onSelect, opts)
+    d.check = true
+    return d
+end
+
+-- The radio / check mark, on or off
+local function SetMark(mark, it, on)
+    local t0 = it.check and 0.5 or 0
+    mark:SetTexCoord(on and 0 or 0.5, on and 0.5 or 1, t0, t0 + 0.5)
 end
 
 function Desc:CreateDivider()
@@ -326,8 +342,7 @@ local function RefreshMarks()
         for _, r in ipairs(_levels[k] and _levels[k]._rows or {}) do
             local it = r:IsShown() and r._desc
             if it and it.kind == "radio" then
-                local on = it.isSelected and it.isSelected() and true or false
-                r._mark:SetTexCoord(on and 0 or 0.5, on and 0.5 or 1, 0, 0.5)
+                SetMark(r._mark, it, it.isSelected and it.isSelected() and true or false)
             end
         end
     end
@@ -521,8 +536,7 @@ local function Fill(f, d)
             r._text:SetText(it.text or "")
             r._text:Show()
             if it.kind == "radio" then
-                local on = it.isSelected and it.isSelected() and true or false
-                r._mark:SetTexCoord(on and 0 or 0.5, on and 0.5 or 1, 0, 0.5)
+                SetMark(r._mark, it, it.isSelected and it.isSelected() and true or false)
                 if _skin then   -- tinted like the dividers
                     local _, _, _, br, bg_, bb = SkinColours()
                     r._mark:SetDesaturated(true); r._mark:SetVertexColor(br, bg_, bb)

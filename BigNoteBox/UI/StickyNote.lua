@@ -1851,6 +1851,7 @@ local function CreateStickyFrame(noteID)
     local titleLock = header:CreateTexture(nil, "ARTWORK")
     titleLock:SetSize(TITLE_LOCK_SZ, TITLE_LOCK_SZ)
     titleLock:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("lock"))
+    BNB.TintAbIcon(titleLock)
     titleLock:SetAlpha(TITLE_LOCK_ALPHA)
     titleLock:Hide()
     f._titleLock  = titleLock

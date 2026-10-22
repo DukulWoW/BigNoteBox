@@ -1603,6 +1603,7 @@ local function CreateListEntry(parent)
     lockIcon:SetSize(12, 12)
     lockIcon:SetPoint("TOPLEFT", btn, "TOPLEFT", textLeft, -8)
     lockIcon:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\" .. BNB.AbIcon("lock"))
+    BNB.TintAbIcon(lockIcon)
     lockIcon:SetAlpha(0.65)
     lockIcon:Hide()
     btn._lockIcon = lockIcon

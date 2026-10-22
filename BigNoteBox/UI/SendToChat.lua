@@ -587,6 +587,7 @@ local function CreateSendDialog()
     -- Send button (send.tga)
     local sendBtn = MakeBottomIcon(BNB.AbIcon("send"), L["STC_SEND_TIP"],
         L["STC_SEND_TIP_SUB"])
+    BNB.TintAbIcon(sendBtn._tx)
     sendBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", iconLeftX, ICON_BTN_Y)
     sendBtn:SetScript("OnClick", function()
         -- Say/yell: each click sends the next message; a paced send runs by itself

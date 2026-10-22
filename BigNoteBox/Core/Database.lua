@@ -84,6 +84,8 @@ BNB.DEFAULTS = {
     explorerLastTile = "medium", -- the last tile size, for the status bar's tiles button
     explorerPinnedClosed = false,   -- the grid's Pinned / Notes headers closed (ALL-414)
     explorerNotesClosed  = false,
+    explorerPinnedFirst  = false,   -- no Pinned / Notes sections: pinned notes first after the folders
+    explorerFavFirst     = false,   -- favourite notes grouped at the top of the notes (no section)
 
     -- Font / display (fontChoice depends on the client language: InitSettingsDB)
     fontSize   = 13,

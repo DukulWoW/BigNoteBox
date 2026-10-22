@@ -1385,6 +1385,7 @@ end
 -- changes reload).
 --------------------------------------------------------------------------------
 local OVERLAY_DIR = "Interface\\AddOns\\BigNoteBox\\Assets\\Overlay\\"
+local SOLO_NORMAL = { pin = true }   -- normal mode: one picture, no layers
 local MARKER_TINT = 2.2
 local _skinMarkers = setmetatable({}, { __mode = "k" })
 
@@ -1413,6 +1414,18 @@ function BNB.CreateIconMarker(host, symbol)
                 for k in pairs(_skinMarkers) do if type(k) == "table" then TintMarker(k) end end
             end)
         end
+        return t
+    end
+    -- A symbol with its own normal-mode picture, drawn alone with no layers:
+    -- Overlay/ov-<symbol>-normal (the pin, Dukul 2026-10-22)
+    if SOLO_NORMAL[symbol] then
+        local t = host:CreateTexture(nil, "OVERLAY", nil, 1)
+        t:SetTexture(OVERLAY_DIR .. "ov-" .. symbol .. "-normal")
+        function t:SetMuted(on)
+            local c = on and 0.5 or 1
+            self:SetDesaturated(on and true or false); self:SetVertexColor(c, c, c)
+        end
+        t:Hide()
         return t
     end
     local m = CreateFrame("Frame", nil, host)

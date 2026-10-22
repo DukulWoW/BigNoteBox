@@ -867,8 +867,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     BNB._wysiwygMapBtn = mapBtn
 
     -- Note settings for the open note (ALL-538, Dukul 2026-10-21: the explorer
-    -- view has no list to right-click). tb-notesettings is a placeholder copy
-    -- of the menu symbol until Dukul draws it
+    -- view has no list to right-click)
     local noteSetBtn = WyBtn("tb-notesettings", L["NE_NOTE_SETTINGS_TIP"])
     noteSetBtn:SetIconEnabled(true)
     noteSetBtn:SetScript("OnClick", function()
