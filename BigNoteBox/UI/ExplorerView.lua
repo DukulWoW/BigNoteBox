@@ -760,6 +760,9 @@ local function EnsurePane()
     pane:Hide()
     if _main._stylePane then _main._stylePane(pane) end   -- the list pane's look (Forever glow)
     _pane = pane
+    -- A size change while hidden (a note open, the window closed) skipped its
+    -- redraw: draw again the frame after it shows, with the size it has then
+    pane:HookScript("OnShow", Queue)
 
     local sf = BNB.CreateScrollFrame(nil, pane)
     sf:SetPoint("TOPLEFT", pane, "TOPLEFT", PAD, -PAD)
@@ -1868,7 +1871,19 @@ Draw = function()
     if _sysPick and not sysSeen[_sysPick] then _sysPick = nil end
     PaintPicks()
 
-    _child:SetHeight(math.max(y, _sf:GetHeight() or 1))
+    local sfH = _sf:GetHeight() or 1
+    _child:SetHeight(math.max(y, sfH))
+    -- The bar follows what was drawn, not only OnScrollRangeChanged: going back
+    -- from a long folder (or a resize while a note was open) could leave the old
+    -- range, and the bar, up over a grid that fits (Dukul, 2026-10-22)
+    _sf:UpdateScrollChildRect()
+    local bar = _sf.ScrollBar
+    if y <= sfH + 1 then
+        _sf:SetVerticalScroll(0)
+        if bar then bar:SetAlpha(0) end
+    elseif bar then
+        bar:SetAlpha(1)
+    end
 end
 
 function K.Refresh() Refresh() end

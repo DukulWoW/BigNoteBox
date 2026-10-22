@@ -215,7 +215,6 @@ local function OpenSubPage(page)
     page.sf:SetVerticalScroll(0)
     page.sf:Show()
     activeSub = page
-    BNB.MarkSeen(page.key)   -- its NEW badge goes (UI/NewMarker.lua)
     -- Both chromes disable the selected tab button; enable it so a click on
     -- the highlighted tab comes back. The next tab select disables it again.
     local ctrl = cfgFrame and cfgFrame._skinTabCtrl

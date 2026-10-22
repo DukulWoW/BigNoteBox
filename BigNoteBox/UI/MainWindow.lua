@@ -474,6 +474,7 @@ end
 --------------------------------------------------------------------------------
 -- Lives in the dev addon (never packaged), so the shipped zip does not carry it
 local DEV_BG = "Interface\\AddOns\\BigNoteBox_Dev\\Assets\\ui-bg-devmode"
+local DOC_BG = "Interface\\AddOns\\BigNoteBox_Dev\\Assets\\ui-bg-docmode"   -- doc mode's own (Dukul, 2026-10-22)
 
 -- Main window title, both chromes: "BigNoteBox (Development Mode Enabled)" in dev mode
 function BNB.MainWindowTitle()
@@ -499,7 +500,7 @@ local function AddDevModeOverlay(f)
         ov:SetPoint("TOPLEFT", 3, -3)
         ov:SetPoint("BOTTOMRIGHT", -3, 3)
     end
-    ov:SetTexture(DEV_BG, "REPEAT", "REPEAT")
+    ov:SetTexture((BNB.IsDocMode and BNB.IsDocMode()) and DOC_BG or DEV_BG, "REPEAT", "REPEAT")
     ov:SetHorizTile(true)
     ov:SetVertTile(true)
     f._devOverlay = ov

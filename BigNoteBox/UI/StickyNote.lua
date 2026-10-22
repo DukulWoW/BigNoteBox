@@ -2169,6 +2169,14 @@ local function CreateStickyFrame(noteID)
         local over = f._inlineEditing or f:IsMouseOver() or (f._focusHovered and f._focusHovered > 0)
         local cfg  = f._cfg
         local focusMode = cfg and cfg.focusMode
+        -- After the Show all animation (ALL-501): apply the hover state again
+        -- even though it did not change, or the header buttons stayed up until
+        -- the pointer went in and out (Dukul 2026-10-22)
+        if f._hoverDirty then
+            f._hoverDirty = nil
+            _btnsShown = not over
+            f._bgHover = not over
+        end
 
         -- ── Background / text hover fade (acts on a change only) ─────────────
         if over ~= f._bgHover then
@@ -2904,35 +2912,165 @@ function SN.Close(noteID, keep)
     end)
 end
 
+-- Sticky exposé (ALL-501, Dukul 2026-10-22): Hide all / Show all by key, eye
+-- or minimap animate each sticky from its own centre. Hide: the text (front
+-- face) fades out quickly, then the whole sticky grows from its centre as it
+-- fades out; show shrinks it back in as it fades in (Dukul 2026-10-22). (Growing out from the screen centre was
+-- tried first: only the text moved and every sticky went the same way, so
+-- Dukul picked this.) A Scale animation changes the drawing, not the size: no
+-- OnSizeChanged, so no rich-body reflow (FOR-30). On / off and the three
+-- values: Settings > Modules > Accessibility (stickyAnim*, Dukul's tuned
+-- 0.1 s / 1.3 / 0.05 s as the defaults).
+local function AnimOpt(key)
+    local v = BigNoteBoxDB and tonumber(BigNoteBoxDB[key])
+    return v or BNB.DEFAULTS[key]
+end
+
+-- One Scale + Alpha group per frame, from the frame's own centre
+local function FrameGroup(f)
+    local ag = f._explodeAG
+    if not ag then
+        ag = f:CreateAnimationGroup()
+        ag._scale = ag:CreateAnimation("Scale")
+        ag._scale:SetOrigin("CENTER", 0, 0)
+        ag._alpha = ag:CreateAnimation("Alpha")
+        ag:SetScript("OnFinished", function(self)
+            local d = self._done
+            self._done = nil
+            if d then d() end
+        end)
+        f._explodeAG = ag
+    end
+    return ag
+end
+
+-- The text's quick fade: an Alpha group on the front face (a tile has none)
+local function TextGroup(f)
+    local face = f._frontFace
+    if not face then return nil end
+    local ag = face._explodeAG
+    if not ag then
+        ag = face:CreateAnimationGroup()
+        ag:SetToFinalAlpha(true)   -- holds faded out while the frame's part runs
+        ag._alpha = ag:CreateAnimation("Alpha")
+        -- In: the text is drawn again for good once it has faded in
+        ag:SetScript("OnFinished", function(self)
+            if self._in then self._in = nil; face:SetAlpha(1); face:GetParent()._hoverDirty = true end
+        end)
+        face._explodeAG = ag
+    end
+    return ag
+end
+
+local function StopExplode(fr)
+    local ag = fr._explodeAG
+    if ag then ag._done = nil; ag:Stop() end
+    local face = fr._frontFace
+    if face then
+        if face._explodeAG then face._explodeAG._in = nil; face._explodeAG:Stop() end
+        face:SetAlpha(1)
+    end
+end
+
+-- out = hide. The frame part waits for the text part on the way out and
+-- comes first on the way in.
+local function Explode(f, out, done)
+    StopExplode(f)   -- a press during the last one: start over from here
+    local ag, tg = FrameGroup(f), TextGroup(f)
+    local t, s = AnimOpt("stickyAnimTime"), AnimOpt("stickyAnimScale")
+    local tt = tg and AnimOpt("stickyAnimText") or 0
+    local sc, al = ag._scale, ag._alpha
+    sc:SetDuration(t); al:SetDuration(t)
+    if out then
+        sc:SetStartDelay(tt); al:SetStartDelay(tt)
+        sc:SetScaleFrom(1, 1); sc:SetScaleTo(s, s); sc:SetSmoothing("IN")
+        al:SetFromAlpha(1); al:SetToAlpha(0); al:SetSmoothing("IN")
+    else
+        sc:SetStartDelay(0); al:SetStartDelay(0)
+        sc:SetScaleFrom(s, s); sc:SetScaleTo(1, 1); sc:SetSmoothing("OUT")
+        al:SetFromAlpha(0); al:SetToAlpha(1); al:SetSmoothing("OUT")
+    end
+    if tg then
+        local ta = tg._alpha
+        ta:SetDuration(tt)
+        if out then
+            ta:SetStartDelay(0); ta:SetFromAlpha(1); ta:SetToAlpha(0)
+        else
+            -- Hidden while the frame comes in, then fades in
+            f._frontFace:SetAlpha(0)
+            ta:SetStartDelay(t); ta:SetFromAlpha(0); ta:SetToAlpha(1)
+            tg._in = true
+        end
+    end
+    if out then
+        ag._done = function()
+            -- Off the hold: the face's own alpha (1) is back for the next show
+            if tg then tg:Stop() end
+            if f._frontFace then f._frontFace:SetAlpha(1) end
+            if done then done() end
+        end
+    else
+        ag._done = done
+    end
+    ag:Play()
+    if tg then tg:Play() end
+end
+
+local function ExplodeOut(fr)
+    if not fr:IsShown() then return end
+    Explode(fr, true, function() fr:Hide() end)
+end
+
+local function ExplodeIn(fr)
+    if fr:IsShown() and not (fr._explodeAG and fr._explodeAG:IsPlaying()) then return end
+    fr:Show()
+    fr._hoverDirty = true
+    Explode(fr, false, function() fr._hoverDirty = true end)
+end
+
 -- Hide all open sticky frames and tiles without closing them.
 -- Positions and content are preserved; stickies reappear on ShowAll().
 -- Sets BigNoteBoxDB.stickiesHidden = true (transient; cleared on login unless
 -- stickiesHiddenPersist is enabled in Config > Features > Sticky Notes).
-function SN.HideAll()
+-- animate (ALL-501): the explode; combat and the Feature list hide at once.
+function SN.HideAll(animate)
     local db = BigNoteBoxDB
+    animate = animate and not (db and db.stickyAnim == false)
     if db then db.stickiesHidden = true end
     for _, f in pairs(openFrames) do
         -- Skip ESC-only stickies — they have their own show/hide lifecycle.
         if not (f._cfg and f._cfg.escOnly) then
-            f:Hide()
-            if f._miniTile then f._miniTile:Hide() end
+            if animate then
+                ExplodeOut(f)
+                if f._miniTile then ExplodeOut(f._miniTile) end
+            else
+                StopExplode(f)
+                f:Hide()
+                if f._miniTile then StopExplode(f._miniTile); f._miniTile:Hide() end
+            end
         end
     end
     if BNB.RefreshStickyEyeBtn then BNB.RefreshStickyEyeBtn() end
 end
 
 -- Restore all open sticky frames and tiles that were hidden by HideAll().
-function SN.ShowAll()
+function SN.ShowAll(animate)
     local db = BigNoteBoxDB
+    animate = animate and not (db and db.stickyAnim == false)
     if db then db.stickiesHidden = false end
     for _, f in pairs(openFrames) do
         -- Skip ESC-only stickies — they show only when the ESC menu is open.
         if not (f._cfg and f._cfg.escOnly) then
-            if f._minimized then
-                -- Minimized stickies show only as tile
-                if f._miniTile then f._miniTile:Show() end
-            else
-                f:Show()
+            -- Minimized stickies show only as tile
+            local fr = f._minimized and f._miniTile or (not f._minimized and f)
+            if fr then
+                if animate then
+                    ExplodeIn(fr)
+                else
+                    StopExplode(fr)
+                    fr:Show()
+                    fr._hoverDirty = true
+                end
             end
         end
     end
@@ -2994,9 +3132,9 @@ function SN.ToggleHidden()
     -- Nothing to hide: the key does nothing, as the greyed eye (ALL-237)
     if not (db and db.stickiesHidden) and SN.WorldCount() == 0 then return end
     if db and db.stickiesHidden then
-        SN.ShowAll()
+        SN.ShowAll(true)
     else
-        SN.HideAll()
+        SN.HideAll(true)
         SN.PrintHiddenNotice(false)
     end
 end

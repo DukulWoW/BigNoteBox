@@ -48,7 +48,7 @@ local SHARED = {
     setupPage = true, setupUsage = true,
     sysFolders = true,   -- system folders open / hidden releases (ALL-511)
     explorerIntroSeen = true,   -- the Explorer welcome, once per account (ALL-543)
-    newSeen = true,   -- NEW badges already opened (ALL-166, UI/NewMarker.lua)
+    newSeen = true,   -- NEW badges once opened (ALL-166): no longer read since 2026-10-22, kept so an old saved list is never copied into a profile
     devBgLab = true, devIconLab = true, devSearch = true,
 }
 

@@ -1298,6 +1298,18 @@ local function BuildStickyPage(sf, ct, y, page)
     -- ── Keybind capture button — Show/Hide all sticky notes ───────────────────
     y = MakeKeybindRow(ct, y, L["CFG_STICKY_KEYBIND_LABEL"],
         "BIGNOTEBOXHIDESTICKIES", L["CFG_KB_HINT_CTRL_H"], L["CFG_KB_DESC_HIDE_STICKIES"])
+    -- Its animation lives on Modules > Accessibility (ALL-501 / ALL-548)
+    local animBtn = BNB.CreateButton(nil, ct, L["CFG_STICKY_ANIM_BTN"], 150, 22)
+    animBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    animBtn:SetScript("OnClick", function() BNB.OpenSettingsPage("modules", "accessibility") end)
+    animBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:AddLine(L["CFG_STICKY_ANIM_BTN"], 1, 1, 1)
+        GameTooltip:AddLine(L["CFG_STICKY_ANIM_BTN_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    animBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    y = y - (22 + 6)
 
     -- ── Hover buttons (ALL-266) ───────────────────────────────────────────────
     -- stickyHideBtn[key] = true hides that header button (UI/StickyNote.lua
@@ -1810,6 +1822,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
         { L["CFG_HDR_UNDO_REDO"],      NeedsHistory(L["CFG_SUB_UNDO_DESC"]), K.BuildUndoPage, "undo" },        -- UI/Config/NotePages.lua (ALL-460)
+        { L["CFG_HDR_ACCESSIBILITY"],  L["CFG_SUB_ACCESSIBILITY_DESC"], K.BuildAccessibilityPage, "accessibility" },   -- UI/Config/Accessibility.lua (ALL-548)
     }
     -- Alphabetical by the shown title, in the active language (Dukul 2026-10-06,
     -- ALL-331); colour codes left out of the compare

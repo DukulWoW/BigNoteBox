@@ -96,6 +96,7 @@ UI\Config\ContextMenuSettings.lua
 UI\Config\Tldr.lua
 UI\Config\Templates.lua
 UI\Config\Tokens.lua
+UI\Config\Accessibility.lua
 UI\MainConfigSkin.lua
 UI\TrashWindow.lua
 UI\DangerZone.lua

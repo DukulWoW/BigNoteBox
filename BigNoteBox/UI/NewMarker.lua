@@ -2,12 +2,11 @@
 --
 -- A feature in NEW below shows the game's NEW badge (the character-create
 -- notification, its Alliance half: the streak trails right, so it sits after
--- a name) until the player has opened it, or a release past the one it came
--- in ships (Dukul, 2026-10-22). Seen keys: BigNoteBoxDB.newSeen, account-wide
--- (Profiles SHARED).
+-- a name) for the whole release it came in: it goes with the next minor
+-- release (X.Y), opened or not (Dukul, 2026-10-22: "they should stay till the
+-- next Y version, they should not go away when you go into or use it").
 --
 --   BNB.IsNew(key)                 still marked
---   BNB.MarkSeen(key)              opened: every badge for key hides
 --   BNB.AddNewMarker(key, fs)      a badge after fontstring fs's text; nil
 --                                  when key is not new
 
@@ -16,8 +15,9 @@ local BNB = BigNoteBox
 -- key -> the release it came in ("major.minor"); the badge shows while the
 -- addon is that release or older (a dev build of it)
 local NEW = {
-    explorer = "1.31",   -- Settings > Modules > Explorer view (ALL-414)
-    folders  = "1.31",   -- Settings > Modules > Folders (ALL-510)
+    explorer = "2.0",    -- Settings > Modules > Explorer view (ALL-414)
+    folders  = "2.0",    -- Settings > Modules > Folders (ALL-510)
+    accessibility = "2.0",    -- Settings > Modules > Accessibility (ALL-548)
 }
 
 local TEX    = 929716   -- interface/glues/charactercreate/newcharacternotification
@@ -29,7 +29,6 @@ local GAP    = 4
 -- time from BNB.HEADER_COLOR_NORMAL (UI/TextColors.lua)
 local TINT_FALLBACK = { 0.55, 0.82, 0.55 }
 
-local _badges = {}   -- key -> { texture, ... }
 
 local function MajorMinor(v)
     local a, b = tostring(v or ""):match("^(%d+)%.(%d+)")
@@ -47,21 +46,9 @@ end
 function BNB.IsNew(key)
     local tag = key and NEW[key]
     if not tag then return false end
-    local db = BigNoteBoxDB
-    if db and db.newSeen and db.newSeen[key] then return false end
     local am, an = MajorMinor(BNB.ADDON_VERSION)
     local tm, tn = MajorMinor(tag)
     return am < tm or (am == tm and an <= tn)
-end
-
-function BNB.MarkSeen(key)
-    if not (key and NEW[key]) then return end
-    local db = BigNoteBoxDB
-    if not db then return end
-    db.newSeen = db.newSeen or {}
-    if db.newSeen[key] then return end
-    db.newSeen[key] = true
-    for _, t in ipairs(_badges[key] or {}) do t:Hide() end
 end
 
 function BNB.AddNewMarker(key, fs)
@@ -81,7 +68,5 @@ function BNB.AddNewMarker(key, fs)
     Place()
     local p = fs:GetParent()
     if p and p.HookScript then p:HookScript("OnShow", Place) end   -- a cold font measures 0 at build
-    _badges[key] = _badges[key] or {}
-    table.insert(_badges[key], t)
     return t
 end

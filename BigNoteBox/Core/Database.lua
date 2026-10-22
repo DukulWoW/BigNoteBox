@@ -51,6 +51,10 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 local NOTES_SCHEMA_VERSION    = 15  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
+-- Doc mode (ALL-512): the newest seed round in BigNoteBox_Dev/DocsSeed.lua (an
+-- entry's rev, 1 when it has none). Bump it with each round of new or
+-- rewritten topics; BNB.TopUpDocs brings a doc set made earlier up to it.
+local DOC_SEED_REV = 2
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -259,6 +263,13 @@ BNB.DEFAULTS = {
     stickyMaxCount        = 20,
     -- true: Ctrl+H "hide all stickies" persists across reloads and relogins
     stickiesHiddenPersist = false,
+    -- Hide all / Show all animation (ALL-501, Settings > Modules > Accessibility):
+    -- seconds of the frame's grow + fade, how big it grows, seconds of the
+    -- text's fade first (Dukul's tuned values, 2026-10-22)
+    stickyAnim            = true,
+    stickyAnimTime        = 0.1,
+    stickyAnimScale       = 1.3,
+    stickyAnimText        = 0.05,
 
     -- Undo/redo history depth per note (runtime only, never in the notes DB).
     -- Range 10-200; above 50 shows a memory warning in Settings.
@@ -497,6 +508,11 @@ local function InitDevMode()
         if dev.docsDB == nil then
             dev.docsDB = { notes = {}, noteOrder = {}, dbVersion = NOTES_SCHEMA_VERSION }
             BNB._docSeedCount = BNB.SeedDocsFromFeatureList and BNB.SeedDocsFromFeatureList(dev.docsDB) or 0
+            dev.docsSeedRev = DOC_SEED_REV
+        elseif (tonumber(dev.docsSeedRev) or 1) < DOC_SEED_REV then
+            -- Later seed rounds (rev = N in DocsSeed.lua): only once per round
+            BNB._docTopUp = { BNB.TopUpDocs(dev.docsDB, tonumber(dev.docsSeedRev) or 1) }
+            dev.docsSeedRev = DOC_SEED_REV
         end
     end
 end
@@ -539,6 +555,49 @@ function BNB.SeedDocsFromFeatureList(set)
         n = n + 1
     end
     return n
+end
+
+-- A later seed round: the entries whose rev is above the round the doc set
+-- already has. A topic of that title never edited since it was seeded
+-- (updated == created) gets the new text; an edited one is left as it is;
+-- a missing one is added after the topic before it. Returns added,
+-- rewritten, left alone.
+function BNB.TopUpDocs(set, fromRev)
+    local added, rewritten, kept = 0, 0, 0
+    local byTitle = {}
+    for _, note in pairs(set.notes or {}) do
+        if type(note) == "table" and note.title then byTitle[note.title] = note end
+    end
+    local now, prevId = time(), nil
+    for i, t in ipairs(DocSeedList()) do
+        local title = tostring(t.title or ("Topic " .. i))
+        local note = byTitle[title]
+        if (tonumber(t.rev) or 1) > fromRev then
+            local body = tostring(t.body or ""):gsub("^\n", ""):gsub("\n$", "")
+            if note and note.updated == note.created then
+                note.body, note.richMode = body, t.rich ~= false
+                rewritten = rewritten + 1
+            elseif note then
+                kept = kept + 1
+            else
+                local id
+                repeat
+                    id = string.format("bnb-%08x%04x%04x", now, math.random(0, 0xFFFF), math.random(0, 0xFFFF))
+                until not set.notes[id]
+                note = { id = id, title = title, body = body, richMode = t.rich ~= false,
+                    tags = {}, scope = "global", pinned = false, created = now - i, updated = now - i }
+                set.notes[id] = note
+                local at = #set.noteOrder + 1
+                for k, oid in ipairs(set.noteOrder) do
+                    if oid == prevId then at = k + 1; break end
+                end
+                table.insert(set.noteOrder, at, id)
+                added = added + 1
+            end
+        end
+        if note then prevId = note.id end
+    end
+    return added, rewritten, kept
 end
 
 --------------------------------------------------------------------------------

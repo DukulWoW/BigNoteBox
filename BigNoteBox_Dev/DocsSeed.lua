@@ -13,20 +13,24 @@
 
 BigNoteBoxDevDocsSeed = {
 
-{ title = "Getting started", body = [[
+{ title = "Getting started", rev = 2, body = [[
 {p}BigNoteBox is a notepad inside the game. Your notes are kept for your whole account, and each one belongs to every character (Global) or to one character.{/p}
 {h3}Open it{/h3}
 - Type /bnb, press Ctrl+N, or click the minimap button.
 - F8 makes a new note, F7 a quick note: {link*bnbui:help.quick-notes*Quick notes}.
 - Ctrl+Space opens {link*bnbui:help.oracle-search*Oracle search} from anywhere.
+{h3}Find your notes{/h3}
+{p}The main window shows your notes in one of two ways, and the icon at the top left switches between them:{/p}
+- The {link*bnbui:help.explorer-view*Explorer view}: your notes and folders as a grid of icons over the whole window, like the file explorer on your computer.
+- The {link*bnbui:help.note-list*Note list}: a list on the left, the open note on the right.
 {h3}Write{/h3}
-{p}Pick a note on the left, write on the right: {link*bnbui:help.writing-notes*Writing notes}.{/p}
+{p}Open a note and write: {link*bnbui:help.writing-notes*Writing notes}. A new note can start from a {link*bnbui:help.note-templates*template}.{/p}
 {h3}Choose what you use{/h3}
 {p}Most parts of BigNoteBox are modules you can switch on or off: {link*bnbui:help.modules*Modules}. The {link*bnbui:wizard*setup wizard} sets them up for you.{/p}
 ]] },
 
-{ title = "Note list", body = [[
-{p}The list on the left of the main window, from top to bottom:{/p}
+{ title = "Note list", rev = 2, body = [[
+{p}The list on the left of the main window, beside the open note. The icon left of the sort dropdown switches to the {link*bnbui:help.explorer-view*Explorer view}. From top to bottom:{/p}
 - Pinned: the notes you pinned (right-click > Pin to top).
 - Your folders: {link*bnbui:help.folders*Folders}.
 - Notes: everything else, in the sort you picked.
@@ -42,14 +46,39 @@ BigNoteBoxDevDocsSeed = {
 {p}Character tabs beside the list show one character's notes at a time: {link*bnbui:settings.modules.sidebar*}.{/p}
 ]] },
 
-{ title = "Folders", body = [[
+{ title = "Explorer view", rev = 2, body = [[
+{p}The Explorer view shows your notes and folders as a grid of icons over the whole main window, the way the file explorer on your computer shows files. The icon at the top left switches between it and the {link*bnbui:help.note-list*Note list}.{/p}
+{h3}Open and go back{/h3}
+- Double-click a note or a folder to open it.
+- The arrow at the top left, or Esc, takes you back. Next to it is where you are: click Notes there to go back to the top.
+- Pinned and Notes are headers you can fold away.
+{h3}Pick notes{/h3}
+- Click a note to pick it. Ctrl+click picks more, Shift+click picks a row of them, or drag a box around several.
+- The bar at the bottom counts your notes and folders, and what you picked.
+{h3}The buttons along the top{/h3}
+- New: a note in the open folder, or a new folder.
+- Copy, Move, Delete, Rename, Pin, Favorite, Share and Export work on the notes you picked.
+- Sort and Order: how the notes are sorted. View: small, medium or large icons, a list of titles, details in columns, or every note in one flat list.
+- The search button opens a search field; the buttons at its end show only favourites or notes with tasks.
+- In a small window, the buttons that do not fit go under More.
+{h3}Drag and right-click{/h3}
+- Drag notes onto a folder to file them. Drop them on Notes in the path to take them out again.
+- In Custom sort, drag the icons into the order you like.
+- Right-click a note, a folder or empty space for everything else. Empty space has Sort by, New folder and the View choices, among them Pinned notes first and Favorites first.
+{h3}Inside a note{/h3}
+{p}The note fills the window. The button at the right end of the toolbar opens the note menu, with Note settings and situations; right-clicking the text has Open note settings at the bottom. The icon beside the title changes the note's icon.{/p}
+{p}Settings: {link*bnbui:settings.modules.explorer*}. There you pick which view the window opens on, and whether it opens on the note you had open when you closed it.{/p}
+]] },
+
+{ title = "Folders", rev = 2, body = [[
 {p}Folders keep notes together. They sit between Pinned and your notes, A-Z, and remember whether you left them open.{/p}
 {h3}Put notes in a folder{/h3}
 - Right-click a note > Move to folder, then a folder or New folder...
 - Drag a note onto a folder header. Drop it on the Notes header to take it out again.
 - Actions > Copy / Move to... can copy or move notes into a folder too.
+- In the {link*bnbui:help.explorer-view*Explorer view}, drag notes onto a folder icon, or pick some and right-click empty space > New folder with selection.
 {h3}The folder itself{/h3}
-{p}Right-click a folder header to add a note to it, rename it, give it a colour or delete it. Deleting a folder never deletes its notes: they go back under Notes. A pinned note shows under Pinned and in its folder.{/p}
+{p}Right-click a folder to add a note to it, rename it, give it a colour or delete it. Deleting a folder never deletes its notes: they go back under Notes. A pinned note shows under Pinned and in its folder.{/p}
 {p}Settings: {link*bnbui:settings.modules.folders*}.{/p}
 ]] },
 
@@ -61,14 +90,24 @@ BigNoteBoxDevDocsSeed = {
 - The {link*bnbui:tagmanager*} renames, colours and deletes tags across all your notes.
 ]] },
 
-{ title = "Writing notes", body = [[
-{p}The editor is the right side of the main window: the title on top, the text below.{/p}
+{ title = "Writing notes", rev = 2, body = [[
+{p}The editor shows the open note: the title on top, the text below. In the Note list it is the right side of the window; in the Explorer view the note fills the window.{/p}
 - Notes save as you type. A setting can switch this to a Save button.
 - Undo and Redo work per note: {link*bnbui:help.history-and-undo*History and undo}.
 - A locked note cannot be changed: right-click > Lock note / Unlock note.
-- The toolbar above the text inserts waypoints, links, time stamps and more.
-- Right-click > Open note settings: the note's look, icon and situation.
+- The toolbar above the text inserts waypoints, links, time stamps and {link*bnbui:help.note-tokens*note tokens}.
+- The button at the right end of the toolbar opens the note menu: Note settings, situations, alarms, tasks and more.
+- Right-click the text to insert game info; Open note settings is at the bottom.
+- Note settings has the note's look, icon and situation.
 {p}For headings, colours and pictures, make it a {link*bnbui:help.rich-notes*rich note}.{/p}
+]] },
+
+{ title = "Note templates", rev = 2, body = [[
+{p}A template fills a new note for you: a title, text, tags and a look to start from.{/p}
+- The New Note window has Blank, Boss, Weekly and Journal at the top. More shows every template.
+- To make your own, right-click a note > Actions > Save as template.
+- A template can be shared as a code, like a note.
+{p}Rename, change or delete your templates, or copy a built-in one, in {link*bnbui:settings.notes.templates*}.{/p}
 ]] },
 
 { title = "Rich notes", rich = false, body = [[
@@ -87,6 +126,21 @@ The tags:
 - {br}: a new line inside a paragraph.
 
 With the Rich Notes module off, every note shows as plain text with its tags visible, like this one (Settings > Modules > Rich Notes).
+]] },
+
+{ title = "Note tokens", rev = 2, rich = false, body = [[
+A note token is a word in double braces that BigNoteBox fills in for you. Type {{ in a note to see the list, or use the token button on the toolbar.
+
+Here and now, filled in once when you finish typing it:
+- {{date}}, {{time}}, {{datetime}}: today's date and the time.
+- {{zone}}, {{subzone}}, {{instance}}: where you are.
+- {{target}}: your target's name. {{coords}}: where you stand, as a waypoint link.
+
+Your character: {{me}}, {{name}}, {{realm}}, {{class}}, {{race}}, {{level}}, {{spec}}, {{ilvl}}, {{guild}}, {{gold}} and more. In a rich note these stay in the note and show the character of whoever reads it; in a normal note they become the value right away.
+
+Game data by id: {{item:6948}} and the like show the link. The id is the number in the thing's Wowhead address.
+
+Make tokens of your own in Settings > Notes > Tokens.
 ]] },
 
 { title = "Links in notes", body = [[

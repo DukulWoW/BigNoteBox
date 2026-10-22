@@ -158,8 +158,9 @@ local SETTINGS = {
         { "quickNote", "CFG_HDR_QUICK_NOTE" }, { "unitNotes", "CFG_SUB_PLAYER_NPC" },
         { "situations", "CFG_HDR_CONTEXT_POPUP" }, { "toasts", "CFG_HDR_TOASTS" },
         { "tldr", "CFG_HDR_TLDR" }, { "folders", "CFG_FOLDERS_HEADER" },
+        { "explorer", "CFG_EXPLORER_HEADER" },
         { "contextMenu", "CFG_HDR_CONTEXT_MENU" }, { "placement", "CFG_HDR_PLACEMENT" },
-        { "undo", "CFG_HDR_UNDO_REDO" } } },
+        { "undo", "CFG_HDR_UNDO_REDO" }, { "accessibility", "CFG_HDR_ACCESSIBILITY" } } },
     { "backup",     "CFG_TAB_BACKUP" },
     { "advanced",   "CFG_TAB_ADVANCED", { { "integrations", "CFG_HDR_INTEGRATIONS" } } },
 }

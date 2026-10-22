@@ -253,6 +253,8 @@ function BNB.Initialize()
         for _ in pairs(BNB.NotesDB().notes or {}) do n = n + 1 end
         BNB:Print(string.format(L["CFG_DEV_DOC_LOGIN_FMT"], n))
         if BNB._docSeedCount then BNB:Print(string.format(L["CFG_DEV_DOC_SEEDED_FMT"], BNB._docSeedCount)) end
+        local up = BNB._docTopUp
+        if up then BNB:Print(string.format(L["CFG_DEV_DOC_TOPUP_FMT"], up[1] or 0, up[2] or 0, up[3] or 0)) end
     elseif BNB.IsDevMode() then
         if BNB._devNotesCopied then
             BNB:Print(string.format(L["CFG_DEV_MODE_COPIED_FMT"], BNB._devNotesCopied))
