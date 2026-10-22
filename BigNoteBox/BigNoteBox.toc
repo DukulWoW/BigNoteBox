@@ -41,6 +41,7 @@ Core\Initialize.lua
 
 # UI
 UI\Widgets.lua
+UI\NewMarker.lua
 UI\BorderBright.lua
 UI\Chrome.lua
 UI\Cursor.lua

@@ -215,6 +215,7 @@ local function OpenSubPage(page)
     page.sf:SetVerticalScroll(0)
     page.sf:Show()
     activeSub = page
+    BNB.MarkSeen(page.key)   -- its NEW badge goes (UI/NewMarker.lua)
     -- Both chromes disable the selected tab button; enable it so a click on
     -- the highlighted tab comes back. The next tab select disables it again.
     local ctrl = cfgFrame and cfgFrame._skinTabCtrl
@@ -231,7 +232,7 @@ end
 local function NewSubPage(title, build, key)
     local o = buildOwner
     local sf, ct = MakeScrollPanel(o.parent, o.topOffset)
-    local page = { sf = sf, ct = ct, idx = o.idx, title = title }
+    local page = { sf = sf, ct = ct, idx = o.idx, title = title, key = key }
     function page.Open() OpenSubPage(page) end
     if key then subPages[key] = page end
     allPages[#allPages + 1] = page   -- the settings search walks every page (ALL-480)
@@ -317,6 +318,7 @@ local function AddOverviewRow(ct, sf, y, page, title, desc)
     else         lbl:SetPoint("RIGHT", ct,   "TOPRIGHT", 0, y - 10) end
     lbl:SetJustifyH("LEFT")
     lbl:SetText(title)
+    BNB.AddNewMarker(page.key, lbl)   -- a new feature's NEW badge (ALL-166)
     lbl._searchTip = page.tip   -- found by the settings search (ALL-480)
     -- The row's checkbox reaches over its title (tooltip and click)
     local rowCb = page.get and tg or (cb and ov) or nil

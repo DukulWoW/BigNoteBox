@@ -302,6 +302,9 @@ end
 
 function RP.Open()
     if not BNB.RichEnabled() then return end   -- Rich Notes module off (ALL-343)
+    -- Never over the explorer's grid (no editor showing): kept for when the
+    -- note opens again (SyncPreview, UI/ExplorerView.lua, Dukul, 2026-10-22)
+    if BNB.Explorer and BNB.Explorer.Mode() == "grid" then RP._wantOpen = true; return end
     BuildMainFrame()
     SyncMainHeight()
 

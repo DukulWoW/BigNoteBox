@@ -2571,7 +2571,10 @@ function BNB.AM_RefreshTabs()
     local strip = BNB._editorRichTabs or _richTabStrip
     if not strip then return end
     local note  = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-    if not BNB.AdvancedMode.IsRich(note) then
+    -- The explorer's grid hides the editor but the note stays current: the
+    -- strip hangs on the main window, so it hides itself (Dukul, 2026-10-22)
+    local grid = BNB.Explorer and BNB.Explorer.Mode() == "grid"
+    if grid or not BNB.AdvancedMode.IsRich(note) then
         strip:Hide()
         return
     end

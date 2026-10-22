@@ -48,6 +48,7 @@ local SHARED = {
     setupPage = true, setupUsage = true,
     sysFolders = true,   -- system folders open / hidden releases (ALL-511)
     explorerIntroSeen = true,   -- the Explorer welcome, once per account (ALL-543)
+    newSeen = true,   -- NEW badges already opened (ALL-166, UI/NewMarker.lua)
     devBgLab = true, devIconLab = true, devSearch = true,
 }
 

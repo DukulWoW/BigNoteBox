@@ -86,6 +86,7 @@ BNB.DEFAULTS = {
     explorerNotesClosed  = false,
     explorerPinnedFirst  = false,   -- no Pinned / Notes sections: pinned notes first after the folders
     explorerFavFirst     = false,   -- favourite notes grouped at the top of the notes (no section)
+    explorerKeepNote     = false,   -- the window opens again on the note it was closed on (Dukul, 2026-10-22)
 
     -- Font / display (fontChoice depends on the client language: InitSettingsDB)
     fontSize   = 13,

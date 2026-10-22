@@ -489,19 +489,26 @@ end
 local function ShowEmptyMenu(owner)
     local FD = FoldersOn()
     BNB.ContextMenu.Open(owner, function(root)
-        root:CreateButton(L["FOLDER_CM_NEW_NOTE"], K.NewNoteHere, { icon = "create" })
+        -- The toolbar's pictures on each row (Dukul, 2026-10-22)
+        root:CreateButton(L["EXPLORER_TB_NEW_NOTE"], K.NewNoteHere,
+            { iconTex = ART .. "ex-new-note", iconGold = true })
         if FD then
-            root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder, { icon = "folder-add" })
+            root:CreateButton(L["FOLDER_CM_NEW_FOLDER"], K.NewFolder,
+                { iconTex = ART .. "ex-new-folder", iconGold = true })
         end
         root:CreateDivider()
-        root:CreateButton(K.SelectAllText(), K.SelectAll, { disabled = not K.CanPick() })
+        root:CreateButton(K.SelectAllText(), K.SelectAll,
+            { disabled = not K.CanPick(), iconTex = ART .. "ex-select-all", iconGold = true })
         root:CreateDivider()
         -- Sort by: the toolbar strip's two dropdowns in one sub-menu (Dukul,
         -- 2026-10-20); the order means nothing in Custom, so it is greyed there
-        K.FillSortMenu(root:CreateButton(L["EXPLORER_CM_SORT_BY"]))
-        K.FillViewMenu(root:CreateButton(L["EXPLORER_TB_VIEW"]))
+        K.FillSortMenu(root:CreateButton(L["EXPLORER_CM_SORT_BY"], nil,
+            { iconTex = ART .. "ex-sort", iconGold = true }))
+        K.FillViewMenu(root:CreateButton(L["EXPLORER_TB_VIEW"], nil,
+            { iconTex = ART .. "ex-view", iconGold = true }))
         root:CreateDivider()
-        root:CreateButton(L["FOLDER_TREE_TIP_OFF"], function() EX.SetActive(false) end)
+        root:CreateButton(L["FOLDER_TREE_TIP_OFF"], function() EX.SetActive(false) end,
+            { iconTex = ART .. "ex-list-mode", iconGold = true })
     end)
 end
 
@@ -1898,12 +1905,30 @@ function EX.State()
         Size(_pane), Size(_sf), Size(_child), tostring(_trace.err and _trace.err:sub(1, 300)))
 end
 
+-- The live preview belongs to the editor: the grid hides it (the note stays
+-- current, so nothing else closed it, Dukul, 2026-10-22) and leaving the grid
+-- shows it again, only when the grid was what hid it
+local _previewHidden = false
+local function SyncPreview(grid)
+    local RP = BNB.RichPreview
+    if not RP then return end
+    if grid then
+        if RP.IsOpen() then RP.Close(); _previewHidden = true end
+    elseif _previewHidden or RP._wantOpen then   -- _wantOpen: asked for while on the grid
+        _previewHidden, RP._wantOpen = false, nil
+        local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+        if note and _main and _main:IsShown() then RP.OnNoteSelected(note) end
+    end
+end
+
 -- Lays the window out for the current view and mode
 function EX.Apply()
     local active = EX.IsActive()
     if active then EnsurePane() end
     if _pane then _pane:SetShown(active and _mode == "grid") end
+    SyncPreview(active and _mode == "grid")
     if BNB._applyMainSplit then BNB._applyMainSplit() end
+    if BNB.AM_RefreshTabs then BNB.AM_RefreshTabs() end   -- the Markup / Note tabs
     UpdateHeader()
     if active and _mode == "grid" then
         if K.LayoutToolRow then K.LayoutToolRow() end   -- takes the search row
@@ -2150,14 +2175,25 @@ function EX.OnWindowShow()
         if BNB.ApplyToolbarIcons then BNB.ApplyToolbarIcons() end
     end)
     if not EX.IsActive() then UpdateHeader(); return end
-    if not _keepNote then _mode = "grid" end
+    -- "closed": kept by the Remember the open note setting; that note may be
+    -- gone since (deleted from a sticky, the Oracle)
+    local closed = _keepNote == "closed"
+    local note = _keepNote and BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    if not note then _mode = "grid" end
     _keepNote = nil
     EX.Apply()
+    -- The window's close took the live preview with it (Focus mode brings
+    -- its own back); OnNoteSelected opens it when Auto show is on
+    if closed and note and BNB.RichPreview then BNB.RichPreview.OnNoteSelected(note) end
 end
 
--- MainWindow's OnHide (a real close and Focus mode's hide)
+-- MainWindow's OnHide (a real close and Focus mode's hide). Esc steps out of
+-- a note first (EX.Back), so a close from a note is X, a key or a command
 function EX.OnWindowHide(f)
-    _keepNote = f._focusHide and _mode == "note" or nil
+    if _mode ~= "note" then _keepNote = nil
+    elseif f._focusHide then _keepNote = "focus"
+    elseif BigNoteBoxDB and BigNoteBoxDB.explorerKeepNote then _keepNote = "closed"
+    else _keepNote = nil end
     if _boxState then FinishBox() end
     if _drag then EndDrag(false) end
 end

@@ -1865,6 +1865,8 @@ L["CFG_EXPLORER_DEFAULT"]         = "Open the main window on"
 L["CFG_EXPLORER_DEFAULT_TIP"]     = "The view the main window shows after each login or reload. The button left of the sort dropdown still swaps views until then."
 L["CFG_EXPLORER_DEFAULT_EXPLORER"] = "Explorer view"
 L["CFG_EXPLORER_DEFAULT_LIST"]    = "Note list"
+L["CFG_EXPLORER_KEEP_NOTE"]       = "Remember the open note"
+L["CFG_EXPLORER_KEEP_NOTE_TIP"]   = "Close the main window while a note is open, and it opens on that note again. Off: it always opens on the explorer's notes. Esc steps out of the note first, so only the close button, a key binding or the minimap button keeps it."
 -- Explorer welcome over the main window, once per account (ALL-543, UI/ExplorerIntro.lua)
 L["EXPLORER_INTRO_WELCOME"]       = "Welcome to the"
 L["EXPLORER_INTRO_TITLE"]         = "Explorer view"

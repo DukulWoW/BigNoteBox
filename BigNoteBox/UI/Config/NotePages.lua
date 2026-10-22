@@ -791,11 +791,12 @@ end
 -- ─────────────────────────────────────────────────────────────────────────────
 function K.BuildExplorerPage(sf, ct, y, page)
     local db = BigNoteBoxDB
-    local dd, ddLbl
+    local dd, ddLbl, keepCb
     local function Sync()
         local on = BNB.ExplorerEnabled()
         if dd then dd:SetEnabled(on); dd:SetAlpha(on and 1 or 0.35) end
         if ddLbl then ddLbl:SetAlpha(on and 1 or 0.35) end
+        if keepCb then keepCb:SetEnabled(on); keepCb:SetAlpha(on and 1 or 0.35) end
     end
 
     local enableCb
@@ -834,6 +835,11 @@ function K.BuildExplorerPage(sf, ct, y, page)
     dd:HookScript("OnLeave", function() GameTooltip:Hide() end)
     dd:HookScript("OnShow", Sync)
     y = y - 32
+    -- No note list to find it again in (Dukul, 2026-10-22): off by default
+    y, keepCb = AddCheck(ct, y, L["CFG_EXPLORER_KEEP_NOTE"],
+        function() return db.explorerKeepNote == true end,
+        function(v) db.explorerKeepNote = v and true or false end,
+        L["CFG_EXPLORER_KEEP_NOTE_TIP"])
     Sync()
     sf:FinaliseHeight(math.abs(y) + 12)
 end
