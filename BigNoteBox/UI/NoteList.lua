@@ -2360,7 +2360,7 @@ local function LayoutFolderHeader(hdr, f, n, open, forced, iconRow, rowH)
     local r, g, b
     if f.sys then r, g, b = f.r, f.g, f.b else r, g, b = FD.Color(f.id) end
     r, g, b = r or hr, g or hg, b or hb
-    FD.PaintArt(hdr._icon, open, n > 0, r, g, b)   -- skin mode: tinted like the name
+    FD.PaintArt(hdr._icon, open, n > 0, r, g, b, f.sys)   -- skin mode: tinted like the name
     hdr._icon:ClearAllPoints(); hdr._text:ClearAllPoints(); hdr._rule:ClearAllPoints()
     if iconRow then
         hdr:SetHeight(rowH)

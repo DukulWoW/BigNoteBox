@@ -73,10 +73,24 @@ end
 F.ART_SKIN_OPEN   = ART .. "ui-note-list-folder-open"
 F.ART_SKIN_CLOSED = ART .. "ui-note-list-folder-closed"
 
+-- The Patch notes system folder's own BNB picture (Dukul, 2026-10-22), one
+-- for open and closed: normal = colour art, skin = white art tinted
+F.ART_BNB      = ART .. "ui-folder-bnb"
+F.ART_BNB_SKIN = ART .. "ui-folder-bnb-skin"
+
 -- Draws a folder picture on tex: the normal look = Dukul's colour art as it is
--- drawn, skin mode = the white art in r, g, b (the folder name's colour)
-function F.PaintArt(tex, open, hasNotes, r, g, b)
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+-- drawn, skin mode = the white art in r, g, b (the folder name's colour).
+-- sys = a system folder's key, for one with its own picture
+function F.PaintArt(tex, open, hasNotes, r, g, b, sys)
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    if sys == "patchnotes" then
+        tex:SetTexture(skin and F.ART_BNB_SKIN or F.ART_BNB)
+        if not skin then tex:SetVertexColor(1, 1, 1); return end
+        if not r then r, g, b = BNB.HeaderColor() end
+        tex:SetVertexColor(r, g, b)
+        return
+    end
+    if skin then
         tex:SetTexture(open and F.ART_SKIN_OPEN or F.ART_SKIN_CLOSED)
         if not r then r, g, b = BNB.HeaderColor() end
         tex:SetVertexColor(r, g, b)

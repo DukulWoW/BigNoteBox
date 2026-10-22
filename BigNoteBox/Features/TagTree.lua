@@ -364,7 +364,7 @@ function BNB.RefreshTagTree()
             if b.key == NO_FOLDER then   -- the Notes picture, as in the list (Dukul, 2026-10-20)
                 BNB.Folders.PaintSectionArt(hdr._pic, "notes", b.r, b.g, b.b)
             else
-                BNB.Folders.PaintArt(hdr._pic, expanded, #notes > 0, b.r, b.g, b.b)
+                BNB.Folders.PaintArt(hdr._pic, expanded, #notes > 0, b.r, b.g, b.b, b.sys and b.key or nil)
             end
             hdr._pic:Show()
             hdr._lbl:SetPoint("LEFT", hdr._pic, "RIGHT", 4, 0)

@@ -25,6 +25,7 @@
 --   SYS.Register(p)       p = { key, order, name = L key, setting = DEFAULTS
 --                         key, prefix = id prefix, r, g, b = name colour,
 --                         icon = the notes' list icon (a note's own wins),
+--                         iconFrame = its icon frame key (UI/IconFrames.lua),
 --                         Build(rich) -> notes newest first, canHide = bool }
 --   SYS.IsSystem(id)      true for any "sys-" id
 --   SYS.Folders()         { provider, ... } of the folders switched on, in order
@@ -110,6 +111,7 @@ local function Built(p)
         n.scope, n.tags, n.locked, n.pinned = "global", n.tags or {}, true, false
         n.system = p.key
         n.icon = n.icon or p.icon
+        n.iconFrame = n.iconFrame or p.iconFrame
         -- A provider may say a note is plain (a Help topic written plain)
         if n.richMode == nil then n.richMode = rich end
         n.updated = n.updated or n.created

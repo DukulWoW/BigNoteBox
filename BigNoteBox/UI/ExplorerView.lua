@@ -294,8 +294,15 @@ local function UpdateStatus()
                 Plural(nf, "EXPLORER_SB_FOLDER_1", "EXPLORER_SB_FOLDERS_FMT"))
         end
         if n > 0 and BNB.RichEnabled and BNB.RichEnabled() then
-            sel = sel .. " (" .. Plural(rich, "EXPLORER_SB_RICH_1", "EXPLORER_SB_RICH_FMT") .. ", "
-                .. Plural(n - rich, "EXPLORER_SB_NORMAL_1", "EXPLORER_SB_NORMAL_FMT") .. ")"
+            -- Only the kinds picked: no "0 rich notes" (Dukul, 2026-10-22)
+            local kinds = {}
+            if rich > 0 then
+                kinds[#kinds + 1] = Plural(rich, "EXPLORER_SB_RICH_1", "EXPLORER_SB_RICH_FMT")
+            end
+            if n - rich > 0 then
+                kinds[#kinds + 1] = Plural(n - rich, "EXPLORER_SB_NORMAL_1", "EXPLORER_SB_NORMAL_FMT")
+            end
+            sel = sel .. " (" .. table.concat(kinds, ", ") .. ")"
         end
         parts[#parts + 1] = sel
         if n > 0 then parts[#parts + 1] = SizeText(bytes) end   -- the notes' size only
@@ -937,7 +944,7 @@ local function PaintHeader(hdr, text, art, r, g, b, opts)
     local hr, hg, hb = BNB.HeaderColor()
     r, g, b = r or hr, g or hg, b or hb
     if type(art) == "table" then
-        BNB.Folders.PaintArt(hdr._pic, true, art.hasNotes, r, g, b)
+        BNB.Folders.PaintArt(hdr._pic, true, art.hasNotes, r, g, b, art.sys)
     else
         BNB.Folders.PaintSectionArt(hdr._pic, art, hr, hg, hb)
     end
@@ -1171,6 +1178,8 @@ local MARKERS = {
 -- flat fills over the whole tile. sub = the OVERLAY sub-level, as the list
 local SQ_ART  = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-collapsed-"
 local SQ_GROW = 12
+local FOLDER_GLOW = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-folder-glow"
+local FOLDER_GLOW_TOP = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-folder-glow-top"
 local function TileArt(t, kind, sub, fill)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
         return BNB.CreateListRowArt(t, kind, fill)
@@ -1191,6 +1200,19 @@ local function GetTile(i)
     t:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     t._icon = t:CreateTexture(nil, "ARTWORK")
     t._folderTex = t:CreateTexture(nil, "ARTWORK")
+    -- Normal look only: a glow behind the folder in its colour, so it stands
+    -- out beyond the coloured name (Dukul, 2026-10-22). White art, tinted;
+    -- same size as the folder art, so it follows it in every view
+    t._folderGlow = t:CreateTexture(nil, "ARTWORK", nil, -1)
+    t._folderGlow:SetTexture(FOLDER_GLOW)
+    t._folderGlow:SetAllPoints(t._folderTex)
+    t._folderGlow:Hide()
+    -- Normal look only: the folder's small mark drawn over the picture in its
+    -- colour (Dukul, 2026-10-22, a test)
+    t._folderTop = t:CreateTexture(nil, "ARTWORK", nil, 1)
+    t._folderTop:SetTexture(FOLDER_GLOW_TOP)
+    t._folderTop:SetAllPoints(t._folderTex)
+    t._folderTop:Hide()
     local selFill, hoverFill = { 0.40, 0.85, 0.40, 0.18 }, { 1, 1, 1, 0.06 }
     t._selT   = TileArt(t, "selection", 2, selFill)
     t._hoverT = TileArt(t, "hover", 4, hoverFill)
@@ -1503,6 +1525,8 @@ local function FillNoteTile(t, note, size, section)
     t._sysKey = note.system and ("sysnote:" .. note.id) or nil
     t._section = section
     t._folderTex:Hide()
+    t._folderGlow:Hide()
+    t._folderTop:Hide()
     t._icon:Show()
     BNB.PaintNoteIcon(t, t._icon, note, size)
     local hasTitle = note.title and note.title ~= ""
@@ -1537,8 +1561,22 @@ local function FillFolderTile(t, key, name, n, r, g, b)
     if t._borderFrame then t._borderFrame:Hide() end
     HideMarkers(t)
     local hr, hg, hb = BNB.HeaderColor()
-    BNB.Folders.PaintArt(t._folderTex, false, n > 0, r or hr, g or hg, b or hb)
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    -- The Patch notes folder has Dukul's own BNB picture (2026-10-22, drawn
+    -- by PaintArt): it keeps the glow but gets no top layer
+    local sysKey = SysKey(key)
+    local bnb = sysKey == "patchnotes"
+    BNB.Folders.PaintArt(t._folderTex, false, n > 0, r or hr, g or hg, b or hb, sysKey)
     t._folderTex:Show()
+    if skin then
+        t._folderGlow:Hide()
+        t._folderTop:Hide()
+    else
+        t._folderGlow:SetVertexColor(r or hr, g or hg, b or hb)
+        t._folderGlow:Show()
+        t._folderTop:SetVertexColor(r or hr, g or hg, b or hb)
+        t._folderTop:SetShown(not bnb)
+    end
     t._label:SetText(name .. " (" .. n .. ")")
     t._label:SetTextColor(r or hr, g or hg, b or hb)
     t._sel:Hide()
@@ -1703,7 +1741,7 @@ Draw = function()
         -- ── A system folder ─────────────────────────────────────────────────
         local p = SYS.Provider(sys)
         local list = SysList(sys)
-        Header(L[p.name] .. " (" .. #list .. ")", { hasNotes = #list > 0 }, p.r, p.g, p.b, { crumb = true })
+        Header(L[p.name] .. " (" .. #list .. ")", { hasNotes = #list > 0, sys = p.key }, p.r, p.g, p.b, { crumb = true })
         for _, n in ipairs(list) do NoteTile(n, "sys") end
         EndRow()
         if #list == 0 then Empty(filtering and "NL_NO_MATCHES" or "EXPLORER_FOLDER_EMPTY") end

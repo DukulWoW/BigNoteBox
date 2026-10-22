@@ -503,6 +503,8 @@ if BNB.SystemNotes then
         setting = "sysPatchNotes", prefix = PN_SYS_PREFIX, canHide = true,
         r = 0x66 / 255, g = 0xbb / 255, b = 0x6a / 255,   -- BNB green
         icon = "Interface\\AddOns\\BigNoteBox\\Assets\\icon",   -- the addon icon (Dukul, 2026-10-19)
+        -- Round logo: Simple Glass Orb frame, not the square border (Dukul, 2026-10-22)
+        iconFrame = "ui-glyphframe-2",
         Build = BuildPatchFolder,
     })
 end
