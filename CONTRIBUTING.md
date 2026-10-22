@@ -15,7 +15,7 @@ Updated 2026-10-22. English has 3286 keys.
 | Language | File | Status |
 |---|---|---|
 | English | `enUS.lua` | Reference, always complete |
-| Simplified Chinese | `zhCN.lua` | 99% (3271 / 3286), quality check in progress |
+| Simplified Chinese | `zhCN.lua` | 100% (3286 / 3286), quality check in progress |
 | Traditional Chinese | `zhTW.lua` | Not started |
 | Korean | `koKR.lua` | Not started |
 | German | `deDE.lua` | Not started |
