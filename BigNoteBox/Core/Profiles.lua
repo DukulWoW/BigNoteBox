@@ -47,6 +47,7 @@ local SHARED = {
     tagColors = true, foreverNoticeHidden = true, historyAddonNotice = true,
     setupPage = true, setupUsage = true,
     sysFolders = true,   -- system folders open / hidden releases (ALL-511)
+    explorerIntroSeen = true,   -- the Explorer welcome, once per account (ALL-543)
     devBgLab = true, devIconLab = true, devSearch = true,
 }
 

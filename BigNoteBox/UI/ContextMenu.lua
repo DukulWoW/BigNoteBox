@@ -563,7 +563,10 @@ local function Fill(f, d)
                     r._icon:SetSize(ICON, ICON)
                 end
                 r._icon:ClearAllPoints()
-                r._icon:SetPoint("LEFT", 4, 0)
+                -- Among radios with pictures (the explorer's Sort menu), a
+                -- button's picture lines up with theirs, not with the marks
+                local picCol = radioPic and o.iconTex and not o.iconW
+                r._icon:SetPoint("LEFT", picCol and radioPicX or 4, 0)
                 r._icon:Show()
                 r._iconCoord = o.iconTex and o.iconCoord or nil
                 DrawIcon(r, false)   -- shows the plate in the normal look

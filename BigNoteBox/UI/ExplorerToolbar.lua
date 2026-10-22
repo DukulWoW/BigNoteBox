@@ -324,6 +324,7 @@ local function PaintButton(b)
     local spec = b._spec
     local on = Enabled(spec)
     b:SetEnabled(on)
+    if not on and b._hl then b._hl:Hide() end
     local icon = type(spec.icon) == "function" and spec.icon() or spec.icon
     b._ic:SetTexture(ART .. icon)
     b._ic:SetDesaturated(not on)
@@ -339,10 +340,15 @@ local function MakeButton(parent, spec)
     local b = CreateFrame("Button", nil, parent)
     b:SetHeight(BTN_H)
     b._spec = spec
+    -- Hover: the search icon's glow (ui-hover-64, gold / skin accent),
+    -- stretched over the whole button, label and arrow included (Dukul,
+    -- 2026-10-22: the flat white box looked out of place). Enabled only
     local hl = b:CreateTexture(nil, "BACKGROUND")
     hl:SetAllPoints()
-    hl:SetColorTexture(1, 1, 1, 0.08)
+    hl:SetTexture(BNB.UI_HOVER_TEX)
+    BNB.TintUIIcon(hl)
     hl:Hide()
+    b._hl = hl
     local ic = b:CreateTexture(nil, "ARTWORK")
     ic:SetSize(ICON, ICON)
     ic:SetPoint("LEFT", b, "LEFT", BTN_PAD, 0)
@@ -362,7 +368,10 @@ local function MakeButton(parent, spec)
         BNB.TintUIIcon(ar)
         b._ar = ar
     end
-    b:SetScript("OnEnter", function(self) hl:Show(); ShowTip(self, self._spec) end)
+    b:SetScript("OnEnter", function(self)
+        if self:IsEnabled() then hl:Show() end
+        ShowTip(self, self._spec)
+    end)
     b:SetScript("OnLeave", function(self)
         hl:Hide()
         if GameTooltip:IsOwned(self) then GameTooltip:Hide() end

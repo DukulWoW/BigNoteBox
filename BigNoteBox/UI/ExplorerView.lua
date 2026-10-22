@@ -474,14 +474,16 @@ function K.FillViewMenu(menu)
             BigNoteBoxDB.explorerPinnedFirst = BigNoteBoxDB.explorerPinnedFirst ~= true
             Refresh()
         end,
-        { keepOpen = true, tip = L["EXPLORER_PINNED_FIRST"], tipSub = L["EXPLORER_PINNED_FIRST_TIP"] })
+        { keepOpen = true, iconGold = true, iconTex = ART .. "ex-pin",   -- the toolbar's Pin icon
+          tip = L["EXPLORER_PINNED_FIRST"], tipSub = L["EXPLORER_PINNED_FIRST_TIP"] })
     menu:CreateCheckbox(L["EXPLORER_FAV_FIRST"],
         function() return BigNoteBoxDB.explorerFavFirst == true end,
         function()
             BigNoteBoxDB.explorerFavFirst = BigNoteBoxDB.explorerFavFirst ~= true
             Refresh()
         end,
-        { keepOpen = true, tip = L["EXPLORER_FAV_FIRST"], tipSub = L["EXPLORER_FAV_FIRST_TIP"] })
+        { keepOpen = true, iconGold = true, iconTex = ART .. "ex-favorite",   -- the toolbar's Favorite icon
+          tip = L["EXPLORER_FAV_FIRST"], tipSub = L["EXPLORER_FAV_FIRST_TIP"] })
 end
 
 local function ShowEmptyMenu(owner)
@@ -1973,6 +1975,9 @@ function EX.Back()
 end
 
 -- ── Toolbar strip: the switch and the back arrow ────────────────────────────
+-- The switch icon (the welcome's callout points at it, ALL-543)
+function EX.ViewButton() return _viewBtn end
+
 function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     _main, _sortDD, _dirDD, _selBtn = f, sortDD, dirDD, selBtn
     -- Built once per session: the window opens on the default view (Dukul,
@@ -2000,6 +2005,7 @@ function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     BNB.TintUIIcon(tx)
     BNB.AddUIIconHover(vb, tx)
     _viewTx, _viewBtn = tx, vb
+    vb._tx = tx   -- the welcome's lit copy reads it (UI/ExplorerIntro.lua)
     vb:SetScript("OnClick", function() EX.SetActive(not EX.IsActive()) end)
     vb:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")

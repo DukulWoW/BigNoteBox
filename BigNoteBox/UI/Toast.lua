@@ -83,6 +83,7 @@ local GROW = {
 local _shown      = {}   -- toast frames on screen, [1] = at the anchor
 local _queue      = {}   -- specs waiting for room
 local _waitCombat = {}   -- specs held back until combat ends
+local _waitIntro  = {}   -- specs held back until the Explorer welcome is answered (ALL-543)
 local _pool       = {}   -- toast frames not in use
 local _driver     = nil
 local _ax, _ay    = 0, 200   -- anchor offset, cached by Relayout
@@ -120,8 +121,30 @@ local function InCombat()
     return InCombatLockdown() or UnitAffectingCombat("player")
 end
 
+-- The default anchor by screen shape (Dukul, 2026-10-22): the wider main
+-- window on an ultrawide (ALL-536) covered the 16:9 spot, so there it sits
+-- further left (Dukul's placement on 2293 x 960 at UI scale 0.80)
+local WIDE_ANCHOR_X, WIDE_ANCHOR_Y = -696, 270
+local function DefaultAnchor()
+    if BNB.IsUltrawide and BNB.IsUltrawide() then return WIDE_ANCHOR_X, WIDE_ANCHOR_Y end
+    return BNB.DEFAULTS.popupAnchorX, BNB.DEFAULTS.popupAnchorY
+end
+
+-- The saved anchor, or the default for this screen. One saved exactly on the
+-- 16:9 default (Reset, the v21 move) counts as the default too
+local function AnchorXY()
+    local db = BigNoteBoxDB
+    local x, y = db and db.popupAnchorX, db and db.popupAnchorY
+    if x == nil or y == nil
+        or (x == BNB.DEFAULTS.popupAnchorX and y == BNB.DEFAULTS.popupAnchorY) then
+        return DefaultAnchor()
+    end
+    return x, y
+end
+
 function T.AnchorPoint()
-    return "CENTER", UIParent, "CENTER", Setting("popupAnchorX"), Setting("popupAnchorY")
+    local x, y = AnchorXY()
+    return "CENTER", UIParent, "CENTER", x, y
 end
 
 -- The size (screen units) of a toast drawn in a style
@@ -541,14 +564,19 @@ function T.Show(spec)
                 Fill(f, spec); Retarget(); return
             end
         end
-        if ReplaceKeyed(_queue, spec) or ReplaceKeyed(_waitCombat, spec) then return end
+        if ReplaceKeyed(_queue, spec) or ReplaceKeyed(_waitCombat, spec)
+            or ReplaceKeyed(_waitIntro, spec) then return end
+    end
+    -- Every toast waits for the Explorer welcome (Dukul, 2026-10-22)
+    if not spec.force and BNB.ExplorerIntroHolding and BNB.ExplorerIntroHolding() then
+        _waitIntro[#_waitIntro + 1] = spec; return
     end
     if not spec.force and InCombat() then
         local mode = Setting("toastCombat")
         if mode == "drop" then return end
         if mode ~= "show" then _waitCombat[#_waitCombat + 1] = spec; return end
     end
-    _ax, _ay = Setting("popupAnchorX"), Setting("popupAnchorY")
+    _ax, _ay = AnchorXY()
     if #_shown < MaxShown() then Add(spec) else _queue[#_queue + 1] = spec end
     UpdateMore()
 end
@@ -560,6 +588,14 @@ BNB.RegisterEvent("PLAYER_REGEN_ENABLED", function()
     for _, spec in ipairs(list) do T.Show(spec) end
 end)
 
+-- The Explorer welcome was answered: what waited for it, in order
+function T.ReleaseHeld()
+    if #_waitIntro == 0 then return end
+    local list = _waitIntro
+    _waitIntro = {}
+    for _, spec in ipairs(list) do T.Show(spec) end
+end
+
 local function Keep(list, test)
     local out = {}
     for _, s in ipairs(list) do if not test(s) then out[#out + 1] = s end end
@@ -570,6 +606,7 @@ function T.Dismiss(key)
     if not key then return end
     local function Match(s) return s.key == key end
     _queue, _waitCombat = Keep(_queue, Match), Keep(_waitCombat, Match)
+    _waitIntro = Keep(_waitIntro, Match)
     for i = #_shown, 1, -1 do
         local f = _shown[i]
         if f._spec and f._spec.key == key then Remove(f) end
@@ -581,6 +618,7 @@ end
 function T.DismissAll(source)
     local function Match(s) return source == nil or s.source == source end
     _queue, _waitCombat = Keep(_queue, Match), Keep(_waitCombat, Match)
+    _waitIntro = Keep(_waitIntro, Match)
     for i = #_shown, 1, -1 do
         local f = _shown[i]
         if f._spec and Match(f._spec) then Remove(f) end
@@ -590,7 +628,7 @@ end
 
 -- After a settings change (grow direction, Max shown, Slide in, position)
 function T.Relayout()
-    _ax, _ay = Setting("popupAnchorX"), Setting("popupAnchorY")
+    _ax, _ay = AnchorXY()
     -- Fewer allowed than on screen: the newest go back to the queue front
     while #_shown > MaxShown() do
         local f = _shown[#_shown]
@@ -748,7 +786,7 @@ local function CreateAnchor()
     f:SetScript("OnDragStop", function(self)
         BNB.StopDragMoving(self)
         SaveAnchor(self)
-        PrintAnchorPos(Setting("popupAnchorX"), Setting("popupAnchorY"))
+        PrintAnchorPos(AnchorXY())
     end)
     f:SetScript("OnMouseUp", function(_, btn)
         if btn == "RightButton" then T.LockAnchor() end
@@ -787,8 +825,9 @@ end
 
 function T.ResetAnchor()
     if BigNoteBoxDB then
-        BigNoteBoxDB.popupAnchorX = BNB.DEFAULTS.popupAnchorX
-        BigNoteBoxDB.popupAnchorY = BNB.DEFAULTS.popupAnchorY
+        -- Back to the default, which follows the screen shape (AnchorXY)
+        BigNoteBoxDB.popupAnchorX = nil
+        BigNoteBoxDB.popupAnchorY = nil
     end
     if _anchor then
         _anchor:ClearAllPoints()

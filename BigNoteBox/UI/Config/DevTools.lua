@@ -322,6 +322,16 @@ function K.BuildDevToolsPage(sf, ct, y)
                 BNB:Print("|cffff9900The patch notes toast is off in Settings > Modules > Toasts.|r")
             end
         end },
+        -- The Explorer welcome as after the 2.0.0 update (ALL-543): seen
+        -- flag cleared, then a reload (in the click itself: C_UI.Reload is protected)
+        { L["CFG_DEV_EXPINTRO_BTN"], L["CFG_DEV_EXPINTRO_TIP_BODY"], function()
+            if not (BNB.ExplorerEnabled and BNB.ExplorerEnabled()) then
+                BNB:Print("|cffff9900The Explorer view module is off (Settings > Modules).|r")
+                return
+            end
+            BigNoteBoxDB.explorerIntroSeen = nil
+            C_UI.Reload()
+        end, BNB.ShowExplorerIntroIfDue ~= nil },
         -- Every UI link key as a note (ALL-513, Dukul 2026-10-19: "Easier to work
         -- with if I know what they all are"): made from the registry, so it is
         -- never out of date; the same note is rewritten on the next click

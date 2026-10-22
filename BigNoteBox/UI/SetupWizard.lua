@@ -205,6 +205,8 @@ local function RegisterQuitDialog()
             HideOverlay()
             StopCamera()
             StopGlow()
+            -- The Explorer welcome first (ALL-543); the notice waits for it
+            if BNB.ShowExplorerIntroIfDue then pcall(BNB.ShowExplorerIntroIfDue) end
             -- Held back while the wizard was pending (Core/Events.lua)
             if BNB.ShowForeverNoticeIfDue then BNB.ShowForeverNoticeIfDue() end
             -- The welcome note's toast too (ALL-242); Finish reloads, the login shows it

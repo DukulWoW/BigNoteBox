@@ -58,6 +58,7 @@ UI\NoteContextMenu.lua
 UI\FolderMenus.lua
 UI\ExplorerView.lua
 UI\ExplorerToolbar.lua
+UI\ExplorerIntro.lua
 UI\NoteEditor.lua
 UI\WelcomePanel.lua
 UI\WysiwygBar.lua

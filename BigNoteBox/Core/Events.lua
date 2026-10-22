@@ -102,6 +102,8 @@ function BNB.ShowForeverNoticeIfDue()
     local db = BigNoteBoxDB
     if not (BNB.IsForever or BNB.IsClassic) or not db then return end
     if db.foreverNoticeHidden or db.setupComplete ~= true then return end
+    -- After the Explorer welcome, which calls this when it closes (ALL-543)
+    if BNB.ExplorerIntroHolding and BNB.ExplorerIntroHolding() then return end
     pcall(BNB.ShowForeverNotice)
 end
 -- The notice's chrome. Normal mode: a hand-built frame with the game's art
@@ -399,6 +401,8 @@ BNB.RegisterEvent("PLAYER_LOGIN", function()
     end)
     C_Timer.After(0.5, function()
         if BNB.Initialize then BNB.Initialize() end
+        -- The Explorer welcome over the main window, once per account (ALL-543)
+        if BNB.ShowExplorerIntroIfDue then pcall(BNB.ShowExplorerIntroIfDue) end
         BNB.ShowForeverNoticeIfDue()
         -- After an update: the patch note + its toast (ALL-409). During
         -- first-time setup the version is only stamped, so a new install gets

@@ -17,9 +17,13 @@ local DEFAULT_H  = 640
 -- ultrawide or wider screen (width / height 2.0 or more), 820 on 16:9 / 16:10.
 -- UIParent has the screen's shape at any UI scale. Used for a new user (no
 -- saved width), the lock button's right-click and Reset size on load (ALL-536)
-local function DefaultWindowW()
+-- Ultrawide or wider: the toast anchor's default follows it too (UI/Toast.lua)
+function BNB.IsUltrawide()
     local w, h = UIParent:GetWidth(), UIParent:GetHeight()
-    return (h and h > 0 and w / h >= 2.0) and 1080 or 820
+    return (h and h > 0 and w / h >= 2.0) and true or false
+end
+local function DefaultWindowW()
+    return BNB.IsUltrawide() and 1080 or 820
 end
 function BNB.DefaultWindowSize() return DefaultWindowW(), DEFAULT_H end
 
@@ -965,8 +969,13 @@ function BNB.CreateMainWindow()
             local b2 = root:CreateButton(L["SORT_MAKE_DEFAULT"], Save)
             if same and b1.SetEnabled then b1:SetEnabled(false); b2:SetEnabled(false) end
         else
-            root:CreateButton(resetText, Reset, { disabled = same })
-            root:CreateButton(L["SORT_MAKE_DEFAULT"], Save, { disabled = same })
+            -- The explorer's menu: the search row's reset and the check mark
+            -- (Dukul, 2026-10-22), gold like the other pictures there
+            local UI = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\"
+            root:CreateButton(resetText, Reset,
+                { disabled = same, iconTex = UI .. "ui-reset", iconGold = true })
+            root:CreateButton(L["SORT_MAKE_DEFAULT"], Save,
+                { disabled = same, iconTex = UI .. "ui-cb-skin-check", iconGold = true })
         end
     end
 
