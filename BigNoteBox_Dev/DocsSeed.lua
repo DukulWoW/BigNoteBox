@@ -7,7 +7,7 @@
 -- _work/tools/docs-build.lua turns doc mode's notes into UI/HelpData.lua.
 -- Titles become the topic keys on the first build ("Note list" -> note-list),
 -- and the links below name those keys (help.<key>): until the first build they
--- draw grey in doc mode. rich = false: a plain note (the Rich notes topic shows
+-- draw gray in doc mode. rich = false: a plain note (the Rich notes topic shows
 -- its tags as text). {link*bnbui:<key>*} with no text shows the place's real
 -- name (Features/UILinks.lua). Never shipped (the dev addon is not packaged).
 --
@@ -45,7 +45,7 @@ BigNoteBoxDevDocsSeed = {
 - Patch notes and Help: folders from BigNoteBox itself.
 {h3}Find a note{/h3}
 - {icon:@Explorer/ex-search:16} The search box finds text in titles and notes as you type.
-- {icon:@UI/ui-favorite:16} The star and {icon:@UI/ui-tasks:16} task buttons show only favourites, or notes with tasks.
+- {icon:@UI/ui-favorite:16} The star and {icon:@UI/ui-tasks:16} task buttons show only favorites, or notes with tasks.
 - {icon:@UI/ui-folder:16} The folder view and {icon:@UI/ui-treeview:16} tag tree buttons, left of the search box, group notes by folder or by tag.
 {h3}Do things{/h3}
 - Right-click a note for everything you can do with it.
@@ -68,7 +68,7 @@ BigNoteBoxDevDocsSeed = {
 - {icon:@Explorer/ex-copy:16} Copy, {icon:@Explorer/ex-move:16} Move, {icon:@Explorer/ex-delete:16} Delete, {icon:@Explorer/ex-rename:16} Rename, {icon:@Explorer/ex-pin:16} Pin, {icon:@Explorer/ex-favorite:16} Favorite, {icon:@Explorer/ex-share:16} Share and {icon:@Explorer/ex-export:16} Export work on the notes you picked.
 - {icon:@Explorer/ex-sort:16} Sort and Order: how the notes are sorted.
 - {icon:@Explorer/ex-view:16} View: small {icon:@Explorer/ex-view-small:16}, medium {icon:@Explorer/ex-view-medium:16} or large {icon:@Explorer/ex-view-large:16} icons, a list of titles {icon:@Explorer/ex-view-list:16}, details in columns {icon:@Explorer/ex-view-details:16}, or every note in one flat list {icon:@Explorer/ex-view-flat:16}.
-- {icon:@Explorer/ex-search:16} The search button opens a search field; the buttons at its end show only favourites or notes with tasks.
+- {icon:@Explorer/ex-search:16} The search button opens a search field; the buttons at its end show only favorites or notes with tasks.
 - {icon:@Explorer/ex-more:16} In a small window, the buttons that do not fit go under More.
 {h3}Drag and right-click{/h3}
 - Drag notes onto a folder to file them. Drop them on Notes in the path to take them out again.
@@ -87,7 +87,7 @@ BigNoteBoxDevDocsSeed = {
 - {icon:@ContextMenu/Symbols/cm-copy-move:16} Actions > Copy / Move to... can copy or move notes into a folder too.
 - {icon:@Explorer/ex-new-folder:16} In the {link*bnbui:help.explorer-view*Explorer view}, drag notes onto a folder icon, or pick some and right-click empty space > New folder with selection.
 {h3}The folder itself{/h3}
-{p}Right-click a folder to add a note to it, rename it, give it a colour or delete it. A pinned note shows under Pinned and in its folder.{/p}
+{p}Right-click a folder to add a note to it, rename it, give it a color or delete it. A pinned note shows under Pinned and in its folder.{/p}
 {p}{icon:@Documentation/doc-info:16} Deleting a folder never deletes its notes: they go back under Notes.{/p}
 {p}Settings: {link*bnbui:settings.modules.folders*}.{/p}
 ]] },
@@ -97,7 +97,7 @@ BigNoteBoxDevDocsSeed = {
 - {icon:@ContextMenu/Symbols/cm-tags-add:16} Right-click a note > Add tags, or add them under the title in the editor.
 - Click a tag to show only the notes that have it.
 - {icon:@UI/ui-treeview:16} The tag tree button groups every note by tag.
-- {icon:@Topbar/Normal/tp-tagmanager-normal:16} The {link*bnbui:tagmanager*} renames, colours and deletes tags across all your notes.
+- {icon:@Topbar/Normal/tp-tagmanager-normal:16} The {link*bnbui:tagmanager*} renames, colors and deletes tags across all your notes.
 ]] },
 
 { title = "Writing notes", rev = 3, body = [[
@@ -108,7 +108,7 @@ BigNoteBoxDevDocsSeed = {
 - The toolbar above the text inserts waypoints {icon:@Toolbar/tb-way:16}, links {icon:@Toolbar/tb-link:16}, time stamps {icon:@Toolbar/tb-timestamp:16} and {link*bnbui:help.note-tokens*note tokens} {icon:@Toolbar/tb-syntax:16}.
 - {icon:@Toolbar/tb-notesettings:16} The Note settings button at the right end of the toolbar opens Note settings: the note's look, icon and situation.
 - Right-click the text to insert game info; Open note settings is at the bottom.
-{p}{icon:@ContextMenu/Symbols/cm-rich-note:16} For headings, colours and pictures, make it a {link*bnbui:help.rich-notes*rich note}.{/p}
+{p}{icon:@ContextMenu/Symbols/cm-rich-note:16} For headings, colors and pictures, make it a {link*bnbui:help.rich-notes*rich note}.{/p}
 ]] },
 
 { title = "Note templates", rev = 3, body = [[
@@ -121,16 +121,16 @@ BigNoteBoxDevDocsSeed = {
 ]] },
 
 { title = "Rich notes", rich = false, body = [[
-A rich note is a small page: headings, colours, icons, pictures and links. The toolbar inserts every tag for you, and the preview beside the editor shows the result as you type.
+A rich note is a small page: headings, colors, icons, pictures and links. The toolbar inserts every tag for you, and the preview beside the editor shows the result as you type.
 
 Right-click a note > Convert to rich or normal note.
 
 The tags:
-- {h1}Title{/h1}, {h2}...{/h2}, {h3}...{/h3}: headings. {h1:c} centres one, {h1:r} puts it on the right.
-- {p}text{/p}: a paragraph. {p:c} centred, {p:r} on the right.
-- {col:ff8800}text{/col}: coloured text.
+- {h1}Title{/h1}, {h2}...{/h2}, {h3}...{/h3}: headings. {h1:c} centers one, {h1:r} puts it on the right.
+- {p}text{/p}: a paragraph. {p:c} centerd, {p:r} on the right.
+- {col:ff8800}text{/col}: colored text.
 - {icon:INV_Misc_Note_01:16}: a game icon in the text, 16 pixels.
-- {atlas:name:32} or {atlas:name:32:64}: game art by its atlas name, 32 high (and 64 wide). :c or :r at the end centres it or puts it on the right.
+- {atlas:name:32} or {atlas:name:32:64}: game art by its atlas name, 32 high (and 64 wide). :c or :r at the end centers it or puts it on the right.
 - {img:path:width:height}: a picture.
 - {link*address*text}: a link. {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:16}} is a picture button that opens the Oracle bar.
 - {br}: a new line inside a paragraph.
@@ -156,7 +156,7 @@ Make tokens of your own in Settings > Notes > Tokens.
 { title = "Links in notes", rev = 3, body = [[
 {p}The link button {icon:@Toolbar/tb-link:16} on the editor toolbar puts a link at the cursor. Right-click any link for more choices.{/p}
 {h3}Note links{/h3}
-{p}A link to another note. It keeps working when that note is renamed. If the note is deleted, the link turns grey; Shift-click it to bring the note back from the Trash.{/p}
+{p}A link to another note. It keeps working when that note is renamed. If the note is deleted, the link turns gray; Shift-click it to bring the note back from the Trash.{/p}
 {h3}Waypoint links{/h3}
 {p}{icon:@Toolbar/tb-way:16} A place on the map.{/p}
 - Click: place the waypoint and track it.
@@ -172,7 +172,7 @@ Make tokens of your own in Settings > Notes > Tokens.
 {p}A sticky note is a note pinned to your screen as a small window, so it stays up while you play.{/p}
 - {icon:@ContextMenu/Symbols/cm-sticky-note:16} Right-click a note > Open as sticky note.
 - Drag it to move it, drag an edge or a corner to resize it.
-- Each sticky has its own font, size, colour, background and border.
+- Each sticky has its own font, size, color, background and border.
 - A rich note shows as a rich page on its sticky.
 - {icon:@UI/ui-tasks:16} A note with tasks can show its tasks instead of its text.
 - Stickies come back where you left them after a reload.
@@ -238,7 +238,7 @@ Make tokens of your own in Settings > Notes > Tokens.
 - c this character, g global {icon:@Search/s-icon-global:16}, t tasks {icon:@Search/s-icon-tasks:16}, a alarms {icon:@Search/s-icon-alarm:16}, x rich {icon:@Search/s-icon-rich:16}, l plain.
 - d today, d week, d month: made or edited then.
 - b searches the Trash, o searches the settings, m sends a note to chat.
-- #tag, @who the note is about, * favourites, -word leaves a word out, "an exact phrase".
+- #tag, @who the note is about, * favorites, -word leaves a word out, "an exact phrase".
 {p}Settings: {link*bnbui:settings.modules.oracle*}.{/p}
 ]] },
 
@@ -286,7 +286,7 @@ Make tokens of your own in Settings > Notes > Tokens.
 
 { title = "Backup and import", rev = 3, body = [[
 {p}{link*bnbui:settings.backup*} keeps your notes safe outside the game.{/p}
-- {icon:@ContextMenu/Symbols/cm-export-json:16} Full backup: everything as JSON: your notes, templates, note tokens, tag colours and every settings profile.
+- {icon:@ContextMenu/Symbols/cm-export-json:16} Full backup: everything as JSON: your notes, templates, note tokens, tag colors and every settings profile.
 - Settings backup: every settings profile, without notes.
 - {icon:@ContextMenu/Symbols/cm-export-markdown:16} Selective backup: pick the format and what goes in. Markdown is for reading outside WoW.
 {p}Copy the text and keep it in a file. To bring it back, paste it into Import on the same page. Import also takes shared notes, template codes and profile codes.{/p}

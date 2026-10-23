@@ -41,7 +41,7 @@ Create and manage a complete in-game knowledge library.
 - Global or per-character scope per note
 - Drag-to-reorder notes in the list
 - Pin notes to the top of the list
-- Mark notes as favourites
+- Mark notes as favorites
 - Sort by creation date, last modified, title, or manual order
 - Live search by title or body text
 - Right-click context menu for all actions
@@ -56,7 +56,7 @@ BNB supports both Blizzard-style and custom UI themes.
 
 - Blizzard-style default chrome mode
 - Optional skin mode with custom themes
-- 13 colour presets
+- 13 color presets
 - Brightness control per theme
 - Random theme on login/reload (optional)
 - OLED-friendly dark theme available
@@ -84,7 +84,7 @@ Advanced formatting system for structured notes.
 
 - Heading levels (h1, h2, h3)
 - Paragraph alignment options
-- Colour formatting with picker
+- Color formatting with picker
 - Inline icons and item links
 - Embedded images
 - Clickable links and tooltips
@@ -100,7 +100,7 @@ Floating always-visible notes.
 
 - Pin any note to screen
 - Resize and reposition freely
-- Per-sticky font, size, and colour
+- Per-sticky font, size, and color
 - Transparency controls
 - Rich rendering support
 - Persistent across sessions
