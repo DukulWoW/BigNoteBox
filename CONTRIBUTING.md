@@ -45,7 +45,7 @@ Only change the text on the right side. The key on the left (`"SAVE"`) must stay
 ### Rules
 
 - **Keep placeholders.** `%s`, `%d` and `%%` are filled in by the addon. Every one in the English text must also be in your translation, in the same order.
-- **Keep colour codes and line breaks.** Leave `|cffRRGGBB`, `|r` and `\n` where they are. You can move them to fit your sentence, but do not delete them.
+- **Keep color codes and line breaks.** Leave `|cffRRGGBB`, `|r` and `\n` where they are. You can move them to fit your sentence, but do not delete them.
 - **Missing keys are fine.** Any key you do not translate shows in English, so a partial translation does not break anything.
 - **Save as UTF-8 without BOM.**
 

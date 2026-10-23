@@ -3,7 +3,8 @@
 -- The help topics (UI/HelpData.lua, the same text as the Help folder) in a
 -- window of their own, so a new player has somewhere to start: the table of
 -- contents on the narrow parchment, the page on the wide one, a cover first
--- (logo.tga), Previous / Next along the bottom. Decided with Dukul,
+-- (logo.tga), Previous / Next along the bottom (the cover has one button to
+-- the first topic instead, Dukul, 2026-10-23). Decided with Dukul,
 -- 2026-10-23: Blizzard's Neutral frame kit (the wood "table" tile behind,
 -- UI-Frame-Neutral-CardParchment / -CardParchmentWider, the vertical edge as
 -- the divider, the Neutral nine-slice border and title), fixed size ("the doc
@@ -31,12 +32,16 @@ BNB.HelpBook = HB
 
 local LOGO = "Interface\\AddOns\\BigNoteBox\\Assets\\logo"
 
--- Sizes in window pixels. The parchments keep the shape of their art
-local PARCH_H  = 500
-local TOC_W    = math.floor(254 / 439 * PARCH_H + 0.5)   -- CardParchment 254 x 439
-local PAGE_W   = math.floor(515 / 438 * PARCH_H + 0.5)   -- CardParchmentWider 515 x 438
+-- Sizes in window pixels. The page parchment keeps the shape of its art; the
+-- Contents one is a little narrower than its art (Dukul, 2026-10-23: "make
+-- the left side a little smaller"). 440 high, down from 500, near the skin
+-- window's size (Dukul, 2026-10-23: "Do the same in Normal mode")
+local PARCH_H  = 440
+local TOC_W    = math.floor(254 / 439 * PARCH_H * 0.88 + 0.5)   -- CardParchment 254 x 439
+local PAGE_W   = math.floor(515 / 438 * PARCH_H + 0.5)          -- CardParchmentWider 515 x 438
 local ROW_H    = 22
 local SEARCH_H = 22
+local START_W, START_H = 200, 32   -- the cover's Getting started button
 
 -- Where things sit, per look. Book: inside the wooden border and the burnt
 -- parchment edges, under the shaded tops. Skin: a skin window's title strip
@@ -46,9 +51,10 @@ local SEARCH_H = 22
 local LAYOUTS = {
     book = { side = 26, gap = 16, top = 100, bottom = 26,
              tocW = TOC_W, pageW = PAGE_W, paneH = PARCH_H,
-             search = -60, tocHead = -92, tocList = -124, tocX = 30, tocR = -40, tocB = 34,
-             pageX = 44, pageTop = -64, pageR = -56, pageB = 54,
-             footX = 44, footR = -52, footY = 22, noY = 27, logo = 220, logoY = -48 },
+             -- the 500-high places x 0.88, with the parchments
+             search = -53, tocHead = -82, tocList = -110, tocX = 26, tocR = -35, tocB = 30,
+             pageX = 39, pageTop = -56, pageR = -49, pageB = 52,
+             footX = 39, footR = -46, footY = 19, noY = 24, logo = 170, logoY = -40 },
     skin = { side = 10, gap = 10, top = 38, bottom = 10,
              tocW = 190, pageW = 500, paneH = 440,
              search = -10, tocHead = -42, tocList = -72, tocX = 12, tocR = -24, tocB = 10,
@@ -200,8 +206,14 @@ local function BuildTitle(f)
     mid:SetPoint("LEFT",  lft, "RIGHT", -60, 0)
     mid:SetPoint("RIGHT", rgt, "LEFT",  60,  0)
 
+    -- Bigger than SystemFont_Large (Dukul, 2026-10-23: "make the text in the
+    -- header on the top bigger")
+    local plateFont = CreateFont("BNBHelpBookPlateFont")
+    plateFont:CopyFontObject(_G.SystemFont_Large or BNBFontNormalLarge)
+    local path, _, flags = plateFont:GetFont()
+    if path then plateFont:SetFont(path, 22, flags or "") end
     local fs = tf:CreateFontString(nil, "OVERLAY")
-    fs:SetFontObject(_G.SystemFont_Large or BNBFontNormalLarge)
+    fs:SetFontObject(plateFont)
     fs:SetPoint("CENTER", mid, "CENTER", 0, 0)
     fs:SetTextColor(PLATE_TEXT[1], PLATE_TEXT[2], PLATE_TEXT[3])
     f._artTitle = fs
@@ -361,9 +373,14 @@ function HB.ShowPage(i)
     local cover = current == 0
     frame._cover:SetShown(cover)
     frame._topic:SetShown(not cover)
+    -- The cover has no arrows and no page number: one button to the first
+    -- topic in their place (Dukul, 2026-10-23)
+    frame._prev:SetShown(not cover)
+    frame._next:SetShown(not cover)
+    frame._pageNo:SetShown(not cover)
+    frame._start:SetShown(cover and n > 0)
     if cover then
         gen.n = gen.n + 1
-        frame._pageNo:SetText(L["HELP_BOOK_COVER"])
         frame:SetWindowTitle(L["HELP_BOOK_TITLE"])
     else
         local t = topics[current]
@@ -516,7 +533,9 @@ local function BuildSearch(toc)
     if C.skin then
         BNB.SetBackdropDark(bg)
     else
-        BNB.SetBackdrop(bg, 0.45, 0.28, 0.10, 0.12, 0.40, 0.24, 0.08, 0.9)
+        -- A light paper field with a brown edge (Dukul, 2026-10-23: "Add a
+        -- background to the search box"; the faint wash hardly showed)
+        BNB.SetBackdrop(bg, 1.00, 0.96, 0.86, 0.80, 0.40, 0.24, 0.08, 0.9)
     end
     bg:SetPoint("TOPLEFT",  toc, "TOPLEFT",  LAY.tocX, LAY.search)
     bg:SetPoint("TOPRIGHT", toc, "TOPRIGHT", LAY.tocR + 18, LAY.search)
@@ -635,7 +654,9 @@ local function Build()
     if not C.skin then
         local dv = CreateFrame("Frame", nil, f)
         dv:SetScale(0.5)
-        dv:SetSize(30, PARCH_H / 0.5)
+        -- On past the parchments, under the bottom wood (the border draws
+        -- over it; Dukul, 2026-10-23: "a little further under the wood")
+        dv:SetSize(30, (PARCH_H + LAY.bottom) / 0.5)
         dv:SetPoint("TOP", toc, "TOPRIGHT", (LAY.gap / 2) / 0.5, 0)
         dv:SetFrameLevel(f:GetFrameLevel() + 10)
         local dtx = dv:CreateTexture(nil, "ARTWORK")
@@ -665,6 +686,31 @@ local function Build()
     no:SetPoint("BOTTOM", page, "BOTTOM", -4, LAY.noY)
     Ink(no, C.body)
     f._pageNo = no
+    -- The cover's way in: named after the first topic (Getting started), set
+    -- in HB.Open. A large button with large text (Dukul, 2026-10-23: "make
+    -- the getting started button bigger too")
+    if C.skin then
+        f._start = BNB.CreateSkinButton(nil, page, "", START_W, START_H, 16)
+    else
+        f._start = CreateFrame("Button", nil, page, BNB.PanelButtonTemplate())
+        f._start:SetSize(START_W, START_H)
+        -- The template's own fonts (its colours), copied at 16
+        local function Big(get, set, name)
+            local src = f._start[get](f._start)
+            if not src then return end
+            local fo = CreateFont(name)
+            fo:CopyFontObject(src)
+            local path, _, flags = fo:GetFont()
+            if path then fo:SetFont(path, 16, flags or "") end
+            f._start[set](f._start, fo)
+        end
+        Big("GetNormalFontObject",    "SetNormalFontObject",    "BNBHelpBookStartFont")
+        Big("GetHighlightFontObject", "SetHighlightFontObject", "BNBHelpBookStartFontHL")
+        Big("GetDisabledFontObject",  "SetDisabledFontObject",  "BNBHelpBookStartFontDis")
+    end
+    f._start:SetPoint("BOTTOM", page, "BOTTOM", -4, LAY.footY - 1)
+    f._start:SetScript("OnClick", function() HB.ShowPage(1) end)
+    f._start:Hide()
 
     f:HookScript("OnHide", function() gen.n = gen.n + 1 end)
     return f
@@ -683,6 +729,12 @@ function HB.Open(key)
     local hint = L["HELP_BOOK_HINT"]
     if #topics == 0 then hint = L["HELP_BOOK_EMPTY"] end
     f._cover._hint:SetText(hint)
+    if topics[1] then
+        f._start:SetText((BNB.HelpTopicText(topics[1])))
+        local fs = f._start:GetFontString()
+        local w = fs and fs:GetStringWidth() or 0
+        f._start:SetWidth(math.max(START_W, math.ceil(w) + 48))
+    end
     BNB.SeatWindow(f, f._strata)
     f:ClearAllPoints()
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
