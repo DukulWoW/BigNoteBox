@@ -6,6 +6,141 @@
 
 local BNB = BigNoteBox
 
-BNB.HELP_BUILT = nil
+BNB.HELP_BUILT = 1792757214
 BNB.HELP_TOPICS = {
+    {
+        key = "getting-started", src = "bnb-6ad64115eabc3964", rich = true, clients = nil,
+        title = "Getting started",
+        body = "{p}BigNoteBox is a notepad inside the game. Your notes are kept for your whole account, and each one belongs to every character (Global) or to one character.{/p}\n{h3}Open it{/h3}\n- Type /bnb, press Ctrl+N, or click the minimap button {icon:@icon:16}.\n- F8 makes a new note, F7 a quick note: {link*bnbui:help.quick-notes*Quick notes}.\n- Ctrl+Space opens {link*bnbui:help.oracle-search*Oracle search} from anywhere.\n{h3}Find your notes{/h3}\n{p}The main window shows your notes in one of two ways, and the icon at the top left switches between them:{/p}\n- {icon:@Explorer/ex-explorer-mode:16} The {link*bnbui:help.explorer-view*Explorer view}: your notes and folders as a grid of icons over the whole window, like the file explorer on your computer.\n- {icon:@Explorer/ex-list-mode:16} The {link*bnbui:help.note-list*Note list}: a list on the left, the open note on the right.\n{h3}Write{/h3}\n{p}Open a note and write: {link*bnbui:help.writing-notes*Writing notes}. A new note can start from a {link*bnbui:help.note-templates*template}.{/p}\n{h3}Choose what you use{/h3}\n{p}Most parts of BigNoteBox are modules you can switch on or off: {link*bnbui:help.modules*Modules}. The {link*bnbui:wizard*setup wizard} sets them up for you.{/p}\n{p}{icon:@Documentation/doc-info:16} Right-click almost anything for more choices: a note, a folder, a link, empty space.{/p}",
+    },
+    {
+        key = "note-list", src = "bnb-6ad64115aba01ebb", rich = true, clients = nil,
+        title = "Note list",
+        body = "{p}The list on the left of the main window, beside the open note. The icon {icon:@Explorer/ex-explorer-mode:16} left of the sort dropdown switches to the {link*bnbui:help.explorer-view*Explorer view}. From top to bottom:{/p}\n- {icon:@ContextMenu/Symbols/cm-pinned:16} Pinned: the notes you pinned (right-click > Pin to top).\n- {icon:@ContextMenu/Symbols/cm-folder:16} Your folders: {link*bnbui:help.folders*Folders}.\n- Notes: everything else, in the sort you picked.\n- Patch notes and Help: folders from BigNoteBox itself.\n{h3}Find a note{/h3}\n- {icon:@Explorer/ex-search:16} The search box finds text in titles and notes as you type.\n- {icon:@UI/ui-favorite:16} The star and {icon:@UI/ui-tasks:16} task buttons show only favourites, or notes with tasks.\n- {icon:@UI/ui-folder:16} The folder view and {icon:@UI/ui-treeview:16} tag tree buttons, left of the search box, group notes by folder or by tag.\n{h3}Do things{/h3}\n- Right-click a note for everything you can do with it.\n- Hold a note and drag it: to reorder (Custom sort), or onto a folder.\n- The arrow at the top folds the list to icons only.\n{p}Character tabs beside the list show one character's notes at a time: {link*bnbui:settings.modules.sidebar*}.{/p}",
+    },
+    {
+        key = "explorer-view", src = "bnb-6ada45417fde3bdc", rich = true, clients = nil,
+        title = "Explorer view",
+        body = "{p}The Explorer view shows your notes and folders as a grid of icons over the whole main window, the way the file explorer on your computer shows files. The icon at the top left switches between it {icon:@Explorer/ex-explorer-mode:16} and the {link*bnbui:help.note-list*Note list} {icon:@Explorer/ex-list-mode:16}.{/p}\n{h3}Open and go back{/h3}\n- Double-click a note or a folder to open it.\n- The arrow at the top left, or Esc, takes you back. Next to it is where you are: click Notes there to go back to the top.\n- {icon:@Explorer/ex-chevron-down:16} Pinned and Notes are headers you can fold away.\n{h3}Pick notes{/h3}\n- Click a note to pick it. Ctrl+click picks more, Shift+click picks a row of them, or drag a box around several.\n- The bar at the bottom counts your notes and folders, and what you picked.\n{h3}The buttons along the top{/h3}\n- {icon:@Explorer/ex-new:16} New: a note {icon:@Explorer/ex-new-note:16} in the open folder, or a new folder {icon:@Explorer/ex-new-folder:16}.\n- {icon:@Explorer/ex-copy:16} Copy, {icon:@Explorer/ex-move:16} Move, {icon:@Explorer/ex-delete:16} Delete, {icon:@Explorer/ex-rename:16} Rename, {icon:@Explorer/ex-pin:16} Pin, {icon:@Explorer/ex-favorite:16} Favorite, {icon:@Explorer/ex-share:16} Share and {icon:@Explorer/ex-export:16} Export work on the notes you picked.\n- {icon:@Explorer/ex-sort:16} Sort and Order: how the notes are sorted.\n- {icon:@Explorer/ex-view:16} View: small {icon:@Explorer/ex-view-small:16}, medium {icon:@Explorer/ex-view-medium:16} or large {icon:@Explorer/ex-view-large:16} icons, a list of titles {icon:@Explorer/ex-view-list:16}, details in columns {icon:@Explorer/ex-view-details:16}, or every note in one flat list {icon:@Explorer/ex-view-flat:16}.\n- {icon:@Explorer/ex-search:16} The search button opens a search field; the buttons at its end show only favourites or notes with tasks.\n- {icon:@Explorer/ex-more:16} In a small window, the buttons that do not fit go under More.\n{h3}Drag and right-click{/h3}\n- Drag notes onto a folder to file them. Drop them on Notes in the path to take them out again.\n- {icon:@Explorer/ex-sort-custom:16} In Custom sort, drag the icons into the order you like.\n- Right-click a note, a folder or empty space for everything else. Empty space has Sort by, New folder and the View choices, among them Pinned notes first and Favorites first.\n{h3}Inside a note{/h3}\n{p}The note fills the window. The button at the right end of the toolbar opens the note menu, with Note settings {icon:@Toolbar/tb-notesettings:16} and situations; right-clicking the text has Open note settings at the bottom. The icon beside the title changes the note's icon.{/p}\n{p}Settings: {link*bnbui:settings.modules.explorer*}. There you pick which view the window opens on, and whether it opens on the note you had open when you closed it.{/p}",
+    },
+    {
+        key = "folders", src = "bnb-6ad641151adf46de", rich = true, clients = nil,
+        title = "Folders",
+        body = "{p}Folders keep notes together. They sit between Pinned and your notes, A-Z, and remember whether you left them open.{/p}\n{h3}Put notes in a folder{/h3}\n- {icon:@ContextMenu/Symbols/cm-folder:16} Right-click a note > Move to folder, then a folder or {icon:@ContextMenu/Symbols/cm-folder-add:16} New folder...\n- Drag a note onto a folder header. Drop it on the Notes header to take it out again.\n- {icon:@ContextMenu/Symbols/cm-copy-move:16} Actions > Copy / Move to... can copy or move notes into a folder too.\n- {icon:@Explorer/ex-new-folder:16} In the {link*bnbui:help.explorer-view*Explorer view}, drag notes onto a folder icon, or pick some and right-click empty space > New folder with selection.\n{h3}The folder itself{/h3}\n{p}Right-click a folder to add a note to it, rename it, give it a colour or delete it. A pinned note shows under Pinned and in its folder.{/p}\n{p}{icon:@Documentation/doc-info:16} Deleting a folder never deletes its notes: they go back under Notes.{/p}\n{p}Settings: {link*bnbui:settings.modules.folders*}.{/p}",
+    },
+    {
+        key = "tags", src = "bnb-6ad64115c3964d38", rich = true, clients = nil,
+        title = "Tags",
+        body = "{p}Tags are short words on a note, like Raid or Gold. A note can have as many as you like, and a tag is the same whatever its case.{/p}\n- {icon:@ContextMenu/Symbols/cm-tags-add:16} Right-click a note > Add tags, or add them under the title in the editor.\n- Click a tag to show only the notes that have it.\n- {icon:@UI/ui-treeview:16} The tag tree button groups every note by tag.\n- {icon:@Topbar/Normal/tp-tagmanager-normal:16} The {link*bnbui:tagmanager*} renames, colours and deletes tags across all your notes.",
+    },
+    {
+        key = "writing-notes", src = "bnb-6ad641159f064ec7", rich = true, clients = nil,
+        title = "Writing notes",
+        body = "{p}The editor shows the open note: the title on top, the text below. In the Note list it is the right side of the window; in the Explorer view the note fills the window.{/p}\n- Notes save as you type. A setting can switch this to a Save button.\n- {icon:@Toolbar/tb-undo:16} Undo and {icon:@Toolbar/tb-redo:16} Redo work per note: {link*bnbui:help.history-and-undo*History and undo}.\n- {icon:@ContextMenu/Symbols/cm-locked:16} A locked note cannot be changed: right-click > Lock note / Unlock note.\n- The toolbar above the text inserts waypoints {icon:@Toolbar/tb-way:16}, links {icon:@Toolbar/tb-link:16}, time stamps {icon:@Toolbar/tb-timestamp:16} and {link*bnbui:help.note-tokens*note tokens} {icon:@Toolbar/tb-syntax:16}.\n- The button at the right end of the toolbar opens the note menu: Note settings, situations, alarms, tasks and more.\n- Right-click the text to insert game info; Open note settings is at the bottom.\n- {icon:@Toolbar/tb-notesettings:16} Note settings has the note's look, icon and situation.\n{p}{icon:@ContextMenu/Symbols/cm-rich-note:16} For headings, colours and pictures, make it a {link*bnbui:help.rich-notes*rich note}.{/p}",
+    },
+    {
+        key = "note-templates", src = "bnb-6ada45411100f55b", rich = true, clients = nil,
+        title = "Note templates",
+        body = "{p}A template fills a new note for you: a title, text, tags and a look to start from.{/p}\n{p:c}{icon:@Templates/tmp-blank:40} {icon:@Templates/tmp-boss:40} {icon:@Templates/tmp-weekly:40} {icon:@Templates/tmp-diary:40} {icon:@Templates/tmp-more:40}{/p}\n- The New Note window has Blank, Boss, Weekly and Journal at the top. More shows every template.\n- {icon:@ContextMenu/Symbols/cm-save-template:16} To make your own, right-click a note > Actions > Save as template.\n- {icon:@ContextMenu/Symbols/cm-share:16} A template can be shared as a code, like a note.\n{p}Rename, change or delete your templates, or copy a built-in one, in {link*bnbui:settings.notes.templates*}.{/p}",
+    },
+    {
+        key = "rich-notes", src = "bnb-6ad64115bc710dda", rich = false, clients = nil,
+        title = "Rich notes",
+        body = "A rich note is a small page: headings, colours, icons, pictures and links. The toolbar inserts every tag for you, and the preview beside the editor shows the result as you type.\n\nRight-click a note > Convert to rich or normal note.\n\nThe tags:\n- {h1}Title{/h1}, {h2}...{/h2}, {h3}...{/h3}: headings. {h1:c} centres one, {h1:r} puts it on the right.\n- {p}text{/p}: a paragraph. {p:c} centred, {p:r} on the right.\n- {col:ff8800}text{/col}: coloured text.\n- {icon:INV_Misc_Note_01:16}: a game icon in the text, 16 pixels.\n- {img:path:width:height}: a picture.\n- {link*address*text}: a link. {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:16}} is a picture button that opens the Oracle bar.\n- {br}: a new line inside a paragraph.\n\nWith the Rich Notes module off, every note shows as plain text with its tags visible, like this one (Settings > Modules > Rich Notes).",
+    },
+    {
+        key = "note-tokens", src = "bnb-6ada4541b8cff90d", rich = false, clients = nil,
+        title = "Note tokens",
+        body = "A note token is a word in double braces that BigNoteBox fills in for you. Type {{ in a note to see the list, or use the token button on the toolbar.\n\nHere and now, filled in once when you finish typing it:\n- {{date}}, {{time}}, {{datetime}}: today's date and the time.\n- {{zone}}, {{subzone}}, {{instance}}: where you are.\n- {{target}}: your target's name. {{coords}}: where you stand, as a waypoint link.\n\nYour character: {{me}}, {{name}}, {{realm}}, {{class}}, {{race}}, {{level}}, {{spec}}, {{ilvl}}, {{guild}}, {{gold}} and more. In a rich note these stay in the note and show the character of whoever reads it; in a normal note they become the value right away.\n\nGame data by id: {{item:6948}} and the like show the link. The id is the number in the thing's Wowhead address.\n\nMake tokens of your own in Settings > Notes > Tokens. ",
+    },
+    {
+        key = "links-in-notes", src = "bnb-6ad64115e4af0721", rich = true, clients = nil,
+        title = "Links in notes",
+        body = "{p}The link button {icon:@Toolbar/tb-link:16} on the editor toolbar puts a link at the cursor. Right-click any link for more choices.{/p}\n{h3}Note links{/h3}\n{p}A link to another note. It keeps working when that note is renamed. If the note is deleted, the link turns grey; Shift-click it to bring the note back from the Trash.{/p}\n{h3}Waypoint links{/h3}\n{p}{icon:@Toolbar/tb-way:16} A place on the map.{/p}\n- Click: place the waypoint and track it.\n- Shift-click: put the map pin into chat.\n- Ctrl-click: copy a /way line.\n- Alt-click: show it on the map.\n{p}In a rich note, a typed /way line becomes a link by itself.{/p}\n{h3}BigNoteBox links{/h3}\n{p}The link button's BigNoteBox tab links to a Settings page, a window or a help topic, like this one: {link*bnbui:settings.modules.situations*}. A rich note can make one a picture button: {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:20}} (see {link*bnbui:help.rich-notes*Rich notes}).{/p}",
+    },
+    {
+        key = "sticky-notes", src = "bnb-6ad64115f85c62f2", rich = true, clients = nil,
+        title = "Sticky notes",
+        body = "{p}A sticky note is a note pinned to your screen as a small window, so it stays up while you play.{/p}\n- {icon:@ContextMenu/Symbols/cm-sticky-note:16} Right-click a note > Open as sticky note.\n- Drag it to move it, drag an edge or a corner to resize it.\n- Each sticky has its own font, size, colour, background and border.\n- A rich note shows as a rich page on its sticky.\n- {icon:@UI/ui-tasks:16} A note with tasks can show its tasks instead of its text.\n- Stickies come back where you left them after a reload.\n{p}{icon:@Documentation/doc-info:16} Ctrl+H shows or hides every sticky, Ctrl+J brings them to the front.{/p}\n{p}Settings: {link*bnbui:settings.modules.stickies*}.{/p}",
+    },
+    {
+        key = "situations", src = "bnb-6ad64115a9124b18", rich = true, clients = nil,
+        title = "Situations",
+        body = "{p}{icon:@UI/ui-situation:16} A situation makes a note show up by itself where it matters: a {link*bnbui:help.toasts*toast} shows the note, or it opens as a sticky note.{/p}\n{h3}What can match{/h3}\n- A zone, a sub-zone or an instance.\n- An instance type: dungeon, raid, delve or battleground.\n- A player, an NPC or a guild.\n- A window: vendor, bank, mailbox, auction house or trainer.\n- Being rested, in an inn or a city.\n{h3}Set one{/h3}\n{p}{icon:@ContextMenu/Symbols/cm-create-situation:16} Right-click a note > Create situation, or Note Settings > Situation. With nothing typed, Add uses where you are now or your target. Then pick when it shows (when it starts, when it ends, or both) and how often {icon:@UI/ui-repeat:16} (every time, once a session, once a day, once per reset, or only once). A situation can also place waypoints.{/p}\n{p}Settings: {link*bnbui:settings.modules.situations*}.{/p}",
+    },
+    {
+        key = "toasts", src = "bnb-6ad64115295ae768", rich = true, clients = nil,
+        title = "Toasts",
+        body = "{p}Toasts are small pop-ups on your screen: when a note's situation matches, when tasks reset, after an update.{/p}\n- Click a toast to open its note.\n- You choose which kinds show, where they appear, how they look and how long they stay.\n{p}{icon:@Documentation/doc-info:16} Switched off, nothing pops up, but notes still match where they are set: {link*bnbui:settings.modules.toasts*}.{/p}",
+    },
+    {
+        key = "tasks", src = "bnb-6ad64115319731a7", rich = true, clients = nil,
+        title = "Tasks",
+        body = "{p}{icon:@UI/ui-tasks:16} Tasks are a checklist inside a note, with sub-tasks.{/p}\n- {icon:@ContextMenu/Symbols/cm-create-task:16} Right-click a note > Create task, or add them in the task panel beside the note.\n- Tick a task when it is done; drag tasks to reorder them.\n- {icon:@UI/ui-reset:16} Tasks can untick themselves at the daily or weekly reset, the whole list or one task at a time: good for dailies and weekly chores.\n- A sticky note can show the note's tasks, and you can tick them there.\n- {icon:@UI/ui-tasks:16} The task button above the list shows only notes with tasks.\n{p}Settings: {link*bnbui:settings.modules.tasks*}.{/p}",
+    },
+    {
+        key = "alarms", src = "bnb-6ad641158caa74af", rich = true, clients = nil,
+        title = "Alarms",
+        body = "{p}An alarm on a note rings at a time you pick: a real-world time, an in-game time, or the daily or weekly reset. It can ring once or repeat on the days you choose.{/p}\n- {icon:@ContextMenu/Symbols/cm-create-alarm:16} Right-click a note > Create alarm, or use the alarm button {icon:@Toolbar/tb-alarm:16} on the toolbar.\n- When it rings, the note pops up with a sound. Snooze it or dismiss it.\n- {icon:@Topbar/Normal/tp-alarms-normal:16} The alarm button at the top of the main window lists every alarm.\n{p}Settings: {link*bnbui:settings.modules.alarms*}.{/p}",
+    },
+    {
+        key = "reference-box", src = "bnb-6ad64115b02bee55", rich = true, clients = nil,
+        title = "Reference Box",
+        body = "{p}{icon:@ContextMenu/Symbols/cm-reference-box:16} The Reference Box is a panel beside the editor for the items, spells, quests and links you attach to a note.{/p}\n- Drag an item or a spell onto it, or Shift-click a link while it is open.\n- Hover an entry for its tooltip.\n- {icon:@Toolbar/tb-refbox:16} The toolbar's Reference Box button puts an entry into the text.\n- {icon:@ContextMenu/Symbols/cm-model-view:16} Notes about a player keep their gear here, with a model viewer to look at it.\n{p}Settings: {link*bnbui:settings.modules.refBox*}.{/p}",
+    },
+    {
+        key = "oracle-search", src = "bnb-6ad64115cdf93a99", rich = true, clients = nil,
+        title = "Oracle search",
+        body = "{p}A search bar that finds any note from anywhere in the game, by title, text or tags. Open it with Ctrl+Space or /bnb search.{/p}\n{h3}Open a note{/h3}\n- Enter: open it.\n- Shift: as a sticky note {icon:@ContextMenu/Symbols/cm-sticky-note:16}. Ctrl: in Focus mode {icon:@ContextMenu/Symbols/cm-focus-mode:16}. Alt: in the Reference Box {icon:@ContextMenu/Symbols/cm-reference-box:16}.\n{h3}Narrow it down{/h3}\n{p}Type a letter and a space before your words. Type ? in the bar to see them all.{/p}\n- p player notes, n NPC notes {icon:@Search/s-icon-npc:16}, i notes with an item {icon:@Search/s-icon-items:16}, z notes tied to a zone {icon:@Search/s-icon-situation:16}.\n- c this character, g global {icon:@Search/s-icon-global:16}, t tasks {icon:@Search/s-icon-tasks:16}, a alarms {icon:@Search/s-icon-alarm:16}, x rich {icon:@Search/s-icon-rich:16}, l plain.\n- d today, d week, d month: made or edited then.\n- b searches the Trash, o searches the settings, m sends a note to chat.\n- #tag, @who the note is about, * favourites, -word leaves a word out, \"an exact phrase\".\n{p}Settings: {link*bnbui:settings.modules.oracle*}.{/p}",
+    },
+    {
+        key = "player-and-npc-notes", src = "bnb-6ad6411517893ab3", rich = true, clients = nil,
+        title = "Player and NPC notes",
+        body = "{p}Make a note about a player or an NPC, with their details filled in.{/p}\n- A player: from the Inspect window, or their right-click menu.\n- {icon:@Search/s-icon-npc:16} An NPC: target it and press F6 (Create Note from Target).\n- The note gets their portrait and details, and for a player their gear in the {link*bnbui:help.reference-box*Reference Box}.\n- {icon:@UI/ui-tldr-add:16} Give the note a tl;dr, one short line like KOS: it shows in the game tooltip when you hover them.\n{p}Settings: {link*bnbui:settings.modules.unitNotes*} and {link*bnbui:settings.modules.tldr*}.{/p}",
+    },
+    {
+        key = "quick-notes", src = "bnb-6ad64115a6c638d1", rich = true, clients = nil,
+        title = "Quick notes",
+        body = "{p}{icon:@Explorer/ex-quick-note:16} Ways to make a note in a hurry.{/p}\n- F7 makes a new note at once, in the main window or as a sticky note to type in.\n- {icon:@UI/ui-icon-quest:16} Quest, gossip, book and letter windows get a note button: one click makes a note of what they say.\n- {icon:@BCB/addon-dialogueui:16} Dialogue UI and {icon:@BCB/addon-immersion:16} Immersion get the same button.\n{p}Settings: {link*bnbui:settings.modules.quickNote*}.{/p}",
+    },
+    {
+        key = "focus-mode", src = "bnb-6ad64115416c83a7", rich = true, clients = nil,
+        title = "Focus mode",
+        body = "{p}{icon:@ContextMenu/Symbols/cm-focus-mode:16} Write in full screen, with the game interface hidden and the camera slowly turning around your character.{/p}\n- Open it from the editor toolbar, or with Ctrl+Enter in the Oracle bar.\n- A rich note gets its preview beside the text.\n- Esc or the close button brings everything back as it was.\n{p}Settings: {link*bnbui:settings.modules.focus*}.{/p}",
+    },
+    {
+        key = "history-and-undo", src = "bnb-6ad6411504f5404f", rich = true, clients = nil,
+        title = "History and undo",
+        body = "{p}BigNoteBox keeps earlier versions of your notes.{/p}\n- {icon:@Toolbar/tb-history:16} History: a version of each note is saved when you log out or reload. Compare two versions side by side and bring an old one back (right-click > History).\n- {icon:@Toolbar/tb-restore:16} Restore point: save one by hand before a big change.\n- {icon:@Toolbar/tb-undo:16} Undo: steps per note, and they can be kept between sessions.\n- {icon:@ContextMenu/Symbols/cm-restore-auto:16} Rescue: a note that went missing without being deleted can be brought back from its history.\n{p}{icon:@Documentation/doc-important:16} History and kept undo need the BigNoteBox_History addon, which comes with BigNoteBox. Settings: {link*bnbui:settings.modules.history*} and {link*bnbui:settings.modules.undo*}.{/p}",
+    },
+    {
+        key = "trash", src = "bnb-6ad641150aa79321", rich = true, clients = nil,
+        title = "Trash",
+        body = "{p}{icon:@ContextMenu/Symbols/cm-trash:16} A deleted note goes to the Trash first, for 30 days unless you change it, so you can get it back.{/p}\n- {icon:@Topbar/Normal/tp-trash-normal:16} Open the {link*bnbui:trash*} to restore a note or delete it for good.\n- Notes older than the days you set are removed by themselves.\n- The Oracle's b prefix searches the Trash.\n{p}{icon:@Documentation/doc-important:16} Switched off, deleting a note is permanent: {link*bnbui:settings.modules.trash*}.{/p}",
+    },
+    {
+        key = "backup-and-import", src = "bnb-6ad64115615d93d6", rich = true, clients = nil,
+        title = "Backup and import",
+        body = "{p}{link*bnbui:settings.backup*} keeps your notes safe outside the game.{/p}\n- {icon:@ContextMenu/Symbols/cm-export-json:16} Full backup: everything as JSON: your notes, templates, note tokens, tag colours and every settings profile.\n- Settings backup: every settings profile, without notes.\n- {icon:@ContextMenu/Symbols/cm-export-markdown:16} Selective backup: pick the format and what goes in. Markdown is for reading outside WoW.\n{p}Copy the text and keep it in a file. To bring it back, paste it into Import on the same page. Import also takes shared notes, template codes and profile codes.{/p}\n{p}{icon:@Documentation/doc-info:16} Notes from other note addons can be moved over from {link*bnbui:settings.advanced*}.{/p}",
+    },
+    {
+        key = "sharing-notes", src = "bnb-6ad6411532d4724d", rich = true, clients = nil,
+        title = "Sharing notes",
+        body = "{p}{icon:@ContextMenu/Symbols/cm-share:16} Right-click a note > Share note.{/p}\n- Pick what goes with it: tags, tasks, Reference Box, look, situation, player or NPC data.\n- Send it straight to another player who has BigNoteBox, or copy a share code they paste into Import {icon:@Topbar/Normal/tp-import-normal:16}.\n- {icon:@ContextMenu/Symbols/cm-send-chat:16} Send to Chat posts the note's text in a chat channel, line by line.",
+    },
+    {
+        key = "settings-profiles", src = "bnb-6ad64115eb5bb497", rich = true, clients = nil,
+        title = "Settings profiles",
+        body = "{p}{icon:@Topbar/Normal/tp-settings-normal:16} A profile is a set of settings and window layout. Each character picks one; your notes are the same in every profile.{/p}\n- Make a new profile as a copy of the current one, or from scratch.\n- Export a profile as a code to share or keep; Import one from a code.\n{p}{icon:@Documentation/doc-important:16} Picking another profile reloads the UI.{/p}\n{p}Settings: {link*bnbui:settings.advanced*}.{/p}",
+    },
+    {
+        key = "modules", src = "bnb-6ad64115b2bb4cac", rich = true, clients = nil,
+        title = "Modules",
+        body = "{p}Most parts of BigNoteBox are modules you can switch on or off in {link*bnbui:settings.modules*}. Switching one off hides it everywhere. Your notes keep everything that belongs to it, so switching it back on brings it all back.{/p}\n{p:c}{icon:@UI/ui-mode-minimal:64} {icon:@UI/ui-mode-full:64} {icon:@UI/ui-mode-custom:64}{/p}\n{p}Minimal, Full and Custom at the top of that page switch many at once. The {link*bnbui:wizard*setup wizard} asks the same on your first login.{/p}",
+    },
+    {
+        key = "keys-and-commands", src = "bnb-6ad6411580f66ca0", rich = true, clients = nil,
+        title = "Keys and commands",
+        body = "{h3}Keys{/h3}\n- Ctrl+N: open or close BigNoteBox.\n- F8: new note. F7: quick note. F6: note from your target.\n- Ctrl+Space: Oracle search.\n- Ctrl+H: show or hide every sticky. Ctrl+J: bring stickies to the front.\n{p}{icon:@Documentation/doc-info:16} A key the game or another addon already uses is left alone. Change them in {link*bnbui:settings.general*}.{/p}\n{h3}Commands{/h3}\n- /bnb: open or close the window.\n- /bnb new: a new note.\n- /bnb search text: Oracle search.\n- /bnb config: Settings.\n- /bnb whatsnew: the latest patch notes.\n- /bnb help: this help book.\n- /bnb commands: every command in chat.",
+    },
 }

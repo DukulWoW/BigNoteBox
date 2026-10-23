@@ -41,7 +41,12 @@ function BNB.RegisterSlashCommands()
         elseif cmd == "features" then
             if BNB.FeatureList and BNB.FeatureList.Open then BNB.FeatureList.Open() end
         elseif cmd == "help" then
+            -- The help book (ALL-554); the command list moved to /bnb commands
+            if BNB.HelpBook then BNB.HelpBook.Open() end
+        elseif cmd == "commands" then
             print(L["SLASH_HELP"])
+            print(L["SLASH_HELP_BOOK"])
+            print(L["SLASH_HELP_COMMANDS"])
             print(L["SLASH_HELP_OPEN"])
             print(L["SLASH_HELP_NEW"])
             print(L["SLASH_HELP_SEARCH"])

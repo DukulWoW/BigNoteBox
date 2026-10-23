@@ -819,22 +819,26 @@ function BNB.CreateMainWindow()
     local configBtn = TBIcon(TOPBAR .. "tp-settings", L["MW_CONFIG_TIP"], 1,
         function() if BNB.OpenConfig then BNB.OpenConfig() end end, "tp-settings")
 
-    local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 2,
+    -- The help book (ALL-554, UI/HelpBook.lua), left of Settings
+    local helpBtn = TBIcon(TOPBAR .. "tp-help", L["TB_ITEM_HELP"], 2,
+        function() if BNB.HelpBook then BNB.HelpBook.Toggle() end end, "tp-help")
+
+    local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 3,
         function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end, "tp-trash")
     BNB._toolbarTrashBtn = trashBtn
 
     -- History button (desaturated until history exists)
-    local histBtn = TBIcon(TOPBAR .. "tp-notehistory", L["HISTORY_TOOLBAR_TIP"], 3,
+    local histBtn = TBIcon(TOPBAR .. "tp-notehistory", L["HISTORY_TOOLBAR_TIP"], 4,
         function() if BNB.ToggleHistoryWindow then BNB.ToggleHistoryWindow() end end, "tp-notehistory")
     histBtn:SetIconEnabled(false)
     BNB._toolbarHistoryBtn = histBtn
 
-    local tagsBtn = TBIcon(TOPBAR .. "tp-tagmanager", L["TAG_MGR_TOOLTIP"], 4,
+    local tagsBtn = TBIcon(TOPBAR .. "tp-tagmanager", L["TAG_MGR_TOOLTIP"], 5,
         function() if BNB.ToggleTagManager then BNB.ToggleTagManager() end end, "tp-tagmanager")
     BNB._toolbarTagsBtn = tagsBtn
 
     -- Share/import button — toggles the import-only window
-    local shareTopBtn = TBIcon(TOPBAR .. "tp-import", L["MW_IMPORT_SHARED_TIP"], 5,
+    local shareTopBtn = TBIcon(TOPBAR .. "tp-import", L["MW_IMPORT_SHARED_TIP"], 6,
         function()
             local iw = _G["BNBImportFrame"]
             if iw and iw:IsShown() then
@@ -845,7 +849,7 @@ function BNB.CreateMainWindow()
         end, "tp-import")
 
     -- Alarm overview button
-    local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarms", L["MW_ALARM_TIP"], 6,
+    local alarmOvBtn = TBIcon(TOPBAR .. "tp-alarms", L["MW_ALARM_TIP"], 7,
         function()
             if BNB.AlarmOverview and BNB.AlarmOverview.Toggle then
                 BNB.AlarmOverview.Toggle()
@@ -858,11 +862,11 @@ function BNB.CreateMainWindow()
     -- goes to the Send to Chat window (UI/SendNotePicker.lua). The tp-bcb art
     -- stands in until the button has its own icon
     local sendBtn
-    sendBtn = TBIcon(TOPBAR .. "tp-bcb", L["MW_SEND_NOTE_TIP"], 7,
+    sendBtn = TBIcon(TOPBAR .. "tp-bcb", L["MW_SEND_NOTE_TIP"], 8,
         function() if BNB.ToggleSendNotePicker then BNB.ToggleSendNotePicker(sendBtn) end end, "tp-bcb")
 
     if chrome.StyleIcons then
-        chrome.StyleIcons({ menuBtn, configBtn, trashBtn, histBtn,
+        chrome.StyleIcons({ menuBtn, configBtn, helpBtn, trashBtn, histBtn,
             tagsBtn, shareTopBtn, alarmOvBtn, sendBtn })
     end
 
@@ -1059,6 +1063,7 @@ function BNB.CreateMainWindow()
     -- its key in BigNoteBoxDB.topbarIcons (ALL-112); the icons stop short of
     -- the left-hand controls (TB_LEFT_LIMIT), the rest go into the menu
     configBtn._tbKey, trashBtn._tbKey, histBtn._tbKey = "settings", "trash", "history"
+    helpBtn._tbKey = "help"
     tagsBtn._tbKey, shareTopBtn._tbKey = "tags", "import"
     alarmOvBtn._tbKey, sendBtn._tbKey = "alarms", "send"
     f._tbLeftFrames = { selBtn, dirDD, sortDD }
@@ -1066,7 +1071,7 @@ function BNB.CreateMainWindow()
     -- explorer view hides the rest (ALL-414)
     if BNB.Explorer then BNB.Explorer.AddLeftFrames(f._tbLeftFrames) end
     BNB.InitToolbarIconRow({
-        configBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, sendBtn,
+        configBtn, helpBtn, trashBtn, histBtn, tagsBtn, shareTopBtn, alarmOvBtn, sendBtn,
     })
     f:HookScript("OnSizeChanged", function() BNB.ApplyToolbarIcons() end)
     -- The left-hand controls have no screen position until laid out
@@ -1397,6 +1402,7 @@ local TB_GAP = 6   -- room kept between the left-hand controls and the first ico
 -- white <base> (tinted by the menu) in skin mode
 local TB_ITEMS = {
     settings = { "TB_ITEM_SETTINGS",     "tp-settings" },
+    help     = { "TB_ITEM_HELP",         "tp-help" },
     trash    = { "TB_ITEM_TRASH",        "tp-trash" },
     history  = { "HISTORY_TOOLBAR_TIP",  "tp-notehistory" },
     tags     = { "TAG_MGR_TOOLTIP",      "tp-tagmanager" },

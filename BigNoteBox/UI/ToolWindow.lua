@@ -30,6 +30,11 @@
 --     opts.escClose     add to UISpecialFrames
 --     opts.noGlow       no whole-window Forever glow (the window draws its own,
 --                       e.g. one per pane in History compare)
+--     opts.art          a window that draws all its own art (the help book,
+--                       ALL-554): a plain frame, no template chrome, no skin
+--                       look, no footer; the caller makes the title (sets
+--                       f._artTitle for SetWindowTitle) and the close button,
+--                       which calls f._onClose
 --     opts.keyEsc       ESC closes it through its own key handler
 --                       (BNB.AttachEscClose with onClose), for windows that
 --                       must close on ESC where UISpecialFrames does not reach
@@ -134,6 +139,17 @@ local function BuildSkin(o)
     return f
 end
 
+-- opts.art (ALL-554): the same in both modes, all the art is the caller's
+local function BuildArt(o)
+    local f = CreateFrame("Frame", o.name, UIParent)
+    f:SetSize(o.w, o.h)
+    f._onClose = o.onClose
+    function f:SetWindowTitle(text)
+        if self._artTitle then self._artTitle:SetText(text) end
+    end
+    return f
+end
+
 -- ── Pages (ALL-258) ──────────────────────────────────────────────────────────
 -- A window with a second page (Note History's per-note page, Trash's View)
 -- swaps pages inside itself instead of opening a second window (Dukul,
@@ -210,7 +226,8 @@ function BNB.CreateToolWindow(o)
     -- The close handlers are built before the window exists: look it up then
     local userClose = o.onClose
     o.onClose = function() if userClose then userClose() else f:Hide() end end
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode then f = BuildSkin(o)
+    if o.art then f = BuildArt(o)
+    elseif BigNoteBoxDB and BigNoteBoxDB.skinMode then f = BuildSkin(o)
     else f = BuildNormal(o) end
 
     f._pages   = {}

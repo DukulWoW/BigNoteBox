@@ -674,6 +674,19 @@ function BNB.SkinScrollBar(bar)
     KeepTinted(bar, function() TintScrollBar(bar) end, { track and track.Thumb, bar.Back, bar.Forward })
 end
 
+-- A scrollbar tinted to a fixed colour in both modes, for a window with its
+-- own look (the help book, ALL-554): the same shades as a skin bar
+function BNB.TintScrollBarFixed(bar, r, g, b)
+    if not bar then return end
+    local track = bar.Track
+    KeepTinted(bar, function()
+        TintRegions(track, SB_TINT.track, false, r, g, b)
+        TintRegions(track and track.Thumb, SB_TINT.thumb, false, r, g, b)
+        TintRegions(bar.Back, SB_TINT.arrow, true, r, g, b)
+        TintRegions(bar.Forward, SB_TINT.arrow, true, r, g, b)
+    end, { track and track.Thumb, bar.Back, bar.Forward })
+end
+
 -- Skin-mode sliders (ALL-393, Dukul 2026-10-08: "skin the value sliders"):
 -- MinimalSliderWithSteppersTemplate tinted like the scrollbars, track darker,
 -- thumb and stepper arrows lighter, half as bright while disabled. Called by

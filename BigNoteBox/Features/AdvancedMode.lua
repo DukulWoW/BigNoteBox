@@ -149,10 +149,13 @@ end
 -- on (to see them while writing); in any other note an @ path stays as it is
 -- and draws nothing.
 local ASSET_PREFIX = "Interface\\AddOns\\BigNoteBox\\Assets\\"
+-- {icon:@Toolbar/tb-link:16} is the same for a small picture inside the text
+-- (Dukul, 2026-10-23: icons beside the words that explain a button)
 function AM.ExpandAssetImages(text)
-    if type(text) ~= "string" or not text:find("{img:@", 1, true) then return text end
-    return (text:gsub("{img:@([^:}]+)", function(rel)
-        return "{img:" .. ASSET_PREFIX .. rel:gsub("/", "\\")
+    if type(text) ~= "string" or not text:find("{%a+:@") then return text end
+    return (text:gsub("{(%a+):@([^:}]+)", function(tag, rel)
+        if tag ~= "img" and tag ~= "icon" then return nil end
+        return "{" .. tag .. ":" .. ASSET_PREFIX .. rel:gsub("/", "\\")
     end))
 end
 
@@ -217,7 +220,8 @@ function AM.ToHTML(text, bodySize)
         -- without the Interface\ICONS\ prefix — WoW resolves them natively.
         local function iconTex(name, size)
             size = tonumber(size) or 25
-            if name:match("^%d+$") then
+            -- A file id, or a full path (a help topic's {icon:@...}, above)
+            if name:match("^%d+$") or name:find("\\", 1, true) then
                 return string.format("|T%s:%d:%d|t", name, size, size)
             end
             return string.format("|TInterface\\ICONS\\%s:%d:%d|t", name, size, size)

@@ -20,6 +20,7 @@
 --   BNB.HelpTopic(key)        the topic on this client, or nil
 --   BNB.HelpTopics()          every topic on this client, in order
 --   BNB.OpenHelp(key)         opens it in the main window; false when unknown
+--   BNB.HelpTopicText(t)      title, body (translated, pictures expanded)
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -58,6 +59,16 @@ local function Localized(t)
     local tr = type(loc) == "table" and loc[t.key]
     if type(tr) ~= "table" then return t.title, t.body end
     return tr.title or t.title, tr.body or t.body
+end
+
+-- A topic's title and body as the reader sees them: translated when there
+-- is a translation, Assets pictures expanded, markup kept (the help book,
+-- UI/HelpBook.lua, ALL-554)
+function BNB.HelpTopicText(t)
+    local title, body = Localized(t)
+    local AM = BNB.AdvancedMode
+    body = AM and AM.ExpandAssetImages and AM.ExpandAssetImages(body or "") or (body or "")
+    return title or t.key, body
 end
 
 local function BuildHelpFolder(rich)

@@ -54,7 +54,7 @@ local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 -- Doc mode (ALL-512): the newest seed round in BigNoteBox_Dev/DocsSeed.lua (an
 -- entry's rev, 1 when it has none). Bump it with each round of new or
 -- rewritten topics; BNB.TopUpDocs brings a doc set made earlier up to it.
-local DOC_SEED_REV = 2
+local DOC_SEED_REV = 4
 
 --------------------------------------------------------------------------------
 -- DEFAULTS (SV-03, ALL-136.8)
@@ -116,7 +116,7 @@ BNB.DEFAULTS = {
 
     -- Top bar icons: on the bar (true) or in its menu (false) (ALL-112, Dukul
     -- 2026-10-13); "Show on top bar" in the menu changes them
-    topbarIcons = { send = true, tags = true, history = true, trash = true,
+    topbarIcons = { send = true, tags = true, history = true, trash = true, help = true,
                     alarms = false, import = false, settings = false },
 
     -- Trash
