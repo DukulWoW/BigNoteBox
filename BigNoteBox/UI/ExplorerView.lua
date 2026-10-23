@@ -1192,8 +1192,24 @@ local SQ_ART  = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-note-list-collaps
 local SQ_GROW = 12
 local FOLDER_GLOW = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-folder-glow"
 local FOLDER_GLOW_TOP = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-folder-glow-top"
+local HOVER_SOFT = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-hover-soft"
 local function TileArt(t, kind, sub, fill)
     if BigNoteBoxDB and BigNoteBoxDB.skinMode then
+        -- Skin mode's hover: the toolbar buttons' glow (ui-hover-64, skin
+        -- accent) behind the whole tile, icon and name, not a flat block
+        -- (Dukul, 2026-10-22, ALL-550). List / Details rows keep the fill
+        if kind == "hover" then
+            -- ui-hover-soft = ui-hover-64 with its edges faded to clear: the
+            -- 64 px art keeps a little alpha at its edge, which showed as a
+            -- cut on the sides of a big tile (Dukul, 2026-10-23)
+            local tex = t:CreateTexture(nil, "BACKGROUND", nil, 3)
+            tex:SetAllPoints()
+            tex:SetTexture(HOVER_SOFT)
+            BNB.TintUIIcon(tex)
+            tex._glow = true
+            tex:Hide()
+            return tex
+        end
         return BNB.CreateListRowArt(t, kind, fill)
     end
     local tex = t:CreateTexture(nil, "OVERLAY", nil, sub)
@@ -1234,7 +1250,7 @@ local function GetTile(i)
         t._selL   = BNB.CreateListRowArt(t, "selection", selFill)
         t._hoverL = BNB.CreateListRowArt(t, "hover", hoverFill)
     else
-        t._selL, t._hoverL = t._selT, t._hoverT
+        t._selL, t._hoverL = t._selT, BNB.CreateListRowArt(t, "hover", hoverFill)
     end
     t._sel, t._hover = t._selT, t._hoverT   -- the pair in use, set by ShapeTile
     local fs = t:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
@@ -1276,7 +1292,7 @@ end
 
 -- The hover / pick pair for this view; the pick is shown again on a swap
 local function UseArt(t, sel, hover)
-    if t._sel == sel then return end
+    if t._sel == sel and t._hover == hover then return end   -- skin mode: same pick, other hover
     t._sel:Hide(); t._hover:Hide()
     t._sel, t._hover = sel, hover
     t._sel:SetShown((t._pickKey ~= nil and _pick[t._pickKey] == true)
@@ -1454,7 +1470,12 @@ local function BuildColumnHeader()
         local b = CreateFrame("Button", nil, hdr)
         b:SetHeight(COLHDR_H)
         local hl = b:CreateTexture(nil, "BACKGROUND")
-        hl:SetAllPoints(); hl:SetColorTexture(1, 1, 1, 0.06); hl:Hide()
+        hl:SetAllPoints(); hl:Hide()
+        if BigNoteBoxDB and BigNoteBoxDB.skinMode then   -- the toolbar glow (ALL-550)
+            hl:SetTexture(BNB.UI_HOVER_TEX); BNB.TintUIIcon(hl)
+        else
+            hl:SetColorTexture(1, 1, 1, 0.06)
+        end
         local fs = b:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         fs:SetWordWrap(false)
         fs:SetText(L[c.title])

@@ -10,7 +10,7 @@ authoritative one.
 | CallbackHandler-1.0 | 8 | No license notice in the file; part of the Ace3 project |
 | LibDataBroker-1.1 | 4 | No license notice in the file |
 | LibDBIcon-1.0 | 57 | No license notice in the file |
-| LibSharedMedia-3.0 | 12000004 | LGPL v2.1 (stated in `LibSharedMedia-3.0.lua`) |
+| LibSharedMedia-3.0 | 12000005 | LGPL v2.1 (stated in `LibSharedMedia-3.0.lua`) |
 | LibSerialize | 7 | MIT, Copyright (c) 2020 Ross Nichols (full text in `LibSerialize.lua`) |
 | LibDeflate | 1.0.2 | zlib License, Copyright 2018-2020 Haoqian He (stated in `LibDeflate.lua`) |
 | LibCustomGlow-1.0 | 25 | No license notice in the file |

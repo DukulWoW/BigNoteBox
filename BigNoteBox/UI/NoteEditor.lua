@@ -60,7 +60,7 @@ function BNB.UpdateSaveButtonState()
     local enabled = BNB._dirty == true
     saveBtn._showsDirty = enabled   -- MarkDirty skips the update while true
     saveBtn:SetEnabled(enabled)
-    saveBtn:SetAlpha(enabled and 1.0 or 0.4)
+    saveBtn:SetAlpha(enabled and 1.0 or BNB.DimAlpha(0.4))
     if saveBtn._tx then saveBtn._tx:SetDesaturated(not enabled) end
     -- Keep focus button in sync: disabled with no note or a locked note
     local hasNote = BNB._currentNoteID ~= nil
@@ -1048,7 +1048,7 @@ local function BuildToolbar(parent)
         -- Helper: set enabled + visual state (alpha + desaturation)
         btn.SetIconEnabled = function(self, enabled)
             self:SetEnabled(enabled)
-            self:SetAlpha(enabled and 1.0 or 0.4)
+            self:SetAlpha(enabled and 1.0 or BNB.DimAlpha(0.4))
             pcall(function() tx:SetDesaturated(not enabled) end)
         end
         return btn, tx
@@ -1866,6 +1866,14 @@ local function ApplySystemNote()
             b:SetIconEnabled(false)
         end
     end
+    -- Share, Copy/Move, Alarm, History and Restore are set again by their own
+    -- refreshes on every note load; Note settings has none, so it is turned
+    -- back on here (ALL-549: it stayed grey after a system note until /reload).
+    local ns = BNB._wysiwygNoteSetBtn
+    if ns then
+        if sys then ns._sysOff = true
+        elseif ns._sysOff then ns:SetIconEnabled(true); ns._sysOff = nil end
+    end
 end
 
 local function SetEditorLocked(locked)
@@ -1902,7 +1910,7 @@ local function SetEditorLocked(locked)
         if toolbar._saveBtn then
             saveBtn._showsDirty = (not locked and BNB._dirty == true)
             saveBtn:SetEnabled(not locked and BNB._dirty == true)
-            saveBtn:SetAlpha((not locked and BNB._dirty == true) and 1.0 or 0.4)
+            saveBtn:SetAlpha((not locked and BNB._dirty == true) and 1.0 or BNB.DimAlpha(0.4))
             pcall(function() saveBtn._tx:SetDesaturated(locked or not BNB._dirty) end)
         end
         if toolbar._delBtn then toolbar._delBtn:SetIconEnabled(not locked) end

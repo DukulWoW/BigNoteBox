@@ -430,7 +430,7 @@ local function SetFavFilter(active, favBtn, outerClear)
     _favFilterActive = active
     BNB._favFilterActive = active
     if favBtn then
-        favBtn:SetAlpha(active and 1.0 or 0.35)
+        favBtn:SetAlpha(active and 1.0 or BNB.DimAlpha(0.35))
         pcall(function() favBtn._tx:SetDesaturated(not active) end)
     end
     if BNB._applyOuterClearState then BNB._applyOuterClearState() end
@@ -461,7 +461,7 @@ local function BuildSearchBar(parent)
         return db.treeSource ~= "folders"
     end
     local function ApplyLit(btn, tx, on)
-        btn:SetAlpha(on and 1.0 or 0.35)
+        btn:SetAlpha(on and 1.0 or BNB.DimAlpha(0.35))
         pcall(function() tx:SetDesaturated(not on) end)
     end
     -- tint = the search row's white art (gold / skin accent). texOn = the
@@ -608,7 +608,7 @@ local function BuildSearchBar(parent)
         GameTooltip:Show()
     end)
     favBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(_favFilterActive and 1.0 or 0.35)
+        self:SetAlpha(_favFilterActive and 1.0 or BNB.DimAlpha(0.35))
         GameTooltip:Hide()
     end)
     BNB._favBtn = favBtn   -- stored so MainWindow OnHide and collapse can reset it
@@ -628,7 +628,7 @@ local function BuildSearchBar(parent)
     local function SetTaskFilter(active)
         _taskFilterActive = active
         BNB._taskFilterActive = active
-        taskFilterBtn:SetAlpha(active and 1.0 or 0.35)
+        taskFilterBtn:SetAlpha(active and 1.0 or BNB.DimAlpha(0.35))
         pcall(function() taskFilterTx:SetDesaturated(not active) end)
         if BNB._applyOuterClearState then BNB._applyOuterClearState() end
         BNB.RefreshNoteList()
@@ -643,7 +643,7 @@ local function BuildSearchBar(parent)
         GameTooltip:Show()
     end)
     taskFilterBtn:SetScript("OnLeave", function(self)
-        self:SetAlpha(_taskFilterActive and 1.0 or 0.35)
+        self:SetAlpha(_taskFilterActive and 1.0 or BNB.DimAlpha(0.35))
         GameTooltip:Hide()
     end)
     BNB._taskFilterBtn = taskFilterBtn
@@ -663,7 +663,7 @@ local function BuildSearchBar(parent)
     local function ApplyOuterClearState()
         local active = _favFilterActive or _taskFilterActive or (currentFilter ~= "")
             or (currentTagFilter ~= nil)
-        outerClear:SetAlpha(active and 1.0 or 0.40)
+        outerClear:SetAlpha(active and 1.0 or BNB.DimAlpha(0.40))
         pcall(function() oTex:SetDesaturated(not active) end)
     end
     ApplyOuterClearState()

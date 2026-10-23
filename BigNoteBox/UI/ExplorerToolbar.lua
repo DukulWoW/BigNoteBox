@@ -328,12 +328,12 @@ local function PaintButton(b)
     local icon = type(spec.icon) == "function" and spec.icon() or spec.icon
     b._ic:SetTexture(ART .. icon)
     b._ic:SetDesaturated(not on)
-    b._ic:SetAlpha(on and 1 or 0.35)
+    b._ic:SetAlpha(on and 1 or BNB.DimAlpha(0.35))
     if b._fs then
         b._fs:SetText(Text(spec.title) or "")
         b._fs:SetAlpha(on and 1 or 0.45)
     end
-    if b._ar then b._ar:SetAlpha(on and 1 or 0.35) end
+    if b._ar then b._ar:SetAlpha(on and 1 or BNB.DimAlpha(0.35)) end
 end
 
 local function MakeButton(parent, spec)

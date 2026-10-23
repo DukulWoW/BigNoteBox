@@ -74,7 +74,7 @@ function BNB.CreateToolbarIconButton(parent, tex, tip)
     btn._tx = tx
     btn.SetIconEnabled = function(self, en)
         self:SetEnabled(en)
-        self:SetAlpha(en and 1.0 or 0.30)
+        self:SetAlpha(en and 1.0 or BNB.DimAlpha(0.30))
         pcall(function() tx:SetDesaturated(not en) end)
     end
     btn:SetScript("OnEnter", function(self)
@@ -1182,6 +1182,21 @@ function BNB.TintUIIcon(tx, shade)
         local g = BNB.ICON_GOLD
         tx:SetVertexColor(g[1] * k, g[2] * k, g[3] * k)
     end
+end
+
+-- Alpha of a greyed-out (or switched-off) icon: `base` in most looks. A skin
+-- whose accent is dark (OLED Flat's 0.2 grey) gets it raised so the icon keeps
+-- DIM_FLOOR brightness, never past DIM_CAP: 35% of an icon that dark was black
+-- on black (ALL-551, 2026-10-23). Read when the state is set.
+local DIM_FLOOR, DIM_CAP = 0.20, 0.70   -- 0.20 = OLED Flat's old active icon (Dukul, 2026-10-23)
+function BNB.DimAlpha(base)
+    if not (BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset and BNB.SkinAccentOf) then
+        return base
+    end
+    local r, g, b = BNB.SkinAccentOf(BNB.GetSkinPreset())
+    local v = math.max(r, g, b)
+    if v <= 0 then return base end
+    return math.max(base, math.min(DIM_CAP, DIM_FLOOR / v))
 end
 
 -- The hover glow over `tx` (default: the whole button), shown by the client

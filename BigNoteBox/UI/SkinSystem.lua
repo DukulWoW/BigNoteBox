@@ -57,8 +57,9 @@ BNB.SKIN_PRESETS = {
     oled       = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.18, bg_=0.18, bb=0.18, text=0.80, noBright=true },
     -- Flat OLED (Dukul's Skin Lab export, 2026-10-12): no borders or dividers
     -- (borderAlpha 0 + fadeRules, ALL-455); buttons stand out by the floor in
-    -- SkinButtonOf (ALL-454)
-    oledflat   = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.00, bg_=0.00, bb=0.00, accent={ 0.200, 0.200, 0.200 }, header={ 0.455, 0.373, 0.173 }, text=0.55, noBright=true, borderAlpha=0.00, fadeRules=true },
+    -- SkinButtonOf (ALL-454). Accent 0.2 -> 0.3: the icons a bit brighter, a greyed
+    -- one as bright as an active one was (Dukul, 2026-10-23, ALL-551)
+    oledflat   = { r=0.000, g=0.000, b=0.000, lift=0.00, br=0.00, bg_=0.00, bb=0.00, accent={ 0.300, 0.300, 0.300 }, header={ 0.455, 0.373, 0.173 }, text=0.55, noBright=true, borderAlpha=0.00, fadeRules=true },
 }
 
 -- Display order of the presets: the one list Settings > Appearance and the

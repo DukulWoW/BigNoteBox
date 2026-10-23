@@ -221,7 +221,7 @@ local function MakeIconToolbarBtn(f, iconTex, tooltipText, x, y, onClick, stateB
         if self._stateArt then
             Refresh()
         else
-            self:SetAlpha(on and 1.0 or 0.4)
+            self:SetAlpha(on and 1.0 or BNB.DimAlpha(0.4))
             pcall(function() iconTx:SetDesaturated(not on) end)
         end
     end
