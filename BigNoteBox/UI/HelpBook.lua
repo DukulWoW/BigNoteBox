@@ -11,9 +11,18 @@
 -- window shouldn't be resizeable"). Skin mode has its own version (Dukul,
 -- 2026-10-23): a skin window, Contents and page as two skin panels, white
 -- text, accent headings; the same pages and controls. Retail and
--- Forever first; Classic waits on Dukul's art check. Later stages: chapters
--- from doc-mode folders, the "?" icons and help links open it, the patch
--- notes move in.
+-- Forever first; Classic waits on Dukul's art check. Later stages: the "?"
+-- icons and help links open it, the patch notes move in.
+--
+-- Chapters (stage 2, decided with Dukul 2026-10-23): each doc-mode folder is
+-- a chapter (BNB.HelpChapters, UI/Help.lua). The pages run: the cover, the
+-- topics in no chapter, then per chapter its own cover and its topics. A
+-- chapter cover has the chapter's number and name, its Cover note's picture
+-- and intro, and its topics as links; Previous / Next stay, and the page
+-- number's spot holds a button to its first topic (the main cover has only
+-- that button). Contents: chapter names as headers (click = its cover), its
+-- topics indented under them, never folded; a search keeps the header of a
+-- chapter with a match.
 --
 -- The page is dark ink on parchment: the topic markup is the same as in a
 -- note, so the book swaps the light link colours for darker ones and tints
@@ -40,6 +49,9 @@ local PARCH_H  = 440
 local TOC_W    = math.floor(254 / 439 * PARCH_H * 0.88 + 0.5)   -- CardParchment 254 x 439
 local PAGE_W   = math.floor(515 / 438 * PARCH_H + 0.5)          -- CardParchmentWider 515 x 438
 local ROW_H    = 22
+local HEAD_GAP = 6    -- space above a chapter header in Contents
+local INDENT   = 14   -- a chapter's topics in Contents
+local PIC      = 64   -- a chapter cover's picture
 local SEARCH_H = 22
 local START_W, START_H = 200, 32   -- the cover's Getting started button
 
@@ -104,10 +116,14 @@ local INK_SWAP = {
 -- Assets folders whose art is white (drawn brown here); the rest has its own colours
 local WHITE_ART = { Toolbar = true, Explorer = true, Documentation = true }
 
-local frame, coverFont
-local topics = {}
-local hay = {}             -- hay[i] = topics[i]'s title and text, plain and lower case (search)
-local current = 0          -- 0 = the cover, i = topics[i]
+local frame, coverFont, chapterFont, chapterRowFont
+-- The pages after the cover, in order. A topic: { kind = "topic", topic =
+-- t, chapterPage = its chapter cover's index or nil }. A chapter cover:
+-- { kind = "chapter", chapter = { ch, topics }, no = its number, first =
+-- the index of its first topic }
+local pages = {}
+local hay = {}             -- hay[i] = pages[i]'s text, plain and lower case (search)
+local current = 0          -- 0 = the cover, i = pages[i]
 local gen = { n = 0 }      -- drops a render a newer page replaced
 
 -- The quest log's text font: made for dark ink on parchment, and the
@@ -232,15 +248,33 @@ end
 
 -- ── Table of contents ────────────────────────────────────────────────────────
 
--- The row in list slot `slot` (0 = the top); row._i is the page it opens
+-- A chapter header's font in Contents: the quest title font, smaller
+local function ChapterRowFont()
+    if chapterRowFont then return chapterRowFont end
+    chapterRowFont = CreateFont("BNBHelpBookChapterRowFont")
+    chapterRowFont:CopyFontObject(TitleFont())
+    local path, _, flags = chapterRowFont:GetFont()
+    if path then chapterRowFont:SetFont(path, 15, flags or "") end
+    chapterRowFont:SetShadowOffset(0, 0)
+    return chapterRowFont
+end
+
+-- A page's name: the topic's title, or the chapter's name
+local function PageName(i)
+    local pg = pages[i]
+    if not pg then return "" end
+    if pg.kind == "chapter" then return (BNB.HelpChapterText(pg.chapter.ch)) end
+    return (BNB.HelpTopicText(pg.topic))
+end
+
+-- The row in list slot `slot` (0 = the top), placed by FillToc; row._i is
+-- the page it opens, row._head = a chapter header
 local function TocRow(slot)
     local toc = frame._tocChild
     local row = frame._rows[slot + 1]
     if row then return row end
     row = CreateFrame("Button", nil, toc)
     row:SetHeight(ROW_H)
-    row:SetPoint("TOPLEFT",  toc, "TOPLEFT",  0, -slot * ROW_H)
-    row:SetPoint("TOPRIGHT", toc, "TOPRIGHT", 0, -slot * ROW_H)
     -- Hover only: the open topic is marked by its colour (a fill drew a hard
     -- edge on the shaded parchment, first test 2026-10-23)
     local hl = row:CreateTexture(nil, "HIGHLIGHT")
@@ -248,26 +282,32 @@ local function TocRow(slot)
     hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], C.hover[4])
     row._fs = row:CreateFontString(nil, "OVERLAY")
     row._fs:SetFontObject(BookFont())
-    row._fs:SetPoint("LEFT", row, "LEFT", 6, 0)
-    row._fs:SetPoint("RIGHT", row, "RIGHT", -4, 0)
     row._fs:SetJustifyH("LEFT")
     row._fs:SetWordWrap(false)
-    row._i = 0
+    row._i, row._y = 0, 0
     row:SetScript("OnClick", function(self) HB.ShowPage(self._i) end)
     frame._rows[slot + 1] = row
     return row
 end
 
--- A topic's searchable text: title and body without markup, lower case
-local function Haystack(t)
-    local title, body = BNB.HelpTopicText(t)
-    local s = (title or "") .. "\n" .. (body or "")
+-- Markup out, lower case: what a search looks through
+local function Plain(s)
+    s = tostring(s or "")
     s = s:gsub("|T.-|t", " ")
          :gsub("|H.-|h(.-)|h", "%1")
          :gsub("|c%x%x%x%x%x%x%x%x", "")
          :gsub("|r", "")
          :gsub("{[^}]*}", " ")
     return s:lower()
+end
+
+-- A page's searchable text: a topic's title and body, a chapter's name and intro
+local function Haystack(i)
+    local pg = pages[i]
+    local a, b
+    if pg.kind == "chapter" then a, b = BNB.HelpChapterText(pg.chapter.ch)
+    else a, b = BNB.HelpTopicText(pg.topic) end
+    return Plain((a or "") .. "\n" .. (b or ""))
 end
 
 -- The search box's words, lower case; empty = no search
@@ -279,10 +319,10 @@ local function SearchWords()
     return words
 end
 
--- Every word must be in the topic, anywhere in its title or text
+-- Every word must be in the page, anywhere in its title or text
 local function Matches(i, words)
     local h = hay[i]
-    if not h then h = Haystack(topics[i]); hay[i] = h end
+    if not h then h = Haystack(i); hay[i] = h end
     for _, w in ipairs(words) do
         if not h:find(w, 1, true) then return false end
     end
@@ -291,46 +331,87 @@ end
 
 local MarkToc
 
--- The list: every topic, or while searching only the topics that have the
--- words (Dukul, 2026-10-23). No Cover row: the book opens on the cover, and
--- Previous on the first topic goes back to it (Dukul: "remove Cover")
+-- The list: every page, or while searching only the pages that have the
+-- words (Dukul, 2026-10-23), plus the header of a chapter one of whose
+-- topics has them. No Cover row: the book opens on the cover, and Previous
+-- on the first page goes back to it (Dukul: "remove Cover")
 local function FillToc()
     local words = SearchWords()
-    local pages = {}
-    for i = 1, #topics do
-        if #words == 0 or Matches(i, words) then pages[#pages + 1] = i end
+    local searching = #words > 0
+    local show, hits = {}, {}
+    for i, pg in ipairs(pages) do
+        if not searching or Matches(i, words) then
+            show[i] = true
+            hits[#hits + 1] = i
+            if pg.chapterPage then show[pg.chapterPage] = true end
+        end
     end
-    for slot, i in ipairs(pages) do
-        local row = TocRow(slot - 1)
-        row._i = i
-        row._fs:SetText((BNB.HelpTopicText(topics[i])))
-        row:Show()
+    local toc = frame._tocChild
+    local slot, y = 0, 0
+    for i, pg in ipairs(pages) do
+        if show[i] then
+            local head = pg.kind == "chapter"
+            if head and slot > 0 then y = y + HEAD_GAP end
+            local row = TocRow(slot)
+            slot = slot + 1
+            row:ClearAllPoints()
+            row:SetPoint("TOPLEFT",  toc, "TOPLEFT",  0, -y)
+            row:SetPoint("TOPRIGHT", toc, "TOPRIGHT", 0, -y)
+            row._i, row._y, row._head = i, y, head
+            local fs = row._fs
+            fs:SetFontObject(head and ChapterRowFont() or BookFont())
+            fs:ClearAllPoints()
+            fs:SetPoint("LEFT",  row, "LEFT",  6 + (pg.chapterPage and INDENT or 0), 0)
+            fs:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+            fs:SetText(PageName(i))
+            row:Show()
+            y = y + ROW_H
+        end
     end
-    for k = #pages + 1, #frame._rows do frame._rows[k]:Hide() end
-    frame._noMatch:SetShown(#words > 0 and #pages == 0)
-    frame._tocPages = pages
-    frame._tocChild:SetHeight(math.max(1, #pages * ROW_H))
+    for k = slot + 1, #frame._rows do frame._rows[k]:Hide() end
+    frame._noMatch:SetShown(searching and #hits == 0)
+    frame._tocHits = hits
+    frame._tocChild:SetHeight(math.max(1, y))
     frame._tocScroll:SetVerticalScroll(0)
     MarkToc()
 end
 
 function MarkToc()
-    local slot
-    for k, row in ipairs(frame._rows) do
+    local mark
+    for _, row in ipairs(frame._rows) do
         local on = row:IsShown() and row._i == current
-        if on then slot = k - 1 end
-        Ink(row._fs, on and C.pick or C.body)
+        if on then mark = row end
+        Ink(row._fs, on and C.pick or (row._head and C.title or C.body))
     end
-    -- Keep the open topic in view, when the list shows it
-    if not slot then return end
+    -- Keep the open page in view, when the list shows it
+    if not mark then return end
     local sf = frame._tocScroll
-    local y, viewH = slot * ROW_H, sf:GetHeight()
+    local y, viewH = mark._y, sf:GetHeight()
     local s = sf:GetVerticalScroll()
     if y < s then sf:SetVerticalScroll(y)
     elseif y + ROW_H > s + viewH then sf:SetVerticalScroll(math.max(0, y + ROW_H - viewH)) end
 end
 
 -- ── The page ─────────────────────────────────────────────────────────────────
+
+-- The width a page's text gets: its scroll frame's, once laid out
+local function TextWidth(sf)
+    local w = sf:GetWidth()
+    if not (w and w > 0) then w = LAY.pageW - 100 end
+    return w
+end
+
+-- Draws markup into a page's render frame; -> its height
+local function RenderMarkup(rf, text, w)
+    rf:SetWidth(w)
+    local rawST = getmetatable(rf).__index.SetText
+    local html = BNB.AdvancedMode.ToHTML(text)
+    if not C.skin then html = Parchment(html) end
+    rawST(rf, html)
+    local h = rf:GetContentHeight()
+    rf:SetHeight(h)
+    return h
+end
 
 -- Next frame: a SimpleHTML's width is never set while the client lays out
 -- (FOR-30), and a newer page drops this one
@@ -341,20 +422,12 @@ local function RenderTopic(t)
         if my ~= gen.n or not frame:IsShown() then return end
         local AM = BNB.AdvancedMode
         local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
-        local w = sf:GetWidth()
-        if not (w and w > 0) then w = LAY.pageW - 100 end
+        local w = TextWidth(sf)
         hold:SetWidth(w)
         local _, body = BNB.HelpTopicText(t)
         if t.rich and AM then
             pfs:Hide(); rf:Show()
-            rf:SetWidth(w)
-            local rawST = getmetatable(rf).__index.SetText
-            local html = AM.ToHTML(body)
-            if not C.skin then html = Parchment(html) end
-            rawST(rf, html)
-            local h = rf:GetContentHeight()
-            rf:SetHeight(h)
-            hold:SetHeight(h + 8)
+            hold:SetHeight(RenderMarkup(rf, body, w) + 8)
         else
             -- A plain topic (Rich notes, Note tokens): its markup shows as typed
             rf:Hide(); pfs:Show()
@@ -366,29 +439,104 @@ local function RenderTopic(t)
     end)
 end
 
+-- A chapter cover: picture, "Chapter N", the name, the intro, its topics as
+-- links (the page's link handler turns to them). Next frame, as a topic
+local function RenderChapter(pg)
+    gen.n = gen.n + 1
+    local my = gen.n
+    C_Timer.After(0, function()
+        if my ~= gen.n or not frame:IsShown() then return end
+        local cp = frame._chapter
+        local sf, hold = cp._scroll, cp._hold
+        local w = TextWidth(sf)
+        hold:SetWidth(w)
+        local ch = pg.chapter.ch
+        local name, body = BNB.HelpChapterText(ch)
+
+        local top = 6
+        local pic = cp._pic
+        if ch.icon then
+            pic:SetTexture(ch.icon)
+            -- White Assets art in the page's brown, as in a topic (Parchment)
+            local folder = type(ch.icon) == "string" and ch.icon:match("^Interface\\AddOns\\BigNoteBox\\Assets\\(%a+)\\")
+            if not C.skin and folder and WHITE_ART[folder] then
+                pic:SetVertexColor(90 / 255, 58 / 255, 26 / 255)
+            else
+                pic:SetVertexColor(1, 1, 1)
+            end
+            pic:Show()
+            top = top + PIC + 12
+        else
+            pic:Hide()
+        end
+        local no, nm = cp._no, cp._name
+        no:ClearAllPoints()
+        no:SetPoint("TOP", hold, "TOP", 0, -top)
+        no:SetText(string.format(L["HELP_BOOK_CHAPTER_FMT"], pg.no))
+        nm:SetWidth(w - 20)
+        nm:SetText(name)
+        top = top + no:GetStringHeight() + 4 + nm:GetStringHeight() + 18
+
+        -- The intro, then the chapter's topics: note links to their Help ids,
+        -- as docs-build writes a link between topics
+        local lines = {}
+        if body and body:find("%S") then lines[1] = body end
+        for _, t in ipairs(pg.chapter.topics) do
+            local title = tostring((BNB.HelpTopicText(t))):gsub("|", "")
+            lines[#lines + 1] = string.format("- |cff6cb4ee|Hbnbnote:%s|h%s|h|r", BNB.HelpNoteID(t.key), title)
+        end
+        local rf = cp._rf
+        rf:ClearAllPoints()
+        rf:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, -top)
+        hold:SetHeight(top + RenderMarkup(rf, table.concat(lines, "\n"), w) + 8)
+        sf:SetVerticalScroll(0)
+    end)
+end
+
+-- The one big button: on the main cover and in a chapter cover's page
+-- number spot, named after the page it opens; nil = hidden
+local function SetStart(to)
+    local b = frame._start
+    if not (to and pages[to]) then b:Hide(); return end
+    b._to = to
+    b:SetText(PageName(to))
+    local fs = b:GetFontString()
+    local w = fs and fs:GetStringWidth() or 0
+    b:SetWidth(math.max(START_W, math.ceil(w) + 48))
+    b:Show()
+end
+
 function HB.ShowPage(i)
     if not frame then return end
-    local n = #topics
+    local n = #pages
     current = math.max(0, math.min(i or 0, n))
-    local cover = current == 0
-    frame._cover:SetShown(cover)
-    frame._topic:SetShown(not cover)
+    local pg = pages[current]
+    local kind = pg and pg.kind or "cover"
+    frame._cover:SetShown(kind == "cover")
+    frame._topic:SetShown(kind == "topic")
+    frame._chapter:SetShown(kind == "chapter")
     -- The cover has no arrows and no page number: one button to the first
-    -- topic in their place (Dukul, 2026-10-23)
-    frame._prev:SetShown(not cover)
-    frame._next:SetShown(not cover)
-    frame._pageNo:SetShown(not cover)
-    frame._start:SetShown(cover and n > 0)
-    if cover then
+    -- page in their place (Dukul, 2026-10-23). A chapter cover keeps the
+    -- arrows; the button to its first topic takes the page number's spot
+    frame._prev:SetShown(kind ~= "cover")
+    frame._next:SetShown(kind ~= "cover")
+    frame._pageNo:SetShown(kind == "topic")
+    if kind == "cover" then
         gen.n = gen.n + 1
         frame:SetWindowTitle(L["HELP_BOOK_TITLE"])
+        SetStart(n > 0 and 1 or nil)
     else
-        local t = topics[current]
-        -- The topic's name goes on the title plate, not on the page (Dukul,
+        -- The page's name goes on the title plate, not on the page (Dukul,
         -- 2026-10-23: "Writing Notes - BigNoteBox Help")
-        frame:SetWindowTitle(string.format(L["HELP_BOOK_TITLE_FMT"], (BNB.HelpTopicText(t))))
-        frame._pageNo:SetText(string.format(L["HELP_BOOK_PAGE_FMT"], current, n))
-        RenderTopic(t)
+        frame:SetWindowTitle(string.format(L["HELP_BOOK_TITLE_FMT"], PageName(current)))
+        if kind == "chapter" then
+            SetStart(pg.first)
+            RenderChapter(pg)
+        else
+            SetStart(nil)
+            frame._pageNo:SetText(string.format(L["HELP_BOOK_PAGE_FMT"], current, n))
+            RenderTopic(pg.topic)
+        end
     end
     frame._prev:SetEnabled(current > 0)
     frame._next:SetEnabled(current < n)
@@ -397,8 +545,8 @@ end
 
 -- A help topic by key; false when this client has no such topic
 function HB.ShowKey(key)
-    for i, t in ipairs(topics) do
-        if t.key == key then HB.ShowPage(i); return true end
+    for i, pg in ipairs(pages) do
+        if pg.topic and pg.topic.key == key then HB.ShowPage(i); return true end
     end
     return false
 end
@@ -447,13 +595,12 @@ local function BuildCover(page)
     return cv
 end
 
-local function BuildTopic(page)
-    local tp = CreateFrame("Frame", nil, page)
-    tp:SetAllPoints(page)
-    -- The text starts under the parchment's shaded top
-    local sf = BNB.CreateScrollFrame(nil, tp)
-    sf:SetPoint("TOPLEFT",     tp, "TOPLEFT",     LAY.pageX, LAY.pageTop)
-    sf:SetPoint("BOTTOMRIGHT", tp, "BOTTOMRIGHT", LAY.pageR, LAY.pageB)
+-- A page's scrolling text area, under the parchment's shaded top; -> the
+-- scroll frame and its child
+local function PageScroll(parent)
+    local sf = BNB.CreateScrollFrame(nil, parent)
+    sf:SetPoint("TOPLEFT",     parent, "TOPLEFT",     LAY.pageX, LAY.pageTop)
+    sf:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", LAY.pageR, LAY.pageB)
     local bar = sf.ScrollBar
     if bar then
         -- Skin mode: CreateScrollFrame tinted it to the skin already
@@ -466,7 +613,11 @@ local function BuildTopic(page)
     local hold = CreateFrame("Frame", nil, sf)
     hold:SetSize(LAY.pageW - 100, 1)
     sf:SetScrollChild(hold)
+    return sf, hold
+end
 
+-- A render frame with the page's fonts and ink, bound once (FOR-30)
+local function PageRender(hold)
     local rf = BNB.AdvancedMode.CreateRenderFrame(nil, hold)
     rf:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, 0)
     rf:SetWidth(LAY.pageW - 100)
@@ -486,6 +637,50 @@ local function BuildTopic(page)
         end
         if orig then orig(self, link, text, button) end
     end)
+    return rf
+end
+
+-- A chapter cover: filled by RenderChapter. All of it scrolls, so a long
+-- intro or a long chapter still fits
+local function BuildChapter(page)
+    local cp = CreateFrame("Frame", nil, page)
+    cp:SetAllPoints(page)
+    local sf, hold = PageScroll(cp)
+    cp._scroll, cp._hold = sf, hold
+
+    local pic = hold:CreateTexture(nil, "ARTWORK")
+    pic:SetSize(PIC, PIC)
+    pic:SetPoint("TOP", hold, "TOP", 0, -6)
+    cp._pic = pic
+
+    local no = hold:CreateFontString(nil, "OVERLAY")
+    no:SetFontObject(TitleFont())
+    Ink(no, C.title)
+    cp._no = no
+
+    if not chapterFont then
+        chapterFont = CreateFont("BNBHelpBookChapterFont")
+        chapterFont:CopyFontObject(TitleFont())
+        local path, _, flags = chapterFont:GetFont()
+        if path then chapterFont:SetFont(path, 26, flags or "") end
+    end
+    local nm = hold:CreateFontString(nil, "OVERLAY")
+    nm:SetFontObject(chapterFont)
+    nm:SetPoint("TOP", no, "BOTTOM", 0, -4)
+    nm:SetJustifyH("CENTER")
+    nm:SetWordWrap(true)
+    Ink(nm, C.head)
+    cp._name = nm
+
+    cp._rf = PageRender(hold)
+    return cp
+end
+
+local function BuildTopic(page)
+    local tp = CreateFrame("Frame", nil, page)
+    tp:SetAllPoints(page)
+    local sf, hold = PageScroll(tp)
+    local rf = PageRender(hold)
 
     local pfs = hold:CreateFontString(nil, "OVERLAY")
     pfs:SetFontObject(PageFonts().p)
@@ -549,11 +744,11 @@ local function BuildSearch(toc)
     eb:SetMaxLetters(64)
     BNB.AddPlaceholder(eb, L["HELP_BOOK_SEARCH"], 0.45, 0.45, 0.45)
     if not C.skin then eb.SetRealColor(eb, { r = C.body[1], g = C.body[2], b = C.body[3] }) end
-    -- Enter opens the first topic found
+    -- Enter opens the first page found (not a header shown only for its topics)
     eb:SetScript("OnEnterPressed", function(self)
         self:ClearFocus()
-        local pages = frame._tocPages
-        if pages and pages[1] and #SearchWords() > 0 then HB.ShowPage(pages[1]) end
+        local hits = frame._tocHits
+        if hits and hits[1] and #SearchWords() > 0 then HB.ShowPage(hits[1]) end
     end)
     eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
 
@@ -672,8 +867,9 @@ local function Build()
     else
         page:SetPoint("TOPLEFT", toc, "TOPRIGHT", LAY.gap, 0)
     end
-    f._cover = BuildCover(page)
-    f._topic = BuildTopic(page)
+    f._cover   = BuildCover(page)
+    f._topic   = BuildTopic(page)
+    f._chapter = BuildChapter(page)
 
     f._prev = BNB.CreateIconButton(page, 22, "left", {
         skin = C.skin, tip = L["HELP_BOOK_PREV"], onClick = function() HB.ShowPage(current - 1) end })
@@ -686,9 +882,10 @@ local function Build()
     no:SetPoint("BOTTOM", page, "BOTTOM", -4, LAY.noY)
     Ink(no, C.body)
     f._pageNo = no
-    -- The cover's way in: named after the first topic (Getting started), set
-    -- in HB.Open. A large button with large text (Dukul, 2026-10-23: "make
-    -- the getting started button bigger too")
+    -- The cover's way in, named after the first page (Getting started), and
+    -- a chapter cover's way to its first topic: set by SetStart. A large
+    -- button with large text (Dukul, 2026-10-23: "make the getting started
+    -- button bigger too")
     if C.skin then
         f._start = BNB.CreateSkinButton(nil, page, "", START_W, START_H, 16)
     else
@@ -709,7 +906,7 @@ local function Build()
         Big("GetDisabledFontObject",  "SetDisabledFontObject",  "BNBHelpBookStartFontDis")
     end
     f._start:SetPoint("BOTTOM", page, "BOTTOM", -4, LAY.footY - 1)
-    f._start:SetScript("OnClick", function() HB.ShowPage(1) end)
+    f._start:SetScript("OnClick", function(self) HB.ShowPage(self._to or 1) end)
     f._start:Hide()
 
     f:HookScript("OnHide", function() gen.n = gen.n + 1 end)
@@ -718,23 +915,33 @@ end
 
 -- ── Public ───────────────────────────────────────────────────────────────────
 
+-- The pages: the topics in no chapter, then each chapter's cover and topics
+local function BuildPages()
+    pages = {}
+    local chapters, loose = {}, {}
+    if BNB.HelpChapters then chapters, loose = BNB.HelpChapters()
+    elseif BNB.HelpTopics then loose = BNB.HelpTopics() end
+    for _, t in ipairs(loose) do pages[#pages + 1] = { kind = "topic", topic = t } end
+    for no, c in ipairs(chapters) do
+        local at = #pages + 1
+        pages[at] = { kind = "chapter", chapter = c, no = no, first = at + 1 }
+        for _, t in ipairs(c.topics) do
+            pages[#pages + 1] = { kind = "topic", topic = t, chapterPage = at }
+        end
+    end
+end
+
 function HB.Open(key)
     local f = Build()
-    topics = BNB.HelpTopics and BNB.HelpTopics() or {}
+    BuildPages()
     hay = {}
     -- A new open starts with no search
     if f._search:HasFocus() then f._search:ClearFocus() end
     f._search.SetRealText(f._search, "")
     FillToc()
     local hint = L["HELP_BOOK_HINT"]
-    if #topics == 0 then hint = L["HELP_BOOK_EMPTY"] end
+    if #pages == 0 then hint = L["HELP_BOOK_EMPTY"] end
     f._cover._hint:SetText(hint)
-    if topics[1] then
-        f._start:SetText((BNB.HelpTopicText(topics[1])))
-        local fs = f._start:GetFontString()
-        local w = fs and fs:GetStringWidth() or 0
-        f._start:SetWidth(math.max(START_W, math.ceil(w) + 48))
-    end
     BNB.SeatWindow(f, f._strata)
     f:ClearAllPoints()
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)

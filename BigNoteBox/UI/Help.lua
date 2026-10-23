@@ -11,9 +11,13 @@
 -- not show (the list skips an empty system folder).
 --
 -- A topic: { key, src, title, body, rich, clients = { retail, forever,
--- classic } or nil (= every client) }. A translation, when one exists, is
--- BNB.HELP_LOCALES[locale][key] = { title, body } (Locales/Help/<locale>.lua);
--- a topic it does not have stays English.
+-- classic } or nil (= every client), chapter = a chapter key or nil }. A
+-- translation, when one exists, is BNB.HELP_LOCALES[locale][key] = { title,
+-- body } (Locales/Help/<locale>.lua); a topic it does not have stays English.
+-- A chapter of the help book (ALL-554 stage 2, a doc-mode folder): { key,
+-- src, name, body, rich, icon } in BNB.HELP_CHAPTERS, body / icon from the
+-- folder's Cover note; its translation is HELP_LOCALES[locale]["chapter." ..
+-- key] = { name, body } (topic keys have no dot, so the two never meet).
 --
 -- Public API:
 --   BNB.HelpNoteID(key)       "sys-help-<key>"
@@ -21,6 +25,10 @@
 --   BNB.HelpTopics()          every topic on this client, in order
 --   BNB.OpenHelp(key)         opens it in the main window; false when unknown
 --   BNB.HelpTopicText(t)      title, body (translated, pictures expanded)
+--   BNB.HelpChapters()        chapters, loose: { { ch, topics }, ... } with a
+--                             topic on this client, in order; loose = the
+--                             topics in no chapter, in order
+--   BNB.HelpChapterText(ch)   name, body (translated, pictures expanded)
 
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -69,6 +77,34 @@ function BNB.HelpTopicText(t)
     local AM = BNB.AdvancedMode
     body = AM and AM.ExpandAssetImages and AM.ExpandAssetImages(body or "") or (body or "")
     return title or t.key, body
+end
+
+-- The book's chapters on this client: a chapter none of whose topics this
+-- client has is left out; a topic whose chapter is unknown counts as loose
+function BNB.HelpChapters()
+    local byKey, out, loose = {}, {}, {}
+    for _, ch in ipairs(BNB.HELP_CHAPTERS or {}) do
+        if type(ch) == "table" and ch.key then byKey[ch.key] = { ch = ch, topics = {} } end
+    end
+    for _, t in ipairs(BNB.HelpTopics()) do
+        local c = t.chapter and byKey[t.chapter]
+        if c then c.topics[#c.topics + 1] = t else loose[#loose + 1] = t end
+    end
+    for _, ch in ipairs(BNB.HELP_CHAPTERS or {}) do
+        local c = type(ch) == "table" and ch.key and byKey[ch.key]
+        if c and #c.topics > 0 then out[#out + 1] = c end
+    end
+    return out, loose
+end
+
+function BNB.HelpChapterText(ch)
+    local loc = BNB.HELP_LOCALES[GetLocale()]
+    local tr = type(loc) == "table" and loc["chapter." .. tostring(ch.key)]
+    local name, body = ch.name, ch.body
+    if type(tr) == "table" then name, body = tr.name or name, tr.body or body end
+    local AM = BNB.AdvancedMode
+    body = AM and AM.ExpandAssetImages and AM.ExpandAssetImages(body or "") or (body or "")
+    return name or ch.key, body
 end
 
 local function BuildHelpFolder(rich)
