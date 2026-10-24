@@ -132,7 +132,6 @@ UI\PatchHistory.lua
 UI\HelpData.lua
 UI\Help.lua
 UI\HelpBook.lua
-UI\FeatureList.lua
 UI\FeatureListData.lua
 UI\SetupWizard.lua
 UI\NewNoteDialog.lua

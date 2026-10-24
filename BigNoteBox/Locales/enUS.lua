@@ -1123,8 +1123,15 @@ L["HELP_BOOK_PREV"]        = "Previous page"
 L["HELP_BOOK_NEXT"]        = "Next page"
 L["HELP_BOOK_SEARCH"]      = "Search the help..."
 L["HELP_BOOK_NO_MATCH"]    = "No topic has that text."
+-- The book's two tabs (ALL-554, 2026-10-24): Documentation = the help topics, Features = the feature list
+L["HELP_BOOK_TAB_DOCS"]          = "Documentation"
+L["HELP_BOOK_TAB_DOCS_TIP"]      = "How to use BigNoteBox"
+L["HELP_BOOK_TAB_FEATURES"]      = "Features"
+L["HELP_BOOK_TAB_FEATURES_TIP"]  = "What BigNoteBox can do"
+L["HELP_BOOK_FEAT_TITLE_FMT"]    = "%s - BigNoteBox Features"
+L["HELP_BOOK_MORE"]              = "More in the help:"
 
--- Features window chrome (ALL-36)
+-- The bnbui:features link's name (it opens the help book's Features tab, ALL-554)
 L["FL_WINDOW_TITLE"]     = "Features in BigNoteBox"
 L["SLASH_NOTE_CREATED"]  = "New note created."
 

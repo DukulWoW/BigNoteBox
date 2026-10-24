@@ -29,7 +29,9 @@
 -- the white Assets art (toolbar, explorer, doc icons) brown (Parchment).
 --
 -- Public API:
---   BNB.HelpBook.Open(key)   opens the book at that topic (nil = the cover)
+--   BNB.HelpBook.Open(key, which)   opens the book at that topic (nil = the
+--                            cover); which = "features" opens the Features tab
+--   BNB.HelpBook.OpenFeatures()
 --   BNB.HelpBook.Close()
 --   BNB.HelpBook.Toggle()
 
@@ -117,12 +119,20 @@ local INK_SWAP = {
 local WHITE_ART = { Toolbar = true, Explorer = true, Documentation = true }
 
 local frame, coverFont, chapterFont, chapterRowFont
+-- Two books, picked by the tabs under the window (Dukul, 2026-10-24):
+-- "docs" = the help topics, "features" = BNB.FEATURE_LIST sorted A-Z by
+-- header (UI/FeatureListData.lua; it replaced the Features window). Each
+-- has its own pages; Contents, search and page turning work on the open one.
 -- The pages after the cover, in order. A topic: { kind = "topic", topic =
 -- t, chapterPage = its chapter cover's index or nil }. A chapter cover:
 -- { kind = "chapter", chapter = { ch, topics }, no = its number, first =
--- the index of its first topic }
-local pages = {}
-local hay = {}             -- hay[i] = pages[i]'s text, plain and lower case (search)
+-- the index of its first topic }. A feature: { kind = "feature", sec = its
+-- FEATURE_LIST section }. The Features book has no cover: it starts at 1
+local book = "docs"
+local sets = { docs = {}, features = {} }
+local hays = { docs = {}, features = {} }
+local pages = sets.docs
+local hay = hays.docs      -- hay[i] = pages[i]'s text, plain and lower case (search)
 local current = 0          -- 0 = the cover, i = pages[i]
 local gen = { n = 0 }      -- drops a render a newer page replaced
 
@@ -163,9 +173,11 @@ local function SetLook(skin)
         C.head, C.title, C.pick = { hr, hg, hb }, { hr, hg, hb }, { hr, hg, hb }
         C.body = { wr, wg, wb }
         C.hover = { 1, 1, 1, 0.08 }
+        C.link = { 0x6c / 255, 0xb4 / 255, 0xee / 255 }   -- a note link's blue
     else
         C.head, C.title, C.pick, C.body = INK_HEAD, INK_TITLE, INK_PICK, INK_BODY
         C.hover = { 0.45, 0.28, 0.10, 0.10 }
+        C.link = { 0x1a / 255, 0x4f / 255, 0x8a / 255 }   -- the same, darker on parchment (INK_SWAP)
     end
     C.skin = skin
 end
@@ -264,6 +276,7 @@ local function PageName(i)
     local pg = pages[i]
     if not pg then return "" end
     if pg.kind == "chapter" then return (BNB.HelpChapterText(pg.chapter.ch)) end
+    if pg.kind == "feature" then return tostring(pg.sec.header or "") end
     return (BNB.HelpTopicText(pg.topic))
 end
 
@@ -306,6 +319,10 @@ local function Haystack(i)
     local pg = pages[i]
     local a, b
     if pg.kind == "chapter" then a, b = BNB.HelpChapterText(pg.chapter.ch)
+    elseif pg.kind == "feature" then
+        local sec = pg.sec
+        a = sec.header
+        b = tostring(sec.blurb or "") .. "\n" .. table.concat(type(sec.items) == "table" and sec.items or {}, "\n")
     else a, b = BNB.HelpTopicText(pg.topic) end
     return Plain((a or "") .. "\n" .. (b or ""))
 end
@@ -413,6 +430,12 @@ local function RenderMarkup(rf, text, w)
     return h
 end
 
+-- A feature's "More in the help" links share the topic page's scroll child
+local function HideFeatLinks()
+    frame._featMore:Hide()
+    for _, b in ipairs(frame._featLinks) do b:Hide() end
+end
+
 -- Next frame: a SimpleHTML's width is never set while the client lays out
 -- (FOR-30), and a newer page drops this one
 local function RenderTopic(t)
@@ -420,6 +443,7 @@ local function RenderTopic(t)
     local my = gen.n
     C_Timer.After(0, function()
         if my ~= gen.n or not frame:IsShown() then return end
+        HideFeatLinks()
         local AM = BNB.AdvancedMode
         local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
         local w = TextWidth(sf)
@@ -435,6 +459,86 @@ local function RenderTopic(t)
             pfs:SetText(body)
             hold:SetHeight(pfs:GetStringHeight() + 8)
         end
+        sf:SetVerticalScroll(0)
+    end)
+end
+
+-- The Documentation page of a help topic key; nil when this client has none
+local function DocsIndex(key)
+    for i, pg in ipairs(sets.docs) do
+        if pg.topic and pg.topic.key == key then return i end
+    end
+end
+
+-- The links under a feature, from y down: a "More in the help" line, then
+-- one row per help topic it names (sec.help) that this client has; -> the y
+-- under them. A click turns to the topic in Documentation (HB.ShowKey)
+local function FeatureLinks(hold, sec, y)
+    local found = {}
+    for _, key in ipairs(type(sec.help) == "table" and sec.help or {}) do
+        local i = DocsIndex(key)
+        if i then found[#found + 1] = { key = key, name = (BNB.HelpTopicText(sets.docs[i].topic)) } end
+    end
+    if #found == 0 then return y end
+    local more = frame._featMore
+    more:ClearAllPoints()
+    more:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, -(y + 6))
+    more:Show()
+    y = y + 6 + more:GetStringHeight() + 2
+    for n, it in ipairs(found) do
+        local b = frame._featLinks[n]
+        if not b then
+            b = CreateFrame("Button", nil, hold)
+            b:SetHeight(ROW_H)
+            local fs = b:CreateFontString(nil, "OVERLAY")
+            fs:SetFontObject(PageFonts().p)
+            fs:SetPoint("LEFT", b, "LEFT", INDENT, 0)
+            fs:SetJustifyH("LEFT")
+            fs:SetWordWrap(false)
+            Ink(fs, C.link)
+            b._fs = fs
+            local hl = b:CreateTexture(nil, "HIGHLIGHT")
+            hl:SetAllPoints(b)
+            hl:SetColorTexture(C.hover[1], C.hover[2], C.hover[3], C.hover[4])
+            b:SetScript("OnClick", function(self) HB.ShowKey(self._key) end)
+            frame._featLinks[n] = b
+        end
+        b._key = it.key
+        b._fs:SetText("> " .. it.name)
+        b:SetWidth(INDENT + math.ceil(b._fs:GetStringWidth()) + 10)
+        b:ClearAllPoints()
+        b:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, -y)
+        b:Show()
+        y = y + ROW_H
+    end
+    return y
+end
+
+-- A feature: its blurb, its items as a list and its help links. Plain text,
+-- as a plain topic: through the rich renderer {{date}} would be filled in
+local function RenderFeature(pg)
+    gen.n = gen.n + 1
+    local my = gen.n
+    C_Timer.After(0, function()
+        if my ~= gen.n or not frame:IsShown() then return end
+        HideFeatLinks()
+        local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
+        local w = TextWidth(sf)
+        hold:SetWidth(w)
+        local sec = pg.sec
+        local lines = {}
+        if type(sec.blurb) == "string" and sec.blurb ~= "" then
+            lines[1] = sec.blurb
+            lines[2] = ""
+        end
+        for _, item in ipairs(type(sec.items) == "table" and sec.items or {}) do
+            lines[#lines + 1] = "-  " .. tostring(item)
+        end
+        rf:Hide(); pfs:Show()
+        pfs:SetWidth(w)
+        pfs:SetText(table.concat(lines, "\n"))
+        local y = pfs:GetStringHeight() + 8
+        hold:SetHeight(FeatureLinks(hold, sec, y) + 8)
         sf:SetVerticalScroll(0)
     end)
 end
@@ -506,21 +610,28 @@ local function SetStart(to)
     b:Show()
 end
 
+-- The first page of the open book: the Features book has no cover
+local function FirstPage()
+    return (book == "features" and #pages > 0) and 1 or 0
+end
+
 function HB.ShowPage(i)
     if not frame then return end
     local n = #pages
-    current = math.max(0, math.min(i or 0, n))
+    local lo = FirstPage()
+    current = math.max(lo, math.min(i or lo, n))
     local pg = pages[current]
     local kind = pg and pg.kind or "cover"
+    local text = kind == "topic" or kind == "feature"
     frame._cover:SetShown(kind == "cover")
-    frame._topic:SetShown(kind == "topic")
+    frame._topic:SetShown(text)
     frame._chapter:SetShown(kind == "chapter")
     -- The cover has no arrows and no page number: one button to the first
     -- page in their place (Dukul, 2026-10-23). A chapter cover keeps the
     -- arrows; the button to its first topic takes the page number's spot
     frame._prev:SetShown(kind ~= "cover")
     frame._next:SetShown(kind ~= "cover")
-    frame._pageNo:SetShown(kind == "topic")
+    frame._pageNo:SetShown(text)
     if kind == "cover" then
         gen.n = gen.n + 1
         frame:SetWindowTitle(L["HELP_BOOK_TITLE"])
@@ -528,27 +639,47 @@ function HB.ShowPage(i)
     else
         -- The page's name goes on the title plate, not on the page (Dukul,
         -- 2026-10-23: "Writing Notes - BigNoteBox Help")
-        frame:SetWindowTitle(string.format(L["HELP_BOOK_TITLE_FMT"], PageName(current)))
+        local fmt = L["HELP_BOOK_TITLE_FMT"]
+        if kind == "feature" then fmt = L["HELP_BOOK_FEAT_TITLE_FMT"] end
+        frame:SetWindowTitle(string.format(fmt, PageName(current)))
         if kind == "chapter" then
             SetStart(pg.first)
             RenderChapter(pg)
         else
             SetStart(nil)
             frame._pageNo:SetText(string.format(L["HELP_BOOK_PAGE_FMT"], current, n))
-            RenderTopic(pg.topic)
+            if kind == "feature" then RenderFeature(pg) else RenderTopic(pg.topic) end
         end
     end
-    frame._prev:SetEnabled(current > 0)
+    frame._prev:SetEnabled(current > lo)
     frame._next:SetEnabled(current < n)
     MarkToc()
 end
 
--- A help topic by key; false when this client has no such topic
-function HB.ShowKey(key)
-    for i, pg in ipairs(pages) do
-        if pg.topic and pg.topic.key == key then HB.ShowPage(i); return true end
+-- Opens a book ("docs" / "features"): its pages, an empty search, its tab
+-- marked. The caller shows a page
+local function SetBook(name)
+    book = (name == "features") and "features" or "docs"
+    pages, hay = sets[book], hays[book]
+    local eb = frame._search
+    if eb:HasFocus() then eb:ClearFocus() end
+    eb.SetRealText(eb, "")
+    FillToc()
+    local tabs = frame._tabs
+    if tabs then
+        tabs.docs:SetActive(book == "docs")
+        tabs.features:SetActive(book == "features")
     end
-    return false
+end
+
+-- A help topic by key, in Documentation (from Features too); false when
+-- this client has no such topic
+function HB.ShowKey(key)
+    local i = DocsIndex(key)
+    if not i then return false end
+    if book ~= "docs" then SetBook("docs") end
+    HB.ShowPage(i)
+    return true
 end
 
 -- ── Build ────────────────────────────────────────────────────────────────────
@@ -691,6 +822,14 @@ local function BuildTopic(page)
     pfs:SetWordWrap(true)
     Ink(pfs, C.body)
 
+    -- A feature's "More in the help" line; its link rows are made by FeatureLinks
+    local more = hold:CreateFontString(nil, "OVERLAY")
+    more:SetFontObject(PageFonts().h3)
+    Ink(more, C.head)
+    more:SetText(L["HELP_BOOK_MORE"])
+    more:Hide()
+    frame._featMore, frame._featLinks = more, {}
+
     frame._pageScroll, frame._hold, frame._rf, frame._pfs = sf, hold, rf, pfs
     return tp
 end
@@ -768,6 +907,59 @@ local function BuildSearch(toc)
         FillToc()
     end)
     return eb
+end
+
+-- Documentation | Features: the rich-note tabs (UI/NoteEditor.lua's
+-- _BottomTabKit) hanging under the window's bottom edge, at the left (Dukul,
+-- 2026-10-24: "just like rich note tabs in main window, outside at the
+-- bottom"). Skin: tucked up under the window, in the strata below it (set on
+-- open, HB.Open). Book: just under the bottom wood, which draws over their tops
+local function BuildTabs(f)
+    local K = BNB._BottomTabKit
+    if not K then return end
+    local strip = CreateFrame("Frame", nil, f)
+    strip:SetSize(1, C.skin and K.SKIN_H or K.H)
+    local L1, T1 = L["HELP_BOOK_TAB_DOCS"], L["HELP_BOOK_TAB_DOCS_TIP"]
+    local L2, T2 = L["HELP_BOOK_TAB_FEATURES"], L["HELP_BOOK_TAB_FEATURES_TIP"]
+    local docs, feats, y
+    if C.skin then
+        docs  = K.Skin(strip, "help", L1, T1)
+        feats = K.Skin(strip, "note", L2, T2)
+        strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, 0)
+        y = K.SKIN_TUCK
+        strip._under = true
+    elseif K.HasSheet() then
+        docs  = K.Forever(strip, "yellow", "help", L1, T1)
+        feats = K.Forever(strip, "blue",   "note", L2, T2)
+        -- The bottom wood reaches 6 px under the frame (BORDER corners)
+        strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, -2)
+        strip:SetFrameLevel(f:GetFrameLevel() + 1)   -- under the border (+20)
+        y = 0
+    else
+        -- No tab art on this client: icon buttons, the inactive one dimmed
+        local function Btn(sym, tip)
+            local b = BNB.CreateIconButton(strip, 32, sym, { tip = tip, tipAnchor = "ANCHOR_TOP" })
+            function b:SetActive(on) self:SetDim(not on) end
+            return b
+        end
+        docs, feats = Btn("help", L1), Btn("note", L2)
+        strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, -4)
+        y = 0
+    end
+    if docs.SetWidth and feats.GetWidth and not docs.SetDim then   -- text tabs: the wider label's width
+        local w = math.max(docs:GetWidth(), feats:GetWidth())
+        docs:SetWidth(w); feats:SetWidth(w)
+    end
+    docs:SetPoint("TOPLEFT", strip, "TOPLEFT", 0, y)
+    feats:SetPoint("LEFT", docs, "RIGHT", K.GAP, 0)
+    -- HookScript: an icon button owns its handlers (windows-widgets.md)
+    docs:HookScript("OnClick", function()
+        if book ~= "docs" then SetBook("docs"); HB.ShowPage(0) end
+    end)
+    feats:HookScript("OnClick", function()
+        if book ~= "features" then SetBook("features"); HB.ShowPage(1) end
+    end)
+    f._tabs = { strip = strip, docs = docs, features = feats }
 end
 
 local function Build()
@@ -909,45 +1101,69 @@ local function Build()
     f._start:SetScript("OnClick", function(self) HB.ShowPage(self._to or 1) end)
     f._start:Hide()
 
+    BuildTabs(f)
     f:HookScript("OnHide", function() gen.n = gen.n + 1 end)
     return f
 end
 
 -- ── Public ───────────────────────────────────────────────────────────────────
 
--- The pages: the topics in no chapter, then each chapter's cover and topics
+-- Both books' pages. Documentation: the topics in no chapter, then each
+-- chapter's cover and topics. Features: the FEATURE_LIST sections A-Z by
+-- header (Dukul, 2026-10-24: "make the features alphabetical")
 local function BuildPages()
-    pages = {}
+    local docs = {}
     local chapters, loose = {}, {}
     if BNB.HelpChapters then chapters, loose = BNB.HelpChapters()
     elseif BNB.HelpTopics then loose = BNB.HelpTopics() end
-    for _, t in ipairs(loose) do pages[#pages + 1] = { kind = "topic", topic = t } end
+    for _, t in ipairs(loose) do docs[#docs + 1] = { kind = "topic", topic = t } end
     for no, c in ipairs(chapters) do
-        local at = #pages + 1
-        pages[at] = { kind = "chapter", chapter = c, no = no, first = at + 1 }
+        local at = #docs + 1
+        docs[at] = { kind = "chapter", chapter = c, no = no, first = at + 1 }
         for _, t in ipairs(c.topics) do
-            pages[#pages + 1] = { kind = "topic", topic = t, chapterPage = at }
+            docs[#docs + 1] = { kind = "topic", topic = t, chapterPage = at }
         end
     end
+
+    local secs = {}
+    for _, sec in ipairs(type(BNB.FEATURE_LIST) == "table" and BNB.FEATURE_LIST or {}) do
+        if type(sec) == "table" and sec.header then secs[#secs + 1] = sec end
+    end
+    table.sort(secs, function(a, b) return tostring(a.header):lower() < tostring(b.header):lower() end)
+    local feats = {}
+    for i, sec in ipairs(secs) do feats[i] = { kind = "feature", sec = sec } end
+
+    sets.docs, sets.features = docs, feats
+    hays.docs, hays.features = {}, {}
 end
 
-function HB.Open(key)
+-- which = "features" opens the Features tab at its first section; else
+-- Documentation at the topic `key` (nil = the cover)
+function HB.Open(key, which)
     local f = Build()
     BuildPages()
-    hay = {}
     -- A new open starts with no search
-    if f._search:HasFocus() then f._search:ClearFocus() end
-    f._search.SetRealText(f._search, "")
-    FillToc()
+    SetBook(which)
     local hint = L["HELP_BOOK_HINT"]
-    if #pages == 0 then hint = L["HELP_BOOK_EMPTY"] end
+    if #sets.docs == 0 then hint = L["HELP_BOOK_EMPTY"] end
     f._cover._hint:SetText(hint)
     BNB.SeatWindow(f, f._strata)
+    local tabs = f._tabs
+    if tabs and tabs.strip._under then
+        local below = BNB._BottomTabKit.STRATA_BELOW
+        tabs.strip:SetFrameStrata(below[f:GetFrameStrata()] or "LOW")
+    end
     f:ClearAllPoints()
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:Show()
     f:Raise()
-    if not (key and HB.ShowKey(key)) then HB.ShowPage(0) end
+    if book == "features" then HB.ShowPage(1)
+    elseif not (key and HB.ShowKey(key)) then HB.ShowPage(0) end
+end
+
+-- The Features tab (/bnb features, Settings > General, the bnbui:features link)
+function HB.OpenFeatures()
+    HB.Open(nil, "features")
 end
 
 function HB.Close()

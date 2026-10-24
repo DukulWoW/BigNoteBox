@@ -242,7 +242,7 @@ local function BuildGeneralTab(sf, ct)
         end
     end
     moreBtn:SetScript("OnClick", function()
-        if BNB.FeatureList then BNB.FeatureList.Open() end
+        if BNB.HelpBook then BNB.HelpBook.OpenFeatures() end   -- the help book's Features tab (ALL-554)
     end)
     moreBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")

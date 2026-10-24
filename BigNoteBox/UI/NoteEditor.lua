@@ -2499,6 +2499,17 @@ local function MakeForeverTab(parent, color, symbol, label, tip)
     return btn
 end
 
+-- The same bottom tabs for the help book's Documentation / Features (ALL-554):
+-- the builders and their numbers, handed over as a kit (file-level locals stay here)
+BNB._BottomTabKit = {
+    Skin = MakeSkinTab, Forever = MakeForeverTab,
+    HasSheet = function()
+        return not (C_UIFileAsset and C_UIFileAsset.IsKnownFile) or C_UIFileAsset.IsKnownFile(FTAB_TEX)
+    end,
+    SKIN_TUCK = SKTAB_TUCK, STRATA_BELOW = STRATA_BELOW,
+    X = FTAB_X, Y = FTAB_Y, GAP = FTAB_GAP, H = FTAB_H, SKIN_H = SKTAB_H,
+}
+
 local function BuildRichTabStrip()
     if _richTabStrip then return _richTabStrip end
     local mf = BNB.mainFrame

@@ -39,7 +39,8 @@ function BNB.RegisterSlashCommands()
             -- Routes into existing windows (ALL-33); text resolves at call time
             if BNB.WhatsNew and BNB.WhatsNew.Open then BNB.WhatsNew.Open(false) end
         elseif cmd == "features" then
-            if BNB.FeatureList and BNB.FeatureList.Open then BNB.FeatureList.Open() end
+            -- The help book's Features tab (it replaced the Features window, ALL-554)
+            if BNB.HelpBook then BNB.HelpBook.OpenFeatures() end
         elseif cmd == "help" then
             -- The help book (ALL-554); the command list moved to /bnb commands
             if BNB.HelpBook then BNB.HelpBook.Open() end

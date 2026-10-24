@@ -1,411 +1,389 @@
 -- BigNoteBox UI/FeatureListData.lua
 --
 -- EDITABLE FEATURE LIST
--- This file is the only file you need to edit to update the Features window.
+-- This file is the only file you need to edit to update the help book's Features tab.
 --
 -- FORMAT:
 --   Each entry in BNB.FEATURE_LIST is a section with:
 --     header  string   -- section title (gold, large)
 --     blurb   string   -- one paragraph description shown below the header
 --     items   table    -- bullet list of specific features
+--     help    table    -- optional: help topic keys (UI/HelpData.lua) shown as
+--                         "More in the help" links under the section
+--
+--   Shown in the help book's Features tab, sorted A-Z by header (Dukul,
+--   2026-10-24), so the order here does not matter.
 --
 -- RULES:
 --   - Plain ASCII only in string literals (no Unicode curly quotes, em-dashes etc.)
---   - WoW colour codes are fine: |cffrrggbb...|r
+--   - WoW color codes are fine: |cffrrggbb...|r
 --   - Keep blurb to 2-4 sentences. Wrap long lines with \n for readability here,
 --     but the renderer does its own word-wrap so \n is optional.
 --   - Item strings are plain text; one capability per line.
+--   - US spelling (color, favorite, center, gray), as everywhere in BigNoteBox.
+--   - Keep it in step with README.md and the Help topics (ALL-556, 2026-10-24).
 
 local BNB = BigNoteBox
 
 BNB.FEATURE_LIST = {
 
-    -- ── Notes & Organisation ─────────────────────────────────────────────────
+    -- ── Notes & Folders ──────────────────────────────────────────────────────
     {
-        header = "Notes & Organisation",
-        blurb  = "BigNoteBox is a full notepad companion for World of Warcraft. " ..
-                 "Create as many notes as you like, organised by tags, scope, and " ..
-                 "context. Notes are stored account-wide so every character shares " ..
-                 "the same library, with optional per-character scoping when you need it.",
+        header = "Notes & Folders",
+        help   = { "folders", "getting-started" },
+        blurb  = "BigNoteBox is a full notepad inside World of Warcraft. Your notes " ..
+                 "are kept for your whole account: each one belongs to every " ..
+                 "character (Global) or to just one. Runs on Retail and WoW: Forever, " ..
+                 "and in beta on Classic Era, TBC Anniversary and Mists of Pandaria Classic.",
         items  = {
-            "Unlimited notes with title and freeform body text",
+            "As many notes as you like, each with a title and as much text as you want",
             "Global or per-character scope per note",
-            "Drag-to-reorder notes in the list",
-            "Pin notes to the top of the list so they are always visible",
-            "Mark notes as favourite for quick identification",
-            "Sort by creation date, last modified, title, or manual order",
-            "Search by title or body text with live filtering",
-            "Right-click any note for a full context menu",
-            "Duplicate any note with one click",
-            "Lock a note to prevent accidental edits",
+            "Folders: drag notes in, give a folder a color; deleting a folder never deletes its notes",
+            "Pin notes to the top, mark favorites, lock a note against edits",
+            "Sort by creation date, last modified, title or your own drag order",
+            "Duplicate, copy or move notes, alone or several at once in Select mode",
+            "Right-click any note for every action it has",
         },
     },
 
-    -- ── Normal Mode & Skin Mode ──────────────────────────────────────────────
+    -- ── Note List & Explorer View ────────────────────────────────────────────
     {
-        header = "Normal Mode & Skin Mode",
-        blurb  = "BigNoteBox was originaly made with the standard WoW chrome, meaning " ..
-                 "the one you see when you open the achievements panel, or the character " ..
-                 "window. It looks like an official Blizzard UI in this mode. " ..
-                 "But a lot of players like a less lore friendly look, so therefore " ..
-                 "you can select Skin Mode, then choose a color and brightness.",
+        header = "Note List & Explorer View",
+        help   = { "note-list", "explorer-view" },
+        blurb  = "Two ways to see your notes. The Note list sits beside the open note; " ..
+                 "the Explorer view shows notes and folders as a grid of icons over " ..
+                 "the whole window, like the file explorer on your computer. The " ..
+                 "first button on the toolbar switches between them.",
         items  = {
-            "Found in Main Config > Appearance > Skins",
-            "Select between 13 different colors",
-            "Choose a brightness to make the color pop more",
-            "Randomize the theme on login and reload",
-            "Randomize the brightness together with the theme on login and reload",
-            "One of the skins is an OLED one where it's as black as possible",
-            "Every window is skinned and has their own buttons to tie everything togheter nicely",
+            "Note list: Pinned, Folders and Notes sections, each remembering if it is open",
+            "Explorer view: pick several notes and drag them onto a folder",
+            "Explorer view: Pinned first or Favorites first from the View menu",
+            "Explorer view can open on the note you left open",
+            "Filter the list by tags, or to notes with tasks",
         },
     },
 
-    -- ── Tags & Trash ─────────────────────────────────────────────────────────
+    -- ── Oracle Search ────────────────────────────────────────────────────────
     {
-        header = "Tags & Trash",
-        blurb  = "Tags give you a flexible second dimension of organisation on top of " ..
-                 "note titles. Filter the list to any combination of tags instantly. " ..
-                 "Deleted notes go to the Trash and stay there until you choose to " ..
-                 "restore or permanently remove them.",
+        header = "Oracle Search",
+        help   = { "oracle-search" },
+        blurb  = "A search bar that finds any note from anywhere in the game, by " ..
+                 "title, text or tag. Open it with Ctrl+Space or /bnb search. Type ? " ..
+                 "in the bar to see every way to narrow it down.",
         items  = {
-            "Add any number of tags to each note",
-            "Tag tree panel filters the note list to matching notes",
-            "Multi-tag filter: show notes that match all selected tags",
-            "Rename or delete tags globally from the Tag Manager",
-            "Deleted notes move to Trash instead of being erased",
-            "Restore any trashed note at any time",
-            "Trash auto-purges notes older than a configurable number of days",
-            "Empty Trash manually from the Trash window",
+            "Enter opens the note; Shift as a sticky note, Ctrl in Focus mode, Alt in the Reference Box",
+            "Prefixes: p player notes, n NPC notes, i items, z zones, t tasks, a alarms",
+            "c this character, g global, x rich, l plain, d today / week / month",
+            "b searches the Trash, o searches the settings, m sends a note to chat",
+            "#tag, @who the note is about, * favorites, -word to leave a word out, \"an exact phrase\"",
+        },
+    },
+
+    -- ── Tags ─────────────────────────────────────────────────────────────────
+    {
+        header = "Tags",
+        help   = { "tags" },
+        blurb  = "Tags are short words on a note, like Raid or Gold. A note can have " ..
+                 "as many as you like, and a tag is the same whatever its case.",
+        items  = {
+            "Add tags from the right-click menu or under the title in the editor",
+            "Click a tag to show only the notes that have it",
+            "The tag tree groups every note by tag",
+            "The Tag Manager renames, colors and deletes tags across all your notes",
+        },
+    },
+
+    -- ── Writing ──────────────────────────────────────────────────────────────
+    {
+        header = "Writing",
+        help   = { "writing-notes", "links-in-notes" },
+        blurb  = "Notes save as you type, or with a Save button if you prefer. The " ..
+                 "toolbar above the text puts in waypoints, links, time stamps and " ..
+                 "note tokens, and right-clicking the text inserts game info.",
+        items  = {
+            "Undo and redo per note, kept between sessions if you like",
+            "Note links: link to another note; the link keeps working when it is renamed",
+            "Waypoint links: click to track, Shift-click for chat, Ctrl-click to copy a /way line",
+            "BigNoteBox links: a link to a Settings page, a window or a help topic",
+            "Note settings: the note's icon, icon frame, border, background and font",
+        },
+    },
+
+    -- ── Templates & Tokens ───────────────────────────────────────────────────
+    {
+        header = "Templates & Tokens",
+        help   = { "note-templates", "note-tokens" },
+        blurb  = "A template fills a new note for you: a title, text, tags and a look " ..
+                 "to start from. A note token is a word in double braces that " ..
+                 "BigNoteBox fills in for you; type {{ in a note to see the list.",
+        items  = {
+            "Built-in templates: Blank, Boss, Weekly, Journal and more",
+            "Save any note as a template; share templates as a code",
+            "Tokens for here and now: {{date}}, {{time}}, {{zone}}, {{target}}, {{coords}}",
+            "Tokens for your character: {{name}}, {{class}}, {{spec}}, {{ilvl}}, {{gold}} and more",
+            "Game data by id: {{item:6948}} shows the item link",
+            "Make tokens of your own in Settings > Notes > Tokens",
         },
     },
 
     -- ── Rich Notes ───────────────────────────────────────────────────────────
     {
         header = "Rich Notes",
-        blurb  = "Rich Notes are an optional per-note formatting mode that lets you " ..
-                 "turn plain text into a fully laid-out document, rendered right inside " ..
-                 "the note window and on sticky notes. When you mark a note as rich, a " ..
-                 "markup toolbar appears above the editor. Write your content using " ..
-                 "simple tags, then switch to View mode to see it rendered. Rich Notes " ..
-                 "use a tag syntax compatible with TotalRP3, so notes can be copied " ..
-                 "between the two addons without reformatting.",
+        help   = { "rich-notes" },
+        blurb  = "A rich note is a small page: headings, colors, icons, pictures and " ..
+                 "links. The toolbar inserts every tag for you, and the preview beside " ..
+                 "the editor shows the result as you type. The tags are compatible " ..
+                 "with Total RP 3.",
         items  = {
-            "Three heading levels: {h1}, {h2}, {h3} with left, centre, or right alignment",
-            "Paragraph blocks: {p}, {p:l}, {p:c}, {p:r} for structured body text",
-            "Color: {col:rrggbb}...{/col} with a color picker in the toolbar",
-            "Inline icons: {icon:IconName:size} embeds any WoW game icon inline",
-            "Images: {img:filename:width:height} displays custom .tga or .blp files from UserImages/",
-            "Links: {link*url*label} creates clickable hyperlinks; item and spell links show tooltips",
-            "Markup toolbar: one-click insertion for all tags; wraps selected text automatically",
-            "Editor / View toggle: switch between editing and rendered view with one click",
-            "Sticky note rendering: rich notes display formatted on pinned sticky notes",
-            "Convert anytime: right-click to convert to or from rich mode; tags are stripped cleanly",
-            "TotalRP3 tag compatibility: markup copies cleanly between both addons",
+            "Headings {h1} {h2} {h3} and paragraphs {p}, left, centered or right",
+            "Colored text with a color picker",
+            "Game icons {icon}, game art {atlas} and your own pictures {img}",
+            "Clickable links; item and spell links show their tooltips",
+            "Rich notes show as a page on sticky notes too",
+            "Convert any note to rich or back from the right-click menu",
         },
     },
 
-    -- ── Sticky Notes ─────────────────────────────────────────────────────────
+    -- ── Quick Notes & Note Capture ───────────────────────────────────────────
     {
-        header = "Sticky Notes",
-        blurb  = "Sticky Notes let you pin any note to your screen as a floating, " ..
-                 "always-visible overlay. Each sticky has its own position, size, " ..
-                 "font, and transparency. Rich notes render formatted on the sticky. " ..
-                 "Open up to 50 sticky notes at once (config > features > sticky notes).",
+        header = "Quick Notes & Note Capture",
+        help   = { "quick-notes" },
+        blurb  = "Ways to make a note in a hurry, or to keep what an NPC, a quest or " ..
+                 "a book just told you.",
         items  = {
-            "Pin any note as a floating sticky note anywhere on screen",
-            "Per-sticky font family, font size, and text colour",
-            "Adjustable background colour and transparency",
-            "Configurable border style and brightness",
-            "Rich notes render with full formatting on the sticky",
-            "Toggle between rendered view and raw markup per sticky",
-            "Stickies persist across sessions and are restored on login",
-            "Drag to reposition; resize from any corner or edge",
-            "Sticky Notes have a Focus Mode which hides everything but the note/task and background",
-            "Sticky Notes can be opened on the ESC main menu screen. This way they don't clutter the game screen",
-        },
-    },
-
-    -- ── Tasks ────────────────────────────────────────────────────────────────
-    {
-        header = "Tasks",
-        blurb  = "Add a task list to any note and track your progress without leaving " ..
-                 "the game. Tasks live inside the Reference Box alongside your note, " ..
-                 "and can also be shown directly in sticky notes for at-a-glance tracking.",
-        items  = {
-            "Add tasks and sub-tasks to any note",
-            "Check and uncheck tasks to track progress",
-            "Sub-tasks collapse and expand to keep things tidy",
-            "Reorder tasks by dragging",
-            "Set daily or weekly auto-reset per task or for the whole note",
-            "Bind tasks to a situation so they reset when you leave a zone, instance, or player",
-            "Task panel in the Reference Box with a completion counter and splitter",
-            "Sticky notes can show task view instead of the note body",
-            "Live checkbox toggling directly in sticky note task view",
-            "Global reset and situation shown as icons in the sticky note footer",
-            "Task filter in the note list to show only notes with tasks",
-            "Task list spacing: Compact, Normal, or Spacious (Config > Features > Tasks)",
-            "Tasks included as a tier in the note share system",
-        },
-    },
-
-    -- ── Alarms ───────────────────────────────────────────────────────────────
-    {
-        header = "Alarms",
-        blurb  = "Every note can have an alarm attached to it. Alarms fire at a " ..
-                 "specific in-game time and can repeat daily, weekly, or on custom " ..
-                 "days of the week. When an alarm fires, the note is highlighted " ..
-                 "and optionally announced with a sound and chat message.",
-        items  = {
-            "Set a one-off or repeating alarm on any note",
-            "Recurrence options: daily, weekly, or specific days of the week",
-            "Sound alert from a selectable list of sounds on alarm fire",
-            "Optional chat message printed when the alarm fires",
-            "Optional glow effect on the note list entry",
-            "Alarm Overview window lists all upcoming alarms",
-            "Snooze or dismiss alarms from the overview or the note itself",
-        },
-    },
-
-    -- ── Contextual Surfacing ─────────────────────────────────────────────────
-    {
-        header = "Contextual Surfacing",
-        blurb  = "Notes can be tagged with a context so they surface automatically " ..
-                 "when you enter the right zone, instance, or encounter a specific " ..
-                 "player or NPC. The sidebar shows which notes are relevant to " ..
-                 "your current situation at a glance.",
-        items  = {
-            "Trigger notes by zone or subzone name",
-            "Trigger notes by instance (dungeon, raid, battleground)",
-            "Trigger notes by player name for PvP or social notes",
-            "Trigger notes by NPC name for boss or vendor notes",
-            "Sidebar highlights contextually active notes with an indicator",
-            "Configurable: show a popup when a contextual note becomes active",
-            "Zone Picker UI for browsing and selecting zones without typing",
-        },
-    },
-
-    -- ── BCB Integration ──────────────────────────────────────────────────────
-    {
-        header = "BigChatBox Integration",
-        blurb  = "When BigChatBox is installed, BigNoteBox gains direct two-way " ..
-                 "integration. Send note content to any chat channel line by line, " ..
-                 "or capture chat input directly into a new note. Requires " ..
-                 "BigChatBox to be installed and enabled.",
-        items  = {
-            "Send any note to chat line by line via BigChatBox",
-            "Choose target channel: say, party, raid, guild, or whisper",
-            "Capture BCB chat input as a new BNB note with one click",
-            "QuickNote mode: pop open a note from the BCB input bar",
-        },
-    },
-
-    -- ── DUI & Immersion Integration ──────────────────────────────────────────
-    {
-        header = "Dialogue UI & Immersion Integration",
-        blurb  = "If you have DUI and/or Immersion installed, BigNoteBox will " ..
-                 "integrate directly with the addons letting you create notes " ..
-                 "of quests, notes, tomes and other ingame content.",
-        items  = {
-            "DUIs copy text button will automatically create a note",
-            "Immersion has an extra floating button that when clicked creates a note",
-            "You can turn this on and off in \"Settings > Modules > Note Capture\"",
+            "F7 makes a new note at once, in the main window or as a sticky note",
+            "Quest, gossip, book and letter windows get a note button: one click keeps their text",
+            "Dialogue UI and Immersion get the same button",
+            "On or off in Settings > Modules > Note Capture",
         },
     },
 
     -- ── Focus Mode ───────────────────────────────────────────────────────────
     {
         header = "Focus Mode",
-        blurb  = "Focus Mode opens a distraction-free full-screen editor that hides " ..
-                 "the main BNB window and companion panels. A dark overlay dims the " ..
-                 "game world, and the camera slowly orbits while you write. " ..
-                 "Everything is restored exactly as you left it when you exit.",
+        help   = { "focus-mode" },
+        blurb  = "Write in full screen, with the game interface hidden and the camera " ..
+                 "slowly circling your character. Everything comes back as it was " ..
+                 "when you leave.",
         items  = {
-            "Distraction-free editor with dark full-screen overlay",
-            "Slow camera orbit while writing (speed configurable, can be disabled)",
-            "Camera orbit pauses on movement and resumes after a configurable delay",
-            "Side-by-side rich preview pane in focus mode",
-            "Orbit spin toggle button in the focus toolbar",
-            "ESC or the close button exits and restores all windows",
-            "AFK overlay shown if you go AFK while focus mode is open",
+            "Open it from the editor toolbar, or with Ctrl+Enter in the Oracle bar",
+            "A rich note gets its preview beside the text",
+            "Camera turn speed can be changed or switched off",
+            "Esc or the close button brings everything back",
         },
     },
 
-    -- ── History ──────────────────────────────────────────────────────────────
+    -- ── Sticky Notes ─────────────────────────────────────────────────────────
     {
-        header = "Note History",
-        blurb  = "BigNoteBox automatically snapshots every note when you log out or " ..
-                 "reload. You can also save a manual snapshot at any time. The " ..
-                 "History window lets you browse, compare, and restore any previous " ..
-                 "version of a note.",
+        header = "Sticky Notes",
+        help   = { "sticky-notes" },
+        blurb  = "A sticky note is a note pinned to your screen as a small window, so " ..
+                 "it stays up while you play. Up to 50 at once (20 by default, " ..
+                 "Settings > Modules > Sticky Notes).",
         items  = {
-            "Auto-snapshot on every logout and reload",
-            "Manual snapshot from the note toolbar or right-click menu",
-            "Configurable maximum number of auto-slots per note (1-20, default 5)",
-            "History window: browse all snapshots with timestamps",
-            "Side-by-side diff view: compare any two snapshots",
-            "One-click restore from any snapshot",
-            "History size shown in the Data Summary section of Settings",
+            "Drag to move, drag an edge or a corner to resize",
+            "Each sticky has its own font, size, color, background and border",
+            "A note with tasks can show its tasks, ticked right on the sticky",
+            "Focus look hides everything but the text and the background",
+            "Stickies can stay on the Esc menu screen instead of the game screen",
+            "Ctrl+H shows or hides every sticky, Ctrl+J brings them to the front",
+            "They come back where you left them after a reload",
         },
     },
 
-    -- ── Share & Import ───────────────────────────────────────────────────────
+    -- ── Situations & Toasts ──────────────────────────────────────────────────
     {
-        header = "Share & Import",
-        blurb  = "Share any note with another player in one click by generating a " ..
-                 "compressed share code that fits in a single chat message. The " ..
-                 "recipient pastes the code into the Import field to add the note " ..
-                 "to their library. You control exactly which fields are included.",
+        header = "Situations & Toasts",
+        help   = { "situations", "toasts" },
+        blurb  = "A situation makes a note show up by itself where it matters: a " ..
+                 "toast shows the note, or it opens as a sticky note. Toasts are the " ..
+                 "small pop-ups for situations, task resets and updates.",
         items  = {
-            "Generate a compressed share code for any note",
-            "Choose share tier: title and body only, with tags, with icon, or everything",
-            "Inspect tier: includes RefBox gear card data for player notes",
-            "Import a shared note by pasting the code into the Import field",
-            "Import merges alongside existing notes; nothing is overwritten",
-            "Share codes are plain text and can be sent via any chat channel",
+            "Match a zone, a sub-zone, an instance or an instance type (dungeon, raid, delve, battleground)",
+            "Match a player, an NPC or a guild",
+            "Match a window: vendor, bank, mailbox, auction house or trainer",
+            "Match being rested, in an inn or in a city",
+            "Show it when the situation starts, ends or both; every time, once a session, a day, a reset or only once",
+            "A situation can place waypoints",
+            "Choose which toasts show, where, how they look and how long they stay",
         },
     },
 
-    -- ── Backup & Export ──────────────────────────────────────────────────────
+    -- ── Tasks ────────────────────────────────────────────────────────────────
     {
-        header = "Backup & Export",
-        blurb  = "Export your entire note library to Markdown or JSON at any time. " ..
-                 "Markdown is human-readable and pasteable anywhere. JSON is " ..
-                 "full-fidelity and can be imported back into BNB without data loss. " ..
-                 "Both formats include all note metadata.",
+        header = "Tasks",
+        help   = { "tasks" },
+        blurb  = "Tasks are a checklist inside a note, with sub-tasks. Good for " ..
+                 "dailies and weekly chores: they can untick themselves at the reset.",
         items  = {
-            "Export all notes to Markdown (.md) format",
-            "Export all notes to JSON format (full fidelity, re-importable)",
-            "Import a JSON export back into BNB alongside existing notes",
-            "Import a Markdown export with title, body, and scalar fields",
-            "No data loss on JSON round-trip: all fields preserved",
-        },
-    },
-    
-    -- ── HTML Export ──────────────────────────────────────────────────────────
-    {
-        header = "HTML Export",
-        blurb  = "You can export any note as HTML to add directly to your website " ..
-                 "and there are three different styles to choose from.",
-        items  = {
-            "Right click any note and export as HTML",
-            "Three styles to choose from",
-            "Note only: Will give the HTML format needed to give you the note only",
-            "Plain HTML: Will give you a formated note based on the skin you're using",
-            "Stylized: Full HTML file with full CSS, animations and a book-ish look",
+            "Add tasks from the right-click menu or the task panel beside the note",
+            "Sub-tasks, drag to reorder",
+            "Daily or weekly reset for the whole list or one task at a time",
+            "Tick tasks on a sticky note",
+            "Show only notes with tasks with one button",
+            "Compact, Normal or Spacious task rows",
         },
     },
 
+    -- ── Alarms ───────────────────────────────────────────────────────────────
+    {
+        header = "Alarms",
+        help   = { "alarms" },
+        blurb  = "An alarm on a note rings at a time you pick: a real-world time, an " ..
+                 "in-game time, or the daily or weekly reset. It can ring once or " ..
+                 "repeat on the days you choose.",
+        items  = {
+            "When it rings, the note pops up with a sound of your choice",
+            "Snooze or dismiss",
+            "The alarm list at the top of the main window shows every alarm",
+        },
+    },
 
     -- ── Reference Box ────────────────────────────────────────────────────────
     {
-        header = "Reference Box (RefBox)",
-        blurb  = "The Reference Box is a companion panel that displays item and " ..
-                 "gear information attached to a note. Inspect another player and " ..
-                 "their equipped gear is captured and stored with the note as " ..
-                 "interactive cards. Ctrl-click any card to open the dressing room.",
+        header = "Reference Box",
+        help   = { "reference-box" },
+        blurb  = "A panel beside the editor for the items, spells, quests and links " ..
+                 "you attach to a note.",
         items  = {
-            "Attach items, spells, and quests to any note by drag and drop",
-            "Inspect a player to capture their full gear set into the note",
-            "Gear cards show item icon, name, item level, and slot",
-            "Transmog mode: view the appearance of each gear slot separately",
-            "Ctrl-click any gear card to open the WoW dressing room",
-            "Gear data is stored with the note and persists across sessions",
-            "RefBox floats alongside the main window and can be repositioned",
+            "Drag an item or a spell onto it, or Shift-click a link while it is open",
+            "Hover an entry for its tooltip; put an entry into the text with one click",
+            "A note about a player keeps their gear, with a model viewer and a transmog view",
+            "Ctrl-click a gear card to open the dressing room",
         },
     },
 
-    -- ── Migration ────────────────────────────────────────────────────────────
+    -- ── Player & NPC Notes ───────────────────────────────────────────────────
     {
-        header = "Migration from Other Addons",
-        blurb  = "If you are switching from another note-taking addon, BigNoteBox " ..
-                 "can import your existing notes automatically. Supported addons are " ..
-                 "detected at login and a migration prompt is shown. Your notes in " ..
-                 "the other addon are never modified.",
+        header = "Player & NPC Notes",
+        help   = { "player-and-npc-notes" },
+        blurb  = "Make a note about a player or an NPC, with their portrait and " ..
+                 "details filled in.",
         items  = {
-            "Supported: Noteworthy II, TakeANote, Yet Another Notepad, Notepad",
-            "Supported: Notes, TinyPad, PurpleNotes, SimpleNote, QuickNotes",
-            "Supported: MyNotepad, AmmeNotepad",
-            "Supported: OneWoW Notes (global and per-character notes)",
-            "Per-character notes are imported with their correct character scope",
-            "All imported notes are tagged with the source addon name",
-            "Category and tag data from source addons is preserved as BNB tags",
-            "Preview migration before committing: see exactly what will be imported",
-            "Migration can be re-run from Settings > Advanced at any time",
+            "A player: from the Inspect window or their right-click menu",
+            "An NPC: target it and press F6",
+            "A player note keeps their gear in the Reference Box",
+            "tl;dr: one short line (like KOS) that shows in their tooltip when you hover them",
         },
     },
 
-    -- ── Appearance & Skins ───────────────────────────────────────────────────
+    -- ── History, Undo & Trash ────────────────────────────────────────────────
     {
-        header = "Appearance & Skins",
-        blurb  = "BigNoteBox ships with a full skin system that replaces the default " ..
-                 "WoW frame chrome with a custom styled look. Choose from multiple " ..
-                 "colour presets and adjust brightness to your taste. Every window " ..
-                 "in BNB - including Config, RefBox, and sticky notes - follows " ..
-                 "the active skin.",
+        header = "History, Undo & Trash",
+        help   = { "history-and-undo", "trash" },
+        blurb  = "Nothing has to be lost. History and kept undo live in the " ..
+                 "BigNoteBox_History addon, which comes with BigNoteBox: keep it enabled.",
         items  = {
-            "Skin mode toggle: switch between WoW default chrome and BNB skin",
-            "Multiple colour presets: Emerald, Sapphire, Amber, Rose, and more",
-            "Brightness slider: lighten or darken the skin independently",
-            "All windows skinned: main, config, refbox, stickies, alarms, history",
-            "Per-note font family from bundled fonts: Noto Serif, EB Garamond, Noto Sans, JetBrains Mono, Gloria Hallelujah, OpenDyslexic, Fredoka, Playwrite IE",
-            "Per-note font size, font outline, and line height",
-            "Per-note background texture from 20 bundled textures",
-            "OpenDyslexic font available for accessibility",
-        },
-    },
-    
-    -- ── LSM font support ─────────────────────────────────────────────────────
-    {
-        header = "LSM font support",
-        blurb  = "By default BNB has a currated list of fonts you can use, " ..
-                 "but you can turn on support for all LibSharedMedia-3.0 fonts " ..
-                 "that you have installed. " ..
-                 "It will also show fonts installed by other addons through LSM.",
-        items  = {
-            "Turn on LSM font support in \"Main config > Advanced > Fonts\"",
-            "Will give you the ability to use even more fonts for your notes and sticky notes",
-            "Viewing rich notes will use the default font regardless",
+            "A version of each note is saved when you log out or reload",
+            "Compare two versions side by side and bring an old one back",
+            "Restore point: save one by hand before a big change",
+            "Rescue: a note that went missing without being deleted comes back from its history",
+            "Deleted notes wait in the Trash for 30 days (you choose how long)",
+            "The Oracle's b prefix searches the Trash",
         },
     },
 
-    -- ── Minimap & Keybinds ───────────────────────────────────────────────────
+    -- ── Backup, Import & Migration ───────────────────────────────────────────
     {
-        header = "Minimap Button & Keybinds",
-        blurb  = "BigNoteBox adds a minimap button for quick access and supports " ..
-                 "configurable keybinds for the most common actions. All keybinds " ..
-                 "are set directly in the Settings window without going through " ..
-                 "the WoW keybind interface.",
+        header = "Backup, Import & Migration",
+        help   = { "backup-and-import" },
+        blurb  = "Settings > Backup keeps your notes safe outside the game. Copy the " ..
+                 "text and keep it in a file; paste it into Import to bring it back.",
         items  = {
-            "Minimap button: left-click to toggle BNB, right-click for options",
-            "Minimap button position is draggable",
-            "Keybind for open/close BNB (default: Ctrl+N)",
-            "Keybind for New Note",
-            "Keybind for Quick Note (F7)",
-            "Keybind for Focus Mode",
-            "Keybind for Sticky Note (current note)",
-            "All keybinds configurable from Settings > General",
+            "Full backup: notes, templates, tokens, tag colors and every settings profile, as JSON",
+            "Settings backup: every settings profile, without notes",
+            "Selective backup: pick the notes, the parts and JSON or Markdown",
+            "Import takes backups, shared notes, template codes and profile codes",
+            "Export a note as HTML in three styles: Note only, Plain HTML, Stylized",
+            "Move your notes over from OneWoW Notes, Noteworthy II, Take A Note, Yet Another Notepad,",
+            "Notepad, Notes, TinyPad, PurpleNotes, SimpleNote, Quick Notes, MyNotepad and AmmeNotepad",
+            "See the notes before they come in; nothing is removed from the other addon",
+        },
+    },
+
+    -- ── Sharing ──────────────────────────────────────────────────────────────
+    {
+        header = "Sharing",
+        help   = { "sharing-notes" },
+        blurb  = "Right-click a note > Share note. Pick what goes with it, then send " ..
+                 "it straight to another player who has BigNoteBox, or copy a share " ..
+                 "code they paste into Import.",
+        items  = {
+            "Choose the parts: tags, tasks, Reference Box, look, situation, player or NPC data",
+            "Send to Chat posts the note's text in a chat channel, line by line",
+            "Import adds the note beside yours; nothing is overwritten",
+        },
+    },
+
+    -- ── BigChatBox ───────────────────────────────────────────────────────────
+    {
+        header = "BigChatBox",
+        blurb  = "BigNoteBox works on its own. With BigChatBox installed it gets two " ..
+                 "more ways to talk to chat.",
+        items  = {
+            "Send any note to chat line by line through BigChatBox",
+            "Capture chat into a new note with one click",
+        },
+    },
+
+    -- ── Look & Feel ──────────────────────────────────────────────────────────
+    {
+        header = "Look & Feel",
+        blurb  = "BigNoteBox looks like Blizzard's own windows by default. Skin mode " ..
+                 "gives every window a look of your choice instead.",
+        items  = {
+            "Skin mode: 14 colors, OLED and OLED Flat among them, with a brightness slider",
+            "Random skin at login if you like",
+            "Bundled fonts, OpenDyslexic among them, and every LibSharedMedia font you have",
+            "Per note: font, size, icon, icon frame, border and background",
+            "Accessibility: turn off or slow down the sticky note animation",
+        },
+    },
+
+    -- ── Modules & Profiles ───────────────────────────────────────────────────
+    {
+        header = "Modules & Profiles",
+        help   = { "modules", "settings-profiles" },
+        blurb  = "Most parts of BigNoteBox are modules you can switch on or off. " ..
+                 "Your notes keep everything, so switching one back on brings it all " ..
+                 "back. A settings profile keeps settings and window layout per character.",
+        items  = {
+            "Minimal, Full and Custom switch many modules at once",
+            "The setup wizard asks the same on your first login",
+            "Profiles: copy the current one or start blank, rename, delete",
+            "Export and import a profile as a code",
+        },
+    },
+
+    -- ── Help, Keys & Commands ────────────────────────────────────────────────
+    {
+        header = "Help, Keys & Commands",
+        help   = { "keys-and-commands", "getting-started" },
+        blurb  = "The help book has every help topic in chapters, with a search. Open " ..
+                 "it with the Help button at the top of the main window or /bnb help.",
+        items  = {
+            "Ctrl+N open or close, F8 new note, F7 quick note, F6 note from your target",
+            "Ctrl+Space Oracle search, Ctrl+H hide stickies, Ctrl+J stickies to the front",
+            "Change the keys in Settings > General; a key already in use is left alone",
+            "/bnb, /bnb new, /bnb search, /bnb config, /bnb whatsnew, /bnb features",
+            "/bnb help opens the help book, /bnb commands lists every command",
+            "Minimap button: click to open, drag to move",
         },
     },
 
     -- ── Danger Zone ──────────────────────────────────────────────────────────
     {
-        header = "Danger zone",
-        blurb  = "The Danger Zone is where you can reset settings, factory reset " ..
-                 "the addon and re-run the setup wizard. " ..
-                 "Be careful, most of these settings are irreversible.",
+        header = "Danger Zone",
+        blurb  = "The Danger Zone resets settings, clears data and re-runs the setup " ..
+                 "wizard. Be careful: most of it cannot be undone, so take a backup first.",
         items  = {
             "Re-run setup wizard",
-            "Reset settings",
-            "Clear out trash",
-            "Clear all session history",
-            "Clear all manual restore points",
+            "Reset the profile in use, or all settings and profiles",
+            "Clear the trash, the history or the restore points",
             "Reset sticky note layouts",
-            "Clear migration history",
-            "Remove all characters",
             "Delete all notes",
             "Factory reset",
         },
     },
 
 }
-

@@ -203,7 +203,7 @@ UL.Register("trash", {
 })
 UL.Register("features", {
     label = "FL_WINDOW_TITLE", icon = "Interface\\Icons\\INV_Misc_Book_12",
-    open  = function() BNB.FeatureList.Open() end,
+    open  = function() BNB.HelpBook.OpenFeatures() end,   -- the help book's Features tab (ALL-554)
 })
 UL.Register("whatsnew", {
     label = "UILINK_WHATSNEW", icon = "Interface\\AddOns\\BigNoteBox\\Assets\\icon",
