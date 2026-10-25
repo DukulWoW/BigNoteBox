@@ -594,6 +594,9 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     MkBtn("h2", L["FE_MK_H2"], function() FocusInsertTagPair("{h2}", "{/h2}") end)
     MkBtn("h3", L["FE_MK_H3"], function() FocusInsertTagPair("{h3}", "{/h3}") end)
     Divider()
+    MkBtn("tb-underline", L["FE_MK_U"], function() FocusInsertTagPair("{u}", "{/u}") end)
+    MkBtn("tb-strike",    L["FE_MK_S"], function() FocusInsertTagPair("{s}", "{/s}") end)
+    Divider()
     MkBtn("p",  L["FE_MK_P"],  function() FocusInsertTagPair("{p}", "{/p}") end)
     MkBtn("pl", L["FE_MK_PL"], function() FocusInsertTagPair("{p:l}", "{/p}") end)
     MkBtn("pc", L["FE_MK_PC"], function() FocusInsertTagPair("{p:c}", "{/p}") end)
@@ -898,6 +901,15 @@ local function BuildFocusFrame()
 
     if BNB.WireDropTarget       then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
+    -- {u} / {s} lines in a rich note (UI/TextLines.lua), after the box's
+    -- last SetScript (hooks); rich notes only (Dukul, 2026-10-25)
+    if BNB.TextLines then
+        BNB.TextLines.Attach(eb, sf, function(text)
+            local n = focusNoteID and BNB.GetNote(focusNoteID)
+            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
+            return BNB.TextLines.MarkupRanges(text)
+        end)
+    end
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, TOOLBAR_H + 4)
@@ -1206,6 +1218,15 @@ local function BuildFocusFrameSkin()
 
     if BNB.WireDropTarget      then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end
+    -- {u} / {s} lines in a rich note (UI/TextLines.lua), after the box's
+    -- last SetScript (hooks); rich notes only (Dukul, 2026-10-25)
+    if BNB.TextLines then
+        BNB.TextLines.Attach(eb, sf, function(text)
+            local n = focusNoteID and BNB.GetNote(focusNoteID)
+            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
+            return BNB.TextLines.MarkupRanges(text)
+        end)
+    end
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, TOOLBAR_H + 4)

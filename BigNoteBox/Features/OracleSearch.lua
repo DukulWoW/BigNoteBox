@@ -107,6 +107,7 @@ function OS.PlainText(s, rich)
         s = s:gsub("{br}", " ")
         s = s:gsub("{/?%a[^{}]*}", "")
     end
+    s = s:gsub("{/?[us]}", "")   -- underline / strikethrough tags, every note (2026-10-25)
     s = s:gsub("%s+", " ")
     return (s:gsub("^ ", ""):gsub(" $", ""))
 end

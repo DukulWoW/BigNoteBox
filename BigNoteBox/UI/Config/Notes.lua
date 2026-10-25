@@ -7,15 +7,8 @@ local L   = BNB.L
 local K = BNB._ConfigKit
 local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
-
--- A smaller gold heading for a group inside a section (Trash, Tag tree under Notes).
-local function AddSubHeader(ct, y, text)
-    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 6)
-    BNB.SetHeaderColor(lbl)
-    lbl:SetText(text)
-    return y - 26
-end
+-- A smaller gold heading for a group inside a section (moved to the kit, 2026-10-25)
+local AddSubHeader = K.AddSubHeader
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 2 -- NOTES

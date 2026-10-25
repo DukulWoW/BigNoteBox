@@ -126,12 +126,15 @@ end
 -- Divider(), both advancing a shared x-offset starting at startX. icon =
 -- Assets/Toolbar/tb-rich-<icon> (Dukul's art, ALL-487; the buttons were
 -- "H1" / "Pc" / "Col" text buttons until 2026-10-17). bar._mkLast = the
--- last button made (the bar's collapse measures from it).
-local TB_RICH = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\tb-rich-"
+-- last button made (the bar's collapse measures from it). An icon that starts
+-- with "tb-" is a whole file name in Assets/Toolbar (tb-underline, tb-strike).
+local TB_DIR  = "Interface\\AddOns\\BigNoteBox\\Assets\\Toolbar\\"
+local TB_RICH = TB_DIR .. "tb-rich-"
 function BNB.MakeToolbarFactory(bar, startX)
     local btnX = startX or 0
     local function MkBtn(icon, tip, onClick)
-        local btn = BNB.CreateToolbarIconButton(bar, TB_RICH .. icon, tip)
+        local path = icon:find("^tb%-") and (TB_DIR .. icon) or (TB_RICH .. icon)
+        local btn = BNB.CreateToolbarIconButton(bar, path, tip)
         btn:SetPoint("LEFT", bar, "LEFT", btnX, 0)
         btn:SetScript("OnClick", onClick)
         btnX = btnX + 20 + 6   -- 6 px to the next one (Dukul, 2026-10-17)
@@ -1175,6 +1178,53 @@ end
 -- following preset changes (ALL-262, Dukul 2026-10-05: "The dividers in skin
 -- mode should all be tinted, not grey."). Focus mode uses it too.
 BNB.NOTE_RULE_RGBA = { 0.35, 0.35, 0.38, 0.7 }
+
+--------------------------------------------------------------------------------
+-- STATUS BAR  (the Explorer view's, Dukul 2026-10-21; the note editor's since
+-- 2026-10-25: "use the same style as explorer mode uses")
+-- A strip along the bottom of a pane: a thin rule over it in the header colour
+-- (the note list's header rule), and in skin mode a darker band like the
+-- toolbar strip's, inside the window's border. st:PaintRule() re-reads the
+-- header colour (skin preset change). Text goes in by the caller:
+-- BNBFontNormalSmall, BNB.TextWhite(0.75), clear of BNB.STATUS_GRIP_W at the
+-- right (the window's resize grip).
+--------------------------------------------------------------------------------
+BNB.STATUS_H      = 22
+BNB.STATUS_GRIP_W = 14
+local STATUS_SHADE      = 0.6    -- skin band = the body colour x this
+local STATUS_SKIN_INSET = 3      -- skin mode: in from the window edge (MainWindowSkin SK_FILL_INSET)
+local STATUS_RULE_A     = 0.35   -- the note list's header rule alpha (ALL-328)
+function BNB.CreateStatusBar(parent, pad)
+    pad = pad or 10
+    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
+    local inset = skin and STATUS_SKIN_INSET or 0
+    local st = CreateFrame("Frame", nil, parent)
+    st:SetPoint("BOTTOMLEFT", parent, "BOTTOMLEFT", inset, inset)
+    st:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -inset, inset)
+    st:SetHeight(BNB.STATUS_H)
+    if skin and BNB.SkinColourOf then
+        local band = st:CreateTexture(nil, "BACKGROUND")
+        band:SetAllPoints()
+        local function PaintBand()
+            local r, g, b = BNB.SkinColourOf(BNB.GetSkinPreset(), false)
+            band:SetColorTexture(r * STATUS_SHADE, g * STATUS_SHADE, b * STATUS_SHADE, BNB.GetSkinBgAlpha())
+        end
+        PaintBand()
+        if BNB.RegisterSkinBackdrop then BNB.RegisterSkinBackdrop(PaintBand) end
+    end
+    local rule = st:CreateTexture(nil, "ARTWORK")
+    if rule.SetSnapToPixelGrid then rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0) end
+    rule:SetPoint("TOPLEFT", st, "TOPLEFT", pad, 0)
+    rule:SetPoint("TOPRIGHT", st, "TOPRIGHT", -pad, 0)
+    if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(rule, 1, 1) else rule:SetHeight(1) end
+    st._rule = rule
+    function st:PaintRule()
+        local hr, hg, hb = BNB.HeaderColor()
+        rule:SetColorTexture(hr, hg, hb, STATUS_RULE_A)
+    end
+    st:PaintRule()
+    return st
+end
 
 --------------------------------------------------------------------------------
 -- WHITE UI ICONS  (Dukul, 2026-10-08: all new icon art is white)

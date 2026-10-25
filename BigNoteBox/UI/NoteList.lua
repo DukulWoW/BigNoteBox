@@ -1930,6 +1930,7 @@ local function PreviewText(note)
         body = body:gsub("\n%s*\n+", "\n")
         body = body:match("^%s*(.-)%s*$") or body
     end
+    body = body:gsub("{/?[us]}", "")   -- underline / strikethrough tags, every note (2026-10-25)
     _previewCache[note] = { body = raw, rich = rich, src = note.source, text = body }
     return body
 end

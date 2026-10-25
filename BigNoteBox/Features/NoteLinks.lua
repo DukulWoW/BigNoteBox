@@ -279,6 +279,7 @@ local function NotePreview(note)
     local body = note.body or ""
     local AM = BNB.AdvancedMode
     if note.richMode and AM and AM.StripMarkup then body = AM.StripMarkup(body) end
+    if BNB.TextLines then body = BNB.TextLines.StripLineTags(body) end   -- {u} / {s}, every note
     if BNB.Tokens then body = BNB.Tokens.Fill(body) end   -- ALL-481
     local n = 0
     for line in (Plain(body) .. "\n"):gmatch("([^\n]*)\n") do

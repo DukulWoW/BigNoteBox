@@ -264,6 +264,10 @@ function AM.ToHTML(text, bodySize)
             return "|cff" .. hex
         end)
         line = line:gsub("{/col}", "|r")
+        -- 3b. {u}...{/u} underline, {s}...{/s} strikethrough (2026-10-25): the
+        --     lines are drawn in Edit mode only (UI/TextLines.lua); here the
+        --     tags are left out until the View mode lines are built
+        line = line:gsub("{/?[us]}", "")
 
         -- 4. {link*url*text} -> <a href="url"> with BNB green colour baked in.
         -- SimpleHTML has no API to set <a> tag colour at runtime, so we wrap
@@ -716,6 +720,7 @@ local TAG_PATTERNS = {
     "{atlas:[^}]+}",
     "{col:%x%x%x%x%x%x}",
     "{/col}",
+    "{/?[us]}",          -- {u} {/u} {s} {/s}
     "{link%*[^*}]+%*[^}]*}",
 }
 

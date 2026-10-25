@@ -105,6 +105,18 @@ local function AddButtonGrid(ct, y, entries)
     return y
 end
 
+-- A sub-heading plus its buttons (Tools and tests, Dukul 2026-10-25: "getting
+-- a bit much now"). No heading when none of its tools is loaded.
+local function AddButtonGroup(ct, y, title, entries)
+    for _, e in ipairs(entries) do
+        if e[4] ~= false then
+            y = K.AddSubHeader(ct, y, title)
+            return AddButtonGrid(ct, y, entries)
+        end
+    end
+    return y
+end
+
 -- Context Menu Test (ALL-148): the engine with every kind of row, no notes
 function BNB.OpenContextMenuTest(owner)
     local function Say(what) return function() BNB:Print("|cff88bbffMenu:|r " .. what) end end
@@ -299,7 +311,7 @@ function K.BuildDevToolsPage(sf, ct, y)
     -- ── Tools and tests ─────────────────────────────────────────────────────
     AddRule(ct, y - 4); y = y - 18
     y = AddHeader(ct, y, L["DEV_HDR_TOOLS"])
-    y = AddButtonGrid(ct, y, {
+    y = AddButtonGroup(ct, y, L["CFG_DEV_SUB_POPUPS"], {
         { L["CFG_DEV_TOAST_BTN"], L["CFG_DEV_TOAST_TIP_BODY"], function()
             BNB:Print("|cff88bbffFiring test toast...|r")
             BNB._contextMatches = {}
@@ -332,12 +344,6 @@ function K.BuildDevToolsPage(sf, ct, y)
             BigNoteBoxDB.explorerIntroSeen = nil
             C_UI.Reload()
         end, BNB.ShowExplorerIntroIfDue ~= nil },
-        -- Every UI link key as a note (ALL-513, Dukul 2026-10-19: "Easier to work
-        -- with if I know what they all are"): made from the registry, so it is
-        -- never out of date; the same note is rewritten on the next click
-        { L["CFG_DEV_UILINKS_BTN"], L["CFG_DEV_UILINKS_TIP_BODY"], function()
-            if BNB.MakeUILinkListNote then BNB.MakeUILinkListNote() end
-        end, BNB.UILinks ~= nil },
         -- The fresh-install welcome note (ALL-242), for this character's faction
         { L["CFG_DEV_WELCOMENOTE_BTN"], L["CFG_DEV_WELCOMENOTE_TIP_BODY"], function()
             BNB.WhatsNew.CheckWelcome(true, true)
@@ -352,6 +358,8 @@ function K.BuildDevToolsPage(sf, ct, y)
                 BNB.Migration.ShowPopup()
             end
         end },
+    })
+    y = AddButtonGroup(ct, y, L["CFG_DEV_SUB_UITESTS"], {
         -- Hover boxes for every drag cursor (ALL-95, UI/Cursor.lua)
         { L["CFG_DEV_CURSOR_BTN"], L["CFG_DEV_CURSOR_TIP_BODY"], function()
             if BNB.OpenCursorTest then BNB.OpenCursorTest() end
@@ -359,7 +367,6 @@ function K.BuildDevToolsPage(sf, ct, y)
         -- The menu engine on its own (ALL-148, UI/ContextMenu.lua)
         { L["CFG_DEV_CTXMENU_BTN"], L["CFG_DEV_CTXMENU_TIP_BODY"],
             function(btn) BNB.OpenContextMenuTest(btn) end },
-        -- The rest live in the dev addon as slash commands
         { L["CFG_DEV_TOPTABS_BTN"], L["CFG_DEV_TOPTABS_TIP_BODY"],
             Slash("BNBTOPTABS"), SlashCmdList.BNBTOPTABS ~= nil },
         { L["CFG_DEV_SKINW_BTN"], L["CFG_DEV_SKINW_TIP_BODY"],
@@ -368,12 +375,31 @@ function K.BuildDevToolsPage(sf, ct, y)
             Slash("BNBBUTTONTEST"), SlashCmdList.BNBBUTTONTEST ~= nil },
         { L["CFG_DEV_ICONPROBE_BTN"], L["CFG_DEV_ICONPROBE_TIP_BODY"],
             Slash("BNBICONPROBE"), SlashCmdList.BNBICONPROBE ~= nil },
+        -- Every UI link key as a note (ALL-513, Dukul 2026-10-19: "Easier to work
+        -- with if I know what they all are"): made from the registry, so it is
+        -- never out of date; the same note is rewritten on the next click
+        { L["CFG_DEV_UILINKS_BTN"], L["CFG_DEV_UILINKS_TIP_BODY"], function()
+            if BNB.MakeUILinkListNote then BNB.MakeUILinkListNote() end
+        end, BNB.UILinks ~= nil },
+    })
+    y = AddButtonGroup(ct, y, L["CFG_DEV_SUB_TESTDATA"], {
         -- Fake characters of different ages + their notes (ALL-312, dev addon)
         { L["CFG_DEV_FAKEADD_BTN"], L["CFG_DEV_FAKEADD_TIP_BODY"],
             Slash("BNBFAKEDATA"), SlashCmdList.BNBFAKEDATA ~= nil },
         { L["CFG_DEV_FAKEDEL_BTN"], L["CFG_DEV_FAKEDEL_TIP_BODY"], function()
             if SlashCmdList.BNBFAKEDATA then SlashCmdList.BNBFAKEDATA("remove") else BNB.DevToolMissing() end
         end, SlashCmdList.BNBFAKEDATA ~= nil },
+    })
+    y = AddButtonGroup(ct, y, L["CFG_DEV_SUB_SPELL"], {
+        -- Spellchecker probe (ALL-559 stage 0, dev addon's SpellProbe.lua)
+        { L["CFG_DEV_SPELLNOTES_BTN"], L["CFG_DEV_SPELLNOTES_TIP_BODY"],
+            function() SlashCmdList.BNBSPELLPROBE("notes") end, SlashCmdList.BNBSPELLPROBE ~= nil },
+        { L["CFG_DEV_SPELLBOX_BTN"], L["CFG_DEV_SPELLBOX_TIP_BODY"],
+            Slash("BNBSPELLPROBE"), SlashCmdList.BNBSPELLPROBE ~= nil },
+        { L["CFG_DEV_SPELLCHECK_BTN"], L["CFG_DEV_SPELLCHECK_TIP_BODY"],
+            function() SlashCmdList.BNBSPELLPROBE("check") end, SlashCmdList.BNBSPELLPROBE ~= nil },
+        { L["CFG_DEV_SPELLBENCH_BTN"], L["CFG_DEV_SPELLBENCH_TIP_BODY"],
+            function() SlashCmdList.BNBSPELLPROBE("bench") end, SlashCmdList.BNBSPELLPROBE ~= nil },
     })
 
     -- ── Reload ──────────────────────────────────────────────────────────────

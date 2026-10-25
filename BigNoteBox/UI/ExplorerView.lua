@@ -100,10 +100,8 @@ local HDR_ARROW  = 12    -- Pinned / Notes: the open / closed arrow
 local VIEW_BTN   = 18    -- the switch, as the list's tree buttons
 local BACK_BTN   = 22
 local SCROLL_W   = 22    -- room for the scroll bar (it draws outside its frame)
-local STATUS_H   = 22    -- the status bar under the grid (Dukul, 2026-10-21)
-local STATUS_SHADE = 0.6 -- skin mode: its band = the body colour x this, as the toolbar band
-local STATUS_SKIN_INSET = 3   -- skin mode: in from the window edge (MainWindowSkin SK_FILL_INSET)
-local STATUS_GRIP_W = 14      -- the window's resize grip in the bottom right corner
+local STATUS_H      = BNB.STATUS_H        -- the status bar under the grid (Dukul, 2026-10-21; BNB.CreateStatusBar)
+local STATUS_GRIP_W = BNB.STATUS_GRIP_W   -- the window's resize grip in the bottom right corner
 local BOX_START  = 4     -- px the pointer moves before the picking box shows
                          -- or a pressed tile is carried
 local GHOST      = 36    -- the carried tile's picture
@@ -770,33 +768,9 @@ local function EnsurePane()
     _sf = sf
 
     -- The status bar: a thin rule over it (the headers' rule); skin mode adds
-    -- a darker band like the toolbar strip's
-    -- Skin mode: inside the window's border, as the toolbar band (the
-    -- backdrop's fill stops 3 px in; at 0 the band covered the border line)
-    local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
-    local inset = skin and STATUS_SKIN_INSET or 0
-    local st = CreateFrame("Frame", nil, pane)
-    st:SetPoint("BOTTOMLEFT", pane, "BOTTOMLEFT", inset, inset)
-    st:SetPoint("BOTTOMRIGHT", pane, "BOTTOMRIGHT", -inset, inset)
-    st:SetHeight(STATUS_H)
-    if skin and BNB.SkinColourOf then
-        local band = st:CreateTexture(nil, "BACKGROUND")
-        band:SetAllPoints()
-        local function PaintBand()
-            local r, g, b = BNB.SkinColourOf(BNB.GetSkinPreset(), false)
-            band:SetColorTexture(r * STATUS_SHADE, g * STATUS_SHADE, b * STATUS_SHADE, BNB.GetSkinBgAlpha())
-        end
-        PaintBand()
-        if BNB.RegisterSkinBackdrop then BNB.RegisterSkinBackdrop(PaintBand) end
-    end
-    local rule = st:CreateTexture(nil, "ARTWORK")
-    if rule.SetSnapToPixelGrid then rule:SetSnapToPixelGrid(false); rule:SetTexelSnappingBias(0) end
-    rule:SetPoint("TOPLEFT", st, "TOPLEFT", PAD, 0)
-    rule:SetPoint("TOPRIGHT", st, "TOPRIGHT", -PAD, 0)
-    if PixelUtil and PixelUtil.SetHeight then PixelUtil.SetHeight(rule, 1, 1) else rule:SetHeight(1) end
-    local hr, hg, hb = BNB.HeaderColor()
-    rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
-    st._rule = rule
+    -- a darker band like the toolbar strip's. Shared with the note editor
+    -- since 2026-10-25 (BNB.CreateStatusBar, UI/Widgets.lua)
+    local st = BNB.CreateStatusBar(pane, PAD)
     -- Two view buttons at the right end, as Windows 11's status bar
     local function ViewBtn(onClick, tipKey)
         local b = CreateFrame("Button", nil, st)
@@ -1687,10 +1661,7 @@ Draw = function()
 
     local y, ti, hi = 0, 0, 0
     _count.notes, _count.folders = 0, 0
-    if _status then   -- the header colour may have changed (skin preset)
-        local hr, hg, hb = BNB.HeaderColor()
-        _status._rule:SetColorTexture(hr, hg, hb, HDR_RULE_A)
-    end
+    if _status then _status:PaintRule() end   -- the header colour may have changed (skin preset)
     local function Header(text, art, r, g, b, opts)
         hi = hi + 1
         local hdr = GetHeader(hi)

@@ -1643,13 +1643,20 @@ end
 
 -- The plain read view's text: markup taken out when a rich note is shown as
 -- plain text, live note tokens filled (ALL-481)
-local function ReadBody(note, cfg)
+local function ReadBodyTagged(note, cfg)
     local body = note.body or ""
     if cfg.richPlainText and BNB.AdvancedMode and BNB.AdvancedMode.StripMarkup then
         body = BNB.AdvancedMode.StripMarkup(body)
     end
     -- "plain": an edit box, so no pictures in its text
     if BNB.Tokens then body = BNB.Tokens.Fill(body, "plain") end
+    return body
+end
+-- The read view: {u} / {s} tags out, their lines drawn instead (TextLines,
+-- attached to the body below; Dukul 2026-10-25)
+local function ReadBody(note, cfg)
+    local body = ReadBodyTagged(note, cfg)
+    if BNB.TextLines then body = BNB.TextLines.StripLineTags(body) end
     return body
 end
 
@@ -2277,6 +2284,20 @@ local function CreateStickyFrame(noteID)
     sf2:SetPoint("BOTTOMRIGHT", front,  "BOTTOMRIGHT", -(PAD+22),  PAD)
     f._bodyScroll = sf2
     f._bodyEb     = bodyEb
+    -- Underline / strikethrough lines (UI/TextLines.lua) for a rich note
+    -- shown as plain text here: the tags out, the lines where they were
+    -- (only while the box shows exactly that text). Normal notes: no lines,
+    -- the tags are only taken out (Dukul, 2026-10-25)
+    if BNB.TextLines then
+        BNB.TextLines.Attach(bodyEb, sf2, function(text)
+            if f._inlineEditing then return nil end
+            local note = f._noteID and BNB.GetNote(f._noteID)
+            if not (note and BNB.AdvancedMode.IsRich(note)) then return nil end
+            local shown, ranges = BNB.TextLines.StripLineTags(ReadBodyTagged(note, GetCfg(f._noteID)))
+            if shown == text then return ranges end
+            return nil
+        end)
+    end
     bodyEb:SetEnabled(false)
     bodyEb:SetAlpha(0.90)
     -- Sticky note body is read-only — disable OnCursorChanged so SetText

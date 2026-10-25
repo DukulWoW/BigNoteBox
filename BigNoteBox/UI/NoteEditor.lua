@@ -5,7 +5,7 @@ local L   = BNB.L
 
 BNB._coordWaypoint = nil  -- TomTom UID of the current BNB coord waypoint, or nil
 
-local TOOLBAR_H   = 36
+local TOOLBAR_H   = 36 + BNB.STATUS_H   -- the action bar + the status bar under it (set in BuildToolbar)
 local MARKUP_H    = 28   -- height of the rich note markup toolbar (= WYSIWYG_H, Dukul 2026-10-17)
 local PAD         = 8
 local TSTAMP_H    = 16   -- height of the timestamp strip below title
@@ -438,28 +438,34 @@ local function BuildTitleField(parent)
     underline:SetPoint("TOPLEFT",  bg, "BOTTOMLEFT",  0, -1)
     underline:SetPoint("TOPRIGHT", bg, "BOTTOMRIGHT", 0, -1)
 
-    -- Timestamp strip anchored below the underline
-    local tsStrip = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    tsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
-    tsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
+    -- What sits under the title rule (the formatting bar, the body): where
+    -- the timestamp row was, now with no height (the row moved to the status
+    -- bar, Dukul 2026-10-25)
+    local topRow = CreateFrame("Frame", nil, parent)
+    topRow:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
+    topRow:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
+    topRow:SetHeight(1)
+    BNB._editorTopRow = topRow
+
+    -- The status bar at the bottom of the pane, the Explorer view's look
+    -- (Dukul, 2026-10-25: "move the created edited character counter etc.
+    -- (status) to the bottom of the window like we do in explorer mode"):
+    -- dates and coords on the left, the counts on the right
+    local status = BNB.CreateStatusBar(parent, PAD)
+    BNB._editorStatusBar = status
+    local tsStrip = status:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    tsStrip:SetPoint("LEFT",  status, "LEFT",  PAD, 0)
+    tsStrip:SetPoint("RIGHT", status, "RIGHT", -(PAD + BNB.STATUS_GRIP_W), 0)
     tsStrip:SetHeight(TSTAMP_H)
     tsStrip:SetJustifyH("LEFT")
+    tsStrip:SetWordWrap(false)
     tsStrip:SetText("")
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        tsStrip:SetTextColor(br * 0.90, bg_ * 0.90, bb * 0.90)
-        BNB.RegisterSkinLabel(tsStrip, 0.90)
-    else
-        tsStrip:SetTextColor(0.55, 0.55, 0.55)
-    end
+    BNB.SetTextWhite(tsStrip, 0.75)
 
     -- Invisible hover frame over the timestamp strip.
     -- Always shows full detail tooltip: absolute dates, zone, and coords.
-    local tsHover = CreateFrame("Frame", nil, parent)
-    tsHover:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  0, -1)
-    tsHover:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", 0, -1)
-    tsHover:SetHeight(TSTAMP_H + 2)
+    local tsHover = CreateFrame("Frame", nil, status)
+    tsHover:SetAllPoints(status)
     tsHover:EnableMouse(true)
     tsHover:SetScript("OnEnter", function(self)
         local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
@@ -500,20 +506,14 @@ local function BuildTitleField(parent)
     parent:HookScript("OnSizeChanged", FitLater)
 
     -- Word/char count label (M) — right-aligned in the same strip
-    local statsStrip = parent:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    statsStrip:SetPoint("TOPRIGHT",  underline, "BOTTOMRIGHT", -2, -2)
-    statsStrip:SetPoint("TOPLEFT",   underline, "BOTTOMLEFT",  2,  -2)
+    local statsStrip = status:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    statsStrip:SetPoint("LEFT",  status, "LEFT",  PAD, 0)
+    statsStrip:SetPoint("RIGHT", status, "RIGHT", -(PAD + BNB.STATUS_GRIP_W), 0)
     statsStrip:SetHeight(TSTAMP_H)
     statsStrip:SetJustifyH("RIGHT")
+    statsStrip:SetWordWrap(false)
     statsStrip:SetText("")
-    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset then
-        local p = BNB.GetSkinPreset()
-        local br, bg_, bb = BNB.SkinBorderOf(p)
-        statsStrip:SetTextColor(br * 0.90, bg_ * 0.90, bb * 0.90)
-        BNB.RegisterSkinLabel(statsStrip, 0.90)
-    else
-        statsStrip:SetTextColor(0.55, 0.55, 0.55)
-    end
+    BNB.SetTextWhite(statsStrip, 0.75)
 
     -- Markup to fix (ALL-264): left of the counts, over the timestamp hover,
     -- in a rich note's Markup view. Placed and filled by RefreshMarkupWarn.
@@ -899,6 +899,16 @@ local function BuildBodyField(parent, topAnchor)
         BNB.Tokens.WireAutocomplete(eb, function() return BNB._currentNoteID end,
             function() BNB.MarkDirty() end)
     end
+    -- {u} / {s} lines in a rich note's Edit mode (UI/TextLines.lua); hooks,
+    -- so after the box's last SetScript. Rich notes only: a normal note is
+    -- plain text, its tags could never be hidden (Dukul, 2026-10-25)
+    if BNB.TextLines then
+        BNB.TextLines.Attach(eb, sf, function(text)
+            local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
+            return BNB.TextLines.MarkupRanges(text)
+        end)
+    end
 
     return sf, eb
 end
@@ -925,15 +935,18 @@ function BNB.UpdateBodyTopAnchor()
     local bare = BNB.AdvancedMode.IsRich(note) and BNB._editorInViewMode == true and ul
     if note then
         local stats, tsHover = BNB._editorStatsStrip, BNB._editorTsHover
+        local status = BNB._editorStatusBar
         if bare then
             ts:Hide()
             if stats   then stats:Hide()   end
             if tsHover then tsHover:Hide() end
+            if status  then status:Hide()  end
             if bar     then bar:Hide()     end
         else
             ts:Show()
             if stats   then stats:Show()   end
             if tsHover then tsHover:Show() end
+            if status  then status:Show()  end
             if bar then
                 if BigNoteBoxDB and BigNoteBoxDB.wysiwygBarVisible == false then bar:Hide() else bar:Show() end
             end
@@ -941,7 +954,7 @@ function BNB.UpdateBodyTopAnchor()
     end
 
     -- Build anchor chain: tsStrip -> wysiwygBar (if shown) -> markupBar (if shown)
-    local topAnchor = bare and ul or ts
+    local topAnchor = bare and ul or (BNB._editorTopRow or ts)
     if bar  and bar:IsShown()  then topAnchor = bar  end
     if mbar and mbar:IsShown() then topAnchor = mbar end
     if mbar and mbar._sepT then
@@ -994,11 +1007,14 @@ local function BuildToolbar(parent)
     -- The larger icons left 2 px above and below them on Retail / Classic normal
     -- mode, where the window's bottom edge sits closer than Forever's chrome
     -- (Dukul, 2026-10-08): the bar grows there. Built before anything else reads it
-    if AB_GROW > 0 and not BNB.IsForever then TOOLBAR_H = 36 + 10 end
+    local abH = (AB_GROW > 0 and not BNB.IsForever) and (36 + 10) or 36
+    -- TOOLBAR_H = all under the tag strip: this bar plus the status bar under
+    -- it (2026-10-25), so the offsets from the pane's bottom stay as they were
+    TOOLBAR_H = abH + BNB.STATUS_H
     local bar = CreateFrame("Frame", nil, parent)
-    bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, 0)
-    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
-    bar:SetHeight(TOOLBAR_H)
+    bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, BNB.STATUS_H)
+    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, BNB.STATUS_H)
+    bar:SetHeight(abH)
 
     local sep = BNB.CreateNoteRule(parent)
     sep:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, TOOLBAR_H)
@@ -1945,6 +1961,7 @@ function BNB.LoadNoteInEditor(id)
         if titleBg    then titleBg:Hide()    end
         if titleUl    then titleUl:Hide()    end
         if tsStrip    then tsStrip:Hide()    end
+        if BNB._editorStatusBar   then BNB._editorStatusBar:Hide()   end
 
         if BNB._editorStatsStrip  then BNB._editorStatsStrip:Hide()  end
         if BNB._editorMarkupWarn  then BNB._editorMarkupWarn:Hide()  end
@@ -2049,6 +2066,7 @@ function BNB.LoadNoteInEditor(id)
                            short = short }
         tsStrip:SetText(createdStr .. updatedStr .. coords)
         tsStrip:Show()
+        if BNB._editorStatusBar then BNB._editorStatusBar:Show() end
         FitStatsRow()
     end
     -- Enable map button only when the note has coord data
@@ -2251,6 +2269,13 @@ local function BuildMarkupBar(parent, wysiwygBar)
         function() InsertTagPair("{h2}", "{/h2}") end)
     MkBtn("h3", L["NE_MU_H3_TIP"],
         function() InsertTagPair("{h3}", "{/h3}") end)
+    Divider()
+    -- Underline / strikethrough between the headers and the paragraphs
+    -- (Dukul, 2026-10-25; rich notes only, lines by UI/TextLines.lua)
+    MkBtn("tb-underline", L["NE_MU_U_TIP"],
+        function() InsertTagPair("{u}", "{/u}") end)
+    MkBtn("tb-strike", L["NE_MU_S_TIP"],
+        function() InsertTagPair("{s}", "{/s}") end)
     Divider()
     MkBtn("p",  L["NE_MU_P_TIP"],
         function() InsertTagPair("{p}", "{/p}") end)
@@ -2819,7 +2844,7 @@ function BNB.BuildNoteEditor()
 
     -- WYSIWYG bar sits between timestamp strip and body.
     -- topAnchor is the bar when visible, tsStrip when hidden.
-    local wysiwygBar = BNB._BuildWysiwygBar(pane, tsStrip)
+    local wysiwygBar = BNB._BuildWysiwygBar(pane, BNB._editorTopRow)
     BNB._editorWysiwygBar = wysiwygBar
 
     -- Markup bar sits between WYSIWYG bar and body (rich notes only).
@@ -2827,7 +2852,7 @@ function BNB.BuildNoteEditor()
     BNB._editorMarkupBar = markupBar
 
     local topAnchor  = (BigNoteBoxDB and BigNoteBoxDB.wysiwygBarVisible ~= false)
-                       and wysiwygBar or tsStrip
+                       and wysiwygBar or BNB._editorTopRow
     local bodyScroll, bodyEb = BuildBodyField(pane, topAnchor)
     BNB._editorBodyScroll = bodyScroll
     BNB._editorBody       = bodyEb
@@ -2849,6 +2874,7 @@ function BNB.BuildNoteEditor()
     titleUl:Hide()
     tsStrip:Hide()
     statsStrip:Hide()
+    BNB._editorStatusBar:Hide()
     bodyScroll:Hide()
     tagStrip:Hide()
     tagStripSep:Hide()

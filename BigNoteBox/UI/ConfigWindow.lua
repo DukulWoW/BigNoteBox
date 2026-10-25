@@ -137,6 +137,16 @@ local function AddHeader(ct, y, text, r, g, b)
     return y - 26
 end
 
+-- A smaller gold heading for a group inside a section (Trash, Tag tree under
+-- Notes; the groups of Developer tools > Tools and tests)
+local function AddSubHeader(ct, y, text)
+    local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    lbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 6)
+    BNB.SetHeaderColor(lbl)
+    lbl:SetText(text)
+    return y - 26
+end
+
 local function AddCheck(ct, y, text, getter, setter, tip)
     local cb = CreateFrame("CheckButton", nil, ct, "UICheckButtonTemplate")
     BNB.LabelHit(cb)   -- the tooltip and click reach over its label too
@@ -578,6 +588,7 @@ local K = {
     ASSET                = ASSET,
     AddRule              = AddRule,
     AddHeader            = AddHeader,
+    AddSubHeader         = AddSubHeader,
     AddCheck             = AddCheck,
     ReadOnShow           = ReadOnShow,
     GreyWhileOff         = GreyWhileOff,

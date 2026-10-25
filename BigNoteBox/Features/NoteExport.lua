@@ -251,6 +251,9 @@ local function ConvertRichBody(body)
         line = line:gsub("{col:(%x%x%x%x%x%x)}", function(hex) return '<span style="color:#' .. hex .. ';">' end)
         line = line:gsub("{/col}", "</span>")
 
+        -- {u}/{/u} underline, {s}/{/s} strikethrough
+        line = line:gsub("{(/?)u}", "<%1u>"):gsub("{(/?)s}", "<%1s>")
+
         -- {link*url*text}
         line = line:gsub("{link%*([^*}]+)%*([^}]*)}", function(url, lt) if lt == "" then lt = url end return '<a href="' .. url .. '">' .. lt .. '</a>' end)
 
