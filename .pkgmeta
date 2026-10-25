@@ -1,9 +1,10 @@
 # BigWigs packager layout contract for BigNoteBox.
-# This repo holds FOUR addons at its root, so the default one-addon-per-repo
+# This repo holds FIVE addons at its root, so the default one-addon-per-repo
 # assumption does not apply: move-folders lifts each addon folder up to the
 # top level of the zip. The result must list exactly BigNoteBox\, BigNoteBoxDB\,
 # BigNoteBox_Icons\ (load-on-demand icon list, ALL-62) and BigNoteBox_History\
-# (load-on-demand saved undo history, ALL-460) and nothing else.
+# (load-on-demand saved undo history, ALL-460) and BigNoteBox_Spell\ (load-on-demand
+# word lists for the spellchecker, ALL-559) and nothing else.
 # (BigNoteBox_BGs, the old sticky backgrounds, was removed in ALL-338.)
 # BigNoteBox_Dev\ (dev mode, ALL-129) is tracked but never packaged: it is in
 # ignore below, or it would land inside the zip's BigNoteBox\ folder.
@@ -17,6 +18,7 @@ move-folders:
   BigNoteBox/BigNoteBoxDB: BigNoteBoxDB
   BigNoteBox/BigNoteBox_Icons: BigNoteBox_Icons
   BigNoteBox/BigNoteBox_History: BigNoteBox_History
+  BigNoteBox/BigNoteBox_Spell: BigNoteBox_Spell
 
 manual-changelog:
   filename: CHANGELOG.md

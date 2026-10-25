@@ -164,6 +164,64 @@ local function HtmlUnescape(s)
     return (s:gsub("&quot;", "\""):gsub("&lt;", "<"):gsub("&gt;", ">"):gsub("&amp;", "&"))
 end
 
+-- Underline / strikethrough in the View mode (ALL-561 stage 2, 2026-10-25).
+-- SimpleHTML has no <u> / <s>, so the marked words get an invisible link,
+-- |Hbnbline:u|h...|h ("s" strikethrough, "us" both), that survives into the
+-- FontString SimpleHTML draws; UI/TextLines.lua (AttachHTML) finds it there
+-- and draws the lines. Runs on a line already turned into html: a marker is
+-- closed at every html tag (a block, <BR/>, <img>) and never put inside an
+-- <a> link or around a raw |H code, since links cannot nest. A tag left
+-- open runs to the end of its line (as TL.StripLineTags).
+local function LineMarkers(line)
+    if not line:find("{/?[us]}") then return line end
+    local out, pos = {}, 1
+    local u, s, inA, open = false, false, false, nil
+    local function close()
+        if open then out[#out + 1] = "|h"; open = nil end
+    end
+    local function text(t)
+        if t == "" then return end
+        local want = not inA and not t:find("|H", 1, true)
+            and ((u and s) and "us" or u and "u" or s and "s") or nil
+        if want ~= open then
+            close()
+            if want then out[#out + 1] = "|Hbnbline:" .. want .. "|h"; open = want end
+        end
+        out[#out + 1] = t
+    end
+    while true do
+        local ts = line:find("[<{]", pos)
+        if not ts then break end
+        local tag, tagEnd
+        if line:sub(ts, ts) == "<" then
+            tagEnd = line:find(">", ts, true)
+            if tagEnd then tag = line:sub(ts, tagEnd) end
+        else
+            local a, b = line:find("^{/?[us]}", ts)
+            if a then tag, tagEnd = line:sub(a, b), b end
+        end
+        if not tag then
+            text(line:sub(pos, ts))
+            pos = ts + 1
+        else
+            text(line:sub(pos, ts - 1))
+            if tag:sub(1, 1) == "<" then
+                close()
+                if tag:find("^<[aA][%s>]") then inA = true
+                elseif tag:find("^</[aA]>") then inA = false end
+                out[#out + 1] = tag
+            elseif tag == "{u}" then u = true
+            elseif tag == "{/u}" then u = false
+            elseif tag == "{s}" then s = true
+            elseif tag == "{/s}" then s = false end
+            pos = tagEnd + 1
+        end
+    end
+    text(line:sub(pos))
+    close()
+    return table.concat(out)
+end
+
 --------------------------------------------------------------------------------
 -- MAIN CONVERTER: AM.ToHTML(text, bodySize)
 -- Converts BNB rich-note markup to WoW SimpleHTML format.
@@ -264,10 +322,8 @@ function AM.ToHTML(text, bodySize)
             return "|cff" .. hex
         end)
         line = line:gsub("{/col}", "|r")
-        -- 3b. {u}...{/u} underline, {s}...{/s} strikethrough (2026-10-25): the
-        --     lines are drawn in Edit mode only (UI/TextLines.lua); here the
-        --     tags are left out until the View mode lines are built
-        line = line:gsub("{/?[us]}", "")
+        -- 3b. {u}...{/u} underline, {s}...{/s} strikethrough: kept as they are
+        --     here and turned into line markers at the end (LineMarkers, 8b)
 
         -- 4. {link*url*text} -> <a href="url"> with BNB green colour baked in.
         -- SimpleHTML has no API to set <a> tag colour at runtime, so we wrap
@@ -307,6 +363,8 @@ function AM.ToHTML(text, bodySize)
             if openEnd then
                 if carried then parts[#parts + 1] = "<BR/>" end
                 parts[#parts + 1] = t
+            elseif t:find("{/?[us]}") and t:gsub("{/?[us]}", "") == "" then
+                parts[#parts + 1] = t   -- only {u} / {s} tags: no block of their own (8b)
             else
                 parts[#parts + 1] = WrapBare(t, not hadTag)
             end
@@ -333,6 +391,9 @@ function AM.ToHTML(text, bodySize)
         -- An empty line inside a block is a blank line there
         if carried and line == "" then parts[1] = "<BR/>" end
         line = table.concat(parts)
+
+        -- 8b. {u} / {s} -> invisible |Hbnbline:..|h markers (LineMarkers)
+        line = LineMarkers(line)
 
         -- 9. Spacer after block closes for visual breathing room.
         --    WoW SimpleHTML has no CSS margins; inject a <P><br/></P> after
@@ -373,6 +434,12 @@ end
 --   stray    = a close tag with nothing open: removed
 --   unclosed = a block still open at the end: its close tag goes after the last text
 -- Text outside a block is no repair: plain lines are how rich notes are written.
+-- {u} / {s} (2026-10-25, Dukul: "placing a new U inside a U stops the line
+-- before the first {/u}. This should probably give a syntax error"), by the
+-- rules LineMarkers draws them with, one line at a time:
+--   repeat     = {u} while a {u} is open on that line: it does nothing, removed
+--   stray      = {/u} with no {u} open on that line: removed
+--   lineopen   = {u} still open at the end of its line: {/u} goes after the line's last text
 --------------------------------------------------------------------------------
 local function CloseTagFor(openTag)
     return "{/" .. openTag:match("^{(%a%d?)") .. "}"
@@ -380,12 +447,47 @@ end
 
 -- Every repair the text needs, in text order: { kind, line, at, len, tag,
 -- open, insert } (at / len = the bytes replaced by insert, len 0 = an insert)
+-- {u} / {s} on one line (see above); repairs go into list
+local function LineTagRepairs(list, line, lineNo, lineStart)
+    if not line:find("{/?[us]}") then return end
+    local isOpen, order, scan = {}, {}, 1
+    while true do
+        local st, en, slash, k = line:find("{(/?)([us])}", scan)
+        if not st then break end
+        local tag, at = line:sub(st, en), lineStart + st - 1
+        if slash == "" then
+            if isOpen[k] then
+                list[#list + 1] = { kind = "repeat", line = lineNo, at = at, len = #tag, tag = tag, insert = "" }
+            else
+                isOpen[k] = true
+                order[#order + 1] = k
+            end
+        elseif isOpen[k] then
+            isOpen[k] = nil
+        else
+            list[#list + 1] = { kind = "stray", line = lineNo, at = at, len = #tag, tag = tag, insert = "" }
+        end
+        scan = en + 1
+    end
+    -- Still open: closed after the line's last text, the last one opened first
+    local last = #line
+    while last > 0 and line:sub(last, last):find("%s") do last = last - 1 end
+    for i = #order, 1, -1 do
+        local k = order[i]
+        if isOpen[k] then
+            list[#list + 1] = { kind = "lineopen", line = lineNo, at = lineStart + last, len = 0,
+                tag = "{" .. k .. "}", insert = "{/" .. k .. "}" }
+        end
+    end
+end
+
 function AM.MarkupRepairs(text)
     local list = {}
     if not text or text == "" then return list end
     local open, openLine, lineNo, lineStart = nil, nil, 0, 1
     for line in (text .. "\n"):gmatch("([^\n]*)\n") do
         lineNo = lineNo + 1
+        LineTagRepairs(list, line, lineNo, lineStart)
         local scan = 1
         while true do
             local st, en = line:find("{/?[hp]%d?:?[clr]?}", scan)
@@ -420,6 +522,13 @@ function AM.MarkupRepairs(text)
         list[#list + 1] = { kind = "unclosed", line = openLine, at = last + 1, len = 0,
             tag = open, insert = CloseTagFor(open) }
     end
+    -- Text order (RepairMarkup works back to front). Same place: the order
+    -- they were found, so {/u} lands before a block's close tag
+    for i, r in ipairs(list) do r._n = i end
+    table.sort(list, function(a, b)
+        if a.at ~= b.at then return a.at < b.at end
+        return a._n < b._n
+    end)
     return list
 end
 
@@ -443,6 +552,10 @@ function AM.DescribeRepair(r)
         return string.format(L["MARKUP_FIX_MISMATCH_FMT"], r.line, r.tag, r.open, r.insert)
     elseif r.kind == "stray" then
         return string.format(L["MARKUP_FIX_STRAY_FMT"], r.line, r.tag)
+    elseif r.kind == "repeat" then
+        return string.format(L["MARKUP_FIX_REPEAT_FMT"], r.line, r.tag)
+    elseif r.kind == "lineopen" then
+        return string.format(L["MARKUP_FIX_LINEOPEN_FMT"], r.line, r.tag, r.insert)
     end
     return string.format(L["MARKUP_FIX_UNCLOSED_FMT"], r.line, r.tag, r.insert)
 end
@@ -622,6 +735,7 @@ function AM.CreateRenderFrame(name, parent)
 
     -- Item/spell hyperlink tooltip on hover
     f:SetScript("OnHyperlinkEnter", function(self, link)
+        if link:find("^bnbline:") then return end   -- a {u} / {s} marker, not a link (8b)
         if BNB.ShowLinkCursor then BNB.ShowLinkCursor(self, link) end   -- ALL-489 / ALL-492
         -- Waypoint and note links (ALL-478, Features/NoteLinks.lua)
         local NL = BNB.NoteLinks
@@ -650,6 +764,7 @@ function AM.CreateRenderFrame(name, parent)
 
     -- Clickable links: WoW item/spell links are informational; plain URLs copy
     f:SetScript("OnHyperlinkClick", function(self, link, text, button)
+        if link:find("^bnbline:") then return end   -- a {u} / {s} marker (8b)
         local NL = BNB.NoteLinks
         -- Right-click: the link menu, Send to chat and the rest (2026-10-18)
         if button == "RightButton" and NL then NL.LinkMenu(self, HtmlUnescape(link), text); return end
@@ -665,6 +780,9 @@ function AM.CreateRenderFrame(name, parent)
         -- (NL.GameLinkClick, shared with normal notes)
         if NL then NL.GameLinkClick(self, link, text, button) end
     end)
+
+    -- Underline / strikethrough lines over the view (UI/TextLines.lua, ALL-561)
+    if BNB.TextLines then BNB.TextLines.AttachHTML(f) end
 
     return f
 end

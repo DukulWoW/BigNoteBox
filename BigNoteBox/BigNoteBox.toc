@@ -95,6 +95,7 @@ UI\Config\DevTools.lua
 UI\Config\OracleSettings.lua
 UI\Config\ContextMenuSettings.lua
 UI\Config\Tldr.lua
+UI\Config\Spelling.lua
 UI\Config\Templates.lua
 UI\Config\Tokens.lua
 UI\Config\Accessibility.lua
@@ -169,6 +170,7 @@ Features\NoteExport.lua
 Features\ShareNote.lua
 Features\OracleSearch.lua
 Features\Tldr.lua
+Features\Spellcheck.lua
 UI\NoteTooltip.lua
 Features\UnitNotes.lua
 Features\InspectNote.lua

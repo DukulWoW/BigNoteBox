@@ -6,7 +6,7 @@
 
 local BNB = BigNoteBox
 
-BNB.HELP_BUILT = 1792787282
+BNB.HELP_BUILT = 1792931807
 -- The help book's chapters (ALL-554), in book order: a doc-mode folder each;
 -- body / icon / rich = its Cover note ("" / nil when it has none)
 BNB.HELP_CHAPTERS = {
@@ -85,7 +85,7 @@ BNB.HELP_TOPICS = {
     {
         key = "rich-notes", src = "bnb-6ad64115bc710dda", rich = false, clients = nil, chapter = "writing",
         title = "Rich notes",
-        body = "A rich note is a small page: headings, colors, icons, pictures and links. The toolbar inserts every tag for you, and the preview beside the editor shows the result as you type.\n\nRight-click a note > Convert to rich or normal note.\n\nThe tags:\n- {h1}Title{/h1}, {h2}...{/h2}, {h3}...{/h3}: headings. {h1:c} centers one, {h1:r} puts it on the right.\n- {p}text{/p}: a paragraph. {p:c} centered, {p:r} on the right.\n- {col:ff8800}text{/col}: colored text.\n- {icon:INV_Misc_Note_01:16}: a game icon in the text, 16 pixels.\n- {img:path:width:height}: a picture.\n- {link*address*text}: a link. {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:16}} is a picture button that opens the Oracle bar.\n- {br}: a new line inside a paragraph.\n\nWith the Rich Notes module off, every note shows as plain text with its tags visible, like this one (Settings > Modules > Rich Notes).",
+        body = "A rich note is a small page: headings, colors, icons, pictures and links. The toolbar inserts every tag for you, and the preview beside the editor shows the result as you type.\n\nRight-click a note > Convert to rich or normal note.\n\nThe tags:\n- {h1}Title{/h1}, {h2}...{/h2}, {h3}...{/h3}: headings. {h1:c} centers one, {h1:r} puts it on the right.\n- {p}text{/p}: a paragraph. {p:c} centered, {p:r} on the right.\n- {col:ff8800}text{/col}: colored text.\n- {u}text{/u}: underlined text. {s}text{/s}: struck through. The lines show in View mode and in the preview; while you edit, you see the tags.\n- {icon:INV_Misc_Note_01:16}: a game icon in the text, 16 pixels.\n- {img:path:width:height}: a picture.\n- {link*address*text}: a link. {link*bnbui:oracle*{icon:INV_Misc_Spyglass_03:16}} is a picture button that opens the Oracle bar.\n- {br}: a new line inside a paragraph.\n\nWith the Rich Notes module off, every note shows as plain text with its tags visible, like this one (Settings > Modules > Rich Notes).",
     },
     {
         key = "note-tokens", src = "bnb-6ada4541b8cff90d", rich = false, clients = nil, chapter = "writing",

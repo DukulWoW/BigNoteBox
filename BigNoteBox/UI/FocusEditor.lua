@@ -901,15 +901,8 @@ local function BuildFocusFrame()
 
     if BNB.WireDropTarget       then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
-    -- {u} / {s} lines in a rich note (UI/TextLines.lua), after the box's
-    -- last SetScript (hooks); rich notes only (Dukul, 2026-10-25)
-    if BNB.TextLines then
-        BNB.TextLines.Attach(eb, sf, function(text)
-            local n = focusNoteID and BNB.GetNote(focusNoteID)
-            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
-            return BNB.TextLines.MarkupRanges(text)
-        end)
-    end
+    -- No {u} / {s} lines here: the tags show while editing, the lines only
+    -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, TOOLBAR_H + 4)
@@ -1218,15 +1211,8 @@ local function BuildFocusFrameSkin()
 
     if BNB.WireDropTarget      then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end
-    -- {u} / {s} lines in a rich note (UI/TextLines.lua), after the box's
-    -- last SetScript (hooks); rich notes only (Dukul, 2026-10-25)
-    if BNB.TextLines then
-        BNB.TextLines.Attach(eb, sf, function(text)
-            local n = focusNoteID and BNB.GetNote(focusNoteID)
-            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
-            return BNB.TextLines.MarkupRanges(text)
-        end)
-    end
+    -- No {u} / {s} lines here: the tags show while editing, the lines only
+    -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, TOOLBAR_H + 4)

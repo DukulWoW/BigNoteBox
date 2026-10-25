@@ -899,15 +899,11 @@ local function BuildBodyField(parent, topAnchor)
         BNB.Tokens.WireAutocomplete(eb, function() return BNB._currentNoteID end,
             function() BNB.MarkDirty() end)
     end
-    -- {u} / {s} lines in a rich note's Edit mode (UI/TextLines.lua); hooks,
-    -- so after the box's last SetScript. Rich notes only: a normal note is
-    -- plain text, its tags could never be hidden (Dukul, 2026-10-25)
-    if BNB.TextLines then
-        BNB.TextLines.Attach(eb, sf, function(text)
-            local n = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-            if not (n and BNB.AdvancedMode.IsRich(n)) then return nil end
-            return BNB.TextLines.MarkupRanges(text)
-        end)
+    -- No {u} / {s} lines here: the tags show while editing, the lines only
+    -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
+    -- Spelling mistakes (ALL-559, Features/Spellcheck.lua), every note
+    if BNB.Spell then
+        BNB.Spell.AttachEditor(eb, sf, function() return BNB._currentNoteID end)
     end
 
     return sf, eb

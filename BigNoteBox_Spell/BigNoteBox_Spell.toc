@@ -1,0 +1,13 @@
+## Interface: 120105, 120100, 16001, 50504, 20506, 11509
+## Title: |cff66bb6aB|cff72c476i|cff7ecd82g|cff8ad68eN|cff96df9ao|cffa2e8a6t|cffaef1b2e|cffbafabeB|cffc6ffcao|cffd2ffd6x|r |cffaaaaaaSpelling|r
+## IconTexture: Interface/Addons/BigNoteBox/Assets/icon
+## Notes: English word lists (US and UK) for BigNoteBox's spellchecker. Loaded only while the Spelling module is on.
+## Author: Dukul
+## Group: BigNoteBox
+## Version: 1.0.0
+## Dependencies: BigNoteBox
+## LoadOnDemand: 1
+
+enUS.lua
+enGB.lua
+WoWWords.lua

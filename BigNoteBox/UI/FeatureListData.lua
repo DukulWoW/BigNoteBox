@@ -106,6 +106,7 @@ BNB.FEATURE_LIST = {
             "Waypoint links: click to track, Shift-click for chat, Ctrl-click to copy a /way line",
             "BigNoteBox links: a link to a Settings page, a window or a help topic",
             "Note settings: the note's icon, icon frame, border, background and font",
+            "Spelling: a red line under words that are not in the dictionary (English US or UK); nothing is changed for you",
         },
     },
 
@@ -137,6 +138,7 @@ BNB.FEATURE_LIST = {
         items  = {
             "Headings {h1} {h2} {h3} and paragraphs {p}, left, centered or right",
             "Colored text with a color picker",
+            "Underline {u} and strikethrough {s}",
             "Game icons {icon}, game art {atlas} and your own pictures {img}",
             "Clickable links; item and spell links show their tooltips",
             "Rich notes show as a page on sticky notes too",

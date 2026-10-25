@@ -185,6 +185,12 @@ BNB.DEFAULTS = {
     -- list `tldrSnippets` stays out of DEFAULTS: nil = the default list, in
     -- the player's language (Features/Tldr.lua); a list would be merged key by key
     tldrEnabled         = true,
+    -- Spelling (ALL-559): on for English game clients, off for the others
+    -- (their notes are mostly in another language). Features/Spellcheck.lua
+    spellEnabled        = (GetLocale() == "enUS" or GetLocale() == "enGB"),
+    spellLang           = "enUS",    -- "enUS" / "enGB"
+    spellMode           = "type",    -- "type" = as you type, "click" = on Check spelling
+    spellSkipCaps       = true,      -- capitalized words in a sentence = names, not checked
     tldrUnderTitle      = true,
     tldrUnitTooltip     = true,
     tldrToast           = true,

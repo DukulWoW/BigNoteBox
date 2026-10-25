@@ -18,6 +18,7 @@ local NEW = {
     explorer = "2.0",    -- Settings > Modules > Explorer view (ALL-414)
     folders  = "2.0",    -- Settings > Modules > Folders (ALL-510)
     accessibility = "2.0",    -- Settings > Modules > Accessibility (ALL-548)
+    spelling = "2.0",    -- Settings > Modules > Spelling (ALL-559)
 }
 
 local TEX    = 929716   -- interface/glues/charactercreate/newcharacternotification

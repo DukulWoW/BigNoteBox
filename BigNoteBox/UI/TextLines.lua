@@ -1,10 +1,11 @@
 --------------------------------------------------------------------------------
 -- TextLines.lua -- lines drawn under / through parts of an edit box's text
 --
--- Underline and strikethrough in rich notes' Edit mode ({u}...{/u},
--- {s}...{/s}, Dukul 2026-10-25), and the spellchecker's underlines later
--- (ALL-559 stage 1). The text itself is never touched: the lines are textures
--- over the box.
+-- The spellchecker's lines in the editor (ALL-559), the {u} / {s} lines of a
+-- normal note's sticky read view, and (TL.AttachHTML, below) underline and
+-- strikethrough in rich notes' View mode and previews. Not in Edit mode: the
+-- tags show there (Dukul, 2026-10-25). The text itself is never touched: the
+-- lines are textures over the box.
 --
 -- How (proven in BigNoteBox_Dev/SpellProbe.lua, ALL-559 stage 0):
 --   * Measured on the edit box's OWN FontString (EditBox:GetRegions()), so the
@@ -25,9 +26,35 @@ local TL = {}
 BNB.TextLines = TL
 
 local BUDGET_MS = 4          -- span work per frame
-local THICK     = 2          -- line thickness
+local THICK     = 1          -- {u} / {s} line: one screen pixel (Dukul, 2026-10-25: thinner)
 local _attached = {}         -- every controller, for recoloring
 local _n = 0
+
+-- A spelling mistake ("x") gets a wavy line: Assets/UI/ui-spell-squiggle.tga,
+-- white on clear, tiled along the word and tinted (placeholder art, Dukul
+-- redraws it: keep it a power-of-two size, SQUIG_W x SQUIG_H)
+local SQUIGGLE = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-spell-squiggle"
+local SQUIG_W, SQUIG_H = 8, 4
+
+-- One line texture in its look; a pooled texture may have been either before
+local function Paint(t, kind, w, r, g, b)
+    if kind == "x" then
+        t:SetTexture(SQUIGGLE, "REPEAT", "CLAMP")
+        t:SetTexCoord(0, w / SQUIG_W, 0, 1)
+        t:SetVertexColor(r, g, b, 1)
+        t:SetSize(w, SQUIG_H)
+    else
+        t:SetTexCoord(0, 1, 0, 1)
+        t:SetVertexColor(1, 1, 1, 1)
+        t:SetColorTexture(r, g, b, 1)
+        -- One real pixel at any UI scale, so a 1 px line never blurs or vanishes
+        local px = THICK
+        if PixelUtil and PixelUtil.GetNearestPixelSize then
+            px = PixelUtil.GetNearestPixelSize(THICK, t:GetEffectiveScale(), THICK)
+        end
+        t:SetSize(w, px)
+    end
+end
 
 -- Gold in normal mode, the skin accent in skin mode (Dukul, 2026-10-25)
 function TL.LineColor()
@@ -38,35 +65,9 @@ function TL.LineColor()
     return c[1], c[2], c[3]
 end
 
--- {u}...{/u} and {s}...{/s} in typed markup -> { first, last, kind } (bytes,
--- the text between the tags). A tag left open runs to the end of its line.
-local MARKUP = { { "{u}", "{/u}", "u" }, { "{s}", "{/s}", "s" } }
-function TL.MarkupRanges(text)
-    local out = {}
-    for _, m in ipairs(MARKUP) do
-        local open, close, kind = m[1], m[2], m[3]
-        local pos = 1
-        while true do
-            local _, oEnd = text:find(open, pos, true)
-            if not oEnd then break end
-            local cStart, cEnd = text:find(close, oEnd + 1, true)
-            local nl = text:find("\n", oEnd + 1, true)
-            local last
-            if cStart and not (nl and nl < cStart) then
-                last, pos = cStart - 1, cEnd + 1
-            else
-                last = (nl or #text + 1) - 1
-                pos = last + 1
-            end
-            if last >= oEnd + 1 then out[#out + 1] = { oEnd + 1, last, kind } end
-        end
-    end
-    return out
-end
-
 -- The text with every {u} {/u} {s} {/s} taken out, and the ranges they
--- marked in the text that is left (same rules as MarkupRanges: an open tag
--- runs to the end of its line). For text shown, not edited: a normal note's
+-- marked in the text that is left (an open tag runs to the end of its line,
+-- as in AM.ToHTML's LineMarkers). For text shown, not edited: a normal note's
 -- sticky read view, Send to Chat, toasts (Dukul, 2026-10-25)
 function TL.StripLineTags(text)
     if not text or not text:find("{/?[us]}") then return text or "", {} end
@@ -121,10 +122,13 @@ local function RectParts(r)
     return r.left or r[1], r.bottom or r[2], r.width or r[3], r.height or r[4]
 end
 
--- Attach(eb, sf, getRanges): getRanges(text) returns a list of
--- { first, last, kind } ("u" underline, "s" strikethrough) or nil for none.
--- Returns the controller; ctl:Refresh() asks for a redraw.
-function TL.Attach(eb, sf, getRanges)
+-- Attach(eb, sf, getRanges, color): getRanges(text) returns a list of
+-- { first, last, kind } ("u" underline, "s" strikethrough, "x" a spelling
+-- mistake, a wavy line) or nil for none. color (optional) = a
+-- function returning r, g, b; TL.LineColor when left out. Several
+-- controllers can sit on one box (the {u} lines and the spellchecker).
+-- Returns the controller; ctl.Refresh() asks for a redraw.
+function TL.Attach(eb, sf, getRanges, color)
     if not (eb and sf and getRanges) then return end
     _n = _n + 1
     local key = "TextLines" .. _n
@@ -202,7 +206,7 @@ function TL.Attach(eb, sf, getRanges)
             if not (r[2] >= vA and r[1] <= vB) then order[#order + 1] = r end
         end
 
-        local cr, cg, cb = TL.LineColor()
+        local cr, cg, cb = (color or TL.LineColor)()
         local i, n = 1, 0
         local function Step()
             if gen ~= ctl.gen then return end
@@ -223,8 +227,7 @@ function TL.Attach(eb, sf, getRanges)
                         local t = GetLine(n)
                         t:ClearAllPoints()
                         t:SetPoint("TOPLEFT", fs, "TOPLEFT", l, y)
-                        t:SetSize(w, THICK)
-                        t:SetColorTexture(cr, cg, cb, 1)
+                        Paint(t, r[3], w, cr, cg, cb)
                         t:Show()
                     end
                 end
@@ -251,6 +254,184 @@ function TL.Attach(eb, sf, getRanges)
     hooksecurefunc(eb, "SetFont", ctl.Refresh)
     hooksecurefunc(eb, "SetFontObject", ctl.Refresh)
     hooksecurefunc(eb, "SetJustifyH", ctl.Refresh)
+    return ctl
+end
+
+--------------------------------------------------------------------------------
+-- The View mode: the same lines over a SimpleHTML view (ALL-561 stage 2)
+--
+-- AM.ToHTML turns {u} / {s} into an invisible link, |Hbnbline:u|h...|h ("s",
+-- "us" for both). SimpleHTML draws one FontString per block, the marker stays
+-- in its text, and the span function works on it once it is laid out (probe
+-- /bnbspell html, 2026-10-25). Byte indices count the escape codes. Each
+-- render ends in SetHeight(GetContentHeight()) at every call site, so that
+-- and SetWidth are the "drawn again" signal: the old FontStrings may be gone,
+-- so work in progress stops at once and starts again next frame (never
+-- inside the layout pass, FOR-30). The lines sit on a layer over the frame,
+-- placed from the frame's top-left, never anchored to SimpleHTML's own
+-- FontStrings (they are freed on the next render).
+--------------------------------------------------------------------------------
+
+-- The marked parts of one FontString's text -> { first, last, kinds }.
+-- A typed pipe is "||", so "||h" is not the end of a marker
+local function MarkedSpans(text)
+    local out, pos = {}, 1
+    while true do
+        local _, e, kinds = text:find("|Hbnbline:(%a+)|h", pos)
+        if not e then break end
+        local i, close = e + 1, nil
+        while true do
+            local p = text:find("|", i, true)
+            if not p then break end
+            local nx = text:sub(p + 1, p + 1)
+            if nx == "h" then close = p; break end
+            i = p + (nx == "|" and 2 or 1)
+        end
+        if not close then break end
+        if close - 1 >= e + 1 then out[#out + 1] = { e + 1, close - 1, kinds } end
+        pos = close + 2
+    end
+    return out
+end
+TL._MarkedSpans = MarkedSpans   -- offline tests
+
+function TL.AttachHTML(rf)
+    if not rf or rf._bnbLines then return end
+    _n = _n + 1
+    local key = "TextLines" .. _n
+    local ctl = { lines = {}, gen = 0 }
+    rf._bnbLines = ctl
+    _attached[#_attached + 1] = ctl
+
+    local layer = CreateFrame("Frame", nil, rf)
+    layer:SetAllPoints(rf)
+    layer:EnableMouse(false)
+
+    local lastSig, retries = nil, 0
+
+    local function GetLine(i)
+        local t = ctl.lines[i]
+        if not t then
+            t = layer:CreateTexture(nil, "OVERLAY")
+            ctl.lines[i] = t
+        end
+        return t
+    end
+    local function HideFrom(i)
+        for j = i, #ctl.lines do ctl.lines[j]:Hide() end
+    end
+
+    -- One FontString's lines; n = lines drawn so far -> new n, and whether
+    -- the span function answered (nil = not laid out yet)
+    local function PlaceFS(job, n, rl, rt, cr, cg, cb)
+        local fs = job.fs
+        if fs:GetText() ~= job.text then return n, true end   -- drawn again since
+        local fl, ft, fb = fs:GetLeft(), fs:GetTop(), fs:GetBottom()
+        if not (fl and ft and fb) then return n, false end
+        local fsH = ft - fb
+        -- The line grid: the API's from the whole text, the drawn one from
+        -- the FontString's height (the same line snap as the Edit mode)
+        local all = Rects(fs, 1, #job.text)
+        if #all == 0 then return n, false end
+        local apiTop, apiBot
+        for _, r in ipairs(all) do
+            local _, b, _, h = RectParts(r)
+            if b and h then
+                apiTop = math.max(apiTop or b + h, b + h)
+                apiBot = math.min(apiBot or b, b)
+            end
+        end
+        local nL = #all
+        local snap = nL > 1 and apiTop and fsH > 0 and apiTop > apiBot
+        local apiStep = snap and (apiTop - apiBot) / nL
+        local step = snap and fsH / nL
+        for _, sp in ipairs(MarkedSpans(job.text)) do
+            for _, rect in ipairs(Rects(fs, sp[1], sp[2])) do
+                local l, b, w, h = RectParts(rect)
+                if l and b and w and h and w > 0 then
+                    local yTop   -- the rect's top, down from the FontString's top
+                    if snap then
+                        yTop = -math.floor((apiTop - b - h) / apiStep + 0.5) * step
+                    else
+                        yTop = b + h - fsH
+                    end
+                    for kind in sp[3]:gmatch("[us]") do
+                        local y = kind == "s" and (yTop - h * 0.5 + THICK / 2) or (yTop - h + 2)
+                        n = n + 1
+                        local t = GetLine(n)
+                        t:ClearAllPoints()
+                        t:SetPoint("TOPLEFT", layer, "TOPLEFT", fl - rl + l, ft - rt + y)
+                        Paint(t, kind, w, cr, cg, cb)
+                        t:Show()
+                    end
+                end
+            end
+        end
+        return n, true
+    end
+
+    local function Draw()
+        ctl.gen = ctl.gen + 1
+        local gen = ctl.gen
+        if not rf:IsVisible() then lastSig = nil; HideFrom(1); return end
+        layer:SetFrameLevel(rf:GetFrameLevel() + 2)
+        local rl, rt = rf:GetLeft(), rf:GetTop()
+        if not (rl and rt) then return end
+        local jobs, parts = {}, { tostring(rf:GetWidth()) }
+        for _, r in ipairs({ rf:GetRegions() }) do
+            if r.GetObjectType and r:GetObjectType() == "FontString" and r:IsShown()
+               and r.CalculateScreenAreaFromCharacterSpan then
+                local t = r:GetText()
+                if t and t:find("|Hbnbline:", 1, true) then
+                    jobs[#jobs + 1] = { fs = r, text = t }
+                    -- A font change re-wraps the same text: its size and place too
+                    parts[#parts + 1] = t .. "\2" .. tostring(r:GetHeight()) .. "\2" .. tostring((r:GetTop() or 0) - rt)
+                end
+            end
+        end
+        if #jobs == 0 then lastSig = nil; HideFrom(1); return end
+        local sig = table.concat(parts, "\1")
+        if sig == lastSig then return end
+        lastSig = sig
+
+        local cr, cg, cb = TL.LineColor()
+        local j, n, early = 1, 0, false
+        local function Step()
+            if gen ~= ctl.gen then return end
+            local t0 = debugprofilestop()
+            while j <= #jobs and debugprofilestop() - t0 < BUDGET_MS do
+                local ok, nn, answered = pcall(PlaceFS, jobs[j], n, rl, rt, cr, cg, cb)
+                if ok then
+                    n = nn
+                    if not answered then early = true end
+                end
+                j = j + 1
+            end
+            if j <= #jobs then C_Timer.After(0, Step); return end
+            HideFrom(n + 1)
+            -- Asked before SimpleHTML had laid the text out: once more, soon
+            if early and retries < 3 then
+                retries = retries + 1
+                lastSig = nil
+                BNB.Debounce(key, 0.1, Draw)
+            else
+                retries = 0
+            end
+        end
+        Step()
+    end
+
+    local function Invalidate()
+        ctl.gen = ctl.gen + 1   -- steps in progress stop now: their FontStrings may be gone
+        retries = 0
+        BNB.Debounce(key, 0, Draw)
+    end
+    function ctl.Refresh() BNB.Debounce(key, 0, Draw) end
+    function ctl.Recolor() lastSig = nil; ctl.Refresh() end
+
+    hooksecurefunc(rf, "SetHeight", Invalidate)
+    hooksecurefunc(rf, "SetWidth", Invalidate)
+    rf:HookScript("OnShow", Invalidate)
     return ctl
 end
 

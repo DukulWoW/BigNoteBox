@@ -607,6 +607,12 @@ local MODULES = {
           SetDB("richEnabled", v)
           if BNB.ApplyRichModule then BNB.ApplyRichModule(v) end
       end },
+    { key = "spell", label = "CFG_HDR_SPELL", tip = "SW_MOD_SPELL_TIP",
+      get = function() return BNB.SpellEnabled() end,
+      set = function(v)
+          SetDB("spellEnabled", v)
+          if BNB.ApplySpellModule then BNB.ApplySpellModule(v) end
+      end },
     { key = "stickies", label = "CFG_CELL_STICKY_HDR", tip = "SW_MOD_STICKY_TIP",
       get = function() return BNB.StickiesEnabled() end,
       set = function(v)

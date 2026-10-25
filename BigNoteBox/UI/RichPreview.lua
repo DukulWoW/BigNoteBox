@@ -65,7 +65,9 @@ local function BuildRenderPair(name, parent, titleH)
 
     -- FOR-30: a SimpleHTML's width is set on the next frame, never inside
     -- OnSizeChanged (the client's layout pass; a reflow there frees lines
-    -- that pass still walks)
+    -- that pass still walks). A new width alone does not wrap the text again:
+    -- the last html is set again, as the editor's View mode does (Dukul,
+    -- 2026-10-25: resizing the preview left the text where it was)
     local pending = false
     rsf:HookScript("OnSizeChanged", function()
         if pending then return end
@@ -73,7 +75,14 @@ local function BuildRenderPair(name, parent, titleH)
         C_Timer.After(0, function()
             pending = false
             local w = rsf:GetWidth()
-            if w and w > 0 then rf:SetWidth(w) end
+            if not (w and w > 0) or math.abs((rf:GetWidth() or 0) - w) < 0.5 then return end
+            rf:SetWidth(w)
+            if rf._bnbHTML and rsf:IsShown() then
+                local y = rsf:GetVerticalScroll()
+                getmetatable(rf).__index.SetText(rf, rf._bnbHTML)
+                rf:SetHeight(rf:GetContentHeight())
+                rsf:SetVerticalScroll(math.min(y, rsf:GetVerticalScrollRange() or y))
+            end
         end)
     end)
 
@@ -117,6 +126,7 @@ local function RenderNote(note, rsf, rf, gen, liveBody, cursorRatio)
         local html = AM.ToHTML(bodyText, sz)
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, html)
+        rf._bnbHTML = html   -- drawn again on a resize (BuildRenderPair)
         local contentH = rf:GetContentHeight()
         rf:SetHeight(contentH)
 

@@ -1817,6 +1817,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_CONTEXT_POPUP"],  L["CFG_SUB_CONTEXT_DESC"],    BuildContextPopupPage, "situations", "context" },
         { L["CFG_HDR_TOASTS"],         L["CFG_SUB_TOASTS_DESC"],     BuildToastsPage,       "toasts",     "toasts"  },
         { L["CFG_HDR_TLDR"],           L["CFG_SUB_TLDR_DESC"],       K.BuildTldrPage,       "tldr",       "tldr"    },   -- UI/Config/Tldr.lua (ALL-372)
+        { L["CFG_HDR_SPELL"],          L["CFG_SUB_SPELL_DESC"],      K.BuildSpellPage,      "spelling",   "spell"   },   -- UI/Config/Spelling.lua (ALL-559)
         { L["CFG_FOLDERS_HEADER"],     L["CFG_SUB_FOLDERS_DESC"],    K.BuildFoldersPage,    "folders",    "folders" },   -- UI/Config/NotePages.lua (ALL-514)
         { L["CFG_EXPLORER_HEADER"],    L["CFG_SUB_EXPLORER_DESC"],   K.BuildExplorerPage,   "explorer",   "explorer" },  -- UI/Config/NotePages.lua (ALL-414)
         { L["CFG_HDR_CONTEXT_MENU"],   L["CFG_SUB_CONTEXT_MENU_DESC"], K.BuildContextMenuPage, "contextMenu" },   -- UI/Config/ContextMenuSettings.lua

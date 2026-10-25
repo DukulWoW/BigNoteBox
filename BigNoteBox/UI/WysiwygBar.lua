@@ -809,6 +809,39 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         })
     end)
 
+    -- Check spelling (ALL-559, Features/Spellcheck.lua; Dukul's tb-spellcheck
+    -- art): marks the words now, in either check mode. Main editor only until
+    -- stage 3; gone while the Spelling module is off
+    local spellDiv, spellBtn
+    if main then
+        spellDiv = MakeDiv(linkBtn)
+        spellBtn = WyBtn("tb-spellcheck", L["NE_SPELL_CHECK_TIP"])
+        spellBtn:SetPoint("LEFT", spellDiv, "RIGHT", DIV_GAP, 0)
+        spellBtn:SetIconEnabled(true)
+        TipWithBody(spellBtn, "NE_SPELL_CHECK_TIP", "NE_SPELL_CHECK_BODY")
+        spellBtn:SetScript("OnClick", function()
+            local SP = BNB.Spell
+            if not (SP and Body() and BNB._currentNoteID) then return end
+            local function Run()
+                local n = SP.CheckNow()
+                if n == 0 then BNB:Print(L["SPELL_NONE_FOUND"])
+                elseif n then BNB:Print(string.format(L["SPELL_FOUND_FMT"], n)) end
+            end
+            -- Rich View mode has no box to mark: Edit mode first
+            if BNB._editorInViewMode and BNB.AM_EnterEditMode then
+                BNB.AM_EnterEditMode()
+                C_Timer.After(0, Run)
+            else
+                Run()
+            end
+        end)
+        function BNB._wySpellSync()
+            local on = BNB.SpellEnabled and BNB.SpellEnabled()
+            spellDiv:SetShown(on); spellBtn:SetShown(on)
+            if bar._collapse then bar._collapse() end
+        end
+    end
+
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
     -- Placed from the right edge inward by LayoutRight (below), which puts
     -- what does not fit into the overflow menu.
@@ -1147,7 +1180,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local GAP = 8
     -- Room for the right side: from the left side's last button to the edge
     local function Room()
-        local lr = linkBtn:GetRight()
+        local last = (spellBtn and spellBtn:IsShown()) and spellBtn or linkBtn
+        local lr = last:GetRight()
         if not lr then return math.huge end
         return bar:GetRight() - 6 - lr - GAP
     end
@@ -1173,6 +1207,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     bar._collapse = function() BNB.Debounce(main and "wyCollapseMain" or "wyCollapseFocus", 0, Collapse) end
     bar:HookScript("OnSizeChanged", bar._collapse)
     bar:HookScript("OnShow", bar._collapse)
+    if BNB._wySpellSync and main then BNB._wySpellSync() end
     bar._collapse()
 
     -- Respect initial visibility setting (Focus mode places its own bar)
