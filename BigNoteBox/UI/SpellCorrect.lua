@@ -14,10 +14,16 @@
 -- the body's right-click menu (Features/Spellcheck.lua, SP.AddMenuActions).
 -- Ignore this skips the word for this pass only: it stays marked in the note.
 --
+-- Focus mode (ALL-559 S3): the same pass on Focus mode's body, Focus mode
+-- dimmed instead, the window seated over it (BNB.SeatWindow). Stickies have
+-- no Correct spelling window.
+--
 -- Public API:
---   BNB.SpellCorrect.Open(startAt)   startAt = a byte position (optional)
+--   BNB.SpellCorrect.Open(startAt, eb)   startAt = a byte position, eb = the
+--                                        body (both optional)
 --   BNB.SpellCorrect.Close()
 --   BNB.SpellCorrect.IsOpen()
+--   BNB.SpellCorrect.AskAdd(word)        Add to dictionary's question in Focus mode
 --------------------------------------------------------------------------------
 local BNB = BigNoteBox
 local L   = BNB.L
@@ -41,17 +47,47 @@ local _changeBtn, _addBtn
 local _eb, _noteID, _hit
 local _stopAt, _wrapped                   -- where the pass started; past the end once
 local _sel                                -- the picked suggestion row
+local _host                               -- the window dimmed: main window or Focus mode
+local _ovs = {}                           -- host -> its dimming overlay
+local _af, _afEb                          -- Focus mode's Add to dictionary window (SC.AskAdd)
 
 local function Spell() return BNB.Spell end
 -- One of two strings (never `c and L[a] or L[b]`: the banned-pattern check)
 local function Either(c, a, b) if c then return a end return b end
 
--- ── The main window, dimmed and closed to clicks ──────────────────────────────
+-- The highest frame level inside a window, skipping this file's own frames
+-- (skip): Focus mode's border and other pieces sit well above the window's
+-- own level, so +50 was not enough (its border drew through, 2026-10-25)
+local function TopLevel(frame, skip)
+    local top = frame:GetFrameLevel() or 0
+    for _, c in ipairs({ frame:GetChildren() }) do
+        if not skip[c] then
+            local l = TopLevel(c, skip)
+            if l > top then top = l end
+        end
+    end
+    return top
+end
+local function AboveAll(host)
+    local skip = {}
+    if _f then skip[_f] = true end
+    if _af then skip[_af] = true end
+    for _, ov in pairs(_ovs) do skip[ov] = true end
+    return math.min(TopLevel(host, skip) + 1, 9000)
+end
+
+-- ── The note's window (main window or Focus mode), dimmed and closed to clicks
 local function ShowOverlay(show)
-    local mf = BNB.mainFrame
-    if not mf then return end
-    if not _ov or _ov:GetParent() ~= mf then
-        local ov = CreateFrame("Frame", nil, mf)
+    if not show then
+        if _ov then _ov:Hide() end
+        return
+    end
+    local host = _host
+    if not host then return end
+    if _ov and _ov ~= _ovs[host] then _ov:Hide() end
+    _ov = _ovs[host]
+    if not _ov then
+        local ov = CreateFrame("Frame", nil, host)
         ov:SetAllPoints()
         ov:SetFrameStrata("FULLSCREEN_DIALOG")
         ov:EnableMouse(true)
@@ -59,14 +95,10 @@ local function ShowOverlay(show)
         bg:SetAllPoints()
         bg:SetColorTexture(0, 0, 0, 0.55)
         ov:Hide()
-        _ov = ov
+        _ovs[host], _ov = ov, ov
     end
-    if show then
-        _ov:SetFrameLevel((mf:GetFrameLevel() or 0) + 50)
-        _ov:Show()
-    else
-        _ov:Hide()
-    end
+    _ov:SetFrameLevel(AboveAll(host))
+    _ov:Show()
 end
 
 function SC.IsOpen() return _f ~= nil and _f:IsShown() end
@@ -242,21 +274,39 @@ local function DoAdd()
 end
 
 -- ── The window ───────────────────────────────────────────────────────────────
+-- Where a window of this file sits. Over Focus mode it is a CHILD of the
+-- Focus window: that window is top level in the same strata, so the game
+-- lifts it to the front on every click on it (the dimming overlay is its
+-- child) and a window beside it went behind (Dukul, 2026-10-25). As a
+-- child it moves up with it. Elsewhere BNB.SeatWindow, as before
+local function Seat(f, focusHost)
+    if focusHost then
+        if f:GetParent() ~= focusHost then f:SetParent(focusHost) end
+        f:SetScale(1)
+        f:SetFrameStrata("FULLSCREEN_DIALOG")
+    else
+        BNB.SeatWindow(f, "FULLSCREEN_DIALOG")
+    end
+end
+
+local function OverFocus() return _host ~= nil and _host ~= BNB.mainFrame end
+
 local function SavePos()
-    if not (_f and BigNoteBoxDB) then return end
+    if not (_f and BigNoteBoxDB) or OverFocus() then return end
     BigNoteBoxDB.spellCorrectPos = { x = math.floor(_f:GetLeft() + 0.5), y = math.floor(_f:GetTop() + 0.5) }
 end
 
 local function Place()
     _f:ClearAllPoints()
     local pos = BigNoteBoxDB and BigNoteBoxDB.spellCorrectPos
-    local mf = BNB.mainFrame
+    -- Over Focus mode: centered on it (the saved place is the main window's)
+    if OverFocus() then pos = nil end
     if type(pos) == "table" and pos.x and pos.y then
-        _f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", pos.x, pos.y)
-    elseif mf and mf:IsShown() then
-        _f:SetPoint("CENTER", mf, "CENTER", 0, 20)
+        _f:SetPoint("TOPLEFT", _f:GetParent(), "BOTTOMLEFT", pos.x, pos.y)
+    elseif _host and _host:IsShown() then
+        _f:SetPoint("CENTER", _host, "CENTER", 0, 20)
     else
-        _f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
+        _f:SetPoint("CENTER", _f:GetParent(), "CENTER", 0, 20)
     end
 end
 
@@ -378,32 +428,40 @@ local function Build()
     Btn(2, L["SPELL_CORRECT_IGNORE_THIS"], DoIgnoreThis, L["SPELL_CORRECT_IGNORE_THIS_TIP"])
     Btn(3, L["SPELL_CORRECT_IGNORE_ALL"], DoIgnoreAll, L["SPELL_MENU_IGNORE_TIP"])
     _addBtn       = Btn(4, L["SPELL_CORRECT_ADD"], DoAdd, L["SPELL_MENU_ADD_TIP"])
+end
 
-    -- The main window going away ends the pass
-    local mf = BNB.mainFrame
-    if mf and not mf._bnbSpellCorrectHooked then
-        mf._bnbSpellCorrectHooked = true
-        mf:HookScript("OnHide", function() if SC.IsOpen() then SC.Close() end end)
-    end
+-- The note's window going away ends the pass (hooked once per window, in Open)
+local _hooked = {}
+local function HookHost(host)
+    if _hooked[host] then return end
+    _hooked[host] = true
+    host:HookScript("OnHide", function() if SC.IsOpen() and _host == host then SC.Close() end end)
 end
 
 -- startAt: the byte to start from (a right-clicked word); nil = the marked
--- word at the text cursor, else the cursor
-function SC.Open(startAt)
+-- word at the text cursor, else the cursor. eb: the body (main editor or
+-- Focus mode, ALL-559 S3); nil = Focus mode while it is open, else the main
+-- editor. Never a sticky (no window for those)
+function SC.Open(startAt, eb)
     local SP = Spell()
-    local mf = BNB.mainFrame
     local id = BNB._currentNoteID
-    if not (SP and SP._editor and BNB.SpellEnabled() and id and mf and mf:IsVisible()) then return end
+    if not (SP and BNB.SpellEnabled() and id) then return end
     if tostring(id):find("^sys%-") then return end
-    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then return end
+    local ed = SP.ActiveEditor()
+    if eb and SP.EditorKind(eb) ~= (ed and ed.kind) then return end   -- not the box in front
+    if not ed or ed.kind == "sticky" then return end
+    local focus = ed.kind == "focus"
+    local host
+    if focus then host = BNB.GetFocusFrame and BNB.GetFocusFrame() else host = BNB.mainFrame end
+    if not (host and host:IsVisible()) then return end
     if not SP.EnsureLoaded() then SP.Announce(); return end
     -- Rich View mode has no box: Edit mode first, then here again
-    if BNB._editorInViewMode and BNB.AM_EnterEditMode then
+    if not focus and BNB._editorInViewMode and BNB.AM_EnterEditMode then
         BNB.AM_EnterEditMode()
         C_Timer.After(0, function() if not BNB._editorInViewMode then SC.Open(startAt) end end)
         return
     end
-    local eb = SP._editor.eb
+    eb = ed.eb
     if not (eb and eb:IsVisible()) then return end
     if not eb:IsEnabled() then BNB:Print(L["SPELL_CORRECT_LOCKED"]); return end
     if #SP.Mistakes(eb:GetText() or "") == 0 then BNB:Print(L["SPELL_NONE_FOUND"]); return end
@@ -414,12 +472,80 @@ function SC.Open(startAt)
     end
     eb:ClearFocus()
     Build()
-    _eb, _noteID = eb, id
+    if _f:IsShown() then _f:Hide() end   -- a pass in the other window ends first
+    _eb, _noteID, _host = eb, id, host
+    HookHost(host)
     _stopAt, _wrapped = startAt, false
+    -- Over Focus mode, and on WorldFrame while its UI is hidden (ALL-506)
+    Seat(_f, focus and host)
     Place()
     ShowOverlay(true)
     _f:Show()
     _f:SetFrameLevel(_ov:GetFrameLevel() + 10)
     _f:Raise()
     Next(startAt)
+end
+
+-- ── Add to dictionary in Focus mode (ALL-559 S3) ─────────────────────────────
+-- The toolbar's Add to dictionary asks first (SP.AskAddWord). Outside Focus
+-- mode that is a game popup (BNB_SPELL_ADD_WORD, Features/Spellcheck.lua),
+-- which would sit under the Focus window or be hidden with the UI: the same
+-- question, word editable, in a window of our own here.
+local AW, AH = 340, 132
+
+local function AskAccept()
+    if not _af then return end
+    local w = _afEb:GetText()
+    _af:Hide()
+    local SP = Spell()
+    if SP and SP.TryAdd then SP.TryAdd(w) end
+end
+
+local function BuildAsk()
+    if _af then return end
+    local cw = AW - 2 * PAD
+    local f, ok, cancel = BNB.CreateToolWindow({
+        name = "BNBSpellAddFrame", w = AW, h = AH,
+        title = L["SPELL_MENU_ADD"], strata = "FULLSCREEN_DIALOG",
+        pad = PAD, cw = cw, footH = FOOT_H, keyEsc = true,
+        btn1 = L["SPELL_ADD_POPUP_BTN"], btn2 = CANCEL,
+        onClose = function() _af:Hide() end,
+    })
+    _af = f
+    local top = f._isSkin and -(BNB.TOOL_SKIN_TITLE_H + 12) or -36
+    local msg = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+    msg:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, top)
+    msg:SetWidth(cw); msg:SetJustifyH("LEFT")
+    msg:SetText(L["SPELL_ADD_POPUP"])
+
+    _afEb = CreateFrame("EditBox", nil, f, "BackdropTemplate")
+    BNB.EnsureBackdrop(_afEb)
+    BNB.SetBackdropDark(_afEb)
+    _afEb:SetPoint("TOPLEFT", msg, "BOTTOMLEFT", 0, -8)
+    _afEb:SetSize(cw, 22)
+    _afEb:SetFontObject("BNBFontNormal")
+    _afEb:SetAutoFocus(false)
+    _afEb:SetMaxLetters(Spell().MAX_WORD or 60)
+    _afEb:SetTextInsets(5, 5, 0, 0)
+    _afEb:SetScript("OnEscapePressed", function() _af:Hide() end)
+    _afEb:SetScript("OnEnterPressed", AskAccept)
+
+    ok:SetScript("OnClick", AskAccept)
+    cancel:SetScript("OnClick", function() _af:Hide() end)
+end
+
+-- word: filled in, editable
+function SC.AskAdd(word)
+    BuildAsk()
+    local host = BNB.GetFocusFrame and BNB.GetFocusFrame()
+    Seat(_af, host and host:IsShown() and host)
+    _af:ClearAllPoints()
+    if host and host:IsShown() then _af:SetPoint("CENTER", host, "CENTER", 0, 40)
+    else _af:SetPoint("CENTER", _af:GetParent(), "CENTER", 0, 40) end
+    _af:Show()
+    if host then _af:SetFrameLevel(AboveAll(host) + 10) end
+    _af:Raise()
+    _afEb:SetText(word or "")
+    _afEb:SetFocus()
+    _afEb:HighlightText()
 end

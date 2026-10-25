@@ -104,6 +104,9 @@ function K.BuildSpellPage(sf, ct, y, page)
     -- Check spelling key (ALL-567): the same as the toolbar button
     y = K.MakeKeybindRow(ct, y, L["CFG_KB_SPELLCHECK"], "BIGNOTEBOXSPELLCHECK",
         "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F9") .. ")", L["CFG_KB_SPELLCHECK_TIP"])
+    -- Correct spelling key (ALL-568): the same as the Correct spelling button
+    y = K.MakeKeybindRow(ct, y, L["CFG_KB_SPELLCORRECT"], "BIGNOTEBOXSPELLCORRECT",
+        "(" .. string.format(L["SW_KB_DEFAULT_FMT"], "F10") .. ")", L["CFG_KB_SPELLCORRECT_TIP"])
 
     -- ── What is checked (Dukul, 2026-10-25) ─────────────────────────────────
     y = K.AddHeader(ct, y - 4, L["CFG_SPELL_RULES_HDR"])

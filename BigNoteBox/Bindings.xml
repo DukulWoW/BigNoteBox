@@ -26,4 +26,7 @@
     <Binding name="BIGNOTEBOXSPELLCHECK" category="BigNoteBox" default="F9" runOnUp="false">
         BNB_KeybindSpellCheck()
     </Binding>
+    <Binding name="BIGNOTEBOXSPELLCORRECT" category="BigNoteBox" default="F10" runOnUp="false">
+        BNB_KeybindSpellCorrect()
+    </Binding>
 </Bindings>

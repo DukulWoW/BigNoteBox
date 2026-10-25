@@ -733,7 +733,18 @@ function BNB.CreateMainWindow()
     -- ── Title-bar buttons: focus mode, sticky eye, scale lock (right to left) ─
     if chrome.closeBtn then
         local focusBtn = BNB.CreateIconButton(chrome.btnParent, chrome.btnSize, "focus", {
-            onClick = function() if BNB.OpenFocusMode then BNB.OpenFocusMode() end end,
+            onClick = function()
+                if not BNB.OpenFocusMode then return end
+                -- A note picked in the explorer grid opens first (ALL-569);
+                -- SelectNote refuses while the open note cannot be left
+                local id, picked = BNB.FocusModeTarget()
+                if not id then return end
+                if picked then
+                    if BNB.SelectNote then BNB.SelectNote(id) end
+                    if BNB._currentNoteID ~= id then return end
+                end
+                BNB.OpenFocusMode()
+            end,
             tip = L["FOCUS_MODE_TIP"], tipSub = L["FOCUS_MODE_TIP_SUB"] })
         focusBtn:SetPoint("RIGHT", chrome.closeBtn, "LEFT", -chrome.btnGap, 0)
         BNB._focusModeBtn = focusBtn

@@ -2071,7 +2071,26 @@ local function CreateStickyFrame(noteID)
     -- Same entries as the header buttons: Open in editor, Settings, Set/Edit
     -- alarm, Show tasks/note, then a divider, Minimize, Close.
     local function ShowStickyContextMenu(anchor)
+        -- Right-click on a word the spellchecker marked while editing: its
+        -- suggestions, Add to dictionary and Ignore on top (ALL-559 S3)
+        local spellHit = (anchor == f._bodyEb) and f._spellHit or nil
+        f._spellHit = nil
+        -- Check spelling while editing (Dukul, 2026-10-25): a sticky has no
+        -- toolbar, and in "only when I click" mode this or F9 is the way to check
+        local spellCheck = f._inlineEditing and BNB.Spell and BNB.SpellEnabled()
         BNB.ContextMenu.Open(anchor, function(root)   -- ALL-148
+            if spellHit and BNB.Spell then
+                BNB.Spell.AddMenuTop(root, f._bodyEb, spellHit)
+                BNB.Spell.AddMenuActions(root, f._bodyEb, spellHit)
+            end
+            if spellCheck then
+                -- A click on the menu outside the sticky ends the edit: start it again
+                root:CreateButton(L["NE_SPELL_CHECK_TIP"], function()
+                    if not f._inlineEditing and f:IsShown() then StartInlineEdit(f) end
+                    BNB.Spell.CheckAndReport(f._bodyEb)
+                end, { icon = "spell-check", tip = L["NE_SPELL_CHECK_TIP"], tipSub = L["NE_SPELL_CHECK_BODY"] })
+            end
+            if spellHit or spellCheck then root:CreateDivider() end
             root:CreateButton(L["STICKY_OPEN_TO_EDIT_TIP"], function()
                 EndInlineEdit(f)
                 OpenInMainEditor(noteID)
@@ -2444,6 +2463,38 @@ local function CreateStickyFrame(noteID)
     -- LeftButton, so this cannot interfere with the double-click-to-edit timer.
     local function OnBodyMouseUp(_, button)
         if button == "RightButton" then ShowStickyContextMenu(bodyEb) end
+    end
+    -- The marked word under the pointer is read on the right button's mouse
+    -- down, before the box moves its cursor (ALL-559 S3, as InsertInfo does)
+    bodyEb:HookScript("OnMouseDown", function(_, button)
+        if button ~= "RightButton" then return end
+        f._spellHit = nil
+        if f._inlineEditing and BNB.Spell then f._spellHit = BNB.Spell.HitAtPointer(bodyEb) end
+    end)
+    -- The spellchecker (ALL-559 S3): marks only while the inline edit runs
+    -- (Dukul, 2026-10-25). A fix has no undo step here (the inline edit has
+    -- no undo) and is saved when the edit ends, as typing is. A click on the
+    -- menu outside the sticky has ended the edit by then (GLOBAL_MOUSE_DOWN):
+    -- prepare starts it again, so the fix goes in and the edit carries on
+    if BNB.Spell then
+        BNB.Spell.AttachEditor(bodyEb, sf2, function() return f._noteID end, {
+            kind    = "sticky",
+            active  = function() return f._inlineEditing == true end,
+            prepare = function()
+                if not f._inlineEditing and f:IsShown() then StartInlineEdit(f) end
+            end,
+            replace = function(first, last, new)
+                if not f._inlineEditing then return false end
+                local text = bodyEb:GetText() or ""
+                if first < 1 or last > #text or last < first - 1 then return false end
+                bodyEb:SetText(text:sub(1, first - 1) .. new .. text:sub(last + 1))
+                local cur = first - 1 + #new
+                C_Timer.After(0, function()
+                    if f._inlineEditing then bodyEb:SetFocus(); bodyEb:SetCursorPosition(cur) end
+                end)
+                return true
+            end,
+        })
     end
     bodyEb:HookScript("OnMouseUp", OnBodyMouseUp)
     sf2:HookScript("OnMouseUp", OnBodyMouseUp)

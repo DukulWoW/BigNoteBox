@@ -67,6 +67,13 @@ end
 -- ALL-559 stage 2). eb = the body of the main editor or Focus mode.
 -- -> true when it was done
 local _replacers = {}
+
+-- The spell buttons of each bar shown or hidden with the Spelling module
+-- (BNB.ApplySpellModule, Features/Spellcheck.lua)
+local _spellSyncs = {}
+function BNB._wySpellSync()
+    for _, fn in ipairs(_spellSyncs) do fn() end
+end
 -- noFocus: the text cursor moves but the box does not take the keyboard
 -- (the Correct spelling window keeps it, UI/SpellCorrect.lua)
 function BNB.ReplaceInEditor(eb, first, last, text, noFocus)
@@ -852,10 +859,10 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end)
 
     -- Check spelling (ALL-559, Features/Spellcheck.lua; Dukul's tb-spellcheck
-    -- art): marks the words now, in either check mode. Main editor only until
-    -- stage 3; gone while the Spelling module is off
-    local spellDiv, spellBtn, correctBtn, dictBtn
-    if main then
+    -- art): marks the words now, in either check mode. In both bars (Focus
+    -- mode since ALL-559 S3); gone while the Spelling module is off
+    local spellDiv, spellBtn, correctBtn, dictBtn, spellSync
+    do
         spellDiv = MakeDiv(linkBtn)
         spellBtn = WyBtn("tb-spellcheck", L["NE_SPELL_CHECK_TIP"])
         spellBtn:SetPoint("LEFT", spellDiv, "RIGHT", DIV_GAP, 0)
@@ -865,8 +872,9 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         -- shared with the Check spelling key, ALL-567)
         spellBtn:SetScript("OnClick", function()
             local SP = BNB.Spell
-            if not (SP and Body() and BNB._currentNoteID) then return end
-            SP.CheckAndReport()
+            local eb = Body()
+            if not (SP and eb and BNB._currentNoteID) then return end
+            SP.CheckAndReport(eb)
         end)
         -- Correct spelling (ALL-559, Dukul 2026-10-25; Dukul's tb-spell-correct
         -- art): the window that goes through the
@@ -876,7 +884,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         correctBtn:SetIconEnabled(true)
         TipWithBody(correctBtn, "NE_SPELL_CORRECT_TIP", "NE_SPELL_CORRECT_BODY")
         correctBtn:SetScript("OnClick", function()
-            if BNB.SpellCorrect and Body() and BNB._currentNoteID then BNB.SpellCorrect.Open() end
+            local eb = Body()
+            if BNB.SpellCorrect and eb and BNB._currentNoteID then BNB.SpellCorrect.Open(nil, eb) end
         end)
         -- Add to dictionary (ALL-559 stage 2, Dukul's tb-dictionary art): a
         -- popup asks first, with the marked word at the text cursor filled in
@@ -889,14 +898,15 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             local SP = BNB.Spell
             if not (SP and BNB._currentNoteID) then return end
             local eb = Body()
-            local word = eb and not BNB._editorInViewMode and SP.WordAtCursor(eb)
+            local word = eb and not (main and BNB._editorInViewMode) and SP.WordAtCursor(eb)
             SP.AskAddWord(word)
         end)
-        function BNB._wySpellSync()
+        function spellSync()
             local on = BNB.SpellEnabled and BNB.SpellEnabled()
             spellDiv:SetShown(on); spellBtn:SetShown(on); correctBtn:SetShown(on); dictBtn:SetShown(on)
             if bar._collapse then bar._collapse() end
         end
+        _spellSyncs[#_spellSyncs + 1] = spellSync
     end
 
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
@@ -1264,7 +1274,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     bar._collapse = function() BNB.Debounce(main and "wyCollapseMain" or "wyCollapseFocus", 0, Collapse) end
     bar:HookScript("OnSizeChanged", bar._collapse)
     bar:HookScript("OnShow", bar._collapse)
-    if BNB._wySpellSync and main then BNB._wySpellSync() end
+    spellSync()
     bar._collapse()
 
     -- Respect initial visibility setting (Focus mode places its own bar)

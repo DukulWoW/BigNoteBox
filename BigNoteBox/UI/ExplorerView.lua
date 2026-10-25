@@ -317,6 +317,7 @@ local function PaintPicks()
     end
     UpdateStatus()
     if K.OnPicks then K.OnPicks() end
+    if BNB.RefreshFocusButton then BNB.RefreshFocusButton() end   -- ALL-569: a picked note
 end
 
 local function ClearPicks()
@@ -1941,6 +1942,7 @@ function EX.Apply()
         if K.LayoutToolRow then K.LayoutToolRow() end   -- takes the search row
         Refresh()
     end
+    if BNB.RefreshFocusButton then BNB.RefreshFocusButton() end   -- ALL-569: grid or note
 end
 
 -- After the module switch changed (Settings > Modules, the setup wizard):

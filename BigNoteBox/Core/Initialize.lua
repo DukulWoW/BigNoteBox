@@ -325,7 +325,7 @@ end
 --------------------------------------------------------------------------------
 -- Third value = the version a key arrived in: a bump applies only the newer
 -- ones, so a default the player unbound on purpose is not handed back.
-local DEFAULT_KEYS_VERSION = 3
+local DEFAULT_KEYS_VERSION = 4
 local DEFAULT_KEYS = {
     { "BIGNOTEBOXNOTEONTARGET",   "F6",     1 },
     { "BIGNOTEBOXQUICKNOTE",      "F7",     1 },
@@ -334,6 +334,8 @@ local DEFAULT_KEYS = {
     -- ALL-567: F9, after F6-F8 (Dukul, 2026-10-25). Ctrl+S was dropped: the
     -- game's own default binds it to Toggle Sound
     { "BIGNOTEBOXSPELLCHECK",     "F9",     3 },
+    -- ALL-568: Correct spelling on F10, beside Check spelling (Dukul, 2026-10-25)
+    { "BIGNOTEBOXSPELLCORRECT",   "F10",    4 },
 }
 
 -- Every BigNoteBox binding and its default key, the same as Bindings.xml:
@@ -348,6 +350,7 @@ BNB.BINDING_DEFAULTS = {
     { "BIGNOTEBOXORACLE",       "CTRL-SPACE" },
     { "BIGNOTEBOXSTICKIESFRONT", "CTRL-J" },
     { "BIGNOTEBOXSPELLCHECK",   "F9" },       -- ALL-567
+    { "BIGNOTEBOXSPELLCORRECT", "F10" },      -- ALL-568
 }
 
 -- Is key, with the modifiers held now, one of action's keys? A focused edit
@@ -483,4 +486,10 @@ end
 -- catches the key itself while it has focus (Features/Spellcheck.lua)
 function BNB_KeybindSpellCheck()
     if BNB.Spell and BNB.Spell.CheckFromKey then BNB.Spell.CheckFromKey() end
+end
+
+-- Correct spelling (ALL-568): the Correct spelling window, as its toolbar
+-- button, on Focus mode's note while it is open, else the main editor's
+function BNB_KeybindSpellCorrect()
+    if BNB.Spell and BNB.Spell.CorrectFromKey then BNB.Spell.CorrectFromKey() end
 end

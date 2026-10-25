@@ -48,12 +48,31 @@ end
 --------------------------------------------------------------------------------
 -- Focus mode button: off with no note selected, and off while the note is
 -- locked, since Focus mode does not honour the lock (Dukul, 2026-09-27)
+-- The note the title-bar Focus mode button opens (ALL-569): the note in the
+-- editor, or in the explorer grid the one note picked there; nil = none.
+-- In the grid the editor's last note is not open, so it does not count
+-- (Dukul, 2026-10-25: Focus opened the previous note from the explorer)
+function BNB.FocusModeTarget()
+    local EX = BNB.Explorer
+    if EX and EX.Mode and EX.Mode() == "grid" then
+        local K = BNB._ExplorerKit
+        local ids = K and K.Picked and K.Picked()
+        if ids and #ids == 1 then return ids[1], true end
+        return nil
+    end
+    return BNB._currentNoteID, false
+end
+
 local function RefreshFocusButton()
     local btn = BNB._focusModeBtn
     if not btn then return end
-    local ok = BNB._currentNoteID ~= nil and not BNB._editorLocked
+    local id, picked = BNB.FocusModeTarget()
+    local ok
+    if picked then ok = not NoteIsLocked(BNB.GetNote(id))
+    else ok = id ~= nil and not BNB._editorLocked end
     btn:SetEnabled(ok)   -- the icon button draws its own disabled look
 end
+BNB.RefreshFocusButton = RefreshFocusButton
 
 function BNB.UpdateSaveButtonState()
     if not saveBtn then return end

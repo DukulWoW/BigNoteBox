@@ -901,6 +901,10 @@ local function BuildFocusFrame()
 
     if BNB.WireDropTarget       then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget  then BNB.WireInsertInfoTarget(eb) end
+    -- The spellchecker (ALL-559 S3): after the box's last SetScript (it hooks)
+    if BNB.Spell then
+        BNB.Spell.AttachEditor(eb, sf, function() return BNB._currentNoteID end, { kind = "focus" })
+    end
     -- No {u} / {s} lines here: the tags show while editing, the lines only
     -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 
@@ -1211,6 +1215,10 @@ local function BuildFocusFrameSkin()
 
     if BNB.WireDropTarget      then BNB.WireDropTarget(eb, nil, function() return focusNoteID end) end
     if BNB.WireInsertInfoTarget then BNB.WireInsertInfoTarget(eb) end
+    -- The spellchecker (ALL-559 S3): after the box's last SetScript (it hooks)
+    if BNB.Spell then
+        BNB.Spell.AttachEditor(eb, sf, function() return BNB._currentNoteID end, { kind = "focus" })
+    end
     -- No {u} / {s} lines here: the tags show while editing, the lines only
     -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 

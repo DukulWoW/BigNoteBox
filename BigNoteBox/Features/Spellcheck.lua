@@ -2,7 +2,7 @@
 -- Spellcheck.lua -- the spellchecker (ALL-559 stage 1)
 --
 -- Marks words that are not in the dictionary with a red line under them in
--- the main editor's body. The text is never touched: the lines are drawn over
+-- the note editors' bodies. The text is never touched: the lines are drawn over
 -- the box by UI/TextLines.lua. No autocorrect, ever (Dukul, 2026-10-25:
 -- notes are full of names, bosses and shorthand).
 --
@@ -34,7 +34,14 @@
 -- lines (TextLines ctl.RangeAtPointer). Correct spelling = UI/SpellCorrect.lua.
 -- Repeated words ("the the") are marked too and can be removed.
 -- Your words: BigNoteBoxNotesDB.spellWords, listed on the Spelling page, in
--- the JSON full backup. The Check spelling key: BIGNOTEBOXSPELLCHECK (ALL-567).
+-- the JSON full backup. The Check spelling key: BIGNOTEBOXSPELLCHECK (ALL-567),
+-- the Correct spelling key: BIGNOTEBOXSPELLCORRECT (ALL-568).
+-- Stage 3: the same in Focus mode (marks, right-click, the toolbar's spell
+-- buttons, the key, Correct spelling over Focus mode) and in a sticky's
+-- inline edit (marks only while editing; suggestions, Add and Ignore on top
+-- of the sticky's own menu, no Correct spelling window). One checker per box
+-- (SP.AttachEditor, kind main / focus / sticky); SP.ActiveEditor() = Focus
+-- mode while it is open, else the main editor.
 --
 -- Not checked: game links, textures, color codes, every complete {...}
 -- markup and {{token}}, web and mail addresses, lines that start with "/"
@@ -60,6 +67,8 @@ local _extra   = nil          -- game words of this player: classes, characters,
 local _own     = nil          -- the player's own words, lower-case (BigNoteBoxNotesDB.spellWords)
 local _ignored = {}           -- Ignore in the right-click menu: until the next reload
 local _ignoredRep = {}        -- the same for a repeated word ("the the")
+local _editors = {}           -- edit box -> its checker (SP.AttachEditor, below)
+local _main                   -- the main editor's checker
 
 -- Called by BigNoteBox_Spell's files when they run
 function BNB.ReceiveSpellData(lang, data)
@@ -322,11 +331,11 @@ end
 -- Settings, the language or the player's words changed
 function SP.Reset()
     _memo, _memoN, _extra = {}, 0, nil
-    local ed = SP._editor
-    if not ed then return end
-    -- Click mode: the marks of the last check, asked again (Add / Ignore)
-    if ed.clickText then ed.clickRanges = SP.Mistakes(ed.clickText) end
-    ed.Redraw()
+    for _, ed in pairs(_editors) do
+        -- Click mode: the marks of the last check, asked again (Add / Ignore)
+        if ed.clickText then ed.clickRanges = SP.Mistakes(ed.clickText) end
+        ed.Redraw()
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -656,19 +665,52 @@ function SP.Suggest(word)
 end
 
 --------------------------------------------------------------------------------
--- The main editor's body (stage 3: Focus mode and the sticky inline edit)
+-- The editors: the main editor's body, Focus mode's body (stage 3) and each
+-- sticky's inline edit box (stage 3, marks only while editing). One record
+-- per box in _editors, kind "main" / "focus" / "sticky"
 --------------------------------------------------------------------------------
 
--- noteID(): the note in the box. Call after the box's last SetScript
-function SP.AttachEditor(eb, sf, noteID)
-    if not (BNB.TextLines and eb and sf) or SP._editor then return end
-    local ed = { eb = eb }
+-- eb or ed -> ed (nil when the box has no checker)
+local function EdOf(x)
+    if type(x) ~= "table" then return nil end
+    if x.eb and x.kind then return x end
+    return _editors[x]
+end
+
+-- The box a check, the key or Correct spelling is for: Focus mode while it
+-- is open, else the main editor
+function SP.ActiveEditor()
+    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then
+        local fe = _editors[BNB._focusEditorBody]
+        if fe then return fe end
+    end
+    return _main
+end
+function SP.EditorKind(eb)
+    local ed = EdOf(eb)
+    return ed and ed.kind or nil
+end
+
+-- noteID(): the note in the box. opts (optional):
+--   kind     "main" (default) / "focus" / "sticky"
+--   active() false = no marks now (a sticky outside its inline edit)
+--   prepare() runs before a fix or a menu action (a sticky starts its
+--            inline edit again: a click on the menu may have ended it)
+--   replace(first, last, new, noFocus) -> true; the fix for a box with no
+--            formatting bar (no undo there: the sticky inline edit)
+-- Call after the box's last SetScript
+function SP.AttachEditor(eb, sf, noteID, opts)
+    if not (BNB.TextLines and eb and sf) or _editors[eb] then return end
+    opts = opts or {}
+    local ed = { eb = eb, kind = opts.kind or "main", noteID = noteID,
+                 active = opts.active, prepare = opts.prepare, replace = opts.replace }
     local lastText, lastRanges
     ed.clickText, ed.clickRanges = nil, nil
 
     -- Every marked word of text, the one being typed too
     local function AllRanges(text)
         if not BNB.SpellEnabled() then return nil end
+        if ed.active and not ed.active() then return nil end
         local id = noteID()
         if not id or tostring(id):find("^sys%-") then return nil end   -- Patch notes / Help
         if SP.ClickOnly(text) then
@@ -704,18 +746,27 @@ function SP.AttachEditor(eb, sf, noteID)
         lastText, lastRanges = nil, nil
         if ed.ctl then ed.ctl.Recolor() end
     end
+    -- A sticky's inline edit starts and ends with the focus
+    eb:HookScript("OnEditFocusGained", function() if ed.ctl then ed.ctl.Refresh() end end)
     eb:HookScript("OnEditFocusLost", function() if ed.ctl then ed.ctl.Refresh() end end)
     -- The Check spelling key while typing: bindings never see it then (ALL-567)
     eb:HookScript("OnKeyDown", function(_, key)
-        if BNB.KeyIsBinding and BNB.KeyIsBinding("BIGNOTEBOXSPELLCHECK", key) then SP.CheckAndReport() end
+        if not BNB.KeyIsBinding then return end
+        if BNB.KeyIsBinding("BIGNOTEBOXSPELLCHECK", key) then SP.CheckAndReport(ed)
+        elseif ed.kind ~= "sticky" and BNB.KeyIsBinding("BIGNOTEBOXSPELLCORRECT", key) then
+            if BNB.SpellCorrect then BNB.SpellCorrect.Open(nil, eb) end   -- no window for a sticky
+        end
     end)
-    SP._editor = ed
+    _editors[eb] = ed
+    if ed.kind == "main" then _main = ed end
+    return ed
 end
 
 -- Check spelling (the toolbar button): marks the text now, in either mode.
+-- x = the box or its ed (nil = SP.ActiveEditor()).
 -- -> the number of words marked, or nil when the lists are not there
-function SP.CheckNow()
-    local ed = SP._editor
+function SP.CheckNow(x)
+    local ed = EdOf(x) or SP.ActiveEditor()
     if not (ed and BNB.SpellEnabled()) then return end
     if not SP.EnsureLoaded() then SP.Announce(); return end
     local text = ed.eb:GetText() or ""
@@ -724,17 +775,21 @@ function SP.CheckNow()
     return #ed.clickRanges
 end
 
--- Check spelling as the toolbar button and the key do it: the main editor's
--- note (rich View mode switched to Edit first), the count in chat
-function SP.CheckAndReport()
-    local id = BNB._currentNoteID
-    if not (SP._editor and BNB.SpellEnabled() and id) or tostring(id):find("^sys%-") then return end
+-- Check spelling as the toolbar buttons and the key do it, the count in
+-- chat. x = the box or its ed (nil = SP.ActiveEditor()); the main editor's
+-- rich View mode is switched to Edit first; a sticky only while editing
+function SP.CheckAndReport(x)
+    local ed = EdOf(x) or SP.ActiveEditor()
+    if not (ed and BNB.SpellEnabled()) then return end
+    if ed.active and not ed.active() then return end
+    local id = ed.noteID()
+    if not id or tostring(id):find("^sys%-") then return end
     local function Run()
-        local n = SP.CheckNow()
+        local n = SP.CheckNow(ed)
         if n == 0 then BNB:Print(L["SPELL_NONE_FOUND"])
         elseif n then BNB:Print(string.format(L["SPELL_FOUND_FMT"], n)) end
     end
-    if BNB._editorInViewMode and BNB.AM_EnterEditMode then
+    if ed.kind == "main" and BNB._editorInViewMode and BNB.AM_EnterEditMode then
         BNB.AM_EnterEditMode()
         C_Timer.After(0, Run)
     else
@@ -742,13 +797,29 @@ function SP.CheckAndReport()
     end
 end
 
--- The key binding (BNB_KeybindSpellCheck, ALL-567): only while the main
--- window shows the note (Focus mode = stage 3)
+-- The key binding (BNB_KeybindSpellCheck, ALL-567) when no box has the
+-- keyboard: Focus mode while it is open, else the main window's note
 function SP.CheckFromKey()
+    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then
+        local fe = _editors[BNB._focusEditorBody]
+        if fe then SP.CheckAndReport(fe) end
+        return
+    end
     local mf = BNB.mainFrame
-    if not (mf and mf:IsVisible()) then return end
-    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() then return end
-    SP.CheckAndReport()
+    if not (mf and mf:IsVisible() and _main) then return end
+    SP.CheckAndReport(_main)
+end
+
+-- The Correct spelling key (BNB_KeybindSpellCorrect, ALL-568) when no box
+-- has the keyboard: the window on Focus mode's note or the main editor's
+-- (BNB.SpellCorrect.Open picks the one in front and checks the rest)
+function SP.CorrectFromKey()
+    if not (BNB.SpellCorrect and BNB.SpellEnabled()) then return end
+    if not (BNB.IsFocusModeOpen and BNB.IsFocusModeOpen()) then
+        local mf = BNB.mainFrame
+        if not (mf and mf:IsVisible()) then return end
+    end
+    BNB.SpellCorrect.Open()
 end
 
 --------------------------------------------------------------------------------
@@ -757,8 +828,8 @@ end
 --------------------------------------------------------------------------------
 
 local function EditorOf(eb)
-    local ed = SP._editor
-    if ed and ed.eb == eb and BNB.SpellEnabled() then return ed end
+    local ed = eb and _editors[eb]
+    if ed and BNB.SpellEnabled() then return ed end
 end
 SP._EditorOf = EditorOf
 
@@ -805,18 +876,37 @@ end
 -- word with new == "" goes with the space before it. noFocus: the box does
 -- not take the keyboard (the Correct spelling window). -> true when done
 function SP.Replace(eb, hit, new, noFocus)
+    local ed = _editors[eb]
+    if ed and ed.prepare then ed.prepare() end
     if (eb:GetText() or ""):sub(hit.first, hit.last) ~= hit.word then return false end
     local clickMode = SP.ClickOnly(eb:GetText() or "")
     local first = (hit.rep and new == "") and hit.rep or hit.first
-    if not BNB.ReplaceInEditor(eb, first, hit.last, new, noFocus) then
+    local done
+    if ed and ed.replace then done = ed.replace(first, hit.last, new, noFocus)
+    else done = BNB.ReplaceInEditor(eb, first, hit.last, new, noFocus) end
+    if not done then
         BNB:Print(L["SPELL_REPLACE_FAILED"])
         return false
     end
+    -- Measured once more a moment later: the next frame's redraw can still
+    -- see the box laid out with the old text (a sticky's fix sets the text
+    -- twice in one frame), so a later word's line kept the old width and
+    -- place (Dukul, 2026-10-25: "the the" removed, "onee" underlined as "one")
+    if ed then C_Timer.After(0.1, function() ed.Redraw() end) end
     if clickMode then
         -- Click mode drops the marks on an edit: the other words keep theirs
-        C_Timer.After(0, function() SP.CheckNow() end)
+        C_Timer.After(0, function() SP.CheckNow(eb) end)
     end
     return true
+end
+
+-- A menu row's action: a sticky gets its inline edit back first (prepare)
+local function Act(eb, fn)
+    return function()
+        local ed = _editors[eb]
+        if ed and ed.prepare then ed.prepare() end
+        fn()
+    end
 end
 
 local function MenuWord(hit) return (hit.word:gsub("\226\128\153", "'")) end
@@ -842,21 +932,25 @@ function SP.AddMenuTop(root, eb, hit)
 end
 
 -- The middle of the menu, between the token groups and New token: Add to
--- dictionary, Ignore, Correct spelling (Dukul, 2026-10-25)
+-- dictionary, Ignore, Correct spelling (Dukul, 2026-10-25). A sticky's menu
+-- has them under the suggestions, without Correct spelling (no window for
+-- a sticky: Dukul, 2026-10-25)
 function SP.AddMenuActions(root, eb, hit)
-    if not (hit and EditorOf(eb)) then return end
+    local ed = hit and EditorOf(eb)
+    if not ed then return end
     local word = MenuWord(hit)
     if not hit.rep then
-        root:CreateButton(string.format(L["SPELL_MENU_ADD_FMT"], word), function() SP.AddWord(word) end,
+        root:CreateButton(string.format(L["SPELL_MENU_ADD_FMT"], word), Act(eb, function() SP.AddWord(word) end),
             { icon = "dictionary", tip = L["SPELL_MENU_ADD"], tipSub = L["SPELL_MENU_ADD_TIP"] })
     end
     local ignoreTip = L["SPELL_MENU_IGNORE_TIP"]
     if hit.rep then ignoreTip = L["SPELL_MENU_IGNORE_REP_TIP"] end
-    root:CreateButton(L["SPELL_MENU_IGNORE"], function()
+    root:CreateButton(L["SPELL_MENU_IGNORE"], Act(eb, function()
         if hit.rep then SP.IgnoreRepeat(word) else SP.Ignore(word) end
-    end, { icon = "spell-ignore", tip = L["SPELL_MENU_IGNORE"], tipSub = ignoreTip })
+    end), { icon = "spell-ignore", tip = L["SPELL_MENU_IGNORE"], tipSub = ignoreTip })
+    if ed.kind == "sticky" then return end
     root:CreateButton(L["SPELL_MENU_CORRECT"], function()
-        if BNB.SpellCorrect then BNB.SpellCorrect.Open(hit.first) end
+        if BNB.SpellCorrect then BNB.SpellCorrect.Open(hit.first, eb) end
     end, { icon = "spell-correct", tip = L["SPELL_CORRECT_TITLE"], tipSub = L["NE_SPELL_CORRECT_BODY"] })
 end
 
@@ -873,6 +967,8 @@ local function TryAdd(w)
     end
     if not SP.AddWord(clean) then BNB:Print(string.format(L["SPELL_ADD_ALREADY_FMT"], clean)) end
 end
+SP.TryAdd = TryAdd   -- Focus mode's own ask window (UI/SpellCorrect.lua)
+SP.MAX_WORD = MAX_WORD
 StaticPopupDialogs["BNB_SPELL_ADD_WORD"] = {
     preferredIndex = 3,
     text = L["SPELL_ADD_POPUP"], hasEditBox = true, maxLetters = MAX_WORD,
@@ -896,8 +992,15 @@ StaticPopupDialogs["BNB_SPELL_ADD_WORD"] = {
     EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
     timeout = 0, whileDead = true, hideOnEscape = true,
 }
+-- In Focus mode a game popup would sit under the Focus window (or be hidden
+-- with the UI): the same question in a window of our own there
 function SP.AskAddWord(word)
-    StaticPopup_Show("BNB_SPELL_ADD_WORD", nil, nil, { word = word and word:gsub("\226\128\153", "'") or "" })
+    word = word and word:gsub("\226\128\153", "'") or ""
+    if BNB.IsFocusModeOpen and BNB.IsFocusModeOpen() and BNB.SpellCorrect and BNB.SpellCorrect.AskAdd then
+        BNB.SpellCorrect.AskAdd(word)
+        return
+    end
+    StaticPopup_Show("BNB_SPELL_ADD_WORD", nil, nil, { word = word })
 end
 
 -- The module switch (Settings > Modules > Spelling, the setup wizard)
