@@ -41,6 +41,239 @@ local function AddChoice(ct, y, label, tip, choices, get, set)
     return y - 32, dd, lbl
 end
 
+-- ── Text shortcuts (stage 4, Features/TextShortcuts.lua) ─────────────────
+-- The switch, an Add row (shortcut + its text) and one row per shortcut:
+-- hover highlight, click to edit both in place (Enter saves, Esc cancels,
+-- Tab moves between them), X removes it. -> y
+local function BuildShortcuts(sf, ct, y, greyed)
+    local db = BigNoteBoxDB
+    local TS = BNB.TextShortcuts
+    if not TS then return y end
+    local NAME_W, ADD_W = 110, 90
+
+    y = K.AddHeader(ct, y, L["CFG_SHORTCUTS_HDR"])
+    local cb
+    y, cb = AddCheck(ct, y, L["CFG_SHORTCUTS_ENABLE"],
+        function() return db.spellShortcuts ~= false end,
+        function(v) db.spellShortcuts = v and true or false end,
+        L["CFG_SHORTCUTS_ENABLE_TIP"])
+    greyed[#greyed + 1] = { cb, cb._lbl }
+
+    local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+    desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    desc:SetWidth(K.CONTENT_W); desc:SetJustifyH("LEFT"); desc:SetWordWrap(true)
+    desc:SetTextColor(0.65, 0.65, 0.65)
+    desc:SetText(L["CFG_SHORTCUTS_DESC"])
+    local dh = math.ceil(desc:GetStringHeight())
+    desc:SetHeight(dh)
+    y = y - dh - 6
+
+    -- A dark box with an edit box in it
+    local function Field(w)
+        local bg = BNB.CreateBackdropFrame("Frame", nil, ct)
+        BNB.SetBackdropDark(bg)
+        bg:SetSize(w, 24)
+        local eb = CreateFrame("EditBox", nil, bg)
+        eb:SetPoint("TOPLEFT", bg, "TOPLEFT", 6, 0)
+        eb:SetPoint("BOTTOMRIGHT", bg, "BOTTOMRIGHT", -6, 0)
+        eb:SetFontObject("BNBFontNormal")
+        eb:SetAutoFocus(false)
+        return bg, eb
+    end
+
+    -- Add a shortcut
+    local nameBg, nameEb = Field(NAME_W)
+    nameBg:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    nameEb:SetMaxLetters(TS.MAX_NAME)
+    BNB.AddPlaceholder(nameEb, L["CFG_SHORTCUTS_NAME_PH"], 0.4, 0.4, 0.4)
+    local textBg, textEb = Field(K.CONTENT_W - NAME_W - ADD_W - 16)
+    textBg:SetPoint("LEFT", nameBg, "RIGHT", 8, 0)
+    textEb:SetMaxLetters(TS.MAX_TEXT)
+    BNB.AddPlaceholder(textEb, L["CFG_SHORTCUTS_TEXT_PH"], 0.4, 0.4, 0.4)
+    local addBtn = BNB.CreateButton(nil, ct, L["CFG_SPELL_WORDS_ADD"], ADD_W, 24)
+    addBtn:SetPoint("LEFT", textBg, "RIGHT", 8, 0)
+    local function AddTyped()
+        local n, t = nameEb:GetRealText() or "", textEb:GetRealText() or ""
+        if not (n:match("%S") or t:match("%S")) then return end
+        local ok, err = TS.Set(n, t)
+        if ok then
+            nameEb:SetRealText(""); textEb:SetRealText("")
+            nameEb:ClearFocus(); textEb:ClearFocus()
+        else
+            BNB:Print(err)
+        end
+    end
+    addBtn:SetScript("OnClick", AddTyped)
+    for _, eb in ipairs({ nameEb, textEb }) do
+        eb:SetScript("OnEnterPressed", AddTyped)
+        eb:SetScript("OnEscapePressed", function(self) self:ClearFocus() end)
+        greyed[#greyed + 1] = { eb }
+    end
+    nameEb:SetScript("OnTabPressed", function() textEb:SetFocus() end)
+    textEb:SetScript("OnTabPressed", function() nameEb:SetFocus() end)
+    greyed[#greyed + 1] = { addBtn }
+    y = y - 24 - 6
+
+    -- The list
+    local ROW, VISIBLE = 22, 6
+    local LIST_H = ROW * VISIBLE + 8
+    local box = BNB.CreateBackdropFrame("Frame", nil, ct)
+    BNB.SetBackdropDark(box)
+    box:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    box:SetSize(K.CONTENT_W, LIST_H)
+    local lsf = BNB.CreateScrollFrame(nil, box)
+    lsf:SetPoint("TOPLEFT", box, "TOPLEFT", 4, -4)
+    lsf:SetPoint("BOTTOMRIGHT", box, "BOTTOMRIGHT", -24, 4)
+    local childW = K.CONTENT_W - 28
+    local child = CreateFrame("Frame", nil, lsf)
+    child:SetSize(childW, 1)
+    lsf:SetScrollChild(child)
+    local empty = box:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    empty:SetPoint("TOPLEFT", box, "TOPLEFT", 10, -10)
+    empty:SetTextColor(0.45, 0.45, 0.45)
+    empty:SetText(L["CFG_SHORTCUTS_EMPTY"])
+    y = y - LIST_H - 4
+
+    local count = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
+    count:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    count:SetWidth(K.CONTENT_W); count:SetJustifyH("LEFT")
+    count:SetTextColor(0.65, 0.65, 0.65)
+    y = y - 18
+
+    -- Two edit boxes for the row being edited, laid over that row
+    local function RowEdit(w)
+        local eb = CreateFrame("EditBox", nil, child, "BackdropTemplate")
+        BNB.EnsureBackdrop(eb)
+        BNB.SetBackdropDark(eb)
+        eb:SetFontObject("BNBFontNormal")
+        eb:SetAutoFocus(false)
+        eb:SetTextInsets(5, 5, 0, 0)
+        eb:SetHeight(ROW)
+        if w then eb:SetWidth(w) end
+        eb:Hide()
+        return eb
+    end
+    local editName = RowEdit(NAME_W)
+    editName:SetMaxLetters(TS.MAX_NAME)
+    local editText = RowEdit()
+    editText:SetMaxLetters(TS.MAX_TEXT)
+    local editRow
+    local rows = {}
+    local Fill   -- below
+
+    local function EndEdit(save)
+        if not editRow then return end
+        local row = editRow
+        editRow = nil
+        local n, t = editName:GetText() or "", editText:GetText() or ""
+        editName:Hide(); editText:Hide()
+        editName:ClearFocus(); editText:ClearFocus()
+        row._name:Show(); row._text:Show()
+        if save and (n ~= row._rec.name or t ~= row._rec.text) then
+            local ok, err = TS.Set(n, t, row._rec.name)
+            if not ok then BNB:Print(err) end
+        end
+        Fill()
+    end
+    -- Saved when the keyboard leaves both boxes (Tab moves between them)
+    local function FocusLeft()
+        C_Timer.After(0, function()
+            if editRow and not (editName:HasFocus() or editText:HasFocus()) then EndEdit(true) end
+        end)
+    end
+    for _, eb in ipairs({ editName, editText }) do
+        eb:SetScript("OnEnterPressed", function() EndEdit(true) end)
+        eb:SetScript("OnEscapePressed", function() EndEdit(false) end)
+        eb:SetScript("OnEditFocusLost", FocusLeft)
+    end
+    editName:SetScript("OnTabPressed", function() editText:SetFocus() end)
+    editText:SetScript("OnTabPressed", function() editName:SetFocus() end)
+
+    local function StartEdit(row)
+        if not BNB.SpellEnabled() then return end
+        if editRow then EndEdit(true) end
+        editRow = row
+        row._name:Hide(); row._text:Hide()
+        editName:ClearAllPoints()
+        editName:SetPoint("TOPLEFT", row, "TOPLEFT", 0, 0)
+        editText:ClearAllPoints()
+        editText:SetPoint("TOPLEFT", editName, "TOPRIGHT", 4, 0)
+        editText:SetPoint("BOTTOMRIGHT", row, "BOTTOMRIGHT", -26, 0)
+        for _, eb in ipairs({ editName, editText }) do
+            eb:SetFrameLevel(row:GetFrameLevel() + 5)
+            eb:Show()
+        end
+        editName:SetText(row._rec.name)
+        editText:SetText(row._rec.text)
+        editText:SetFocus()
+        editText:HighlightText()
+    end
+
+    local function GetRow(i)
+        local row = rows[i]
+        if row then return row end
+        row = CreateFrame("Button", nil, child)
+        row:SetSize(childW, ROW)
+        row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -(i - 1) * ROW)
+        row._hover = BNB.CreateListRowArt(row, "hover", { 1, 1, 1, 0.08 })
+        local name = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        name:SetPoint("LEFT", row, "LEFT", 8, 0)
+        name:SetWidth(NAME_W - 8)
+        name:SetJustifyH("LEFT"); name:SetWordWrap(false)
+        BNB.SetTextWhite(name, 0.95)
+        row._name = name
+        local text = row:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        text:SetPoint("LEFT", row, "LEFT", NAME_W + 4, 0)
+        text:SetPoint("RIGHT", row, "RIGHT", -30, 0)
+        text:SetJustifyH("LEFT"); text:SetWordWrap(false)
+        text:SetTextColor(0.7, 0.7, 0.7)
+        row._text = text
+        local x = BNB.CreateIconButton(row, 18, "close", { skin = false,
+            tip = L["CFG_SHORTCUTS_REMOVE"], tipAnchor = "ANCHOR_RIGHT",
+            onClick = function()
+                if row._rec and BNB.SpellEnabled() then TS.Delete(row._rec.name) end
+            end })
+        x:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        local function Hover() row._hover:SetShown(row:IsMouseOver() and BNB.SpellEnabled()) end
+        row:SetScript("OnEnter", Hover)
+        row:SetScript("OnLeave", Hover)
+        x:HookScript("OnEnter", Hover)
+        x:HookScript("OnLeave", Hover)
+        row:SetScript("OnClick", function() StartEdit(row) end)
+        rows[i] = row
+        return row
+    end
+
+    Fill = function()
+        if editRow then return end   -- never under the writer's hands
+        local list = TS.List()
+        count:SetText(string.format(L["CFG_SHORTCUTS_COUNT_FMT"], #list))
+        for i, r in ipairs(list) do
+            local row = GetRow(i)
+            row._rec = r
+            row._name:SetText(r.name)
+            row._text:SetText(r.text)
+            row._hover:Hide()
+            row:Show()
+        end
+        for i = #list + 1, #rows do rows[i]:Hide() end
+        child:SetHeight(math.max(1, #list * ROW))
+        empty:SetShown(#list == 0)
+    end
+
+    sf:HookScript("OnHide", function()
+        if editRow then EndEdit(true) end
+        nameEb:ClearFocus(); textEb:ClearFocus()
+    end)
+    sf:HookScript("OnShow", Fill)
+    BNB.RegisterMessage("SpellingShortcuts", "SpellShortcutsChanged", function()
+        if sf:IsVisible() then Fill() end
+    end)
+    greyed[#greyed + 1] = { box, nil, true }
+    Fill()
+    return y
+end
+
 function K.BuildSpellPage(sf, ct, y, page)
     local db = BigNoteBoxDB
     local SP = BNB.Spell
@@ -312,6 +545,8 @@ function K.BuildSpellPage(sf, ct, y, page)
     end)
     greyed[#greyed + 1] = { box, nil, true }
     FillWords()
+
+    y = BuildShortcuts(sf, ct, y - 6, greyed)
 
     Sync()
     sf:HookScript("OnShow", Sync)

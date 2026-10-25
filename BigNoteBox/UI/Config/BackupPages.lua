@@ -160,6 +160,8 @@ function K.BuildSelectiveBackupPage(sf, ct, y)
           count = ProfileCount },
         { key = "spellWords", fmt = "BACKUP_SEL_SPELLWORDS", tip = "BACKUP_SEL_SPELLWORDS_TIP",
           count = function() return #(BNB.Spell and BNB.Spell.BackupList() or {}) end },   -- ALL-559 S2
+        { key = "spellShortcuts", fmt = "BACKUP_SEL_SHORTCUTS", tip = "BACKUP_SEL_SHORTCUTS_TIP",
+          count = function() return #(BNB.TextShortcuts and BNB.TextShortcuts.BackupList() or {}) end },   -- ALL-559 S4
     }
     for i, part in ipairs(PARTS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
@@ -403,6 +405,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         { key = "tokens",    fmt = "BACKUP_SEL_TOKENS",    tip = "BACKUP_PICK_TOKENS_TIP" },
         { key = "tagColors", fmt = "BACKUP_SEL_TAGCOLORS", tip = "BACKUP_PICK_TAGCOLORS_TIP" },
         { key = "spellWords", fmt = "BACKUP_SEL_SPELLWORDS", tip = "BACKUP_PICK_SPELLWORDS_TIP" },   -- ALL-559 S2
+        { key = "spellShortcuts", fmt = "BACKUP_SEL_SHORTCUTS", tip = "BACKUP_PICK_SHORTCUTS_TIP" },   -- ALL-559 S4
     }
     for i, part in ipairs(PARTS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
@@ -531,7 +534,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
             out.folders = data.folders   -- the notes' folders come with them (ALL-510 S2)
             any = any or #out > 0
         end
-        for _, key in ipairs({ "templates", "tokens", "tagColors", "spellWords" }) do
+        for _, key in ipairs({ "templates", "tokens", "tagColors", "spellWords", "spellShortcuts" }) do
             if On(key) then out[key] = data[key]; any = true end
         end
         local codes, names, replace = {}, {}, {}

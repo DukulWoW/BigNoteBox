@@ -110,6 +110,7 @@ BNB.FEATURE_LIST = {
             "Right-click a red-marked word for suggestions, Add to dictionary or Ignore; your own words in Settings, a Check spelling key",
             "Correct spelling window: goes through the marked words one by one, with suggestions, Ignore this, Ignore all and Add to dictionary",
             "Repeated words (the the) marked; choose whether words in capitals and words with numbers are checked",
+            "Text shortcuts: your own, brb + space becomes be right back (Brb gives Be right back), one Undo brings back what you typed",
         },
     },
 

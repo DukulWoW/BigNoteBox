@@ -151,7 +151,7 @@ local function BuildBackupTab(sf, page)
         exportStatus:SetText(L["BACKUP_BTN_COPY_FALLBACK"])
     end
     fullBtn:SetScript("OnClick", function(self)
-        CopyBackup(self, { templates = true, tokens = true, tagColors = true, profiles = true, spellWords = true })
+        CopyBackup(self, { templates = true, tokens = true, tagColors = true, profiles = true, spellWords = true, spellShortcuts = true })
     end)
     setBtn:SetScript("OnClick", function(self)
         CopyBackup(self, { ids = {}, profiles = true })
@@ -257,6 +257,7 @@ local function BuildBackupTab(sf, page)
         Add(list.tagColors, "BACKUP_PREVIEW_TAGCOLORS")
         Add(list.profiles, "BACKUP_PREVIEW_PROFILES")
         Add(list.spellWords, "BACKUP_PREVIEW_SPELLWORDS")   -- ALL-559 S2
+        Add(list.spellShortcuts, "BACKUP_PREVIEW_SHORTCUTS")   -- ALL-559 S4
         return Good(L[kind] .. " " .. table.concat(parts, ", "))
     end
     local function UpdatePreview()
@@ -396,6 +397,7 @@ local function BuildBackupTab(sf, page)
         local extra = (notes.templates and #notes.templates > 0) or (notes.tokens and #notes.tokens > 0)
             or (notes.tagColors and next(notes.tagColors) ~= nil) or (notes.profiles and #notes.profiles > 0)
             or (notes.spellWords and #notes.spellWords > 0)
+            or (notes.spellShortcuts and #notes.spellShortcuts > 0)
         if extra then
             pickPage.SetData(notes, function(picked)
                 BNB.ConfigSubPageBack()

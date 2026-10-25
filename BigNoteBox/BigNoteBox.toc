@@ -172,6 +172,7 @@ Features\ShareNote.lua
 Features\OracleSearch.lua
 Features\Tldr.lua
 Features\Spellcheck.lua
+Features\TextShortcuts.lua
 UI\SpellCorrect.lua
 UI\NoteTooltip.lua
 Features\UnitNotes.lua

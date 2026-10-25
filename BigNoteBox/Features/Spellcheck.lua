@@ -42,6 +42,9 @@
 -- of the sticky's own menu, no Correct spelling window). One checker per box
 -- (SP.AttachEditor, kind main / focus / sticky); SP.ActiveEditor() = Focus
 -- mode while it is open, else the main editor.
+-- Stage 4: text shortcuts (brb -> be right back) in the same boxes,
+-- Features/TextShortcuts.lua, wired from SP.AttachEditor; their names are
+-- known words (Extra).
 --
 -- Not checked: game links, textures, color codes, every complete {...}
 -- markup and {{token}}, web and mail addresses, lines that start with "/"
@@ -158,6 +161,10 @@ local function Extra()
         if ok and type(tags) == "table" then
             for _, t in ipairs(tags) do AddWords(set, t.tag) end
         end
+    end
+    -- Text shortcuts (stage 4): brb is a word once it is a shortcut
+    if BNB.TextShortcuts then
+        for k in pairs(BNB.TextShortcuts.Names()) do set[k] = true end
     end
     _extra = set
     return set
@@ -302,6 +309,13 @@ local function Known(w)
     d = d or _data.enUS
     if d and InBuckets(d.words, w) then return true end
     return _data.wow ~= nil and InBuckets(_data.wow.words, w)
+end
+
+-- In the word lists (any a-z case), leaving out the player's own words and
+-- game words: a text shortcut that is a real word gets a warning (stage 4)
+function SP.InDictionary(w)
+    if type(w) ~= "string" or not SP.EnsureLoaded() then return false end
+    return Known(w) or Known(LowerAscii(w))
 end
 
 -- w: the word with ' for a typographic apostrophe. "The" at a sentence's
@@ -759,6 +773,8 @@ function SP.AttachEditor(eb, sf, noteID, opts)
     end)
     _editors[eb] = ed
     if ed.kind == "main" then _main = ed end
+    -- Text shortcuts (stage 4) in every box the checker is on
+    if BNB.TextShortcuts then BNB.TextShortcuts.Wire(eb, ed) end
     return ed
 end
 

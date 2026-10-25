@@ -194,6 +194,7 @@ BNB.DEFAULTS = {
     spellSkipUpper      = false,     -- words in capitals not checked (off: they are)
     spellSkipDigits     = true,      -- words with a number not checked
     spellRepeats        = true,      -- "the the" marked
+    spellShortcuts      = true,      -- text shortcuts expand as typed (ALL-559 S4, Features/TextShortcuts.lua)
     spellCorrectPos     = false,     -- Correct spelling window { x, y }; false = on the main window
     tldrUnderTitle      = true,
     tldrUnitTooltip     = true,
