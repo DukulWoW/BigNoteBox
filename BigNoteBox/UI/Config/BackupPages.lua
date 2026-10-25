@@ -158,6 +158,8 @@ function K.BuildSelectiveBackupPage(sf, ct, y)
           count = function() return Count(BNB.TagColors and BNB.TagColors.BackupMap()) end },
         { key = "profiles",  fmt = "BACKUP_SEL_PROFILES", tip = "BACKUP_SEL_PROFILES_TIP",
           count = ProfileCount },
+        { key = "spellWords", fmt = "BACKUP_SEL_SPELLWORDS", tip = "BACKUP_SEL_SPELLWORDS_TIP",
+          count = function() return #(BNB.Spell and BNB.Spell.BackupList() or {}) end },   -- ALL-559 S2
     }
     for i, part in ipairs(PARTS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
@@ -167,7 +169,7 @@ function K.BuildSelectiveBackupPage(sf, ct, y)
         end)
         part.cb:SetChecked(true)
     end
-    y = y - 2 * (26 + ROW_GAP)
+    y = y - math.ceil(#PARTS / 2) * (26 + ROW_GAP)
 
     function UpdateParts()
         for _, part in ipairs(PARTS) do
@@ -400,12 +402,13 @@ function K.BuildImportPickerPage(sf, ct, y, page)
         { key = "templates", fmt = "BACKUP_SEL_TEMPLATES", tip = "BACKUP_PICK_TEMPLATES_TIP" },
         { key = "tokens",    fmt = "BACKUP_SEL_TOKENS",    tip = "BACKUP_PICK_TOKENS_TIP" },
         { key = "tagColors", fmt = "BACKUP_SEL_TAGCOLORS", tip = "BACKUP_PICK_TAGCOLORS_TIP" },
+        { key = "spellWords", fmt = "BACKUP_SEL_SPELLWORDS", tip = "BACKUP_PICK_SPELLWORDS_TIP" },   -- ALL-559 S2
     }
     for i, part in ipairs(PARTS) do
         local col, row = (i - 1) % 2, math.floor((i - 1) / 2)
         part.cb = MakeCheck(ct, col * CONTENT_W / 2, y - row * (26 + ROW_GAP), L[part.tip])
     end
-    y = y - 2 * (26 + ROW_GAP) - 4
+    y = y - math.ceil(#PARTS / 2) * (26 + ROW_GAP) - 4
 
     local profHdrY = y
     local profHdr = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalLarge")
@@ -528,7 +531,7 @@ function K.BuildImportPickerPage(sf, ct, y, page)
             out.folders = data.folders   -- the notes' folders come with them (ALL-510 S2)
             any = any or #out > 0
         end
-        for _, key in ipairs({ "templates", "tokens", "tagColors" }) do
+        for _, key in ipairs({ "templates", "tokens", "tagColors", "spellWords" }) do
             if On(key) then out[key] = data[key]; any = true end
         end
         local codes, names, replace = {}, {}, {}

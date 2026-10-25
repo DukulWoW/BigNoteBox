@@ -315,6 +315,8 @@ end)
 --   TokensChanged ()               Features/Tokens.lua, an item / quest / spell
 --                                  a note token waited for has loaded (ALL-481
 --                                  S2): the editor's rich view and stickies redraw
+--   SpellWordsChanged ()           Features/Spellcheck.lua, the player's own words
+--                                  changed (ALL-559 S2): the Spelling page re-lists
 --   SettingsShown / SettingsHidden ()   the Settings window's OnShow / OnHide
 --   UIFontChanged ()               UI/Fonts.lua, end of ApplyFont: skin button
 --                                  labels and the welcome panel re-read

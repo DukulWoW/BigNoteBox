@@ -62,6 +62,20 @@ function BNB.InsertIntoEditor(snippet, back, value, atEnd)
     if _inserters.main then return _inserters.main(snippet, back, value, atEnd) end
 end
 
+-- Bytes first..last of eb's text replaced with text, one undo step, the note
+-- marked changed, the cursor after it (the spellchecker's suggestions,
+-- ALL-559 stage 2). eb = the body of the main editor or Focus mode.
+-- -> true when it was done
+local _replacers = {}
+-- noFocus: the text cursor moves but the box does not take the keyboard
+-- (the Correct spelling window keeps it, UI/SpellCorrect.lua)
+function BNB.ReplaceInEditor(eb, first, last, text, noFocus)
+    for _, r in pairs(_replacers) do
+        if r.body() == eb then return r.fn(first, last, text, noFocus) end
+    end
+    return false
+end
+
 -- True once the writer has clicked into the text of the note shown (the box
 -- an insert goes into, as above); rich View mode has no cursor
 function BNB.EditorHasCursor()
@@ -111,7 +125,9 @@ local function TokenRow(sub, name, kind, insert)
     end, { tip = "{{" .. base .. (open and (":" .. hint) or "") .. "}}", tipSub = tipSub })
 end
 
-function BNB.BuildTokenMenu(root, insert)
+-- middle (optional): fn(root), rows between the groups and New token (the
+-- spellchecker's actions in the body's right-click menu, ALL-559)
+function BNB.BuildTokenMenu(root, insert, middle)
     local Tk = BNB.Tokens
     if not Tk then return end
     local plain = Tk.NotePlain(BNB._currentNoteID)
@@ -138,6 +154,7 @@ function BNB.BuildTokenMenu(root, insert)
             if Tk.Listed(name, plain) then TokenRow(sub, name, g.kind, insert) end
         end
     end
+    if middle then root:CreateDivider(); middle(root) end
     root:CreateDivider()
     root:CreateButton(L["TOKEN_NEW"], function()
         if BNB.OpenTokenEdit then BNB.OpenTokenEdit(nil) end
@@ -649,6 +666,31 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end
     _inserters[main and "main" or "focus"] = InsertSnippet
 
+    -- BNB.ReplaceInEditor for this bar's body: the same undo point as an insert
+    local function ReplaceRange(first, last, new, noFocus)
+        local eb = Body()
+        if not eb or BNB._editorLocked or not eb:IsVisible() then return false end
+        local id = BNB._currentNoteID; if not id then return false end
+        local text = eb:GetText() or ""
+        if first < 1 or last > #text or last < first - 1 then return false end
+        local cursor = eb:GetCursorPosition() or 0
+        local newText   = text:sub(1, first - 1) .. new .. text:sub(last + 1)
+        local newCursor = first - 1 + #new
+        UndoPoint(id, text, cursor)
+        BNB._undoActive = true
+        eb:SetText(newText)
+        BNB._undoActive = false
+        BNB.UndoPush(id, newText, newCursor)
+        if BNB._refreshUndoButtons then BNB._refreshUndoButtons() end
+        C_Timer.After(0, function()
+            if not noFocus then eb:SetFocus() end
+            eb:SetCursorPosition(newCursor)
+        end)
+        ctx.markDirty()
+        return true
+    end
+    _replacers[main and "main" or "focus"] = { body = Body, fn = ReplaceRange }
+
     -- Note tokens (ALL-481 S2, Dukul's tb-syntax art): a menu of every token
     -- by kind; hover tells what it does, how it is written and what it gives
     -- right now. A normal note gets the value at once (ALL-503), a rich note
@@ -812,32 +854,47 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- Check spelling (ALL-559, Features/Spellcheck.lua; Dukul's tb-spellcheck
     -- art): marks the words now, in either check mode. Main editor only until
     -- stage 3; gone while the Spelling module is off
-    local spellDiv, spellBtn
+    local spellDiv, spellBtn, correctBtn, dictBtn
     if main then
         spellDiv = MakeDiv(linkBtn)
         spellBtn = WyBtn("tb-spellcheck", L["NE_SPELL_CHECK_TIP"])
         spellBtn:SetPoint("LEFT", spellDiv, "RIGHT", DIV_GAP, 0)
         spellBtn:SetIconEnabled(true)
         TipWithBody(spellBtn, "NE_SPELL_CHECK_TIP", "NE_SPELL_CHECK_BODY")
+        -- Rich View mode has no box to mark: Edit mode first (SP.CheckAndReport,
+        -- shared with the Check spelling key, ALL-567)
         spellBtn:SetScript("OnClick", function()
             local SP = BNB.Spell
             if not (SP and Body() and BNB._currentNoteID) then return end
-            local function Run()
-                local n = SP.CheckNow()
-                if n == 0 then BNB:Print(L["SPELL_NONE_FOUND"])
-                elseif n then BNB:Print(string.format(L["SPELL_FOUND_FMT"], n)) end
-            end
-            -- Rich View mode has no box to mark: Edit mode first
-            if BNB._editorInViewMode and BNB.AM_EnterEditMode then
-                BNB.AM_EnterEditMode()
-                C_Timer.After(0, Run)
-            else
-                Run()
-            end
+            SP.CheckAndReport()
+        end)
+        -- Correct spelling (ALL-559, Dukul 2026-10-25; Dukul's tb-spell-correct
+        -- art): the window that goes through the
+        -- marked words one by one (UI/SpellCorrect.lua)
+        correctBtn = WyBtn("tb-spell-correct", L["NE_SPELL_CORRECT_TIP"])
+        correctBtn:SetPoint("LEFT", spellBtn, "RIGHT", ICON_GAP, 0)
+        correctBtn:SetIconEnabled(true)
+        TipWithBody(correctBtn, "NE_SPELL_CORRECT_TIP", "NE_SPELL_CORRECT_BODY")
+        correctBtn:SetScript("OnClick", function()
+            if BNB.SpellCorrect and Body() and BNB._currentNoteID then BNB.SpellCorrect.Open() end
+        end)
+        -- Add to dictionary (ALL-559 stage 2, Dukul's tb-dictionary art): a
+        -- popup asks first, with the marked word at the text cursor filled in
+        -- (Dukul, 2026-10-25: "that way you know which words to add")
+        dictBtn = WyBtn("tb-dictionary", L["NE_SPELL_ADD_TIP"])
+        dictBtn:SetPoint("LEFT", correctBtn, "RIGHT", ICON_GAP, 0)
+        dictBtn:SetIconEnabled(true)
+        TipWithBody(dictBtn, "NE_SPELL_ADD_TIP", "NE_SPELL_ADD_BODY")
+        dictBtn:SetScript("OnClick", function()
+            local SP = BNB.Spell
+            if not (SP and BNB._currentNoteID) then return end
+            local eb = Body()
+            local word = eb and not BNB._editorInViewMode and SP.WordAtCursor(eb)
+            SP.AskAddWord(word)
         end)
         function BNB._wySpellSync()
             local on = BNB.SpellEnabled and BNB.SpellEnabled()
-            spellDiv:SetShown(on); spellBtn:SetShown(on)
+            spellDiv:SetShown(on); spellBtn:SetShown(on); correctBtn:SetShown(on); dictBtn:SetShown(on)
             if bar._collapse then bar._collapse() end
         end
     end
@@ -1180,7 +1237,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local GAP = 8
     -- Room for the right side: from the left side's last button to the edge
     local function Room()
-        local last = (spellBtn and spellBtn:IsShown()) and spellBtn or linkBtn
+        local last = (dictBtn and dictBtn:IsShown()) and dictBtn or linkBtn
         local lr = last:GetRight()
         if not lr then return math.huge end
         return bar:GetRight() - 6 - lr - GAP

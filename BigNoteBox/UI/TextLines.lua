@@ -228,6 +228,7 @@ function TL.Attach(eb, sf, getRanges, color)
                         t:ClearAllPoints()
                         t:SetPoint("TOPLEFT", fs, "TOPLEFT", l, y)
                         Paint(t, r[3], w, cr, cg, cb)
+                        t._range, t._lineH = r, boxStep
                         t:Show()
                     end
                 end
@@ -244,6 +245,27 @@ function TL.Attach(eb, sf, getRanges, color)
     -- kept here too: a span lays the text out)
     function ctl.Refresh() BNB.Debounce(key, 0, Draw) end
     function ctl.Recolor() lastSig = nil; ctl.Refresh() end
+
+    -- The range whose drawn line is under the mouse pointer, or nil (the
+    -- spellchecker's right-click, ALL-559). Read from the lines themselves:
+    -- the game's own index-at-point answer drifts down a long note, as its
+    -- spans do (see the header), so it missed words lower down
+    function ctl.RangeAtPointer()
+        if not sf:IsMouseOver() then return nil end
+        for i = 1, #ctl.lines do
+            local t = ctl.lines[i]
+            if t:IsShown() and t._range and t:GetLeft() then
+                local sc = t:GetEffectiveScale()
+                local cx, cy = GetCursorPosition()
+                cx, cy = cx / sc, cy / sc
+                -- The letters stand on the line: from its bottom up one text line
+                if cx >= t:GetLeft() - 2 and cx <= t:GetRight() + 2
+                   and cy >= t:GetBottom() - 1 and cy <= t:GetTop() + (t._lineH or 12) then
+                    return t._range
+                end
+            end
+        end
+    end
 
     eb:HookScript("OnTextChanged", ctl.Refresh)
     eb:HookScript("OnSizeChanged", ctl.Refresh)

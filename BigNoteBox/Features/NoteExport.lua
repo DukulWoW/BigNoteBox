@@ -678,7 +678,7 @@ end
 -- every settings profile as a profile code (ALL-496 S2); folders (optional):
 -- the note folders, BNB.Folders.BackupList (ALL-510 S2); an older build reads
 -- past these keys
-local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles, folders)
+local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles, folders, spellWords)
     local header = string.format(
         "{\"export_version\":%d,\"addon_version\":%s,\"note_count\":%d,\"notes\":[\n",
         JSON_VERSION,
@@ -699,6 +699,10 @@ local function JsonEnvelope(noteParts, templates, tokens, tagColors, profiles, f
     end
     if profiles and #profiles > 0 then
         tail = tail .. ",\"profiles\":" .. Json.Encode(profiles)
+    end
+    -- The spellchecker's own words (ALL-559 S2), a list of strings
+    if spellWords and #spellWords > 0 then
+        tail = tail .. ",\"spellWords\":" .. Json.Encode(spellWords)
     end
     tail = tail .. "}"
     return header .. table.concat(noteParts, ",\n") .. tail
@@ -738,7 +742,8 @@ local function SerializeNotes(fmt)
         local cols = BNB.TagColors and BNB.TagColors.BackupMap() or nil
         local profs = BNB.Profiles and BNB.Profiles.BackupList() or nil
         local fold = BNB.Folders and BNB.Folders.BackupList() or nil   -- every folder (ALL-510)
-        return JsonEnvelope(noteParts, tpls, toks, cols, profs, fold), #noteParts
+        local words = BNB.Spell and BNB.Spell.BackupList() or nil
+        return JsonEnvelope(noteParts, tpls, toks, cols, profs, fold, words), #noteParts
 
     else  -- Markdown
         local chunks = {}
@@ -1045,8 +1050,11 @@ local function ParseJsonNotes(text, quiet)
     if type(doc) == "table" and type(doc.folders) == "table" then parsed.folders = doc.folders end
     -- and the settings profiles (ALL-496 S2), BNB.Profiles.ImportBackup
     if type(doc) == "table" and type(doc.profiles) == "table" then parsed.profiles = doc.profiles end
+    -- and the spellchecker's own words (ALL-559 S2), BNB.Spell.ImportList
+    if type(doc) == "table" and type(doc.spellWords) == "table" then parsed.spellWords = doc.spellWords end
     -- A settings backup has no notes (ALL-507): kept while it holds anything
     local any = #parsed > 0 or parsed.templates or parsed.tokens or parsed.tagColors or parsed.profiles
+        or parsed.spellWords
     return any and parsed or nil
 end
 
@@ -1259,6 +1267,11 @@ local function ImportNotes(noteList, remapScope)
     end
     -- Tag colours from a full backup (ALL-106), for tags with no colour here
     if noteList.tagColors and BNB.TagColors then BNB.TagColors.ImportMap(noteList.tagColors) end
+    -- The spellchecker's own words (ALL-559 S2): added to yours
+    if noteList.spellWords and BNB.Spell then
+        local n = BNB.Spell.ImportList(noteList.spellWords)
+        if n > 0 then BNB:Print("|cff66bb6a" .. string.format(L["SPELL_BACKUP_IMPORTED_FMT"], n) .. "|r") end
+    end
     -- Settings profiles from a full backup (ALL-496 S2): a name already used here
     -- comes in under a free one, "Default (1)", or replaces the one here when the
     -- import picker says so (ALL-509); profileNames = the picker's names
@@ -1340,7 +1353,7 @@ end
 -- The backups of Settings > Backup (ALL-507). opts:
 --   fmt        NE.FMT_JSON (default) or NE.FMT_MARKDOWN (notes only)
 --   ids        note ids to include, in list order; nil = every note
---   templates, tokens, tagColors, profiles   true = include (JSON only)
+--   templates, tokens, tagColors, profiles, spellWords   true = include (JSON only)
 -- Returns the text and the number of notes in it.
 local function BuildBackup(opts)
     opts = opts or {}
@@ -1364,10 +1377,11 @@ local function BuildBackup(opts)
     local toks  = opts.tokens    and BNB.Tokens    and BNB.Tokens.BackupList()    or nil
     local cols  = opts.tagColors and BNB.TagColors and BNB.TagColors.BackupMap()  or nil
     local profs = opts.profiles  and BNB.Profiles  and BNB.Profiles.BackupList()  or nil
+    local words = opts.spellWords and BNB.Spell    and BNB.Spell.BackupList()     or nil
     -- Folders ride with the notes (ALL-510 S2): every one in a full backup,
     -- only those in use when notes were picked (none for ids = {})
     local fold  = BNB.Folders and BNB.Folders.BackupList(opts.ids and list or nil) or nil
-    return JsonEnvelope(parts, tpls, toks, cols, profs, fold), #list
+    return JsonEnvelope(parts, tpls, toks, cols, profs, fold, words), #list
 end
 
 -- Public wrapper so the BNB_IMPORT_SCOPE_REMAP popup callback (defined in

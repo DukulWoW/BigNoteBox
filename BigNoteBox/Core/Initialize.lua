@@ -325,12 +325,15 @@ end
 --------------------------------------------------------------------------------
 -- Third value = the version a key arrived in: a bump applies only the newer
 -- ones, so a default the player unbound on purpose is not handed back.
-local DEFAULT_KEYS_VERSION = 2
+local DEFAULT_KEYS_VERSION = 3
 local DEFAULT_KEYS = {
     { "BIGNOTEBOXNOTEONTARGET",   "F6",     1 },
     { "BIGNOTEBOXQUICKNOTE",      "F7",     1 },
     { "BIGNOTEBOXNEWNOTE",        "F8",     1 },
     { "BIGNOTEBOXSTICKIESFRONT",  "CTRL-J", 2 },   -- ALL-200
+    -- ALL-567: F9, after F6-F8 (Dukul, 2026-10-25). Ctrl+S was dropped: the
+    -- game's own default binds it to Toggle Sound
+    { "BIGNOTEBOXSPELLCHECK",     "F9",     3 },
 }
 
 -- Every BigNoteBox binding and its default key, the same as Bindings.xml:
@@ -344,7 +347,21 @@ BNB.BINDING_DEFAULTS = {
     { "BIGNOTEBOXNOTEONTARGET", "F6" },
     { "BIGNOTEBOXORACLE",       "CTRL-SPACE" },
     { "BIGNOTEBOXSTICKIESFRONT", "CTRL-J" },
+    { "BIGNOTEBOXSPELLCHECK",   "F9" },       -- ALL-567
 }
+
+-- Is key, with the modifiers held now, one of action's keys? A focused edit
+-- box eats key presses before bindings see them, so a binding that must work
+-- while typing is caught in the box's OnKeyDown with this too
+function BNB.KeyIsBinding(action, key)
+    if not key or key:find("SHIFT$") or key:find("CTRL$") or key:find("ALT$") then return false end
+    local combo = (IsAltKeyDown() and "ALT-" or "") .. (IsControlKeyDown() and "CTRL-" or "")
+        .. (IsShiftKeyDown() and "SHIFT-" or "") .. key
+    for _, b in ipairs({ GetBindingKey(action) }) do
+        if b == combo then return true end
+    end
+    return false
+end
 
 -- Danger Zone "Reset key bindings" (Dukul, 2026-10-02): every BigNoteBox
 -- action loses its keys and gets its default back. A default key that the
@@ -459,4 +476,11 @@ end
 -- way of opening a note keeps its own combat check.
 function BNB_KeybindOracle()
     if BNB.Oracle then BNB.Oracle.Toggle() end
+end
+
+-- Check spelling (ALL-567): the same as the toolbar button, on the note in
+-- the main editor; nothing while the Spelling module is off. The body box
+-- catches the key itself while it has focus (Features/Spellcheck.lua)
+function BNB_KeybindSpellCheck()
+    if BNB.Spell and BNB.Spell.CheckFromKey then BNB.Spell.CheckFromKey() end
 end

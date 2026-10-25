@@ -191,6 +191,10 @@ BNB.DEFAULTS = {
     spellLang           = "enUS",    -- "enUS" / "enGB"
     spellMode           = "type",    -- "type" = as you type, "click" = on Check spelling
     spellSkipCaps       = true,      -- capitalized words in a sentence = names, not checked
+    spellSkipUpper      = false,     -- words in capitals not checked (off: they are)
+    spellSkipDigits     = true,      -- words with a number not checked
+    spellRepeats        = true,      -- "the the" marked
+    spellCorrectPos     = false,     -- Correct spelling window { x, y }; false = on the main window
     tldrUnderTitle      = true,
     tldrUnitTooltip     = true,
     tldrToast           = true,

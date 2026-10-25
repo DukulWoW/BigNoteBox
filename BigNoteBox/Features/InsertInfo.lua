@@ -3,11 +3,16 @@
 -- Adds a right-click context menu to the NoteEditor body EditBox (and Focus
 -- Mode body) with the following insert actions:
 --
+--   On a word the spellchecker marked: its suggestions first, above Insert
+--   Info (BNB.Spell.AddMenuTop, Features/Spellcheck.lua), then
 --   Insert Info
 --     • Set TomTom waypoint   — (shown only when TomTom is loaded)
 --     • The note token groups, as the toolbar's token button
 --       (BNB.BuildTokenMenu): they took over the old rows (location, name,
 --       target, date, time, date and time), Dukul 2026-10-18
+--     • On a marked word: Add to dictionary, Ignore, Correct spelling
+--       between the token groups and New token (BNB.Spell.AddMenuActions,
+--       Dukul 2026-10-25)
 --   A right-click on a link opens the link menu instead (NoteLinks.lua).
 --
 -- Location format:
@@ -89,9 +94,15 @@ end
 
 -- ── Menu (BNB.ContextMenu, ALL-148) ──────────────────────────────────────────
 
-local function ShowInsertInfoMenu(eb)
+-- spellHit = the red-marked word right-clicked (Features/Spellcheck.lua,
+-- ALL-559 stage 2): its suggestions on top, its actions after the token groups
+local function ShowInsertInfoMenu(eb, spellHit)
+    local SP = spellHit and BNB.Spell
     BNB.ContextMenu.Open(eb, function(root)
+        if SP then SP.AddMenuTop(root, eb, spellHit) end
         root:CreateTitle(L["INSERT_INFO_TITLE"])
+        local actionsDone = not SP
+        local function Actions(r) SP.AddMenuActions(r, eb, spellHit); actionsDone = true end
 
         -- TomTom waypoint here: an action, not text (only with TomTom)
         if BNB.HasTomTom() then
@@ -111,8 +122,9 @@ local function ShowInsertInfoMenu(eb)
         if BNB.BuildTokenMenu and BNB.Tokens and BNB._currentNoteID then
             BNB.BuildTokenMenu(root, function(snippet, back, value)
                 BNB.InsertIntoEditor(snippet, back, value)
-            end)
+            end, SP and Actions or nil)
         end
+        if not actionsDone then root:CreateDivider(); Actions(root) end
 
         -- Note settings from the open note (ALL-538, Dukul 2026-10-21: only
         -- this; alarm, task and the rest are on the action bar). Not in Focus
@@ -129,11 +141,18 @@ local function ShowInsertInfoMenu(eb)
 end
 
 -- A right-click on a link opens the link menu instead (Features/NoteLinks.lua
--- marks the box); both run on the same click, so this one waits a frame
+-- marks the box); both run on the same click, so this one waits a frame.
+-- The marked word under the pointer was read on the mouse down, before the
+-- box moved its cursor and the lines were drawn again
 local function ShowUnlessLinkMenu(eb)
+    local hit = eb._bnbSpellHit
+    if eb._bnbSpellHitT == nil or GetTime() - eb._bnbSpellHitT > 2 then
+        hit = BNB.Spell and BNB.Spell.HitAtPointer(eb)
+    end
+    eb._bnbSpellHit, eb._bnbSpellHitT = nil, nil
     C_Timer.After(0, function()
         if eb._bnbLinkMenuT and GetTime() - eb._bnbLinkMenuT < 0.3 then return end
-        ShowInsertInfoMenu(eb)
+        ShowInsertInfoMenu(eb, hit)
     end)
 end
 
@@ -144,6 +163,11 @@ function BNB.WireInsertInfoTarget(eb)
     if not eb or eb._bnbInsertInfoWired then return end
     eb._bnbInsertInfoWired = true
 
+    eb:HookScript("OnMouseDown", function(self, btn)
+        if btn ~= "RightButton" then return end
+        self._bnbSpellHit = BNB.Spell and BNB.Spell.HitAtPointer(self) or nil
+        self._bnbSpellHitT = GetTime()
+    end)
     eb:HookScript("OnMouseUp", function(self, btn)
         -- Only show our menu when the editor is not locked / disabled
         if btn == "RightButton" and self:IsEnabled() then

@@ -23,4 +23,7 @@
     <Binding name="BIGNOTEBOXORACLE" category="BigNoteBox" default="CTRL-SPACE" runOnUp="false">
         BNB_KeybindOracle()
     </Binding>
+    <Binding name="BIGNOTEBOXSPELLCHECK" category="BigNoteBox" default="F9" runOnUp="false">
+        BNB_KeybindSpellCheck()
+    </Binding>
 </Bindings>
