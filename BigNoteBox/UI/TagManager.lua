@@ -544,10 +544,10 @@ local function BuildTagManager()
 
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxTagManagerFrame", w = TM_W, h = 460,
-        -- HIGH like the other windows beside the main window (Note History,
-        -- Trash, Alarms, Rich preview): one strata, so the last opened is on
-        -- top (was DIALOG, always over them)
-        title = L["TAG_MGR_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        -- MEDIUM like the main window and the other big windows (ALL-564):
+        -- one strata, the last clicked in front (was HIGH with the side
+        -- windows, and DIALOG before that, always over them)
+        title = L["TAG_MGR_TITLE"], strata = "MEDIUM", escClose = true,
         pad = PAD, footH = FOOT_H - 1,
         onHide = function() if _multiMode then SetMultiMode(false) end end,
     })

@@ -778,13 +778,14 @@ end
 local SK_TAB_GAP = 30   -- skin tab strip (24) + 6px gap below the title strip
 
 local function CreateNoteConfigWindow()
-    -- Same strata as the Reference Box (DIALOG, the builder's default), which
-    -- drew over this window from MEDIUM whatever was clicked (Dukul,
-    -- 2026-10-04). Raised on open, and BNB.RaiseBNBWindows raises it after the
-    -- Reference Box (WINDOWS order). Shared shell: UI/ToolWindow.lua (CMP-02)
+    -- Same strata as the Reference Box and the main window (MEDIUM, one of
+    -- the big windows, ALL-564): last clicked in front (UI/WindowStack.lua).
+    -- The Reference Box drew over this window whatever was clicked while they
+    -- were in different strata (Dukul, 2026-10-04). Shared shell:
+    -- UI/ToolWindow.lua (CMP-02)
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxNoteConfigFrame", w = NCW, h = 640, pad = PAD,
-        title = L["STICKY_NOTE_SETTINGS_TIP"], toplevel = true, escClose = true,
+        title = L["STICKY_NOTE_SETTINGS_TIP"], strata = "MEDIUM", escClose = true,
     })
     f:SetPoint("CENTER")
     local skinMode = f._isSkin

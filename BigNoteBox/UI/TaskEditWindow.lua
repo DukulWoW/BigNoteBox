@@ -395,6 +395,7 @@ local function BuildWindow()
 
     local f, saveBtn, cancelBtn = BNB.CreateToolWindow({
         name = "BNBTaskEditWindow", w = TW_W, h = TW_H, title = L["TEW_TITLE"],
+        strata = "MEDIUM",
         pad = TW_PAD, cw = TW_CW, footH = TW_FOOT_H,
         btn1 = L["SAVE"], btn2 = L["CANCEL"],
         onClose = function() TW.Close() end,

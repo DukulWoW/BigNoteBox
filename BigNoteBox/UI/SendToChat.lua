@@ -433,7 +433,7 @@ local function CreateSendDialog()
     -- Chrome for both modes (CMP-02 S3); ESC closes through its own key handler too
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxSendDialog", w = DLG_W, h = DLG_H,
-        title = L["SEND_TITLE"], toplevel = true, escClose = true, keyEsc = true,
+        title = L["SEND_TITLE"], strata = "MEDIUM", escClose = true, keyEsc = true,
         onClose = function() BNB.CloseSendToChat() end,
     })
 

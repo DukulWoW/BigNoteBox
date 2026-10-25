@@ -308,7 +308,7 @@ local function BuildHistoryWindow()
     local f
     f = BNB.CreateToolWindow({
         name = "BigNoteBoxHistoryFrame", w = HW_W, h = 400,   -- height follows the main window
-        title = L["HISTORY_WINDOW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        title = L["HISTORY_WINDOW_TITLE"], strata = "MEDIUM", escClose = true,
         pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
         onClose = function() BNB.CloseHistoryWindow() end,
         -- Focus mode reopens the page the window closed on (ReopenHistoryWindow)

@@ -120,9 +120,11 @@ local closedFrames = {}
 
 -- Settings > Modules > Sticky notes "Keep sticky notes above BigNoteBox
 -- windows" (nil = off, Dukul 2026-10-02: off by default now that Ctrl+J
--- brings them forward). On: HIGH, over the main window (MEDIUM). Off: MEDIUM
--- as well, where SetToplevel brings whichever window was clicked last to the
--- front. ESC-screen stickies keep FULLSCREEN_DIALOG.
+-- brings them forward). On: HIGH, over the main window and every big window
+-- (all MEDIUM since ALL-564), under the dialogs and pickers (DIALOG). Off:
+-- MEDIUM as well, where the window stack brings whichever window was
+-- clicked last to the front (UI/WindowStack.lua). ESC-screen stickies keep
+-- FULLSCREEN_DIALOG.
 function SN.Strata()
     return (BigNoteBoxDB and BigNoteBoxDB.stickiesOnTop == true) and "HIGH" or "MEDIUM"
 end
@@ -940,7 +942,7 @@ local function CreateMiniTile(frame, noteID, note)
     local tile = BNB.CreateBackdropFrame("Frame", nil, UIParent)
     tile:SetSize(MINI_SIZE, MINI_SIZE)
     tile:SetFrameStrata(SN.Strata())
-    tile:SetToplevel(true)
+    BNB.StackWindow(tile)   -- last clicked in front (ALL-564)
     tile:SetMovable(true)
     tile:SetClampedToScreen(true)
     tile:EnableMouse(true)
@@ -1783,7 +1785,7 @@ local function CreateStickyFrame(noteID)
 
     local f = BNB.CreateBackdropFrame("Frame", nil, UIParent)
     f:SetFrameStrata(SN.Strata())
-    f:SetToplevel(true)
+    BNB.StackWindow(f)   -- last clicked in front, own band of levels (ALL-564, ALL-198)
     f:SetMovable(true)
     f:SetResizable(true)
     f:SetResizeBounds(MIN_W, MIN_H, 1200, 800)

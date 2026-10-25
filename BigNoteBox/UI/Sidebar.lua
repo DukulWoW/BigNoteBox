@@ -603,9 +603,13 @@ function SB.Refresh()
     end
 
     if forNormal and side ~= "left" then
-        -- Right side draws below the main window so its border overlaps the strip.
+        -- Right side draws below the main window so its border overlaps the
+        -- strip: kept in the band just under it by the window stack
+        -- (UI/WindowStack.lua, ALL-564), clear of the window behind
         _strip:SetFrameLevel(math.max(0, parent:GetFrameLevel() - 1))
+        BNB.StackUnder(parent, _strip)
     else
+        BNB.StackUnder(parent, nil)
         _strip:SetFrameLevel(parent:GetFrameLevel() + 1)
     end
 
@@ -738,23 +742,6 @@ function SB.Build(parent)
         end)
     end)
 
-    -- When the main window is raised (clicked/dragged), companion windows
-    -- (preview, RefBox, etc.) must be re-raised so the sidebar strip —
-    -- which is a child of mainFrame — does not visually overlap them.
-    local function RaiseCompanions()
-        if not _strip or not _strip:IsShown() then return end
-        local lvl = parent:GetFrameLevel() + 10
-        local companions = {
-            _G["BigNoteBoxRichPreviewFrame"],
-            _G["BigNoteBoxReferenceBoxFrame"],
-        }
-        for _, cf in ipairs(companions) do
-            if cf and cf:IsShown() then
-                cf:SetFrameLevel(lvl)
-            end
-        end
-    end
-    parent:HookScript("OnMouseDown", RaiseCompanions)
 
     -- Register a live-refresh for sidebar button borders so they track the
     -- current preset and brightness. ApplyMainWindowSkin iterates the

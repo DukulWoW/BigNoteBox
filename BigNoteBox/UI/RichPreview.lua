@@ -263,12 +263,13 @@ local function BuildMainFrame()
     end
 
     f:SetSize(PREVIEW_W, h)
-    -- One strata above the main window (MEDIUM): the sidebar strip is a child
-    -- of the main window and its icons drew over the preview beside it; a
-    -- raised frame level does not hold against another window's children
-    -- (Dukul, 2026-10-04). Below DIALOG, so Note Settings and the Reference
-    -- Box still open over it
-    f:SetFrameStrata("HIGH")
+    -- MEDIUM with the main window, last clicked in front (ALL-564). It was
+    -- HIGH because the main window's sidebar icons drew over it (a raised
+    -- frame level does not hold against another window's children, Dukul,
+    -- 2026-10-04); the window stack gives each window its own band of levels
+    -- (UI/WindowStack.lua)
+    f:SetFrameStrata("MEDIUM")
+    BNB.StackWindow(f)
 
     _mainRSF, _mainRF = BuildRenderPair(FRAME_NAME, f, titleH)
 

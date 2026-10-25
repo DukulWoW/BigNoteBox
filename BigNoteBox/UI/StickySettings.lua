@@ -93,7 +93,7 @@ local function BuildStickySettingsWindow()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxStickySettingsFrame", w = SETTINGS_W, h = 640,
         pad = SETTINGS_PAD, title = L["STICKY_SETTINGS_TITLE"],
-        toplevel = true, escClose = true,
+        strata = "MEDIUM", escClose = true,
         onClose = function() CloseStickySettings() end,
     })
     local skinMode = f._isSkin

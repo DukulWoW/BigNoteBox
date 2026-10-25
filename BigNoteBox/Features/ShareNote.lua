@@ -456,7 +456,7 @@ local function BuildShareWindow()
     -- Shared chrome (CMP-02); the content offsets are the old ones
     local f = BNB.CreateToolWindow({
         name = "BNBShareFrame", w = SHARE_W, h = 340, title = L["SHARE_TITLE"],
-        strata = "HIGH", toplevel = true,
+        strata = "MEDIUM",
         onClose = function() BNB.CloseShareWindow() end,
     })
     local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
@@ -897,8 +897,8 @@ local function BuildShareWindow()
     f:SetHeight(math.abs(y) + PAD)
 
     -- Non-ESC keys propagate so they can reach focused editboxes below
-    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
-    -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
+    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). A window that
+    -- has EnableKeyboard otherwise swallows all keys here.
     BNB.AttachEscClose(f, function()
         -- Preview closes first if open, then the share window
         local spv = _previewFrame
@@ -967,7 +967,7 @@ local function BuildImportWindow()
     -- Shared chrome (CMP-02); the content offsets are the old ones
     local f = BNB.CreateToolWindow({
         name = "BNBImportFrame", w = IMPORT_W, h = 220, title = L["SHARE_IMPORT_TITLE"],
-        strata = "HIGH", toplevel = true,
+        strata = "MEDIUM",
         onClose = function() BNB.CloseImportWindow() end,
     })
     local titleH = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
@@ -1060,8 +1060,8 @@ local function BuildImportWindow()
 
     f:SetHeight(math.abs(y) + PAD)
     -- Non-ESC keys propagate so they can reach focused editboxes below
-    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). HIGH strata +
-    -- SetToplevel + EnableKeyboard otherwise swallows all keys here.
+    -- (e.g. the BNB clipboard helper editbox for Ctrl+C). A window that
+    -- has EnableKeyboard otherwise swallows all keys here.
     BNB.AttachEscClose(f, function()
         local spv = _previewFrame
         if spv and spv:IsShown() then BNB.CloseSharePreview(); return end

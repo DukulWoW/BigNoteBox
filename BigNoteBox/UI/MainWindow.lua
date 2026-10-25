@@ -323,7 +323,8 @@ end
 -- Every BNB window the main window manages. ESC closes the shown window in
 -- front (OnEscapeKey); this order only breaks a tie between two at the same
 -- strata and level, the first winning. It replaces four lists kept by hand (the ESC cascade,
--- CloseCompanionWindows, the raise list and Focus mode's snapshot). A new
+-- CloseCompanionWindows, the raise list and Focus mode's snapshot; the raise
+-- list is gone since ALL-564: UI/WindowStack.lua stacks the windows). A new
 -- window = one entry here. Fields:
 --   name       global frame name (nil for an ESC step that is not a window)
 --   esc        true = Hide on ESC while shown; a function = how ESC closes it
@@ -331,7 +332,6 @@ end
 --              it handled the key)
 --   companion  closes with the main window: true = Hide if shown, a function
 --              = called every time (the close functions check for themselves)
---   raise      raised together with the main window when it is clicked
 --   focus      Focus mode closes it and reopens it afterwards; the number is
 --              the reopen order, `reopen(noteID)` how
 -- Close and open functions live in files that load later, so every entry
@@ -341,8 +341,7 @@ local function Call(t, k, ...) local fn = t and t[k]; if fn then return fn(...) 
 local function ShowNamed(name) local w = _G[name]; if w then w:Show() end end
 
 local WINDOWS = {
-    { name = "BigNoteBoxSendConfirm", raise = true },
-    { name = "BigNoteBoxSendDialog",  raise = true,
+    { name = "BigNoteBoxSendDialog",
       companion = function() Call(BNB, "CloseSendToChat") end,
       focus = 8, reopen = function(id) Call(BNB, "OpenSendToChat", id) end },
     -- DIALOG-strata popups first: New Note dialog, clipboard hint, any open
@@ -358,29 +357,29 @@ local WINDOWS = {
           local cm = BNB.ContextMenu
           if cm and cm.IsOpen() then cm.Close(); return true end
       end },
-    { name = "BigNoteBoxExportFrame",   esc = true, companion = true, raise = true },
-    { name = "BigNoteBoxCopyMoveFrame", esc = true, companion = true, raise = true },
-    { name = "BigNoteBoxHistoryCompareFrame", raise = true,
+    { name = "BigNoteBoxExportFrame",   esc = true, companion = true },
+    { name = "BigNoteBoxCopyMoveFrame", esc = true, companion = true },
+    { name = "BigNoteBoxHistoryCompareFrame",
       esc       = function() Call(BNB, "CloseHistoryCompare") end,
       companion = function() Call(BNB, "CloseHistoryCompare") end },
     -- Alarm setter window closes before sticky settings
-    { name = "BNBAlarmWindow", raise = true,
+    { name = "BNBAlarmWindow",
       esc       = function() Call(BNB.AlarmWindow, "Close") end,
       companion = function() Call(BNB.AlarmWindow, "Close") end },
-    { name = "BNBAlarmOverviewFrame", esc = true, companion = true, raise = true },
-    { name = "BigNoteBoxStickySettingsFrame", raise = true,
+    { name = "BNBAlarmOverviewFrame", esc = true, companion = true },
+    { name = "BigNoteBoxStickySettingsFrame",
       esc = function() Call(BNB.Sticky, "CloseSettings") end },
     -- The Tag Manager's note picker is a second page (ALL-302): ESC goes back first
-    { name = "BigNoteBoxTagManagerFrame", companion = true, raise = true,
+    { name = "BigNoteBoxTagManagerFrame", companion = true,
       esc = function(w) if not w:PageBack() then w:Hide() end end,
       focus = 4, reopen = function() Call(BNB, "ToggleTagManager") end },
     -- Note History and Trash have a second page (ALL-258): ESC goes back to
     -- the list first, then closes the window
-    { name = "BigNoteBoxHistoryFrame", raise = true,
+    { name = "BigNoteBoxHistoryFrame",
       esc       = function(w) if not w:PageBack() then Call(BNB, "CloseHistoryWindow") end end,
       companion = function() Call(BNB, "CloseHistoryWindow") end,
       focus = 5, reopen = function() Call(BNB, "ReopenHistoryWindow") end },
-    { name = "BigNoteBoxTrashFrame", companion = true, raise = true,
+    { name = "BigNoteBoxTrashFrame", companion = true,
       esc = function(w) if not w:PageBack() then w:Hide() end end,
       focus = 3, reopen = function() ShowNamed("BigNoteBoxTrashFrame") end },
     -- Icon frame picker (opened from NoteConfig) before NoteConfig itself
@@ -394,25 +393,25 @@ local WINDOWS = {
     { name = "BigNoteBoxIconPicker",
       esc       = function() Call(BNB.IconPicker, "Close") end,
       companion = function() Call(BNB.IconPicker, "Close", "sidebar") end },
-    { name = "BigNoteBoxNoteConfigFrame", esc = true, companion = true, raise = true,
+    { name = "BigNoteBoxNoteConfigFrame", esc = true, companion = true,
       focus = 1, reopen = function(id) Call(BNB, "OpenNoteConfig", id) end },
     -- Task Edit Window before the Reference Box
-    { name = "BNBTaskEditWindow", raise = true,
+    { name = "BNBTaskEditWindow",
       esc = function() Call(BNB.TaskEditWindow, "Close") end },
-    { name = "BigNoteBoxReferenceBoxFrame", esc = true, raise = true,
+    { name = "BigNoteBoxReferenceBoxFrame", esc = true,
       companion = function() Call(BNB, "CloseReferenceBox") end,
       focus = 7, reopen = function(id) Call(BNB, "OpenReferenceBox", id) end },
     -- Share preview, then share, then import, all before the main window
-    { name = "BNBSharePreviewFrame", raise = true,
+    { name = "BNBSharePreviewFrame",
       esc = function() Call(BNB, "CloseSharePreview") end },
-    { name = "BNBShareFrame", raise = true,   -- closing it also closes the preview
+    { name = "BNBShareFrame",   -- closing it also closes the preview
       esc       = function() Call(BNB, "CloseShareWindow") end,
       companion = function() Call(BNB, "CloseShareWindow") end },
-    { name = "BNBImportFrame", raise = true,
+    { name = "BNBImportFrame",
       esc       = function() Call(BNB, "CloseImportWindow") end,
       companion = function() Call(BNB, "CloseImportWindow") end },
     -- Addon settings window: a sub-page goes back to its tab first
-    { name = "BigNoteBoxConfigFrame", raise = true,
+    { name = "BigNoteBoxConfigFrame",
       esc = function(w) if not Call(BNB, "ConfigSubPageBack") then w:Hide() end end,
       companion = function(w)
           if w and w:IsShown() and not BNB._keepSettingsOpen then w:Hide() end
@@ -713,7 +712,9 @@ function BNB.CreateMainWindow()
 
     f:SetSize(DefaultWindowW(), DEFAULT_H)
     f:SetPoint("CENTER")
-    f:SetToplevel(true)
+    -- Stacked with the big windows and the stickies: last clicked in front
+    -- (UI/WindowStack.lua, ALL-564)
+    BNB.StackWindow(f)
     f:EnableMouse(true)
     f:SetMovable(true)
     f:SetResizable(true)   -- REQUIRED — ButtonFrameTemplate does not set this
@@ -728,11 +729,6 @@ function BNB.CreateMainWindow()
             SaveWindowPos(f)
         end)
     end
-    -- When the main window is clicked/raised, bring all visible BNB windows
-    -- to the front together so none get left behind other frames.
-    f:SetScript("OnMouseDown", function()
-        if BNB.RaiseBNBWindows then BNB.RaiseBNBWindows() end
-    end)
 
     -- ── Title-bar buttons: focus mode, sticky eye, scale lock (right to left) ─
     if chrome.closeBtn then
@@ -1627,32 +1623,6 @@ function BNB.CloseCompanionWindows()
             end
         end
     end
-end
-
--- Raise all currently-visible BNB frames together so clicking the main window
--- never leaves companion windows stranded behind other addon frames. The main
--- window first, then WINDOWS from the bottom up, so the window ESC would close
--- first ends on top.
-local function RaiseShown(name)
-    local fr = _G[name]
-    if fr and fr:IsShown() then pcall(fr.Raise, fr) end
-end
--- The open windows keep their stacking among themselves: raised lowest first
--- (strata, then frame level), so the one on top stays on top. Raising them in
--- WINDOWS order reset the stack to that order on every click.
-function BNB.RaiseBNBWindows()
-    RaiseShown("BigNoteBoxFrame")
-    local open = {}
-    for _, e in ipairs(WINDOWS) do
-        local fr = e.raise and _G[e.name]
-        if fr and fr:IsShown() then open[#open + 1] = fr end
-    end
-    table.sort(open, function(a, b)
-        local ra, rb = STRATA_RANK[a:GetFrameStrata()] or 0, STRATA_RANK[b:GetFrameStrata()] or 0
-        if ra ~= rb then return ra < rb end
-        return a:GetFrameLevel() < b:GetFrameLevel()
-    end)
-    for _, fr in ipairs(open) do pcall(fr.Raise, fr) end
 end
 
 -- Focus mode (UI/FocusEditor.lua): which `focus` windows are open now, and

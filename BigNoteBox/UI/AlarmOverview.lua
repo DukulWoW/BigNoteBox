@@ -462,7 +462,7 @@ local function BuildOverview()
     -- entry and Forever glow come from CreateToolWindow
     local f = BNB.CreateToolWindow({
         name = "BNBAlarmOverviewFrame", w = OV_W, h = OV_H,
-        title = L["MW_ALARM_TIP"], strata = "HIGH", toplevel = true, escClose = true,
+        title = L["MW_ALARM_TIP"], strata = "MEDIUM", escClose = true,
         pad = OV_PAD, footH = OV_FOOT_H,
     })
     _ovFootDiv = f._footDiv   -- hidden while there are no alarms

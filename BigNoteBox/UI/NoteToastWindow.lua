@@ -92,7 +92,7 @@ end
 local function Build()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxNoteToastFrame", w = W, h = H, title = L["NOTE_TOAST_TITLE"],
-        escClose = true, toplevel = true,
+        escClose = true, strata = "MEDIUM",
     })
     local top = f._isSkin and BNB.TOOL_SKIN_TITLE_H or 32
     local cw = W - 2 * PAD

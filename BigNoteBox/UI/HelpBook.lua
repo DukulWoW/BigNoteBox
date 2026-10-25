@@ -970,7 +970,7 @@ local function Build()
     local winH = LAY.top + LAY.paneH + LAY.bottom
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxHelpBook", w = winW, h = winH, art = not C.skin,
-        title = L["HELP_BOOK_TITLE"], toplevel = true, escClose = true, keyEsc = true,
+        title = L["HELP_BOOK_TITLE"], escClose = true, keyEsc = true,
         -- The main window's strata: clicking either brings it to the front
         -- (Dukul, 2026-10-23: "the window shouldn't always on top")
         strata = "MEDIUM",

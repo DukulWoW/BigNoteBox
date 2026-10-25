@@ -693,14 +693,15 @@ function BNB._BuildConfigTabPanels(parent, topOffset)
 end
 
 -- The window shell for both modes (UI/ToolWindow.lua, CMP-02); w is the
--- mode's width. DIALOG (the builder's default) like Note Settings and the
--- Reference Box: it was MEDIUM and drew under the live preview (HIGH, ALL-250).
+-- mode's width. MEDIUM with the main window and the other big windows, last
+-- clicked in front (ALL-564; it was DIALOG so it drew over the rich preview,
+-- ALL-250).
 -- ESC is handled by the main window's OnKeyDown chain and the AttachEscClose
 -- in BNB.OpenConfig: do not add to UISpecialFrames.
 function BNB._CreateConfigShell(w)
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxConfigFrame", w = w, h = GetTargetHeight(), pad = PAD,
-        title = L["CONFIG_TITLE"], toplevel = true,
+        title = L["CONFIG_TITLE"], strata = "MEDIUM",
     })
     f:SetPoint("CENTER")
     if BNB.AddDevModeOverlay then BNB.AddDevModeOverlay(f) end   -- dev mode marking (ALL-395)

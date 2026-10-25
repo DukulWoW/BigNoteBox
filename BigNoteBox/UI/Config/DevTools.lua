@@ -427,7 +427,7 @@ end
 local function BuildDevToolsWindow()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxDevToolsFrame", w = CONTENT_W + WIN_PAD * 2, h = 600,
-        title = L["DEV_WIN_TITLE"], toplevel = true, escClose = true,
+        title = L["DEV_WIN_TITLE"], strata = "MEDIUM", escClose = true,
         onDragStop = function() SaveWinPos(_devWin) end,
     })
     local pos = BNB.LabDB().devToolsPos

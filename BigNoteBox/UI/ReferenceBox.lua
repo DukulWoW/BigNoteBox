@@ -2028,9 +2028,12 @@ end
 -- (Dukul, 2026-09-27: they drew on top of the window). Normal mode: under the
 -- frame on Forever's right side (its border overlaps the tab) and on Classic
 -- (both sides, Dukul 2026-10-10), above otherwise.
--- "Under" is one strata lower: a child's frame level below its parent's did not
--- hold (raising the window lifts its children back over it, Dukul 2026-10-03).
--- A child keeps its own strata and still hides with the window.
+-- "Under" in MEDIUM (the box's own strata, ALL-564): the window stack keeps
+-- the strip in the band just under the box, over the window behind it
+-- (UI/WindowStack.lua). Seated over Focus mode, "under" is one strata lower:
+-- a child's frame level below its parent's did not hold (raising the window
+-- lifts its children back over it, Dukul 2026-10-03). A child keeps its own
+-- strata and still hides with the window.
 local STRATA_BELOW = { MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH",
                        FULLSCREEN = "DIALOG", FULLSCREEN_DIALOG = "FULLSCREEN" }
 local function ApplySideTabLevel()
@@ -2039,6 +2042,11 @@ local function ApplySideTabLevel()
     local skin   = BigNoteBoxDB and BigNoteBoxDB.skinMode
     local under  = skin or BNB.IsClassic or (BNB.IsForever and SideTabSide() ~= "left")
     local strata = rbFrame:GetFrameStrata()
+    if under and strata == "MEDIUM" then
+        BNB.StackUnder(rbFrame, strip)
+        return
+    end
+    BNB.StackUnder(rbFrame, nil)
     if under then
         strip:SetFrameStrata(STRATA_BELOW[strata] or "LOW")
     else
@@ -2205,7 +2213,7 @@ end
 local function BuildReferenceBox()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxReferenceBoxFrame", w = RBW, h = 640, pad = PAD,
-        title = L["REFBOX_TITLE"], toplevel = true,
+        title = L["REFBOX_TITLE"], strata = "MEDIUM",
         onClose = function() BNB.CloseReferenceBox() end,
         onDragStop = function() PositionModeStrip() end,
     })
@@ -3192,7 +3200,7 @@ local function SeatBox(inFocus)
     else
         if rbFrame:GetParent() ~= UIParent then rbFrame:SetParent(UIParent) end
         rbFrame:SetScale(1)
-        rbFrame:SetFrameStrata(rbFrame._strata or "DIALOG")
+        rbFrame:SetFrameStrata(rbFrame._strata or "MEDIUM")
     end
     -- The bar under the box (no side tabs) is not its child: it follows
     local strip = _modeStrip
@@ -3460,7 +3468,7 @@ end
 -- Focus mode closing (UI/FocusEditor.lua CloseFocusMode): a box opened over
 -- it goes back on UIParent at its own strata, beside the main window
 function BNB.RefBoxLeaveFocus()
-    if not (rbFrame and rbFrame:GetFrameStrata() ~= (rbFrame._strata or "DIALOG")) then return end
+    if not (rbFrame and rbFrame:GetFrameStrata() ~= (rbFrame._strata or "MEDIUM")) then return end
     SeatBox(false)
     PositionFrame(true)
     PositionModeStrip()

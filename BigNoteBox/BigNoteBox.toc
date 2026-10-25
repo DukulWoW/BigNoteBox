@@ -41,6 +41,7 @@ Core\Initialize.lua
 
 # UI
 UI\Widgets.lua
+UI\WindowStack.lua
 UI\TextLines.lua
 UI\NewMarker.lua
 UI\BorderBright.lua

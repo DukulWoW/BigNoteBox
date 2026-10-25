@@ -474,7 +474,7 @@ local function BuildTrashWindow()
 
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxTrashFrame", w = TW_W, h = 400,   -- height follows the main window
-        title = L["TW_TITLE"], strata = "HIGH", toplevel = true, escClose = true,
+        title = L["TW_TITLE"], strata = "MEDIUM", escClose = true,
         pad = PAD, footH = BOTTOM_STRIP_H - 1, footR = PAD + 28,
         onClose = function()
             if _multiMode then SetTrashMultiMode(false) end

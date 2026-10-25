@@ -125,7 +125,7 @@ local function BuildWindow()
         name = "BNBAlarmWindow", w = AW_W, h = AW_H, title = L["AW_TITLE"],
         pad = AW_PAD, cw = AW_CW, footH = AW_FOOT_H,
         btn1 = L["SAVE"], btn2 = L["AW_REMOVE_ALARM_BTN"],
-        toplevel = true, escClose = true,
+        strata = "MEDIUM", escClose = true,
         onClose     = function() AW.Close() end,
         onHide      = function()
             _noteID = nil; _isPopulating = false

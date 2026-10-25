@@ -24,8 +24,10 @@
 --     opts.onDragStart  optional, runs after the drag starts (frame or title strip)
 --     opts.onDragStop   optional, runs after the drag ends
 --     opts.onHide       optional, hooked to OnHide
---     opts.strata       frame strata, nil = "DIALOG"
---     opts.toplevel     SetToplevel(true)
+--     opts.strata       frame strata, nil = "DIALOG"; "MEDIUM" = one of the
+--                       big windows, stacked with the main window and the
+--                       stickies (BNB.StackWindow, ALL-564)
+--     opts.toplevel     SetToplevel(true) (a MEDIUM window gets it from the stack)
 --     opts.noDrag       not movable (a dialog pinned to another window)
 --     opts.escClose     add to UISpecialFrames
 --     opts.noGlow       no whole-window Forever glow (the window draws its own,
@@ -238,7 +240,10 @@ function BNB.CreateToolWindow(o)
 
     f._strata = o.strata or "DIALOG"
     f:SetFrameStrata(f._strata)
-    if o.toplevel then f:SetToplevel(true) end
+    -- MEDIUM = one of the big windows: stacked with the main window and the
+    -- stickies, last clicked in front (UI/WindowStack.lua, ALL-564)
+    if f._strata == "MEDIUM" then BNB.StackWindow(f)
+    elseif o.toplevel then f:SetToplevel(true) end
     f:EnableMouse(true); f:SetClampedToScreen(true)
     if not o.noDrag then
         f:SetMovable(true)
