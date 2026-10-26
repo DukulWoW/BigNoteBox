@@ -293,12 +293,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
 
         root:CreateDivider()
 
-        root:CreateButton(note.pinned and L["NL_CTX_UNPIN"] or L["NL_CTX_PIN"],
-            function() A.pin(noteID) end, { icon = note.pinned and "unpinned" or "pinned" })
-        root:CreateButton(note.favorited and L["NL_CTX_UNFAV"] or L["NL_CTX_FAV"],
-            function() A.fav(noteID) end, { icon = note.favorited and "unfavorite" or "favorite" })
-        root:CreateButton(locked and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"],
-            function() A.lock(noteID) end, { icon = locked and "unlocked" or "locked" })
+        -- Pin / favorite / lock moved into the icon row at the bottom (ALL-571)
         -- This note's tags in their own small window (UI/NoteTags.lua, 2026-10-17)
         local hasTags = note.tags and #note.tags > 0
         local tagsLabel = L["NL_CTX_ADD_TAGS"]
@@ -405,11 +400,27 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
         end
         end   -- HistoryEnabled
 
+        -- Icon row, Windows 11 style (ALL-571, Dukul 2026-10-26): each icon
+        -- shows the note's state, its tooltip names what a click does
         root:CreateDivider()
-        if BNB.TrashEnabled and BNB.TrashEnabled() then
-            root:CreateButton(L["NL_CTX_TRASH"], DoTrash, { icon = "trash" })
+        local row = root:CreateIconRow()
+        row:AddIcon(note.favorited and "favorite" or "unfavorite", function() A.fav(noteID) end,
+            { tip = note.favorited and L["NL_CTX_UNFAV"] or L["NL_CTX_FAV"] })
+        row:AddIcon(note.pinned and "pinned" or "unpinned", function() A.pin(noteID) end,
+            { tip = note.pinned and L["NL_CTX_UNPIN"] or L["NL_CTX_PIN"] })
+        row:AddIcon(locked and "locked" or "unlocked", function() A.lock(noteID) end,
+            { tip = locked and L["NL_CTX_UNLOCK"] or L["NL_CTX_LOCK"] })
+        -- A locked note cannot be renamed or deleted (Dukul, 2026-10-26)
+        local lockTip
+        if locked then lockTip = L["NL_CTX_LOCKED_TIP"] end
+        row:AddIcon("rename", function() BNB.PromptRenameNote(noteID) end,
+            { tip = L["NL_CTX_RENAME"], tipSub = lockTip, disabled = locked })
+        local trashOn = BNB.TrashEnabled and BNB.TrashEnabled()
+        if trashOn then
+            row:AddIcon("trash", DoTrash, { tip = L["NL_CTX_TRASH"], tipSub = lockTip, disabled = locked, gap = true })
         end
-        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), DoDeletePerm, { icon = "danger" })
+        row:AddIcon("danger", DoDeletePerm, { tip = Plain(L["NL_CTX_DELETE_PERM"]), tipSub = lockTip,
+            disabled = locked, danger = true, gap = not trashOn })
         if extraBottom then
             root:CreateDivider()
             extraBottom(root)
@@ -441,9 +452,42 @@ function BNB.ShowSampleNoteMenu(owner)
             if n == 2 then root:CreateDivider() end
         end
         root:CreateDivider()
-        root:CreateButton(L["NL_CTX_TRASH"], Nop, { icon = "trash" })
-        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), Nop, { icon = "danger" })
+        local row = root:CreateIconRow()   -- as a note that is not pinned / favorite / locked
+        row:AddIcon("unfavorite", Nop, { tip = L["NL_CTX_FAV"] })
+        row:AddIcon("unpinned", Nop, { tip = L["NL_CTX_PIN"] })
+        row:AddIcon("unlocked", Nop, { tip = L["NL_CTX_LOCK"] })
+        row:AddIcon("rename", Nop, { tip = L["NL_CTX_RENAME"] })
+        row:AddIcon("trash", Nop, { tip = L["NL_CTX_TRASH"], gap = true })
+        row:AddIcon("danger", Nop, { tip = Plain(L["NL_CTX_DELETE_PERM"]), danger = true })
     end)
+end
+
+-- Rename a note (ALL-571): the right-click menu's icon row and the explorer's
+-- Rename button. The open note's unsaved text is saved first, then the editor
+-- shows the new title. An empty name is refused: OK stays greyed (Dukul,
+-- 2026-10-26). The dialog sits on the main window and dims it while open
+local function ApplyRename(id, text)
+    local note = BNB.GetNote(id)
+    if not note then return end
+    text = (text or ""):match("^%s*(.-)%s*$")
+    if text == "" or text == (note.title or "") then return end
+    local open = BNB._currentNoteID == id
+    if open and BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
+    BNB.UpdateNote(id, { title = text })
+    if open and BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
+end
+
+function BNB.PromptRenameNote(id)
+    local n = id and BNB.GetNote(id)
+    if not n then return end
+    local shown = (n.title ~= "" and n.title or L["UNTITLED"]):gsub("|", "||")
+    BNB.Dialog.Prompt({
+        title = L["DLG_RENAME_NOTE"],
+        text = string.format(L["EXPLORER_RENAME_PROMPT"], shown),
+        value = n.title or "", maxLetters = 200,   -- the editor's title box
+        host = BNB.mainFrame,   -- nil / hidden (Oracle alone, Focus mode) = screen centre, nothing dimmed
+        onAccept = function(text) ApplyRename(id, text) end,
+    })
 end
 
 --------------------------------------------------------------------------------
@@ -552,24 +596,7 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             root:CreateDivider()
         end
 
-        if c.pinned < total then
-            root:CreateButton(L["MULTI_CM_PIN_ALL"], function() SetAll("pinned", true) end, { icon = "pinned" })
-        end
-        if c.pinned > 0 then
-            root:CreateButton(L["MULTI_CM_UNPIN_ALL"], function() SetAll("pinned", false) end, { icon = "unpinned" })
-        end
-        if c.fav < total then
-            root:CreateButton(L["MULTI_CM_FAV_ALL"], function() SetAll("favorited", true) end, { icon = "favorite" })
-        end
-        if c.fav > 0 then
-            root:CreateButton(L["MULTI_CM_UNFAV_ALL"], function() SetAll("favorited", false) end, { icon = "unfavorite" })
-        end
-        if c.locked < total then
-            root:CreateButton(L["MULTI_CM_LOCK_ALL"], function() LockAll(true) end, { icon = "locked" })
-        end
-        if c.locked > 0 then
-            root:CreateButton(L["MULTI_CM_UNLOCK_ALL"], function() LockAll(false) end, { icon = "unlocked" })
-        end
+        -- Pin / favorite / lock all: in the icon row at the bottom (ALL-571)
         -- Folders (ALL-510); Select mode stays on, as for Pin all
         if BNB.AddMoveToFolderMenu then BNB.AddMoveToFolderMenu(root, ids) end
 
@@ -639,13 +666,32 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
             Confirm("MULTI_CONFIRM_REMOVE_SITUATIONS", c.situations, RemoveSituations)
         end, { icon = "remove-situation", danger = true, disabled = c.situations == 0 })
 
+        -- Icon row (ALL-571): pin / favorite / lock show "all on" only when
+        -- every note is; a click on a mixed set turns it on for all, the next
+        -- one off. Rename is for one note, greyed here
         root:CreateDivider()
+        local row = root:CreateIconRow()
+        local allFav, allPin, allLock = c.fav == total, c.pinned == total, c.locked == total
+        row:AddIcon(allFav and "favorite" or "unfavorite", function() SetAll("favorited", not allFav) end,
+            { tip = allFav and L["MULTI_CM_UNFAV_ALL"] or L["MULTI_CM_FAV_ALL"] })
+        row:AddIcon(allPin and "pinned" or "unpinned", function() SetAll("pinned", not allPin) end,
+            { tip = allPin and L["MULTI_CM_UNPIN_ALL"] or L["MULTI_CM_PIN_ALL"] })
+        row:AddIcon(allLock and "locked" or "unlocked", function() LockAll(not allLock) end,
+            { tip = allLock and L["MULTI_CM_UNLOCK_ALL"] or L["MULTI_CM_LOCK_ALL"] })
+        row:AddIcon("rename", nil, { tip = L["NL_CTX_RENAME"], disabled = true })
         -- The ids given, not the list's Select mode: the explorer view's
         -- picked tiles open this menu too (ALL-414)
-        if BNB.TrashEnabled and BNB.TrashEnabled() then
-            root:CreateButton(L["NL_CTX_TRASH"], function() BNB.ConfirmDeleteNotes(ids, false) end, { icon = "trash" })
+        -- Greyed while any picked note is locked (Dukul, 2026-10-26)
+        local anyLocked = c.locked > 0
+        local lockTip
+        if anyLocked then lockTip = L["MULTI_CM_LOCKED_TIP"] end
+        local trashOn = BNB.TrashEnabled and BNB.TrashEnabled()
+        if trashOn then
+            row:AddIcon("trash", function() BNB.ConfirmDeleteNotes(ids, false) end,
+                { tip = L["NL_CTX_TRASH"], tipSub = lockTip, disabled = anyLocked, gap = true })
         end
-        root:CreateButton(Plain(L["NL_CTX_DELETE_PERM"]), function() BNB.ConfirmDeleteNotes(ids, true) end,
-            { icon = "danger" })
+        row:AddIcon("danger", function() BNB.ConfirmDeleteNotes(ids, true) end,
+            { tip = Plain(L["NL_CTX_DELETE_PERM"]), tipSub = lockTip, disabled = anyLocked,
+              danger = true, gap = not trashOn })
     end)
 end

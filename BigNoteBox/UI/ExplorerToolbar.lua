@@ -111,52 +111,13 @@ local function SetAll(field, on)
 end
 
 -- ── Rename ──────────────────────────────────────────────────────────────────
-local function PopupEditBox(self) return (self.GetEditBox and self:GetEditBox()) or self.editBox or self.EditBox end
-
-local function ApplyRename(id, text)
-    local note = BNB.GetNote(id)
-    if not note then return end
-    text = (text or ""):match("^%s*(.-)%s*$")
-    if text == (note.title or "") then return end
-    -- The open note: its unsaved text first, then the editor shows the new title
-    local open = BNB._currentNoteID == id
-    if open then BNB.SaveCurrentNote() end
-    BNB.UpdateNote(id, { title = text })
-    if open and BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(id) end
-end
-
-StaticPopupDialogs["BNB_EXPLORER_RENAME"] = {
-    preferredIndex = 3,
-    text = "%s", hasEditBox = true, maxLetters = 200,   -- the editor's title box
-    button1 = OKAY, button2 = CANCEL,
-    OnShow = function(self, id)
-        local eb = PopupEditBox(self)
-        local n = id and BNB.GetNote(id)
-        if eb then eb:SetText(n and n.title or ""); eb:HighlightText(); eb:SetFocus() end
-    end,
-    OnAccept = function(self, id)
-        local eb = PopupEditBox(self)
-        ApplyRename(id, eb and eb:GetText())
-    end,
-    -- Read the text before hiding: hiding clears the edit box (as BNB_FOLDER_NAME)
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        local id, text = p.data, eb:GetText()
-        p:Hide()
-        ApplyRename(id, text)
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
+-- A note: the shared rename dialog (BNB.PromptRenameNote, UI/NoteContextMenu.lua,
+-- ALL-571), as the right-click menu's Rename
 local function Rename()
     local fid = OnlyFolder()
     if fid then BNB.PromptFolderName({ mode = "rename", id = fid }); return end
     local id = OnlyOne()
-    local n = id and BNB.GetNote(id)
-    if not n then return end
-    local title = (n.title ~= "" and n.title or L["UNTITLED"]):gsub("|", "||")
-    StaticPopup_Show("BNB_EXPLORER_RENAME", string.format(L["EXPLORER_RENAME_PROMPT"], title), nil, id)
+    if id then BNB.PromptRenameNote(id) end
 end
 
 -- ── Buttons ─────────────────────────────────────────────────────────────────

@@ -57,6 +57,12 @@
 --   root:CreateCheckbox(text, isSelected, onSelect, opts) -> item
 --     a radio with a check mark: an on / off setting (onSelect flips it)
 --   root:CreateDivider()
+--   root:CreateIconRow() -> row        icons side by side, Windows 11 style
+--     row:AddIcon(icon, onClick, opts)  (the note menu's Favorite ... Delete
+--     permanently, ALL-571): the cm-<icon> symbol alone, no plate; opts.tip /
+--     tipSub = tooltip, opts.disabled, opts.danger = red tooltip, opts.gap =
+--     the first icon of the right-hand group: icons before it sit on the left
+--     edge, it and the rest on the right edge, a thin line between (one gap)
 --
 -- Closes on: a click on an item, a click outside every open level, ESC
 -- (deepest level first), the owner hiding. In combat ESC goes to the game
@@ -77,6 +83,8 @@ local WARNING  = { danger = true }   -- red plate on hover (Delete permanently)
 local UNTINTED = { danger = true }   -- skin look keeps the red
 
 local ROW_H, TITLE_H, DIV_H = 20, 24, 9
+local IROW_H, IBTN, ISYM = 30, 26, 20   -- icon row: row height, button, symbol
+local IBTN_SP, IROW_GAP  = 4, 12        -- space between icons, extra before a gap (holds a line)
 local PAD      = 4      -- frame edge to rows
 local ICON     = 18     -- row icon size
 local TITLE_IC = 20     -- header icon size
@@ -154,6 +162,20 @@ end
 function Desc:CreateDivider()
     local d = NewDesc("divider")
     self.items[#self.items + 1] = d
+    return d
+end
+
+-- A row of icons (ALL-571): one menu row, each icon a button of its own
+function Desc:CreateIconRow()
+    local d = NewDesc("iconrow")
+    d.icons = {}
+    self.items[#self.items + 1] = d
+    return d
+end
+
+function Desc:AddIcon(icon, onClick, opts)
+    local d = { icon = icon, fn = onClick, opts = opts or {} }
+    self.icons[#self.icons + 1] = d
     return d
 end
 
@@ -366,6 +388,85 @@ local function RowClick(row)
     end
 end
 
+-- ICON ROW BUTTONS (ALL-571) ------------------------------------------------
+-- The symbol alone (Dukul: "without the button layer part"); hover = the
+-- row highlight behind it. Skin look: tinted like the row symbols
+local function DrawIconBtn(b, active)
+    local ic, sym, hl = b._desc, b._sym, b._hl
+    sym:SetTexture(SYMBOLS .. "cm-" .. ic.icon)
+    if _skin then
+        local _, _, _, br, bg_, bb = SkinColours()
+        hl:SetColorTexture(br, bg_, bb, 0.25)
+    else
+        hl:SetTexture(LAYERS .. "cm-background-highlight")
+        hl:SetVertexColor(1, 1, 1, 1)
+    end
+    hl:SetShown(active and not b._disabled)
+    if b._disabled then
+        sym:SetDesaturated(true); sym:SetVertexColor(0.45, 0.45, 0.45)
+    elseif _skin and not UNTINTED[ic.icon] then
+        SkinTint(sym, active)
+    else
+        sym:SetDesaturated(false); sym:SetVertexColor(1, 1, 1)
+    end
+end
+
+local function IconBtnEnter(b)
+    local ic = b._desc
+    local i = b:GetParent():GetParent()._level
+    if ic.opts.tip then
+        GameTooltip:SetOwner(b, "ANCHOR_TOP")
+        if ic.opts.danger or WARNING[ic.icon] then
+            GameTooltip:AddLine(ic.opts.tip, DANGER_TEXT[1], DANGER_TEXT[2], DANGER_TEXT[3])
+        else
+            GameTooltip:AddLine(ic.opts.tip, 1, 1, 1)
+        end
+        if ic.opts.tipSub then GameTooltip:AddLine(ic.opts.tipSub, 0.78, 0.78, 0.78, true) end
+        GameTooltip:Show()
+    end
+    DrawIconBtn(b, true)
+    -- As a row without a sub-menu: an open sub-menu closes after the grace
+    if _open > i then
+        Schedule(SWITCH_DELAY, function() if b:IsMouseOver() then CloseFrom(i + 1) end end)
+    else
+        Cancel()
+    end
+end
+
+local function IconBtnLeave(b)
+    if GameTooltip:IsOwned(b) then GameTooltip:Hide() end
+    DrawIconBtn(b, false)
+end
+
+local function IconBtnClick(b)
+    local ic = b._desc
+    if b._disabled or not (ic and ic.fn) then return end
+    local after = _after
+    CM.Close()
+    xpcall(ic.fn, geterrorhandler())
+    if after then xpcall(after, geterrorhandler()) end
+end
+
+local function IconBtn(r, k)
+    r._ib = r._ib or {}
+    local b = r._ib[k]
+    if b then return b end
+    b = CreateFrame("Button", nil, r)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetSize(IBTN, IBTN)
+    b._hl = b:CreateTexture(nil, "BACKGROUND")
+    b._hl:SetAllPoints()
+    b._hl:Hide()
+    b._sym = b:CreateTexture(nil, "ARTWORK")
+    b._sym:SetSize(ISYM, ISYM)
+    b._sym:SetPoint("CENTER")
+    b:SetScript("OnEnter", IconBtnEnter)
+    b:SetScript("OnLeave", IconBtnLeave)
+    b:SetScript("OnClick", IconBtnClick)
+    r._ib[k] = b
+    return b
+end
+
 local function NewRow(f)
     local r = CreateFrame("Button", nil, f)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -473,12 +574,71 @@ local function Fill(f, d)
         r._disabled, r._hasSub = false, false
         r._hl:Hide()
         r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide(); r._mark:Hide()
+        if r._ib then for _, b in ipairs(r._ib) do b:Hide() end end
+        if r._gapHost then r._gapHost:Hide(); r._gapHost._ln:Hide() end
         r._icon:SetDesaturated(false); r._icon:SetVertexColor(1, 1, 1); r._icon:SetTexCoord(0, 1, 0, 1)
         r._text:ClearAllPoints()
         ApplyRowLook(r)
         if it.kind == "divider" then
             r:SetHeight(DIV_H); r:EnableMouse(false)
             r._div:Show()
+        elseif it.kind == "iconrow" then
+            -- The row takes no mouse: its icons are the buttons (ALL-571)
+            r:SetHeight(IROW_H); r:EnableMouse(false)
+            -- Icons before the first gap stick to the left edge, the gap and
+            -- the rest to the right edge, the line centred between the two
+            -- groups (Dukul, 2026-10-26: no empty space on the right). The
+            -- row only knows its width after every row is measured, so the
+            -- right group is anchored to the row's right edge
+            local split
+            for k, ic in ipairs(it.icons) do
+                if ic.opts.gap and k > 1 then split = k; break end
+            end
+            local nLeft = (split or (#it.icons + 1)) - 1
+            local x, lastLeft, firstRight = 4, nil, nil
+            for k, ic in ipairs(it.icons) do
+                local b = IconBtn(r, k)
+                b._desc, b._disabled = ic, ic.opts.disabled and true or false
+                b:ClearAllPoints()
+                if k <= nLeft then
+                    b:SetPoint("LEFT", r, "LEFT", x, 0)
+                    lastLeft = b
+                else
+                    local fromRight = 4 + (#it.icons - k) * (IBTN + IBTN_SP)
+                    b:SetPoint("RIGHT", r, "RIGHT", -fromRight, 0)
+                    firstRight = firstRight or b
+                end
+                DrawIconBtn(b, false)
+                b:Show()
+                x = x + IBTN + IBTN_SP
+            end
+            if split then
+                x = x + IROW_GAP
+                if lastLeft and firstRight then
+                    -- A thin upright line in the middle of the gap (Dukul, 2026-10-26)
+                    local host = r._gapHost
+                    if not host then
+                        host = CreateFrame("Frame", nil, r)
+                        host:SetHeight(1)
+                        host._ln = r:CreateTexture(nil, "ARTWORK")
+                        host._ln:SetSize(1, IBTN - 8)
+                        host._ln:SetPoint("CENTER", host, "CENTER", 0, 0)
+                        r._gapHost = host
+                    end
+                    local ln = host._ln
+                    if _skin then
+                        local _, _, _, br, bg_, bb = SkinColours()
+                        ln:SetColorTexture(br, bg_, bb, 0.6 * BNB.SkinRuleAlphaOf(BNB.GetSkinPreset()))
+                    else
+                        ln:SetColorTexture(0.45, 0.45, 0.45, 0.6)   -- as the divider rows
+                    end
+                    host:ClearAllPoints()
+                    host:SetPoint("LEFT", lastLeft, "RIGHT", 0, 0)
+                    host:SetPoint("RIGHT", firstRight, "LEFT", 0, 0)
+                    host:Show(); ln:Show()
+                end
+            end
+            w = math.max(w, x - IBTN_SP + 4)
         elseif it.kind == "title" then
             r:SetHeight(TITLE_H); r:EnableMouse(false)
             r._text:SetFontObject("BNBFontNormal")

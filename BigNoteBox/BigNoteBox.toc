@@ -54,6 +54,7 @@ UI\HeaderFonts.xml
 UI\TextColors.lua
 UI\IconButton.lua
 UI\ContextMenu.lua
+UI\Dialog.lua
 UI\MainWindow.lua
 UI\MainWindowSkin.lua
 UI\NoteList.lua
