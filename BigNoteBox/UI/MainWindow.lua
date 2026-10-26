@@ -416,7 +416,7 @@ local WINDOWS = {
       companion = function(w)
           if w and w:IsShown() and not BNB._keepSettingsOpen then w:Hide() end
       end,
-      focus = 2, reopen = function() ShowNamed("BigNoteBoxConfigFrame") end },
+      focus = 2, reopen = function() Call(BNB, "ReopenConfig") end },
     -- Rich preview has no fixed frame name; it only closes with the main window
     { companion = function() Call(BNB, "CloseRichPreview") end },
 }

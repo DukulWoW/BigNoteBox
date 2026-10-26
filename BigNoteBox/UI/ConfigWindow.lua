@@ -84,6 +84,7 @@ local activeSub  = nil   -- the open page, or nil
 local subPages   = {}    -- key -> page, for pages built with a key (BNB.OpenSettingsPage)
 local allPages   = {}    -- every page, in build order (the settings search, ALL-480)
 local buildOwner = nil   -- { parent, topOffset, idx } while _BuildConfigTabPanels runs
+local hiddenSub  = nil   -- the page open when the window last hid (BNB.ReopenConfig)
 
 local function CloseSubPage()
     if not activeSub then return end
@@ -775,7 +776,12 @@ local function EnsureConfigFrame()
         end
         BNB.HookConfigHeightTracking()
         -- A sub-page never outlives the window (ALL-84); reopening shows its tab.
-        cfgFrame:HookScript("OnHide", CloseSubPage)
+        -- Its tab panel is shown again here: a plain Show (Focus mode's
+        -- reopen) came back blank (ALL-576). BNB.ReopenConfig puts it back.
+        cfgFrame:HookScript("OnHide", function()
+            hiddenSub = activeSub
+            if activeSub then ReselectTab(activeSub.idx) end
+        end)
         -- Every way Settings opens or closes (toggle, its X, Esc, a page link)
         cfgFrame:HookScript("OnShow", function() BNB.SendMessage("SettingsShown") end)
         cfgFrame:HookScript("OnHide", function() BNB.SendMessage("SettingsHidden") end)
@@ -800,6 +806,15 @@ end
 
 function BNB.ConfigShown()
     return cfgFrame ~= nil and cfgFrame:IsShown()
+end
+
+-- Focus mode's reopen (UI/MainWindow.lua WINDOWS): the window where it was,
+-- on the sub-page that was open when Focus mode hid it (ALL-576)
+function BNB.ReopenConfig()
+    if not cfgFrame or cfgFrame:IsShown() then return end
+    local page = hiddenSub
+    cfgFrame:Show()
+    if page and cfgFrame._activeTab == page.idx then page.Open() end
 end
 
 function BNB.OpenConfig()

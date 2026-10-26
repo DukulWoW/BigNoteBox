@@ -49,7 +49,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 15  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 16  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 -- Doc mode (ALL-512): the newest seed round in BigNoteBox_Dev/DocsSeed.lua (an
 -- entry's rev, 1 when it has none). Bump it with each round of new or
@@ -914,6 +914,24 @@ function BNB.MigrateNotesDB()
         end
         if BNB.TagIndexRebuild then BNB.TagIndexRebuild() end
         v = 15
+    end
+
+    -- v15 -> v16 (ALL-587, 2026-10-26): player notes are round by default.
+    -- New ones get the Simple Glass Orb frame (Features/InspectNote.lua), as
+    -- the live portrait shown while the player is targeted is a circle. Old
+    -- player notes with no icon frame and no LSM border get it too; a frame
+    -- or border already picked is kept. Notes and trash.
+    if v < 16 then
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                local player = note.source == "inspect"
+                    or (note.source == "target" and note.targetPlayerKey ~= nil)
+                if player and not note.iconFrame and not note.borderOverride then
+                    note.iconFrame = "ui-glyphframe-2"
+                end
+            end
+        end
+        v = 16
     end
 
     -- Never lower the stored version: running an older build must not make the

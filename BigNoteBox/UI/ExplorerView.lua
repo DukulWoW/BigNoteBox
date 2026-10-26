@@ -1536,6 +1536,7 @@ local function FillNoteTile(t, note, size, section)
     t._folderGlow:Hide()
     t._folderTop:Hide()
     t._icon:Show()
+    t._iconSize = size   -- repainted on a target change
     BNB.PaintNoteIcon(t, t._icon, note, size)
     local hasTitle = note.title and note.title ~= ""
     t._label:SetText(hasTitle and note.title or L["UNTITLED"])
@@ -2220,6 +2221,18 @@ end
 -- delete, folders, system folders, skin) and on any note change (title,
 -- icon, pin), one redraw per frame
 BNB.RegisterMessage("Explorer", "NoteListRefreshed", Queue)
+-- A player / NPC note shows the live portrait while its unit is targeted:
+-- repaint just those tiles when the target changes, as the note list does
+-- (UI/NoteList.lua; the grid kept the round portrait after the target went)
+BNB.RegisterEvent("PLAYER_TARGET_CHANGED", function()
+    if not (EX.IsActive() and BNB.mainFrame and BNB.mainFrame:IsShown()) then return end
+    for _, t in ipairs(_tiles) do
+        local note = t:IsShown() and t._noteID and BNB.GetNote(t._noteID)
+        if note and (note.source == "target" or note.source == "inspect") then
+            BNB.PaintNoteIcon(t, t._icon, note, t._iconSize)
+        end
+    end
+end)
 BNB.RegisterMessage("Explorer", "NoteChanged", function(_, id)
     Queue()
     if _path and _mode == "note" and id == BNB._currentNoteID and EX.IsActive() then _path.Update(true) end

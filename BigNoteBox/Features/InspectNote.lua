@@ -553,6 +553,9 @@ local function CreateInspectNote(richMode, silent)
         source         = "inspect",
         richMode       = richMode or false,
         icon           = data.raceIcon,
+        -- Round by default: the live portrait is a circle (Simple Glass Orb,
+        -- UI/IconFrames.lua); Note Settings can change it (Dukul, 2026-10-26)
+        iconFrame      = "ui-glyphframe-2",
         tags           = tags,
         inspectRaceID  = data.raceID,
         inspectSexID   = data.sexID,

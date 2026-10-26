@@ -171,6 +171,11 @@ local PLACE = {
         ["main:explorer"]  = { x = -1,  y = -83,  s = 0.5 },
         ["welcome:newbtn"] = { x = -50, y = -30,  s = 0.8 },
     },
+    -- Every other Classic spot is Retail's (Dukul, 2026-10-26)
+    ["classic-normal"] = {  -- Dukul, 2026-10-26
+        ["main:corner"]    = { x = 1,   y = -82,  s = 0.55 },
+        ["main:explorer"]  = { x = 1,   y = -82,  s = 0.55 },
+    },
 }
 
 local function LookKey()
