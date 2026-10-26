@@ -341,6 +341,7 @@ BNB.DEFAULTS = {
     skinRandomize           = false,
     skinRandomizeBrightness = false,
     skinBrightness          = 1.5,   -- Settings > Appearance > Skins (was 1.0, Dukul 2026-10-06)
+    worldEvents             = "auto",   -- Appearance > World events: auto / off / event key (ALL-584)
 
     -- Rich note live preview: open it when a rich note is selected / always in
     -- Focus mode; seconds after the last keystroke before it re-renders

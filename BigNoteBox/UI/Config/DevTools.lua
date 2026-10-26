@@ -290,6 +290,28 @@ function K.BuildDevToolsPage(sf, ct, y)
     end
     y = y + math.min(colY[1], colY[2])
 
+    -- Holiday (ALL-584, UI/WorldEvents.lua): show an event's look now, or
+    -- none, whatever the date and the World events setting. Saved (a debug
+    -- key, never in a profile), so it holds over the reload being tested
+    local holLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    holLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y - 6)
+    holLbl:SetText(L["CFG_DEV_HOLIDAY_LABEL"])
+    local holEntries = {
+        { value = "follow", label = L["CFG_DEV_HOLIDAY_FOLLOW"] },
+        { value = "none",   label = L["CFG_DEV_HOLIDAY_NONE"] },
+    }
+    for _, ev in ipairs(BNB.WORLD_EVENTS or {}) do
+        holEntries[#holEntries + 1] = { value = ev.key, label = L[ev.name] }
+    end
+    local holDD = BNB.CreateValueDropdown(ct, holEntries, db.debugHoliday or "follow",
+        function(v)
+            db.debugHoliday = (v ~= "follow") and v or nil
+            if BNB.RefreshWorldEvents then BNB.RefreshWorldEvents() end
+        end, 200, 24)
+    holDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 120, y)
+    Tip(holDD._dd, L["CFG_DEV_HOLIDAY_LABEL"], L["CFG_DEV_HOLIDAY_TIP"])
+    y = y - 32
+
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────
     AddRule(ct, y - 4); y = y - 18
     y = AddHeader(ct, y, L["DEV_HDR_LABS"])

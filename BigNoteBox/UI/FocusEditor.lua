@@ -61,6 +61,9 @@ local function GetFocusOverlay()
     ov._tex = tex
     ov:SetAlpha(0)
     ov:Hide()
+    -- World event snow over the dark fill (ALL-585, UI/WorldEvents.lua):
+    -- three times the flakes of the Reference Box, half as big again
+    if BNB.AddFallingSnow then BNB.AddFallingSnow(ov, 3, 1.5) end
     -- Hide immediately on combat start
     local ef = CreateFrame("Frame")
     ef:RegisterEvent("PLAYER_REGEN_DISABLED")

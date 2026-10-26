@@ -244,6 +244,10 @@ function BNB.CreateToolWindow(o)
     -- stickies, last clicked in front (UI/WindowStack.lua, ALL-564)
     if f._strata == "MEDIUM" then BNB.StackWindow(f)
     elseif o.toplevel then f:SetToplevel(true) end
+    -- World event art (ALL-584): the big windows only, placed by their name
+    if f._strata == "MEDIUM" and o.name and BNB.DecorateToolWindow then
+        BNB.DecorateToolWindow(f, o.name)
+    end
     f:EnableMouse(true); f:SetClampedToScreen(true)
     if not o.noDrag then
         f:SetMovable(true)

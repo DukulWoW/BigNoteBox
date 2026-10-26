@@ -2862,6 +2862,8 @@ function BNB.BuildNoteEditor()
     -- Becomes clickable only when the current note has coord data.
     local toolbar = BuildToolbar(pane)
     BNB._editorToolbar = toolbar
+    -- World event art behind the action buttons (ALL-584, UI/WorldEvents.lua)
+    if BNB.DecorateMainWindow and BNB.mainFrame then BNB.DecorateMainWindow(BNB.mainFrame, toolbar) end
     BNB.ApplySaveMode()
 
     -- Tag strip sits between body and toolbar — build after toolbar so we know TOOLBAR_H

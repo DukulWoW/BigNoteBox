@@ -2075,6 +2075,8 @@ local function PositionSideTabs()
         btn._icon:ClearAllPoints()
         btn._icon:SetPoint("TOPLEFT", btn, "TOPLEFT", TAB_ICON_X[side], TAB_ICON_Y)
     end
+    -- World event art on the upper tab (ALL-584, UI/WorldEvents.lua)
+    if BNB.DecorateRefBoxTab then BNB.DecorateRefBoxTab(strip._modelBtn, side ~= "left") end
 end
 
 -- NPC notes store a creature-type icon (Humanoid = a human face). While that
@@ -2419,6 +2421,8 @@ BuildModelViewer = function(f)
     end
     model:HookScript("OnSizeChanged", SizeCrest)
     model._sizeCrest = SizeCrest
+    -- World event snow falling behind the model (ALL-585, UI/WorldEvents.lua)
+    if BNB.AddFallingSnow then BNB.AddFallingSnow(model) end
 
     -- Mouse drag: left = turn (sideways) and tilt (up / down), right = pan;
     -- wheel = zoom, Shift+wheel = nearer / further (ALL-213, Dukul
