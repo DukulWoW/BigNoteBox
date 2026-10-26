@@ -973,6 +973,8 @@ local function BuildFocusFrame()
     end)
 
     focusFrame = f
+    -- World event art on the title bar, as the big windows (ALL-584)
+    if BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, "BigNoteBoxFocusFrame") end
     f:Hide()
 end
 -- Matches the look of MainWindowSkin. Called when BigNoteBoxDB.skinMode == true.
@@ -1285,6 +1287,8 @@ local function BuildFocusFrameSkin()
     end)
 
     focusFrame = f
+    -- World event art on the title bar, as the big windows (ALL-584)
+    if BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, "BigNoteBoxFocusFrame") end
     f:Hide()
 end
 

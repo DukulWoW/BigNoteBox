@@ -572,6 +572,8 @@ local function BuildDialog()
         onClose = function() NND.Close() end,
     })
     local skinMode = f._isSkin
+    -- World event art: the big windows' piece on its title bar (ALL-584)
+    if BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, "BNBNewNoteDialogFrame", "large") end
     -- Two pages (ALL-68): the dialog, and the More templates page
     local body = f:AddPage("main")
 

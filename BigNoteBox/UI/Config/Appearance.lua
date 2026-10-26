@@ -551,31 +551,34 @@ local function BuildAppearanceTab(sf, ct)
 
     -- World events (ALL-584, UI/WorldEvents.lua): Off / Automatic / one
     -- event all year (that one then replaces every other event's look)
-    y = AddRule(ct, y) - 4
-    y = AddHeader(ct, y, L["CFG_HDR_WORLD_EVENTS"])
-    local weDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    weDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    weDesc:SetWidth(CONTENT_W); weDesc:SetJustifyH("LEFT"); weDesc:SetWordWrap(true)
-    weDesc:SetHeight(28); weDesc:SetJustifyV("TOP")
-    weDesc:SetTextColor(0.60, 0.60, 0.60)
-    weDesc:SetText(L["CFG_WORLD_EVENTS_DESC"])
-    y = y - 32
-    local weEntries = {
-        { value = "off",  label = L["CFG_WORLD_EVENTS_OFF"] },
-        { value = "auto", label = L["CFG_WORLD_EVENTS_AUTO"] },
-    }
-    for _, ev in ipairs(BNB.WORLD_EVENTS or {}) do
-        weEntries[#weEntries + 1] = { value = ev.key,
-            label = string.format(L["CFG_WORLD_EVENTS_ALWAYS_FMT"], L[ev.name]) }
+    -- Hidden until the art is placed on every client (BNB.WORLD_EVENTS_LIVE)
+    if BNB.WORLD_EVENTS_LIVE then
+        y = AddRule(ct, y) - 4
+        y = AddHeader(ct, y, L["CFG_HDR_WORLD_EVENTS"])
+        local weDesc = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+        weDesc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        weDesc:SetWidth(CONTENT_W); weDesc:SetJustifyH("LEFT"); weDesc:SetWordWrap(true)
+        weDesc:SetHeight(28); weDesc:SetJustifyV("TOP")
+        weDesc:SetTextColor(0.60, 0.60, 0.60)
+        weDesc:SetText(L["CFG_WORLD_EVENTS_DESC"])
+        y = y - 32
+        local weEntries = {
+            { value = "off",  label = L["CFG_WORLD_EVENTS_OFF"] },
+            { value = "auto", label = L["CFG_WORLD_EVENTS_AUTO"] },
+        }
+        for _, ev in ipairs(BNB.WORLD_EVENTS or {}) do
+            weEntries[#weEntries + 1] = { value = ev.key,
+                label = string.format(L["CFG_WORLD_EVENTS_ALWAYS_FMT"], L[ev.name]) }
+        end
+        local weDD = BNB.CreateValueDropdown(ct, weEntries,
+            db.worldEvents or BNB.DEFAULTS.worldEvents,
+            function(v)
+                db.worldEvents = (v ~= BNB.DEFAULTS.worldEvents) and v or nil
+                if BNB.RefreshWorldEvents then BNB.RefreshWorldEvents() end
+            end, CONTENT_W, 24)
+        weDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+        y = y - 32
     end
-    local weDD = BNB.CreateValueDropdown(ct, weEntries,
-        db.worldEvents or BNB.DEFAULTS.worldEvents,
-        function(v)
-            db.worldEvents = (v ~= BNB.DEFAULTS.worldEvents) and v or nil
-            if BNB.RefreshWorldEvents then BNB.RefreshWorldEvents() end
-        end, CONTENT_W, 24)
-    weDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
-    y = y - 32
 
     local belowH = math.abs(y)
     LayoutSkinSection = function()

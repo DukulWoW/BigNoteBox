@@ -308,8 +308,30 @@ function K.BuildDevToolsPage(sf, ct, y)
             db.debugHoliday = (v ~= "follow") and v or nil
             if BNB.RefreshWorldEvents then BNB.RefreshWorldEvents() end
         end, 200, 24)
-    holDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 120, y)
+    y = y - 24   -- the dropdown and buttons go under the label (room for Reset)
+    holDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     Tip(holDD._dd, L["CFG_DEV_HOLIDAY_LABEL"], L["CFG_DEV_HOLIDAY_TIP"])
+    -- Place snow: drag the pieces on screen, positions saved and printed
+    -- (UI/WorldEvents.lua); Reset drops every placed spot
+    local placeBtn = BNB.CreateButton(nil, ct, L["CFG_DEV_SNOW_PLACE"], 110, 24)
+    placeBtn:SetPoint("LEFT", holDD, "RIGHT", 10, 0)
+    local function PlaceLabel()
+        local key = "CFG_DEV_SNOW_PLACE"
+        if BNB.IsPlacingSnow and BNB.IsPlacingSnow() then key = "CFG_DEV_SNOW_DONE" end
+        placeBtn:SetText(L[key])
+    end
+    placeBtn:SetScript("OnClick", function()
+        if BNB.SetPlacingSnow then BNB.SetPlacingSnow(not BNB.IsPlacingSnow()) end
+        PlaceLabel()
+    end)
+    placeBtn:HookScript("OnShow", PlaceLabel)
+    Tip(placeBtn, L["CFG_DEV_SNOW_PLACE"], L["CFG_DEV_SNOW_PLACE_TIP"])
+    local resetBtn = BNB.CreateButton(nil, ct, L["CFG_DEV_SNOW_RESET"], 110, 24)
+    resetBtn:SetPoint("LEFT", placeBtn, "RIGHT", 6, 0)
+    resetBtn:SetScript("OnClick", function()
+        if BNB.ResetPlacedSnow then BNB.ResetPlacedSnow() end
+    end)
+    Tip(resetBtn, L["CFG_DEV_SNOW_RESET"], L["CFG_DEV_SNOW_RESET_TIP"])
     y = y - 32
 
     -- ── Labs (the dev addon, ARCH-04) ───────────────────────────────────────

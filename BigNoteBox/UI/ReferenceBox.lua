@@ -2076,7 +2076,7 @@ local function PositionSideTabs()
         btn._icon:SetPoint("TOPLEFT", btn, "TOPLEFT", TAB_ICON_X[side], TAB_ICON_Y)
     end
     -- World event art on the upper tab (ALL-584, UI/WorldEvents.lua)
-    if BNB.DecorateRefBoxTab then BNB.DecorateRefBoxTab(strip._modelBtn, side ~= "left") end
+    if BNB.DecorateRefBoxTab then BNB.DecorateRefBoxTab(strip._modelBtn, side ~= "left", rbFrame) end
 end
 
 -- NPC notes store a creature-type icon (Humanoid = a human face). While that

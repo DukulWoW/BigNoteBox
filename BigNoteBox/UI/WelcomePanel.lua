@@ -405,6 +405,8 @@ local function BuildEmptyState(parent)
     newBtn:SetScript("OnClick", function()
         if BNB.CreateNewNote then BNB.CreateNewNote() end
     end)
+    -- World event art on the page's bottom edge and the button (ALL-584, UI/WorldEvents.lua)
+    if BNB.DecorateWelcome then BNB.DecorateWelcome(f, newBtn) end
 
     -- ── Dynamic sections container ────────────────────────────────────────────
     -- Location notes header
@@ -435,7 +437,7 @@ local function BuildEmptyState(parent)
 
     -- ── Footer buttons ────────────────────────────────────────────────────────
     local importBtn = BNB.CreateButton(nil, f, L["WELCOME_IMPORT_BTN"], 140, 28)
-    importBtn:SetPoint("BOTTOM", f, "BOTTOM", -80, 4)
+    importBtn:SetPoint("BOTTOM", f, "BOTTOM", -80, 6)   -- as the note list's New note (NoteList.lua btnY)
     importBtn:SetScript("OnClick", function()
         local win = GetImportFrame()
         win:Show()
@@ -453,7 +455,7 @@ local function BuildEmptyState(parent)
     importBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
     local configBtn = BNB.CreateButton(nil, f, L["WELCOME_CONFIG_BTN"], 140, 28)
-    configBtn:SetPoint("BOTTOM", f, "BOTTOM", 80, 4)
+    configBtn:SetPoint("BOTTOM", f, "BOTTOM", 80, 6)
     configBtn:SetScript("OnClick", function()
         -- The label follows through SettingsShown / SettingsHidden (below)
         if BNB.OpenConfig then BNB.OpenConfig() end
@@ -545,7 +547,9 @@ local function BuildEmptyState(parent)
         -- locRowContainer bottom = favHeader top + 14       (or favRowContainer top + 14 if no favs)
         -- locHeader       bottom = locRowContainer top + 6  (or skip if no loc)
 
-        local STACK_BASE = 48   -- px above frame bottom where the stack starts
+        -- px above frame bottom where the stack starts: clear of the action
+        -- bar's rule (36 or 46 px up, NoteEditor.lua BuildToolbar)
+        local STACK_BASE = 60
 
         if #favNotes > 0 then
             favHeader:Show()

@@ -12,6 +12,34 @@ local TSTAMP_H    = 16   -- height of the timestamp strip below title
 local CHIP_ROW_H  = 22   -- height of one row of tag chips
 local TAG_STRIP_H = CHIP_ROW_H  -- kept for legacy references; strip grows dynamically
 
+-- The pane's foot: everything at the bottom of a note (action bar, tag strip,
+-- the body's bottom edge) hangs off it at TOOLBAR_H. It sits on the pane's
+-- bottom edge, and STATUS_H lower while the status bar is hidden (a rich
+-- note's Note view, the welcome page), so the action bar and its rule take
+-- the status bar's room instead of leaving a gap (Dukul, 2026-10-26). It
+-- follows the status bar's own Show / Hide (hooks in BuildTitleField)
+local function Foot(parent)
+    local foot = BNB._editorFoot
+    if not foot then
+        foot = CreateFrame("Frame", nil, parent)
+        foot:SetHeight(1)
+        foot:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, 0)
+        foot:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, 0)
+        BNB._editorFoot = foot
+    end
+    return foot
+end
+local function SetFootDown(down)
+    local foot = BNB._editorFoot
+    if not foot or foot._down == down then return end
+    foot._down = down
+    local parent = foot:GetParent()
+    local y = down and -BNB.STATUS_H or 0
+    foot:ClearAllPoints()
+    foot:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, y)
+    foot:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, y)
+end
+
 local saveBtn  -- forward ref
 
 -- Debounce timers for undo snapshots, keyed by noteID
@@ -472,6 +500,11 @@ local function BuildTitleField(parent)
     -- dates and coords on the left, the counts on the right
     local status = BNB.CreateStatusBar(parent, PAD)
     BNB._editorStatusBar = status
+    Foot(parent)
+    local function SyncFoot() SetFootDown(not status:IsShown()) end
+    hooksecurefunc(status, "Show", SyncFoot)
+    hooksecurefunc(status, "Hide", SyncFoot)
+    hooksecurefunc(status, "SetShown", SyncFoot)
     local tsStrip = status:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     tsStrip:SetPoint("LEFT",  status, "LEFT",  PAD, 0)
     tsStrip:SetPoint("RIGHT", status, "RIGHT", -(PAD + BNB.STATUS_GRIP_W), 0)
@@ -795,7 +828,7 @@ local function BuildBodyField(parent, topAnchor)
     end
 
     sf:SetPoint("TOPLEFT",     topAnchor, "BOTTOMLEFT",  PAD, -4)
-    sf:SetPoint("BOTTOMRIGHT", parent,    "BOTTOMRIGHT", -22,  TOOLBAR_H + TAG_STRIP_H + PAD)
+    sf:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", -22,  TOOLBAR_H + TAG_STRIP_H + PAD)
 
     BNB.AddPlaceholder(eb, L["NOTE_BODY_HINT"], 0.35, 0.35, 0.35)
 
@@ -972,9 +1005,12 @@ function BNB.UpdateBodyTopAnchor()
     local topAnchor = bare and ul or (BNB._editorTopRow or ts)
     if bar  and bar:IsShown()  then topAnchor = bar  end
     if mbar and mbar:IsShown() then topAnchor = mbar end
-    if mbar and mbar._sepT then
-        if bar and bar:IsShown() then mbar._sepT:Hide() else mbar._sepT:Show() end
-    end
+    -- The first bar under the title has no top line: the title's underline
+    -- is a few px above it (two lines since the timestamp row moved to the
+    -- status bar, Dukul 2026-10-26); the formatting bar's bottom line parts
+    -- the two bars
+    if mbar and mbar._sepT then mbar._sepT:Hide() end
+    if bar and bar._sepT then bar._sepT:Hide() end
     -- Find and replace (ALL-582): a row of its own under the bars while open
     local frow = BNB.FindReplace and BNB.FindReplace.RowOf("main")
     if frow and frow:IsShown() then
@@ -998,12 +1034,12 @@ function BNB.UpdateBodyTopAnchor()
     if sf then
         sf:ClearAllPoints()
         sf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  topX, topY)
-        sf:SetPoint("BOTTOMRIGHT", BNB.editorPane, "BOTTOMRIGHT", -22, bottomOffset)
+        sf:SetPoint("BOTTOMRIGHT", Foot(BNB.editorPane), "BOTTOMRIGHT", -22, bottomOffset)
     end
     if rsf then
         rsf:ClearAllPoints()
         rsf:SetPoint("TOPLEFT",     topAnchor,      "BOTTOMLEFT",  topX, topY)
-        rsf:SetPoint("BOTTOMRIGHT", BNB.editorPane, "BOTTOMRIGHT", -22, bottomOffset)
+        rsf:SetPoint("BOTTOMRIGHT", Foot(BNB.editorPane), "BOTTOMRIGHT", -22, bottomOffset)
     end
     RefreshMarkupWarn()   -- shown in Markup view only (ALL-264)
 end
@@ -1039,13 +1075,13 @@ local function BuildToolbar(parent)
     -- it (2026-10-25), so the offsets from the pane's bottom stay as they were
     TOOLBAR_H = abH + BNB.STATUS_H
     local bar = CreateFrame("Frame", nil, parent)
-    bar:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, BNB.STATUS_H)
-    bar:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", 0, BNB.STATUS_H)
+    bar:SetPoint("BOTTOMLEFT",  Foot(parent), "BOTTOMLEFT",  0, BNB.STATUS_H)
+    bar:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", 0, BNB.STATUS_H)
     bar:SetHeight(abH)
 
     local sep = BNB.CreateNoteRule(parent)
-    sep:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, TOOLBAR_H)
-    sep:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -1, TOOLBAR_H)
+    sep:SetPoint("BOTTOMLEFT",  Foot(parent), "BOTTOMLEFT",  0, TOOLBAR_H)
+    sep:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", -1, TOOLBAR_H)
 
     -- Icon button helper — 26×26, texture from Assets/
     -- Returns btn, tx. Calling btn:SetIconEnabled(bool) sets alpha + desaturation.
@@ -1534,8 +1570,8 @@ end
 local function BuildTagStrip(parent, toolbarFrame)
     local strip = CreateFrame("Frame", nil, parent)
     strip:SetHeight(TAG_STRIP_H)
-    strip:SetPoint("BOTTOMLEFT",  parent, "BOTTOMLEFT",  0, TOOLBAR_H)
-    strip:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -1, TOOLBAR_H)
+    strip:SetPoint("BOTTOMLEFT",  Foot(parent), "BOTTOMLEFT",  0, TOOLBAR_H)
+    strip:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", -1, TOOLBAR_H)
 
     -- Sep anchors to the strip's top so it moves up as the strip grows
     local sep = BNB.CreateNoteRule(parent)
@@ -1552,7 +1588,7 @@ local function BuildTagStrip(parent, toolbarFrame)
         -- Always reanchor body scroll to match current strip height
         local bs = BNB._editorBodyScroll
         if bs then
-            bs:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -22,
+            bs:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", -22,
                 TOOLBAR_H + self:GetHeight() + PAD)
         end
         -- If width changed, debounce a chip rebuild
@@ -1617,7 +1653,7 @@ local function BuildTagStrip(parent, toolbarFrame)
     local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
     local toggleBtn = CreateFrame("Button", nil, parent)
     toggleBtn:SetSize(18, 18)
-    toggleBtn:SetPoint("BOTTOMRIGHT", parent, "BOTTOMRIGHT", -24, TOOLBAR_H + 2)
+    toggleBtn:SetPoint("BOTTOMRIGHT", Foot(parent), "BOTTOMRIGHT", -24, TOOLBAR_H + 2)
 
     local toggleTx = toggleBtn:CreateTexture(nil, "ARTWORK")
     toggleTx:SetAllPoints()
@@ -2862,8 +2898,8 @@ function BNB.BuildNoteEditor()
     -- Becomes clickable only when the current note has coord data.
     local toolbar = BuildToolbar(pane)
     BNB._editorToolbar = toolbar
-    -- World event art behind the action buttons (ALL-584, UI/WorldEvents.lua)
-    if BNB.DecorateMainWindow and BNB.mainFrame then BNB.DecorateMainWindow(BNB.mainFrame, toolbar) end
+    -- World event art on the main window (ALL-584, UI/WorldEvents.lua)
+    if BNB.DecorateMainWindow and BNB.mainFrame then BNB.DecorateMainWindow(BNB.mainFrame) end
     BNB.ApplySaveMode()
 
     -- Tag strip sits between body and toolbar — build after toolbar so we know TOOLBAR_H

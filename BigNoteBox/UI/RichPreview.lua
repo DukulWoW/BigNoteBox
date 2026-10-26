@@ -175,6 +175,8 @@ local function BuildFrameSkin(frameName, onClose, frameParent)
     f:SetScript("OnShow", function()
         if BNB.ApplyMainWindowSkin then BNB.ApplyMainWindowSkin() end
     end)
+    -- World event art on the title bar, as the big windows (ALL-584)
+    if frameName and BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, frameName) end
 
     return f, TITLE_H_SKIN
 end
@@ -207,6 +209,8 @@ local function BuildFrameNormal(frameName, onClose, frameParent)
     -- before StartSizing, which left the frame with no position and threw it
     -- to a corner (ALL-97)
     BNB.CreateResizeGrip(f, { x = -2, y = 2 })
+    -- World event art on the title bar, as the big windows (ALL-584)
+    if frameName and BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, frameName) end
 
     return f, TITLE_H_NORMAL
 end

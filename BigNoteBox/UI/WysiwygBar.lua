@@ -203,6 +203,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local sepB = BNB.CreateNoteRule(bar)
     sepB:SetPoint("BOTTOMLEFT",  bar, "BOTTOMLEFT",  0, 0)
     sepB:SetPoint("BOTTOMRIGHT", bar, "BOTTOMRIGHT", 0, 0)
+    bar._sepT = sepT   -- the main editor hides it (UpdateBodyTopAnchor)
 
     -- ── Shared helpers ────────────────────────────────────────────────────────
 

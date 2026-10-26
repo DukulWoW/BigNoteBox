@@ -16,7 +16,9 @@
 --     a fixed spot between the left edge and the close X and a fixed mirror,
 --     both made from the window's name, so every player sees the same
 --   - main window: the bottom piece behind the editor's action buttons, and
---     the large art along the top while the character tabs are not on top
+--     the large art along the top while the character tabs are not on top;
+--     on the welcome page (no note open) the bottom piece and a small piece
+--     on the Create new note button
 --   - the Reference Box model tab: the tab piece
 --   - the Reference Box model view and the Focus mode backdrop: snow falling
 --     in three depth layers (far = small, faint, slow), ALL-585
@@ -26,11 +28,13 @@
 -- Public API:
 --   BNB.WORLD_EVENTS               ordered event list (key, name, dates, art)
 --   BNB.ActiveWorldEvent()         the event shown now, or nil
---   BNB.WorldEventArt(host, piece, place, cond) -> texture
---                                  place(tex, host, mirrored) anchors it;
---                                  cond() false = hidden
---   BNB.DecorateToolWindow(f, name)
+--   BNB.WorldEventArt(host, piece, place, opts) -> texture
+--                                  place(tex, host, pieceInfo, pos) anchors it
+--   BNB.DecorateToolWindow(f, name) / DecorateMainWindow / DecorateWelcome /
+--   DecorateRefBoxTab              put the pieces on our windows
 --   BNB.RefreshWorldEvents()       re-applies every piece
+--   BNB.SetPlacingSnow(on) / IsPlacingSnow() / ResetPlacedSnow()
+--                                  Developer tools > Place snow (see PLACE)
 
 local BNB = BigNoteBox
 if not BNB then return end
@@ -52,6 +56,12 @@ BNB.WORLD_EVENTS = {
 }
 local BY_KEY = {}
 for _, ev in ipairs(BNB.WORLD_EVENTS) do BY_KEY[ev.key] = ev end
+
+-- Off for players until Dukul has placed the art on every client (Forever
+-- and Classic draw the windows differently): no Appearance setting and no
+-- event by date; Developer tools > Holiday still shows it (Dukul, 2026-10-26:
+-- show it after Forever launches and has been tested there)
+BNB.WORLD_EVENTS_LIVE = false
 
 -- Piece sizes (the art's own pixel size) and how far above the edge it sits:
 -- yOff = the art's top edge above the window's top edge (positive = up)
@@ -84,6 +94,7 @@ function BNB.ActiveWorldEvent()
     local dev = db.debugHoliday
     if dev == "none" then return nil end
     if dev and BY_KEY[dev] then return BY_KEY[dev] end
+    if not BNB.WORLD_EVENTS_LIVE then return nil end
     local mode = db.worldEvents or BNB.DEFAULTS.worldEvents
     if mode == "off" then return nil end
     if BY_KEY[mode] then return BY_KEY[mode] end
@@ -118,34 +129,140 @@ local function Seed(name)
     return (h % 1000) / 1000, math.floor(h / 1000) % 2 == 1
 end
 
+-- A window's snow spot: the left edge, the middle or the right edge (0, 0.5,
+-- 1) and a mirror flag, from its name. Spread values left the windows used
+-- most all on the left half (Dukul, 2026-10-26); with these the Reference Box,
+-- Focus and preview sit left, Note Settings, Focus preview and New Note right
+local SLOTS = { 0, 0.5, 1 }
+local function WindowSeed(name)
+    local h = 7
+    for i = 1, #name do h = (h * 31 + name:byte(i)) % 2147483647 end
+    for _ = 1, 3 do h = (h * 48271) % 2147483647 end   -- exact in doubles
+    return SLOTS[h % 3 + 1], math.floor(h / 3) % 2 == 1
+end
+
 local _pieces = {}   -- every texture made here, re-applied by RefreshWorldEvents
+
+-- ── Placement ────────────────────────────────────────────────────────────────
+-- Every piece has an id and a spot: x / y offsets from its anchor, s = size
+-- (1 = the art's own size), m = mirrored. A spot comes from, in order:
+-- Developer tools > Place snow (BigNoteBoxDB.debugSnowSpots, dev testing
+-- only), PLACE below (spots Dukul placed), the piece's default. Both are kept
+-- per client and look ("retail-normal", "retail-skin", ...): the windows are
+-- drawn differently on each; a client with no spots of its own uses Retail's.
+-- Tool windows share y and s per art size ("size:small" / "size:large", one
+-- drag sets every window of that size); their x lies between xl (from the
+-- left edge) and the window's width minus xr, picked from the window's name,
+-- as is the mirror; Place snow can pin x / m for one window ("win:<name>").
+local PLACE = {
+    ["retail-normal"] = {   -- Dukul, 2026-10-26
+        ["size:small"]     = { y = 28,  s = 0.9,  xl = 2,  xr = 125 },
+        ["size:large"]     = { y = 10,  s = 1,    xl = 0,  xr = 267 },
+        ["refbox:tab"]     = { x = 4,   y = -23,  s = 0.85 },
+        ["main:corner"]    = { x = 0,   y = -87,  s = 0.55 },
+        ["main:explorer"]  = { x = -1,  y = -86,  s = 0.55 },
+        ["welcome:newbtn"] = { x = -50, y = -30,  s = 0.8 },
+    },
+    ["retail-skin"] = {     -- Dukul, 2026-10-26
+        ["size:small"]     = { y = 32,  s = 0.9,  xl = -3, xr = 124 },
+        ["size:large"]     = { y = 10,  s = 1,    xl = -5, xr = 266 },
+        ["refbox:tab"]     = { x = 4,   y = -23,  s = 0.85 },
+        ["main:corner"]    = { x = -1,  y = -83,  s = 0.5 },
+        ["main:explorer"]  = { x = -1,  y = -83,  s = 0.5 },
+        ["welcome:newbtn"] = { x = -50, y = -30,  s = 0.8 },
+    },
+}
+
+local function LookKey()
+    local client = (BNB.IsForever and "forever") or (BNB.IsClassic and "classic") or "retail"
+    local look = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and "skin" or "normal"
+    return client .. "-" .. look, "retail-" .. look
+end
+
+-- PLACE's entry for an id (this client's, else Retail's), or nil
+local function Placed(id)
+    local key, retail = LookKey()
+    local own = PLACE[key] and PLACE[key][id]
+    if own then return own end
+    return PLACE[retail] and PLACE[retail][id]
+end
+
+-- The Place snow spots for this client and look (made on first write)
+local function DevSpots(make)
+    local db = BigNoteBoxDB
+    if not db then return nil end
+    local key = LookKey()
+    if make then
+        db.debugSnowSpots = db.debugSnowSpots or {}
+        db.debugSnowSpots[key] = db.debugSnowSpots[key] or {}
+    end
+    return db.debugSnowSpots and db.debugSnowSpots[key]
+end
+
+local _placing = false   -- Developer tools > Place snow (session only)
+
+local function IdOf(tex, field)
+    return tex._idOf and tex._idOf(field) or tex._id
+end
+
+local FIELDS = { "x", "y", "s", "m" }
+local function PosOf(tex, p)
+    local dev = DevSpots(false)
+    local def = tex._def(p)
+    local pos = {}
+    for _, fld in ipairs(FIELDS) do
+        local id = IdOf(tex, fld)
+        local placed = Placed(id)
+        local v
+        if dev and dev[id] and dev[id][fld] ~= nil then v = dev[id][fld]
+        elseif placed and placed[fld] ~= nil then v = placed[fld] end
+        if v == nil then v = def[fld] end
+        pos[fld] = v
+    end
+    return pos
+end
+
+local Handle   -- forward: the drag handle, made on first use while placing
 
 local function Apply(tex)
     local ev = SkinAllows() and BNB.ActiveWorldEvent()
     local piece = type(tex._piece) == "function" and tex._piece() or tex._piece
     local path = ev and piece and ev.art[piece]
     if not path or (tex._cond and not tex._cond()) then
-        tex:Hide(); return
+        tex:Hide()
+        if tex._handle then tex._handle:Hide() end
+        return
     end
-    tex:SetTexture(path)
     local p = PIECE[piece]
-    tex:SetSize(p.w * (tex._scale or 1), p.h * (tex._scale or 1))
-    if tex._mirror then tex:SetTexCoord(1, 0, 0, 1) else tex:SetTexCoord(0, 1, 0, 1) end
+    local pos = PosOf(tex, p)
+    tex._pos = pos
+    tex:SetTexture(path)
+    tex:SetSize(p.w * pos.s, p.h * pos.s)
+    local mir = pos.m and true or false
+    if tex._flip and tex._flip() then mir = not mir end
+    if mir then tex:SetTexCoord(1, 0, 0, 1) else tex:SetTexCoord(0, 1, 0, 1) end
     local s = Shade()
     tex:SetVertexColor(s, s, s, 1)
     tex:ClearAllPoints()
-    tex._place(tex, tex._host, p)
+    tex._place(tex, tex._host, p, pos)
     tex:Show()
+    if _placing then Handle(tex):Show()
+    elseif tex._handle then tex._handle:Hide() end
 end
 
 -- host: the frame the texture lives on (its layer frame). piece: a piece key
--- or a function returning one. place(tex, host, pieceInfo) anchors it.
--- opts: cond, mirror, scale, layer, sub
+-- or a function returning one. place(tex, host, pieceInfo, pos) anchors it.
+-- opts: id (string), idOf(field) (an id per field, else id), def(pieceInfo)
+-- -> { x, y, s, m } (the default spot), flip() (true = mirror the other way),
+-- xSign (-1 = a drag to the right lowers x), cond, layer, sub
 function BNB.WorldEventArt(host, piece, place, opts)
     opts = opts or {}
     local tex = host:CreateTexture(nil, opts.layer or "OVERLAY", nil, opts.sub or 7)
     tex._host, tex._piece, tex._place = host, piece, place
-    tex._cond, tex._mirror, tex._scale = opts.cond, opts.mirror, opts.scale
+    tex._id, tex._idOf, tex._flip = opts.id, opts.idOf, opts.flip
+    tex._def = opts.def or function() return { x = 0, y = 0, s = 1, m = false } end
+    tex._xSign = opts.xSign or 1
+    tex._cond = opts.cond
     tex:Hide()
     _pieces[#_pieces + 1] = tex
     host:HookScript("OnShow", function() Apply(tex) end)
@@ -154,26 +271,168 @@ function BNB.WorldEventArt(host, piece, place, opts)
     return tex
 end
 
--- Tool windows (called by BNB.CreateToolWindow for named MEDIUM windows)
-function BNB.DecorateToolWindow(f, name)
-    if not (f and name) then return end
-    local frac, mirror = Seed(name)
-    local layer = CreateFrame("Frame", nil, f)
-    layer:SetAllPoints(f)
-    layer:SetFrameLevel(f:GetFrameLevel() + 10)
-    layer:EnableMouse(false)
-    local function Piece()
-        return (f:GetWidth() or 0) <= SMALL_MAX_W and "small" or "large"
-    end
-    BNB.WorldEventArt(layer, Piece, function(tex, host, p)
-        local room = math.max(0, (f:GetWidth() or 0) - CLOSE_ROOM - p.w)
-        tex:SetPoint("TOPLEFT", host, "TOPLEFT", math.floor(room * frac), p.yOff)
-    end, { mirror = mirror })
+-- ── Place snow (Developer tools) ────────────────────────────────────────────
+-- While on, every piece on screen gets a blue box: drag = move, right-click =
+-- mirror, wheel = size. Each change is saved in BigNoteBoxDB.debugSnowSpots and
+-- printed to chat, for copying into PLACE above (kept per client and look).
+local function SetVal(tex, field, v)
+    local spots = DevSpots(true)
+    if not spots then return end
+    local id = IdOf(tex, field)
+    spots[id] = spots[id] or {}
+    spots[id][field] = v
 end
 
--- Main window: the bottom piece on the editor's action bar (behind its
--- buttons) and the large piece along the top while the tabs are not on top
-local MAIN_BOTTOM_X, MAIN_BOTTOM_Y = -14, 0   -- art centre on the bottom edge (+ Y)
+local function Round(v) return math.floor(v + 0.5) end
+
+local function Report(tex)
+    local pos = tex._pos
+    if not pos then return end
+    local ids = IdOf(tex, "x")
+    if IdOf(tex, "y") ~= ids then ids = ids .. " + " .. IdOf(tex, "y") end
+    local mir = ""
+    if pos.m then mir = BNB.L["CFG_DEV_SNOW_MIRRORED"] end
+    BNB:Print(string.format(BNB.L["CFG_DEV_SNOW_POS_FMT"], ids, pos.x, pos.y, pos.s, mir))
+end
+
+function Handle(tex)
+    local h = tex._handle
+    if h then return h end
+    h = CreateFrame("Button", nil, tex._host)
+    h:SetAllPoints(tex)
+    local fill = h:CreateTexture(nil, "BACKGROUND")
+    fill:SetAllPoints()
+    fill:SetColorTexture(0.2, 0.6, 1, 0.15)
+    local function Edge(p1, p2, horiz)
+        local e = h:CreateTexture(nil, "BORDER")
+        e:SetColorTexture(0.3, 0.7, 1, 0.9)
+        e:SetPoint(p1); e:SetPoint(p2)
+        if horiz then e:SetHeight(1) else e:SetWidth(1) end
+    end
+    Edge("TOPLEFT", "TOPRIGHT", true);    Edge("BOTTOMLEFT", "BOTTOMRIGHT", true)
+    Edge("TOPLEFT", "BOTTOMLEFT", false); Edge("TOPRIGHT", "BOTTOMRIGHT", false)
+    h:EnableMouseWheel(true)
+    h:SetScript("OnMouseDown", function(self, btn)
+        if btn ~= "LeftButton" or not tex._pos then return end
+        local cx, cy = GetCursorPosition()
+        local sc = self:GetEffectiveScale()
+        local x0, y0 = tex._pos.x, tex._pos.y
+        self:SetScript("OnUpdate", function()
+            local nx, ny = GetCursorPosition()
+            SetVal(tex, "x", x0 + Round((nx - cx) / sc * tex._xSign))
+            SetVal(tex, "y", y0 + Round((ny - cy) / sc))
+            Apply(tex)
+        end)
+    end)
+    h:SetScript("OnMouseUp", function(self, btn)
+        if btn == "LeftButton" then
+            if not self:GetScript("OnUpdate") then return end
+            self:SetScript("OnUpdate", nil)
+        elseif btn == "RightButton" and tex._pos then
+            SetVal(tex, "m", not tex._pos.m)
+        else return end
+        BNB.RefreshWorldEvents()   -- a shared y moves the other windows too
+        Report(tex)
+    end)
+    h:SetScript("OnMouseWheel", function(_, delta)
+        if not tex._pos then return end
+        local s = math.floor((tex._pos.s + delta * 0.05) * 100 + 0.5) / 100
+        SetVal(tex, "s", math.max(0.2, math.min(3, s)))
+        Apply(tex)
+        BNB.Debounce("WorldEvents.report", 0.4, function() Report(tex) end)
+    end)
+    h:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:AddLine(IdOf(tex, "x"), 1, 1, 1)
+        if IdOf(tex, "y") ~= IdOf(tex, "x") then GameTooltip:AddLine(IdOf(tex, "y"), 1, 1, 1) end
+        GameTooltip:AddLine(BNB.L["CFG_DEV_SNOW_HANDLE_TIP"], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    h:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    h:Hide()
+    tex._handle = h
+    return h
+end
+
+function BNB.IsPlacingSnow() return _placing end
+function BNB.SetPlacingSnow(on)
+    _placing = on and true or false
+    for _, tex in ipairs(_pieces) do
+        if not _placing and tex._handle then
+            tex._handle:SetScript("OnUpdate", nil)
+            tex._handle:Hide()
+        end
+    end
+    BNB.RefreshWorldEvents()
+end
+function BNB.ResetPlacedSnow()
+    if BigNoteBoxDB then
+        BigNoteBoxDB.debugSnowSpots = nil
+        BigNoteBoxDB.debugSnowPos = nil   -- the first build's key, one look for all
+    end
+    BNB.RefreshWorldEvents()
+end
+
+-- Over the window's border: the layer hangs off the window's close button,
+-- which ButtonFrameTemplate keeps over its border (the main window's title
+-- bar icons do the same). Never a SetFrameLevel from the window's children:
+-- the window stack (UI/WindowStack.lua) measures how deep a window's
+-- children reach, and a layer lifted over every frame in the window broke
+-- the main window's order on the next click (2026-10-26). No close button
+-- (skin mode): 10 levels over the window, as before.
+local function ChromeLayer(win)
+    local cb = win.CloseButton
+    local layer
+    if cb then
+        layer = CreateFrame("Frame", nil, cb)
+    else
+        layer = CreateFrame("Frame", nil, win)
+        layer:SetFrameLevel(win:GetFrameLevel() + 10)
+    end
+    layer:SetAllPoints(win)
+    layer:EnableMouse(false)
+    return layer
+end
+
+-- A piece on a chrome layer shown with another frame (cond checks it)
+local function Follow(tex, owner)
+    owner:HookScript("OnShow", function() Apply(tex) end)
+    owner:HookScript("OnHide", function() Apply(tex) end)
+end
+
+-- Tool windows (called by BNB.CreateToolWindow for named MEDIUM windows)
+-- piece = "small" / "large" to pick the art whatever the width (nil = by width)
+function BNB.DecorateToolWindow(f, name, piece)
+    if not (f and name) then return end
+    local frac, mirror = WindowSeed(name)
+    local layer = ChromeLayer(f)
+    local function Piece()
+        if piece then return piece end
+        return (f:GetWidth() or 0) <= SMALL_MAX_W and "small" or "large"
+    end
+    BNB.WorldEventArt(layer, Piece, function(tex, host, _, pos)
+        tex:SetPoint("TOPLEFT", host, "TOPLEFT", pos.x, pos.y)
+    end, {
+        idOf = function(field)
+            if field == "y" or field == "s" then return "size:" .. Piece() end
+            return "win:" .. name
+        end,
+        def = function(p)
+            local sz = Placed("size:" .. Piece()) or {}
+            local s  = sz.s or 1
+            local xl = sz.xl or 0
+            local xr = (f:GetWidth() or 0) - (sz.xr or (CLOSE_ROOM + p.w * s))
+            if xr < xl then xr = xl end
+            return { x = math.floor(xl + (xr - xl) * frac), y = p.yOff, s = s, m = mirror }
+        end,
+    })
+end
+
+-- Main window: in the note list view a piece under the top bar's right-hand
+-- icons (x from the editor pane's right edge, y from the window's top edge;
+-- the welcome page and an open note alike), in the explorer view the same
+-- piece from the window's top right (it stays put when the window is resized),
+-- and the large piece along the top while the tabs are not on top
 local MAIN_TOP_RIGHT_ROOM = 130                 -- the title bar's icons and X
 local function TabsOnTop()
     local db = BigNoteBoxDB
@@ -185,49 +444,86 @@ local function SidebarLeftW()
     local on = BNB.Sidebar and BNB.Sidebar.IsEnabled and BNB.Sidebar.IsEnabled()
     return (on and db and db.sidebarSide == "left") and 64 or 0
 end
+local function ExplorerOn()
+    return BigNoteBoxDB and BigNoteBoxDB.explorerView == true
+end
 
-function BNB.DecorateMainWindow(f, actionBar)
+function BNB.DecorateMainWindow(f)
     if not f or f._weDone then return end
     f._weDone = true
-    -- The top piece follows the tabs (on top or not)
+    -- The top piece follows the tabs (on top or not), the corner and the
+    -- explorer pieces the view
     if BNB.Sidebar and BNB.Sidebar.Refresh then
         hooksecurefunc(BNB.Sidebar, "Refresh", BNB.RefreshWorldEvents)
     end
-    if actionBar then
-        local low = CreateFrame("Frame", nil, actionBar)
-        low:SetAllPoints(f)
-        low:SetFrameLevel(actionBar:GetFrameLevel())   -- its buttons sit one higher
-        low:EnableMouse(false)
-        -- Right end on the action bar (left of a right-side tab strip),
-        -- height on the window's bottom edge
-        BNB.WorldEventArt(low, "bottom", function(tex, _, p)
-            tex:SetPoint("RIGHT",  actionBar, "RIGHT",  MAIN_BOTTOM_X, 0)
-            tex:SetPoint("BOTTOM", f,         "BOTTOM", 0, MAIN_BOTTOM_Y - p.h / 2)
-        end, { layer = "BACKGROUND", sub = 0 })
+    if BNB.Explorer and BNB.Explorer.SetActive then
+        hooksecurefunc(BNB.Explorer, "SetActive", BNB.RefreshWorldEvents)
     end
+    local pane = BNB.editorPane
+    if pane then
+        -- its top right = the window's top edge over the pane's right edge
+        local corner = CreateFrame("Frame", nil, f)
+        corner:SetPoint("TOPLEFT",     f,    "TOPLEFT")
+        corner:SetPoint("BOTTOMRIGHT", pane, "TOPRIGHT")
+        local tex = BNB.WorldEventArt(ChromeLayer(f), "bottom", function(tex, _, _, pos)
+            tex:SetPoint("BOTTOMRIGHT", corner, "TOPRIGHT", pos.x, pos.y)
+        end, { id = "main:corner",
+               cond = function() return not ExplorerOn() and pane:IsVisible() end,
+               def = function() return { x = -1, y = -116, s = 0.7, m = false } end })
+        Follow(tex, pane)
+    end
+    BNB.WorldEventArt(ChromeLayer(f), "bottom", function(tex, _, _, pos)
+        tex:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", pos.x, pos.y)
+    end, { id = "main:explorer", cond = ExplorerOn,
+           def = function() return { x = -1, y = -86, s = 0.55, m = false } end })
     local frac, mirror = Seed("BigNoteBoxFrame")
-    local top = CreateFrame("Frame", nil, f)
-    top:SetAllPoints(f)
-    top:SetFrameLevel(f:GetFrameLevel() + 10)
-    top:EnableMouse(false)
-    BNB.WorldEventArt(top, "large", function(tex, host, p)
-        local left = SidebarLeftW()
-        local room = math.max(0, (f:GetWidth() or 0) - left - MAIN_TOP_RIGHT_ROOM - p.w)
-        tex:SetPoint("TOPLEFT", host, "TOPLEFT", left + math.floor(room * frac), p.yOff)
-    end, { mirror = mirror, cond = function() return not TabsOnTop() end })
+    local top = ChromeLayer(f)
+    BNB.WorldEventArt(top, "large", function(tex, host, _, pos)
+        tex:SetPoint("TOPLEFT", host, "TOPLEFT", SidebarLeftW() + pos.x, pos.y)
+    end, { id = "main:top", cond = function() return not TabsOnTop() end,
+           def = function(p)
+               local room = math.max(0, (f:GetWidth() or 0) - SidebarLeftW() - MAIN_TOP_RIGHT_ROOM - p.w)
+               return { x = math.floor(room * frac), y = p.yOff, s = 1, m = mirror }
+           end })
+end
+
+-- Main window welcome page (no note open, UI/WelcomePanel.lua): a small piece
+-- on the Create new note button (the corner piece above covers the page too)
+function BNB.DecorateWelcome(panel, newBtn)
+    if not panel or panel._weDone or not newBtn then return end
+    panel._weDone = true
+    local cap = CreateFrame("Frame", nil, newBtn)
+    cap:SetAllPoints(newBtn)
+    cap:SetFrameLevel(newBtn:GetFrameLevel() + 5)
+    cap:EnableMouse(false)
+    BNB.WorldEventArt(cap, "small", function(tex, host, _, pos)
+        tex:SetPoint("BOTTOM", host, "TOP", pos.x, pos.y)
+    end, { id = "welcome:newbtn",
+           def = function() return { x = 0, y = -12, s = 0.6, m = false } end })
 end
 
 -- Reference Box: the tab piece on the model tab (the upper one), mirrored on
--- the right side so it leans the same way against the box
-local TAB_SCALE = 0.75   -- 64 px art on the 48 px tab
-function BNB.DecorateRefBoxTab(btn, isRight)
+-- the right side so it leans the same way against the box; x counts toward
+-- the box on both sides. The tab strip is drawn under the box (a lower strata
+-- or stacked under it), so the piece lives on the box's chrome layer, over
+-- its border, anchored to the tab and shown while the tab is
+function BNB.DecorateRefBoxTab(btn, isRight, box)
     if not btn then return end
-    if not btn._weTex then
-        btn._weTex = BNB.WorldEventArt(btn, "tab", function(tex, host)
-            tex:SetPoint("BOTTOM", host, "TOP", 0, -tex:GetHeight() * 0.45)
-        end, { scale = TAB_SCALE })
+    btn._weRight = isRight and true or nil
+    box = box or (btn:GetParent() and btn:GetParent():GetParent())
+    if not btn._weTex and box then
+        local layer = ChromeLayer(box)
+        btn._weTex = BNB.WorldEventArt(layer, "tab", function(tex, _, _, pos)
+            local sign = btn._weRight and -1 or 1
+            tex:SetPoint("BOTTOM", btn, "TOP", pos.x * sign, pos.y)
+        end, { id = "refbox:tab",
+               flip = function() return btn._weRight end,
+               cond = function() return btn:IsVisible() end,
+               def = function(p) return { x = 0, y = -math.floor(p.h * 0.75 * 0.45), s = 0.75, m = false } end })
+        Follow(btn._weTex, btn)
     end
-    btn._weTex._mirror = isRight and true or nil
+    if not btn._weTex then return end
+    btn._weTex._xSign = btn._weRight and -1 or 1
     Apply(btn._weTex)
 end
 
