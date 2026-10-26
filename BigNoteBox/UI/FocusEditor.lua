@@ -369,6 +369,15 @@ local function LayoutFocusBars(note)
             focusMarkupBar:Hide()
         end
     end
+    -- Find and replace (ALL-582): a row of its own under the bars while open
+    local frow = BNB.FindReplace and BNB.FindReplace.RowOf("focus")
+    if frow and frow:IsShown() then
+        local above = (isRich and focusMarkupBar) or (wy and focusWyBar) or focusTsStrip
+        frow:ClearAllPoints()
+        frow:SetPoint("TOPLEFT",  above, "BOTTOMLEFT",  0, -2)
+        frow:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
+        off = off - frow:GetHeight() - 2
+    end
     if focusBodyScroll then
         local pt, rel, rp, xo = focusBodyScroll:GetPoint(1)
         if pt and rel then focusBodyScroll:SetPoint(pt, rel, rp, xo, off) end

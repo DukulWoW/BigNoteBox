@@ -82,6 +82,7 @@ UI\IconPicker.lua
 UI\SendToChat.lua
 UI\SendNotePicker.lua
 UI\WaypointLinkPopup.lua
+UI\FindReplace.lua
 UI\ConfigWindow.lua
 UI\ConfigSearch.lua
 UI\Config\General.lua

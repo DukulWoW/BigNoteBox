@@ -975,6 +975,18 @@ function BNB.UpdateBodyTopAnchor()
     if mbar and mbar._sepT then
         if bar and bar:IsShown() then mbar._sepT:Hide() else mbar._sepT:Show() end
     end
+    -- Find and replace (ALL-582): a row of its own under the bars while open
+    local frow = BNB.FindReplace and BNB.FindReplace.RowOf("main")
+    if frow and frow:IsShown() then
+        if bare then
+            BNB.FindReplace.Close()
+        else
+            frow:ClearAllPoints()
+            frow:SetPoint("TOPLEFT",  topAnchor, "BOTTOMLEFT",  0, 0)
+            frow:SetPoint("TOPRIGHT", topAnchor, "BOTTOMRIGHT", 0, 0)
+            topAnchor = frow
+        end
+    end
 
     local bottomOffset = TOOLBAR_H
         + (BNB._editorTagStrip and BNB._editorTagStrip:GetHeight() or TAG_STRIP_H)

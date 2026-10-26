@@ -36,9 +36,18 @@ local _n = 0
 local SQUIGGLE = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-spell-squiggle"
 local SQUIG_W, SQUIG_H = 8, 4
 
+-- A find hit ("f", ALL-582) is a tinted box over the word, the current one
+-- ("F") stronger; h = the line height
+local HIT_ALPHA = { f = 0.22, F = 0.50 }
+
 -- One line texture in its look; a pooled texture may have been either before
-local function Paint(t, kind, w, r, g, b)
-    if kind == "x" then
+local function Paint(t, kind, w, r, g, b, h)
+    if HIT_ALPHA[kind] then
+        t:SetTexCoord(0, 1, 0, 1)
+        t:SetVertexColor(1, 1, 1, 1)
+        t:SetColorTexture(r, g, b, HIT_ALPHA[kind])
+        t:SetSize(w, h or 12)
+    elseif kind == "x" then
         t:SetTexture(SQUIGGLE, "REPEAT", "CLAMP")
         t:SetTexCoord(0, w / SQUIG_W, 0, 1)
         t:SetVertexColor(r, g, b, 1)
@@ -122,9 +131,49 @@ local function RectParts(r)
     return r.left or r[1], r.bottom or r[2], r.width or r[3], r.height or r[4]
 end
 
+-- The line grid of an edit box (see the header): the text top in the span
+-- answer's y, the answer's line step and the box's own step. nil while the
+-- text is not laid out
+local function Grid(eb, fs, text)
+    -- The text top: the first letter's rect top, plus a line per leading newline
+    local lead = #(text:match("^\n*") or "")
+    local topY
+    local rT = Rects(fs, lead + 1, lead + 1)[1]
+    if rT then
+        local _, b, _, h = RectParts(rT)
+        if b and h then topY = b + h + lead * h end
+    end
+    local nLines = fs.GetNumLines and fs:GetNumLines() or 0
+    if not topY or nLines <= 0 then return nil end
+    local _, _, insT, insB = eb:GetTextInsets()
+    local apiStep = topY / nLines
+    local boxStep = (eb:GetHeight() - (insT or 0) - (insB or 0)) / nLines
+    if apiStep <= 0 or boxStep <= 0 then return nil end
+    return topY, apiStep, boxStep
+end
+
+-- Where byte pos of eb's text is drawn: its line's top down from the box's
+-- top, and the line height; nil while not laid out (find and replace
+-- scrolls a hit into view with it, ALL-582)
+function TL.LineTop(eb, pos)
+    local fs = eb and OwnFontString(eb)
+    local text = eb and eb:GetText() or ""
+    if not fs or text == "" or pos < 1 or pos > #text then return nil end
+    local topY, apiStep, boxStep = Grid(eb, fs, text)
+    if not topY then return nil end
+    local rect = Rects(fs, pos, pos)[1]
+    if not rect then return nil end
+    local _, b, _, h = RectParts(rect)
+    if not (b and h) then return nil end
+    local idx = math.floor((topY - b - h) / apiStep + 0.5)
+    local _, _, insT = eb:GetTextInsets()
+    return (insT or 0) + idx * boxStep, boxStep
+end
+
 -- Attach(eb, sf, getRanges, color): getRanges(text) returns a list of
 -- { first, last, kind } ("u" underline, "s" strikethrough, "x" a spelling
--- mistake, a wavy line) or nil for none. color (optional) = a
+-- mistake, a wavy line, "f" / "F" a find hit / the current one, a tinted
+-- box) or nil for none. color (optional) = a
 -- function returning r, g, b; TL.LineColor when left out. Several
 -- controllers can sit on one box (the {u} lines and the spellchecker).
 -- Returns the controller; ctl.Refresh() asks for a redraw.
@@ -156,16 +205,25 @@ function TL.Attach(eb, sf, getRanges, color)
         for j = i, #ctl.lines do ctl.lines[j]:Hide() end
     end
 
-    local function Draw()
+    -- Stops the steps in progress and hides every line
+    local function Clear()
         ctl.gen = ctl.gen + 1
-        local gen = ctl.gen
-        if not eb:IsVisible() then lastSig = nil; HideFrom(1); return end
+        lastSig = nil
+        HideFrom(1)
+    end
+
+    local function Draw()
+        if not eb:IsVisible() then Clear(); return end
         layer:SetFrameLevel(eb:GetFrameLevel() + 2)
         local text = eb._showingPlaceholder and "" or (eb:GetText() or "")
         local ranges = getRanges(text) or {}
         local fs = OwnFontString(eb)
-        if not fs or #ranges == 0 or text == "" then lastSig = nil; HideFrom(1); return end
-        -- Nothing changed = nothing to do (BNB sets the same text again at times)
+        if not fs or #ranges == 0 or text == "" then Clear(); return end
+        -- Nothing changed = nothing to do (BNB sets the same text again at times).
+        -- The steps still drawing the lines out of view carry on: the
+        -- generation moves only for a new draw. It used to move first, so a
+        -- stray refresh (focus, size) stopped them and the words below the
+        -- view got no line until Check spelling was clicked again (ALL-581)
         local path, size, flags = eb:GetFont()
         local parts = { text, tostring(eb:GetWidth()), tostring(eb:GetHeight()), tostring(path),
             tostring(size), tostring(flags), tostring(eb:GetJustifyH()) }
@@ -173,21 +231,12 @@ function TL.Attach(eb, sf, getRanges, color)
         local sig = table.concat(parts, "\1")
         if sig == lastSig then return end
         lastSig = sig
+        ctl.gen = ctl.gen + 1
+        local gen = ctl.gen
 
-        -- The text top: the first letter's rect top, plus a line per leading newline
-        local lead = #(text:match("^\n*") or "")
-        local topY
-        local rT = Rects(fs, lead + 1, lead + 1)[1]
-        if rT then
-            local _, b, _, h = RectParts(rT)
-            if b and h then topY = b + h + lead * h end
-        end
-        local nLines = fs.GetNumLines and fs:GetNumLines() or 0
-        if not topY or nLines <= 0 then HideFrom(1); return end
-        local _, _, insT, insB = eb:GetTextInsets()
-        local apiStep = topY / nLines
-        local boxStep = (eb:GetHeight() - (insT or 0) - (insB or 0)) / nLines
-        if apiStep <= 0 or boxStep <= 0 then HideFrom(1); return end
+        local topY, apiStep, boxStep = Grid(eb, fs, text)
+        -- Not laid out yet: lastSig cleared too, so the next refresh tries again
+        if not topY then Clear(); return end
 
         -- In view first: the letters under the scroll frame's corners
         local k = sf:GetEffectiveScale() / fs:GetEffectiveScale()
@@ -218,7 +267,9 @@ function TL.Attach(eb, sf, getRanges, color)
                     if l and b and w and h and w > 0 then
                         local idx = math.floor((topY - b - h) / apiStep + 0.5)
                         local y
-                        if r[3] == "s" then
+                        if HIT_ALPHA[r[3]] then
+                            y = -(idx * boxStep)                         -- over the whole line
+                        elseif r[3] == "s" then
                             y = -(idx * boxStep + h * 0.5) + THICK / 2   -- through the middle
                         else
                             y = -(idx * boxStep + h) + 2                 -- just under the letters
@@ -227,7 +278,7 @@ function TL.Attach(eb, sf, getRanges, color)
                         local t = GetLine(n)
                         t:ClearAllPoints()
                         t:SetPoint("TOPLEFT", fs, "TOPLEFT", l, y)
-                        Paint(t, r[3], w, cr, cg, cb)
+                        Paint(t, r[3], w, cr, cg, cb, boxStep)
                         t._range, t._lineH = r, boxStep
                         t:Show()
                     end

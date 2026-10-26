@@ -901,12 +901,49 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             local word = eb and not (main and BNB._editorInViewMode) and SP.WordAtCursor(eb)
             SP.AskAddWord(word)
         end)
-        function spellSync()
-            local on = BNB.SpellEnabled and BNB.SpellEnabled()
-            spellDiv:SetShown(on); spellBtn:SetShown(on); correctBtn:SetShown(on); dictBtn:SetShown(on)
-            if bar._collapse then bar._collapse() end
-        end
-        _spellSyncs[#_spellSyncs + 1] = spellSync
+        _spellSyncs[#_spellSyncs + 1] = function() spellSync() end
+    end
+
+    -- Find and replace (ALL-582, Dukul's tb-search-replace art): right of
+    -- Add to dictionary, or after the note link with its own divider while
+    -- the Spelling module is off. One button; it opens a row under the
+    -- toolbars (UI/FindReplace.lua)
+    local findDiv = MakeDiv(linkBtn)
+    local findBtn = WyBtn("tb-search-replace", L["NE_FIND_TIP"])
+    findBtn:SetIconEnabled(true)
+    TipWithBody(findBtn, "NE_FIND_TIP", "NE_FIND_BODY")
+    local findKind = main and "main" or "focus"
+    local function OpenFind(toggle)
+        local eb = Body()
+        if not (BNB.FindReplace and eb and BNB._currentNoteID) then return end
+        local FRx = BNB.FindReplace
+        if toggle then FRx.Toggle(findKind, eb, parent) else FRx.Open(findKind, eb, parent) end
+    end
+    findBtn:SetScript("OnClick", function() OpenFind(true) end)
+    -- Ctrl+F while writing; the body is made before the bar, Focus mode may
+    -- make a new one later, so each one is hooked when the bar is shown
+    local _ctrlF = {}
+    local function HookCtrlF()
+        local eb = Body()
+        if not eb or _ctrlF[eb] then return end
+        _ctrlF[eb] = true
+        eb:HookScript("OnKeyDown", function(self, key)
+            if key == "F" and IsControlKeyDown() and not IsAltKeyDown() and Body() == self then
+                OpenFind(false)
+            end
+        end)
+    end
+    bar:HookScript("OnShow", HookCtrlF)
+    C_Timer.After(0, HookCtrlF)
+
+    function spellSync()
+        local on = BNB.SpellEnabled and BNB.SpellEnabled()
+        spellDiv:SetShown(on); spellBtn:SetShown(on); correctBtn:SetShown(on); dictBtn:SetShown(on)
+        findDiv:SetShown(not on)
+        findBtn:ClearAllPoints()
+        if on then findBtn:SetPoint("LEFT", dictBtn, "RIGHT", ICON_GAP, 0)
+        else findBtn:SetPoint("LEFT", findDiv, "RIGHT", DIV_GAP, 0) end
+        if bar._collapse then bar._collapse() end
     end
 
     -- ── RIGHT SIDE (right-anchored) ───────────────────────────────────────────
@@ -1247,8 +1284,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local GAP = 8
     -- Room for the right side: from the left side's last button to the edge
     local function Room()
-        local last = (dictBtn and dictBtn:IsShown()) and dictBtn or linkBtn
-        local lr = last:GetRight()
+        local lr = findBtn:GetRight()   -- the left side's last button (ALL-582)
         if not lr then return math.huge end
         return bar:GetRight() - 6 - lr - GAP
     end
