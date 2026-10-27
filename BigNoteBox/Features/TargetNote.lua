@@ -528,8 +528,19 @@ local function BuildRichBody(data)
     end
     lines[#lines + 1] = ""
 
+    -- Dividers between the sections (Dukul, 2026-10-27): gold ornate under
+    -- the header and above Notes, gold plain between Details and Encountered.
+    -- Each sits between two empty lines
+    local function Divider(file)
+        lines[#lines + 1] = BNB.DividerTag(file)
+        lines[#lines + 1] = ""
+    end
+    Divider("gold-ornate")
+
     -- Details section
     local hasDetails = data.creatureType or data.faction or data.maxHealth or data.maxPower
+    local place, way = UN.EncounteredPlace(data.name)
+    local hasPlace = place ~= "" or way
     if hasDetails then
         lines[#lines + 1] = "{h3}" .. L["TGT_HDR_DETAILS"] .. "{/h3}"
         lines[#lines + 1] = ""
@@ -576,11 +587,20 @@ local function BuildRichBody(data)
         end
 
         lines[#lines + 1] = ""
-        lines[#lines + 1] = ""
+        if hasPlace then Divider("gold-plain") end
     end
 
     -- Zone / encounter section: the place, then a /way link to the spot (ALL-449)
-    UN.AddRichEncountered(lines, UN.EncounteredPlace(data.name))
+    if hasPlace then
+        UN.AddRichEncountered(lines, place, way)
+        -- It ends on two empty lines: one before the divider, two after
+        lines[#lines] = nil
+        Divider("gold-ornate")
+        lines[#lines + 1] = ""
+    elseif hasDetails then
+        Divider("gold-ornate")
+        lines[#lines + 1] = ""
+    end
 
     -- Notes section: blank, for the player to fill in.
     -- A bare empty line is intentional — {p}{/p} produces an empty <P></P> in
@@ -699,6 +719,9 @@ local function CreateTargetNote(richMode, data)
     -- Notes made before these existed have neither and show as an NPC.
     fields.targetClassification = data.classification
     fields.targetAttackable     = data.attackable
+    -- Round, a dragon on an elite / rare (ALL-591); a player target keeps
+    -- InspectNote's frame (player targets go there)
+    if not data.isPlayer then fields.iconFrame = UN.NpcIconFrame(data.classification) end
 
     -- Hidden duplicate-detection keys
     fields.targetNpcID = data.npcID  -- may be nil for vehicles/objects without creature ID

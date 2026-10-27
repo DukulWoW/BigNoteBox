@@ -2426,7 +2426,7 @@ local function CreateStickyFrame(noteID)
                 local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(richRender, bs, fs)
                 local rawST = getmetatable(richRender).__index.SetText
-                richRender._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                richRender._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)
                 rawST(richRender, richRender._bnbHTML)
                 richRender:SetHeight(richRender:GetContentHeight())
             end
@@ -3324,7 +3324,7 @@ function SN.RefreshBodyLive(noteID, tokensOnly)
         local rf, rs = f._richRender, f._richScroll
         local y  = rs:GetVerticalScroll()
         local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        local html = BNB.AdvancedMode.ToHTML(note.body or "", bs)
+        local html = BNB.AdvancedMode.ToHTML(note.body or "", bs, rf:GetWidth())
         if tokensOnly and html == rf._bnbHTML then return end
         BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, BNB.AdvancedMode.OutlineFlagStr(note.fontOutline))
         local rawST = getmetatable(rf).__index.SetText
@@ -3476,7 +3476,7 @@ function SN.RefreshNote(noteID)
                 BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
                 -- Use the raw SetText (bypasses SetHTML height-set) then set height
                 local rawST = getmetatable(rf).__index.SetText
-                rf._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                rf._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)
                 rawST(rf, rf._bnbHTML)
                 rf:SetHeight(rf:GetContentHeight())
                 f._richScroll:SetVerticalScroll(0)

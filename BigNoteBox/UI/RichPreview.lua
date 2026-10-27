@@ -79,6 +79,8 @@ local function BuildRenderPair(name, parent, titleH)
             rf:SetWidth(w)
             if rf._bnbHTML and rsf:IsShown() then
                 local y = rsf:GetVerticalScroll()
+                -- Converted again at the new width: a {div} fills it (ALL-589)
+                if rf._bnbSrc then rf._bnbHTML = AM.ToHTML(rf._bnbSrc, rf._bnbSize, w) end
                 getmetatable(rf).__index.SetText(rf, rf._bnbHTML)
                 rf:SetHeight(rf:GetContentHeight())
                 rsf:SetVerticalScroll(math.min(y, rsf:GetVerticalScrollRange() or y))
@@ -123,10 +125,11 @@ local function RenderNote(note, rsf, rf, gen, liveBody, cursorRatio)
         local fs = BNB.AdvancedMode.OutlineFlagStr(note.fontOutline)
         AM.ApplyFontsToRenderFrame(rf, sz, fs)
 
-        local html = AM.ToHTML(bodyText, sz)
+        local html = AM.ToHTML(bodyText, sz, rf:GetWidth())
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, html)
         rf._bnbHTML = html   -- drawn again on a resize (BuildRenderPair)
+        rf._bnbSrc, rf._bnbSize = bodyText, sz   -- {div} sizes follow the width
         local contentH = rf:GetContentHeight()
         rf:SetHeight(contentH)
 

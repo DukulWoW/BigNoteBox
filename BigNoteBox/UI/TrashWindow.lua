@@ -285,7 +285,7 @@ local function BuildViewPage(f, top)
         if html then
             local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
             AM.ApplyFontsToRenderFrame(rf, sz, AM.OutlineFlagStr(note.fontOutline))
-            rf:SetHTML(AM.ToHTML(note.body or "", sz))
+            rf:SetHTML(AM.ToHTML(note.body or "", sz, rf:GetWidth()))
             rf:Show(); bodyFs:Hide()
             h = rf:GetHeight()
         else

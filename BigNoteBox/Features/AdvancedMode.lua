@@ -3,7 +3,8 @@
 --
 -- Public API (BNB.AdvancedMode):
 --   AM.IsRich(note)                          -> bool
---   AM.ToHTML(text, bodySize)                -> html string
+--   AM.ToHTML(text, bodySize, width)         -> html string (width: for {div})
+--   AM.DIVIDERS / AM.DividerSize(name, width) -> the divider pictures (ALL-589)
 --   AM.MarkupRepairs(text) / AM.RepairMarkup(text)  -> repairs ToHTML makes / text with them made
 --   AM.DescribeRepair(r) / AM.RepairOnLeave(id)     -> one repair in words / write them back (ALL-277)
 --   AM.CreateRenderFrame(name, parent)       -> SimpleHTML frame
@@ -225,11 +226,59 @@ local function LineMarkers(line)
 end
 
 --------------------------------------------------------------------------------
--- MAIN CONVERTER: AM.ToHTML(text, bodySize)
+-- DIVIDERS (ALL-589, Dukul 2026-10-27): {div:gold-plain} on a line of its own
+-- draws Assets\Dividers\divider-gold-plain. The long ones (512 x 32 art)
+-- fill the width they are drawn in, up to the art's own 512, at their own
+-- proportions; the short ones keep their size (Dukul: they never stretch),
+-- smaller only where they do not fit. Without a width (the caller has none)
+-- a long one is 320 wide. The menu (UI/TagDialogs.lua) lists them in this
+-- order; art = the picture's width in pixels, 32 high
+--------------------------------------------------------------------------------
+AM.DIVIDER_PATH = "Interface\\AddOns\\BigNoteBox\\Assets\\Dividers\\divider-"
+AM.DIVIDERS = {
+    { name = "gold-plain",             key = "DIVIDER_GOLD_PLAIN",            art = 512 },
+    { name = "gold-ornate",            key = "DIVIDER_GOLD_ORNATE",           art = 512 },
+    { name = "golden-flurry",          key = "DIVIDER_GOLDEN_FLURRY",         art = 512 },
+    { name = "golden-glow",            key = "DIVIDER_GOLDEN_GLOW",           art = 512 },
+    { name = "golden-chevron-top",     key = "DIVIDER_GOLDEN_CHEVRON_TOP",    art = 256 },
+    { name = "golden-chevron-bottom",  key = "DIVIDER_GOLDEN_CHEVRON_BOTTOM", art = 256 },
+    { name = "bronze-handle",          key = "DIVIDER_BRONZE_HANDLE",         art = 128 },
+    { name = "stone-light",            key = "DIVIDER_STONE_LIGHT",           art = 512 },
+    { name = "weathered-stone",        key = "DIVIDER_WEATHERED_STONE",       art = 512 },
+    { name = "wood-plank",             key = "DIVIDER_WOOD_PLANK",            art = 512 },
+    { name = "woodleaf-top",           key = "DIVIDER_WOODLEAF_TOP",          art = 512 },
+    { name = "woodleaf-bottom",        key = "DIVIDER_WOODLEAF_BOTTOM",       art = 512 },
+}
+local DIV_ART = {}
+for _, d in ipairs(AM.DIVIDERS) do DIV_ART[d.name] = d.art end
+local DIV_ART_H, DIV_LONG = 32, 512
+local DIV_SCALE = 20 / 32      -- a short one's size: 20 high, as they were drawn
+local DIV_NO_WIDTH = 320       -- a long one when the width is not known
+local DIV_EDGE = 4             -- kept free of the frame's right edge
+
+-- -> width, height of divider `name` drawn in a frame `width` wide, or nil
+-- for a name that is not a divider
+function AM.DividerSize(name, width)
+    local art = DIV_ART[name]
+    if not art then return nil end
+    local room = (width and width > DIV_EDGE * 4) and math.floor(width - DIV_EDGE) or nil
+    local w
+    if art >= DIV_LONG then
+        w = room and math.min(room, DIV_LONG) or DIV_NO_WIDTH
+    else
+        w = math.floor(art * DIV_SCALE)
+        if room then w = math.min(w, room) end
+    end
+    return w, math.max(1, math.floor(w * DIV_ART_H / art + 0.5))
+end
+
+--------------------------------------------------------------------------------
+-- MAIN CONVERTER: AM.ToHTML(text, bodySize, width)
 -- Converts BNB rich-note markup to WoW SimpleHTML format.
 -- Processing order matters — img must run before struct tags (img closes/reopens P).
+-- width: the render frame's width, for {div} (nil = a default size)
 --------------------------------------------------------------------------------
-function AM.ToHTML(text, bodySize)
+function AM.ToHTML(text, bodySize, width)
     if not text or text == "" then return "" end
     -- Live note tokens ({{me}}...) filled from the reader's game (ALL-481).
     -- First, so the values are escaped and can never make markup
@@ -271,6 +320,14 @@ function AM.ToHTML(text, bodySize)
             h = math.abs(tonumber(h) or 128)
             return string.format("<img src=\"%s\" width=\"%d\" height=\"%d\" align=\"%s\"/>",
                 src, w, h, a)
+        end)
+        -- 1b. {div:name} (ALL-589): a divider picture, as an <img>, sized to
+        -- the frame (AM.DividerSize). An unknown name stays as typed
+        line = line:gsub("{div:([%w%-]+)}", function(name)
+            local w, h = AM.DividerSize(name, width)
+            if not w then return nil end
+            return string.format("<img src=\"%s%s\" width=\"%d\" height=\"%d\" align=\"center\"/>",
+                AM.DIVIDER_PATH, name, w, h)
         end)
 
         -- 2. {icon:name:size} or {icon:name:size:l/c/r} -> texture tag with optional alignment
@@ -835,6 +892,7 @@ local TAG_PATTERNS = {
     "{p:?[clr]?}",      -- {p} {p:l} {p:c} {p:r}
     "{/p}",
     "{img:[^}]+}",
+    "{div:[%w%-]+}",
     "{icon:[^}]+}",
     "{atlas:[^}]+}",
     "{col:%x%x%x%x%x%x}",

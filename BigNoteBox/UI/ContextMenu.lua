@@ -57,6 +57,10 @@
 --   root:CreateCheckbox(text, isSelected, onSelect, opts) -> item
 --     a radio with a check mark: an on / off setting (onSelect flips it)
 --   root:CreateDivider()
+--   root:CreateTileGrid(cols) -> grid  tiles in cols columns (ALL-589), wider
+--     than MAX_W if it needs to be; grid:AddTile(text, onClick, opts): one
+--     button, its text above a picture; opts.tex, texW / texH (default 160 x
+--     20), coord = { l, r, t, b }. A click anywhere on the tile runs it
 --   root:CreateIconRow() -> row        icons side by side, Windows 11 style
 --     row:AddIcon(icon, onClick, opts)  (the note menu's Favorite ... Delete
 --     permanently, ALL-571): the cm-<icon> symbol alone, no plate; opts.tip /
@@ -90,6 +94,8 @@ local ICON     = 18     -- row icon size
 local TITLE_IC = 20     -- header icon size
 local ARROW_W  = 12
 local MIN_W, MAX_W = 140, 320   -- row width limits (text truncates past MAX)
+local TILE_W, TILE_H, TILE_GAP = 172, 48, 2   -- tile grid (ALL-589); a grid may pass MAX_W
+local TILE_TEXT_Y, TILE_PIC_Y  = -5, -24      -- tile top to its text / its picture
 -- A long title (a note's name) widens the menu this far at most and is cut
 -- with "..." past it; the entries still size the menu (Dukul, 2026-10-03)
 local TITLE_MAX_W = 220
@@ -176,6 +182,21 @@ end
 function Desc:AddIcon(icon, onClick, opts)
     local d = { icon = icon, fn = onClick, opts = opts or {} }
     self.icons[#self.icons + 1] = d
+    return d
+end
+
+-- A grid of tiles (the rich toolbar's Dividers, ALL-589): cols side by side,
+-- each tile one button, its text above a picture
+function Desc:CreateTileGrid(cols)
+    local d = NewDesc("tiles")
+    d.cols, d.tiles = cols or 2, {}
+    self.items[#self.items + 1] = d
+    return d
+end
+
+function Desc:AddTile(text, onClick, opts)
+    local d = { text = text, fn = onClick, opts = opts or {} }
+    self.tiles[#self.tiles + 1] = d
     return d
 end
 
@@ -467,6 +488,57 @@ local function IconBtn(r, k)
     return b
 end
 
+-- TILE GRID (ALL-589) -------------------------------------------------------
+-- A tile is one button: hover = the row highlight over the whole tile, a
+-- click on its text or its picture runs it (Dukul, 2026-10-27)
+local function DrawTile(b, active)
+    local hl = b._hl
+    if _skin then
+        local _, _, _, br, bg_, bb = SkinColours()
+        hl:SetColorTexture(br, bg_, bb, 0.25)
+    else
+        hl:SetTexture(LAYERS .. "cm-background-highlight")
+        hl:SetTexCoord(0, 1, 0, 1)
+        hl:SetVertexColor(1, 1, 1, 1)
+    end
+    hl:SetShown(active and true or false)
+end
+
+local function TileEnter(b)
+    local i = b:GetParent():GetParent()._level
+    DrawTile(b, true)
+    -- As a row without a sub-menu: an open sub-menu closes after the grace
+    if _open > i then
+        Schedule(SWITCH_DELAY, function() if b:IsMouseOver() then CloseFrom(i + 1) end end)
+    else
+        Cancel()
+    end
+end
+
+local function TileBtn(r, k)
+    r._tl = r._tl or {}
+    local b = r._tl[k]
+    if b then return b end
+    b = CreateFrame("Button", nil, r)
+    b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    b:SetSize(TILE_W, TILE_H)
+    b._hl = b:CreateTexture(nil, "BACKGROUND")
+    b._hl:SetAllPoints()
+    b._hl:Hide()
+    b._text = b:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
+    b._text:SetJustifyH("LEFT")
+    b._text:SetWordWrap(false)
+    b._text:SetPoint("TOPLEFT", 6, TILE_TEXT_Y)
+    b._text:SetPoint("TOPRIGHT", -6, TILE_TEXT_Y)
+    b._pic = b:CreateTexture(nil, "ARTWORK")
+    b._pic:SetPoint("TOP", b, "TOP", 0, TILE_PIC_Y)
+    b:SetScript("OnEnter", TileEnter)
+    b:SetScript("OnLeave", function(self) DrawTile(self, false) end)
+    b:SetScript("OnClick", IconBtnClick)   -- runs b._desc.fn, closes the menu
+    r._tl[k] = b
+    return b
+end
+
 local function NewRow(f)
     local r = CreateFrame("Button", nil, f)
     r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
@@ -564,7 +636,7 @@ local function Fill(f, d)
     if f._badge then f._badge:Hide() end
 
     -- First pass: rows set up and measured
-    local w = MIN_W
+    local w, gridW = MIN_W, 0
     for n, it in ipairs(d.items) do
         local r = f._rows[n] or NewRow(f)
         f._rows[n] = r
@@ -576,12 +648,35 @@ local function Fill(f, d)
         r._div:Hide(); r._arrow:Hide(); r._icon:Hide(); r._plate:Hide(); r._text:Hide(); r._mark:Hide()
         if r._ib then for _, b in ipairs(r._ib) do b:Hide() end end
         if r._gapHost then r._gapHost:Hide(); r._gapHost._ln:Hide() end
+        if r._tl then for _, b in ipairs(r._tl) do b:Hide() end end
         r._icon:SetDesaturated(false); r._icon:SetVertexColor(1, 1, 1); r._icon:SetTexCoord(0, 1, 0, 1)
         r._text:ClearAllPoints()
         ApplyRowLook(r)
         if it.kind == "divider" then
             r:SetHeight(DIV_H); r:EnableMouse(false)
             r._div:Show()
+        elseif it.kind == "tiles" then
+            -- The row takes no mouse: its tiles are the buttons (ALL-589)
+            local cols = it.cols
+            local nRows = math.ceil(#it.tiles / cols)
+            r:SetHeight(math.max(1, nRows * TILE_H + (nRows - 1) * TILE_GAP)); r:EnableMouse(false)
+            for k, t in ipairs(it.tiles) do
+                local b = TileBtn(r, k)
+                b._desc, b._disabled = t, false
+                local col, row = (k - 1) % cols, math.floor((k - 1) / cols)
+                b:ClearAllPoints()
+                b:SetPoint("TOPLEFT", r, "TOPLEFT", col * (TILE_W + TILE_GAP), -row * (TILE_H + TILE_GAP))
+                b._text:SetText(t.text or "")
+                BNB.SetTextWhite(b._text)
+                local o = t.opts
+                b._pic:SetTexture(o.tex)
+                b._pic:SetSize(o.texW or 160, o.texH or 20)
+                if o.coord then b._pic:SetTexCoord(unpack(o.coord)) else b._pic:SetTexCoord(0, 1, 0, 1) end
+                b._pic:SetDesaturated(false); b._pic:SetVertexColor(1, 1, 1)
+                DrawTile(b, false)
+                b:Show()
+            end
+            gridW = math.max(gridW, cols * TILE_W + (cols - 1) * TILE_GAP)
         elseif it.kind == "iconrow" then
             -- The row takes no mouse: its icons are the buttons (ALL-571)
             r:SetHeight(IROW_H); r:EnableMouse(false)
@@ -742,7 +837,7 @@ local function Fill(f, d)
     for n = #d.items + 1, #f._rows do f._rows[n]:Hide() end
 
     -- Second pass: stack them
-    w = math.min(MAX_W, math.ceil(w))
+    w = math.max(math.min(MAX_W, math.ceil(w)), gridW)
     local y = -PAD
     for n = 1, #d.items do
         local r = f._rows[n]

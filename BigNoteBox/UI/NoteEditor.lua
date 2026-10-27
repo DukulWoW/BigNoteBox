@@ -2394,15 +2394,9 @@ local function BuildMarkupBar(parent, wysiwygBar)
     MkBtn("img", L["NE_INSERT_IMAGE_TIP"],
         function() BNB.OpenImgDialog(InsertTag) end)
     -- Dividers (Dukul, 2026-10-27): a menu of the Assets\Dividers pictures
-    local divBtn = MkBtn("tb-rich-divider", L["NE_INSERT_DIVIDER_TIP"], function(self)
-        local CM = BNB.ContextMenu
-        if not CM then return end
-        if CM.IsOpen() then CM.Close(); return end
-        CM.Open(self, function(root)
-            BNB.BuildDividerMenu(root, function() return BNB._editorBody end, InsertTag)
-        end)
+    MkBtn("tb-rich-divider", L["NE_INSERT_DIVIDER_TIP"], function(self)
+        BNB.ToggleDividerMenu(self, function() return BNB._editorBody end, InsertTag)
     end)
-    divBtn._cmToggle = true
 
     -- Live Preview toggle: the preview-on / -off icon at the right end, does
     -- not advance btnX (ALL-487; a text button until 2026-10-17)
@@ -2755,7 +2749,7 @@ function BNB.AM_EnterViewMode(id)
                 local rn = BNB.GetNote(BNB._currentNoteID)
                 if rn and BNB.AdvancedMode.IsRich(rn) then
                     local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-                    local html = BNB.AdvancedMode.ToHTML(rn.body or "", bs)
+                    local html = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)
                     if tokensOnly and html == rf._bnbHTML then return end
                     local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
                     BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
@@ -2842,7 +2836,7 @@ function BNB.AM_EnterViewMode(id)
         local flagStr  = BNB.AdvancedMode.OutlineFlagStr(freshNote.fontOutline)
         BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bodySize, flagStr)
 
-        local html = BNB.AdvancedMode.ToHTML(freshNote.body or "", bodySize)
+        local html = BNB.AdvancedMode.ToHTML(freshNote.body or "", bodySize, rf:GetWidth())
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, html)
         rf._bnbHTML = html

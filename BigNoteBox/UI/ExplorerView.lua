@@ -123,6 +123,7 @@ local _crumbHdr           -- the open folder's header (its "Notes" part is a dro
 local _tiles, _hdrs = {}, {}
 local _mode   = "grid"    -- "grid" | "note", only while the view is on
 local _folder             -- nil = top level, a folder id, or "sys:<key>"
+local _rbAway             -- the grid hid the Reference Box; a note brings it back
 local _keepNote           -- Focus mode hid the window while a note was open
 
 -- Picks: _pick[key] = true; key = a note id or "folder:<id>" (Dukul,
@@ -1944,6 +1945,23 @@ function EX.Apply()
         Refresh()
     end
     if BNB.RefreshFocusButton then BNB.RefreshFocusButton() end   -- ALL-569: grid or note
+    -- The Reference Box belongs to the open note: the grid hides it, and the
+    -- next note opened (or the list view) shows it again, closed there if
+    -- that note has nothing for it, as a note switch in the list does
+    -- (Dukul, 2026-10-27: it stayed open after leaving the note)
+    if active and _mode == "grid" then
+        if BNB.IsReferenceBoxShown and BNB.IsReferenceBoxShown() then
+            _rbAway = true
+            BNB.CloseReferenceBox()
+        end
+    elseif _rbAway then
+        _rbAway = nil
+        local id = BNB._currentNoteID
+        if id and _main and _main:IsShown() and BNB.OpenReferenceBox and not BNB.IsReferenceBoxShown() then
+            BNB.OpenReferenceBox(id)
+            if BNB.SyncReferenceBox then BNB.SyncReferenceBox(id) end
+        end
+    end
 end
 
 -- After the module switch changed (Settings > Modules, the setup wizard):
@@ -2015,6 +2033,8 @@ function EX.ViewButton() return _viewBtn end
 
 function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     _main, _sortDD, _dirDD, _selBtn = f, sortDD, dirDD, selBtn
+    -- A closed window forgets the hidden Reference Box (it closes with it)
+    f:HookScript("OnHide", function() _rbAway = nil end)
     -- Built once per session: the window opens on the default view (Dukul,
     -- 2026-10-21); the switch changes it until the next login or reload
     local db = BigNoteBoxDB

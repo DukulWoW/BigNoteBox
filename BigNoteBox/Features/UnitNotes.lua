@@ -14,6 +14,7 @@
 --   EncounteredPlace(unitName)               place text, /way line (or nil)
 --   AddPlainEncountered / AddRichEncountered(lines, place, way)  body lines
 --   FormatNumber(n)                          client thousands separator
+--   NpcIconFrame(classification)             an NPC note's icon frame key
 --------------------------------------------------------------------------------
 
 local BNB = BigNoteBox
@@ -21,6 +22,25 @@ local L   = BNB.L
 
 BNB.UnitNotes = BNB.UnitNotes or {}
 local UN = BNB.UnitNotes
+
+-- NPC notes are round, as player notes (ALL-591, Dukul 2026-10-27): the
+-- Elite Dragon on an elite or world boss, the Rare Silver Dragon on a rare
+-- or rare elite, the Simple Glass Orb otherwise and wherever a dragon is not
+-- on this client (Classic). classification = UnitClassification's token,
+-- kept on the note as note.targetClassification. Also used by the notes
+-- schema v17 migration (Core/Database.lua)
+local ROUND_FRAME = "ui-glyphframe-2"
+local NPC_FRAME = {
+    elite     = "Adventure-Mission-Gold-Dragon",
+    worldboss = "Adventure-Mission-Gold-Dragon",
+    rare      = "Adventure-Mission-Silver-Dragon",
+    rareelite = "Adventure-Mission-Silver-Dragon",
+}
+function UN.NpcIconFrame(classification)
+    local key = NPC_FRAME[classification or ""]
+    if key and BNB.IconFrames and BNB.IconFrames.Get(key) then return key end
+    return ROUND_FRAME
+end
 
 --------------------------------------------------------------------------------
 -- MODULE SWITCH (ALL-343): Player & NPC Notes. Off = the notes stay in the

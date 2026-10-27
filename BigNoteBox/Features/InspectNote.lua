@@ -452,18 +452,26 @@ local function BuildRichBody(data, enc)
     end
 
     lines[#lines + 1] = ""
-    lines[#lines + 1] = ""
 
     -- Guild
     if data.guild then
+        lines[#lines + 1] = ""
         lines[#lines + 1] = "{p}" .. GuildLine(data, "INSPECT_LINE_GUILD_MEMBER") .. "{/p}"
         lines[#lines + 1] = ""
+    end
+
+    -- Dividers between the sections (Dukul, 2026-10-27): the golden chevron
+    -- pair around Stats, gold plain under Equipment, gold ornate above Notes.
+    -- Each sits between two empty lines (Divider)
+    local function Divider(file)
+        lines[#lines + 1] = BNB.DividerTag(file)
         lines[#lines + 1] = ""
     end
 
     -- Stats
     local hasStats = data.ilvl or data.achievePoints or data.honorKills
     if hasStats then
+        Divider("golden-chevron-top")
         lines[#lines + 1] = "{h3}" .. L["INSPECT_HDR_STATS"] .. "{/h3}"
         lines[#lines + 1] = ""
         if data.ilvl then
@@ -476,7 +484,7 @@ local function BuildRichBody(data, enc)
             lines[#lines + 1] = "{p}" .. string.format(L["INSPECT_LINE_HK"], FormatNumber(data.honorKills)) .. "{/p}"
         end
         lines[#lines + 1] = ""
-        lines[#lines + 1] = ""
+        Divider("golden-chevron-bottom")
     end
 
     -- Gear with icons and quality colours
@@ -496,13 +504,17 @@ local function BuildRichBody(data, enc)
             if ilvlStr ~= "" then itemStr = itemStr .. "{col:" .. qHex .. "}" .. ilvlStr .. "{/col}" end
             lines[#lines + 1] = "{p}" .. iconStr .. string.format(L["TGT_LINE_STAT_FMT"], g.slot, itemStr) .. "{/p}"
         end
+        lines[#lines + 1] = ""
+        Divider("gold-plain")
     end
 
-    lines[#lines + 1] = ""
-    lines[#lines + 1] = ""
     -- Where you first met them, with a /way link to the spot (ALL-449), and
     -- how often since (ALL-474)
     UN.AddRichMet(lines, enc)
+    -- AddRichMet ends on two empty lines: one before the divider, two after
+    lines[#lines] = nil
+    Divider("gold-ornate")
+    lines[#lines + 1] = ""
     -- A bare empty line, as in TargetNote: {p}{/p} makes an empty <P></P> in
     -- SimpleHTML, which miscalculates document height and offsets the text cursor.
     local head = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"

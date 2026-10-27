@@ -49,7 +49,7 @@ local BNB = BigNoteBox
 --------------------------------------------------------------------------------
 -- SCHEMA VERSIONS  — increment when a migration step is added
 --------------------------------------------------------------------------------
-local NOTES_SCHEMA_VERSION    = 16  -- bump + add block to MigrateNotesDB()
+local NOTES_SCHEMA_VERSION    = 17  -- bump + add block to MigrateNotesDB()
 local SETTINGS_SCHEMA_VERSION = 21 -- bump + add block to MigrateSettingsDB()
 -- Doc mode (ALL-512): the newest seed round in BigNoteBox_Dev/DocsSeed.lua (an
 -- entry's rev, 1 when it has none). Bump it with each round of new or
@@ -932,6 +932,26 @@ function BNB.MigrateNotesDB()
             end
         end
         v = 16
+    end
+
+    -- v16 -> v17 (ALL-591, 2026-10-27): NPC notes are round too. A target
+    -- note that is not a player's, with no icon frame and no LSM border, gets
+    -- the frame a new one gets (BNB.UnitNotes.NpcIconFrame): the Elite
+    -- Dragon on an elite / world boss, the Rare Silver Dragon on a rare /
+    -- rare elite, the Simple Glass Orb otherwise or where a dragon is not on
+    -- this client. A frame or border already picked is kept. Notes and trash.
+    if v < 17 then
+        local UN = BNB.UnitNotes
+        for _, list in ipairs({ ndb.notes or {}, ndb.trash or {} }) do
+            for _, note in pairs(list) do
+                if note.source == "target" and note.targetPlayerKey == nil
+                   and not note.iconFrame and not note.borderOverride then
+                    note.iconFrame = UN and UN.NpcIconFrame and UN.NpcIconFrame(note.targetClassification)
+                        or "ui-glyphframe-2"
+                end
+            end
+        end
+        v = 17
     end
 
     -- Never lower the stored version: running an older build must not make the

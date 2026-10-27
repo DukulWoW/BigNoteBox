@@ -3345,6 +3345,10 @@ function BNB.CloseReferenceBox()
     if _modeStrip then _modeStrip:Hide() end
 end
 
+function BNB.IsReferenceBoxShown()
+    return rbFrame and rbFrame:IsShown() and true or false
+end
+
 function BNB.ToggleReferenceBox()
     if DB().referenceBoxEnabled == false then
         BNB:Print(L["REFBOX_DISABLED"])

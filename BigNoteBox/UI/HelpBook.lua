@@ -422,7 +422,7 @@ end
 local function RenderMarkup(rf, text, w)
     rf:SetWidth(w)
     local rawST = getmetatable(rf).__index.SetText
-    local html = BNB.AdvancedMode.ToHTML(text)
+    local html = BNB.AdvancedMode.ToHTML(text, nil, w)
     if not C.skin then html = Parchment(html) end
     rawST(rf, html)
     local h = rf:GetContentHeight()

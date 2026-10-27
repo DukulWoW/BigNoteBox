@@ -246,6 +246,8 @@ local function ConvertRichBody(body)
 
         -- {atlas:...}: game art with no web copy, left out
         line = line:gsub("{atlas:[^}]+}", "")
+        -- {div:name} (ALL-589): the picture is game-side art, a rule here
+        line = line:gsub("{div:[%w%-]+}", '<hr style="width:60%%;margin:1em auto;"/>')
 
         -- {col:rrggbb}/{/col}
         line = line:gsub("{col:(%x%x%x%x%x%x)}", function(hex) return '<span style="color:#' .. hex .. ';">' end)
