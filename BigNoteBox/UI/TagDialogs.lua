@@ -594,3 +594,53 @@ function BNB.OpenIcoDialog(insertFn)
     _icoDialog:Raise()
     _icoDialog._openPicker()
 end
+
+--------------------------------------------------------------------------------
+-- DIVIDERS (rich notes, Dukul 2026-10-27)
+-- A menu of the pictures in Assets\Dividers; a pick puts an ordinary {img}
+-- tag on a line of its own, so every place that draws or strips {img}
+-- (View mode, previews, stickies, toasts, export) needs nothing new.
+-- w = the width at the picture's own proportions, 20 high.
+--------------------------------------------------------------------------------
+local DIV_DIR = "Interface\\AddOns\\BigNoteBox\\Assets\\Dividers\\"
+local DIV_H   = 20
+local DIVIDERS = {
+    { "divider-gold-plain",      "DIVIDER_GOLD_PLAIN",      320 },
+    { "divider-gold-ornate",     "DIVIDER_GOLD_ORNATE",     320 },
+    { "divider-golden-flurry",   "DIVIDER_GOLDEN_FLURRY",   320 },
+    { "divider-golden-glow",     "DIVIDER_GOLDEN_GLOW",     320 },
+    { "divider-golden-chevron",  "DIVIDER_GOLDEN_CHEVRON",  160 },
+    { "divider-bronze-handle",   "DIVIDER_BRONZE_HANDLE",    80 },
+    { "divider-stone-light",     "DIVIDER_STONE_LIGHT",     320 },
+    { "divider-weathered-stone", "DIVIDER_WEATHERED_STONE", 320 },
+    { "divider-wood-plank",      "DIVIDER_WOOD_PLANK",      320 },
+    { "divider-woodleaf-top",    "DIVIDER_WOODLEAF_TOP",    320 },
+    { "divider-woodleaf-bottom", "DIVIDER_WOODLEAF_BOTTOM", 320 },
+}
+
+-- root: a BNB.ContextMenu description; body: function returning the editor's
+-- EditBox; insertFn(tag) puts text at the cursor (as the Img dialog's).
+function BNB.BuildDividerMenu(root, body, insertFn)
+    local L = BNB.L
+    root:CreateTitle(L["DIVIDER_MENU_TITLE"])
+    for _, d in ipairs(DIVIDERS) do
+        local file, key, w = d[1], d[2], d[3]
+        root:CreateTitle(L[key], { color = { 1, 1, 1 } })
+        root:CreateButton("", function()
+            local tag = string.format("{img:%s%s:%d:%d:center}", DIV_DIR, file, w, DIV_H)
+            -- A line of its own: the {img} tag is read as a whole line
+            local eb = body()
+            if eb then
+                local text, cur = eb:GetText() or "", eb:GetCursorPosition() or 0
+                if cur > 0 and text:sub(cur, cur) ~= "\n" then tag = "\n" .. tag end
+                if text:sub(cur + 1, cur + 1) ~= "\n" then tag = tag .. "\n" end
+            end
+            insertFn(tag)
+        end, {
+            iconTex = DIV_DIR .. file, iconColor = { 1, 1, 1 },
+            iconW = w >= 320 and 160 or w, iconH = DIV_H,
+            -- the middle of a wide picture; the short ones whole
+            iconCoord = w >= 320 and { 0.25, 0.75, 0, 1 } or { 0, 1, 0, 1 },
+        })
+    end
+end

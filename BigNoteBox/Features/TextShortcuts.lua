@@ -179,6 +179,10 @@ end
 local function Expansion(typed, rec, noteID)
     local t = rec.text
     if typed:find("^[A-Z]") then t = BNB.UpperFirst(t) end
+    -- A normal note does not draw rich markup: drop it, keep the words (ALL-575)
+    local note = BNB.GetNote and BNB.GetNote(noteID)
+    local AM = BNB.AdvancedMode
+    if note and not note.richMode and AM and AM.StripMarkup then t = AM.StripMarkup(t) end
     local Tk = BNB.Tokens
     if Tk and t:find("{{", 1, true) then
         if Tk.NotePlain(noteID) then t = Tk.FreezeText(t) or t

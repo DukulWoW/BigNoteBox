@@ -665,6 +665,15 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     MkBtn("link", L["FE_MK_LNK"], function() BNB.OpenLnkDialog(FocusInsertTag, BNB.PeekSelection(focusBodyEb, true)) end)
     MkBtn("ico", L["FE_MK_ICO"],  function() BNB.OpenIcoDialog(FocusInsertTag) end)
     MkBtn("img", L["FE_MK_IMG"],  function() BNB.OpenImgDialog(FocusInsertTag) end)
+    local divBtn = MkBtn("tb-rich-divider", L["NE_INSERT_DIVIDER_TIP"], function(self)
+        local CM = BNB.ContextMenu
+        if not CM then return end
+        if CM.IsOpen() then CM.Close(); return end
+        CM.Open(self, function(root)
+            BNB.BuildDividerMenu(root, function() return focusBodyEb end, FocusInsertTag)
+        end)
+    end)
+    divBtn._cmToggle = true
 
     -- Live Preview toggle, as on the main markup bar (ALL-487)
     local previewBtn = BNB.CreatePreviewButton(bar, "markupPreviewFocus", 4)

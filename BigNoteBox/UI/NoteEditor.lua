@@ -2393,6 +2393,16 @@ local function BuildMarkupBar(parent, wysiwygBar)
         function() BNB.OpenIcoDialog(InsertTag) end)
     MkBtn("img", L["NE_INSERT_IMAGE_TIP"],
         function() BNB.OpenImgDialog(InsertTag) end)
+    -- Dividers (Dukul, 2026-10-27): a menu of the Assets\Dividers pictures
+    local divBtn = MkBtn("tb-rich-divider", L["NE_INSERT_DIVIDER_TIP"], function(self)
+        local CM = BNB.ContextMenu
+        if not CM then return end
+        if CM.IsOpen() then CM.Close(); return end
+        CM.Open(self, function(root)
+            BNB.BuildDividerMenu(root, function() return BNB._editorBody end, InsertTag)
+        end)
+    end)
+    divBtn._cmToggle = true
 
     -- Live Preview toggle: the preview-on / -off icon at the right end, does
     -- not advance btnX (ALL-487; a text button until 2026-10-17)
