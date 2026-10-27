@@ -492,6 +492,39 @@ local function PopulateContent(ct, sf)
         end, "DZ_COUNT_CHARS_ONE", "DZ_COUNT_CHARS_FMT"))
     y = y - SEC_GAP
 
+    -- ── 7b. Delete All Dictionary Words (ALL-578) ───────────────────────────
+    y = MakeRule(ct, y); y = y - 8
+    y = MakeHeader(ct, y, L["DZ_SPELLWORDS_HDR"])
+    y = MakeDesc(ct, y, L["DZ_SPELLWORDS_DESC"])
+    y = MakeActionRow(ct, y,
+        L["DZ_SPELLWORDS_BTN"], 170,
+        L["DZ_CONFIRM_DELETE"], 160,
+        function()
+            local n = BNB.Spell and BNB.Spell.ClearWords and BNB.Spell.ClearWords() or 0
+            BNB:Print(string.format(L["DZ_MSG_SPELLWORDS_FMT"], n))
+        end,
+        CountLabel(function()
+            return BNB.Spell and BNB.Spell.WordList and #BNB.Spell.WordList() or 0
+        end, "DZ_COUNT_SPELLWORDS_ONE", "DZ_COUNT_SPELLWORDS_FMT"))
+    y = y - SEC_GAP
+
+    -- ── 7c. Delete All Text Shortcuts (ALL-578) ─────────────────────────────
+    y = MakeRule(ct, y); y = y - 8
+    y = MakeHeader(ct, y, L["DZ_SHORTCUTS_HDR"])
+    y = MakeDesc(ct, y, L["DZ_SHORTCUTS_DESC"])
+    y = MakeActionRow(ct, y,
+        L["DZ_SHORTCUTS_BTN"], 170,
+        L["DZ_CONFIRM_DELETE"], 160,
+        function()
+            local TS = BNB.TextShortcuts
+            local n = TS and TS.DeleteAll and TS.DeleteAll() or 0
+            BNB:Print(string.format(L["DZ_MSG_SHORTCUTS_FMT"], n))
+        end,
+        CountLabel(function()
+            return BNB.TextShortcuts and #BNB.TextShortcuts.List() or 0
+        end, "DZ_COUNT_SHORTCUTS_ONE", "DZ_COUNT_SHORTCUTS_FMT"))
+    y = y - SEC_GAP
+
     -- ── 8. Delete All Notes ──────────────────────────────────────────────────
     y = MakeRule(ct, y); y = y - 8
     y = MakeHeader(ct, y, L["DZ_DELETEALL_HDR"])

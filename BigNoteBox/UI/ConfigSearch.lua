@@ -407,10 +407,8 @@ function BNB.CreateConfigSearchRow(parent, topOffset, pad)
     placeholder:SetTextColor(0.45, 0.45, 0.45)
     placeholder:SetText(L["CFG_SEARCH_PLACEHOLDER"])
 
-    clearBtn = BNB.CreateIconButton(box, 16, "close", {
-        tip = L["CFG_SEARCH_CLEAR"],
-        onClick = function() eb:SetText(""); eb:ClearFocus() end,
-    })
+    clearBtn = BNB.CreateClearX(box, 16, function() eb:SetText(""); eb:ClearFocus() end,
+        L["CFG_SEARCH_CLEAR"])
     clearBtn:SetPoint("RIGHT", box, "RIGHT", -4, 0)
     clearBtn:SetFrameLevel(eb:GetFrameLevel() + 2)
     clearBtn:Hide()

@@ -135,6 +135,15 @@ function TS.Delete(name)
     Changed()
 end
 
+-- Every shortcut gone (Danger Zone, ALL-578) -> the number deleted
+function TS.DeleteAll()
+    local n = #TS.List()
+    local ndb = BNB.NotesDB and BNB.NotesDB()
+    if ndb then ndb.spellShortcuts = nil end
+    Changed()
+    return n
+end
+
 -- The JSON full backup (Features/NoteExport.lua)
 function TS.BackupList() return TS.List() end
 -- -> the number added; names already here are kept as they are

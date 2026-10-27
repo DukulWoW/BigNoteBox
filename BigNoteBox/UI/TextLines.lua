@@ -76,16 +76,17 @@ end
 
 -- The text with every {u} {/u} {s} {/s} taken out, and the ranges they
 -- marked in the text that is left (an open tag runs to the end of its line,
--- as in AM.ToHTML's LineMarkers). For text shown, not edited: a normal note's
--- sticky read view, Send to Chat, toasts (Dukul, 2026-10-25)
+-- as in AM.ToHTML's LineMarkers; nested pairs count depth, ALL-573). For text
+-- shown, not edited: a normal note's sticky read view, Send to Chat, toasts
+-- (Dukul, 2026-10-25)
 function TL.StripLineTags(text)
     if not text or not text:find("{/?[us]}") then return text or "", {} end
-    local out, ranges, open = {}, {}, {}
+    local out, ranges, open, depth = {}, {}, {}, {}
     local len, pos = 0, 1
     local function closeAt(kind, last)
         local first = open[kind]
         if first and last >= first then ranges[#ranges + 1] = { first, last, kind } end
-        open[kind] = nil
+        open[kind], depth[kind] = nil, nil
     end
     while true do
         local s, e, slash, kind = text:find("{(/?)([us])}", pos)
@@ -101,9 +102,13 @@ function TL.StripLineTags(text)
         out[#out + 1] = chunk
         len = len + #chunk
         if not s then break end
-        if slash == "/" then closeAt(kind, len) else
-            if open[kind] then closeAt(kind, len) end
-            open[kind] = len + 1
+        local d = depth[kind] or 0
+        if slash == "/" then
+            if d > 1 then depth[kind] = d - 1
+            elseif d == 1 then closeAt(kind, len) end
+        else
+            if d == 0 then open[kind] = len + 1 end
+            depth[kind] = d + 1
         end
         pos = e + 1
     end

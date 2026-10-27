@@ -1271,6 +1271,49 @@ function BNB.AddUIIconHover(btn, tx)
     BNB.TintUIIcon(hi)
     return hi
 end
+
+--------------------------------------------------------------------------------
+-- CLEAR X inside an input box (ALL-588, Dukul's ui-circle-x art, 2026-10-27)
+-- The round X that empties a search / filter box. Coloured art, never tinted;
+-- pressed = dimmed and 1 px down-right, as a pressed button. Every clear X
+-- inside an input box is this one: anchor it, show / hide it, set OnClick
+-- through `onClick` (or SetScript after; the pressed look lives in hooks).
+--------------------------------------------------------------------------------
+BNB.CLEAR_X_TEX = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-circle-x"
+function BNB.CreateClearX(parent, size, onClick, tip)
+    local btn = CreateFrame("Button", nil, parent)
+    btn:SetSize(size, size)
+    local tx = btn:CreateTexture(nil, "ARTWORK")
+    tx:SetSize(size, size)
+    tx:SetPoint("CENTER")
+    tx:SetTexture(BNB.CLEAR_X_TEX)
+    local hi = btn:CreateTexture(nil, "HIGHLIGHT")
+    hi:SetAllPoints(tx)
+    hi:SetTexture(BNB.CLEAR_X_TEX)
+    hi:SetBlendMode("ADD")
+    hi:SetAlpha(0.25)
+    btn._tx = tx
+    local function Look(down)
+        tx:SetPoint("CENTER", down and 1 or 0, down and -1 or 0)
+        tx:SetAlpha(down and 0.5 or 1)
+    end
+    btn:HookScript("OnMouseDown", function() Look(true) end)
+    btn:HookScript("OnMouseUp",   function() Look(false) end)
+    btn:HookScript("OnHide",      function() Look(false) end)
+    btn:HookScript("OnLeave", function(self)
+        Look(false)
+        if GameTooltip:IsOwned(self) then GameTooltip:Hide() end
+    end)
+    if tip then
+        btn:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(tip, 1, 1, 1)
+            GameTooltip:Show()
+        end)
+    end
+    if onClick then btn:SetScript("OnClick", onClick) end
+    return btn
+end
 --------------------------------------------------------------------------------
 -- CHECKBOX LABEL HIT  (Dukul, 2026-10-07: the tooltip shows over the text too,
 -- everywhere)

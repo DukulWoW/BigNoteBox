@@ -171,18 +171,20 @@ end
 -- and draws the lines. Runs on a line already turned into html: a marker is
 -- closed at every html tag (a block, <BR/>, <img>) and never put inside an
 -- <a> link or around a raw |H code, since links cannot nest. A tag left
--- open runs to the end of its line (as TL.StripLineTags).
+-- open runs to the end of its line (as TL.StripLineTags). Nested pairs count
+-- depth: {u}a {u}b{/u} c{/u} underlines "a b c", the line ends at the outer
+-- {/u} (ALL-573, Dukul, 2026-10-26); a {/u} with none open does nothing.
 local function LineMarkers(line)
     if not line:find("{/?[us]}") then return line end
     local out, pos = {}, 1
-    local u, s, inA, open = false, false, false, nil
+    local u, s, inA, open = 0, 0, false, nil
     local function close()
         if open then out[#out + 1] = "|h"; open = nil end
     end
     local function text(t)
         if t == "" then return end
         local want = not inA and not t:find("|H", 1, true)
-            and ((u and s) and "us" or u and "u" or s and "s") or nil
+            and ((u > 0 and s > 0) and "us" or u > 0 and "u" or s > 0 and "s") or nil
         if want ~= open then
             close()
             if want then out[#out + 1] = "|Hbnbline:" .. want .. "|h"; open = want end
@@ -210,10 +212,10 @@ local function LineMarkers(line)
                 if tag:find("^<[aA][%s>]") then inA = true
                 elseif tag:find("^</[aA]>") then inA = false end
                 out[#out + 1] = tag
-            elseif tag == "{u}" then u = true
-            elseif tag == "{/u}" then u = false
-            elseif tag == "{s}" then s = true
-            elseif tag == "{/s}" then s = false end
+            elseif tag == "{u}" then u = u + 1
+            elseif tag == "{/u}" then u = math.max(0, u - 1)
+            elseif tag == "{s}" then s = s + 1
+            elseif tag == "{/s}" then s = math.max(0, s - 1) end
             pos = tagEnd + 1
         end
     end
@@ -436,8 +438,9 @@ end
 -- Text outside a block is no repair: plain lines are how rich notes are written.
 -- {u} / {s} (2026-10-25, Dukul: "placing a new U inside a U stops the line
 -- before the first {/u}. This should probably give a syntax error"), by the
--- rules LineMarkers draws them with, one line at a time:
---   repeat     = {u} while a {u} is open on that line: it does nothing, removed
+-- rules LineMarkers draws them with, one line at a time. A {u} inside a {u}
+-- pairs with its own {/u} (depth count, ALL-573, 2026-10-26: Dukul "Agree"
+-- to nested pairs, a warning only when a tag is unbalanced):
 --   stray      = {/u} with no {u} open on that line: removed
 --   lineopen   = {u} still open at the end of its line: {/u} goes after the line's last text
 --------------------------------------------------------------------------------
@@ -450,34 +453,34 @@ end
 -- {u} / {s} on one line (see above); repairs go into list
 local function LineTagRepairs(list, line, lineNo, lineStart)
     if not line:find("{/?[us]}") then return end
-    local isOpen, order, scan = {}, {}, 1
+    -- stack = the open tags in the order opened; a close takes the last of its kind
+    local stack, scan = {}, 1
     while true do
         local st, en, slash, k = line:find("{(/?)([us])}", scan)
         if not st then break end
         local tag, at = line:sub(st, en), lineStart + st - 1
         if slash == "" then
-            if isOpen[k] then
-                list[#list + 1] = { kind = "repeat", line = lineNo, at = at, len = #tag, tag = tag, insert = "" }
-            else
-                isOpen[k] = true
-                order[#order + 1] = k
-            end
-        elseif isOpen[k] then
-            isOpen[k] = nil
+            stack[#stack + 1] = k
         else
-            list[#list + 1] = { kind = "stray", line = lineNo, at = at, len = #tag, tag = tag, insert = "" }
+            local found
+            for i = #stack, 1, -1 do
+                if stack[i] == k then found = i; break end
+            end
+            if found then
+                table.remove(stack, found)
+            else
+                list[#list + 1] = { kind = "stray", line = lineNo, at = at, len = #tag, tag = tag, insert = "" }
+            end
         end
         scan = en + 1
     end
     -- Still open: closed after the line's last text, the last one opened first
     local last = #line
     while last > 0 and line:sub(last, last):find("%s") do last = last - 1 end
-    for i = #order, 1, -1 do
-        local k = order[i]
-        if isOpen[k] then
-            list[#list + 1] = { kind = "lineopen", line = lineNo, at = lineStart + last, len = 0,
-                tag = "{" .. k .. "}", insert = "{/" .. k .. "}" }
-        end
+    for i = #stack, 1, -1 do
+        local k = stack[i]
+        list[#list + 1] = { kind = "lineopen", line = lineNo, at = lineStart + last, len = 0,
+            tag = "{" .. k .. "}", insert = "{/" .. k .. "}" }
     end
 end
 
@@ -552,8 +555,6 @@ function AM.DescribeRepair(r)
         return string.format(L["MARKUP_FIX_MISMATCH_FMT"], r.line, r.tag, r.open, r.insert)
     elseif r.kind == "stray" then
         return string.format(L["MARKUP_FIX_STRAY_FMT"], r.line, r.tag)
-    elseif r.kind == "repeat" then
-        return string.format(L["MARKUP_FIX_REPEAT_FMT"], r.line, r.tag)
     elseif r.kind == "lineopen" then
         return string.format(L["MARKUP_FIX_LINEOPEN_FMT"], r.line, r.tag, r.insert)
     end

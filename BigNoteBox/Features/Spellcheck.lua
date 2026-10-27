@@ -278,6 +278,15 @@ function SP.RenameWord(old, new)
 end
 
 -- The JSON full backup (Features/NoteExport.lua)
+-- Every word in your list gone (Danger Zone, ALL-578) -> the number deleted
+function SP.ClearWords()
+    local n = #SP.WordList()
+    local ndb = BNB.NotesDB and BNB.NotesDB()
+    if ndb then ndb.spellWords = nil end
+    OwnChanged()
+    return n
+end
+
 function SP.BackupList() return SP.WordList() end
 -- -> the number of words added; words already here are left alone
 function SP.ImportList(list)

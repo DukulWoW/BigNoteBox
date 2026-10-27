@@ -565,14 +565,9 @@ local function BuildSearchBar(parent)
     local _tagAC   -- tag autocomplete dropdown, built further down; the clear buttons hide it
 
     -- Inner X: resets only the editbox + tag filter (stays inside bar)
-    local innerClear = CreateFrame("Button", nil, bar)
-    innerClear:SetSize(18, 18)
-    innerClear:SetPoint("RIGHT", bar, "RIGHT", -2, 0)
-    local iClbl = innerClear:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
-    iClbl:SetAllPoints(); iClbl:SetText("x"); iClbl:SetTextColor(0.65, 0.65, 0.65)
+    local innerClear = BNB.CreateClearX(bar, 16)
+    innerClear:SetPoint("RIGHT", bar, "RIGHT", -3, 0)
     innerClear:Hide()
-    innerClear:SetScript("OnEnter", function() iClbl:SetTextColor(1, 0.4, 0.4) end)
-    innerClear:SetScript("OnLeave", function() iClbl:SetTextColor(0.65, 0.65, 0.65) end)
     innerClear:SetScript("OnClick", function()
         eb:SetText(""); eb._showingPlaceholder = false
         BNB.AddPlaceholder(eb, L["SEARCH_PLACEHOLDER"], 0.40, 0.40, 0.40)

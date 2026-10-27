@@ -893,10 +893,8 @@ local function BuildSearch(toc)
 
     -- The X empties the search (Dukul, 2026-10-23: "it's missing a X to
     -- clear it"); shown only while there is something to clear
-    local x = BNB.CreateIconButton(bg, 16, "close", {
-        skin = C.skin, tip = L["CFG_SEARCH_CLEAR"],
-        onClick = function() eb:ClearFocus(); eb.SetRealText(eb, "") end,
-    })
+    local x = BNB.CreateClearX(bg, 16, function() eb:ClearFocus(); eb.SetRealText(eb, "") end,
+        L["CFG_SEARCH_CLEAR"])
     x:SetPoint("RIGHT", bg, "RIGHT", -4, 0)
     x:SetFrameLevel(eb:GetFrameLevel() + 2)
     x:Hide()
