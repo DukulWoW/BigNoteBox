@@ -1094,7 +1094,11 @@ local Editor = BNB.Editor
 
 function Editor.CurrentID() return BNB._currentNoteID end
 function Editor.IsDirty()   return BNB._dirty == true end
-function Editor.SetCurrent(id) BNB._currentNoteID = id end
+function Editor.SetCurrent(id)
+    BNB._currentNoteID = id
+    -- Find and replace belongs to the note it was opened in (ALL-602)
+    if BNB.FindReplace then BNB.FindReplace.NoteChanged(id) end
+end
 function Editor.SetDirty(on)   BNB._dirty = on and true or false end
 
 --------------------------------------------------------------------------------

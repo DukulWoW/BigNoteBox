@@ -22,7 +22,7 @@
 --     is left to replace the row says so ("Done: 18 replaced").
 --   * Edit mode only: the main editor's rich View mode switches to Edit;
 --     the row closes when its note box goes away (View mode, Focus mode
---     opening or closing, no note).
+--     opening or closing, no note) or another note is opened (ALL-602).
 --   * Stays open while you edit the note (the hits follow the text); Esc in
 --     its boxes, its X or the button again closes it.
 --
@@ -52,6 +52,7 @@ local MAX_DRAWN = 100    -- tinted; above that only the current one
 local _rows = {}         -- kind -> row (built on first open)
 local R                  -- the open row, or nil
 local _eb                -- its note box
+local _noteID            -- the note it was opened in (ALL-602)
 local _hits, _hitText, _cur = {}, nil, 0
 local _msg, _msgR, _msgG, _msgB          -- "Done: 18 replaced" until the next search input
 local _lastFind = ""
@@ -467,11 +468,16 @@ local function Build(kind, parent)
     f:SetScript("OnHide", function()
         row.findEb:ClearFocus(); row.replEb:ClearFocus()
         if R ~= row then return end
-        -- Hidden with its window (not by Close): the body moves back up
-        -- when the window shows again
-        C_Timer.After(0, function() if R == nil then Relayout(kind) end end)
+        -- Hidden with its window (not by Close): hidden for real too, or it
+        -- comes back with the window as a dead row over the next note
+        -- (ALL-602), and the body moves back up
+        C_Timer.After(0, function()
+            if R == row then return end
+            if f:IsShown() then f:Hide() end
+            Relayout(kind)
+        end)
         local eb = _eb
-        R, _eb, _hits, _hitText, _cur, _msg = nil, nil, {}, nil, 0, nil
+        R, _eb, _noteID, _hits, _hitText, _cur, _msg = nil, nil, nil, {}, nil, 0, nil
         local ctl = eb and _ctls[eb]
         if ctl then ctl.Recolor() end
     end)
@@ -493,7 +499,7 @@ function FR.Open(kind, eb, parent)
         return
     end
     if R then FR.Close() end
-    R, _eb = row, eb
+    R, _eb, _noteID = row, eb, BNB._currentNoteID
     row.caseCb:SetChecked(_matchCase); row.wordCb:SetChecked(_wholeWord)
     row.findEb:SetText(_lastFind); row.findHint()
     row.frame:Show()
@@ -513,3 +519,9 @@ function FR.Toggle(kind, eb, parent)
 end
 
 function FR.IsOpen() return R ~= nil end
+
+-- Another note (or none) in the editor: the row closes, the next note starts
+-- without it (ALL-602; BNB.Editor.SetCurrent, Core/NoteManager.lua)
+function FR.NoteChanged(id)
+    if R and id ~= _noteID then FR.Close() end
+end

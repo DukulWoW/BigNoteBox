@@ -281,6 +281,12 @@ BNB.DEFAULTS = {
     stickyAnimTime        = 0.1,
     stickyAnimScale       = 1.3,
     stickyAnimText        = 0.05,
+    -- Smooth scrolling (ALL-593, same page): the wheel glides; speed and
+    -- distance per notch as a share of 100% (distance 100% = the game's step).
+    -- Speed 70%: Dukul's pick after testing, 2026-10-28
+    smoothScroll          = true,
+    smoothScrollSpeed     = 0.7,
+    smoothScrollStep      = 1.0,
 
     -- Undo/redo history depth per note (runtime only, never in the notes DB).
     -- Range 10-200; above 50 shows a memory warning in Settings.

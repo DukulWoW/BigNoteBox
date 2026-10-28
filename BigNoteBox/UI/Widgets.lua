@@ -580,6 +580,108 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
 end
 
 --------------------------------------------------------------------------------
+-- SMOOTH SCROLLING  (ALL-593)
+-- The mouse wheel glides instead of jumping (Dukul, 2026-10-28: Parchment
+-- Reader's soft scroll). Every scroll frame gets it from BNB.CreateScrollFrame.
+--   * A notch adds the game's own step (measured: the template's wheel handler
+--     runs and the view is put back in the same frame, so nothing is drawn)
+--     times Scroll distance to a target. The next notch counts from the
+--     target, so a fast spin adds up.
+--   * Each frame the view covers a share of what is left (elapsed x speed),
+--     the last half pixel snaps. One driver frame, shown only while something
+--     glides.
+--   * Anything else that moves the view stops the glide: the scrollbar drag,
+--     the editor's caret follow, a note load's scroll to the top, Find's jump.
+--     The view is then no longer where the glide put it.
+--   * Off: the game's step, times Scroll distance (at 100% the template's own
+--     handler, as before).
+-- Settings > Modules > Accessibility > Motion: smoothScroll, smoothScrollSpeed,
+-- smoothScrollStep (BNB.DEFAULTS).
+--------------------------------------------------------------------------------
+local GLIDE_SPEED = 14       -- share of the distance covered per second at 100%
+local _glideTo  = {}         -- scroll frame -> target offset
+local _glideSet = {}         -- scroll frame -> the offset the glide last set
+local _glideDriver
+
+local function ScrollOpt(key)
+    local db, D = BigNoteBoxDB, BNB.DEFAULTS
+    return (db and db[key]) or (D and D[key]) or 1
+end
+
+local function StopGlide(sf)
+    _glideTo[sf], _glideSet[sf] = nil, nil
+end
+
+local function GlideFrame(_, elapsed)
+    local k = math.min(1, elapsed * GLIDE_SPEED * ScrollOpt("smoothScrollSpeed"))
+    for sf, target in pairs(_glideTo) do
+        local cur = sf:GetVerticalScroll() or 0
+        local set = _glideSet[sf]
+        if not sf:IsVisible() or (set and math.abs(cur - set) > 0.5) then
+            StopGlide(sf)   -- hidden, or something else moved the view
+        else
+            -- The content may have shrunk since the notch
+            local range = sf:GetVerticalScrollRange() or 0
+            if target > range then target = range; _glideTo[sf] = range end
+            local left = target - cur
+            if math.abs(left) < 0.5 then
+                sf:SetVerticalScroll(target)
+                StopGlide(sf)
+            else
+                sf:SetVerticalScroll(cur + left * k)
+                _glideSet[sf] = sf:GetVerticalScroll()
+            end
+        end
+    end
+    if not next(_glideTo) then _glideDriver:Hide() end
+end
+
+-- The game's step for one notch from here: its handler runs, the view goes
+-- back. A step cut short at either end is not kept; the last whole one is
+-- used there instead
+local function NativeStep(sf, native, delta)
+    if not native then return sf._bnbWheelStep or 40 end
+    local cur = sf:GetVerticalScroll() or 0
+    native(sf, delta)
+    local new = sf:GetVerticalScroll() or 0
+    if new ~= cur then sf:SetVerticalScroll(cur) end
+    local step, range = math.abs(new - cur), sf:GetVerticalScrollRange() or 0
+    if step > 0 and new > 0 and new < range then sf._bnbWheelStep = step end
+    return sf._bnbWheelStep or step
+end
+
+local function OnWheel(sf, delta, native)
+    local db = BigNoteBoxDB
+    local smooth = not db or db.smoothScroll ~= false
+    local mult = ScrollOpt("smoothScrollStep")
+    if not smooth and mult == 1 and native then native(sf, delta); return end
+    local cur = sf:GetVerticalScroll() or 0
+    -- A glide something else has since moved: start from where the view is
+    local set = _glideSet[sf]
+    if set and math.abs(cur - set) > 0.5 then StopGlide(sf) end
+    local step = NativeStep(sf, native, delta) * mult
+    if step <= 0 then return end
+    local range = sf:GetVerticalScrollRange() or 0
+    local dir = delta > 0 and -1 or 1
+    local target = math.max(0, math.min(range, (_glideTo[sf] or cur) + dir * step))
+    if not smooth then sf:SetVerticalScroll(target); return end
+    if math.abs(target - cur) < 0.5 then StopGlide(sf); return end
+    _glideTo[sf], _glideSet[sf] = target, cur
+    if not _glideDriver then
+        _glideDriver = CreateFrame("Frame")
+        _glideDriver:Hide()
+        _glideDriver:SetScript("OnUpdate", GlideFrame)
+    end
+    _glideDriver:Show()
+end
+
+-- After the template (and Classic's bar swap) set their wheel handler
+local function AttachSmoothScroll(sf)
+    local native = sf:GetScript("OnMouseWheel")
+    sf:SetScript("OnMouseWheel", function(self, delta) OnWheel(self, delta, native) end)
+end
+
+--------------------------------------------------------------------------------
 -- SCROLL FRAME  (ALL-171 / ALL-172)
 -- Every ScrollFrameTemplate frame is made here. Retail and Forever get the
 -- template's MinimalScrollBar. Classic's template builds the wide
@@ -608,6 +710,7 @@ function BNB.CreateScrollFrame(name, parent)
         end
     end
     BNB.SkinScrollBar(sf.ScrollBar)
+    AttachSmoothScroll(sf)   -- ALL-593
     return sf
 end
 

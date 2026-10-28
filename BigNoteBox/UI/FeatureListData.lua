@@ -343,6 +343,7 @@ BNB.FEATURE_LIST = {
             "Bundled fonts, OpenDyslexic among them, and every LibSharedMedia font you have",
             "Per note: font, size, icon, icon frame, border and background",
             "Accessibility: turn off or slow down the sticky note animation",
+            "Smooth scrolling: the mouse wheel glides, with its speed and distance yours to set",
         },
     },
 
