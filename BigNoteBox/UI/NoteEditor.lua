@@ -287,6 +287,42 @@ local function RefreshRichBadge(note)
     PlaceTitle(rich)
 end
 
+-- The status bar's hover tooltip: the open note's full dates, zone and
+-- coords. One for the editor and Focus mode (both show BNB._currentNoteID),
+-- set as an OnEnter script: owner = the hover frame.
+function BNB.ShowNoteStatusTip(owner)
+    local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
+    if not note then return end
+    local db    = BigNoteBoxDB
+    local use24 = db == nil or db.use24Hour ~= false
+    local function AbsTime(ts)
+        if not ts or ts == 0 then return nil end
+        local d = BNB.Date("%Y-%m-%d", ts)
+        local t
+        if use24 then
+            t = BNB.Date("%H:%M", ts)
+        else
+            local h = tonumber(BNB.Date("%H", ts))
+            local ampm = h >= 12 and "pm" or "am"
+            h = h % 12; if h == 0 then h = 12 end
+            t = h .. ":" .. BNB.Date("%M", ts) .. " " .. ampm
+        end
+        return d .. " " .. t
+    end
+    local created = note.created and AbsTime(note.created)
+    local updated = note.updated and AbsTime(note.updated)
+    if not created and not updated then return end
+    GameTooltip:SetOwner(owner, "ANCHOR_TOP")
+    if created then GameTooltip:AddLine(string.format(L["NE_CREATED_FMT"], created), 0.7, 0.7, 0.7) end
+    if updated then GameTooltip:AddLine(string.format(L["NE_EDITED_FMT"], updated), 0.7, 0.7, 0.7) end
+    local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
+    GameTooltip:AddLine(string.format(L["NE_ZONE_FMT"], zone), 0.7, 0.7, 0.7)
+    if note.coordX and note.coordY then
+        GameTooltip:AddLine(string.format(L["NE_COORDS_FMT"], note.coordX, note.coordY), 0.7, 0.7, 0.7)
+    end
+    GameTooltip:Show()
+end
+
 local function BuildTitleField(parent)
     local bg = BNB.CreateBackdropFrame("Frame", nil, parent)
     bg:SetPoint("TOPLEFT",  parent, "TOPLEFT",  PAD,  -PAD)
@@ -519,38 +555,7 @@ local function BuildTitleField(parent)
     local tsHover = CreateFrame("Frame", nil, status)
     tsHover:SetAllPoints(status)
     tsHover:EnableMouse(true)
-    tsHover:SetScript("OnEnter", function(self)
-        local note = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
-        if not note then return end
-        local db    = BigNoteBoxDB
-        local use24 = db == nil or db.use24Hour ~= false
-        local function AbsTime(ts)
-            if not ts or ts == 0 then return nil end
-            local d = BNB.Date("%Y-%m-%d", ts)
-            local t
-            if use24 then
-                t = BNB.Date("%H:%M", ts)
-            else
-                local h = tonumber(BNB.Date("%H", ts))
-                local ampm = h >= 12 and "pm" or "am"
-                h = h % 12; if h == 0 then h = 12 end
-                t = h .. ":" .. BNB.Date("%M", ts) .. " " .. ampm
-            end
-            return d .. " " .. t
-        end
-        local created = note.created and AbsTime(note.created)
-        local updated = note.updated and AbsTime(note.updated)
-        if not created and not updated then return end
-        GameTooltip:SetOwner(self, "ANCHOR_TOP")
-        if created then GameTooltip:AddLine(string.format(L["NE_CREATED_FMT"], created), 0.7, 0.7, 0.7) end
-        if updated then GameTooltip:AddLine(string.format(L["NE_EDITED_FMT"], updated), 0.7, 0.7, 0.7) end
-        local zone = note.coordZone or L["CFG_EXPORT_UNKNOWN_AUTHOR"]
-        GameTooltip:AddLine(string.format(L["NE_ZONE_FMT"], zone), 0.7, 0.7, 0.7)
-        if note.coordX and note.coordY then
-            GameTooltip:AddLine(string.format(L["NE_COORDS_FMT"], note.coordX, note.coordY), 0.7, 0.7, 0.7)
-        end
-        GameTooltip:Show()
-    end)
+    tsHover:SetScript("OnEnter", BNB.ShowNoteStatusTip)
     tsHover:SetScript("OnLeave", function() GameTooltip:Hide() end)
     BNB._editorTsHover = tsHover   -- hidden with the strip in a rich note's Note view (ALL-286)
     -- Narrow window: the row gives way on the next frame (FitStatsRow, ALL-487)

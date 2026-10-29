@@ -16,12 +16,17 @@ local FOCUS_H   = 640   -- matches MainWindow DEFAULT_H
 local PAD       = 8
 local TSTAMP_H  = 16
 local TOOLBAR_H = 36
+-- The toolbar plus the status bar under it: the dates and counts moved from
+-- under the title to the bottom, as in the editor and the Explorer view
+-- (Dukul, 2026-10-28: "move the status bar to the bottom in focus mode too")
+local FOOT_H    = TOOLBAR_H + BNB.STATUS_H
 local TITLE_H   = 54    -- ButtonFrameTemplate title bar height
 local FADE_TIME = 0.18  -- seconds for cross-fade
 
 -- Fixed pixel offset for body scroll top anchor (relative to content top):
---   36px titleBg + 1px gap + 1px underline + 2px gap + TSTAMP_H + 4px gap
-local BODY_TOP_OFFSET = -(36 + 1 + 1 + 2 + TSTAMP_H + 4)
+--   36px titleBg + 1px gap + 1px underline + 2px gap + 1px top row + 4px gap
+-- (the top row is where the timestamp strip was, now 1 px: the bars hang off it)
+local BODY_TOP_OFFSET = -(36 + 1 + 1 + 2 + 1 + 4)
 local FOCUS_MARKUP_H = 28  -- height of the rich note markup toolbar in focus mode (= WYSIWYG_H)
 
 -- Module-level refs (all set inside BuildFocusFrame)
@@ -29,8 +34,10 @@ local focusFrame
 local focusTitleEb
 local focusTitleBg
 local focusTitleUl
-local focusTsStrip
-local focusStatsStrip   -- right-aligned char/word count on the same row
+local focusTsStrip      -- created / edited, left in the status bar
+local focusStatsStrip   -- char / word count, right in the status bar
+local focusStatusBar    -- the status bar at the bottom (BNB.CreateStatusBar)
+local focusTopRow       -- 1 px row under the title rule: the bars hang off it
 local focusBodyScroll
 local focusBodyEb
 local focusSaveBtn
@@ -350,18 +357,21 @@ local function ApplyFocusFont(note)
     end
 end
 
--- Under the timestamp strip: the formatting toolbar (Settings > Notes,
+-- Under the title rule: the formatting toolbar (Settings > Notes,
 -- focusWysiwygBar, ALL-163), then the rich markup bar, then the body
 local function LayoutFocusBars(note)
     local isRich = note and BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
     local wy = note and focusWyBar and not (BigNoteBoxDB and BigNoteBoxDB.focusWysiwygBar == false)
     if focusWyBar then
         if wy then focusWyBar:Show() else focusWyBar:Hide() end
+        -- No top line: the title's rule is right above it since the dates
+        -- moved to the status bar (ALL-611), as in the editor's UpdateBodyTopAnchor
+        if focusWyBar._sepT then focusWyBar._sepT:Hide() end
     end
     local off = BODY_TOP_OFFSET
     if wy then off = off - focusWyBar:GetHeight() - 2 end
     if focusMarkupBar then
-        local above = wy and focusWyBar or focusTsStrip
+        local above = wy and focusWyBar or focusTopRow
         focusMarkupBar:ClearAllPoints()
         focusMarkupBar:SetPoint("TOPLEFT",  above, "BOTTOMLEFT",  0, -2)
         focusMarkupBar:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
@@ -375,7 +385,7 @@ local function LayoutFocusBars(note)
     -- Find and replace (ALL-582): a row of its own under the bars while open
     local frow = BNB.FindReplace and BNB.FindReplace.RowOf("focus")
     if frow and frow:IsShown() then
-        local above = (isRich and focusMarkupBar) or (wy and focusWyBar) or focusTsStrip
+        local above = (isRich and focusMarkupBar) or (wy and focusWyBar) or focusTopRow
         frow:ClearAllPoints()
         frow:SetPoint("TOPLEFT",  above, "BOTTOMLEFT",  0, -2)
         frow:SetPoint("TOPRIGHT", above, "BOTTOMRIGHT", 0, -2)
@@ -408,6 +418,7 @@ local function LoadNoteInFocus(id)
         if focusTitleUl    then focusTitleUl:Hide()    end
         if focusTsStrip    then focusTsStrip:Hide()    end
         if focusStatsStrip then focusStatsStrip:Hide() end
+        if focusStatusBar  then focusStatusBar:Hide()  end
         if focusBodyScroll then focusBodyScroll:Hide() end
         if focusMarkupBar  then focusMarkupBar:Hide()  end
         if focusWyBar      then focusWyBar:Hide()      end
@@ -420,6 +431,7 @@ local function LoadNoteInFocus(id)
     if focusTitleUl    then focusTitleUl:Show()    end
     if focusTsStrip    then focusTsStrip:Show()    end
     if focusStatsStrip then focusStatsStrip:Show() end
+    if focusStatusBar  then focusStatusBar:Show()  end
     if focusBodyScroll then focusBodyScroll:Show() end
 
     -- Formatting toolbar, markup bar and body offset; then the note's font
@@ -683,6 +695,49 @@ local function BuildFocusMarkupBar(parent, anchorBelow)
     return bar
 end
 
+-- The status bar at the bottom of the window, the editor's (UI/NoteEditor.lua):
+-- created / edited on the left, the counts on the right, the full dates and
+-- zone on hover. Both builders call it; returns the 1 px row under the title
+-- rule that the formatting and markup bars hang off.
+local function BuildFocusStatus(f, pad, content, underline)
+    local topRow = CreateFrame("Frame", nil, content)
+    topRow:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
+    topRow:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
+    topRow:SetHeight(1)
+    focusTopRow = topRow
+
+    -- Focus mode is not resizable: no grip room at the right end
+    local status = BNB.CreateStatusBar(f, pad)
+    focusStatusBar = status
+
+    local tsStrip = status:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    tsStrip:SetPoint("LEFT",  status, "LEFT",  pad, 0)
+    tsStrip:SetPoint("RIGHT", status, "RIGHT", -pad, 0)
+    tsStrip:SetHeight(TSTAMP_H)
+    tsStrip:SetJustifyH("LEFT")
+    tsStrip:SetWordWrap(false)
+    tsStrip:SetText("")
+    BNB.SetTextWhite(tsStrip, 0.75)
+    focusTsStrip = tsStrip
+
+    local statsStrip = status:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    statsStrip:SetPoint("LEFT",  status, "LEFT",  pad, 0)
+    statsStrip:SetPoint("RIGHT", status, "RIGHT", -pad, 0)
+    statsStrip:SetHeight(TSTAMP_H)
+    statsStrip:SetJustifyH("RIGHT")
+    statsStrip:SetWordWrap(false)
+    statsStrip:SetText("")
+    BNB.SetTextWhite(statsStrip, 0.75)
+    focusStatsStrip = statsStrip
+
+    local hover = CreateFrame("Frame", nil, status)
+    hover:SetAllPoints(status)
+    hover:EnableMouse(true)
+    hover:SetScript("OnEnter", BNB.ShowNoteStatusTip)
+    hover:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    return topRow
+end
+
 --------------------------------------------------------------------------------
 -- BUILD FOCUS FRAME  (NORMAL VERSION -- ButtonFrameTemplate)
 --------------------------------------------------------------------------------
@@ -723,7 +778,7 @@ local function BuildFocusFrame()
 
     local content = CreateFrame("Frame", nil, f)
     content:SetPoint("TOPLEFT",     f, "TOPLEFT",     PAD, -TITLE_H)
-    content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, TOOLBAR_H)
+    content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, FOOT_H)
 
     local titleBg = BNB.CreateBackdropFrame("Frame", nil, content)
     titleBg:SetPoint("TOPLEFT",  content, "TOPLEFT",  0, 0)
@@ -778,28 +833,12 @@ local function BuildFocusFrame()
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
     focusTitleUl = underline
 
-    local tsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    tsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
-    tsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
-    tsStrip:SetHeight(TSTAMP_H)
-    tsStrip:SetJustifyH("LEFT")
-    tsStrip:SetTextColor(0.38, 0.38, 0.38)
-    tsStrip:SetText("")
-    focusTsStrip = tsStrip
-
-    local statsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    statsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
-    statsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
-    statsStrip:SetHeight(TSTAMP_H)
-    statsStrip:SetJustifyH("RIGHT")
-    statsStrip:SetTextColor(0.38, 0.38, 0.38)
-    statsStrip:SetText("")
-    focusStatsStrip = statsStrip
-
-    -- Formatting toolbar (ALL-163) and the markup bar for rich notes, both
-    -- below the timestamp strip; LayoutFocusBars stacks them per note
-    BuildFocusWysiwygBar(content, tsStrip)
-    BuildFocusMarkupBar(content, tsStrip)
+    -- Status bar at the bottom; the formatting toolbar (ALL-163) and the
+    -- markup bar for rich notes hang under the title rule, LayoutFocusBars
+    -- stacks them per note
+    local topRow = BuildFocusStatus(f, PAD, content, underline)
+    BuildFocusWysiwygBar(content, topRow)
+    BuildFocusMarkupBar(content, topRow)
 
     local bodyPath, bodySize
     if BNB.GetBodyFont then bodyPath, bodySize = BNB.GetBodyFont() end
@@ -924,20 +963,21 @@ local function BuildFocusFrame()
     -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, TOOLBAR_H + 4)
-    hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, TOOLBAR_H + 4)
+    hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, FOOT_H + 4)
+    hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, FOOT_H + 4)
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(0.30, 0.30, 0.30, 1)
     hintLbl:SetText(L["FE_UNDO_REDO_HINT"])
 
+    -- The toolbar sits on the status bar
     local toolbar = CreateFrame("Frame", nil, f)
-    toolbar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)
-    toolbar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    toolbar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, BNB.STATUS_H)
+    toolbar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, BNB.STATUS_H)
     toolbar:SetHeight(TOOLBAR_H)
 
     local toolSep = BNB.CreateDivider(f, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
-    toolSep:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, TOOLBAR_H)
-    toolSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, TOOLBAR_H)
+    toolSep:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD, FOOT_H)
+    toolSep:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, FOOT_H)
 
     local ASSETS = "Interface\\AddOns\\BigNoteBox\\Assets\\"
     local sBtn = CreateFrame("Button", nil, toolbar)
@@ -1037,7 +1077,7 @@ local function BuildFocusFrameSkin()
     -- ── Content area ──────────────────────────────────────────────────────────
     local content = CreateFrame("Frame", nil, f)
     content:SetPoint("TOPLEFT",     f, "TOPLEFT",     SK_FOCUS_PAD, -SK_FOCUS_TITLE_H)
-    content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, TOOLBAR_H)
+    content:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, FOOT_H)
 
     -- Title background (same as normal version)
     local titleBg = BNB.CreateBackdropFrame("Frame", nil, content)
@@ -1093,28 +1133,12 @@ local function BuildFocusFrameSkin()
     underline:SetPoint("TOPRIGHT", titleBg, "BOTTOMRIGHT", 0, -1)
     focusTitleUl = underline
 
-    local tsStrip = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    tsStrip:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
-    tsStrip:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
-    tsStrip:SetHeight(TSTAMP_H)
-    tsStrip:SetJustifyH("LEFT")
-    tsStrip:SetTextColor(0.38, 0.38, 0.38)
-    tsStrip:SetText("")
-    focusTsStrip = tsStrip
-
-    local statsStrip2 = content:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    statsStrip2:SetPoint("TOPLEFT",  underline, "BOTTOMLEFT",  2, -2)
-    statsStrip2:SetPoint("TOPRIGHT", underline, "BOTTOMRIGHT", -2, -2)
-    statsStrip2:SetHeight(TSTAMP_H)
-    statsStrip2:SetJustifyH("RIGHT")
-    statsStrip2:SetTextColor(0.38, 0.38, 0.38)
-    statsStrip2:SetText("")
-    focusStatsStrip = statsStrip2
-
-    -- Formatting toolbar (ALL-163) and the markup bar for rich notes, both
-    -- below the timestamp strip; LayoutFocusBars stacks them per note
-    BuildFocusWysiwygBar(content, tsStrip)
-    BuildFocusMarkupBar(content, tsStrip)
+    -- Status bar at the bottom; the formatting toolbar (ALL-163) and the
+    -- markup bar for rich notes hang under the title rule, LayoutFocusBars
+    -- stacks them per note
+    local topRow = BuildFocusStatus(f, SK_FOCUS_PAD, content, underline)
+    BuildFocusWysiwygBar(content, topRow)
+    BuildFocusMarkupBar(content, topRow)
 
     -- Body scroll (identical to normal version)
     local bodyPath, bodySize
@@ -1240,23 +1264,23 @@ local function BuildFocusFrameSkin()
     -- in View mode and the previews (Dukul, 2026-10-25; UI/TextLines.lua)
 
     local hintLbl = f:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, TOOLBAR_H + 4)
-    hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, TOOLBAR_H + 4)
+    hintLbl:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, FOOT_H + 4)
+    hintLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, FOOT_H + 4)
     hintLbl:SetJustifyH("CENTER")
     hintLbl:SetTextColor(0.30, 0.30, 0.30, 1)
     hintLbl:SetText(L["FE_UNDO_REDO_HINT"])
 
-    -- ── Bottom toolbar strip ──────────────────────────────────────────────────
+    -- ── Bottom toolbar strip (on the status bar) ──────────────────────────────
     local toolbar = BNB.CreateSkinStrip(f, false, false)
-    toolbar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, 0)
-    toolbar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, 0)
+    toolbar:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  0, BNB.STATUS_H)
+    toolbar:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", 0, BNB.STATUS_H)
     toolbar:SetHeight(TOOLBAR_H)
 
     -- Separator (host frame avoids backdrop overdraw)
     local toolSepHost = CreateFrame("Frame", nil, f)
     toolSepHost:SetHeight(1)
-    toolSepHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, TOOLBAR_H)
-    toolSepHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, TOOLBAR_H)
+    toolSepHost:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  SK_FOCUS_PAD, FOOT_H)
+    toolSepHost:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -SK_FOCUS_PAD, FOOT_H)
     local toolSep = BNB.CreateDivider(toolSepHost, "HORIZONTAL", 0.28, 0.28, 0.30, 1)
     toolSep:SetPoint("TOPLEFT",  toolSepHost, "TOPLEFT",  0, 0)
     toolSep:SetPoint("TOPRIGHT", toolSepHost, "TOPRIGHT", 0, 0)
@@ -1293,6 +1317,42 @@ local function BuildFocusFrameSkin()
     -- World event art on the title bar, as the big windows (ALL-584)
     if BNB.DecorateToolWindow then BNB.DecorateToolWindow(f, "BigNoteBoxFocusFrame") end
     f:Hide()
+end
+
+--------------------------------------------------------------------------------
+-- TOOLTIPS WHILE THE UI IS HIDDEN
+-- GameTooltip is a child of UIParent, so with "hide UI" no tooltip showed in
+-- Focus mode (Dukul, 2026-10-28). While UIParent is hidden it sits on
+-- WorldFrame at the UI scale, as BNB.SeatWindow does for windows, and goes
+-- back when Focus mode closes. A tooltip whose owner is not visible (the
+-- game's unit tooltip on mouseover, owned by the hidden UIParent) is hidden
+-- at once, so the world shows none while you write.
+--------------------------------------------------------------------------------
+local _tipSeat      -- { parent, scale } before the move; nil = not moved
+local _tipHooked = false
+local function SeatTooltip()
+    if _tipSeat or UIParent:IsShown() then return end
+    _tipSeat = { GameTooltip:GetParent(), GameTooltip:GetScale() }
+    GameTooltip:SetParent(WorldFrame)
+    GameTooltip:SetScale(_tipSeat[2] * UIParent:GetScale())
+    GameTooltip:SetFrameStrata("TOOLTIP")
+    if not _tipHooked then
+        _tipHooked = true
+        GameTooltip:HookScript("OnShow", function(self)
+            if not _tipSeat then return end
+            local owner = self:GetOwner()
+            if not (owner and owner:IsVisible()) then self:Hide() end
+        end)
+    end
+end
+local function UnseatTooltip()
+    if not _tipSeat then return end
+    local parent, scale = _tipSeat[1], _tipSeat[2]
+    _tipSeat = nil
+    GameTooltip:Hide()
+    GameTooltip:SetParent(parent or UIParent)
+    GameTooltip:SetScale(scale or 1)
+    GameTooltip:SetFrameStrata("TOOLTIP")
 end
 
 --------------------------------------------------------------------------------
@@ -1399,6 +1459,7 @@ function BNB.OpenFocusMode()
             if InCombatLockdown() then return end
             if focusFrame and focusFrame:IsShown() then
                 UIParent:Hide()
+                SeatTooltip()
             end
         end)
     end
@@ -1461,6 +1522,7 @@ function BNB.CloseFocusMode()
 
     -- Always restore UIParent in case full-UI-hide was active
     UIParent:Show()
+    UnseatTooltip()
     -- A Reference Box opened over Focus mode goes back beside the main window
     if BNB.RefBoxLeaveFocus then BNB.RefBoxLeaveFocus() end
 
