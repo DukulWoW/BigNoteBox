@@ -8,6 +8,18 @@
 ## Dependencies: BigNoteBox
 ## LoadOnDemand: 1
 
+## Category-enUS: Notes & Organization
+## Category-deDE: Notizen & Organisation
+## Category-esES: Notas y organización
+## Category-esMX: Notas y organización
+## Category-frFR: Notes et organisation
+## Category-itIT: Note e organizzazione
+## Category-koKR: 메모 및 정리
+## Category-ptBR: Notas e organização
+## Category-ruRU: Заметки и организация
+## Category-zhCN: 笔记与整理
+## Category-zhTW: 筆記與整理
+
 enUS.lua
 enGB.lua
 WoWWords.lua

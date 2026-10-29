@@ -7,6 +7,18 @@
 ## Version: 1.0.0
 ## SavedVariables: BigNoteBoxDevDB
 
+## Category-enUS: Development Tools
+## Category-deDE: Entwicklungstools
+## Category-esES: Herramientas de desarrollo
+## Category-esMX: Herramientas de desarrollo
+## Category-frFR: Outils de développement
+## Category-itIT: Strumenti di sviluppo
+## Category-koKR: 개발 도구
+## Category-ptBR: Ferramentas de desenvolvimento
+## Category-ruRU: Инструменты разработки
+## Category-zhCN: 开发工具
+## Category-zhTW: 開發工具
+
 BigNoteBox_Dev.lua
 ButtonTest.lua
 IconProbe.lua
