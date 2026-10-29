@@ -1,229 +1,39 @@
 -- BigNoteBox UI/WhatsNew.lua
 --
--- "What's New?" window, opened from the version button in Settings > General
--- (and /bnb whatsnew). Since ALL-409 an update no longer opens it: a toast
--- opens the release in the Patch notes system folder (ALL-511, see "Patch
--- note" below).
+-- Patch notes. Since ALL-614 (Dukul, 2026-10-29) they live in the Help book's
+-- Patch notes tab (UI/HelpBook.lua), one page per release, so they no longer
+-- fill the note list: the Patch notes system folder (ALL-511) and the old
+-- "What's New?" window are gone. An update shows a toast that waits for a
+-- click and opens that release in the Help book.
 --
 -- PUBLIC API:
---   BNB.WhatsNew.Open(showOverlay)   -- showOverlay: true = dimmer behind it, false = none
---   BNB.WhatsNew.Close()
+--   BNB.WhatsNew.Open()                    -- the Help book at the newest release
+--                                             (Settings > General version button,
+--                                             /bnb whatsnew, the bnbui:whatsnew link)
+--   BNB.WhatsNew.Releases()                -- { { version, time, lines }, ... } newest
+--                                             first, this client's lines only
+--   BNB.WhatsNew.PatchBody(version, lines, rich)  -- a release as note text
 --   BNB.WhatsNew.CheckAndShow(newInstall)  -- called on login; the toast if the version is new
---   BNB.WhatsNew.PatchNoteID(version)      -- that release's note in the Patch notes folder
 --
 -- DATA:
 --   BNB.PATCH_NOTES  (defined in UI/WhatsNewData.lua)
---     .version  string  -- must match BNB.ADDON_VERSION to trigger auto-show
+--     .version  string  -- must match BNB.ADDON_VERSION to trigger the toast
 --     .entries  table   -- array, one per bullet. A plain string shows on every client;
 --                          { forever = true, "text" } / { retail = true, "text" } shows on
 --                          that client only (BNB.IsForever). A release with no lines for
---                          this client does not auto-show.
+--                          this client shows no toast.
+--   BNB.PATCH_HISTORY (UI/PatchHistory.lua, generated at each release tag)
 --
 -- PERSISTENCE:
---   BigNoteBoxDB.lastSeenWhatsNewVersion  -- set to version on close (no longer read)
+--   BigNoteBoxDB.lastSeenWhatsNewVersion  -- from the old window, no longer written or read
 --   NotesDB().patchNote = { version, id, sum }  -- the version seen; id / sum = the
 --                         last pinned patch note (before ALL-511), until it is gone
---
--- WINDOW SIZING:
---   Width  : CFG_W (480px) -- same as ConfigWindow
---   Height : grows with content from WN_MIN_H (300px) up to mainFrame:GetHeight() cap
---   When content exceeds cap: scrollbar appears, window stays at cap height
---
--- CHROME:
---   Normal mode : ButtonFrameTemplate (matches ConfigWindow)
---   Skin mode   : BNB.CreateSkinFrame + BNB.CreateSkinStrip title bar
---
--- OVERLAY:
---   Cosmetic full-screen dimmer behind the window (auto-popup only).
---   EnableMouse(false) -- click-through; does not block game interaction.
---   Skin mode + focusOverlayUseSkinColor: tinted with skin preset colour.
---   Dismissed when window closes.
 
 local BNB = BigNoteBox
 local L   = BNB.L
 
 BNB.WhatsNew = BNB.WhatsNew or {}
 local WN = BNB.WhatsNew
-
--- ── Layout constants ──────────────────────────────────────────────────────────
-local CFG_W       = 480     -- matches ConfigWindow
-local WN_MIN_H    = 300     -- window grows from this minimum
-local PAD         = 16
-local TITLE_H_N   = 28      -- ButtonFrameTemplate title bar (normal mode)
-local OK_BTN_H    = 44      -- height of the OK button
-local OK_BTN_PAD  = 10      -- padding above and below OK button area
-local ENTRY_PAD_X = 12      -- horizontal padding inside scroll area
-local ENTRY_GAP   = 6       -- vertical gap between entries
-local ENTRY_FONT_SIZE = 13  -- patch note entry font size in pixels (increase to fit fewer lines, decrease for more)
-local BULLET      = "|cff66bb6a-|r "   -- BNB green bullet prefix
-
--- ── Module state ──────────────────────────────────────────────────────────────
-local _frame    = nil   -- the window frame (built once, reused)
-local _overlay  = nil   -- the cosmetic dimmer (built once, reused)
-
--- ── AutoCast glow (LibCustomGlow-1.0) ─────────────────────────────────────────
--- The LCG lookup, start/stop and the skin-tinted overlay colour check are
--- shared with FeatureList/SetupWizard/DangerZone/FocusEditor in
--- UI/GlowOverlay.lua (ALL-65.4). BNB.StartWindowGlow/StopWindowGlow are the
--- default (BNB-green) window glow; other windows (Report a bug, ALL-73;
--- note-type "add" dialog, ALL-71) call them directly with their own key.
-local GLOW_KEY = "bnb_whatsnew"
-
-local function StartGlow(f, key)
-    BNB.StartWindowGlow(f, key or GLOW_KEY)
-end
-
-local function StopGlow(f, key)
-    BNB.StopWindowGlow(f, key or GLOW_KEY)
-end
-
--- ── Overlay ───────────────────────────────────────────────────────────────────
-local _overlayColor = BNB.OverlayColor
-
-local function GetOverlay()
-    if _overlay then return _overlay end
-    local ov = CreateFrame("Frame", nil, UIParent)
-    ov:SetAllPoints()
-    ov:SetFrameStrata("DIALOG")  -- window is also DIALOG; lower frame level keeps overlay behind
-    ov:SetFrameLevel(1)
-    ov:EnableMouse(false)       -- cosmetic only; clicks pass through
-    local tex = ov:CreateTexture(nil, "BACKGROUND")
-    tex:SetAllPoints()
-    tex:SetColorTexture(0, 0, 0, 1)
-    ov._tex = tex
-    ov:Hide()
-    -- Re-tint when skin changes
-    if BNB.RegisterSkinBackdrop then
-        BNB.RegisterSkinBackdrop(function()
-            if ov:IsShown() then
-                local r, g, b = _overlayColor()
-                ov._tex:SetColorTexture(r, g, b, 0.6)
-            end
-        end)
-    end
-    _overlay = ov
-    return ov
-end
-
-local function ShowOverlay()
-    local ov = GetOverlay()
-    local r, g, b = _overlayColor()
-    ov._tex:SetColorTexture(r, g, b, 0.6)
-    ov:Show()
-end
-
-local function HideOverlay()
-    if _overlay then _overlay:Hide() end
-end
-
--- ── Height calculation ────────────────────────────────────────────────────────
-local function GetMaxHeight()
-    if BNB.mainFrame then
-        local h = BNB.mainFrame:GetHeight()
-        if h and h > 100 then return h end
-    end
-    -- Fallback: use ConfigWindow helper if available
-    if BNB._GetConfigTargetHeight then
-        return BNB._GetConfigTargetHeight()
-    end
-    return math.min(math.max(math.floor(UIParent:GetHeight() * 0.75), WN_MIN_H), 900)
-end
-
--- ── Window chrome, both modes (CMP-02 S3) ─────────────────────────────────────
-local function BuildFrame(onClose)
-    local f = BNB.CreateToolWindow({
-        name = "BigNoteBoxWhatsNewFrame", w = CFG_W, h = WN_MIN_H,   -- sized to the notes later
-        title = string.format(L["WN_TITLE_FMT"], BNB.ADDON_VERSION or "?"),
-        toplevel = true, escClose = true, onClose = onClose,
-    })
-    return f, f._isSkin and BNB.TOOL_SKIN_TITLE_H or TITLE_H_N
-end
-
--- ── Build the window (once) ───────────────────────────────────────────────────
-local function BuildWindow()
-    local skinMode = BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false
-
-    -- Rebuild if skin mode changed since the frame was first created
-    if _frame and _frame._builtSkin ~= skinMode then
-        _frame:Hide()
-        _frame:SetParent(nil)
-        _frame = nil
-    end
-
-    if _frame then return _frame end
-
-    local onClose = function() WN.Close() end
-
-    local f, titleH = BuildFrame(onClose)
-
-    -- Store titleH on frame for content positioning
-    f._titleH = titleH
-
-    -- ── OK button area — fixed at bottom, always visible ──────────────────────
-    -- Anchored to the bottom of the frame BEFORE the scroll area so it's
-    -- always accessible regardless of content length.
-    local okArea = CreateFrame("Frame", nil, f)
-    okArea:SetPoint("BOTTOMLEFT",  f, "BOTTOMLEFT",  PAD,  PAD)
-    okArea:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD, PAD)
-    okArea:SetHeight(OK_BTN_H + OK_BTN_PAD)
-    f._okArea = okArea
-
-    local okBtn
-    if skinMode then
-        okBtn = BNB.CreateSkinButton(nil, okArea, BNB.RandomOkPhrase(), okArea:GetWidth() or (CFG_W - PAD * 2), OK_BTN_H, 16)
-    else
-        local tpl = "SharedButtonLargeTemplate"
-        okBtn = CreateFrame("Button", nil, okArea, tpl)
-        okBtn:SetSize(okArea:GetWidth() or (CFG_W - PAD * 2), OK_BTN_H)
-        pcall(function() DynamicResizeButton_Resize(okBtn) end)
-        okBtn:SetText(BNB.RandomOkPhrase())
-        local bfs = okBtn:GetFontString()
-        if bfs then pcall(function() bfs:SetFont(BNB.GetLocaleFont(), 16, "") end) end
-    end
-    okBtn:SetPoint("BOTTOM", okArea, "BOTTOM", 0, 0)
-    f._okBtn = okBtn
-    okBtn:SetScript("OnClick", onClose)
-
-    -- The OK area width is not valid at build time (frame not laid out yet).
-    -- Re-set it when the frame is shown so the button fills correctly.
-    f:HookScript("OnShow", function()
-        local w = okArea:GetWidth()
-        if w and w > 0 then okBtn:SetWidth(w) end
-    end)
-
-    -- ── Scroll area — fills between title bar and OK area ─────────────────────
-    local BOTTOM_CHROME = OK_BTN_H + OK_BTN_PAD * 2 + PAD
-
-    local sf = BNB.CreateScrollFrame(nil, f)
-    sf:SetPoint("TOPLEFT",     f,  "TOPLEFT",  PAD,  -(titleH + PAD))
-    sf:SetPoint("BOTTOMRIGHT", f,  "BOTTOMRIGHT", -24, BOTTOM_CHROME)
-    f._sf = sf
-
-    local bar = sf.ScrollBar
-    if bar then bar:SetAlpha(0) end
-
-    local ct = CreateFrame("Frame", nil, sf)
-    ct:SetWidth(CFG_W - PAD * 2 - 24)
-    ct:SetHeight(1)
-    sf:SetScrollChild(ct)
-    f._ct = ct
-
-    -- Scrollbar auto-show/hide
-    sf:HookScript("OnSizeChanged", function()
-        local sfH = sf:GetHeight()
-        if sfH < 4 then return end
-        local ctH = ct._contentH or 0
-        ct:SetHeight(math.max(ctH, sfH))
-        if bar then
-            bar:SetAlpha(ctH > sfH + 2 and 1 or 0)
-        end
-    end)
-
-    f:Hide()
-    f._builtSkin = skinMode
-    _frame = f
-    return f
-end
 
 -- ── Entries for this client ──────────────────────────────────────────────────
 -- Drops lines tagged for the other client and unwraps tagged ones to their text.
@@ -244,124 +54,10 @@ local function ClientEntries(entries)
     return out
 end
 
--- ── Populate entries into the scroll content frame ────────────────────────────
-local function PopulateEntries(ct, entries)
-    -- Clear old children
-    for _, child in ipairs({ ct:GetRegions() }) do
-        child:Hide()
-        child:SetParent(nil)
-    end
-
-    local availW = ct:GetWidth() - ENTRY_PAD_X * 2
-    local y = -PAD
-    for _, entry in ipairs(entries or {}) do
-        local fs = ct:CreateFontString(nil, "ARTWORK", "BNBFontNormalSmall")
-        fs:SetFont("Fonts\\FRIZQT__.TTF", ENTRY_FONT_SIZE, "")
-        fs:SetPoint("TOPLEFT", ct, "TOPLEFT", ENTRY_PAD_X, y)
-        fs:SetWidth(availW)
-        fs:SetJustifyH("LEFT")
-        fs:SetWordWrap(true)
-        fs:SetSpacing(2)
-        fs:SetTextColor(0.88, 0.88, 0.88)
-        fs:SetText(BULLET .. entry)
-        local h = fs:GetStringHeight()
-        if h < 14 then h = 14 end
-        y = y - h - ENTRY_GAP
-    end
-    y = y - PAD
-
-    local contentH = math.abs(y)
-    ct._contentH = contentH
-    return contentH
-end
-
--- ── Size the window to fit content ───────────────────────────────────────────
-local function ApplyWindowHeight(f, contentH)
-    local maxH  = GetMaxHeight()
-    local chrome = f._titleH + PAD + (OK_BTN_H + OK_BTN_PAD * 2 + PAD) + PAD
-    local ideal  = contentH + chrome
-    local final  = math.max(WN_MIN_H, math.min(ideal, maxH))
-    f:SetSize(CFG_W, final)
-
-    -- Update scroll child height and scrollbar visibility
-    local sf  = f._sf
-    local ct  = f._ct
-    local bar = sf and sf.ScrollBar
-    if sf and ct then
-        local sfH = sf:GetHeight()
-        if sfH < 4 then
-            -- Not laid out yet; defer one tick
-            C_Timer.After(0.05, function()
-                sfH = sf:GetHeight()
-                ct:SetHeight(math.max(contentH, sfH))
-                if bar then
-                    bar:SetAlpha(contentH > sfH + 2 and 1 or 0)
-                end
-            end)
-        else
-            ct:SetHeight(math.max(contentH, sfH))
-            if bar then
-                bar:SetAlpha(contentH > sfH + 2 and 1 or 0)
-            end
-        end
-    end
-end
-
--- ── Public: Open ─────────────────────────────────────────────────────────────
--- showOverlay: true  = auto-popup path (dimmer visible)
---              false = manual open from version button (no dimmer)
-function WN.Open(showOverlay)
-    local data = BNB.PATCH_NOTES
-    if not data then return end
-
-    local f = BuildWindow()
-
-    -- Randomize OK button label on each open
-    if f._okBtn then f._okBtn:SetText(BNB.RandomOkPhrase()) end
-
-    -- Populate entries and measure
-    local contentH = PopulateEntries(f._ct, ClientEntries(data.entries))
-
-    -- Position CENTER before sizing so GetHeight() is valid when we check maxH
-    f:ClearAllPoints()
-    f:SetPoint("CENTER")
-
-    ApplyWindowHeight(f, contentH)
-    f:Show()
-    f:Raise()
-    StartGlow(f)
-
-    -- Ensure overlay strata is just below the window
-    if showOverlay then
-        ShowOverlay()
-        -- Pull overlay just below the window frame level
-        local ov = GetOverlay()
-        ov:SetFrameLevel(math.max(1, f:GetFrameLevel() - 1))
-    else
-        HideOverlay()
-    end
-end
-
--- ── Public: Close ─────────────────────────────────────────────────────────────
-function WN.Close()
-    HideOverlay()
-    if _frame then
-        StopGlow(_frame)
-        _frame:Hide()
-    end
-    -- Mark this version as seen so it won't auto-show again
-    local data = BNB.PATCH_NOTES
-    if data and data.version and BigNoteBoxDB then
-        BigNoteBoxDB.lastSeenWhatsNewVersion = data.version
-    end
-end
-
 -- ── Patch note (ALL-409, ALL-511) ────────────────────────────────────────────
--- An update no longer opens the window: a toast that waits for a click
--- (source "patchnotes", so it follows the Toasts module) opens the release in
--- the Patch notes system folder (below; Dukul, 2026-10-19: the folder
--- replaces the pinned patch note). The window stays on the version button,
--- and the toast opens it while the Patch notes folder is switched off.
+-- An update shows a toast that waits for a click (source "patchnotes", so it
+-- follows the Toasts module) and opens the release in the Help book's Patch
+-- notes tab (ALL-614; before it the Patch notes system folder, ALL-511).
 --
 -- From ALL-409 to ALL-511 the release became a pinned, favourite, Global
 -- note tagged Bnb / V1.23.0 / V1.23. That last note goes at the next update
@@ -458,35 +154,25 @@ local function PatchBody(version, entries, rich)
     return table.concat(out, "\n")
 end
 
--- ── Patch notes system folder (ALL-511) ──────────────────────────────────────
+WN.PatchBody = PatchBody
+
+-- ── Releases (ALL-614) ───────────────────────────────────────────────────────
 -- Every release in UI/PatchHistory.lua (newest first, made from the release
--- tags by _work/tools/patch-history.lua) as a read-only note in the Patch
--- notes folder (Core/SystemNotes.lua), built the way the patch note above is.
--- The release in WhatsNewData.lua goes on top while the history file does not
--- have it yet; a release with no lines for this client is left out. Hide
--- saves the version (sysItem).
-local PN_SYS_PREFIX = "sys-pn-"
-
-function WN.PatchNoteID(version) return PN_SYS_PREFIX .. version end
-
-local function BuildPatchFolder(rich)
+-- tags by _work/tools/patch-history.lua), with the release in WhatsNewData.lua
+-- on top while the history file does not have it yet. Only this client's
+-- lines; a release with none is left out. For the Help book's Patch notes tab.
+function WN.Releases()
     local list, seen = {}, {}
     local function Add(version, entries, when)
         if seen[version] then return end
         seen[version] = true
         local lines = ClientEntries(entries)
         if #lines == 0 then return end
-        list[#list + 1] = {
-            id      = PN_SYS_PREFIX .. version,
-            title   = string.format(L["PN_NOTE_TITLE"], version),
-            body    = PatchBody(version, lines, rich),
-            created = when or time(),
-            sysItem = version,
-        }
+        list[#list + 1] = { version = version, time = when, lines = lines }
     end
     local cur  = BNB.PATCH_NOTES
     local hist = BNB.PATCH_HISTORY or {}
-    if cur and cur.version and not (hist[1] and hist[1].version == cur.version) then
+    if cur and cur.version then
         local inHist
         for _, r in ipairs(hist) do
             if r.version == cur.version then inHist = true; break end
@@ -497,16 +183,9 @@ local function BuildPatchFolder(rich)
     return list
 end
 
-if BNB.SystemNotes then
-    BNB.SystemNotes.Register({
-        key = "patchnotes", order = 10, name = "SYS_FOLDER_PATCHNOTES",
-        setting = "sysPatchNotes", prefix = PN_SYS_PREFIX, canHide = true,
-        r = 0x66 / 255, g = 0xbb / 255, b = 0x6a / 255,   -- BNB green
-        icon = "Interface\\AddOns\\BigNoteBox\\Assets\\icon",   -- the addon icon (Dukul, 2026-10-19)
-        -- Round logo: Simple Glass Orb frame, not the square border (Dukul, 2026-10-22)
-        iconFrame = "ui-glyphframe-2",
-        Build = BuildPatchFolder,
-    })
+-- The Help book at the newest release (the version button, /bnb whatsnew)
+function WN.Open()
+    if BNB.HelpBook and BNB.HelpBook.OpenPatchNotes then BNB.HelpBook.OpenPatchNotes() end
 end
 
 -- The last pinned patch note goes, unless the player made it theirs; either
@@ -545,11 +224,8 @@ local function ShowPatchToast(version)
         text   = string.format(L["PN_TOAST_TEXT"], version),
         hold   = 0,   -- waits for a click
         onClick = function()
-            -- The release in the Patch notes folder; the window while the
-            -- folder is switched off
-            local id = WN.PatchNoteID(version)
-            if BNB.OpenNoteInMain and BNB.GetNote(id) then BNB.OpenNoteInMain(id)
-            else WN.Open(false) end
+            -- That release in the Help book's Patch notes tab (ALL-614)
+            if BNB.HelpBook and BNB.HelpBook.OpenPatchNotes then BNB.HelpBook.OpenPatchNotes(version) end
         end,
     })
 end

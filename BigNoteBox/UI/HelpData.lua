@@ -6,7 +6,7 @@
 
 local BNB = BigNoteBox
 
-BNB.HELP_BUILT = 1793190620
+BNB.HELP_BUILT = 1793293095
 -- The help book's chapters (ALL-554), in book order: a doc-mode folder each;
 -- body / icon / rich = its Cover note ("" / nil when it has none)
 BNB.HELP_CHAPTERS = {

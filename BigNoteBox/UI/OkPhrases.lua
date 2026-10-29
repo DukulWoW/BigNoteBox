@@ -1,7 +1,8 @@
 -- BigNoteBox UI/OkPhrases.lua
 --
--- Shared pool of lore-friendly OK button phrases used by WhatsNew and
--- FeatureList. Add new entries here to have them appear in both windows.
+-- Shared pool of lore-friendly OK button phrases. Its two windows (What's
+-- New, Features) moved into the Help book (ALL-554, ALL-614); the pool is
+-- kept for the next OK button that wants one.
 --
 -- PUBLIC API:
 --   BNB.RandomOkPhrase()  ->  string

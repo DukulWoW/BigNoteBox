@@ -28,10 +28,17 @@
 -- note, so the book swaps the light link colours for darker ones and tints
 -- the white Assets art (toolbar, explorer, doc icons) brown (Parchment).
 --
+-- Patch notes (ALL-614, Dukul, 2026-10-29): a third tab right of Features,
+-- one page per release (BNB.WhatsNew.Releases, newest first, no cover), the
+-- version numbers in Contents; it replaced the Patch notes system folder and
+-- the "What's New?" window. The update toast opens its release here.
+--
 -- Public API:
 --   BNB.HelpBook.Open(key, which)   opens the book at that topic (nil = the
---                            cover); which = "features" opens the Features tab
+--                            cover); which = "features" / "patches" opens that tab
 --   BNB.HelpBook.OpenFeatures()
+--   BNB.HelpBook.OpenPatchNotes(version)   the Patch notes tab at that
+--                            release (nil = the newest)
 --   BNB.HelpBook.Close()
 --   BNB.HelpBook.Toggle()
 
@@ -128,9 +135,11 @@ local frame, coverFont, chapterFont, chapterRowFont
 -- { kind = "chapter", chapter = { ch, topics }, no = its number, first =
 -- the index of its first topic }. A feature: { kind = "feature", sec = its
 -- FEATURE_LIST section }. The Features book has no cover: it starts at 1
+-- "patches" = the releases, { kind = "patch", rel = a BNB.WhatsNew.Releases()
+-- entry }, no cover either (ALL-614)
 local book = "docs"
-local sets = { docs = {}, features = {} }
-local hays = { docs = {}, features = {} }
+local sets = { docs = {}, features = {}, patches = {} }
+local hays = { docs = {}, features = {}, patches = {} }
 local pages = sets.docs
 local hay = hays.docs      -- hay[i] = pages[i]'s text, plain and lower case (search)
 local current = 0          -- 0 = the cover, i = pages[i]
@@ -213,6 +222,49 @@ local function BuildBorder(f)
     return ns
 end
 
+-- The housing wood frame (ALL-615, Dukul, 2026-10-29: the Neutral border "is
+-- to thick and looks weird"): one picture with a see-through middle, cut in
+-- nine so the corners keep their size and the rails stretch, drawn at its own
+-- size (448 x 320; the file is the 2x one). Retail and Forever have the file;
+-- Classic keeps the Neutral border (Dukul: "The frame exists in Forever, not
+-- Classic")
+local WOOD      = "Interface\\Housing\\HousingWoodFrame2x"   -- file 7012488
+local WOOD_FILE = 1024       -- the file's size
+local WOOD_W, WOOD_H = 896, 640   -- the frame in the file, from (1, 1)
+local WOOD_CW, WOOD_CH = 120, 90  -- a corner in file pixels (the bottom leaves fit)
+
+local function HasWood()
+    if BNB.IsClassic then return false end
+    return not (C_UIFileAsset and C_UIFileAsset.IsKnownFile) or C_UIFileAsset.IsKnownFile(WOOD) and true or false
+end
+
+local function BuildWood(f)
+    local ns = CreateFrame("Frame", nil, f)
+    ns:SetAllPoints(f)
+    ns:SetFrameLevel(f:GetFrameLevel() + 20)
+    local o = 1 / WOOD_FILE
+    local xs = { 1, 1 + WOOD_CW, 1 + WOOD_W - WOOD_CW, 1 + WOOD_W }
+    local ys = { 1, 1 + WOOD_CH, 1 + WOOD_H - WOOD_CH, 1 + WOOD_H }
+    local cw, ch = WOOD_CW / 2, WOOD_CH / 2   -- on screen
+    -- Per column: the left and right edge (anchor point on f, x offset);
+    -- per row: the top and bottom edge
+    local COLS = { { "LEFT", 0, "LEFT", cw }, { "LEFT", cw, "RIGHT", -cw }, { "RIGHT", -cw, "RIGHT", 0 } }
+    local ROWS = { { "TOP", 0, "TOP", -ch }, { "TOP", -ch, "BOTTOM", ch }, { "BOTTOM", ch, "BOTTOM", 0 } }
+    for r = 1, 3 do
+        for c = 1, 3 do
+            if r ~= 2 or c ~= 2 then   -- the middle is see-through
+                local t = ns:CreateTexture(nil, "BORDER")
+                t:SetTexture(WOOD)
+                t:SetTexCoord(xs[c] * o, xs[c + 1] * o, ys[r] * o, ys[r + 1] * o)
+                local col, row = COLS[c], ROWS[r]
+                t:SetPoint("TOPLEFT",     f, row[1] .. col[1], col[2], row[2])
+                t:SetPoint("BOTTOMRIGHT", f, row[3] .. col[3], col[4], row[4])
+            end
+        end
+    end
+    return ns
+end
+
 -- The title plate across the top, as the Chromie Time window has it: the two
 -- ends at their own size, the middle tiled under them, 60 px into each end
 local function BuildTitle(f)
@@ -277,6 +329,7 @@ local function PageName(i)
     if not pg then return "" end
     if pg.kind == "chapter" then return (BNB.HelpChapterText(pg.chapter.ch)) end
     if pg.kind == "feature" then return tostring(pg.sec.header or "") end
+    if pg.kind == "patch" then return string.format(L["HELP_BOOK_PATCH_ROW_FMT"], pg.rel.version) end
     return (BNB.HelpTopicText(pg.topic))
 end
 
@@ -323,6 +376,8 @@ local function Haystack(i)
         local sec = pg.sec
         a = sec.header
         b = tostring(sec.blurb or "") .. "\n" .. table.concat(type(sec.items) == "table" and sec.items or {}, "\n")
+    elseif pg.kind == "patch" then
+        a, b = pg.rel.version, table.concat(pg.rel.lines, "\n")
     else a, b = BNB.HelpTopicText(pg.topic) end
     return Plain((a or "") .. "\n" .. (b or ""))
 end
@@ -543,6 +598,32 @@ local function RenderFeature(pg)
     end)
 end
 
+-- A release (ALL-614): its lines under New / Change / Fixed, as the patch
+-- notes were written for a note (BNB.WhatsNew.PatchBody); plain when the
+-- rich renderer is missing. Next frame, as a topic
+local function RenderPatch(pg)
+    gen.n = gen.n + 1
+    local my = gen.n
+    C_Timer.After(0, function()
+        if my ~= gen.n or not frame:IsShown() then return end
+        HideFeatLinks()
+        local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
+        local w = TextWidth(sf)
+        hold:SetWidth(w)
+        local WN, rel = BNB.WhatsNew, pg.rel
+        if BNB.AdvancedMode then
+            pfs:Hide(); rf:Show()
+            hold:SetHeight(RenderMarkup(rf, WN.PatchBody(rel.version, rel.lines, true), w) + 8)
+        else
+            rf:Hide(); pfs:Show()
+            pfs:SetWidth(w)
+            pfs:SetText(WN.PatchBody(rel.version, rel.lines, false))
+            hold:SetHeight(pfs:GetStringHeight() + 8)
+        end
+        sf:SetVerticalScroll(0)
+    end)
+end
+
 -- A chapter cover: picture, "Chapter N", the name, the intro, its topics as
 -- links (the page's link handler turns to them). Next frame, as a topic
 local function RenderChapter(pg)
@@ -610,9 +691,9 @@ local function SetStart(to)
     b:Show()
 end
 
--- The first page of the open book: the Features book has no cover
+-- The first page of the open book: only Documentation has a cover
 local function FirstPage()
-    return (book == "features" and #pages > 0) and 1 or 0
+    return (book ~= "docs" and #pages > 0) and 1 or 0
 end
 
 function HB.ShowPage(i)
@@ -622,7 +703,7 @@ function HB.ShowPage(i)
     current = math.max(lo, math.min(i or lo, n))
     local pg = pages[current]
     local kind = pg and pg.kind or "cover"
-    local text = kind == "topic" or kind == "feature"
+    local text = kind == "topic" or kind == "feature" or kind == "patch"
     frame._cover:SetShown(kind == "cover")
     frame._topic:SetShown(text)
     frame._chapter:SetShown(kind == "chapter")
@@ -640,7 +721,8 @@ function HB.ShowPage(i)
         -- The page's name goes on the title plate, not on the page (Dukul,
         -- 2026-10-23: "Writing Notes - BigNoteBox Help")
         local fmt = L["HELP_BOOK_TITLE_FMT"]
-        if kind == "feature" then fmt = L["HELP_BOOK_FEAT_TITLE_FMT"] end
+        if kind == "feature" then fmt = L["HELP_BOOK_FEAT_TITLE_FMT"]
+        elseif kind == "patch" then fmt = L["HELP_BOOK_PATCH_TITLE_FMT"] end
         frame:SetWindowTitle(string.format(fmt, PageName(current)))
         if kind == "chapter" then
             SetStart(pg.first)
@@ -648,7 +730,9 @@ function HB.ShowPage(i)
         else
             SetStart(nil)
             frame._pageNo:SetText(string.format(L["HELP_BOOK_PAGE_FMT"], current, n))
-            if kind == "feature" then RenderFeature(pg) else RenderTopic(pg.topic) end
+            if kind == "feature" then RenderFeature(pg)
+            elseif kind == "patch" then RenderPatch(pg)
+            else RenderTopic(pg.topic) end
         end
     end
     frame._prev:SetEnabled(current > lo)
@@ -656,10 +740,10 @@ function HB.ShowPage(i)
     MarkToc()
 end
 
--- Opens a book ("docs" / "features"): its pages, an empty search, its tab
--- marked. The caller shows a page
+-- Opens a book ("docs" / "features" / "patches"): its pages, an empty
+-- search, its tab marked. The caller shows a page
 local function SetBook(name)
-    book = (name == "features") and "features" or "docs"
+    book = sets[name] and name or "docs"
     pages, hay = sets[book], hays[book]
     local eb = frame._search
     if eb:HasFocus() then eb:ClearFocus() end
@@ -669,6 +753,7 @@ local function SetBook(name)
     if tabs then
         tabs.docs:SetActive(book == "docs")
         tabs.features:SetActive(book == "features")
+        tabs.patches:SetActive(book == "patches")
     end
 end
 
@@ -919,18 +1004,24 @@ local function BuildTabs(f)
     strip:SetSize(1, C.skin and K.SKIN_H or K.H)
     local L1, T1 = L["HELP_BOOK_TAB_DOCS"], L["HELP_BOOK_TAB_DOCS_TIP"]
     local L2, T2 = L["HELP_BOOK_TAB_FEATURES"], L["HELP_BOOK_TAB_FEATURES_TIP"]
-    local docs, feats, y
+    -- Patch notes (ALL-614): the bell, the closest symbol to "news"
+    local L3, T3 = L["HELP_BOOK_TAB_PATCH"], L["HELP_BOOK_TAB_PATCH_TIP"]
+    local docs, feats, pats, y
     if C.skin then
         docs  = K.Skin(strip, "help", L1, T1)
         feats = K.Skin(strip, "note", L2, T2)
+        pats  = K.Skin(strip, "alarm", L3, T3)
         strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, 0)
         y = K.SKIN_TUCK
         strip._under = true
     elseif K.HasSheet() then
         docs  = K.Forever(strip, "yellow", "help", L1, T1)
         feats = K.Forever(strip, "blue",   "note", L2, T2)
-        -- The bottom wood reaches 6 px under the frame (BORDER corners)
-        strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, -2)
+        pats  = K.Forever(strip, "yellow", "alarm", L3, T3)
+        -- The Neutral bottom wood reaches 6 px under the frame (BORDER
+        -- corners); the thin housing frame ends at the edge, its 3 px rail
+        -- over the tabs' tops (ALL-615)
+        strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, HasWood() and 3 or -2)
         strip:SetFrameLevel(f:GetFrameLevel() + 1)   -- under the border (+20)
         y = 0
     else
@@ -940,16 +1031,17 @@ local function BuildTabs(f)
             function b:SetActive(on) self:SetDim(not on) end
             return b
         end
-        docs, feats = Btn("help", L1), Btn("note", L2)
+        docs, feats, pats = Btn("help", L1), Btn("note", L2), Btn("alarm", L3)
         strip:SetPoint("TOPLEFT", f, "BOTTOMLEFT", LAY.side, -4)
         y = 0
     end
-    if docs.SetWidth and feats.GetWidth and not docs.SetDim then   -- text tabs: the wider label's width
-        local w = math.max(docs:GetWidth(), feats:GetWidth())
-        docs:SetWidth(w); feats:SetWidth(w)
+    if docs.SetWidth and feats.GetWidth and not docs.SetDim then   -- text tabs: the widest label's width
+        local w = math.max(docs:GetWidth(), feats:GetWidth(), pats:GetWidth())
+        docs:SetWidth(w); feats:SetWidth(w); pats:SetWidth(w)
     end
     docs:SetPoint("TOPLEFT", strip, "TOPLEFT", 0, y)
     feats:SetPoint("LEFT", docs, "RIGHT", K.GAP, 0)
+    pats:SetPoint("LEFT", feats, "RIGHT", K.GAP, 0)
     -- HookScript: an icon button owns its handlers (windows-widgets.md)
     docs:HookScript("OnClick", function()
         if book ~= "docs" then SetBook("docs"); HB.ShowPage(0) end
@@ -957,7 +1049,10 @@ local function BuildTabs(f)
     feats:HookScript("OnClick", function()
         if book ~= "features" then SetBook("features"); HB.ShowPage(1) end
     end)
-    f._tabs = { strip = strip, docs = docs, features = feats }
+    pats:HookScript("OnClick", function()
+        if book ~= "patches" then SetBook("patches"); HB.ShowPage(1) end
+    end)
+    f._tabs = { strip = strip, docs = docs, features = feats, patches = pats }
 end
 
 local function Build()
@@ -978,14 +1073,17 @@ local function Build()
 
     if not C.skin then
         -- The table: the wood tile under everything, inset as Chromie Time's
+        -- (under the thin wood frame's rail, ALL-615)
+        local wood = HasWood()
+        local inset = wood and 2 or 9
         local tbl = f:CreateTexture(nil, "BACKGROUND", nil, -2)
-        tbl:SetPoint("TOPLEFT", f, "TOPLEFT", 9, -9)
-        tbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -9, 9)
+        tbl:SetPoint("TOPLEFT", f, "TOPLEFT", inset, -inset)
+        tbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -inset, inset)
         tbl:SetAtlas("UI-Frame-Neutral-BackgroundTile")
         tbl:SetHorizTile(true)
         tbl:SetVertTile(true)
 
-        BuildBorder(f)
+        if wood then BuildWood(f) else BuildBorder(f) end
         BuildTitle(f)
 
         -- Close: our X in the kit's ring, on the top right corner (Chromie Time's spot)
@@ -1131,11 +1229,17 @@ local function BuildPages()
     local feats = {}
     for i, sec in ipairs(secs) do feats[i] = { kind = "feature", sec = sec } end
 
-    sets.docs, sets.features = docs, feats
-    hays.docs, hays.features = {}, {}
+    -- Patch notes, newest first (ALL-614)
+    local pats = {}
+    if BNB.WhatsNew and BNB.WhatsNew.Releases then
+        for i, rel in ipairs(BNB.WhatsNew.Releases()) do pats[i] = { kind = "patch", rel = rel } end
+    end
+
+    sets.docs, sets.features, sets.patches = docs, feats, pats
+    hays.docs, hays.features, hays.patches = {}, {}, {}
 end
 
--- which = "features" opens the Features tab at its first section; else
+-- which = "features" / "patches" opens that tab at its first page; else
 -- Documentation at the topic `key` (nil = the cover)
 function HB.Open(key, which)
     local f = Build()
@@ -1155,13 +1259,24 @@ function HB.Open(key, which)
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 20)
     f:Show()
     f:Raise()
-    if book == "features" then HB.ShowPage(1)
+    if book ~= "docs" then HB.ShowPage(1)
     elseif not (key and HB.ShowKey(key)) then HB.ShowPage(0) end
 end
 
 -- The Features tab (/bnb features, Settings > General, the bnbui:features link)
 function HB.OpenFeatures()
     HB.Open(nil, "features")
+end
+
+-- The Patch notes tab at a release (the update toast), nil = the newest
+-- (the version button, /bnb whatsnew); a version this client has no lines
+-- for opens the newest (ALL-614)
+function HB.OpenPatchNotes(version)
+    HB.Open(nil, "patches")
+    if not version then return end
+    for i, pg in ipairs(pages) do
+        if pg.rel.version == version then HB.ShowPage(i); return end
+    end
 end
 
 function HB.Close()

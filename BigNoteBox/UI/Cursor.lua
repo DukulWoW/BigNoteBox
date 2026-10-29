@@ -174,6 +174,8 @@ local function UnderMouse(frame)
         local depth = 0
         while x and depth < 20 do
             if x == frame then return true end
+            -- a forbidden frame errors on GetParent (ALL-612, the shop)
+            if x.IsForbidden and x:IsForbidden() then break end
             x = x.GetParent and x:GetParent()
             depth = depth + 1
         end

@@ -1,11 +1,11 @@
 -- BigNoteBox UI/WhatsNewData.lua
 --
 -- EDITABLE PATCH NOTES FILE
--- Update this file before each release. The WhatsNew window reads it directly,
--- and after an update it becomes the pinned patch note (ALL-409, UI/WhatsNew.lua):
--- lines are grouped under their New / Change / Fixed label there, so keep the
--- "|cff66bb6aNew:|r " form. No {braces}: that note is a rich note (they are
--- turned into parentheses there).
+-- Update this file before each release. It is the newest page of the Help
+-- book's Patch notes tab until the release tag puts it in PatchHistory.lua
+-- (ALL-614, UI/WhatsNew.lua): lines are grouped under their New / Change /
+-- Fixed label there, so keep the "|cff66bb6aNew:|r " form. No {braces}: the
+-- page is rich markup (they are turned into parentheses there).
 --
 -- HOW TO UPDATE:
 --   1. Change `version` to the new addon version string (must match Init.lua).

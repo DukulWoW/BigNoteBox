@@ -17,6 +17,8 @@
 --     both made from the window's name, so every player sees the same
 --   - main window: the bottom piece behind the editor's action buttons, and
 --     the large art along the top while the character tabs are not on top;
+--     a garland along the outside of its bottom edge, behind the tabs there
+--     (ALL-607);
 --     on the welcome page (no note open) the bottom piece and a small piece
 --     on the Create new note button
 --   - the Reference Box model tab: the tab piece
@@ -52,6 +54,7 @@ BNB.WORLD_EVENTS = {
               large  = ART .. "WinterVeil\\snow-large",
               bottom = ART .. "WinterVeil\\snow-bottom",
               tab    = ART .. "WinterVeil\\snow-tab",
+              holly  = ART .. "WinterVeil\\snow-holly",
               flake  = ART .. "WinterVeil\\snow-flake" } },
 }
 local BY_KEY = {}
@@ -70,6 +73,7 @@ local PIECE = {
     large  = { w = 256, h = 32, yOff = 16 },
     bottom = { w = 256, h = 64 },
     tab    = { w = 64,  h = 64 },
+    holly  = { w = 128, h = 32 },   -- the garland under the main window, repeated
 }
 local SMALL_MAX_W = 380   -- windows up to this wide take the small art
 local CLOSE_ROOM  = 34    -- kept clear at the right: the close X
@@ -453,6 +457,59 @@ local function ExplorerOn()
     return BigNoteBoxDB and BigNoteBoxDB.explorerView == true
 end
 
+-- The garland (ALL-607, Dukul, 2026-10-28): holly pieces strung along the
+-- outside of the main window's bottom edge, as many as fit, each stretched
+-- sideways so the row fills the width; a resize adds or drops pieces. Behind
+-- the tabs that hang there (the rich note's Markup / Note tabs): one strata
+-- under theirs, which is the window's own, or the one below it in skin mode
+-- (NoteEditor.lua BuildRichTabStrip). x = the inset from both sides, y = the
+-- row's top edge over the window's bottom edge (positive = up, under the
+-- window). The first piece is the placeable one (Place snow); the others copy it.
+local GARLAND_BELOW = { LOW = "BACKGROUND", MEDIUM = "LOW", HIGH = "MEDIUM", DIALOG = "HIGH",
+    FULLSCREEN = "DIALOG", FULLSCREEN_DIALOG = "FULLSCREEN", TOOLTIP = "FULLSCREEN_DIALOG" }
+
+local function DecorateGarland(f)
+    local host = CreateFrame("Frame", nil, f)
+    host:SetAllPoints(f)
+    host:EnableMouse(false)
+    local extra = {}
+    local first
+    first = BNB.WorldEventArt(host, "holly", function(tex, _, p, pos)
+        local tabs = f:GetFrameStrata()
+        if BigNoteBoxDB and BigNoteBoxDB.skinMode then tabs = GARLAND_BELOW[tabs] or tabs end
+        local strata = GARLAND_BELOW[tabs] or "BACKGROUND"
+        if host:GetFrameStrata() ~= strata then host:SetFrameStrata(strata) end
+        local w = math.max(0, (f:GetWidth() or 0) - 2 * pos.x)
+        local h = p.h * pos.s
+        local n = math.max(1, math.floor(w / (p.w * pos.s) + 0.5))
+        local pw = w / n
+        tex:SetSize(pw, h)
+        tex:SetPoint("TOPLEFT", f, "BOTTOMLEFT", pos.x, pos.y)
+        local path = tex:GetTexture()
+        local cr, cg, cb = tex:GetVertexColor()   -- the shade Apply set
+        for i = 2, n do
+            local t = extra[i]
+            if not t then
+                t = host:CreateTexture(nil, "OVERLAY", nil, 7)
+                extra[i] = t
+            end
+            t:SetTexture(path)
+            if pos.m then t:SetTexCoord(1, 0, 0, 1) else t:SetTexCoord(0, 1, 0, 1) end
+            t:SetVertexColor(cr, cg, cb, 1)
+            t:SetSize(pw, h)
+            t:ClearAllPoints()
+            t:SetPoint("TOPLEFT", extra[i - 1] or tex, "TOPRIGHT")
+            t:Show()
+        end
+        for i = n + 1, #extra do if extra[i] then extra[i]:Hide() end end
+    end, { id = "main:garland",
+           def = function() return { x = 0, y = 8, s = 1, m = false } end })
+    -- Apply hides only the first piece (event off, OLED skin): the rest go with it
+    hooksecurefunc(first, "Hide", function()
+        for _, t in pairs(extra) do t:Hide() end
+    end)
+end
+
 function BNB.DecorateMainWindow(f)
     if not f or f._weDone then return end
     f._weDone = true
@@ -481,6 +538,7 @@ function BNB.DecorateMainWindow(f)
         tex:SetPoint("BOTTOMRIGHT", f, "TOPRIGHT", pos.x, pos.y)
     end, { id = "main:explorer", cond = ExplorerOn,
            def = function() return { x = -1, y = -86, s = 0.55, m = false } end })
+    DecorateGarland(f)
     local frac, mirror = Seed("BigNoteBoxFrame")
     local top = ChromeLayer(f)
     BNB.WorldEventArt(top, "large", function(tex, host, _, pos)

@@ -300,7 +300,6 @@ L["OPT_HINT"]             = "使用 |cffffd100/bnb config|r 访问选项"
 L["OPT_OPEN_SETTINGS_BTN"]= "打开设置"
 
 -- ── What's New window ─────────────────────────────────────────────────────────
-L["WN_TITLE_FMT"]         = "BigNoteBox v%s 更新内容"
 
 -- ── History window ────────────────────────────────────────────────────────────
 L["HW_TIME_UNKNOWN"]      = "未知"
@@ -1376,8 +1375,6 @@ L["EXPLORER_INTRO_KEEP"]           = "开始探索"
 L["CFG_SYS_FOLDERS_HEADER"]        = "来自 BigNoteBox"
 L["CFG_FOLDER_START_OPEN"]         = "新文件夹默认展开"
 L["CFG_FOLDER_START_OPEN_TIP"]     = "每个文件夹都会记住上次是展开还是收起。此选项决定新文件夹的初始状态。"
-L["CFG_SYS_PATCHNOTES"]            = "显示更新日志文件夹"
-L["CFG_SYS_PATCHNOTES_TIP"]        = "在你的笔记后显示一个文件夹，收录 BigNoteBox 每个版本的更新日志。内容可阅读和复制，但不可修改。"
 L["CFG_SYS_HELP"]                  = "显示帮助文件夹"
 L["CFG_SYS_HELP_TIP"]              = "在你的笔记后显示一个文件夹，提供 BigNoteBox 各项功能的帮助。主题可阅读和复制，但不可修改。隐藏此文件夹后，仍可通过帮助链接和按钮打开主题。"
 
@@ -2837,11 +2834,9 @@ L["NL_CM_CLOSE_MODEL"] = "关闭模型"
 L["NND_ICON_FRAME_TIP"] = "右键点击：图标边框"
 
 -- What's New window
-L["PN_NOTE_TITLE"] = "BigNoteBox v%s 更新说明"
 L["PN_NOTE_HEADING"] = "v%s 版本改动"
 L["PN_TOAST_TITLE"] = "BigNoteBox 已更新"
 L["PN_TOAST_TEXT"] = "v%s：更新日志位于笔记列表的更新日志文件夹中。点击阅读。"
-L["SYS_FOLDER_PATCHNOTES"] = "更新日志"
 L["SYS_FOLDER_HELP"]       = "帮助"
 L["UILINK_SETTINGS_FMT"]   = "设置 > %s"
 L["UILINK_SETTINGS_PAGE_FMT"] = "设置 > %s > %s"

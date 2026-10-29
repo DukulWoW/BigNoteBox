@@ -124,6 +124,8 @@ local _tiles, _hdrs = {}, {}
 local _mode   = "grid"    -- "grid" | "note", only while the view is on
 local _folder             -- nil = top level, a folder id, or "sys:<key>"
 local _rbAway             -- the grid hid the Reference Box; a note brings it back
+local _rbPickID           -- the pick the Reference Box last followed on the grid (false = none)
+local _applying           -- EX.Apply is running: it syncs the Reference Box itself
 local _keepNote           -- Focus mode hid the window while a note was open
 
 -- Picks: _pick[key] = true; key = a note id or "folder:<id>" (Dukul,
@@ -309,6 +311,26 @@ local function UpdateStatus()
     _statusFs:SetText(table.concat(parts, STATUS_SEP))
 end
 
+-- ALL-616 (Dukul, 2026-10-29): with the Reference Box's auto-open on, the
+-- grid's one picked note gets the box as an opened note does in the list:
+-- open on a note with something for it, closed on one with nothing, on a
+-- folder or on several picks. Only on a change, so a box closed by hand
+-- stays closed until the pick moves.
+local function SyncRefBoxPick()
+    if _applying or not (EX.IsActive() and _mode == "grid") then return end
+    if not (BigNoteBoxDB.refboxAutoOpen and BNB.SyncReferenceBox) then return end
+    local notes = K.Picked()
+    local id = (#notes == 1 and not _sysPick and #K.PickedFolders() == 0) and notes[1] or false
+    if id == _rbPickID then return end
+    _rbPickID = id
+    _rbAway = true   -- leaving the grid puts the open note's box back
+    if id then
+        BNB.SyncReferenceBox(id)
+    elseif BNB.IsReferenceBoxShown and BNB.IsReferenceBoxShown() then
+        BNB.CloseReferenceBox()
+    end
+end
+
 local function PaintPicks()
     for _, t in ipairs(_tiles) do
         if t:IsShown() then
@@ -319,6 +341,7 @@ local function PaintPicks()
     UpdateStatus()
     if K.OnPicks then K.OnPicks() end
     if BNB.RefreshFocusButton then BNB.RefreshFocusButton() end   -- ALL-569: a picked note
+    SyncRefBoxPick()
 end
 
 local function ClearPicks()
@@ -1933,6 +1956,7 @@ end
 
 -- Lays the window out for the current view and mode
 function EX.Apply()
+    _applying = true
     local active = EX.IsActive()
     if active then EnsurePane() end
     if _pane then _pane:SetShown(active and _mode == "grid") end
@@ -1949,16 +1973,21 @@ function EX.Apply()
     -- next note opened (or the list view) shows it again, closed there if
     -- that note has nothing for it, as a note switch in the list does
     -- (Dukul, 2026-10-27: it stayed open after leaving the note)
+    -- ALL-616: on the grid it then follows the picked note (SyncRefBoxPick),
+    -- so the way back re-syncs an open box to the open note as well
+    _applying = nil
     if active and _mode == "grid" then
         if BNB.IsReferenceBoxShown and BNB.IsReferenceBoxShown() then
             _rbAway = true
             BNB.CloseReferenceBox()
         end
+        _rbPickID = nil
+        SyncRefBoxPick()
     elseif _rbAway then
-        _rbAway = nil
+        _rbAway, _rbPickID = nil, nil
         local id = BNB._currentNoteID
-        if id and _main and _main:IsShown() and BNB.OpenReferenceBox and not BNB.IsReferenceBoxShown() then
-            BNB.OpenReferenceBox(id)
+        if id and _main and _main:IsShown() and BNB.OpenReferenceBox then
+            if not BNB.IsReferenceBoxShown() then BNB.OpenReferenceBox(id) end
             if BNB.SyncReferenceBox then BNB.SyncReferenceBox(id) end
         end
     end
@@ -2034,7 +2063,7 @@ function EX.ViewButton() return _viewBtn end
 function EX.BuildHeader(f, sortDD, dirDD, selBtn)
     _main, _sortDD, _dirDD, _selBtn = f, sortDD, dirDD, selBtn
     -- A closed window forgets the hidden Reference Box (it closes with it)
-    f:HookScript("OnHide", function() _rbAway = nil end)
+    f:HookScript("OnHide", function() _rbAway, _rbPickID = nil, nil end)
     -- Built once per session: the window opens on the default view (Dukul,
     -- 2026-10-21); the switch changes it until the next login or reload
     local db = BigNoteBoxDB

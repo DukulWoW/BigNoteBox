@@ -165,8 +165,8 @@ BNB.DEFAULTS = {
     -- Note folders (ALL-510): the module (ALL-514) and how a new folder starts in the list
     foldersEnabled       = true,
     folderStartOpen      = true,
-    -- System folders (ALL-511): the Patch notes folder shows in the list
-    sysPatchNotes        = true,
+    -- System folders (ALL-511); the Patch notes folder moved into the Help
+    -- book (ALL-614), so only Help is left
     sysHelp              = true,   -- the Help system folder (ALL-512)
 
     -- Reference Box and Tasks (ALL-102)

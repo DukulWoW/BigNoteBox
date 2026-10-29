@@ -159,6 +159,9 @@ local function MemberUnder()
     local foci = GetMouseFoci()
     local f = foci and foci[1]
     while f do
+        -- A forbidden frame (the shop's buttons) errors on any method but
+        -- IsForbidden, and holds none of ours (ALL-612)
+        if f:IsForbidden() then return end
         if _member[f] then return f end
         f = f:GetParent()
     end

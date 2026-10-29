@@ -618,9 +618,6 @@ local function GetTargetHeight()
     return math.min(math.max(math.floor(UIParent:GetHeight() * 0.75), 400), 900)
 end
 
--- Exposed for MainConfigSkin.lua
-BNB._GetConfigTargetHeight = GetTargetHeight
-
 -- Font refresh helper — called on window show (both chrome variants) and on
 -- Appearance tab show. The deferred second pass covers the case where WoW's
 -- font renderer hasn't yet cached the .ttf files on the current frame.
