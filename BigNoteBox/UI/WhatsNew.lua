@@ -97,18 +97,33 @@ end
 -- a patch line is never read as a tag (a repair would change the body).
 -- A note token ({{me}}, {{item:6948}}) is kept and escaped instead, so it
 -- shows as written and is never filled (ALL-493: it read "((me))").
+-- A link to a part of BigNoteBox ({link*bnbui:<key>*<text>}, ALL-617) is kept
+-- too: a line can send the player straight to a Settings page. The text has
+-- no braces; empty = the place's name (Settings > Modules > Spelling).
+local UILINK_PAT = "{link%*bnbui:([%w%._%-]+)%*([^{}%*]*)}"
+
 local function LineText(text, rich)
     if rich then
-        local toks = {}
+        local toks, links = {}, {}
         -- An already escaped \{{x}} is taken as it is (one backslash, not two)
         text = text:gsub("\\?{{(%a[%w_]*:?[^{}\n]*)}}", function(inner)
             toks[#toks + 1] = inner
             return "@@BNBTOK" .. #toks .. "@@"
         end)
+        text = text:gsub(UILINK_PAT, function(key, label)
+            links[#links + 1] = "{link*bnbui:" .. key .. "*" .. label .. "}"
+            return "@@BNBLINK" .. #links .. "@@"
+        end)
         text = text:gsub("{", "("):gsub("}", ")")
         text = text:gsub("@@BNBTOK(%d+)@@", function(n) return "\\{{" .. toks[tonumber(n)] .. "}}" end)
+        text = text:gsub("@@BNBLINK(%d+)@@", function(n) return links[tonumber(n)] end)
         text = text:gsub("|c%x%x(%x%x%x%x%x%x)", "{col:%1}"):gsub("|r", "{/col}")
     else
+        text = text:gsub(UILINK_PAT, function(key, label)
+            if label ~= "" then return label end
+            local UL = BNB.UILinks
+            return UL and UL.Label(key) or key
+        end)
         text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     end
     return text

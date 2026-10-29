@@ -24,7 +24,6 @@ local NEW = {
 local TEX    = 929716   -- interface/glues/charactercreate/newcharacternotification
 local COORD  = { 0.007812, 0.882812, 0.007812, 0.460938 }   -- NewCharacter-Alliance, 112 x 58
 local H      = 24
-local W      = math.floor(H * 112 / 58 + 0.5)
 local GAP    = 4
 -- Tinted the BNB green of the headings (Dukul, 2026-10-22), read at draw
 -- time from BNB.HEADER_COLOR_NORMAL (UI/TextColors.lua)
@@ -52,15 +51,25 @@ function BNB.IsNew(key)
     return am < tm or (am == tm and an <= tn)
 end
 
-function BNB.AddNewMarker(key, fs)
-    if not (fs and BNB.IsNew(key) and HasArt()) then return nil end
-    local t = fs:GetParent():CreateTexture(nil, "OVERLAY")
+-- The badge texture alone, h pixels high (default 24) on parent; nil on a
+-- client without the art. Also the release welcome's "marked NEW" row (ALL-617)
+function BNB.NewBadgeTexture(parent, h)
+    if not (parent and HasArt()) then return nil end
+    h = h or H
+    local t = parent:CreateTexture(nil, "OVERLAY")
     t:SetTexture(TEX)
     t:SetTexCoord(COORD[1], COORD[2], COORD[3], COORD[4])
     t:SetDesaturated(true)
     local c = BNB.HEADER_COLOR_NORMAL or TINT_FALLBACK
     t:SetVertexColor(c[1], c[2], c[3])
-    t:SetSize(W, H)
+    t:SetSize(math.floor(h * 112 / 58 + 0.5), h)
+    return t
+end
+
+function BNB.AddNewMarker(key, fs)
+    if not (fs and BNB.IsNew(key)) then return nil end
+    local t = BNB.NewBadgeTexture(fs:GetParent(), H)
+    if not t then return nil end
     -- After the text, not the fontstring's box: a row title spans the row
     local function Place()
         t:ClearAllPoints()

@@ -5,7 +5,10 @@
 -- book's Patch notes tab until the release tag puts it in PatchHistory.lua
 -- (ALL-614, UI/WhatsNew.lua): lines are grouped under their New / Change /
 -- Fixed label there, so keep the "|cff66bb6aNew:|r " form. No {braces}: the
--- page is rich markup (they are turned into parentheses there).
+-- page is rich markup (they are turned into parentheses there), except a
+-- link to a part of BigNoteBox (ALL-617): {link*bnbui:settings.modules.spelling*}
+-- (empty text = the place's name) or {link*bnbui:<key>*<own text>}. Keys:
+-- Developer tools > UI link list. A line that names a Settings page links it.
 --
 -- HOW TO UPDATE:
 --   1. Change `version` to the new addon version string (must match Init.lua).
@@ -22,7 +25,7 @@
 -- FORMAT RULES:
 --   - Keep each entry to a single line of reasonable length.
 --   - Plain ASCII only - no Unicode characters (they render as boxes in WoW).
---   - No markup - entries are rendered as plain GameFont text.
+--   - No markup but the BigNoteBox links above.
 -- |cff66bb6aNew:|r
 -- |cff66bb6aFixed:|r
 -- |cff66bb6aChange:|r

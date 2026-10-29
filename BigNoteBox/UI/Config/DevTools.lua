@@ -378,14 +378,11 @@ function K.BuildDevToolsPage(sf, ct, y)
                 BNB:Print("|cffff9900The patch notes toast is off in Settings > Modules > Toasts.|r")
             end
         end },
-        -- The Explorer welcome as after the 2.0.0 update (ALL-543): seen
-        -- flag cleared, then a reload (in the click itself: C_UI.Reload is protected)
+        -- The release welcome as after the 2.0.0 update (ALL-543, ALL-617):
+        -- seen flag cleared, then a reload (in the click itself: C_UI.Reload is
+        -- protected). Explorer module off = the welcome without its explorer parts
         { L["CFG_DEV_EXPINTRO_BTN"], L["CFG_DEV_EXPINTRO_TIP_BODY"], function()
-            if not (BNB.ExplorerEnabled and BNB.ExplorerEnabled()) then
-                BNB:Print("|cffff9900The Explorer view module is off (Settings > Modules).|r")
-                return
-            end
-            BigNoteBoxDB.explorerIntroSeen = nil
+            BigNoteBoxDB.welcomeSeen = nil
             C_UI.Reload()
         end, BNB.ShowExplorerIntroIfDue ~= nil },
         -- The fresh-install welcome note (ALL-242), for this character's faction
