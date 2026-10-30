@@ -2143,45 +2143,9 @@ function BNB.LoadNoteInEditor(id)
     end
     if BNB._editorStatsStrip then BNB._editorStatsStrip:Show() end
 
-    -- Per-note font override
-    local fontOverride = note.fontOverride
-    local appliedOverride = false
-    if fontOverride and BNB.ResolveFontDef then
-        local def = BNB.ResolveFontDef(fontOverride)
-        if def then
-            local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
-            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
-            appliedOverride = true
-        end
-    end
-    if not appliedOverride then
-        if BNB.ApplyFont then BNB.ApplyFont() end
-    end
-    -- Apply per-note font size override regardless of font override
-    if note.fontSize and BNB._editorBody then
-        local path = select(1, BNB._editorBody:GetFont())
-        if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, note.fontSize), "") end) end
-    end
-    if BNB._editorBody then
-        pcall(function() BNB._editorBody:SetJustifyH(note.textAlign or "LEFT") end)
-        local outline = note.fontOutline or "None"
-        local flags = ""
-        if     outline == "Outline"            then flags = "OUTLINE"
-        elseif outline == "Thick Outline"      then flags = "THICKOUTLINE"
-        elseif outline == "Monochrome Outline" then flags = "MONOCHROME,OUTLINE"
-        elseif outline == "SLUG"               then flags = "SLUG"
-        elseif outline == "SLUG Outline"       then flags = "OUTLINE, SLUG"
-        elseif outline == "SLUG Thick Outline" then flags = "THICKOUTLINE, SLUG" end
-        local ox, oy, sr, sg, sb, sa = 0, 0, 0, 0, 0, 0
-        if     outline == "Drop Shadow"           then ox,oy,sr,sg,sb,sa = 1,-1,0,0,0,0.8
-        elseif outline == "Strong Drop Shadow"    then ox,oy,sr,sg,sb,sa = 2,-2,0,0,0,1.0
-        elseif outline == "Strongest Drop Shadow" then ox,oy,sr,sg,sb,sa = 3,-3,0,0,0,1.0 end
-        local path, sz2 = BNB._editorBody:GetFont()
-        if path then pcall(function() BNB._editorBody:SetFont(path, sz2, flags) end) end
-        pcall(function() BNB._editorBody:SetShadowOffset(ox, oy) end)
-        pcall(function() BNB._editorBody:SetShadowColor(sr, sg, sb, sa) end)
-    end
+    -- The note's font, size, outline and alignment (BNB.ApplyEditorFonts:
+    -- through a font family, so Korean / Chinese draw and changes show, ALL-619)
+    BNB.ApplyEditorFonts()
 
     if titleEb then
         titleEb:SetRealColor(note.titleColor)   -- the note's title colour (ALL-260)

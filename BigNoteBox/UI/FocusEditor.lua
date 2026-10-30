@@ -338,22 +338,13 @@ end
 -- note's size), else the global ones
 local function ApplyFocusFont(note)
     if not note then return end
-    local fo = note.fontOverride
-    local def = fo and BNB.ResolveFontDef and BNB.ResolveFontDef(fo)
-    if def then
-        local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        if focusBodyEb  then pcall(function() focusBodyEb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
-        if focusTitleEb then pcall(function() focusTitleEb:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
-    else
-        if BNB.GetBodyFont and focusBodyEb then
-            local path, gsz = BNB.GetBodyFont()
-            local sz = note.fontSize or gsz
-            if path then pcall(function() focusBodyEb:SetFont(path, BNB.FontPx(path, sz), "") end) end
-        end
-        if BNB.GetBoldFont and focusTitleEb then
-            local path = BNB.GetBoldFont()
-            if path then pcall(function() focusTitleEb:SetFont(path, BNB.FontPx(path, 20), "") end) end
-        end
+    -- Body: the note's font and size through a font family (Korean / Chinese
+    -- draw, changes show, ALL-619); Focus mode has never taken the outline
+    -- or alignment. Title: the card's bold file.
+    if focusBodyEb then BNB.ApplyNoteFont(focusBodyEb, note, false) end
+    if focusTitleEb then
+        local bold = BNB.ResolveFontDef(note.fontOverride).bold
+        pcall(function() focusTitleEb:SetFont(bold, BNB.FontPx(bold, 20), "") end)
     end
 end
 

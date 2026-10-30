@@ -14,7 +14,7 @@ local SaveCfg               = K.SaveCfg
 local BG_TEXTURES           = K.BG_TEXTURES
 local BgTextureLabel        = K.BgTextureLabel
 local OUTLINE_OPTIONS       = K.OUTLINE_OPTIONS
-local ApplyOutlineToEditBox = K.ApplyOutlineToEditBox
+local ApplyBodyFont         = K.ApplyBodyFont
 local ApplyBgAlpha          = K.ApplyBgAlpha
 local ApplyConfig           = K.ApplyConfig
 local FadeFrame             = K.FadeFrame
@@ -385,9 +385,9 @@ local function PopulateStickySettings(noteID)
         cfg.textR, cfg.textG, cfg.textB = r, g, b
         if cancelled then cfg.textFollow = textFollowAtOpen else cfg.textFollow = nil end
         SaveCfg(noteID, cfg)
-        if stickyFrame and stickyFrame._bodyEb then
-            pcall(function() stickyFrame._bodyEb:SetTextColor(r, g, b) end)
-        end
+        -- Through ApplyBodyFont, which also redraws a box with Korean or
+        -- Chinese in it (ALL-619)
+        if stickyFrame then ApplyBodyFont(stickyFrame, cfg) end
     end, function()
         textFollowAtOpen = cfg.textFollow
         return cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88
@@ -558,21 +558,20 @@ local function PopulateStickySettings(noteID)
 
     -- Reset clears the note's own size, so it follows the global one again
     local globalFontSize = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-    local function ApplyStickyFontSize(v)
-        if stickyFrame and stickyFrame._bodyEb then
-            local path = select(1, stickyFrame._bodyEb:GetFont())
-            if path then pcall(function() stickyFrame._bodyEb:SetFont(path, BNB.FontPx(path, v), "") end) end
-        end
+    -- cfg.fontSize is set first: ApplyBodyFont reads it (and keeps the outline,
+    -- which the old raw SetFont here dropped)
+    local function ApplyStickyFontSize()
+        if stickyFrame then ApplyBodyFont(stickyFrame, cfg) end
     end
     local fontSizeSl = MakeSlider(ct1, L["STICKY_FONT_SIZE"], 8, 24,
         cfg.fontSize or globalFontSize,
         function(v)
             cfg.fontSize = v; SaveCfg(noteID, cfg)
-            ApplyStickyFontSize(v)
+            ApplyStickyFontSize()
         end, globalFontSize, nil,
         function()
             cfg.fontSize = nil; SaveCfg(noteID, cfg)
-            ApplyStickyFontSize(globalFontSize)
+            ApplyStickyFontSize()
         end)
     plainOnlyWidgets[#plainOnlyWidgets+1] = fontSizeSl
 
@@ -626,9 +625,7 @@ local function PopulateStickySettings(noteID)
                 function()
                     cfg.textAlign = k; SaveCfg(noteID, cfg)
                     alignDD:GenerateMenu()
-                    if stickyFrame and stickyFrame._bodyEb then
-                        pcall(function() stickyFrame._bodyEb:SetJustifyH(k) end)
-                    end
+                    if stickyFrame then ApplyBodyFont(stickyFrame, cfg) end
                 end)
         end
     end)
@@ -649,7 +646,7 @@ local function PopulateStickySettings(noteID)
                 function()
                     cfg.fontOutline = o; SaveCfg(noteID, cfg)
                     outlineDD:GenerateMenu()
-                    if stickyFrame then ApplyOutlineToEditBox(stickyFrame._bodyEb, o) end
+                    if stickyFrame then ApplyBodyFont(stickyFrame, cfg) end
                 end)
         end
     end)

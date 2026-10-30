@@ -25,6 +25,13 @@ local CW      = NCW - PAD - 8
 -- ── Module state ──────────────────────────────────────────────────────────────
 local ncFrame   = nil
 local _noteID   = nil
+
+-- A font, size, outline or alignment change, live in the main editor when
+-- this note is the open one (BNB.ApplyEditorFonts: a font family, ALL-619)
+local function ApplyLive()
+    if BNB._currentNoteID == _noteID and BNB.ApplyEditorFonts then BNB.ApplyEditorFonts() end
+    if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
+end
 local tabBtns   = {}
 local tabPanels = {}
 local NUM_TABS  = 3
@@ -215,11 +222,8 @@ local function BuildGeneralTab(panel)
         btn:SetScript("OnLeave", HLFonts)
         btn:SetScript("OnClick", function()
             Save({fontOverride = def.id})
-            local sz = BigNoteBoxDB and BigNoteBoxDB.fontSize or BNB.DEFAULTS.fontSize
-            if BNB._editorBody  then pcall(function() BNB._editorBody:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end) end
-            if BNB._editorTitle then pcall(function() BNB._editorTitle:SetFont(def.bold, BNB.FontPx(def.bold, 20), "") end) end
+            ApplyLive()
             HLFonts()
-            if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
         local nameLbl = btn:CreateFontString(nil, "OVERLAY")
         nameLbl:SetPoint("TOPLEFT",  btn, "TOPLEFT",  5, -5)
@@ -273,21 +277,8 @@ local function BuildGeneralTab(panel)
                         BNB.UpdateNote(id, {_clear = {"fontOverride"}})
                     end
                 end
-                -- Apply live to the open editor if this note is loaded
-                local note = GetNote()
-                local sz = (note and note.fontSize)
-                    or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-                local eb = BNB._editorBody
-                if eb and BNB._currentNoteID == _noteID then
-                    local def = path and BNB.GetFontDef and BNB.GetFontDef(path)
-                    if def then
-                        pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
-                    elseif BNB.ApplyFont then
-                        BNB.ApplyFont()
-                    end
-                end
+                ApplyLive()
                 HLFonts()
-                if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
             end,
             CW)
         if dd then y = lsmY - 4; lsmBuilt = true end
@@ -321,22 +312,8 @@ local function BuildGeneralTab(panel)
                 local id = _noteID
                 if id then BNB.UpdateNote(id, {_clear = {"fontOverride"}}) end
             end
-            -- Apply live to the open editor if this note is loaded
-            local note = GetNote()
-            local sz = (note and note.fontSize)
-                or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-            local eb = BNB._editorBody
-            if eb and BNB._currentNoteID == _noteID then
-                local ov = note and note.fontOverride
-                local def = ov and BNB.ResolveFontDef and BNB.ResolveFontDef(ov)
-                if def then
-                    pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
-                elseif BNB.ApplyFont then
-                    BNB.ApplyFont()
-                end
-            end
+            ApplyLive()
             HLFonts()
-            if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
         end)
         _wowCb_nc = wowCb
         y = y - 24
@@ -365,25 +342,18 @@ local function BuildGeneralTab(panel)
 
     -- Stacked slider (ALL-121). Reset clears the note's own size, so it
     -- follows the global one again.
-    local function ApplyEditorSize(sz)
-        if BNB._editorBody and BNB._currentNoteID == _noteID then
-            local path = select(1, BNB._editorBody:GetFont())
-            if path then pcall(function() BNB._editorBody:SetFont(path, BNB.FontPx(path, sz), "") end) end
-        end
-        if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
-    end
     local fsSl = BNB.CreateStackedSlider(panel, CW, {
         label = "", min = 8, max = 32, value = GetNoteFontSize(),
         default = (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize,
         fmt = function(v) return v .. "pt" end,
         onChange = function(sz)
             Save({fontSize = sz})
-            ApplyEditorSize(sz)
+            ApplyLive()
         end,
         onReset = function()
             if not _noteID then return end
             BNB.UpdateNote(_noteID, {_clear = {"fontSize"}})
-            ApplyEditorSize((BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize)
+            ApplyLive()
         end,
     })
     fsSl:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
@@ -421,9 +391,7 @@ local function BuildAppearanceTab(panel)
 
     local function ApplyNoteAlign(align)
         Save({textAlign = align})
-        if BNB._editorBody then
-            pcall(function() BNB._editorBody:SetJustifyH(align) end)
-        end
+        ApplyLive()
     end
 
     local alignDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, panel,
@@ -461,24 +429,7 @@ local function BuildAppearanceTab(panel)
     end
     local function ApplyNoteOutline(outline)
         Save({fontOutline = outline})
-        if BNB._editorBody then
-            local flags, ox, oy, sr, sg, sb, sa
-            if     outline == "Outline"           then flags = "OUTLINE"
-            elseif outline == "Thick Outline"     then flags = "THICKOUTLINE"
-            elseif outline == "Monochrome Outline" then flags = "MONOCHROME,OUTLINE"
-            elseif outline == "SLUG"              then flags = "SLUG"
-            elseif outline == "SLUG Outline"      then flags = "OUTLINE, SLUG"
-            elseif outline == "SLUG Thick Outline" then flags = "THICKOUTLINE, SLUG"
-            else flags = "" end
-            if     outline == "Drop Shadow"           then ox,oy,sr,sg,sb,sa = 1,-1,0,0,0,0.8
-            elseif outline == "Strong Drop Shadow"    then ox,oy,sr,sg,sb,sa = 2,-2,0,0,0,1.0
-            elseif outline == "Strongest Drop Shadow" then ox,oy,sr,sg,sb,sa = 3,-3,0,0,0,1.0
-            else ox,oy,sr,sg,sb,sa = 0,0,0,0,0,0 end
-            local path, sz = BNB._editorBody:GetFont()
-            if path then pcall(function() BNB._editorBody:SetFont(path, sz, flags) end) end
-            pcall(function() BNB._editorBody:SetShadowOffset(ox, oy) end)
-            pcall(function() BNB._editorBody:SetShadowColor(sr, sg, sb, sa) end)
-        end
+        ApplyLive()
     end
 
     local outlineDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, panel,

@@ -551,13 +551,40 @@ local function GetOutlineFlagsAndShadow(outline)
     return flags, ox, oy, sr, sg, sb, sa
 end
 
-local function ApplyOutlineToEditBox(eb, outline)
-    if not eb then return end
-    local flags, ox, oy, sr, sg, sb, sa = GetOutlineFlagsAndShadow(outline or "None")
-    local path, sz = eb:GetFont()
-    if path then pcall(function() eb:SetFont(path, sz, flags) end) end
-    pcall(function() eb:SetShadowOffset(ox, oy) end)
-    pcall(function() eb:SetShadowColor(sr, sg, sb, sa) end)
+-- The body text's font, size, outline / shadow, then colour, opacity and
+-- alignment (a font object put on the box resets those three). Through a font
+-- family (BNB.BodyFontFamily, ALL-619): with a raw SetFont, one Korean or
+-- Chinese character stopped every font, size, outline and colour change
+-- showing; BNB.RelayoutEditBox then makes the box redraw. The single place
+-- that sets the sticky body's font.
+local function ApplyBodyFont(frame, cfg)
+    local eb = frame and frame._bodyEb
+    if not (eb and cfg) then return end
+    local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+    local def = BNB.ResolveFontDef and BNB.ResolveFontDef(cfg.fontID)
+    local flags, ox, oy, sr, sg, sb, sa = GetOutlineFlagsAndShadow(cfg.fontOutline or "None")
+    if def and def.regular then
+        local px  = BNB.FontPx(def.regular, sz)
+        local shadow = (ox ~= 0 or oy ~= 0) and { ox, oy, sr, sg, sb, sa } or nil
+        local fam = BNB.BodyFontFamily and BNB.BodyFontFamily(def, px, flags, shadow)
+        if fam then
+            if eb:GetFontObject() ~= fam then eb:SetFontObject(fam) end
+        else
+            pcall(eb.SetFont, eb, def.regular, px, flags)
+        end
+    end
+    pcall(eb.SetShadowOffset, eb, ox, oy)
+    pcall(eb.SetShadowColor, eb, sr, sg, sb, sa)
+    pcall(eb.SetTextColor, eb, cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88)
+    pcall(eb.SetJustifyH, eb, cfg.textAlign or "LEFT")
+    BNB.RelayoutEditBox(eb)
+end
+
+-- Every open sticky's body font again (a global font or size change, ALL-620)
+function SN.ApplyBodyFonts()
+    for noteID, f in pairs(openFrames) do
+        ApplyBodyFont(f, f._cfg or GetCfg(noteID))
+    end
 end
 
 -- Shows the sticky's background texture on its texture layer (ALL-110), or
@@ -821,18 +848,8 @@ function ApplyConfig(frame, noteID)   -- the local declared above SN.ApplySkinCo
     StopHoverFade(frame)
     ApplyBgAlpha(frame, cfg.alpha or DEFAULT_CFG.alpha, cfg)
     if frame._bodyEb then
-        local r, g, b = cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88
-        pcall(function() frame._bodyEb:SetTextColor(r, g, b) end)
         pcall(function() frame._bodyEb:SetAlpha(cfg.textAlpha or 1.0) end)
-        pcall(function() frame._bodyEb:SetJustifyH(cfg.textAlign or "LEFT") end)
-        local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        local fid = cfg.fontID
-        local path
-        if fid and BNB.ResolveFontDef then path = BNB.ResolveFontDef(fid).regular
-        else path = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) end
-        local flags = GetOutlineFlagsAndShadow(cfg.fontOutline or "None")
-        if path then pcall(function() frame._bodyEb:SetFont(path, BNB.FontPx(path, sz), flags) end) end
-        ApplyOutlineToEditBox(frame._bodyEb, cfg.fontOutline or "None")
+        ApplyBodyFont(frame, cfg)
     end
     -- Icon badge and mini tile use note-level border with scale/offset (matches note list)
     local noteBorder = note and note.borderOverride
@@ -890,7 +907,7 @@ SN._kit = {
     BG_TEXTURES           = BG_TEXTURES,
     BgTextureLabel        = BgTextureLabel,
     OUTLINE_OPTIONS       = OUTLINE_OPTIONS,
-    ApplyOutlineToEditBox = ApplyOutlineToEditBox,
+    ApplyBodyFont         = ApplyBodyFont,
     ApplyBgAlpha          = ApplyBgAlpha,
     ApplyConfig           = ApplyConfig,
     FadeFrame             = FadeFrame,

@@ -1977,6 +1977,9 @@ function EX.Apply()
     -- so the way back re-syncs an open box to the open note as well
     _applying = nil
     if active and _mode == "grid" then
+        -- Note Settings belongs to the note too: leaving it closes the window
+        -- (Dukul, 2026-10-30: one opened for a new note stayed open, ALL-622)
+        if BNB.SyncNoteConfig then BNB.SyncNoteConfig(nil) end
         if BNB.IsReferenceBoxShown and BNB.IsReferenceBoxShown() then
             _rbAway = true
             BNB.CloseReferenceBox()
