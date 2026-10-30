@@ -829,6 +829,7 @@ function BNB.CreateMainWindow()
     -- The help book (ALL-554, UI/HelpBook.lua), left of Settings
     local helpBtn = TBIcon(TOPBAR .. "tp-help", L["TB_ITEM_HELP"], 2,
         function() if BNB.HelpBook then BNB.HelpBook.Toggle() end end, "tp-help")
+    BNB._toolbarHelpBtn = helpBtn   -- the release welcome's callout points at it (ALL-554)
 
     local trashBtn = TBIcon(TOPBAR .. "tp-trash", L["MW_TRASH_TIP"], 3,
         function() if BNB.ToggleTrashWindow then BNB.ToggleTrashWindow() end end, "tp-trash")

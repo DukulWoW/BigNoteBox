@@ -293,6 +293,8 @@ local function NotePreview(note)
 end
 
 function NL.OnEnter(owner, link)
+    -- A note link to a help topic opens it in the Help book (ALL-554)
+    if BNB.HelpLinkAsUI then link = BNB.HelpLinkAsUI(link) end
     local kind = link and link:match("^(bnb%a+):")
     if kind == "bnbwp" then
         local wp = ParseWay(link)
@@ -345,6 +347,8 @@ end
 -- pin into chat, Ctrl copies a /way line (Dukul, 2026-10-15), Alt shows it on
 -- the map (ALL-319). A note link opens the note; Shift as a sticky.
 function NL.OnClick(link, button)
+    -- A note link to a help topic opens it in the Help book (ALL-554)
+    if BNB.HelpLinkAsUI then link = BNB.HelpLinkAsUI(link) end
     local kind = link and link:match("^(bnb%a+):")
     if kind == "bnbui" then   -- ALL-513: open that part of BigNoteBox
         if button == "LeftButton" and BNB.UILinks then BNB.UILinks.Open(link:sub(7)) end
@@ -503,6 +507,8 @@ end
 function NL.LinkMenu(owner, link, text)
     local CM = BNB.ContextMenu
     if not (CM and link) then return end
+    -- A note link to a help topic opens it in the Help book (ALL-554)
+    if BNB.HelpLinkAsUI then link = BNB.HelpLinkAsUI(link) end
     if owner then owner._bnbLinkMenuT = GetTime() end
     local kind = link:match("^(%a+):")
     CM.Open(owner, function(root)

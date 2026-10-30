@@ -14,7 +14,9 @@
 -- callout arrow points at the switch icon at the top left, and the two buttons
 -- keep the explorer or go back to the note list (which then becomes the view
 -- the window opens on). Explorer off: the note list, no callout, one OK
--- button. Esc and the X keep what is showing.
+-- button. Esc and the X keep what is showing. A second callout points at
+-- the Help button on the top right, with the module on or off (ALL-554:
+-- the Help book never opens by itself, Dukul 2026-10-30).
 --
 -- Until it is answered, toasts wait (BNB.Toast holds them through
 -- BNB.ExplorerIntroHolding) and so does the Forever / Classic notice; both
@@ -42,7 +44,8 @@ local BTN_W   = 200
 local BTN_H   = 28
 local ROW_ICON = 20
 local ROW_TEXT_X = 56      -- text column: room for the NEW badge (46 x 24)
-local CALLOUT_W = 240
+local CALLOUT_W = 240      -- widest; narrower when the welcome box is close
+local CALLOUT_MIN = 130
 local FIT_GAP = 16         -- kept free above and below the box
 
 -- The rows: icon (under Assets\), locale key; tint = false keeps the art's
@@ -188,8 +191,8 @@ local function BuildBox(ov)
     return box
 end
 
--- The switch icon lit above the dim, an arrow under it and the callout
-local function BuildCallout(ov)
+-- A top bar icon lit above the dim, an arrow under it and the callout text
+local function BuildCallout(ov, textKey)
     local c = {}
     c.glow = ov:CreateTexture(nil, "ARTWORK", nil, 1)
     c.glow:SetTexture(BNB.UI_HOVER_TEX)
@@ -211,9 +214,44 @@ local function BuildCallout(ov)
     local fs = NewText(box, "BNBFontHighlight", 13)
     fs:SetPoint("TOPLEFT", box, "TOPLEFT", 12, -10)
     fs:SetWidth(CALLOUT_W - 24)
-    fs:SetText(L["EXPLORER_INTRO_CALLOUT"])
+    fs:SetText(L[textKey])
     c.box, c.text = box, fs
     return c
+end
+
+-- A callout on its button, or hidden when the button does not show (the
+-- Help icon moves into the top bar menu on a narrow window). right = the
+-- text box to the left of the arrow, for a button at the right edge
+local function PlaceCallout(c, btn, right, room)
+    local show = btn and btn:IsVisible()
+    for _, r in ipairs({ c.glow, c.icon, c.arrow }) do r:SetShown(show and true or false) end
+    c.box:SetShown(show and true or false)
+    if not show then return end
+    local s = btn:GetWidth()
+    c.icon:ClearAllPoints()
+    c.icon:SetAllPoints(btn)
+    if btn._tx then
+        c.icon:SetTexture(btn._tx:GetTexture())
+        c.icon:SetVertexColor(btn._tx:GetVertexColor())
+    end
+    c.glow:ClearAllPoints()
+    c.glow:SetPoint("CENTER", btn, "CENTER")
+    c.glow:SetSize(s + 18, s + 18)
+    c.arrow:ClearAllPoints()
+    c.arrow:SetPoint("TOP", btn, "BOTTOM", right and -2 or 2, -4)
+    -- The art curves to the right: mirrored for the right-hand callout
+    if right then c.arrow:SetTexCoord(1, 0, 0, 1) else c.arrow:SetTexCoord(0, 1, 0, 1) end
+    -- As wide as the room beside the welcome box allows (Dukul, 2026-10-30)
+    local cw = math.floor(math.max(CALLOUT_MIN, math.min(CALLOUT_W, room or CALLOUT_W)))
+    c.box:SetWidth(cw)
+    c.text:SetWidth(cw - 24)
+    c.box:ClearAllPoints()
+    if right then
+        c.box:SetPoint("TOPRIGHT", c.arrow, "BOTTOMLEFT", 14, 12)
+    else
+        c.box:SetPoint("TOPLEFT", c.arrow, "BOTTOMRIGHT", -14, 12)
+    end
+    c.box:SetHeight(math.ceil(c.text:GetStringHeight() or 0) + 20)
 end
 
 -- Sizes from the measured text; run again a little later, as a bundled font
@@ -273,32 +311,31 @@ local function Layout()
     box._ok:SetPoint("TOP", box, "TOP", 0, y)
     y = y - BTN_H - PAD
     box:SetHeight(-y)
+
     -- Taller than the window: scaled down to fit (CENTER anchor keeps it centred)
     local room = (mf:GetHeight() or -y) - FIT_GAP * 2
-    if -y > room and room > 0 then box:SetScale(math.max(0.5, room / -y)) end
+    local sc = 1
+    if -y > room and room > 0 then sc = math.max(0.5, room / -y) end
+    box:SetScale(sc)
+    box:ClearAllPoints()
+    box:SetPoint("CENTER", _ov, "CENTER", 0, 0)
 
-    -- The callout: on the switch icon when it shows
-    local c = _ov._callout
-    local vb = exOn and EX.ViewButton and EX.ViewButton()
-    local show = vb and vb:IsShown()
-    for _, r in ipairs({ c.glow, c.icon, c.arrow }) do r:SetShown(show and true or false) end
-    c.box:SetShown(show and true or false)
-    if not show then return end
-    local s = vb:GetWidth()
-    c.icon:ClearAllPoints()
-    c.icon:SetAllPoints(vb)
-    if vb._tx then
-        c.icon:SetTexture(vb._tx:GetTexture())
-        c.icon:SetVertexColor(vb._tx:GetVertexColor())
+    -- The callouts: the switch icon (top left, Explorer on) and the Help
+    -- button (top right), each as wide as the room between its button and
+    -- the welcome box. A callout's box starts 12 px past its button's centre
+    -- (the arrow's tip); the welcome box is centred, w * sc wide
+    local half = w * sc / 2
+    local cx = (_ov:GetLeft() or 0) + (_ov:GetWidth() or 0) / 2
+    local function Room(btn, right)
+        local bx = btn and btn:IsVisible() and btn:GetCenter()
+        if not bx then return nil end
+        if right then return (bx - 12) - (cx + half) - FIT_GAP end
+        return (cx - half) - (bx + 12) - FIT_GAP
     end
-    c.glow:ClearAllPoints()
-    c.glow:SetPoint("CENTER", vb, "CENTER")
-    c.glow:SetSize(s + 18, s + 18)
-    c.arrow:ClearAllPoints()
-    c.arrow:SetPoint("TOP", vb, "BOTTOM", 2, -4)
-    c.box:ClearAllPoints()
-    c.box:SetPoint("TOPLEFT", c.arrow, "BOTTOMRIGHT", -14, 12)
-    c.box:SetHeight(math.ceil(c.text:GetStringHeight() or 0) + 20)
+    local vb = exOn and EX.ViewButton and EX.ViewButton()
+    local hb = BNB._toolbarHelpBtn
+    PlaceCallout(_ov._callout, vb, false, Room(vb, false))
+    PlaceCallout(_ov._helpCallout, hb, true, Room(hb, true))
 end
 
 local function Build()
@@ -314,7 +351,8 @@ local function Build()
     dim:SetAllPoints()
     dim:SetColorTexture(0, 0, 0, 0.72)
     ov._box = BuildBox(ov)
-    ov._callout = BuildCallout(ov)
+    ov._callout = BuildCallout(ov, "EXPLORER_INTRO_CALLOUT")
+    ov._helpCallout = BuildCallout(ov, "WELCOME_HELP_CALLOUT")
     BNB.AttachEscClose(ov, function() Finish(false) end)
     ov:SetScript("OnShow", function() Layout() end)
     -- Next frame: Layout sets text widths, never inside OnSizeChanged's pass

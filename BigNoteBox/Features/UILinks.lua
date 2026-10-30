@@ -54,8 +54,8 @@ local function HelpDef(topicKey)
     return {
         key = "help." .. topicKey, icon = HELP,
         label = function()
-            local n = BNB.GetNote and BNB.GetNote(BNB.HelpNoteID(topicKey))
-            return string.format(L["UILINK_HELP_FMT"], (n and n.title) or t.title or topicKey)
+            local title = BNB.HelpTopicText and BNB.HelpTopicText(t)   -- translated
+            return string.format(L["UILINK_HELP_FMT"], title or t.title or topicKey)
         end,
         open = function() BNB.OpenHelp(topicKey) end,
     }

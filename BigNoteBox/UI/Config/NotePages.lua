@@ -762,19 +762,8 @@ function K.BuildFoldersPage(sf, ct, y, page)
         L["CFG_FOLDER_START_OPEN_TIP"])
     startCb:HookScript("OnShow", Sync)
 
-    -- System folders (ALL-511): from BigNoteBox itself, after your notes
-    y = AddRule(ct, y - 4) - 6
-    y = AddHeader(ct, y, L["CFG_SYS_FOLDERS_HEADER"])
-    -- The Patch notes folder is the Help book's Patch notes tab now (ALL-614)
-    -- The Help folder (ALL-512): a help link still opens a topic while it is off
-    y = AddCheck(ct, y, L["CFG_SYS_HELP"],
-        function() return db.sysHelp ~= false end,
-        function(v)
-            db.sysHelp = v
-            if BNB.SystemNotes then BNB.SystemNotes.Reveal("help", false) end
-            BNB.SendMessage("SystemNotesChanged", "help")
-        end,
-        L["CFG_SYS_HELP_TIP"])
+    -- No system folders are left: Patch notes (ALL-614) and Help (ALL-554,
+    -- 2026-10-30) live in the Help book, so the "From BigNoteBox" section went
     Sync()
     sf:FinaliseHeight(math.abs(y) + 12)
 end

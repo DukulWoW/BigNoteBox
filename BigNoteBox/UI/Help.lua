@@ -1,17 +1,16 @@
--- BigNoteBox UI/Help.lua - the Help system folder (ALL-512)
+-- BigNoteBox UI/Help.lua - the help topics (ALL-512)
 --
--- The help topics as read-only notes in a Help folder after Patch notes
--- (Core/SystemNotes.lua). The topics are written in doc mode (BigNoteBox_Dev,
--- a third notes set) and turned into UI/HelpData.lua by
--- _work/tools/docs-build.lua, so nothing here is saved. Decided with Dukul,
--- 2026-10-19: one Help folder, topics in doc mode's own order; each topic has
--- a fixed key the script makes from its first title; the folder can be hidden
--- (Settings > Modules > Folders), never a single topic, and a help link still
--- opens a topic while it is hidden. While there are no topics the folder does
--- not show (the list skips an empty system folder).
+-- The help topics, read in the Help book (UI/HelpBook.lua, ALL-554). Until
+-- 2026-10-30 they were also read-only notes in a Help system folder after
+-- your notes; that folder is gone (ALL-554 stage 4, Dukul: "Remove it").
+-- The topics are written in doc mode (BigNoteBox_Dev, a third notes set) and
+-- turned into UI/HelpData.lua by _work/tools/docs-build.lua, so nothing here
+-- is saved. Topics keep doc mode's own order; each topic has a fixed key the
+-- script makes from its first title.
 --
 -- A topic: { key, src, title, body, rich, clients = { retail, forever,
--- classic } or nil (= every client), chapter = a chapter key or nil }. A
+-- classic } or nil (= every client), chapter = a chapter key or nil, back =
+-- true for the back of the book (after the chapters, the Glossary) }. A
 -- translation, when one exists, is BNB.HELP_LOCALES[locale][key] = { title,
 -- body } (Locales/Help/<locale>.lua); a topic it does not have stays English.
 -- A chapter of the help book (ALL-554 stage 2, a doc-mode folder): { key,
@@ -23,7 +22,8 @@
 --   BNB.HelpNoteID(key)       "sys-help-<key>"
 --   BNB.HelpTopic(key)        the topic on this client, or nil
 --   BNB.HelpTopics()          every topic on this client, in order
---   BNB.OpenHelp(key)         opens it in the main window; false when unknown
+--   BNB.OpenHelp(key)         opens it in the Help book; false when unknown
+--   BNB.HelpLinkAsUI(link)    "bnbnote:sys-help-<key>" -> "bnbui:help.<key>"
 --   BNB.HelpTopicText(t)      title, body (translated, pictures expanded)
 --   BNB.HelpChapters()        chapters, loose: { { ch, topics }, ... } with a
 --                             topic on this client, in order; loose = the
@@ -107,45 +107,22 @@ function BNB.HelpChapterText(ch)
     return name or ch.key, body
 end
 
-local function BuildHelpFolder(rich)
-    local AM = BNB.AdvancedMode
-    local list = {}
-    for i, t in ipairs(BNB.HelpTopics()) do
-        local title, body = Localized(t)
-        -- {img:@UI/name:w:h}: a picture from BigNoteBox's Assets folder,
-        -- allowed in help topics only (Features/AdvancedMode.lua)
-        body = AM and AM.ExpandAssetImages and AM.ExpandAssetImages(body or "") or (body or "")
-        -- Rich Notes off: a rich topic shows its text without the markup
-        if t.rich and not rich and AM and AM.StripMarkup then body = AM.StripMarkup(body) end
-        list[#list + 1] = {
-            id       = PREFIX .. t.key,
-            title    = title or t.key,
-            body     = body,
-            richMode = (t.rich and rich) and true or false,
-            created  = (BNB.HELP_BUILT or time()) - i,   -- keeps the order in a date sort
-            sysItem  = t.key,
-        }
-    end
-    return list
-end
-
-if BNB.SystemNotes then
-    BNB.SystemNotes.Register({
-        key = "help", order = 20, name = "SYS_FOLDER_HELP",
-        setting = "sysHelp", prefix = PREFIX, canHide = false,
-        r = 0x6c / 255, g = 0xb4 / 255, b = 0xee / 255,   -- the note link blue
-        icon = "Interface\\Icons\\INV_Misc_QuestionMark",
-        Build = BuildHelpFolder,
-    })
-end
-
+-- The help lives in the Help book only (ALL-554 stage 4, 2026-10-30): the
+-- Help system folder in the note list is gone, so a topic opens there
 function BNB.OpenHelp(key)
     if not BNB.HelpTopic(key) then
         BNB:Print(string.format(L["HELP_NOT_FOUND_FMT"], tostring(key)))
         return false
     end
-    local SYS = BNB.SystemNotes
-    if SYS then SYS.Reveal("help") end   -- also while the folder is hidden
-    if BNB.OpenNoteInMain then BNB.OpenNoteInMain(PREFIX .. key) end
+    if not BNB.HelpBook then return false end
+    BNB.HelpBook.Open(key)
     return true
+end
+
+-- A "sys-help-<key>" note link (made while the Help folder existed, and the
+-- book's own chapter lists) as the matching "bnbui:help.<key>" link, so a
+-- note link to a topic opens it in the book; any other link as it was
+function BNB.HelpLinkAsUI(link)
+    local key = type(link) == "string" and link:match("^bnbnote:sys%-help%-(.+)$")   -- PREFIX
+    return key and ("bnbui:help." .. key) or link
 end

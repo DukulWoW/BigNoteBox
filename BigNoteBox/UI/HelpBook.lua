@@ -423,7 +423,7 @@ local function FillToc()
     for i, pg in ipairs(pages) do
         if show[i] then
             local head = pg.kind == "chapter"
-            if head and slot > 0 then y = y + HEAD_GAP end
+            if (head or pg.backFirst) and slot > 0 then y = y + HEAD_GAP end
             local row = TocRow(slot)
             slot = slot + 1
             row:ClearAllPoints()
@@ -1071,6 +1071,22 @@ local function Build()
     frame = f
     f._rows = {}
 
+    -- Left / Right turn the pages (ALL-554 stage 3, Dukul: "Left / Right
+    -- only"), with the pointer over the book: the arrow keys also turn the
+    -- character, so they stay the game's anywhere else. The search box keeps
+    -- its own arrows (a focused edit box gets the keys, not this frame). On
+    -- the kit's ESC handler (keyEsc), which passes on every other key
+    local escKey = f:GetScript("OnKeyDown")
+    f:SetScript("OnKeyDown", function(self, key)
+        if (key == "LEFT" or key == "RIGHT") and not InCombatLockdown()
+           and not IsModifierKeyDown() and self:IsMouseOver() then
+            BNB.SetPropagate(self, false)
+            HB.ShowPage(current + (key == "LEFT" and -1 or 1))
+            return
+        end
+        if escKey then escKey(self, key) end
+    end)
+
     if not C.skin then
         -- The table: the wood tile under everything, inset as Chromie Time's
         -- (under the thin wood frame's rail, ALL-615)
@@ -1212,12 +1228,23 @@ local function BuildPages()
     local chapters, loose = {}, {}
     if BNB.HelpChapters then chapters, loose = BNB.HelpChapters()
     elseif BNB.HelpTopics then loose = BNB.HelpTopics() end
-    for _, t in ipairs(loose) do docs[#docs + 1] = { kind = "topic", topic = t } end
+    for _, t in ipairs(loose) do
+        if not t.back then docs[#docs + 1] = { kind = "topic", topic = t } end
+    end
     for no, c in ipairs(chapters) do
         local at = #docs + 1
         docs[at] = { kind = "chapter", chapter = c, no = no, first = at + 1 }
         for _, t in ipairs(c.topics) do
             docs[#docs + 1] = { kind = "topic", topic = t, chapterPage = at }
+        end
+    end
+    -- The back of the book (doc-mode tag Back, the Glossary): after the
+    -- chapters, set apart in Contents like a chapter
+    local first = true
+    for _, t in ipairs(loose) do
+        if t.back then
+            docs[#docs + 1] = { kind = "topic", topic = t, backFirst = first }
+            first = false
         end
     end
 

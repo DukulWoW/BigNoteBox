@@ -165,9 +165,9 @@ BNB.DEFAULTS = {
     -- Note folders (ALL-510): the module (ALL-514) and how a new folder starts in the list
     foldersEnabled       = true,
     folderStartOpen      = true,
-    -- System folders (ALL-511); the Patch notes folder moved into the Help
-    -- book (ALL-614), so only Help is left
-    sysHelp              = true,   -- the Help system folder (ALL-512)
+    -- System folders (ALL-511): Patch notes (ALL-614) and Help (ALL-554)
+    -- moved into the Help book, so none is left; Core/SystemNotes.lua stays
+    -- for a later one
 
     -- Reference Box and Tasks (ALL-102)
     referenceBoxEnabled = true,
