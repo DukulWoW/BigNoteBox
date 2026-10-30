@@ -1137,6 +1137,12 @@ L["HELP_BOOK_TAB_PATCH"]         = "Patch notes"
 L["HELP_BOOK_TAB_PATCH_TIP"]     = "What changed in each release"
 L["HELP_BOOK_PATCH_TITLE_FMT"]   = "%s - BigNoteBox Patch notes"
 L["HELP_BOOK_PATCH_ROW_FMT"]     = "v%s"
+-- The window title in the spellbook look: the open book's name (a tab's name)
+L["HELP_BOOK_WINDOW_FMT"]        = "BigNoteBox - %s"
+-- The chip in front of each patch line (as on the website)
+L["HELP_BOOK_CHIP_NEW"]          = "NEW"
+L["HELP_BOOK_CHIP_CHANGE"]       = "CHANGE"
+L["HELP_BOOK_CHIP_FIX"]          = "FIX"
 L["HELP_BOOK_MORE"]              = "More in the help:"
 
 -- The bnbui:features link's name (it opens the help book's Features tab, ALL-554)

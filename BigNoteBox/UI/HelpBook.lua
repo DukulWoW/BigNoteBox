@@ -70,7 +70,8 @@ local START_W, START_H = 200, 32   -- the cover's Getting started button
 -- longest topic, "No need having it as big"). search = the search box's top,
 -- tocHead = "Contents" under it, tocList = the list
 local LAYOUTS = {
-    book = { side = 26, gap = 16, top = 100, bottom = 26,
+    -- top: 100 under the Classic title plate, 50 on the wood alone (2026-10-30)
+    book = { side = 26, gap = 16, top = BNB.IsClassic and 100 or 50, bottom = 26,
              tocW = TOC_W, pageW = PAGE_W, paneH = PARCH_H,
              -- the 500-high places x 0.88, with the parchments
              search = -53, tocHead = -82, tocList = -110, tocX = 26, tocR = -35, tocB = 30,
@@ -81,7 +82,24 @@ local LAYOUTS = {
              search = -10, tocHead = -42, tocList = -72, tocX = 12, tocR = -24, tocB = 10,
              pageX = 18, pageTop = -18, pageR = -30, pageB = 44,
              footX = 12, footR = -12, footY = 10, noY = 15, logo = 180, logoY = -36 },
+    -- The spellbook look (Dukul, 2026-10-30): the two spellbook pages on the
+    -- wood, the search box in the top band beside the title, the margin on
+    -- the right and at the bottom the same as the top (right), Contents up
+    -- clear of the left page's bottom art, the page's name on the page
+    -- (pageTitle) instead of on the title bar
+    spell = { side = 26, right = 50, gap = 16, top = 50, bottom = 50,
+              tocW = TOC_W, pageW = PAGE_W, paneH = PARCH_H,
+              tocHead = -22, tocList = -50, tocX = 26, tocR = -35, tocB = 64,
+              -- Arrows and page number on the wood under the book (footY / noY
+              -- below the page), the text a little lower at the top (Dukul,
+              -- 2026-10-30: it ran over the page's art)
+              pageX = 39, pageTitle = -40, pageTop = -72, pageR = -49, pageB = 24,
+              footX = 39, footR = -46, footY = -38, noY = -32, logo = 170, logoY = -40,
+              footInk = true },
 }
+-- The spellbook art (Dukul, 2026-10-30): where the client has both pages
+local SB_LEFT, SB_RIGHT = "spellbook-background-evergreen-left", "spellbook-background-evergreen-right"
+local SB_RIBBON = "Spellbook-background-evergreen-ribbon"
 local LAY            -- the layout in use, set at build
 local C = {}         -- the colours in use (head, title, body, pick, hover), set at build
 
@@ -126,6 +144,7 @@ local INK_SWAP = {
 local WHITE_ART = { Toolbar = true, Explorer = true, Documentation = true }
 
 local frame, coverFont, chapterFont, chapterRowFont
+local PageRender   -- a page render frame (defined with the pages; the patch chip rows use it)
 -- Two books, picked by the tabs under the window (Dukul, 2026-10-24):
 -- "docs" = the help topics, "features" = BNB.FEATURE_LIST sorted A-Z by
 -- header (UI/FeatureListData.lua; it replaced the Features window). Each
@@ -265,14 +284,36 @@ local function BuildWood(f)
     return ns
 end
 
+local function HasAtlas(name)
+    return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) and true or false
+end
+
 -- The title plate across the top, as the Chromie Time window has it: the two
 -- ends at their own size, the middle tiled under them, 60 px into each end
+-- Retail / Forever: no plate (Dukul, 2026-10-30: "remove the header, and
+-- shrink the top instead, since the background is a wooden table"), the
+-- title text alone on the wood in a lower top band (LAYOUTS.book.top).
+-- Classic keeps the plate (no housing wood frame there)
 local function BuildTitle(f)
     local tf = CreateFrame("Frame", nil, f)
     tf:SetHeight(85)
     tf:SetPoint("TOPLEFT",  f, "TOPLEFT",  30, -25)
     tf:SetPoint("TOPRIGHT", f, "TOPRIGHT", -30, -25)
     tf:SetFrameLevel(f:GetFrameLevel() + 25)
+    if not BNB.IsClassic then
+        tf:ClearAllPoints()
+        tf:SetPoint("TOPLEFT",  f, "TOPLEFT",  30, 0)
+        tf:SetPoint("TOPRIGHT", f, "TOPRIGHT", -30, 0)
+        tf:SetHeight(LAY.top)
+        local anchor = tf
+        local fs = tf:CreateFontString(nil, "OVERLAY")
+        fs:SetFontObject(_G.SystemFont_Large or BNBFontNormalLarge)
+        fs:SetPoint("CENTER", anchor, "CENTER", 0, 0)
+        fs:SetTextColor(PLATE_TEXT[1], PLATE_TEXT[2], PLATE_TEXT[3])
+        f._artTitle = fs
+        fs:SetText(L["HELP_BOOK_TITLE"])
+        return tf
+    end
     local lft = tf:CreateTexture(nil, "BACKGROUND")
     lft:SetAtlas("UI-Frame-Neutral-TitleLeft", true)
     lft:SetPoint("LEFT", tf, "LEFT")
@@ -307,6 +348,7 @@ local function Parch(f, atlas, w)
     local bg = p:CreateTexture(nil, "BACKGROUND", nil, 2)
     bg:SetAllPoints(p)
     bg:SetAtlas(atlas)
+    p._bg = bg
     return p
 end
 
@@ -491,6 +533,13 @@ local function HideFeatLinks()
     for _, b in ipairs(frame._featLinks) do b:Hide() end
 end
 
+-- A release's chip rows (RenderPatch) share it too
+local function HidePatchRows()
+    for _, row in ipairs(frame._patchRows) do
+        row.chip:Hide(); row.rf:Hide()
+    end
+end
+
 -- Next frame: a SimpleHTML's width is never set while the client lays out
 -- (FOR-30), and a newer page drops this one
 local function RenderTopic(t)
@@ -499,6 +548,7 @@ local function RenderTopic(t)
     C_Timer.After(0, function()
         if my ~= gen.n or not frame:IsShown() then return end
         HideFeatLinks()
+        HidePatchRows()
         local AM = BNB.AdvancedMode
         local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
         local w = TextWidth(sf)
@@ -577,6 +627,7 @@ local function RenderFeature(pg)
     C_Timer.After(0, function()
         if my ~= gen.n or not frame:IsShown() then return end
         HideFeatLinks()
+        HidePatchRows()
         local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
         local w = TextWidth(sf)
         hold:SetWidth(w)
@@ -598,22 +649,147 @@ local function RenderFeature(pg)
     end)
 end
 
--- A release (ALL-614): its lines under New / Change / Fixed, as the patch
--- notes were written for a note (BNB.WhatsNew.PatchBody); plain when the
--- rich renderer is missing. Next frame, as a topic
+-- ── Patch note chips ──────────────────────────────────────────────────────────
+-- Each patch line has a chip in front saying what it is, as on the website
+-- (Dukul, 2026-10-30). Normal look: ui-patch-note-chip.tga (white, a border
+-- and a see-through middle) tinted per kind, gold label. Skin look: flat, a
+-- faint fill and a 1 px edge in the kind's colour, the label in that colour.
+local CHIP_TEX   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-patch-note-chip"
+local CHIP_H     = { book = 18, skin = 16 }
+local CHIP_MIN_W = 52
+local CHIP_PAD   = 16   -- label to chip edge, both sides together
+local CHIP_GAP   = 10   -- chip to text
+local ROW_GAP    = 8    -- between two lines
+local CHIP_GOLD  = { 1, 0.80, 0.22 }   -- the label: warm gold, readable on every tint
+local CHIP_KINDS = {
+    New    = { key = "HELP_BOOK_CHIP_NEW",    book = { 0.20, 0.55, 0.22 }, skin = { 0.40, 0.80, 0.42 } },
+    Change = { key = "HELP_BOOK_CHIP_CHANGE", book = { 0.18, 0.38, 0.75 }, skin = { 0.42, 0.65, 1.00 } },
+    Fixed  = { key = "HELP_BOOK_CHIP_FIX",    book = { 0.70, 0.15, 0.12 }, skin = { 0.95, 0.38, 0.35 } },
+}
+local CHIP_OTHER = { book = { 0.45, 0.30, 0.15 }, skin = { 0.70, 0.70, 0.70 } }
+
+local chipFont
+local function ChipFont()
+    if chipFont then return chipFont end
+    chipFont = CreateFont("BNBHelpBookChipFont")
+    chipFont:CopyFontObject(BookFont())
+    local path, _, flags = chipFont:GetFont()
+    if path then chipFont:SetFont(path, 10, flags or "") end
+    return chipFont
+end
+
+local function MakeChip(parent)
+    local chip = CreateFrame("Frame", nil, parent)
+    chip:SetHeight(C.skin and CHIP_H.skin or CHIP_H.book)
+    if C.skin then
+        local bg = chip:CreateTexture(nil, "BACKGROUND")
+        bg:SetAllPoints(chip)
+        chip._bg = bg
+        local edges = {}
+        for _, e in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
+                             { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+            local t = chip:CreateTexture(nil, "BORDER")
+            t:SetPoint(e[1], chip, e[1])
+            t:SetPoint(e[2], chip, e[2])
+            if #edges < 2 then t:SetHeight(1) else t:SetWidth(1) end
+            edges[#edges + 1] = t
+        end
+        chip._edges = edges
+    else
+        local tex = chip:CreateTexture(nil, "BACKGROUND")
+        tex:SetAllPoints(chip)
+        tex:SetTexture(CHIP_TEX)
+        chip._tex = tex
+    end
+    local fs = chip:CreateFontString(nil, "OVERLAY")
+    fs:SetFontObject(ChipFont())
+    fs:SetPoint("CENTER", chip, "CENTER", 0, 0)
+    fs:SetWordWrap(false)
+    if C.skin then
+        fs:SetShadowOffset(0, 0)
+    else
+        fs:SetTextColor(CHIP_GOLD[1], CHIP_GOLD[2], CHIP_GOLD[3])
+        fs:SetShadowColor(0, 0, 0, 1)
+        fs:SetShadowOffset(1, -1)
+    end
+    chip._fs = fs
+    return chip
+end
+
+local function SetChip(chip, label)
+    local kind = CHIP_KINDS[label]
+    local c = kind and kind[C.skin and "skin" or "book"] or CHIP_OTHER[C.skin and "skin" or "book"]
+    local text = label
+    if kind then text = L[kind.key] end
+    chip._fs:SetText(text)
+    if C.skin then
+        chip._bg:SetColorTexture(c[1], c[2], c[3], 0.15)
+        for _, t in ipairs(chip._edges) do t:SetColorTexture(c[1], c[2], c[3], 0.85) end
+        chip._fs:SetTextColor(c[1], c[2], c[3])
+    else
+        chip._tex:SetVertexColor(c[1], c[2], c[3])
+    end
+end
+
+-- One row per patch line: a chip and its own render frame, so links in the
+-- line still work. Pooled on the topic page
+local function PatchRow(hold, n)
+    local rows = frame._patchRows
+    local row = rows[n]
+    if row then return row end
+    row = { chip = MakeChip(hold), rf = PageRender(hold) }
+    rows[n] = row
+    return row
+end
+
+-- A release (ALL-614): a heading, then one row per line with its chip
+-- (New / Change / Fixed, in that order, BNB.WhatsNew.PatchRows); plain text
+-- under New / Change / Fixed headings when the rich renderer is missing.
+-- Next frame, as a topic
 local function RenderPatch(pg)
     gen.n = gen.n + 1
     local my = gen.n
     C_Timer.After(0, function()
         if my ~= gen.n or not frame:IsShown() then return end
         HideFeatLinks()
+        HidePatchRows()
         local sf, hold, rf, pfs = frame._pageScroll, frame._hold, frame._rf, frame._pfs
         local w = TextWidth(sf)
         hold:SetWidth(w)
         local WN, rel = BNB.WhatsNew, pg.rel
         if BNB.AdvancedMode then
             pfs:Hide(); rf:Show()
-            hold:SetHeight(RenderMarkup(rf, WN.PatchBody(rel.version, rel.lines, true), w) + 8)
+            local heading = string.format(L["PN_NOTE_HEADING"], rel.version)
+            local y = 0
+            if frame._pageTitle then
+                rf:Hide()   -- the heading is the page's title
+            else
+                y = RenderMarkup(rf, "{h1}" .. heading .. "{/h1}", w) + 6
+            end
+            local rows = WN.PatchRows(rel.lines, true)
+            -- One chip width for the page: the widest label
+            local chipW = CHIP_MIN_W
+            for n, it in ipairs(rows) do
+                local row = PatchRow(hold, n)
+                SetChip(row.chip, it.label)
+                chipW = math.max(chipW, math.ceil(row.chip._fs:GetStringWidth()) + CHIP_PAD)
+            end
+            local textX = chipW + CHIP_GAP
+            local textW = math.max(50, w - textX)
+            for n, it in ipairs(rows) do
+                local row = PatchRow(hold, n)
+                local chip, rrf = row.chip, row.rf
+                chip:SetWidth(chipW)
+                chip:ClearAllPoints()
+                chip:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, -(y + 1))
+                chip:SetShown(it.label ~= "")
+                rrf:ClearAllPoints()
+                rrf:SetPoint("TOPLEFT", hold, "TOPLEFT", textX, -y)
+                rrf:Show()
+                local th = RenderMarkup(rrf, it.text, textW)
+                y = y + math.max(chip:GetHeight(), th) + ROW_GAP
+            end
+            hold:SetHeight(y + 8)
         else
             rf:Hide(); pfs:Show()
             pfs:SetWidth(w)
@@ -713,9 +889,27 @@ function HB.ShowPage(i)
     frame._prev:SetShown(kind ~= "cover")
     frame._next:SetShown(kind ~= "cover")
     frame._pageNo:SetShown(text)
+    -- The spellbook look: the title bar names the book, the page's name is
+    -- on the page (Dukul, 2026-10-30: "keep only BigNoteBox - Features /
+    -- Documentation / Patch notes")
+    local pt = frame._pageTitle
+    if pt then
+        local bookName = L["HELP_BOOK_TAB_DOCS"]
+        if book == "features" then bookName = L["HELP_BOOK_TAB_FEATURES"]
+        elseif book == "patches" then bookName = L["HELP_BOOK_TAB_PATCH"] end
+        frame:SetWindowTitle(string.format(L["HELP_BOOK_WINDOW_FMT"], bookName))
+        if text then
+            local name = PageName(current)
+            if kind == "patch" then name = string.format(L["PN_NOTE_HEADING"], pg.rel.version) end
+            pt:SetText(name)
+            pt:Show()
+        else
+            pt:Hide()
+        end
+    end
     if kind == "cover" then
         gen.n = gen.n + 1
-        frame:SetWindowTitle(L["HELP_BOOK_TITLE"])
+        if not pt then frame:SetWindowTitle(L["HELP_BOOK_TITLE"]) end
         SetStart(n > 0 and 1 or nil)
     else
         -- The page's name goes on the title plate, not on the page (Dukul,
@@ -723,7 +917,7 @@ function HB.ShowPage(i)
         local fmt = L["HELP_BOOK_TITLE_FMT"]
         if kind == "feature" then fmt = L["HELP_BOOK_FEAT_TITLE_FMT"]
         elseif kind == "patch" then fmt = L["HELP_BOOK_PATCH_TITLE_FMT"] end
-        frame:SetWindowTitle(string.format(fmt, PageName(current)))
+        if not pt then frame:SetWindowTitle(string.format(fmt, PageName(current))) end
         if kind == "chapter" then
             SetStart(pg.first)
             RenderChapter(pg)
@@ -833,7 +1027,7 @@ local function PageScroll(parent)
 end
 
 -- A render frame with the page's fonts and ink, bound once (FOR-30)
-local function PageRender(hold)
+function PageRender(hold)
     local rf = BNB.AdvancedMode.CreateRenderFrame(nil, hold)
     rf:SetPoint("TOPLEFT", hold, "TOPLEFT", 0, 0)
     rf:SetWidth(LAY.pageW - 100)
@@ -914,6 +1108,7 @@ local function BuildTopic(page)
     more:SetText(L["HELP_BOOK_MORE"])
     more:Hide()
     frame._featMore, frame._featLinks = more, {}
+    frame._patchRows = {}   -- a release's chip rows (PatchRow)
 
     frame._pageScroll, frame._hold, frame._rf, frame._pfs = sf, hold, rf, pfs
     return tp
@@ -956,8 +1151,17 @@ local function BuildSearch(toc)
         -- background to the search box"; the faint wash hardly showed)
         BNB.SetBackdrop(bg, 1.00, 0.96, 0.86, 0.80, 0.40, 0.24, 0.08, 0.9)
     end
-    bg:SetPoint("TOPLEFT",  toc, "TOPLEFT",  LAY.tocX, LAY.search)
-    bg:SetPoint("TOPRIGHT", toc, "TOPRIGHT", LAY.tocR + 18, LAY.search)
+    if C.spellbook then
+        -- The top band, left of the title (Dukul, 2026-10-30), over the wood frame
+        local f = toc:GetParent()
+        -- centred over the Contents side (Dukul, 2026-10-30)
+        bg:SetPoint("CENTER", toc, "TOP", 0, LAY.top / 2)
+        bg:SetWidth(LAY.tocW - 30)
+        bg:SetFrameLevel(f:GetFrameLevel() + 26)
+    else
+        bg:SetPoint("TOPLEFT",  toc, "TOPLEFT",  LAY.tocX, LAY.search)
+        bg:SetPoint("TOPRIGHT", toc, "TOPRIGHT", LAY.tocR + 18, LAY.search)
+    end
     bg:SetHeight(SEARCH_H)
     local eb = CreateFrame("EditBox", nil, bg)
     eb:SetAllPoints()
@@ -1059,7 +1263,18 @@ local function Build()
     if frame then return frame end
     -- Skin mode is read once: switching it reloads the UI
     SetLook(BigNoteBoxDB and BigNoteBoxDB.skinMode and true or false)
-    local winW = LAY.side + LAY.tocW + LAY.gap + LAY.pageW + LAY.side
+    C.spellbook = not C.skin and HasAtlas(SB_LEFT) and HasAtlas(SB_RIGHT)
+    if C.spellbook then
+        LAY = LAYOUTS.spell
+        -- Headers in green, not red-brown (Dukul, 2026-10-30): Contents, its
+        -- chapter rows, the page's name, a chapter cover's number, and the
+        -- open page in Contents. A dark shade of BNB green (#1b5e20): the
+        -- BNB green itself and #2e7d32 were faint on the page, and a dark
+        -- glow behind the headers looked wrong
+        C.title = { 0x1b / 255, 0x5e / 255, 0x20 / 255 }
+        C.pick = C.title
+    end
+    local winW = LAY.side + LAY.tocW + LAY.gap + LAY.pageW + (LAY.right or LAY.side)
     local winH = LAY.top + LAY.paneH + LAY.bottom
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxHelpBook", w = winW, h = winH, art = not C.skin,
@@ -1098,6 +1313,15 @@ local function Build()
         tbl:SetAtlas("UI-Frame-Neutral-BackgroundTile")
         tbl:SetHorizTile(true)
         tbl:SetVertTile(true)
+        -- A little brighter (Dukul, 2026-10-30): the same tile added over
+        -- it, faint (a vertex colour cannot go above 1)
+        local lift = f:CreateTexture(nil, "BACKGROUND", nil, -1)
+        lift:SetAllPoints(tbl)
+        lift:SetAtlas("UI-Frame-Neutral-BackgroundTile")
+        lift:SetHorizTile(true)
+        lift:SetVertTile(true)
+        lift:SetBlendMode("ADD")
+        lift:SetAlpha(0.25)
 
         if wood then BuildWood(f) else BuildBorder(f) end
         BuildTitle(f)
@@ -1148,9 +1372,15 @@ local function Build()
     none:Hide()
     f._noMatch = none
 
+    -- Trying the spellbook's art (Dukul, 2026-10-30), where the client has
+    -- it: the evergreen right page, the left page beside it, the ribbon as
+    -- the partition between them. The old parchments and divider otherwise
+    local LEFT_ART, RIGHT_ART, RIBBON = SB_LEFT, SB_RIGHT, SB_RIBBON
+    local spellbook = C.spellbook
+
     -- The divider between the pages: the kit's edge at half size (so it
     -- tiles at its own scale). Skin: the side panel's own edge is the divider
-    if not C.skin then
+    if not C.skin and not spellbook then
         local dv = CreateFrame("Frame", nil, f)
         dv:SetScale(0.5)
         -- On past the parchments, under the bottom wood (the border draws
@@ -1166,6 +1396,53 @@ local function Build()
 
     -- Right: the page
     local page = Pane(f, "UI-Frame-Neutral-CardParchmentWider", LAY.pageW)
+    if spellbook and page._bg then
+        page._bg:SetAtlas(RIGHT_ART)
+        -- The left page: the page's height, its own shape (never squashed),
+        -- its right edge on the right page's left edge, cut off at the
+        -- window's left edge (the part that would stick out is not drawn).
+        -- On the window itself, so everything on the Contents side draws
+        -- over it; it replaces the Contents parchment
+        local info = C_Texture.GetAtlasInfo(LEFT_ART)
+        local lt = f:CreateTexture(nil, "BACKGROUND", nil, 0)
+        local h = PARCH_H
+        local w = (info.width and info.height and info.height > 0)
+            and h * info.width / info.height or LAY.tocW
+        -- Stops 8 px inside the window's edge (Dukul, 2026-10-30: a little
+        -- of it showed past the frame)
+        local room = LAY.side + LAY.tocW + LAY.gap - 8
+        local show = math.min(w, room)
+        local l, r = info.leftTexCoord or 0, info.rightTexCoord or 1
+        local tp, bt = info.topTexCoord or 0, info.bottomTexCoord or 1
+        if info.file then
+            lt:SetTexture(info.file)
+            -- Cut from the left: keep the right-hand "show" of its width
+            lt:SetTexCoord(r - (r - l) * show / w, r, tp, bt)
+        else
+            lt:SetAtlas(LEFT_ART)
+        end
+        lt:SetSize(show, h)
+        lt:SetPoint("TOPRIGHT", page, "TOPLEFT", 0, 0)
+        if toc._bg then toc._bg:Hide() end
+    end
+    if spellbook and HasAtlas(RIBBON) then
+        local rib = CreateFrame("Frame", nil, f)
+        rib:SetFrameLevel(f:GetFrameLevel() + 22)   -- over the wood frame
+        rib:SetAllPoints(page)
+        -- The partition between the two pages (Dukul, 2026-10-30): most of
+        -- the page's height, its own shape kept
+        local t = rib:CreateTexture(nil, "OVERLAY")
+        t:SetAtlas(RIBBON)
+        local info = C_Texture.GetAtlasInfo(RIBBON)
+        local h = PARCH_H - 30
+        local w = (info and info.width and info.height and info.height > 0)
+            and math.floor(h * info.width / info.height + 0.5) or 30
+        t:SetSize(w, h)
+        -- On the seam, its right edge clear of the page's text (Dukul,
+        -- 2026-10-30: it covered the start of a line)
+        t:SetPoint("TOPLEFT", page, "TOPLEFT", LAY.pageX - 8 - w, 9)
+        f._ribbon = t
+    end
     if C.skin then
         page:SetPoint("TOPLEFT", f, "TOPLEFT", LAY.side + LAY.tocW + LAY.gap, -LAY.top)
     else
@@ -1174,6 +1451,23 @@ local function Build()
     f._cover   = BuildCover(page)
     f._topic   = BuildTopic(page)
     f._chapter = BuildChapter(page)
+    if spellbook then
+        -- The window title centred over the right-hand page, not the whole
+        -- window: the search box shares its row (Dukul, 2026-10-30)
+        if f._artTitle then
+            f._artTitle:ClearAllPoints()
+            f._artTitle:SetPoint("CENTER", page, "TOP", 0, LAY.top / 2)
+        end
+        local pt = page:CreateFontString(nil, "OVERLAY")
+        pt:SetFontObject(PageFonts().h1)
+        pt:SetPoint("TOPLEFT",  page, "TOPLEFT",  LAY.pageX, LAY.pageTitle)
+        pt:SetPoint("TOPRIGHT", page, "TOPRIGHT", LAY.pageR, LAY.pageTitle)
+        pt:SetJustifyH("CENTER")   -- Dukul, 2026-10-30
+        pt:SetWordWrap(false)
+        Ink(pt, C.title)
+        pt:Hide()
+        f._pageTitle = pt
+    end
 
     f._prev = BNB.CreateIconButton(page, 22, "left", {
         skin = C.skin, tip = L["HELP_BOOK_PREV"], onClick = function() HB.ShowPage(current - 1) end })
@@ -1185,6 +1479,8 @@ local function Build()
     no:SetFontObject(BookFont())
     no:SetPoint("BOTTOM", page, "BOTTOM", -4, LAY.noY)
     Ink(no, C.body)
+    -- On the wood (spellbook look): the title bar's light gold
+    if LAY.footInk then Ink(no, PLATE_TEXT) end
     f._pageNo = no
     -- The cover's way in, named after the first page (Getting started), and
     -- a chapter cover's way to its first topic: set by SetStart. A large

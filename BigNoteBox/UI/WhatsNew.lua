@@ -171,6 +171,32 @@ end
 
 WN.PatchBody = PatchBody
 
+-- A release as rows for the Help book's chips: { { label = "New" / "Change" /
+-- "Fixed" / other / "", text = the line as markup (rich) or plain } }, in the
+-- same order as PatchBody: unlabelled lines, New, Change, Fixed, then others
+function WN.PatchRows(entries, rich)
+    local groups, order = {}, {}
+    for _, label in ipairs(PN_ORDER) do groups[label] = {} end
+    for _, entry in ipairs(entries) do
+        local label, text = SplitLabel(entry)
+        if not groups[label] then groups[label] = {}; order[#order + 1] = label end
+        table.insert(groups[label], text)
+    end
+    local seq = {}
+    if groups[""] then seq[1] = "" end
+    for _, label in ipairs(PN_ORDER) do seq[#seq + 1] = label end
+    for _, label in ipairs(order) do
+        if label ~= "" then seq[#seq + 1] = label end
+    end
+    local rows = {}
+    for _, label in ipairs(seq) do
+        for _, text in ipairs(groups[label]) do
+            rows[#rows + 1] = { label = label, text = LineText(text, rich) }
+        end
+    end
+    return rows
+end
+
 -- ── Releases (ALL-614) ───────────────────────────────────────────────────────
 -- Every release in UI/PatchHistory.lua (newest first, made from the release
 -- tags by _work/tools/patch-history.lua), with the release in WhatsNewData.lua
