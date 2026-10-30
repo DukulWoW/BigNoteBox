@@ -192,8 +192,12 @@ local function BuildGeneralTab(panel)
         -- Serif highlighted, regardless of what was selected before. Under another
         -- font set (ALL-14) an override from a different set counts as none.
         local current = BNB.ResolveFontID(note and note.fontOverride) or BNB.GetFontSetDefault()
+        -- A card that cannot draw the note's Korean / Chinese text is greyed
+        -- out and cannot be picked (ALL-619)
         for _,e in ipairs(fontPickerBtns) do
             BNB.PaintSelectCard(e.btn, e.id == current and "sel" or nil, e.nameLbl)
+            e.blocked = BNB.FontBlockedFor(e.def, note and note.body)
+            BNB.DimFontCard(e.nameLbl, e.prevLbl, e.blocked)
         end
         if _wowCb_nc then _wowCb_nc:SetChecked(current == "wow") end
     end
@@ -215,12 +219,21 @@ local function BuildGeneralTab(panel)
         btn:SetSize(CARD_W_F, PH)
         btn:SetPoint("TOPLEFT", panel, "TOPLEFT", xOff, yOff)
         btn:EnableMouse(true)
+        local entry
         btn:SetScript("OnEnter", function(s)
+            local blockedWhy = entry and entry.blocked
+        if blockedWhy then
+            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(blockedWhy, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+            return
+        end
             local note = GetNote()
             if (note and note.fontOverride or nil) ~= def.id then BNB.PaintSelectCard(s, "hover") end
         end)
-        btn:SetScript("OnLeave", HLFonts)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide(); HLFonts() end)
         btn:SetScript("OnClick", function()
+            if entry and entry.blocked then return end
             Save({fontOverride = def.id})
             ApplyLive()
             HLFonts()
@@ -237,7 +250,8 @@ local function BuildGeneralTab(panel)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(12)
         BNB.SetFontSafe(prevLbl, def.regular, 10, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
-        fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
+        entry = {btn=btn, id=def.id, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
+        fontPickerBtns[#fontPickerBtns+1] = entry
     end
     -- Advance y past the grid. It always reserves its 4 rows; free rows carry the
     -- font pack hint.

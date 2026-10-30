@@ -1305,7 +1305,14 @@ end
 local LIST_MARKERS = { "_mLock", "_mPin", "_mFav", "_mAlarm", "_mSitu", "_mLoc" }
 local function HideCells(t)
     if t._cells then for _, fs in pairs(t._cells) do fs:Hide() end end
+    if t._langFlag then t._langFlag:Hide() end
 end
+
+-- Details / Flat: a small flag at the right end of the Name column for a note
+-- with Korean, Chinese or Japanese text (Dukul, 2026-10-30: an indicator;
+-- the editor's title row has the shield). Flags, not shields
+local LANG_FLAG = { ko = "flag-ko", cn = "flag-cn", ja = "flag-ja", ua = "flag-ua", gr = "flag-gr" }
+local FLAG_ART  = "Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\"
 
 -- h = the row height (List / Details); edge = room kept at the right for the
 -- Details columns, so the markers end the Name column
@@ -1323,6 +1330,19 @@ local function ShapeListTile(t, size, w, h, edge)
     -- Normal mode's marker art is hard to read at 12 px (Dukul, 2026-10-21)
     local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode
     local big = skin and 12 or math.min(16, h - 6)
+    local code = edge > 0 and t._note and BNB.TextShield and BNB.TextShield(t._note.body)
+    if code then
+        if not t._langFlag then t._langFlag = t:CreateTexture(nil, "OVERLAY") end
+        local fl = t._langFlag
+        fl:SetTexture(FLAG_ART .. LANG_FLAG[code])
+        fl:SetSize(big, big)
+        fl:ClearAllPoints()
+        fl:SetPoint("RIGHT", t, "RIGHT", x, 0)
+        fl:Show()
+        x = x - big - 2
+    elseif t._langFlag then
+        t._langFlag:Hide()
+    end
     for _, key in ipairs(LIST_MARKERS) do
         local mk = t[key]
         local ms = key == "_mLock" and big - 2 or big

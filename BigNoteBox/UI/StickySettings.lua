@@ -442,8 +442,13 @@ local function PopulateStickySettings(noteID)
         -- Serif highlighted, regardless of what was selected before. Under another
         -- font set (ALL-14) a font from a different set counts as none.
         local cur = BNB.ResolveFontID(cfg.fontID) or BNB.GetFontSetDefault()
+        -- A card that cannot draw the note's Korean / Chinese text is greyed
+        -- out and cannot be picked (ALL-619)
+        local note = BNB.GetNote(noteID)
         for _, e in ipairs(fontPickerBtns) do
             BNB.PaintSelectCard(e.btn, e.id == cur and "sel" or nil, e.nameLbl)
+            e.blocked = BNB.FontBlockedFor(e.def, note and note.body)
+            BNB.DimFontCard(e.nameLbl, e.prevLbl, e.blocked)
         end
         if _wowCb_sn then _wowCb_sn:SetChecked(cur == "wow") end
         if _refreshLSM_sn then _refreshLSM_sn() end
@@ -468,11 +473,20 @@ local function PopulateStickySettings(noteID)
         btn:SetSize(CARD_W, PH_FONT)
         btn:SetPoint("TOPLEFT", ct1, "TOPLEFT", xOff, yOff)
         btn:EnableMouse(true)
+        local entry
         btn:SetScript("OnEnter", function(s)
+            local blockedWhy = entry and entry.blocked
+        if blockedWhy then
+            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(blockedWhy, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+            return
+        end
             if cfg.fontID ~= fid then BNB.PaintSelectCard(s, "hover") end
         end)
-        btn:SetScript("OnLeave", HLStickyFonts)
+        btn:SetScript("OnLeave", function() GameTooltip:Hide(); HLStickyFonts() end)
         btn:SetScript("OnClick", function()
+            if entry and entry.blocked then return end
             cfg.fontID = fid; SaveCfg(noteID, cfg)
             if stickyFrame then ApplyConfig(stickyFrame, noteID) end
             HLStickyFonts()
@@ -489,7 +503,8 @@ local function PopulateStickySettings(noteID)
         prevLbl:SetJustifyH("LEFT"); prevLbl:SetHeight(12)
         BNB.SetFontSafe(prevLbl, def.regular, 10, "BNBFontNormalSmall")
         prevLbl:SetTextColor(0.55, 0.55, 0.55); prevLbl:SetText(def.preview or "")
-        fontPickerBtns[#fontPickerBtns+1] = {btn=btn, id=fid, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
+        entry = {btn=btn, id=fid, nameLbl=nameLbl, prevLbl=prevLbl, def=def}
+        fontPickerBtns[#fontPickerBtns+1] = entry
         plainOnlyWidgets[#plainOnlyWidgets+1] = btn
     end
     -- Advance _y past the grid (ceil rows, since fonts may be odd count). It always

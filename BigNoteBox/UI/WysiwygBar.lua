@@ -325,6 +325,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- Truncated label button that opens a WowStyle1 menu listing all fonts.
     -- Width chosen to fit truncated font names (~90px) without crowding.
     local FONT_DD_W = 90
+    -- The "Aa" box on a narrow bar; skin mode has the square arrow button inside
+    local FONT_DD_COMPACT_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 44 or 32
     local FONT_BTN_H = 20
 
     local fontDDBg = BNB.CreateBackdropFrame("Frame", nil, bar)
@@ -376,7 +378,11 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         return L["NE_FONT_DEFAULT"]
     end
 
+    -- Compact = a narrow bar (Collapse, below): the box shrinks to "Aa" and
+    -- still opens the font list (ALL-623: Focus mode had no font picker left)
+    local fontDDCompact = false
     local function RefreshFontDDLabel()
+        if fontDDCompact then fontDDLabel:SetText("Aa"); return end
         local lbl = GetCurrentFontLabel()
         -- Truncate to fit; approximate 7px per character at small font
         if #lbl > 12 then lbl = lbl:sub(1, 11) .. "..." end
@@ -392,16 +398,10 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         end
         if BNB.SyncNoteConfig then BNB.SyncNoteConfig(id) end
         if ctx.applyFont then ctx.applyFont(BNB.GetNote(id)) end
-        -- Apply to editor body live
-        local eb = BNB._editorBody; if not eb then return end
-        local note = BNB.GetNote(id); if not note then return end
-        local sz = (note.fontSize) or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        local def = fontID and BNB.ResolveFontDef and BNB.ResolveFontDef(fontID)
-        if def then
-            pcall(function() eb:SetFont(def.regular, BNB.FontPx(def.regular, sz), "") end)
-        elseif BNB.ApplyFont then
-            BNB.ApplyFont()
-        end
+        -- The main editor's body and title: through ApplyEditorFonts, which
+        -- keeps the outline and alignment and handles Korean / Chinese text
+        -- (a raw SetFont here dropped the outline, ALL-619)
+        if BNB.ApplyEditorFonts then BNB.ApplyEditorFonts() end
         RefreshFontDDLabel()
     end
 
@@ -429,13 +429,24 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             root:CreateRadio(L["NE_FONT_DEFAULT_GLOBAL"],
                 function() return curID == nil end,
                 function() ApplyFontOverride(nil); Regen(_fontMenuDD) end)
-            -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin
+            -- Bundled fonts (non-LSM) of the active set, plus WoW Default on Latin.
+            -- A font that cannot draw the note's Korean / Chinese text is greyed
+            -- out, its tooltip says why (ALL-619)
+            local curNote = BNB._currentNoteID and BNB.GetNote(BNB._currentNoteID)
             for _, def in ipairs(BNB.FONTS or {}) do
                 if not def._isLSM and BNB.ResolveFontID(def.id) == def.id then
                     local fid = def.id; local lbl = def.label
-                    root:CreateRadio(lbl,
+                    local why = BNB.FontBlockedFor(def, curNote and curNote.body)
+                    local d = root:CreateRadio(lbl,
                         function() return curID == fid end,
-                        function() ApplyFontOverride(fid); Regen(_fontMenuDD) end)
+                        function() ApplyFontOverride(fid); Regen(_fontMenuDD) end,
+                        (why and ctx.ownMenus) and { disabled = true, tip = lbl, tipSub = why } or nil)
+                    if why and not ctx.ownMenus and d and d.SetEnabled then
+                        d:SetEnabled(false)
+                        if d.SetTooltip then
+                            d:SetTooltip(function(tt) tt:AddLine(why, 1, 1, 1, true) end)
+                        end
+                    end
                 end
             end
             -- LSM fonts: only shown when db.lsmFonts is on and entries exist
@@ -463,6 +474,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         GameTooltip:SetOwner(fontDDBg, "ANCHOR_TOP")
         GameTooltip:AddLine(L["NE_FONT_TYPE_TIP_TITLE"], 1, 1, 1)
         GameTooltip:AddLine(L["NE_FONT_TYPE_TIP_BODY"], 0.7, 0.7, 0.7, true)
+        -- The "Aa" box does not show the font's name: the tooltip does
+        if fontDDCompact then GameTooltip:AddLine(GetCurrentFontLabel(), 1, 1, 1) end
         GameTooltip:Show()
     end)
     fontDDBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -526,11 +539,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         BNB.UpdateNote(id, {fontSize = sz})
         if BNB.SyncNoteConfig  then BNB.SyncNoteConfig(id) end
         if ctx.applyFont then ctx.applyFont(BNB.GetNote(id)) end
-        local eb = BNB._editorBody
-        if eb then
-            local path = select(1, eb:GetFont())
-            if path then pcall(function() eb:SetFont(path, BNB.FontPx(path, sz), "") end) end
-        end
+        -- Through ApplyEditorFonts, as the font picker above (ALL-619)
+        if BNB.ApplyEditorFonts then BNB.ApplyEditorFonts() end
         RefreshSizeLbl()
     end
 
@@ -1279,9 +1289,10 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- ── Collapse on a narrow window (Dukul, 2026-10-11) ───────────────────────
     -- At the smallest widths the two sides ran into each other. In order, until
     -- the left side fits: the right side's icons go into its overflow menu one
-    -- by one (LayoutRight, ALL-487), then the font dropdown, then the size
-    -- dropdown (their neighbours move up, no gap). Measured on the next frame
-    -- after a size change, never inside OnSizeChanged.
+    -- by one (LayoutRight, ALL-487), then the font dropdown shrinks to "Aa"
+    -- (ALL-623), then the size dropdown goes, then the font box (their
+    -- neighbours move up, no gap). Measured on the next frame after a size
+    -- change, never inside OnSizeChanged.
     local GAP = 8
     -- Room for the right side: from the left side's last button to the edge
     local function Room()
@@ -1297,15 +1308,22 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local function Collapse()
         if not bar:IsVisible() or (bar:GetWidth() or 0) <= 0 then return end
         -- Everything back first, then take away until it fits
-        fontDDBg:Show(); sizeBg:Show()
+        local function Compact(on)
+            fontDDCompact = on
+            fontDDBg:SetWidth(on and FONT_DD_COMPACT_W or FONT_DD_W)
+            RefreshFontDDLabel()
+        end
+        fontDDBg:Show(); sizeBg:Show(); Compact(false)
         decBtn:ClearAllPoints();    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", ICON_GAP, 0)
         bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", ICON_GAP, 0)
         if Fits() then return end
-        fontDDBg:Hide()
-        decBtn:ClearAllPoints(); decBtn:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
+        Compact(true)
         if Fits() then return end
         sizeBg:Hide()
         bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", incBtn, "RIGHT", ICON_GAP, 0)
+        if Fits() then return end
+        fontDDBg:Hide()
+        decBtn:ClearAllPoints(); decBtn:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
         Fits()
     end
     bar._collapse = function() BNB.Debounce(main and "wyCollapseMain" or "wyCollapseFocus", 0, Collapse) end

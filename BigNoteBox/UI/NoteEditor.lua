@@ -253,15 +253,20 @@ local titleTop = 0
 -- How far the title and tl;dr move right for the note icon (explorer view only)
 local titleLeft = 0
 
--- The title and the rich badge, under the tl;dr line when it shows
+-- The title, the rich badge and the language shield, under the tl;dr line
+-- when it shows. The shield sits left of the rich badge (ALL-619)
 local function PlaceTitle(rich)
-    local eb, badge = BNB._editorTitle, BNB._editorRichBadge
+    local eb, badge, lang = BNB._editorTitle, BNB._editorRichBadge, BNB._editorLangBadge
     if not eb then return end
     local bg = eb:GetParent()
     if rich == nil then rich = badge and badge:IsShown() end
+    local langShown = lang and lang:IsShown()
+    local right = -6
+    if rich then right = right - RICH_BADGE_SIZE - 6 end
+    if langShown then right = right - RICH_BADGE_SIZE - 6 end
     eb:ClearAllPoints()
     eb:SetPoint("TOPLEFT",  bg, "TOPLEFT",  6 + titleLeft, titleTop)
-    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6, titleTop)
+    eb:SetPoint("TOPRIGHT", bg, "TOPRIGHT", right, titleTop)
     if bg._focusBox then bg._focusBox:SetPoint("TOPLEFT", bg, "TOPLEFT", titleLeft, titleTop) end
     local line = BNB._editorTldr
     if line then
@@ -272,6 +277,28 @@ local function PlaceTitle(rich)
         badge:ClearAllPoints()
         badge:SetPoint("RIGHT", bg, "TOPRIGHT", -6, titleTop - TITLE_H / 2)
     end
+    if lang then
+        lang:ClearAllPoints()
+        lang:SetPoint("RIGHT", bg, "TOPRIGHT", rich and -(RICH_BADGE_SIZE + 12) or -6,
+            titleTop - TITLE_H / 2)
+    end
+end
+
+-- The language shield on the title row (Dukul, 2026-10-30): Dukul's
+-- Assets/Flags shield for a note with Korean, Chinese or Japanese text.
+-- text = what the body box holds (typing, via ApplyNoteFont) or the saved body
+local LANG_SHIELD = { ko = "shield-ko", cn = "shield-cn", ja = "shield-ja", ua = "shield-ua", gr = "shield-gr" }
+function BNB.RefreshEditorLangBadge(text)
+    local lang = BNB._editorLangBadge
+    if not lang then return end
+    local code = BNB.TextShield and BNB.TextShield(text)
+    local was = lang._code
+    lang._code = code
+    if code then
+        lang._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. LANG_SHIELD[code])
+    end
+    lang:SetShown(code ~= nil)
+    if was ~= code then PlaceTitle() end
 end
 
 -- Shows the rich badge for a rich note and moves the title's right edge
@@ -281,6 +308,7 @@ local function RefreshRichBadge(note)
     if not (badge and eb) then return end
     local rich = BNB.AdvancedMode.IsRich(note)   -- false while Rich Notes is off (ALL-343)
     badge:SetShown(rich)
+    BNB.RefreshEditorLangBadge(note and note.body)
     -- The title's own right edge (TOPRIGHT): a BOTTOMRIGHT point added on top
     -- of it left the title box over the badge, so a hover or click went to
     -- the title, never the badge's tooltip (ALL-452)
@@ -384,6 +412,28 @@ local function BuildTitleField(parent)
     richBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
     richBadge:Hide()
     BNB._editorRichBadge = richBadge
+
+    -- Language shield, left of the rich badge (placed by PlaceTitle, shown
+    -- by BNB.RefreshEditorLangBadge)
+    local langBadge = CreateFrame("Frame", nil, bg)
+    langBadge:SetSize(RICH_BADGE_SIZE, RICH_BADGE_SIZE)
+    langBadge:SetFrameLevel(eb:GetFrameLevel() + 1)
+    langBadge._tx = langBadge:CreateTexture(nil, "ARTWORK")
+    langBadge._tx:SetAllPoints()
+    langBadge:EnableMouse(true)
+    langBadge:SetScript("OnEnter", function(self)
+        local key = ({ ko = "NE_LANG_BADGE_KOREAN", cn = "NE_LANG_BADGE_CHINESE",
+            ja = "NE_LANG_BADGE_JAPANESE", ua = "NE_LANG_BADGE_CYRILLIC",
+            gr = "NE_LANG_BADGE_GREEK" })[self._code]
+        if not key then return end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine(L[key], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_LANG_BADGE_TIP"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    langBadge:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    langBadge:Hide()
+    BNB._editorLangBadge = langBadge
 
     -- tl;dr line above the title (ALL-372): "tl;dr - <text>" with Dukul's
     -- edit icon, or a faint "Add a tl;dr" with the add icon; the same size

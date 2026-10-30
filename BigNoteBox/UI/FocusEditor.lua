@@ -34,6 +34,7 @@ local focusFrame
 local focusTitleEb
 local focusTitleBg
 local focusTitleUl
+local focusLangBadge    -- language shield at the right end of the title row
 local focusTsStrip      -- created / edited, left in the status bar
 local focusStatsStrip   -- char / word count, right in the status bar
 local focusStatusBar    -- the status bar at the bottom (BNB.CreateStatusBar)
@@ -732,6 +733,51 @@ end
 --------------------------------------------------------------------------------
 -- BUILD FOCUS FRAME  (NORMAL VERSION -- ButtonFrameTemplate)
 --------------------------------------------------------------------------------
+-- The language shield at the right end of the title row (Dukul, 2026-10-30,
+-- as the main editor's): Korean / Chinese / Japanese text. Built by both
+-- frame builders; shown by BNB.RefreshFocusLangBadge (ApplyNoteFont)
+local FOCUS_LANG_SIZE = 22
+local FOCUS_LANG_SHIELD = { ko = "shield-ko", cn = "shield-cn", ja = "shield-ja", ua = "shield-ua", gr = "shield-gr" }
+local FOCUS_LANG_KEY = { ko = "NE_LANG_BADGE_KOREAN", cn = "NE_LANG_BADGE_CHINESE", ja = "NE_LANG_BADGE_JAPANESE",
+    ua = "NE_LANG_BADGE_CYRILLIC", gr = "NE_LANG_BADGE_GREEK" }
+local function BuildFocusLangBadge(titleBg, titleEb)
+    local b = CreateFrame("Frame", nil, titleBg)
+    b:SetSize(FOCUS_LANG_SIZE, FOCUS_LANG_SIZE)
+    b:SetPoint("RIGHT", titleBg, "RIGHT", -6, 0)
+    b:SetFrameLevel(titleEb:GetFrameLevel() + 1)
+    b._tx = b:CreateTexture(nil, "ARTWORK")
+    b._tx:SetAllPoints()
+    b._titleEb, b._titleBg = titleEb, titleBg
+    b:EnableMouse(true)
+    b:SetScript("OnEnter", function(self)
+        local key = FOCUS_LANG_KEY[self._code]
+        if not key then return end
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:AddLine(L[key], 1, 1, 1)
+        GameTooltip:AddLine(L["NE_LANG_BADGE_TIP"], 0.7, 0.7, 0.7, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    b:Hide()
+    focusLangBadge = b
+end
+
+-- text = what the body holds (typing) or the saved body
+function BNB.RefreshFocusLangBadge(text)
+    local b = focusLangBadge
+    if not b then return end
+    local code = BNB.TextShield and BNB.TextShield(text)
+    if code == b._code and b:IsShown() == (code ~= nil) then return end
+    b._code = code
+    if code then
+        b._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. FOCUS_LANG_SHIELD[code])
+    end
+    b:SetShown(code ~= nil)
+    -- The title's right edge moves clear of the shield
+    b._titleEb:SetPoint("BOTTOMRIGHT", b._titleBg, "BOTTOMRIGHT",
+        code and -(FOCUS_LANG_SIZE + 12) or -6, 0)
+end
+
 local function BuildFocusFrame()
     if focusFrame then return end
 
@@ -818,6 +864,7 @@ local function BuildFocusFrame()
         end
     end)
     focusTitleEb = titleEb
+    BuildFocusLangBadge(titleBg, titleEb)
 
     local underline = BNB.CreateNoteRule(content)   -- as the editor's (ALL-262)
     underline:SetPoint("TOPLEFT",  titleBg, "BOTTOMLEFT",  0, -1)
@@ -1118,6 +1165,7 @@ local function BuildFocusFrameSkin()
         end
     end)
     focusTitleEb = titleEb
+    BuildFocusLangBadge(titleBg, titleEb)
 
     local underline = BNB.CreateNoteRule(content)   -- as the editor's (ALL-262)
     underline:SetPoint("TOPLEFT",  titleBg, "BOTTOMLEFT",  0, -1)

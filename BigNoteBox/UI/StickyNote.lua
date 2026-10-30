@@ -551,27 +551,29 @@ local function GetOutlineFlagsAndShadow(outline)
     return flags, ox, oy, sr, sg, sb, sa
 end
 
--- The body text's font, size, outline / shadow, then colour, opacity and
--- alignment (a font object put on the box resets those three). Through a font
--- family (BNB.BodyFontFamily, ALL-619): with a raw SetFont, one Korean or
--- Chinese character stopped every font, size, outline and colour change
--- showing; BNB.RelayoutEditBox then makes the box redraw. The single place
--- that sets the sticky body's font.
-local function ApplyBodyFont(frame, cfg)
+-- The body text's font, size, outline / shadow, then colour and alignment.
+-- The file comes from BNB.NoteFontFile (ALL-619): the chosen card, or WoW's
+-- file when the note has Korean / Chinese text the card cannot draw (with
+-- such a character in it the box showed no font, size or outline change).
+-- BNB.RelayoutEditBox then makes the box redraw. The single place that sets
+-- the sticky body's font.
+-- text (optional): what the box holds while typing in it (inline edit,
+-- BNB.WatchTextScript), else the saved body.
+local function ApplyBodyFont(frame, cfg, text)
     local eb = frame and frame._bodyEb
     if not (eb and cfg) then return end
     local sz  = cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
     local def = BNB.ResolveFontDef and BNB.ResolveFontDef(cfg.fontID)
     local flags, ox, oy, sr, sg, sb, sa = GetOutlineFlagsAndShadow(cfg.fontOutline or "None")
     if def and def.regular then
-        local px  = BNB.FontPx(def.regular, sz)
-        local shadow = (ox ~= 0 or oy ~= 0) and { ox, oy, sr, sg, sb, sa } or nil
-        local fam = BNB.BodyFontFamily and BNB.BodyFontFamily(def, px, flags, shadow)
-        if fam then
-            if eb:GetFontObject() ~= fam then eb:SetFontObject(fam) end
-        else
-            pcall(eb.SetFont, eb, def.regular, px, flags)
-        end
+        local note = frame._noteID and BNB.GetNote(frame._noteID)
+        text = text or (note and note.body) or eb:GetText()
+        eb._bnbScript = BNB.TextScript(text)
+        BNB.WatchTextScript(eb, function(t)
+            if frame._noteID then ApplyBodyFont(frame, frame._cfg or GetCfg(frame._noteID), t) end
+        end)
+        local file = BNB.NoteFontFile(def, text)
+        pcall(eb.SetFont, eb, file, BNB.FontPx(file, sz), flags)
     end
     pcall(eb.SetShadowOffset, eb, ox, oy)
     pcall(eb.SetShadowColor, eb, sr, sg, sb, sa)

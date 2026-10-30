@@ -54,7 +54,7 @@ local GRID_MAX    = 8   -- 2x4 grid; ALL-39 makes it scroll for more
 BNB.FONTS = {
     {
         id      = "notoserif",
-        cyrillic = true,   -- draws Russian itself (BodyFontFamily)
+        cyrillic = true, greek = true,   -- has the letters (checked in the TTF, ALL-619)
         label   = "Noto Serif",
         regular = BASE .. "NotoSerif-Regular.ttf",
         bold    = BASE .. "NotoSerif-Bold.ttf",
@@ -63,7 +63,7 @@ BNB.FONTS = {
     },
     {
         id      = "ebgaramond",
-        cyrillic = true,   -- draws Russian itself (BodyFontFamily)
+        cyrillic = true, greek = true,   -- has the letters (checked in the TTF, ALL-619)
         label   = "EB Garamond",
         regular = BASE .. "EBGaramond-Regular.ttf",
         bold    = BASE .. "EBGaramond-Bold.ttf",
@@ -75,7 +75,7 @@ BNB.FONTS = {
     },
     {
         id      = "notosans",
-        cyrillic = true,   -- draws Russian itself (BodyFontFamily)
+        cyrillic = true, greek = true,   -- has the letters (checked in the TTF, ALL-619)
         label   = "Noto Sans",
         regular = BASE .. "NotoSans-Regular.ttf",
         bold    = BASE .. "NotoSans-Bold.ttf",
@@ -84,7 +84,7 @@ BNB.FONTS = {
     },
     {
         id      = "jetbrains",
-        cyrillic = true,   -- draws Russian itself (BodyFontFamily)
+        cyrillic = true, greek = true,   -- has the letters (checked in the TTF, ALL-619)
         label   = "JetBrains Mono",
         regular = BASE .. "JetBrainsMono-Regular.ttf",
         bold    = BASE .. "JetBrainsMono-Bold.ttf",
@@ -177,79 +177,134 @@ for _, def in ipairs(BNB.FONTS) do _byID[def.id] = def end
 
 local function SetOf(def) return def.set or "latin" end
 
--- ── Font families for note text (ALL-619) ─────────────────────────────────────
--- A raw SetFont gives a box one file and no per-alphabet fallback. One character
--- that file lacks (a single Korean or Chinese one) made a sticky's text box stop
--- following SetFont and repaint (Dukul, 2026-10-30: font, size, outline and
--- colour did nothing). A font family keeps the chosen file for Latin text and
--- WoW's own files for the other alphabets, at the same size and outline.
--- One family per file + size + flags, made once and cached: an existing font
--- object is never re-fonted (FOR-30).
-local FAMILY_ALPHABETS = { "roman", "russian", "korean", "simplifiedchinese", "traditionalchinese" }
--- Chinese is named outright: on an English client the game family's Chinese
--- member drew 你 as a box (Dukul, 2026-10-30). ARKai_T ships with every client
--- (the hans / hant cards above use it too) and serves both Chinese alphabets.
-local FIXED_FILE = {
-    simplifiedchinese = "Fonts\\ARKai_T.ttf", traditionalchinese = "Fonts\\ARKai_T.ttf",
+-- ── A font that can draw the note (ALL-619) ───────────────────────────────────
+-- An edit box whose text holds a character its font file cannot draw stops
+-- showing font, size and outline changes (Dukul, 2026-10-30: one Korean or
+-- Chinese character in a note with a Latin font; 你 with a Chinese card was
+-- fine). A font family did not help (no font object ever showed on these
+-- boxes). So a note with Korean or Chinese text is drawn in a file that has
+-- those letters: the chosen card when it can, else WoW's own file. The font
+-- lists grey out the cards that cannot (BNB.FontBlockedFor).
+-- Cyrillic: WoW's ARIALN (its game font family's Russian member); Greek: no
+-- WoW file has it, so the bundled Noto Sans
+local SCRIPT_FILE = { korean = "Fonts\\2002.TTF", chinese = "Fonts\\ARKai_T.ttf",
+    cyrillic = "Fonts\\ARIALN.TTF", greek = BASE .. "NotoSans-Regular.ttf" }
+-- Lower-case parts of file names that have the letters (WoW's own files; the
+-- hans / hant cards are known by their set)
+local SCRIPT_FILE_HINT = {
+    korean  = { "2002", "k_damage", "k_pagetext" },
+    chinese = { "arkai", "arhei", "arheiuhk", "blei" },
+    cyrillic = { "arialn", "_cyr" },
 }
--- Used when GetFontObjectForAlphabet is missing or answers nothing; Latin and
--- Russian then use the chosen file itself
-local FALLBACK_FILE = { korean = "Fonts\\2002.TTF" }
-local _families, _famN = {}, 0
 
--- WoW's own file for an alphabet, read (never changed) from a game font family
-local function GameAlphabetFile(alphabet)
-    if FIXED_FILE[alphabet] then return FIXED_FILE[alphabet] end
-    local ok, file = pcall(function()
-        local fo = ChatFontNormal:GetFontObjectForAlphabet(alphabet)
-        return fo and fo:GetFont()
-    end)
-    return (ok and file and file ~= "") and file or FALLBACK_FILE[alphabet]
+-- The alphabets of two bytes in UTF-8 (Dukul, 2026-10-30): Cyrillic
+-- U+0400-04FF (D0 80 - D3 BF), Greek U+0370-03FF (CD B0 - CF BF)
+local function TwoByteScript(text)
+    if text:find("[\208-\211][\128-\191]") then return "cyrillic" end
+    if text:find("\205[\176-\191]") or text:find("[\206\207][\128-\191]") then return "greek" end
+    return nil
 end
 
--- def: a BNB.FONTS card (path = def.regular), size: already through FontPx.
--- shadow (optional): { ox, oy, r, g, b, a }. A family draws each alphabet with
--- its member's shadow, not the box's (SetShadowOffset on the box did nothing),
--- so it is set on the new members here, before anything uses them.
--- -> a font family object, or nil when the client cannot make one
-function BNB.BodyFontFamily(def, size, flags, shadow)
-    if not (def and def.regular and size and CreateFontFamily) then return nil end
-    flags = flags or ""
-    local key = def.regular .. "\1" .. size .. "\1" .. flags
-    if shadow then key = key .. "\1" .. table.concat(shadow, ",") end
-    local fam = _families[key]
-    if fam then return fam end
-    local cjk = SetOf(def) ~= "latin"   -- a Chinese card draws Chinese itself
-    local members = {}
-    for _, alphabet in ipairs(FAMILY_ALPHABETS) do
-        local own = alphabet == "roman"
-            or (alphabet == "russian" and def.cyrillic)
-            or (cjk and (alphabet == "simplifiedchinese" or alphabet == "traditionalchinese"))
-        members[#members + 1] = { alphabet = alphabet, height = size, flags = flags,
-            file = (not own and GameAlphabetFile(alphabet)) or def.regular }
+-- "korean", "chinese" or nil for a note's text. UTF-8 lead bytes: Hangul
+-- syllables EA B0 - ED 9E (U+AC00-D7A3), Jamo E1 84-87, compatibility Jamo
+-- E3 84-86; CJK ideographs E4-E9 (U+4000-9FFF), extension A E3 90-BF, kana
+-- E3 81-83, CJK punctuation E3 80, full-width forms EF BC / BD. Korean first:
+-- a note with both gets the Korean file (Korean and Chinese together is the
+-- known edge case, Dukul 2026-10-30).
+function BNB.TextScript(text)
+    if type(text) ~= "string" then return nil end
+    if not text:find("[\225-\239]") then return TwoByteScript(text) end
+    if text:find("[\234\235\236\237][\128-\191][\128-\191]")
+       or text:find("\225[\132-\135]") or text:find("\227[\132-\134]") then
+        return "korean"
     end
-    _famN = _famN + 1
-    local ok, made = pcall(CreateFontFamily, "BNBNoteFamily" .. _famN, members)
-    if not (ok and made) then return nil end
-    local ox, oy, r, g, b, a = 0, 0, 0, 0, 0, 0
-    if shadow then ox, oy, r, g, b, a = unpack(shadow) end
-    for _, alphabet in ipairs(FAMILY_ALPHABETS) do
-        pcall(function()
-            local fo = made:GetFontObjectForAlphabet(alphabet)
-            fo:SetShadowOffset(ox, oy)
-            fo:SetShadowColor(r, g, b, a)
+    if text:find("[\228-\233][\128-\191]") or text:find("\227[\128-\131\144-\191]")
+       or text:find("\239[\188\189]") then
+        return "chinese"
+    end
+    return TwoByteScript(text)
+end
+
+-- The language shield for a note's text (the editor's title row): "ko",
+-- "ja" (kana, E3 81-83), "cn", "ua" (every Cyrillic text: Dukul, 2026-10-30,
+-- the Ukrainian flag, not the Russian one) or "gr", else nil
+function BNB.TextShield(text)
+    local script = BNB.TextScript(text)
+    if script == "korean" then return "ko" end
+    if script == "cyrillic" then return "ua" end
+    if script == "greek" then return "gr" end
+    if not script then return nil end
+    if text:find("\227[\129-\131]") then return "ja" end
+    return "cn"
+end
+
+-- Can this card draw this script? def = a BNB.FONTS card
+local function Covers(def, script)
+    if not script then return true end
+    if script == "chinese" and SetOf(def) ~= "latin" then return true end
+    if def[script] then return true end   -- the card flags cyrillic / greek
+    local file = (def._isWoW and BNB.GetLocaleFont and BNB.GetLocaleFont()) or def.regular or ""
+    file = file:lower()
+    for _, hint in ipairs(SCRIPT_FILE_HINT[script] or {}) do
+        if file:find(hint, 1, true) then return true end
+    end
+    return false
+end
+
+-- The file to draw a note's text with: the card's own, or WoW's file for the
+-- text's script when the card cannot draw it
+function BNB.NoteFontFile(def, text)
+    local script = BNB.TextScript(text)
+    if Covers(def, script) then
+        return (def._isWoW and BNB.GetLocaleFont and BNB.GetLocaleFont()) or def.regular
+    end
+    return SCRIPT_FILE[script]
+end
+
+-- nil when the card can draw the note's text, else the tooltip line that says
+-- why its card is greyed out in a font list
+function BNB.FontBlockedFor(def, text)
+    local script = BNB.TextScript(text)
+    if not def or Covers(def, script) then return nil end
+    if script == "korean" then return L["FONT_BLOCKED_KOREAN"] end
+    if script == "cyrillic" then return L["FONT_BLOCKED_CYRILLIC"] end
+    if script == "greek" then return L["FONT_BLOCKED_GREEK"] end
+    return L["FONT_BLOCKED_CHINESE"]
+end
+
+-- Calls reapply(text) when typing adds the first or takes away the last
+-- Korean / Chinese character, so the box switches file without leaving the
+-- note (Dukul, 2026-10-30). eb._bnbScript = the script its font was set for
+-- (the font setters store it). One hook per box; a later call only swaps
+-- the function (a new note in the same box).
+function BNB.WatchTextScript(eb, reapply)
+    if not eb then return end
+    local hooked = eb._bnbScriptWatch ~= nil
+    eb._bnbScriptWatch = reapply
+    if hooked then return end
+    local key = "TextScript" .. tostring(eb)
+    eb:HookScript("OnTextChanged", function(self, user)
+        if not user then return end
+        BNB.Debounce(key, 0.25, function()
+            local text = self:GetText() or ""
+            if BNB.TextScript(text) ~= self._bnbScript and self._bnbScriptWatch then
+                self._bnbScriptWatch(text)
+            end
         end)
-    end
-    _families[key] = made
-    return made
+    end)
 end
 
--- An edit box whose text draws from two fonts (a Korean or Chinese character
--- through the family's fallback) keeps its old layout after a font, size,
--- outline or colour change until its width changes. One pixel narrower for a
--- frame, then back (Dukul's probe, 2026-10-30: refill and Hide / Show did not
--- do it). Once per frame however many changes came in; the width is put back
--- only if nothing else changed it meanwhile.
+-- Greys out a font card in a list (Note Settings, sticky settings) after
+-- PaintSelectCard: a card that cannot draw the note is dimmed
+function BNB.DimFontCard(nameLbl, prevLbl, blocked)
+    if blocked and nameLbl then nameLbl:SetTextColor(0.42, 0.42, 0.42) end
+    if prevLbl then prevLbl:SetAlpha(blocked and 0.35 or 1) end
+end
+
+-- Keeps the box's layout fresh after a font, size, outline or colour change:
+-- one pixel narrower for a frame, then back (Dukul's probe, 2026-10-30, on a
+-- box with Korean in it). Once per frame however many changes came in; the
+-- width is put back only if nothing else changed it meanwhile.
 function BNB.RelayoutEditBox(eb)
     if not eb or eb._bnbRelayout then return end
     eb._bnbRelayout = true
@@ -276,30 +331,31 @@ local OUTLINE_SHADOW = {
 }
 
 -- A note's body font on an edit box (the main editor, Focus mode, ALL-619):
--- the note's font card (else the global one), size (else the global one) and,
--- with withLook, its outline / shadow and alignment. Through a font family,
--- so Korean and Chinese draw and changes show; the box's colour is kept (a
--- font object put on it resets it: the editor's grey placeholder).
-function BNB.ApplyNoteFont(eb, note, withLook)
+-- the note's font card (else the global one) or, for Korean / Chinese text
+-- the card cannot draw, WoW's file (BNB.NoteFontFile); size (else the global
+-- one) and, with withLook, its outline / shadow and alignment.
+-- text (optional): what the box holds while typing (BNB.WatchTextScript),
+-- else the saved body.
+function BNB.ApplyNoteFont(eb, note, withLook, text)
     if not eb then return end
+    text = text or (note and note.body)
+    eb._bnbScript = BNB.TextScript(text)
+    BNB.WatchTextScript(eb, function(t) BNB.ApplyNoteFont(eb, note, withLook, t) end)
     local db  = BigNoteBoxDB
     local def = BNB.ResolveFontDef(note and note.fontOverride)
     local sz  = (note and note.fontSize) or (db and db.fontSize) or BNB.DEFAULTS.fontSize
     local outline = withLook and note and note.fontOutline or "None"
     local flags, shadow = OUTLINE_FLAGS[outline] or "", OUTLINE_SHADOW[outline]
-    local px  = BNB.FontPx(def.regular, sz)
-    local r, g, b, a = eb:GetTextColor()
-    local fam = BNB.BodyFontFamily(def, px, flags, shadow)
-    if fam then
-        if eb:GetFontObject() ~= fam then eb:SetFontObject(fam) end
-    else
-        pcall(eb.SetFont, eb, def.regular, px, flags)
-        local s = shadow or { 0, 0, 0, 0, 0, 0 }
-        pcall(eb.SetShadowOffset, eb, s[1], s[2])
-        pcall(eb.SetShadowColor, eb, s[3], s[4], s[5], s[6])
-    end
-    if r then pcall(eb.SetTextColor, eb, r, g, b, a) end
+    -- The note's text, not the box's: the box may still hold the last note's
+    local file = BNB.NoteFontFile(def, text)
+    pcall(eb.SetFont, eb, file, BNB.FontPx(file, sz), flags)
+    local sh = shadow or { 0, 0, 0, 0, 0, 0 }
+    pcall(eb.SetShadowOffset, eb, sh[1], sh[2])
+    pcall(eb.SetShadowColor, eb, sh[3], sh[4], sh[5], sh[6])
     if withLook then pcall(eb.SetJustifyH, eb, note and note.textAlign or "LEFT") end
+    -- The title row's language shield follows the text (typing too)
+    if eb == BNB._editorBody and BNB.RefreshEditorLangBadge then BNB.RefreshEditorLangBadge(text) end
+    if eb == BNB._focusEditorBody and BNB.RefreshFocusLangBadge then BNB.RefreshFocusLangBadge(text) end
     BNB.RelayoutEditBox(eb)
 end
 
