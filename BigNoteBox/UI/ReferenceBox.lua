@@ -1981,6 +1981,11 @@ local function BuildSideTabs(f)
         border:SetAllPoints(); border:SetTexture(TAB_BORDER)
         local icon = btn:CreateTexture(nil, "ARTWORK")
         icon:SetSize(TAB_ICON, TAB_ICON)
+        -- Black square behind a round portrait (UpdateSideTabs; ALL-625)
+        local iconBg = btn:CreateTexture(nil, "BACKGROUND", nil, 1)
+        iconBg:SetPoint("TOPLEFT", icon, "TOPLEFT"); iconBg:SetPoint("BOTTOMRIGHT", icon, "BOTTOMRIGHT")
+        iconBg:SetColorTexture(0, 0, 0, 1); iconBg:Hide()
+        btn._iconBg = iconBg
         local hover = btn:CreateTexture(nil, "OVERLAY", nil, -2)
         hover:SetAllPoints(); hover:SetTexture(ASSETS .. "Sidebar\\sb-hover"); hover:Hide()
         local active = btn:CreateTexture(nil, "OVERLAY", nil, -1)
@@ -2111,18 +2116,28 @@ local function UpdateSideTabs()
     local strip = _modeStrip
     local icon  = strip._modelBtn._icon
     icon:SetTexture(ModelTabIcon())
-    -- Live portrait while targeted, else the NPC's saved portrait (ALL-46)
+    -- Live portrait while targeted, else the NPC's saved portrait (ALL-46).
+    -- round = a portrait was drawn (round art), not a square icon
+    local round = false
     if ShownFor(_noteID) and not IsInspectNote(_noteID) then
         -- shown entry's icon, set above
     elseif TargetMatchesNpcNote() or TargetMatchesInspectNote() then
-        pcall(SetPortraitTexture, icon, "target")
+        round = pcall(SetPortraitTexture, icon, "target")
     elseif BNB.SetNpcNotePortrait then
         local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-        BNB.SetNpcNotePortrait(icon, note)
+        round = BNB.SetNpcNotePortrait(icon, note) and true or false
     end
+    -- A round portrait (NPC / mob, or a player while targeted) sits on a
+    -- black square; the race icon and note icons are square already
+    -- (ALL-625, Dukul 2026-10-30)
+    if strip._modelBtn._iconBg then strip._modelBtn._iconBg:SetShown(round) end
     if BNB.ApplyIconFrame then
         local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
-        BNB.ApplyIconFrame(icon, note)
+        -- Player / NPC notes: the tab shows a round portrait, and their
+        -- round icon frame (ALL-587 / ALL-591, made for the square note
+        -- icons) does not belong on a tab (ALL-625, Dukul 2026-10-30)
+        local unit = note and (note.source == "inspect" or note.source == "target")
+        BNB.ApplyIconFrame(icon, not unit and note or nil)
     end
     for _, btn in ipairs({ strip._modelBtn, strip._tasksBtn }) do
         local on = (_rbMode == btn._mode)

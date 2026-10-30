@@ -559,6 +559,27 @@ end
 -- the sticky body's font.
 -- text (optional): what the box holds while typing in it (inline edit,
 -- BNB.WatchTextScript), else the saved body.
+-- Line height (ALL-621): cfg.lineHeight as extra space between lines, in the
+-- read view only. With spacing, an edit box's caret drifts lower than its
+-- text line by line (the old reason SetSpacing was banned in scrolled edit
+-- boxes), so an inline edit runs at no spacing and the read view gets it back
+-- when the edit ends. Plain notes only: the control is plain-only too.
+-- Ends with the redraw (BNB.RelayoutEditBox) every caller needs.
+local function ApplyBodySpacing(frame, cfg, sz)
+    local eb = frame and frame._bodyEb
+    if not (eb and cfg) then return end
+    sz = sz or cfg.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
+    local lh = tonumber(cfg.lineHeight) or 1
+    local note = frame._noteID and BNB.GetNote(frame._noteID)
+    local rich = note and BNB.AdvancedMode and BNB.AdvancedMode.IsRich(note)
+    local sp = 0
+    if lh > 1 and not frame._inlineEditing and not rich then
+        sp = math.floor((lh - 1) * sz + 0.5)
+    end
+    if eb.SetSpacing then pcall(eb.SetSpacing, eb, sp) end
+    BNB.RelayoutEditBox(eb)
+end
+
 local function ApplyBodyFont(frame, cfg, text)
     local eb = frame and frame._bodyEb
     if not (eb and cfg) then return end
@@ -579,7 +600,7 @@ local function ApplyBodyFont(frame, cfg, text)
     pcall(eb.SetShadowColor, eb, sr, sg, sb, sa)
     pcall(eb.SetTextColor, eb, cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88)
     pcall(eb.SetJustifyH, eb, cfg.textAlign or "LEFT")
-    BNB.RelayoutEditBox(eb)
+    ApplyBodySpacing(frame, cfg, sz)
 end
 
 -- Every open sticky's body font again (a global font or size change, ALL-620)
@@ -910,6 +931,7 @@ SN._kit = {
     BgTextureLabel        = BgTextureLabel,
     OUTLINE_OPTIONS       = OUTLINE_OPTIONS,
     ApplyBodyFont         = ApplyBodyFont,
+    ApplyBodySpacing      = ApplyBodySpacing,
     ApplyBgAlpha          = ApplyBgAlpha,
     ApplyConfig           = ApplyConfig,
     FadeFrame             = FadeFrame,
@@ -1690,6 +1712,7 @@ local function EndInlineEdit(f)
     eb:ClearFocus()
     eb:SetEnabled(false)
     eb:SetScript("OnCursorChanged", nil)
+    ApplyBodySpacing(f, f._cfg or GetCfg(noteID))   -- the read view's line height back (ALL-621)
 
     local note = BNB.GetNote(noteID)
     local text = eb:GetText() or ""
@@ -1749,6 +1772,7 @@ local function StartInlineEdit(f)
 
     f._inlineEditing = true
     local eb = f._bodyEb
+    ApplyBodySpacing(f, cfg)   -- no line spacing while the caret shows (ALL-621)
     if eb:GetText() ~= (note.body or "") then eb:SetText(note.body or "") end
     eb:SetEnabled(true)
     if f._cursorFollow then eb:SetScript("OnCursorChanged", f._cursorFollow) end

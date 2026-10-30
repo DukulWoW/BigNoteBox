@@ -3,7 +3,7 @@
 -- One builder for every place that shows a note's details in a tooltip: the
 -- note list hover (UI/NoteList.lua) and the Target / Focus frame badge
 -- (Features/UnitFrameBadge.lua, ALL-400).
--- Sections, each left out when it has nothing: the tl;dr, the next alarm, the
+-- Sections, each left out when it has nothing: the language shield, the tl;dr, the next alarm, the
 -- situations, the waypoints. Compact on purpose (Dukul, 2026-10-08: "as
 -- compact as possible"): a gold header per section, at most MAX_ITEMS lines
 -- under it, every line cut to one line of at most MAX_W pixels.
@@ -146,9 +146,25 @@ local function StateLine(out, note)
     if s[1] then out[#out + 1] = { table.concat(s, ", "), DIM } end
 end
 
+-- The language shield of the title row (ALL-619), for a note with Korean,
+-- Chinese, Japanese, Cyrillic or Greek text: shield + "Chinese content"
+-- (Dukul, 2026-10-30: show it in the explorer's hover too)
+local LANG = {
+    ko = { "shield-ko", "NE_LANG_BADGE_KOREAN" },   cn = { "shield-cn", "NE_LANG_BADGE_CHINESE" },
+    ja = { "shield-ja", "NE_LANG_BADGE_JAPANESE" }, ua = { "shield-ua", "NE_LANG_BADGE_CYRILLIC" },
+    gr = { "shield-gr", "NE_LANG_BADGE_GREEK" },
+}
+local function LangLine(out, note)
+    local code = BNB.TextShield and BNB.TextShield(note.body)
+    local l = code and LANG[code]
+    if not l then return end
+    out[#out + 1] = { "|TInterface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. l[1] .. ":16:16|t " .. L[l[2]], TXT }
+end
+
 local function Collect(note, noteID)
     local out = {}
     if not note.system then StateLine(out, note) end
+    LangLine(out, note)
     TldrLines(out, note)
     AlarmLines(out, note, noteID)
     SituationLines(out, note)

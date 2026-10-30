@@ -20,7 +20,9 @@ local TOOLBAR_H = 36
 -- under the title to the bottom, as in the editor and the Explorer view
 -- (Dukul, 2026-10-28: "move the status bar to the bottom in focus mode too")
 local FOOT_H    = TOOLBAR_H + BNB.STATUS_H
-local TITLE_H   = 54    -- ButtonFrameTemplate title bar height
+-- Content top under the ButtonFrameTemplate title bar (~22): 54 left an empty
+-- band over the note's title (Dukul, 2026-10-30: more room for the note)
+local TITLE_H   = 30
 local FADE_TIME = 0.18  -- seconds for cross-fade
 
 -- Fixed pixel offset for body scroll top anchor (relative to content top):
@@ -553,6 +555,7 @@ local FOCUS_WY_CTX = {
     applyFont   = function(note) ApplyFocusFont(note) end,
     writingOnly = true,
     ownMenus    = true,
+    twoRows     = true,   -- font, size and bullet list on a second row (2026-10-30)
 }
 
 local function BuildFocusWysiwygBar(parent, anchorBelow)

@@ -15,6 +15,7 @@ local BG_TEXTURES           = K.BG_TEXTURES
 local BgTextureLabel        = K.BgTextureLabel
 local OUTLINE_OPTIONS       = K.OUTLINE_OPTIONS
 local ApplyBodyFont         = K.ApplyBodyFont
+local ApplyBodySpacing      = K.ApplyBodySpacing
 local ApplyBgAlpha          = K.ApplyBgAlpha
 local ApplyConfig           = K.ApplyConfig
 local FadeFrame             = K.FadeFrame
@@ -595,11 +596,12 @@ local function PopulateStickySettings(noteID)
 
     -- Line height
     local LH_STICKY = {
-        {key="1.0",label="1.0 (default)"},{key="1.25",label="1.25"},
+        {key="1.0",label=L["STICKY_LINE_HEIGHT_DEFAULT_FMT"]:format("1.0")},{key="1.25",label="1.25"},
         {key="1.5",label="1.5"},{key="1.75",label="1.75"},{key="2.0",label="2.0"},
     }
     local function ApplyStickyLH(val)
         cfg.lineHeight = val; SaveCfg(noteID, cfg)
+        if stickyFrame then ApplyBodySpacing(stickyFrame, cfg) end   -- ALL-621
     end
 
     SubLbl(ct1, L["STICKY_LINE_HEIGHT_LABEL"])

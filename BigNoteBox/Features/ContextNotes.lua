@@ -310,10 +310,14 @@ local function GetOrCreateBadge()
     local btn   = icon and icon:GetMinimapButton("BigNoteBox")
     if not btn then return nil end
 
+    -- In the middle of the icon, big and outlined: in the corner at small
+    -- size it was almost invisible (Dukul, 2026-10-30)
     _badge = btn:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
-    _badge:SetPoint("BOTTOMRIGHT", btn, "BOTTOMRIGHT", 2, -2)
-    _badge:SetJustifyH("RIGHT")
-    _badge:SetTextColor(1, 0.3, 0.3)
+    _badge:SetDrawLayer("OVERLAY", 7)   -- over the button's border ring
+    pcall(_badge.SetFont, _badge, BNB.GetLocaleFont(), 16, "THICKOUTLINE")
+    _badge:SetPoint("CENTER", btn, "CENTER", 1, 0)
+    _badge:SetJustifyH("CENTER")
+    _badge:SetTextColor(1, 0.35, 0.35)
     _badge:Hide()
     return _badge
 end

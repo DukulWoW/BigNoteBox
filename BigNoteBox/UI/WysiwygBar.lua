@@ -175,6 +175,10 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local db = BigNoteBoxDB
     local main = ctx == nil
     ctx = ctx or MAIN_CTX
+    -- Two rows (Focus mode, Dukul 2026-10-30): the writing tools on top, the
+    -- font box, A- / A+, size box and bullet list on a row of their own below,
+    -- with room for wider boxes
+    local twoRows = ctx.twoRows
     local function Body() return ctx.body() end
 
     -- A picker menu (font, size, timestamp): Blizzard's dropdown in the main
@@ -193,7 +197,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     local bar = CreateFrame("Frame", main and "BigNoteBoxWysiwygBar" or nil, parent)
     bar:SetPoint("TOPLEFT",  tsStrip, "BOTTOMLEFT",  0, -2)
     bar:SetPoint("TOPRIGHT", tsStrip, "BOTTOMRIGHT",  0, -2)
-    bar:SetHeight(WYSIWYG_H)
+    bar:SetHeight(twoRows and WYSIWYG_H * 2 or WYSIWYG_H)
 
     -- Top and bottom edge lines (BNB.CreateNoteRule: the note list's divider)
     local sepT = BNB.CreateNoteRule(bar)
@@ -268,7 +272,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Undo / Redo
     local undoBtn = WyBtn("tb-undo", L["NE_TB_UNDO"])
-    undoBtn:SetPoint("LEFT", bar, "LEFT", 6, 0)
+    if twoRows then undoBtn:SetPoint("LEFT", bar, "TOPLEFT", 6, -WYSIWYG_H / 2)
+    else undoBtn:SetPoint("LEFT", bar, "LEFT", 6, 0) end
 
     local redoBtn = WyBtn("tb-redo", L["NE_TB_REDO"])
     redoBtn:SetPoint("LEFT", undoBtn, "RIGHT", ICON_GAP, 0)
@@ -320,18 +325,25 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Divider: undo/redo | font controls
     local divFont = MakeDiv(redoBtn)
+    if twoRows then divFont:Hide() end   -- the font controls are on row 2
 
     -- ── Font type dropdown ────────────────────────────────────────────────────
     -- Truncated label button that opens a WowStyle1 menu listing all fonts.
     -- Width chosen to fit truncated font names (~90px) without crowding.
-    local FONT_DD_W = 90
-    -- The "Aa" box on a narrow bar; skin mode has the square arrow button inside
-    local FONT_DD_COMPACT_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 44 or 32
-    local FONT_BTN_H = 20
+    local FONT_DD_W = twoRows and 150 or 90
+    -- The "Aa" box on a narrow bar; skin mode has the square arrow button inside.
+    -- Normal look 38: at 32 the label had 13 px and "Aa" showed as "..."
+    local FONT_DD_COMPACT_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 44 or 38
+    local FONT_BTN_H = twoRows and 22 or 20
 
     local fontDDBg = BNB.CreateBackdropFrame("Frame", nil, bar)
     fontDDBg:SetSize(FONT_DD_W, FONT_BTN_H)
-    fontDDBg:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
+    -- Row 2's start (two rows) or after the undo / redo divider
+    local function FontRowStart(w)
+        if twoRows then w:SetPoint("LEFT", bar, "BOTTOMLEFT", 6, WYSIWYG_H / 2)
+        else w:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0) end
+    end
+    FontRowStart(fontDDBg)
     local function ApplyFontDDBgSkin()
         local p  = BNB.GetSkinPreset and BNB.GetSkinPreset()
         if not p then return end
@@ -385,7 +397,8 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         if fontDDCompact then fontDDLabel:SetText("Aa"); return end
         local lbl = GetCurrentFontLabel()
         -- Truncate to fit; approximate 7px per character at small font
-        if #lbl > 12 then lbl = lbl:sub(1, 11) .. "..." end
+        local maxC = twoRows and 20 or 12
+        if #lbl > maxC then lbl = lbl:sub(1, maxC - 1) .. "..." end
         fontDDLabel:SetText(lbl)
     end
 
@@ -492,7 +505,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
 
     -- Size display button — shows current pt value, opens preset quick-pick menu
     -- Skin mode: room for the square arrow button beside "12pt"
-    local SIZE_BTN_W = (BigNoteBoxDB and BigNoteBoxDB.skinMode) and 52 or 38
+    local SIZE_BTN_W = ((BigNoteBoxDB and BigNoteBoxDB.skinMode) and 52 or 38) + (twoRows and 10 or 0)
     local sizeBg = BNB.CreateBackdropFrame("Frame", nil, bar)
     sizeBg:SetSize(SIZE_BTN_W, FONT_BTN_H)
     sizeBg:SetPoint("LEFT", incBtn, "RIGHT", ICON_GAP, 0)
@@ -716,7 +729,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- both editors (it has the sub-menus and row tooltips).
     local tokenBtn = WyBtn("tb-syntax", L["NE_INSERT_TOKEN_TIP"])
     -- A divider between the bullet list and the inserts (Dukul, 2026-10-17)
-    local divInsert = MakeDiv(bulletBtn)
+    local divInsert = MakeDiv(twoRows and redoBtn or bulletBtn)
     tokenBtn:SetPoint("LEFT", divInsert, "RIGHT", DIV_GAP, 0)
     tokenBtn:SetIconEnabled(true)
     tokenBtn._cmToggle = true
@@ -1300,7 +1313,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         if not lr then return math.huge end
         return bar:GetRight() - 6 - lr - GAP
     end
-    -- Focus mode has no right side: the left side only has to fit the bar
+    -- Focus mode has no right side and two rows (nothing collapses there)
     local function Fits()
         if LayoutRight then return LayoutRight(Room()) end
         return Room() >= 0
@@ -1313,17 +1326,26 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             fontDDBg:SetWidth(on and FONT_DD_COMPACT_W or FONT_DD_W)
             RefreshFontDDLabel()
         end
-        fontDDBg:Show(); sizeBg:Show(); Compact(false)
-        decBtn:ClearAllPoints();    decBtn:SetPoint("LEFT", fontDDBg, "RIGHT", ICON_GAP, 0)
-        bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", sizeBg, "RIGHT", ICON_GAP, 0)
-        if Fits() then return end
+        -- The shown ones chained left to right, the bullet button after them
+        local function Chain()
+            local prev
+            for _, w in ipairs({ fontDDBg, decBtn, incBtn, sizeBg, bulletBtn }) do
+                if w:IsShown() then
+                    w:ClearAllPoints()
+                    if prev then w:SetPoint("LEFT", prev, "RIGHT", ICON_GAP, 0) else FontRowStart(w) end
+                    prev = w
+                end
+            end
+        end
+        fontDDBg:Show(); decBtn:Show(); incBtn:Show(); sizeBg:Show(); Compact(false)
+        Chain()
+        -- Two rows: row 2 always has room, row 1 is the shorter for it
+        if twoRows or Fits() then return end
         Compact(true)
         if Fits() then return end
-        sizeBg:Hide()
-        bulletBtn:ClearAllPoints(); bulletBtn:SetPoint("LEFT", incBtn, "RIGHT", ICON_GAP, 0)
+        sizeBg:Hide(); Chain()
         if Fits() then return end
-        fontDDBg:Hide()
-        decBtn:ClearAllPoints(); decBtn:SetPoint("LEFT", divFont, "RIGHT", DIV_GAP, 0)
+        fontDDBg:Hide(); Chain()
         Fits()
     end
     bar._collapse = function() BNB.Debounce(main and "wyCollapseMain" or "wyCollapseFocus", 0, Collapse) end
