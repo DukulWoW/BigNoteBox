@@ -105,9 +105,7 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "然后重载您的 UI。\n\n" ..
     "|cffaaaaaa您现有的笔记很安全，一旦 BigNoteBoxDB 激活就会重新出现。|r"
 
--- ── WoW: Forever testing notice (FOR-10) ────────────────────────────
-L["FOREVER_NOTICE_TITLE"] = "WoW: Forever 中的 BigNoteBox"
-L["FOREVER_TEST_NOTICE"] = "BigNoteBox 的 WoW: Forever 版本仍在开发中。\n\n在 Forever 正式上线之前，我们无法保证您的笔记不会突然消失。\n\n记得时不时备份：设置 > 备份 > 完整备份。"
+-- ── Classic beta notice (ALL-168; Forever's went with 2.0.0, ALL-10) ────────────────────────────
 L["FOREVER_NOTICE_DONT_SHOW"] = "不再显示"
 L["FOREVER_NOTICE_BUGS"] = "发现了 bug？如果可以，请在 GitHub 上报告："
 

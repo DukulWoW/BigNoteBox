@@ -146,12 +146,7 @@ L["MW_DB_UNAVAILABLE_BODY"]   =
     "then reload your UI.\n\n" ..
     "|cffaaaaaaYour existing notes are safe and will reappear once BigNoteBoxDB is active.|r"
 
--- ── WoW: Forever testing notice (FOR-10) ────────────────────────────────────
-L["FOREVER_NOTICE_TITLE"] = "BigNoteBox on WoW: Forever"
-L["FOREVER_TEST_NOTICE"] =
-    "BigNoteBox is still being developed for WoW: Forever.\n\n" ..
-    "Until Forever launches, we cannot guarantee that your notes will not suddenly disappear.\n\n" ..
-    "Remember to take a backup now and then: Settings > Backup > Full backup."
+-- ── Classic beta notice (ALL-168; Forever's went with 2.0.0, ALL-10) ────────────────────────────────────
 L["CLASSIC_NOTICE_TITLE"] = "BigNoteBox on WoW Classic"
 L["CLASSIC_TEST_NOTICE"] =
     "BigNoteBox is in beta on the Classic clients.\n\n" ..

@@ -5,87 +5,16 @@ local BNB = BigNoteBox
 local L = BNB.L
 
 --------------------------------------------------------------------------------
--- WoW: Forever beta notice (FOR-10), also shown on the Classic clients (ALL-168
--- beta) with their own title and text. Each client has its own WTF folder, so the
--- one saved flag serves both. Blizzard fixed the SavedVariables loader on
--- 2026-09-25, so this is now a "still in development, keep backups" note with a
--- "Don't show this again" box (BigNoteBoxDB.foreverNoticeHidden). Its own window
+-- Classic beta notice (ALL-168): a "still in development, keep backups" note
+-- with bug links and a "Don't show this again" box (BigNoteBoxDB.foreverNoticeHidden,
+-- named from the Forever beta, FOR-10). Forever no longer shows it: its beta
+-- ended and 2.0.0 opens BigNoteBox for the Forever launch (ALL-10, Dukul
+-- 2026-10-30; the Plunderstorm frame art it had went with it). Its own window
 -- rather than a StaticPopup, so the button is the new SharedButtonTemplate one.
 --------------------------------------------------------------------------------
 local _foreverNotice
 
--- Plunderstorm frame art from the game's own sheet (Interface\FrameGeneral\
--- UIFramePlunderstorm, 256x1024, file id 5607571; not shipped). Four corners with long
--- arms, a top and a bottom edge strip, a two-part crest for the top and an ornament
--- for the bottom. The sheet has no side strips: the sides are a plain stretch of the
--- corners' own vertical arms (a horizontal strip turned on its side is lit from the
--- wrong direction and never matched them). Every edge is one stretched slice from a
--- part of the art that does not change along its length, so there are no joints.
--- Pieces are {x0, x1, y0, y1} in sheet px; cx/cy is where the frame's outer corner
--- sits in a corner cell. Drawn at PS_SCALE (Dukul, 2026-09-27).
-local PS_TEX, PS_W, PS_H = "Interface\\FrameGeneral\\UIFramePlunderstorm", 256, 1024
-local PS_SCALE = 0.75
-local PS_EDGE  = 21            -- edge thickness, sheet px
-local PS_NUDGE = 0.5           -- left/bottom/right edges moved out by this, UI units
-local PS_CORNERS = {
-    TOPLEFT     = { 0, 168, 402, 568, cx = 5,   cy = 3 },
-    TOPRIGHT    = { 0, 168, 570, 736, cx = 165, cy = 3 },
-    BOTTOMLEFT  = { 0, 168,  64, 232, cx = 5,   cy = 164 },
-    BOTTOMRIGHT = { 0, 168, 232, 400, cx = 165, cy = 164 },
-}
-local PS_TOP    = { 100, 156, 37, 58 }     -- outer side up
-local PS_BOTTOM = { 100, 156,  7, 28 }     -- outer side down
-local PS_LEFT   = {   5,  26, 548, 566 }   -- top-left arm; same rows as the bottom-left arm's top
-local PS_RIGHT  = { 144, 165, 242, 254 }   -- bottom-right arm; matches the top-right arm's foot
-local PS_CREST_L, PS_CREST_R = { 0, 119, 736, 794 }, { 119, 238, 736, 794 }
-local PS_ORNAMENT = { 0, 122, 794, 841 }
-
--- inset = half a texel in, for pieces packed against another piece on the sheet
-local function PSTex(f, p, sub, inset)
-    local h = inset and 0.5 or 0
-    local t = f:CreateTexture(nil, "BORDER", nil, sub or 0)
-    t:SetTexture(PS_TEX)
-    t:SetTexCoord((p[1] + h) / PS_W, (p[2] - h) / PS_W, (p[3] + h) / PS_H, (p[4] - h) / PS_H)
-    t:SetSize((p[2] - p[1]) * PS_SCALE, (p[4] - p[3]) * PS_SCALE)
-    return t
-end
-
-local function BuildPlunderChrome(f)
-    local S, E = PS_SCALE, PS_EDGE * PS_SCALE
-    -- The main window's Forever wood with its glow on top (UI/Chrome.lua)
-    local bg = f:CreateTexture(nil, "BACKGROUND")
-    bg:SetTexture(BNB.FOREVER_BG_TEXTURE, "REPEAT", "REPEAT")
-    bg:SetHorizTile(true); bg:SetVertTile(true)
-    bg:SetPoint("TOPLEFT", E / 2, -E / 2); bg:SetPoint("BOTTOMRIGHT", -E / 2, E / 2)
-    BNB.AddForeverGlow(f, bg)
-
-    -- Edges run the full side; the corners draw over their ends. Left, bottom and
-    -- right sat PS_NUDGE inside the corner arms in game, so they move out by that
-    -- (Dukul, 2026-09-27); the top lined up as it was.
-    local N = PS_NUDGE
-    local top, bottom = PSTex(f, PS_TOP), PSTex(f, PS_BOTTOM)
-    top:SetPoint("TOPLEFT");                    top:SetPoint("TOPRIGHT")
-    bottom:SetPoint("BOTTOMLEFT", 0, -N);       bottom:SetPoint("BOTTOMRIGHT", 0, -N)
-    local left, right = PSTex(f, PS_LEFT), PSTex(f, PS_RIGHT)
-    left:SetPoint("TOPLEFT", -N, 0);            left:SetPoint("BOTTOMLEFT", -N, 0)
-    right:SetPoint("TOPRIGHT", N, 0);           right:SetPoint("BOTTOMRIGHT", N, 0)
-
-    for point, c in pairs(PS_CORNERS) do
-        local t = PSTex(f, c, 2, true)
-        local ox = point:find("LEFT") and -c.cx * S or (c[2] - c[1] - c.cx) * S
-        local oy = point:find("TOP")  and  c.cy * S or -((c[4] - c[3]) - c.cy) * S
-        t:SetPoint(point, f, point, ox, oy)
-    end
-
-    -- Crest: its base rests on the top edge's inner line; ornament over the bottom edge
-    local cl, cr = PSTex(f, PS_CREST_L, 4, true), PSTex(f, PS_CREST_R, 4, true)
-    cl:SetPoint("BOTTOMRIGHT", f, "TOP", 0, -E)
-    cr:SetPoint("BOTTOMLEFT",  f, "TOP", 0, -E)
-    local orn = PSTex(f, PS_ORNAMENT, 4, true)
-    orn:SetPoint("TOP", f, "BOTTOM", 0, E + 3 * S)
-end
-
--- Classic: the game's dialog box. The Plunderstorm sheet is Forever art.
+-- The game's dialog box
 local function BuildClassicChrome(f)
     f:SetBackdrop({
         bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background-Dark",
@@ -95,19 +24,19 @@ local function BuildClassicChrome(f)
     })
 end
 
--- Forever and Classic only, until "Don't show this again" is ticked, and never while the setup
+-- Classic only, until "Don't show this again" is ticked, and never while the setup
 -- wizard is still to be done: its Finish reloads (so the next login shows it) and
 -- its Quit calls this directly (UI/SetupWizard.lua BNB_QUIT_SETUP).
 function BNB.ShowForeverNoticeIfDue()
     local db = BigNoteBoxDB
-    if not (BNB.IsForever or BNB.IsClassic) or not db then return end
+    if not BNB.IsClassic or not db then return end
     if db.foreverNoticeHidden or db.setupComplete ~= true then return end
     -- After the Explorer welcome, which calls this when it closes (ALL-543)
     if BNB.ExplorerIntroHolding and BNB.ExplorerIntroHolding() then return end
     pcall(BNB.ShowForeverNotice)
 end
--- The notice's chrome. Normal mode: a hand-built frame with the game's art
--- (Plunderstorm on Forever, the dialog box on Classic) and its own title and X.
+-- The notice's chrome. Normal mode: a hand-built frame with the game's dialog
+-- box art and its own title and X.
 -- Skin mode (ALL-418): BNB.CreateToolWindow's skin frame, title strip and X,
 -- so the window matches the rest instead of mixing game art with skin parts.
 local function NewNoticeFrame(W, title)
@@ -153,14 +82,14 @@ function BNB.ShowForeverNotice()
     if not f then
         local W, PAD = 420, 30
         local TOP, BOTTOM
-        f, TOP, BOTTOM = NewNoticeFrame(W, L[BNB.IsClassic and "CLASSIC_NOTICE_TITLE" or "FOREVER_NOTICE_TITLE"])
+        f, TOP, BOTTOM = NewNoticeFrame(W, L["CLASSIC_NOTICE_TITLE"])
 
         local body = f:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
         body:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -TOP)
         body:SetWidth(W - PAD * 2)
         body:SetJustifyH("LEFT")
         body:SetSpacing(2)
-        body:SetText(L[BNB.IsClassic and "CLASSIC_TEST_NOTICE" or "FOREVER_TEST_NOTICE"])
+        body:SetText(L["CLASSIC_TEST_NOTICE"])
 
         local ok = BNB.CreateButton(nil, f, L["OK"], 120, 26)
         ok:SetPoint("BOTTOM", f, "BOTTOM", 0, BOTTOM)
@@ -206,7 +135,7 @@ function BNB.ShowForeverNotice()
         f:SetHeight(TOP + body:GetStringHeight() + 16 + bugs:GetStringHeight() + 8
             + BNB.BUG_LINKS_H + 16 + 24 + 8 + 26 + BOTTOM)
         if not f._isSkin then
-            if BNB.IsForever then BuildPlunderChrome(f) else BuildClassicChrome(f) end
+            BuildClassicChrome(f)
         end
         f._cb = cb
         _foreverNotice = f
