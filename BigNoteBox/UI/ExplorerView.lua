@@ -325,7 +325,7 @@ local function SyncRefBoxPick()
     _rbPickID = id
     _rbAway = true   -- leaving the grid puts the open note's box back
     if id then
-        BNB.SyncReferenceBox(id)
+        BNB.SyncReferenceBox(id, true)   -- a list only, never the model (RET-09)
     elseif BNB.IsReferenceBoxShown and BNB.IsReferenceBoxShown() then
         BNB.CloseReferenceBox()
     end

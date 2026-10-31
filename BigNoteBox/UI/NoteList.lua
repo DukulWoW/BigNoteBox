@@ -1996,7 +1996,7 @@ local function PaintNoteIcon(host, icon, note, size)
     -- SetPortraitTexture renders the live unit face/model into the texture widget.
     -- Players only get this live: a saved ID cannot carry their customizations.
     if BNB.NoteMatchesTarget(note) then
-        pcall(SetPortraitTexture, icon, "target")
+        BNB.SetLivePortrait(icon, "target")   -- RET-09 guard (Features/TargetNote.lua)
     end
 
     -- Icon frame (ALL-127) takes over from the LSM edge border below when set

@@ -105,6 +105,40 @@ local function RefreshAfterResolve()
     end)
 end
 
+-- RET-09 guard (Dukul, 2026-10-31: "hold portraits"). A creature portrait
+-- loads the creature's model inside the client, and a portrait drawn while one
+-- of our models loads a creature (the Reference Box viewer, the resolver below)
+-- crashed Retail: a freed object read at address 0, no Lua running (four
+-- times 2026-10-09, twice 2026-10-31 after a dialogue capture made the NPC
+-- note). The two never overlap now: a portrait waits while a model loads, a
+-- model waits while portraits load, then the waiting side is drawn again.
+local PORTRAIT_HOLD = 0.5   -- s a drawn portrait counts as loading
+local MODEL_HOLD    = 1.5   -- s a model load counts, unless OnModelLoaded says done
+local _portraitUntil, _modelUntil = 0, 0
+local _redrawPending = false
+local Gate = {}
+BNB.ModelGate = Gate
+-- Seconds left, or nil when the other side is free
+function Gate.PortraitWait()
+    local w = _portraitUntil - GetTime()
+    return w > 0 and w or nil
+end
+function Gate.ModelWait()
+    local w = _modelUntil - GetTime()
+    return w > 0 and w or nil
+end
+function Gate.ModelLoading() _modelUntil = math.max(_modelUntil, GetTime() + MODEL_HOLD) end
+function Gate.ModelLoaded()  _modelUntil = math.min(_modelUntil, GetTime() + 0.1) end
+-- Portraits that waited: draw them again once the model is done
+local function RedrawPortraitsAfter(delay)
+    if _redrawPending then return end
+    _redrawPending = true
+    C_Timer.After(delay + 0.05, function()
+        _redrawPending = false
+        RefreshAfterResolve()
+    end)
+end
+
 -- Display stands (ALL-340, Dukul 2026-10-09): one creature ID with the
 -- invisible model of trigger NPCs, each spawn shown as a different mount by
 -- the server and named after it (NPC 185669 in Orgrimmar: "Reins of the
@@ -156,6 +190,13 @@ local function ProcessQueue()
         return
     end
     _busy = true
+    -- RET-09 guard: not while a portrait loads
+    local wait = Gate.PortraitWait()
+    if wait then
+        table.insert(_queue, 1, npcID)
+        C_Timer.After(wait + 0.05, ProcessQueue)
+        return
+    end
     if not _resolver then
         -- A model that is not drawn never loads: shown, 1px, bottom-left corner,
         -- under everything
@@ -167,6 +208,7 @@ local function ProcessQueue()
     _resolver:Show()
     -- Clear first so GetDisplayInfo cannot return the previous NPC's ID
     pcall(_resolver.ClearModel, _resolver)
+    Gate.ModelLoading()
     local ok = pcall(_resolver.SetCreature, _resolver, tonumber(npcID))
     local tries = 0
     local function Poll()
@@ -186,6 +228,7 @@ local function ProcessQueue()
             _queued[npcID] = nil
             ProcessQueue()
         else
+            Gate.ModelLoading()   -- still loading
             C_Timer.After(0.1, Poll)
         end
     end
@@ -227,6 +270,13 @@ function BNB.SetNpcNotePortrait(tex, note)
     if note.targetShared or EMPTY_DISPLAYS[note.targetDisplayID or 0] then return false end
     local id = note.targetDisplayID
     if id and id > 0 and SetPortraitTextureFromCreatureDisplayID then
+        -- RET-09 guard: not while one of our models loads; drawn again after
+        local wait = Gate.ModelWait()
+        if wait then
+            RedrawPortraitsAfter(wait)
+            return false
+        end
+        _portraitUntil = GetTime() + PORTRAIT_HOLD
         return (pcall(SetPortraitTextureFromCreatureDisplayID, tex, id))
     end
     if not id then Enqueue(note.targetNpcID) end
@@ -238,11 +288,25 @@ end
 -- face exists only live: a saved ID cannot carry customizations). Toasts and
 -- their right-click menu headers use it; a player note's toast showed the
 -- plain icon while the list showed the face (Dukul, 2026-10-10)
+-- A live unit's portrait on tex (it loads the unit's model in the client too):
+-- every SetPortraitTexture of ours goes through here, under the RET-09 guard.
+-- Returns true when drawn; false = it waits for a model and is drawn again.
+function BNB.SetLivePortrait(tex, unit)
+    if not tex then return false end
+    local wait = Gate.ModelWait()
+    if wait then
+        RedrawPortraitsAfter(wait)
+        return false
+    end
+    _portraitUntil = GetTime() + PORTRAIT_HOLD
+    return (pcall(SetPortraitTexture, tex, unit or "target"))
+end
+
 function BNB.SetNoteUnitPortrait(tex, note)
     if not (tex and note) then return false end
     local drawn = BNB.SetNpcNotePortrait(tex, note)
     if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
-        drawn = pcall(SetPortraitTexture, tex, "target") or drawn
+        drawn = BNB.SetLivePortrait(tex, "target") or drawn
     end
     return drawn
 end
@@ -353,19 +417,20 @@ BNB.CreatureIDFromGUID = GetCreatureID
 --------------------------------------------------------------------------------
 -- DATA GATHERING
 --------------------------------------------------------------------------------
-local function GatherTargetData()
+local function GatherTargetData(unit)
+    unit = unit or "target"   -- "npc": the NPC in a dialogue (ALL-631)
     local data = {}
 
-    data.isPlayer = UnitIsPlayer("target")
+    data.isPlayer = UnitIsPlayer(unit)
 
     -- Name + realm
-    local name, realm = BNB.UnitNameRealm("target")   -- FOR-23: Forever surname
+    local name, realm = BNB.UnitNameRealm(unit)   -- FOR-23: Forever surname
     data.name  = name or UNKNOWN_STR
     data.realm = (realm and realm ~= "") and realm or
                  GetNormalizedRealmName() or ""
 
     -- GUID and NPC ID
-    local guid = UnitGUID("target")
+    local guid = UnitGUID(unit)
     data.guid = guid
     data.npcID = not data.isPlayer and GetCreatureID(guid) or nil
     -- Combat pets (hunter pets, warlock demons) share a generic creature ID across
@@ -374,7 +439,7 @@ local function GatherTargetData()
     data.isPet = guid and guid:match("^Pet%-") ~= nil or false
 
     -- Level (-1 means skull/boss)
-    local lvl = UnitLevel("target")
+    local lvl = UnitLevel(unit)
     data.level = (lvl == -1) and "??" or lvl
 
     -- Display ID: UnitDisplayID does not exist on Midnight retail.
@@ -383,12 +448,12 @@ local function GatherTargetData()
     data.displayID = nil
 
     -- Faction: English token for logic (icon, model crest); factionLabel = translated
-    local factionEn, factionLoc = UnitFactionGroup("target")
+    local factionEn, factionLoc = UnitFactionGroup(unit)
     data.faction      = factionEn
     data.factionLabel = factionLoc or factionEn
 
     -- Reaction to player
-    local reactionIdx = UnitReaction("player", "target")
+    local reactionIdx = UnitReaction("player", unit)
     data.reactionIdx   = reactionIdx
     local standing     = reactionIdx and _G["FACTION_STANDING_LABEL" .. reactionIdx]
     data.reactionLabel = type(standing) == "string" and standing
@@ -403,32 +468,32 @@ local function GatherTargetData()
     -- unit menu needs only name and realm for FindExistingNote
     if not data.isPlayer then
         -- ── NPC / mob / boss branch ────────────────────────────────────────
-        local ctName, ctID  = UnitCreatureType("target")   -- translated name, type id
+        local ctName, ctID  = UnitCreatureType(unit)   -- translated name, type id
         data.creatureType   = ctName
         -- English key, icons only: by id first, then the name mapped back
         data.creatureTypeKey = CREATURE_TYPE_KEY_BY_ID[ctID] or CreatureTypeKey(ctName)
-        data.creatureFamily = UnitCreatureFamily("target")  -- may be nil
+        data.creatureFamily = UnitCreatureFamily(unit)  -- may be nil
 
-        local classification = UnitClassification("target")
+        local classification = UnitClassification(unit)
         data.classification      = classification
         local classKey = CLASSIFICATION_KEY[classification or "normal"]
         data.classificationLabel = classKey and L[classKey] or nil
         data.isBoss = (classification == "worldboss") or (data.level == "??")
         -- Mob (can be attacked) or NPC, for the Oracle search badges (ALL-69)
-        data.attackable = UnitCanAttack("player", "target") and true or false
+        data.attackable = UnitCanAttack("player", unit) and true or false
 
         -- Max health — UnitHealthMax returns a "secret" (taint-protected) value
         -- in keybind execution contexts on retail. The comparison must also happen
         -- inside pcall — taint escapes if the secret value is compared outside it.
         pcall(function()
-            local maxHP = UnitHealthMax("target")
+            local maxHP = UnitHealthMax(unit)
             if maxHP and maxHP > 0 then data.maxHealth = maxHP end
         end)
 
         -- Power — same taint risk; entire read + comparison inside pcall.
         pcall(function()
-            local powerIdx, powerToken = UnitPowerType("target")
-            local maxPow = UnitPowerMax("target")
+            local powerIdx, powerToken = UnitPowerType(unit)
+            local maxPow = UnitPowerMax(unit)
             if maxPow and maxPow > 0 then
                 data.powerIdx  = powerIdx
                 local g = powerToken and _G[powerToken]
@@ -668,7 +733,8 @@ end
 -- (a repeated click or key event) is one note, not a second "(Duplicate)".
 local _lastCreate = { guid = nil, at = 0 }
 
-local function CreateTargetNote(richMode, data)
+-- quiet: do not select the new note (a dialogue capture, ALL-631)
+local function CreateTargetNote(richMode, data, quiet)
     local now = GetTime()
     if data.guid and _lastCreate.guid == data.guid and now - _lastCreate.at < 2 then return end
     _lastCreate.guid, _lastCreate.at = data.guid, now
@@ -745,7 +811,7 @@ local function CreateTargetNote(richMode, data)
     -- Select the note so SyncReferenceBox fires with the fully populated note
     -- (targetNpcID must be set before SelectNote, which is why we call it
     -- after UpdateNote rather than after CreateNote).
-    if BNB.SelectNote then
+    if BNB.SelectNote and not quiet then
         if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
         BNB.SelectNote(noteID)
     end
@@ -831,6 +897,54 @@ local function StartTargetNoteFlow(data)
             ShowTypeDialog(data)
         end
     end
+end
+
+-- What an NPC says, into that NPC's own note (ALL-631, Dukul 2026-10-31):
+-- the note F6 makes and finds (by creature ID), with the text at the bottom
+-- under a dated header. No note yet: one is made first, as F6 would, without
+-- its dialogs (Rich unless the setting says Normal). Returns the note id and
+-- title, or nil when it is no case for an NPC note (Player & NPC Notes off,
+-- no NPC, no creature ID, a pet): the caller then makes a note of its own.
+-- open: show the note in the main window after (Note Capture set to "open");
+-- otherwise nothing is opened while the player talks (fewer model loads, RET-09).
+function TN.AddDialogue(text, open)
+    if not BNB.UnitNotesEnabled() or not UnitExists("npc") or UnitIsPlayer("npc") then return nil end
+    if type(text) ~= "string" or text:match("^%s*$") then return nil end
+    local data = GatherTargetData("npc")
+    if data.isPet or not data.npcID then return nil end
+
+    local id = FindExistingNote(data)
+    if not id then
+        local rich = BNB.RichEnabled() and GetType() ~= "always_normal"
+        id = CreateTargetNote(rich, data, true)
+        if not id then return nil end
+    end
+    local note = BNB.GetNote(id)
+    if not note then return nil end
+    -- The note open in the editor: its unsaved changes first (as NoteLinks does)
+    if BNB._currentNoteID == id and BNB._dirty and BNB.SaveCurrentNoteQuiet then
+        BNB.SaveCurrentNoteQuiet()
+        note = BNB.GetNote(id)
+    end
+
+    local hdr  = string.format(L["QN_DIALOGUE_HDR_FMT"], BNB.FmtDate())
+    local body = ((note.body or ""):gsub("%s+$", ""))
+    text = (text:gsub("^%s+", ""):gsub("%s+$", ""))
+    if note.richMode then
+        body = body .. "\n\n" .. BNB.DividerTag("gold-plain") .. "\n\n{h3}" .. hdr .. "{/h3}\n\n" .. text
+    else
+        body = body .. "\n\n----- " .. hdr .. " -----\n" .. text
+    end
+    BNB.UpdateNote(id, { body = body })
+    UN.RefreshNoteViews(id)
+    if open then
+        if BNB.mainFrame and not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end
+        if BNB._currentNoteID ~= id and BNB.SelectNote then
+            if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
+            BNB.SelectNote(id)
+        end
+    end
+    return id, note.title
 end
 
 -- Public entry point

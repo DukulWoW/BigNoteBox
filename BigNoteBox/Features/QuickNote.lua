@@ -143,6 +143,13 @@ local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
     return id
 end
 
+-- A note of what an NPC said is titled "<name> (Dialogue)", so the name itself
+-- stays free for the NPC's own note (F6 / unit menu), which would otherwise
+-- come out as "<name> (Duplicate)" (Dukul, 2026-10-31)
+local function DialogueTitle(npcName)
+    return string.format(BNB.L["QN_DIALOGUE_TITLE_FMT"], npcName)
+end
+
 -- icon:   full texture path or nil (falls back to random)
 -- tags:   array of tag strings
 -- title, body: strings
@@ -979,14 +986,28 @@ local function InjectQuestLogFrame()
     end
 end
 
+-- Plain talk (gossip, not a quest) goes into the NPC's own note, the one F6
+-- makes (BNB.TargetNote.AddDialogue, ALL-631); where that cannot be (Player &
+-- NPC Notes off, an object), a "<name> (Dialogue)" note of its own
+local function SaveDialogue(npcName, text)
+    local TN = BNB.TargetNote
+    local id, title
+    if TN and TN.AddDialogue then id, title = TN.AddDialogue(text, GetAction() == "open") end
+    if id then
+        BNB:Print(string.format(BNB.L["QN_DIALOGUE_ADDED"], title or npcName or ""))
+        return
+    end
+    CreateQuickNote(DialogueTitle(npcName or UnitName("npc") or "NPC"),
+        NPCLocationHeader() .. (text or ""), RandomIcon(), { "Gossip" }, nil)
+end
+
 local function InjectGossipFrame()
     if not GossipFrame then return end
 
     MakeButton("BNBQuickNoteGossipBtn", GossipFrame, function()
         if not IsEnabled() then return end
         local title, body = GossipText()
-        body = NPCLocationHeader() .. body
-        CreateQuickNote(title, body, RandomIcon(), { "Gossip" }, nil)
+        SaveDialogue(title, body)
     end)
 end
 
@@ -1152,16 +1173,23 @@ local function BuildImmersionButton()
             immBody  = textFs and (textFs.storedText or textFs:GetText())
         end
         -- Fallback to live APIs if Immersion frame path fails
-        local questTitle = GetTitleText()
-        local title = (immTitle and immTitle ~= "") and immTitle
-                   or (questTitle and questTitle ~= "") and questTitle
-                   or UnitName("npc") or "NPC"
         local body = (immBody and immBody ~= "") and immBody
                   or GetQuestText()
                   or (C_GossipInfo and C_GossipInfo.GetText and C_GossipInfo.GetText())
                   or GetRewardText()
                   or ""
         local questID = GetQuestID and GetQuestID() or 0
+        local npcName = (immTitle and immTitle ~= "") and immTitle or nil
+        -- Plain talk: into the NPC's own note (ALL-631)
+        if questID <= 0 then
+            SaveDialogue(npcName, body)
+            return
+        end
+        -- A quest: its own note, titled with the quest (Immersion's name
+        -- line shows the NPC)
+        local questTitle = GetTitleText()
+        local title = (questTitle and questTitle ~= "") and questTitle
+                   or DialogueTitle(npcName or UnitName("npc") or "NPC")
         local rewardFn = (questID > 0) and function(noteID)
             AttachQuestID(noteID, questID)
             AttachQuestRewards(noteID)
@@ -1241,6 +1269,7 @@ end
 local _duiInjected  = false  -- true once we have confirmed DUI is loaded
 local _duiCache     = nil    -- cached GetContentForClipboard() for current dialogue
 local _duiQuestID   = nil    -- cached GetQuestID() for current quest dialogue
+local _duiQuestTitle = nil   -- cached GetTitleText() for it (the note's title)
 
 local function CacheDUIText()
     -- Called one tick after a dialogue event fires. DUI has already populated
@@ -1257,6 +1286,8 @@ local function CacheDUIText()
     -- Cache quest ID while QUEST_DETAIL/QUEST_COMPLETE events still have it live
     _duiQuestID = GetQuestID and GetQuestID() or nil
     if _duiQuestID and _duiQuestID <= 0 then _duiQuestID = nil end
+    _duiQuestTitle = _duiQuestID and GetTitleText and GetTitleText() or nil
+    if _duiQuestTitle == "" then _duiQuestTitle = nil end
 end
 
 local function GetDUIText()
@@ -1273,9 +1304,9 @@ local function GetDUIText()
     -- Strip leading "[NPC: XXXX] " and split into title / body
     local npcName, body = raw:match("^%[NPC:%s*%d+%]%s*(.-)%s*\n(.+)$")
     if npcName then
-        return npcName, NPCLocationHeader() .. body
+        return npcName, body
     end
-    return UnitName("npc") or "NPC", NPCLocationHeader() .. raw
+    return UnitName("npc") or "NPC", raw
 end
 
 local function TryInitDUI()
@@ -1297,23 +1328,31 @@ end
 
 local _duiHooked    = false  -- true once dialogue hooksecurefunc called
 local _duiBookPages = {}     -- [pageNum] = text, populated by ITEM_TEXT_READY
+local _duiForceNote = false  -- true while our own button clicks DUI's (note even with duiAutoNote off)
+local _duiBookHooked = false -- true once DUI's book Copy Text button is hooked
 
 local function OnDUIDialogueCopy()
-    if not DB() or not DB().duiAutoNote then return end
+    if not DB() or not (DB().duiAutoNote or _duiForceNote) then return end
     if not IsEnabled() then return end
-    local title, body = GetDUIText()
-    if title and body and body ~= NPCLocationHeader() then
-        local qid = _duiQuestID
-        local rewardFn = qid and function(noteID)
-            AttachQuestID(noteID, qid)
-            AttachQuestRewards(noteID)
-        end or nil
-        CreateQuickNote(title, body, RandomIcon(), { "Quest" }, rewardFn)
+    local npcName, body = GetDUIText()
+    if not npcName or not body or body:match("^%s*$") then return end
+    local qid = _duiQuestID
+    if not qid then
+        -- Plain talk: into the NPC's own note (ALL-631)
+        SaveDialogue(npcName, body)
+        return
     end
+    -- A quest: its own note, titled with the quest
+    local rewardFn = function(noteID)
+        AttachQuestID(noteID, qid)
+        AttachQuestRewards(noteID)
+    end
+    CreateQuickNote(_duiQuestTitle or DialogueTitle(npcName), NPCLocationHeader() .. body,
+        RandomIcon(), { "Quest" }, rewardFn)
 end
 
 local function OnDUIBookCopy()
-    if not DB() or not DB().duiAutoNote then return end
+    if not DB() or not (DB().duiAutoNote or _duiForceNote) then return end
     if not IsEnabled() then return end
     local bookFrame = _G["DUIBookFrame"]
     if not bookFrame or not bookFrame:IsShown() then return end
@@ -1351,7 +1390,160 @@ local function OnDUIBookCopy()
     CreateQuickNote(title, body, RandomIcon(), { "Book" }, nil)
 end
 
+-- ── DUI: our note button beside DUI's Copy Text buttons ─────────────────────
+-- Beside the Copy Text button of DUIQuestFrame (on its left) and DUIBookFrame
+-- (on its right: the book's sits in the top-left corner), same size, no gap,
+-- so the two read as one wider button (Dukul, 2026-10-31). Drawn as DUI draws
+-- its own icon: one colour per DUI theme at 60 % alpha, full on hover. A click
+-- clicks DUI's button (the copy box opens as usual) and always makes a note,
+-- even with duiAutoNote off. Parented to DUI's button, so it shows, hides and
+-- fades with it. duiNoteBtn = false hides it (Settings > Modules > Note Capture).
+local DUI_BTN_SZ   = 24   -- DUI's BUTTON_SIZE (Clipboard.lua)
+local DUI_ICON_SZ  = 18   -- DUI's ICON_SIZE is 16; the quill makes ours look smaller
+local DUI_ICON_DIM = 0.6  -- DUI's ALPHA_UNFOCUSED
+-- Two layers in white, both made from Dukul's ui-dialogueui-normal (kept in
+-- _work/backups/dialogueui-art with his hover / press art) and tinted
+-- per theme: the line (a little bolder than the source) and the soft edge
+-- around it, which DUI's icon has (light on the light themes, dark on the dark)
+local DUI_TEX      = ASSETS .. "UI\\ui-dialogueui-mask"
+local DUI_TEX_EDGE = ASSETS .. "UI\\ui-dialogueui-glow"
+-- DUI's own icon in each theme (CopyTextButton.png, one 1/8 slot each):
+-- { line r, g, b, edge r, g, b }
+local DUI_THEME_RGB = {
+    [1] = { 84, 54, 26,    231, 223, 195 },   -- Brown
+    [2] = { 143, 143, 143, 64, 64, 64 },      -- Dark
+    [3] = { 132, 86, 48,   234, 224, 196 },
+    [4] = { 128, 128, 128, 38, 38, 38 },
+}
+local _duiNoteBtns = {}   -- [DUI's copy button] = ours
+
+local function DUIBtnWanted()
+    return IsEnabled() and DB() and DB().duiNoteBtn ~= false and true or false
+end
+
+-- DUI puts its Translator button 4 px left of the quest Copy Text button
+-- (LayoutTopWidgets): move it left of ours while ours shows
+local function AnchorDUITranslator()
+    local qf = _G["DUIQuestFrame"]
+    local copy = qf and qf.CopyTextButton
+    local tr = qf and qf.TranslatorButton
+    if not (copy and tr and tr:IsShown() and copy:IsShown()) then return end
+    local ours = _duiNoteBtns[copy]
+    tr:ClearAllPoints()
+    if ours and ours:IsShown() then
+        tr:SetPoint("RIGHT", ours, "LEFT", -4, 0)
+    else
+        tr:SetPoint("RIGHT", copy, "LEFT", -4, 0)
+    end
+end
+
+local function SyncDUINoteBtns()
+    local want = DUIBtnWanted()
+    for _, btn in pairs(_duiNoteBtns) do btn:SetShown(want) end
+    AnchorDUITranslator()
+end
+BNB.SyncDUINoteBtns = SyncDUINoteBtns
+
+-- side "LEFT" = ours on the left of DUI's button, "RIGHT" = on its right
+local function AddDUINoteBtn(copy, side)
+    if not copy or _duiNoteBtns[copy] then return end
+
+    local btn = CreateFrame("Button", nil, copy)
+    btn:SetSize(DUI_BTN_SZ, DUI_BTN_SZ)
+    if side == "LEFT" then
+        btn:SetPoint("RIGHT", copy, "LEFT", 0, 0)
+    else
+        btn:SetPoint("LEFT", copy, "RIGHT", 0, 0)
+    end
+    btn:SetFrameLevel(copy:GetFrameLevel() + 1)
+    _duiNoteBtns[copy] = btn
+
+    local tex = btn:CreateTexture(nil, "OVERLAY")
+    tex:SetSize(DUI_ICON_SZ, DUI_ICON_SZ)
+    tex:SetPoint("CENTER")
+    tex:SetTexture(DUI_TEX)
+    local edge = btn:CreateTexture(nil, "ARTWORK")
+    edge:SetAllPoints(tex)   -- follows the line, press sink included
+    edge:SetTexture(DUI_TEX_EDGE)
+    local function SetIconAlpha(a)
+        tex:SetAlpha(a)
+        edge:SetAlpha(a)
+    end
+    SetIconAlpha(DUI_ICON_DIM)
+
+    local function SetTheme(themeID)
+        local c = DUI_THEME_RGB[themeID] or DUI_THEME_RGB[1]
+        tex:SetVertexColor(c[1] / 255, c[2] / 255, c[3] / 255)
+        edge:SetVertexColor(c[4] / 255, c[5] / 255, c[6] / 255)
+    end
+    -- The theme DUI's icon shows now: its tex coord starts at 0.125 * (theme - 1)
+    local left = copy.Icon and copy.Icon:GetTexCoord()
+    SetTheme(left and (math.floor(left / 0.125 + 0.5) + 1) or 1)
+    if copy.SetTheme then
+        hooksecurefunc(copy, "SetTheme", function(_, themeID) SetTheme(themeID or 1) end)
+    end
+
+    -- One button: hovering either half lights both
+    local function Lit(on)
+        SetIconAlpha(on and 1 or DUI_ICON_DIM)
+        if copy.Icon then copy.Icon:SetAlpha(on and 1 or DUI_ICON_DIM) end
+    end
+    -- Tooltip: DUI hides UIParent, and GameTooltip with it, so ours goes
+    -- through DUI's own button functions and its tooltip (they read
+    -- self.Icon and self.tooltipText), the same look as its Copy Text tip
+    btn.Icon = tex
+    btn.tooltipText = BNB.L["QN_BTN_TIP_DUI"]
+    btn:SetScript("OnEnter", function(self)
+        if copy.OnEnter then pcall(copy.OnEnter, self) end
+        Lit(true)
+    end)
+    btn:SetScript("OnLeave", function(self)
+        if copy.OnLeave then pcall(copy.OnLeave, self) end
+        if not copy:IsMouseOver() then Lit(false) end
+    end)
+    -- Pressed: the icon sinks a pixel
+    btn:SetScript("OnMouseDown", function()
+        tex:SetPoint("CENTER", 1, -1)
+    end)
+    btn:SetScript("OnMouseUp", function()
+        tex:SetPoint("CENTER", 0, 0)
+    end)
+    copy:HookScript("OnEnter", function() SetIconAlpha(1) end)
+    copy:HookScript("OnLeave", function()
+        if not btn:IsMouseOver() then SetIconAlpha(DUI_ICON_DIM) end
+    end)
+
+    btn:SetScript("OnClick", function()
+        if not IsEnabled() then return end
+        _duiForceNote = true
+        pcall(copy.Click, copy)
+        _duiForceNote = false
+    end)
+
+    btn:SetShown(DUIBtnWanted())
+end
+
+-- DUI makes each Copy Text button only while its own setting is on, so this
+-- runs again on every dialogue / book open
+local _duiLayoutHooked = false
+local function BuildDUINoteBtns()
+    local qf = _G["DUIQuestFrame"]
+    if qf and qf.CopyTextButton then
+        AddDUINoteBtn(qf.CopyTextButton, "LEFT")
+        if not _duiLayoutHooked and qf.LayoutTopWidgets then
+            _duiLayoutHooked = true
+            hooksecurefunc(qf, "LayoutTopWidgets", AnchorDUITranslator)
+        end
+    end
+    local bf = _G["DUIBookFrame"]
+    if bf and bf.CopyTextButton then
+        AddDUINoteBtn(bf.CopyTextButton, "RIGHT")
+    end
+    SyncDUINoteBtns()
+end
+
 function BNB.ApplyDUIAutoNote()
+    BuildDUINoteBtns()
     if _duiHooked then return end
 
     local questFrame = _G["DUIQuestFrame"]
@@ -1361,6 +1553,8 @@ function BNB.ApplyDUIAutoNote()
     end
 
     local function HookBookCopyBtn(bf)
+        if _duiBookHooked then return end
+        _duiBookHooked = true
         bf.CopyTextButton:HookScript("OnClick", function()
             OnDUIBookCopy()
         end)
@@ -1373,6 +1567,7 @@ function BNB.ApplyDUIAutoNote()
         C_Timer.After(3, function()
             local bf = _G["DUIBookFrame"]
             if bf and bf.CopyTextButton then HookBookCopyBtn(bf) end
+            BuildDUINoteBtns()
         end)
     end
 end
@@ -1451,6 +1646,7 @@ qnFrame:SetScript("OnEvent", function(_, event, arg1, arg2)
         C_Timer.After(0, SyncImmersionBtn)
         if _duiInjected then
             C_Timer.After(0, CacheDUIText)
+            C_Timer.After(0, BuildDUINoteBtns)
         end
 
         -- If DialogueUI wasn't detected yet, try again now (lazy fallback)
@@ -1465,6 +1661,7 @@ qnFrame:SetScript("OnEvent", function(_, event, arg1, arg2)
         if _immersionBtn then _immersionBtn:Hide() end
         _duiCache   = nil    -- clear stale dialogue cache
         _duiQuestID = nil    -- clear stale quest ID
+        _duiQuestTitle = nil
         _duiBookPages = {}   -- clear stale book page cache
         if event == "ITEM_TEXT_CLOSED" then CancelItemTextCapture() end
         ImmersionBypassEnd()

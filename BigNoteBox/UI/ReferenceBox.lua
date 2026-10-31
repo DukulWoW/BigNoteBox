@@ -90,6 +90,7 @@ local EnsureSpellDataListener  -- forward declaration (defined after EnsureItemI
 local EnsureQuestDataListener  -- forward declaration
 local GetQuestTitle            -- forward declaration
 local UpdateModelViewer        -- forward declaration
+local NPC_FALLBACK_WAIT = 2     -- s: no NPC model by then = the fallback (RET-09)
 local BuildModelViewer         -- forward declaration
 local ApplyModelLayout         -- forward declaration
 local UpdateDynamicTitle       -- forward declaration
@@ -2122,7 +2123,7 @@ local function UpdateSideTabs()
     if ShownFor(_noteID) and not IsInspectNote(_noteID) then
         -- shown entry's icon, set above
     elseif TargetMatchesNpcNote() or TargetMatchesInspectNote() then
-        round = pcall(SetPortraitTexture, icon, "target")
+        round = BNB.SetLivePortrait(icon, "target")   -- RET-09 guard
     elseif BNB.SetNpcNotePortrait then
         local note = _noteID and NDB() and NDB().notes and NDB().notes[_noteID]
         round = BNB.SetNpcNotePortrait(icon, note) and true or false
@@ -2484,6 +2485,12 @@ BuildModelViewer = function(f)
     end
     -- A race model that loads after the camera was set: set it again
     pcall(model.HookScript, model, "OnModelLoaded", function(self)
+        if BNB.ModelGate then BNB.ModelGate.ModelLoaded() end   -- RET-09 guard
+        if self._npcKey and not self._npcLoaded then
+            self._npcLoaded = true
+            self._npcFile = self.GetModelFileID and self:GetModelFileID() or nil
+            if self._npcFile == 0 then self._npcFile = nil end
+        end
         if self._cameraID and self._spin and not (rotating or panning) then self._resetView() end
     end)
 
@@ -2855,6 +2862,22 @@ ApplyModelLayout = function(f)
     if sc then sc:SetWidth(sf:GetWidth()) end
 end
 
+-- ============================================================================
+-- !! FICKLE: THE MODEL VIEWER CAN CRASH RETAIL TO DESKTOP (RET-09) !!
+-- Nine crashes on 2026-10-31 / 11-01, four on 2026-10-09: ACCESS_VIOLATION from
+-- the client's frame loop, a freed object, no Lua running, so no error and no
+-- stack of ours. Cause: a creature model load replaced while still in flight
+-- (several asks in one frame, a fallback over an uncached creature), and a
+-- portrait drawn while a model loads. Rules (unit-notes-refbox.md, RET-09):
+--   * one NPC load at a time; never SetCreature / SetUnit / SetDisplayInfo /
+--     ClearModel over a running NPC load (_npcKey / _npcLoaded / _npcFile)
+--   * asks in one frame make one load ("refboxNpcModel" debounce)
+--   * every model load and portrait goes through BNB.ModelGate
+--   * the Explorer grid never shows the model (SyncReferenceBox(id, true))
+-- A change here: test with the RET-09 routine (dialogue capture, F6 > Open
+-- note / Create Duplicate, Esc twice back to the grid, NPCs not seen this
+-- session) before it ships. static-checks.py counts every model load call.
+-- ============================================================================
 -- Show/hide model viewer based on current note; load model if needed
 UpdateModelViewer = function()
     if not rbFrame then return end
@@ -3001,8 +3024,10 @@ UpdateModelViewer = function()
                 ViewerTrace("worn: race=%s tryOn ok=%s result=%s camera=%s model=%s", tostring(raceLoaded),
                     tostring(okTry), tostring(tryResult), tostring(mdl._cameraID), tostring(mdl:GetModelFileID()))
             elseif spec.kind == "creature" then
+                if BNB.ModelGate then BNB.ModelGate.ModelLoading() end   -- RET-09 guard
                 pcall(mdl.SetCreature, mdl, spec.id)
             else
+                if BNB.ModelGate then BNB.ModelGate.ModelLoading() end
                 pcall(mdl.SetDisplayInfo, mdl, spec.id)
             end
             mdl._resetView()
@@ -3157,6 +3182,7 @@ UpdateModelViewer = function()
                 -- Dukul 2026-10-09)
                 local drawn = false
                 if dispID and dispID > 0 and not inv[dispID] then
+                    if BNB.ModelGate then BNB.ModelGate.ModelLoading() end   -- RET-09 guard
                     drawn = pcall(mdl.SetDisplayInfo, mdl, dispID)
                 end
                 if drawn then
@@ -3166,17 +3192,68 @@ UpdateModelViewer = function()
                     if ph then ph:SetText(L["REFBOX_MV_INVISIBLE"]); ph:Show() end
                 end
             else
+                -- RET-09 (Dukul, 2026-10-31 / 11-01, 9 crashes bisected):
+                -- a creature load replaced while it is still in flight leaves
+                -- the client a freed object that its frame loop reads later
+                -- (no Lua running). The same note asked for the viewer
+                -- several times in one frame (back to the Explorer grid:
+                -- close + open; Open note: select + sync), and the fallback
+                -- below fired 0.3 s in, while an uncached creature was still
+                -- loading, most often with the NPC targeted. So: the same
+                -- creature already shown is not loaded again, several asks in
+                -- a frame make one load on the next frame, and the fallback
+                -- waits for OnModelLoaded (2 s at most).
+                local Gate = BNB.ModelGate
+                local noteID = note.id
+                -- shown already, or its load still running: leave it alone
+                if mdl._npcKey == creatureID and (mdl._npcLoaded == false or (mdl._npcFile
+                   and mdl.GetModelFileID and mdl:GetModelFileID() == mdl._npcFile)) then
+                    if ph then ph:Hide() end
+                    if gearBtn then gearBtn:Hide() end
+                    if gearLbl then gearLbl:Hide() end
+                    return
+                end
+                if not mdl._loadNow then
+                    BNB.Debounce("refboxNpcModel", 0, function()
+                        if _noteID ~= noteID or not mdl:IsVisible() or not UpdateModelViewer then return end
+                        mdl._loadNow = true
+                        UpdateModelViewer()
+                        mdl._loadNow = nil
+                    end)
+                    if ph then ph:Hide() end
+                    if gearBtn then gearBtn:Hide() end
+                    if gearLbl then gearLbl:Hide() end
+                    return
+                end
+                -- And never while a creature portrait loads (ModelGate)
+                local wait = Gate and Gate.PortraitWait()
+                if wait then
+                    C_Timer.After(wait + 0.05, function()
+                        if _noteID == noteID and UpdateModelViewer then UpdateModelViewer() end
+                    end)
+                    if ph then ph:Hide() end
+                    if gearBtn then gearBtn:Hide() end
+                    if gearLbl then gearLbl:Hide() end
+                    return
+                end
+                if Gate then Gate.ModelLoading() end
+                mdl._npcKey, mdl._npcFile, mdl._npcLoaded = creatureID, nil, false
                 pcall(function()
                     mdl:SetCreature(creatureID)
                 end)
                 -- SetCreature draws nothing for a creature the client has no
                 -- data for: the saved display ID, then the live unit while it
-                -- is targeted, fill the viewer instead
-                local noteID = note.id
-                C_Timer.After(0.3, function()
+                -- is targeted, fill the viewer instead. Only once the load
+                -- has had its time and said nothing (never over a load)
+                local key = creatureID
+                C_Timer.After(NPC_FALLBACK_WAIT, function()
                     if _noteID ~= noteID or not mdl:IsShown() then return end
+                    if mdl._npcKey ~= key or mdl._npcLoaded then return end
                     local fid = mdl.GetModelFileID and mdl:GetModelFileID()
                     if fid and fid ~= 0 then return end
+                    if Gate and Gate.PortraitWait() then return end
+                    if Gate then Gate.ModelLoading() end
+                    mdl._npcKey = nil
                     if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
                         pcall(mdl.SetUnit, mdl, "target")
                     elseif dispID and dispID > 0 then
@@ -3301,6 +3378,13 @@ local function HasContent(noteID)
     local atts = GetAttachments(noteID)
     return atts and #atts > 0 or false
 end
+-- The same without the model: tasks or attachments (the Explorer grid's pick)
+local function HasListContent(noteID)
+    if BNB.Task and BNB.Task.Shows(noteID) then return true end
+    if not RBOn() then return false end
+    local atts = GetAttachments(noteID)
+    return atts and #atts > 0 or false
+end
 
 -- The window can show this note at all: the Reference part is always there
 -- (its add strip), else the note's model or the tasks view (ALL-388)
@@ -3415,7 +3499,13 @@ end
 -- Auto-opens if configured and note has attachments. Never auto-closes.
 BNB.RegisterMessage("ReferenceBox", "NoteSelected", function(_, id) BNB.SyncReferenceBox(id) end)
 
-function BNB.SyncReferenceBox(noteID)
+-- listOnly: the Explorer grid's pick (ALL-616). The box opens there only for
+-- a list (attachments, tasks) and never on the model: picks and the way back
+-- to the grid closed and reopened it in one frame, and the NPC model loads
+-- that came with it crashed Retail (RET-09; Dukul, 2026-11-01: "not open the
+-- model viewer in explorer mode at all? Only when you are in the note"). Its
+-- Model tab and right-click > Reference Box still show the model.
+function BNB.SyncReferenceBox(noteID, listOnly)
     if not noteID or (BNB.SystemNotes and BNB.SystemNotes.IsSystem(noteID)) then   -- ALL-511
         if rbFrame and rbFrame:IsShown() then rbFrame:Hide() end
         return
@@ -3430,13 +3520,17 @@ function BNB.SyncReferenceBox(noteID)
     -- Auto-open on anything the window shows: attachments, a model (inspect
     -- notes with gear, target notes with an NPC ID) or tasks (HasContent).
     local hasContent = HasContent(noteID)
+    if listOnly then hasContent = HasListContent(noteID) end
+    local function Mode()
+        return (not listOnly and HasModel(noteID)) and "model" or "attachments"
+    end
 
     if DB().refboxAutoOpen and BoxUsable()
        and BNB.mainFrame and BNB.mainFrame:IsShown() then
         if hasContent then
             EnsureFrame()
             if not rbFrame:IsShown() then
-                _rbMode = HasModel(noteID) and "model" or "attachments"
+                _rbMode = Mode()
                 SetTitle(noteID)
                 PositionFrame()
                 rbFrame:Show()
@@ -3453,7 +3547,7 @@ function BNB.SyncReferenceBox(noteID)
             return
         end
         -- Reset mode for new note
-        _rbMode = HasModel(noteID) and "model" or "attachments"
+        _rbMode = Mode()
         UpdateModeStrip()
         SetTitle(noteID)
         RenderList()

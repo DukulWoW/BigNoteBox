@@ -324,6 +324,8 @@ BNB.DEFAULTS = {
     quickNoteAction       = "silent",
     -- DialogueUI: a note whenever the user clicks DUI's copy text button
     duiAutoNote           = true,
+    -- DialogueUI: our note button beside DUI's Copy Text buttons (ALL-631)
+    duiNoteBtn            = true,
     -- Immersion: the floating Quick Note button during Immersion dialogues
     quickNoteImmersionBtn = true,
     saveQuestRewards      = true,

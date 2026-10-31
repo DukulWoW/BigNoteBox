@@ -764,7 +764,7 @@ local function SetStickyNoteIcon(tex, note)
     if note and BNB.SetNpcNotePortrait then BNB.SetNpcNotePortrait(tex, note) end
     -- Its unit targeted now: the live portrait, as the note list row (ALL-208)
     if BNB.NoteMatchesTarget and BNB.NoteMatchesTarget(note) then
-        pcall(SetPortraitTexture, tex, "target")
+        BNB.SetLivePortrait(tex, "target")   -- RET-09 guard (Features/TargetNote.lua)
     end
 end
 

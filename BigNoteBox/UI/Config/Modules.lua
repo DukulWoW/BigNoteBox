@@ -116,6 +116,16 @@ local function BuildQuickNotePage(sf, ct, y, page)
                     if BNB.ApplyDUIAutoNote then BNB.ApplyDUIAutoNote() end
                 end,
                 L["CFG_CHK_DUI_AUTONOTE_TIP"])
+
+            -- Our note button beside DUI's Copy Text buttons (ALL-631)
+            y = AddCheck(ct, y,
+                L["CFG_CHK_DUI_BTN_LABEL"],
+                function() return db.duiNoteBtn ~= false end,
+                function(v)
+                    db.duiNoteBtn = v
+                    if BNB.SyncDUINoteBtns then BNB.SyncDUINoteBtns() end
+                end,
+                L["CFG_CHK_DUI_BTN_TIP"])
         end
 
         -- ── Immersion subsection (only shown when Immersion is installed) ─────────
