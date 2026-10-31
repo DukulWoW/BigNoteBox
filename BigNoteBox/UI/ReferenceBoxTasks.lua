@@ -947,9 +947,16 @@ local function FillTaskRow(row, task, isSubTask, y)
         rstIco:SetPoint("RIGHT", rightAnchor, "LEFT", -2, 0)
         rstIco:SetAlpha(0.75)
         rstIco:Show()
+        rightAnchor = rstIco
     else
         rstIco:Hide()
     end
+    -- The edit box stops at the leftmost button of the chain, so the hover
+    -- buttons and the R / S icons never draw over the text being edited
+    local eb = row._editBox
+    eb:ClearAllPoints()
+    eb:SetPoint("LEFT",  row._cb, "RIGHT", 2, 0)
+    eb:SetPoint("RIGHT", rightAnchor, "LEFT", -2, 0)
     return rowH, subTasks
 end
 

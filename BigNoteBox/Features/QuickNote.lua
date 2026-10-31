@@ -1009,51 +1009,73 @@ end
 
 local _immersionBtn = nil
 
--- Default position confirmed in-game (CENTER offset from UIParent CENTER).
-local IMMERSION_BTN_DEFAULT_X = -250.0
-local IMMERSION_BTN_DEFAULT_Y = -250.0
+-- On Immersion's text box, hanging over its top-left corner as the icon badge
+-- does on a sticky note (Dukul, 2026-10-31). Shift+drag moves it; the spot is
+-- kept as an offset from that corner, so it follows the box wherever Immersion
+-- puts it. quickNoteImmersionOffX/Y: nil = on the corner.
+local IMM_BTN_SZ    = 36
+local IMM_BTN_INSET = 6
+-- Dukul's art, three states (a missing file draws a green square)
+local IMM_TEX = {
+    normal = ASSETS .. "UI\\ui-immersion-note",
+    hover  = ASSETS .. "UI\\ui-immersion-note-hover",
+    press  = ASSETS .. "UI\\ui-immersion-note-press",
+}
 
+local function ImmersionBox()
+    local imm = _G["ImmersionFrame"]
+    local tb = imm and imm.TalkBox
+    return tb and (tb.MainFrame or tb)
+end
+
+-- Puts the button on the box's corner plus the saved offset
+local function AnchorImmersionBtn()
+    local btn, box = _immersionBtn, ImmersionBox()
+    if not btn or not box then return end
+    local db = DB()
+    local ox = (db and db.quickNoteImmersionOffX) or 0
+    local oy = (db and db.quickNoteImmersionOffY) or 0
+    btn:ClearAllPoints()
+    btn:SetPoint("TOPLEFT", box, "TOPLEFT", -IMM_BTN_INSET + ox, IMM_BTN_INSET + oy)
+end
+
+-- After a Shift+drag: the offset from the box's corner, in the button's own
+-- units (Immersion can scale its frame, so both go through screen pixels)
 local function SaveImmersionPos()
-    if not _immersionBtn then return end
-    -- GetLeft/GetBottom and GetScreenWidth/GetScreenHeight all return values in
-    -- UIParent virtual coordinate space. No scale conversion needed.
-    local left   = _immersionBtn:GetLeft()
-    local bottom = _immersionBtn:GetBottom()
-    local w      = _immersionBtn:GetWidth()
-    local h      = _immersionBtn:GetHeight()
-    if not left or not bottom then return end
-    local cx = (left + w / 2) - GetScreenWidth()  / 2
-    local cy = (bottom + h / 2) - GetScreenHeight() / 2
-    DB().quickNoteImmersionX = cx
-    DB().quickNoteImmersionY = cy
-    -- Debug output when Immersion position debug is active
+    local btn, box = _immersionBtn, ImmersionBox()
+    if not btn or not box or not DB() then return end
+    local bl, bt = btn:GetLeft(), btn:GetTop()
+    local xl, xt = box:GetLeft(), box:GetTop()
+    if not (bl and bt and xl and xt) then return end
+    local bs, xs = btn:GetEffectiveScale(), box:GetEffectiveScale()
+    local ox = (bl * bs - xl * xs) / bs + IMM_BTN_INSET
+    local oy = (bt * bs - xt * xs) / bs - IMM_BTN_INSET
+    DB().quickNoteImmersionOffX = ox
+    DB().quickNoteImmersionOffY = oy
     if BNB._debugImmersionPos then
         BNB:Print(string.format(
-            "|cff88bbff[BNB Immersion] Saved position: X=%.1f Y=%.1f|r", cx, cy))
+            "|cff88bbff[BNB Immersion] Saved offset from the box corner: X=%.1f Y=%.1f|r", ox, oy))
     end
 end
 
--- Called from ConfigWindow "Reset button position" button.
+-- Called from Settings "Reset button position": back on the corner
 function BNB.ResetImmersionBtnPos()
     if DB() then
+        DB().quickNoteImmersionOffX = nil
+        DB().quickNoteImmersionOffY = nil
+        -- Screen positions from before the button was attached to the box
         DB().quickNoteImmersionX = nil
         DB().quickNoteImmersionY = nil
     end
-    if _immersionBtn then
-        _immersionBtn:ClearAllPoints()
-        _immersionBtn:SetPoint("CENTER", UIParent, "CENTER",
-            IMMERSION_BTN_DEFAULT_X, IMMERSION_BTN_DEFAULT_Y)
-    end
+    AnchorImmersionBtn()
 end
 
 local function BuildImmersionButton()
     if _immersionBtn then return end
 
-    local BTN_FLOAT_SZ = 64   -- large floating button for Immersion
-
     local btn = CreateFrame("Button", "BNBQuickNoteImmersionBtn", UIParent)
-    btn:SetSize(BTN_FLOAT_SZ, BTN_FLOAT_SZ)
-    btn:SetFrameStrata("DIALOG")
+    btn:SetSize(IMM_BTN_SZ, IMM_BTN_SZ)
+    btn:SetFrameStrata("DIALOG")   -- over Immersion's box (HIGH)
     btn:SetMovable(true)
     btn:EnableMouse(true)
     btn:RegisterForDrag("LeftButton")
@@ -1061,31 +1083,13 @@ local function BuildImmersionButton()
     -- Immersion fades UIParent alpha to 0 when active — ignore that so we stay visible.
     btn:SetIgnoreParentAlpha(true)
     btn:Hide()
-
-    -- Default position confirmed in-game: center-left of screen, mid-height.
-    -- Users can shift-drag it anywhere; position is saved across sessions.
-    local savedX = DB() and DB().quickNoteImmersionX
-    local savedY = DB() and DB().quickNoteImmersionY
-    if savedX and savedY then
-        btn:SetPoint("CENTER", UIParent, "CENTER", savedX, savedY)
-    else
-        btn:SetPoint("CENTER", UIParent, "CENTER",
-            IMMERSION_BTN_DEFAULT_X, IMMERSION_BTN_DEFAULT_Y)
-    end
+    _immersionBtn = btn
+    AnchorImmersionBtn()
 
     local tex = btn:CreateTexture(nil, "ARTWORK")
-    tex:SetTexture(ASSETS .. "UI\\ui-icon-quest")
-    -- Anchor texture to center so it scales symmetrically without moving the hitbox
-    tex:SetPoint("CENTER", btn, "CENTER")
-    tex:SetSize(BTN_FLOAT_SZ, BTN_FLOAT_SZ)
-
-    -- Visual-only scale feedback on the texture — frame hitbox stays fixed
-    local PAD_HOVER = 4   -- grow 4px each side on hover
-    local PAD_CLICK = -3  -- shrink 3px each side on click
-    local function SetTexPad(pad)
-        local s = BTN_FLOAT_SZ + pad * 2
-        tex:SetSize(s, s)
-    end
+    tex:SetAllPoints(btn)
+    tex:SetTexture(IMM_TEX.normal)
+    local function SetState(state) tex:SetTexture(IMM_TEX[state]) end
 
     -- Shift+drag to reposition; plain drag does nothing so click still works cleanly
     btn:SetScript("OnDragStart", function(self)
@@ -1095,34 +1099,44 @@ local function BuildImmersionButton()
     end)
     btn:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
+        self:SetUserPlaced(false)   -- the client must not keep it at a screen spot
         SaveImmersionPos()
+        AnchorImmersionBtn()
     end)
 
     btn:SetScript("OnEnter", function(self)
-        SetTexPad(PAD_HOVER)
+        SetState("hover")
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMRIGHT")
         GameTooltip:AddLine(BNB.L["QN_BTN_TIP1"], 1, 1, 1)
         GameTooltip:AddLine(BNB.L["QN_BTN_TIP2_IMM"], 0.78, 0.78, 0.78)
         GameTooltip:AddLine(BNB.L["QN_BTN_TIP_DRAG"], 0.55, 0.55, 0.55)
+        -- Ctrl+click line only once it has been moved off the corner
+        local db = DB()
+        if db and (db.quickNoteImmersionOffX or db.quickNoteImmersionOffY) then
+            GameTooltip:AddLine(BNB.L["QN_BTN_TIP_RESET_IMM"], 0.55, 0.55, 0.55)
+        end
         GameTooltip:Show()
     end)
-    btn:SetScript("OnLeave", function(self)
-        SetTexPad(0)
+    btn:SetScript("OnLeave", function()
+        SetState("normal")
         GameTooltip:Hide()
     end)
 
-    btn:SetScript("OnMouseDown", function(self)
-        SetTexPad(PAD_CLICK)
+    btn:SetScript("OnMouseDown", function()
+        SetState("press")
     end)
     btn:SetScript("OnMouseUp", function(self)
-        if self:IsMouseOver() then
-            SetTexPad(PAD_HOVER)
-        else
-            SetTexPad(0)
-        end
+        SetState(self:IsMouseOver() and "hover" or "normal")
     end)
 
-    btn:SetScript("OnClick", function()
+    btn:SetScript("OnClick", function(self)
+        -- Ctrl+click: back on the corner of the box (Dukul, 2026-10-31)
+        if IsControlKeyDown() then
+            BNB.ResetImmersionBtnPos()
+            if self:IsMouseOver() then self:GetScript("OnEnter")(self)
+            else self:GetScript("OnLeave")(self) end
+            return
+        end
         if not IsEnabled() then return end
         -- Read text directly from Immersion's FontStrings.
         -- textFs.storedText holds the FULL original dialogue text before Immersion
@@ -1163,8 +1177,6 @@ local function BuildImmersionButton()
         CreateQuickNote(title, noteBody, RandomIcon(), { "Quest" }, rewardFn)
         BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title or ""))
     end)
-
-    _immersionBtn = btn
 end
 
 -- Show/hide the Immersion floating button based on ImmersionFrame visibility
@@ -1173,6 +1185,7 @@ local function SyncImmersionBtn()
     local imm = _G["ImmersionFrame"]
     local btnEnabled = DB() and DB().quickNoteImmersionBtn ~= false
     if imm and imm:IsShown() and IsEnabled() and btnEnabled then
+        AnchorImmersionBtn()
         _immersionBtn:Show()
     else
         _immersionBtn:Hide()

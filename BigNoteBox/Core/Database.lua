@@ -318,7 +318,8 @@ BNB.DEFAULTS = {
     -- Quick Note button in quest/gossip/book frames.
     -- quickNoteAction: "silent" = create in the background, "open" = create
     -- and open BNB on it, "confirm" = small popup to edit the title first.
-    -- quickNoteImmersionX/Y have no default: nil = the built-in position.
+    -- quickNoteImmersionOffX/Y have no default: nil = on the corner of
+    -- Immersion's text box (the old quickNoteImmersionX/Y are no longer read).
     quickNoteEnabled      = true,
     quickNoteAction       = "silent",
     -- DialogueUI: a note whenever the user clicks DUI's copy text button

@@ -2782,6 +2782,11 @@ function BNB.AM_EnterViewMode(id)
         rsf:SetScript("OnSizeChanged", function()
             BNB.Debounce("editorRichReflow", 0, Reflow)
         end)
+        -- Note Settings changed the font, size or outline: draw again on the
+        -- next frame, keeping the scroll (Reflow does nothing outside view mode)
+        BNB._editorRichRedraw = function()
+            BNB.Debounce("editorRichReflow", 0, Reflow)
+        end
         -- A note token's data arrived or its value changed (ALL-481 S2 / S3):
         -- draw again. Its own debounce key: a size change must still reflow
         BNB.RegisterMessage("EditorRichTokens", "TokensChanged", function()

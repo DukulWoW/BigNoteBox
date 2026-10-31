@@ -317,7 +317,7 @@ local function GetOrCreateBadge()
     pcall(_badge.SetFont, _badge, BNB.GetLocaleFont(), 16, "THICKOUTLINE")
     _badge:SetPoint("CENTER", btn, "CENTER", 1, 0)
     _badge:SetJustifyH("CENTER")
-    _badge:SetTextColor(1, 0.35, 0.35)
+    _badge:SetTextColor(0.40, 0.73, 0.42)   -- BigNoteBox green (#66bb6a, Dukul 2026-10-31)
     _badge:Hide()
     return _badge
 end

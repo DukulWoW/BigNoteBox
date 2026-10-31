@@ -30,6 +30,8 @@ local _noteID   = nil
 -- this note is the open one (BNB.ApplyEditorFonts: a font family, ALL-619)
 local function ApplyLive()
     if BNB._currentNoteID == _noteID and BNB.ApplyEditorFonts then BNB.ApplyEditorFonts() end
+    -- The main window's rich view draws its own fonts: draw it again
+    if BNB._currentNoteID == _noteID and BNB._editorRichRedraw then BNB._editorRichRedraw() end
     if BNB._refreshWysiwygFont then BNB._refreshWysiwygFont() end
 end
 local tabBtns   = {}
@@ -451,14 +453,20 @@ local function BuildAppearanceTab(panel)
     outlineDD:SetPoint("TOPLEFT", panel, "TOPLEFT", 0, y)
     outlineDD:SetWidth(CW)
     outlineDD:SetupMenu(function(_, root)
+        -- The rich view has no drop shadows yet (after 2.0.0): a rich note
+        -- lists them only when it already has one saved
+        local note = GetNote()
+        local rich = note and BNB.AdvancedMode.IsRich(note)
         for _, opt in ipairs(OUTLINE_OPTIONS_NC) do
             local o = opt
-            root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
-                function() return GetNoteOutlineLabel() == o end,
-                function()
-                    ApplyNoteOutline(o)
-                    outlineDD:GenerateMenu()
-                end)
+            if not (rich and o:find("Shadow", 1, true) and GetNoteOutlineLabel() ~= o) then
+                root:CreateRadio(BNB.AdvancedMode.OutlineLabel(o),
+                    function() return GetNoteOutlineLabel() == o end,
+                    function()
+                        ApplyNoteOutline(o)
+                        outlineDD:GenerateMenu()
+                    end)
+            end
         end
     end)
     y = y - 36
