@@ -767,7 +767,9 @@ local function PageHeading(i, rich)
 end
 
 -- cap = { rich, npc, npcID, place (true = where the player stands), book
--- (true = "Found in"), info, wowhead, text, objectives (list), rewards (entries) }
+-- (true = "Found in"), info, wowhead, questLink (a heading over the text),
+-- quest (true = a quest note's dividers),
+-- text, objectives (list), rewards (entries) }
 local function CaptureBody(cap)
     local L, rich = BNB.L, cap.rich
     local NL = BNB.NoteLinks
@@ -803,15 +805,18 @@ local function CaptureBody(cap)
         local top = {}
         if title then top[#top + 1] = title end
         if #head > 0 then top[#top + 1] = Block(head) end
-        top[#top + 1] = divider
+        -- A quest note: the ornate divider under the header, the plain one
+        -- over Objectives and Rewards (Dukul's mockup, 2026-11-01)
+        top[#top + 1] = (rich and cap.quest and BNB.DividerTag) and BNB.DividerTag("gold-ornate") or divider
         parts[#parts + 1] = table.concat(top, "\n")
     end
+    if cap.questLink then parts[#parts + 1] = Heading(cap.questLink) end
     local text = cap.text and cap.text:gsub("^%s+", ""):gsub("%s+$", "") or ""
     if text ~= "" then parts[#parts + 1] = text end
     if cap.objectives then
         local o = {}
         for i, t in ipairs(cap.objectives) do o[i] = "- " .. t end
-        parts[#parts + 1] = Heading(L["QN_OBJECTIVES"]) .. "\n" .. Block(o)
+        parts[#parts + 1] = (rich and cap.quest and (divider .. "\n") or "") .. Heading(L["QN_OBJECTIVES"]) .. "\n" .. Block(o)
     end
     if cap.rewards then
         parts[#parts + 1] = divider .. "\n" .. Heading(L["QN_REWARDS"]) .. "\n" .. Block(RewardLines(cap.rewards, rich))
@@ -819,14 +824,30 @@ local function CaptureBody(cap)
     return table.concat(parts, "\n\n")
 end
 
+-- A quest's link: the game's, else one made from its title (the quest log's,
+-- or the open quest window's); nil without a quest id or title
+local function QuestLinkFor(questID)
+    if not (questID and questID > 0) then return nil end
+    local link = GetQuestLink and GetQuestLink(questID)
+    if type(link) == "string" and link ~= "" then return link end
+    local title = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
+    if not title or title == "" then title = GetTitleText and GetTitleText() end
+    if not title or title == "" then return nil end
+    return string.format("|cffffff00|Hquest:%d:0|h[%s]|h|r", questID, title)
+end
+
 -- A quest note's whole body, and whether it is rich. questID 0 = no quest id;
 -- text = the quest's own words. opts: npc / npcID (what the caller knows;
 -- npc = false: none, the quest log), log (read from the quest log), stage
 -- ("accept" / "complete", else the last quest event), objectives / rewards
--- / wowhead (false = leave out)
+-- / wowhead / questLink (false = leave out)
 local function QuestBody(questID, text, opts)
     opts = opts or {}
     local rich = RichFor("quest")
+    -- The quest as a link over its text (a heading in a rich note); its
+    -- right-click menu copies the Wowhead address, so no Wowhead line then
+    -- (Dukul, 2026-11-01: "1. Yes")
+    local qlink = opts.questLink ~= false and QuestLinkFor(questID) or nil
     local npc, npcID
     if opts.npc ~= false then npc, npcID = TalkingNpc(opts.npc, opts.npcID) end
     local rewards
@@ -836,7 +857,8 @@ local function QuestBody(questID, text, opts)
     return CaptureBody({
         rich = rich, npc = npc, npcID = npcID, place = opts.npc ~= false,
         info = QuestInfoLine(questID, opts.stage or (opts.log and "log") or _questStage, not opts.log),
-        wowhead = opts.wowhead ~= false and WowheadLine(questID, rich) or nil,
+        wowhead = not qlink and opts.wowhead ~= false and WowheadLine(questID, rich) or nil,
+        questLink = qlink, quest = true,
         text = text,
         objectives = opts.objectives ~= false and QuestObjectives(questID) or nil,
         rewards = rewards,
@@ -1482,6 +1504,13 @@ end
 -- pictures (Dukul, 2026-11-01). Money and XP are found by the quest's own
 -- numbers, so any language works. Formats: DialogueUI.lua Clipboard block,
 -- UITemplates.lua GetClipboardOutput.
+-- Dialogue UI's section words: the game's OBJECTIVES_LABEL / REWARDS in most
+-- of its languages, its own in the rest (its Locales folder: English, French,
+-- Spanish, German, Russian, Korean, Chinese), as UTF-8 bytes
+local DUI_HEADS = {}
+for _, w in ipairs({ "Objectives", "Objectifs", "Objetivos", "Ziele", "Rewards", "Belohnungen", "Recompensas", "R\195\169compenses", "\208\151\208\176\208\180\208\176\209\135\208\184", "\235\170\169\237\145\156", "\228\187\187\229\138\161\231\155\174\230\160\135", "\208\157\208\176\208\179\209\128\208\176\208\180\209\139", "\235\179\180\236\131\129\235\147\164", "\229\165\150\229\138\177" }) do DUI_HEADS[w] = true end
+if type(OBJECTIVES_LABEL) == "string" then DUI_HEADS[OBJECTIVES_LABEL] = true end
+if type(REWARDS) == "string" then DUI_HEADS[REWARDS] = true end
 local function DUIIcon(tex, rich)
     return (rich and tex) and ("{icon:" .. tostring(tex) .. ":16} ") or ""
 end
@@ -1490,8 +1519,12 @@ local function DUILine(line, rich)
     if id then
         id = tonumber(id)
         local link = GetQuestLink and GetQuestLink(id)
-        return (type(link) == "string" and link ~= "") and link
+        link = (type(link) == "string" and link ~= "") and link
             or string.format("|cffffff00|Hquest:%d:0|h[%s]|h|r", id, rest)
+        return rich and ("{h3}" .. link .. "{/h3}") or link   -- the title heading (Dukul, 2026-11-01)
+    end
+    if rich and DUI_HEADS[(line:gsub("^%s+", ""):gsub("%s+$", ""))] then
+        return BNB.DividerTag("gold-plain") .. "\n\n{h3}" .. (line:gsub("^%s+", ""):gsub("%s+$", "")) .. "{/h3}"
     end
     id, rest = line:match("^%[ItemID:%s*(%d+)%]%s*(.*)$")
     if id then
@@ -1604,7 +1637,7 @@ local function OnDUIDialogueCopy()
     -- whose right-click menu copies the Wowhead address: no Wowhead line
     -- (Dukul, 2026-11-01)
     local noteBody, rich = QuestBody(qid, DUILinks(body, RichFor("quest")), { npc = npcName, npcID = npcID,
-        objectives = false, rewards = false, wowhead = false })
+        objectives = false, rewards = false, wowhead = false, questLink = false })
     CreateQuickNote(_duiQuestTitle or DialogueTitle(npcName), noteBody, RandomIcon(), WithPlaceTags({ "Quest" }), rewardFn, rich)
 end
 
