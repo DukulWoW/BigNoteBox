@@ -210,6 +210,19 @@ local function BuildBackupTab(sf, page)
 
     y = y - PASTE_H - 6
 
+    -- A big backup stalls the game twice: on the paste (the edit box takes
+    -- it all at once) and on Import. Shown on the first click into the box,
+    -- before the paste, and kept, so nobody takes it for a crash (ALL-645).
+    local pasteWarn = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
+    pasteWarn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
+    pasteWarn:SetWidth(CONTENT_W); pasteWarn:SetJustifyH("LEFT"); pasteWarn:SetJustifyV("TOP")
+    pasteWarn:SetWordWrap(true); pasteWarn:SetHeight(28)
+    pasteWarn:SetTextColor(0.72, 0.72, 0.72)
+    pasteWarn:SetText(L["BACKUP_IMPORT_FREEZE_WARN"])
+    pasteWarn:Hide()
+    pasteEb:HookScript("OnEditFocusGained", function() pasteWarn:Show() end)
+    y = y - 28 - 2
+
     -- What the paste holds, before Import (Dukul, 2026-10-18, ALL-507). Read
     -- once the text has rested a moment: a big backup is parsed only once.
     local pastePreview = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")

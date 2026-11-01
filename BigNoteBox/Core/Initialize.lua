@@ -235,6 +235,10 @@ function BNB.Initialize()
     if BNB.TargetNote and BNB.TargetNote.Init then
         SafeCall("TargetNote", BNB.TargetNote.Init)
     end
+    -- 8d. Vendor list button on the vendor window (ALL-644)
+    if BNB.VendorNote and BNB.VendorNote.Init then
+        SafeCall("VendorNote", BNB.VendorNote.Init)
+    end
 
     -- 9. Initial contextual notes check (badge + toast on login)
     if BNB.CheckContextualNotes then

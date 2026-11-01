@@ -899,6 +899,61 @@ local function StartTargetNoteFlow(data)
     end
 end
 
+-- The note of the NPC the player talks to ("npc" unit): found by creature id,
+-- or made as F6 would, without its dialogs (Rich unless the setting says
+-- Normal). Unsaved editor changes to it are saved first (as NoteLinks does).
+-- Returns id, note, or nil (Player & NPC Notes off, no NPC, no creature id,
+-- a pet). made = true when the note was made here. Shared by dialogue
+-- capture and the vendor list (ALL-644).
+function TN.NpcNoteForTalk()
+    if not BNB.UnitNotesEnabled() or not UnitExists("npc") or UnitIsPlayer("npc") then return nil end
+    local data = GatherTargetData("npc")
+    if data.isPet or not data.npcID then return nil end
+
+    local id, made = FindExistingNote(data), false
+    if not id then
+        local rich = BNB.RichEnabled() and GetType() ~= "always_normal"
+        id = CreateTargetNote(rich, data, true)
+        if not id then return nil end
+        made = true
+    end
+    local note = BNB.GetNote(id)
+    if not note then return nil end
+    if BNB._currentNoteID == id and BNB._dirty and BNB.SaveCurrentNoteQuiet then
+        BNB.SaveCurrentNoteQuiet()
+        note = BNB.GetNote(id)
+    end
+    return id, note, made
+end
+
+-- A captured section (dialogue, a vendor list) into a rich NPC note, above
+-- the player's own Notes part, which stays last (Dukul, 2026-11-01: "User
+-- notes should probably always be at the end of the note"): before the
+-- divider over the Notes heading, after a gold-plain divider of its own. No
+-- Notes heading (renamed, removed): at the bottom. Plain NPC notes have no
+-- Notes heading; their callers keep adding at the bottom.
+function TN.AddAboveNotes(body, section)
+    body = ((body or ""):gsub("\r", ""))
+    local lines = {}
+    for line in (body .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
+    local notesHdr = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
+    local at
+    for i, line in ipairs(lines) do
+        if line:gsub("%s+$", "") == notesHdr then at = i; break end
+    end
+    local div = BNB.DividerTag("gold-plain")
+    if not at then
+        body = body:gsub("%s+$", "")
+        return (body ~= "" and (body .. "\n\n" .. div .. "\n\n") or "") .. section
+    end
+    local j = at - 1
+    while j > 0 and lines[j]:match("^%s*$") do j = j - 1 end
+    if j > 0 and lines[j]:find("^{div:") then at = j end
+    local before = table.concat(lines, "\n", 1, at - 1):gsub("%s+$", "")
+    local after  = table.concat(lines, "\n", at, #lines)
+    return (before ~= "" and (before .. "\n\n") or "") .. div .. "\n\n" .. section .. "\n\n" .. after
+end
+
 -- What an NPC says, into that NPC's own note (ALL-631, Dukul 2026-10-31):
 -- the note F6 makes and finds (by creature ID), with the text at the bottom
 -- under a dated header. No note yet: one is made first, as F6 would, without
@@ -908,30 +963,15 @@ end
 -- open: show the note in the main window after (Note Capture set to "open");
 -- otherwise nothing is opened while the player talks (fewer model loads, RET-09).
 function TN.AddDialogue(text, open)
-    if not BNB.UnitNotesEnabled() or not UnitExists("npc") or UnitIsPlayer("npc") then return nil end
     if type(text) ~= "string" or text:match("^%s*$") then return nil end
-    local data = GatherTargetData("npc")
-    if data.isPet or not data.npcID then return nil end
-
-    local id = FindExistingNote(data)
-    if not id then
-        local rich = BNB.RichEnabled() and GetType() ~= "always_normal"
-        id = CreateTargetNote(rich, data, true)
-        if not id then return nil end
-    end
-    local note = BNB.GetNote(id)
-    if not note then return nil end
-    -- The note open in the editor: its unsaved changes first (as NoteLinks does)
-    if BNB._currentNoteID == id and BNB._dirty and BNB.SaveCurrentNoteQuiet then
-        BNB.SaveCurrentNoteQuiet()
-        note = BNB.GetNote(id)
-    end
+    local id, note = TN.NpcNoteForTalk()
+    if not id then return nil end
 
     local hdr  = string.format(L["QN_DIALOGUE_HDR_FMT"], BNB.FmtDate())
     local body = ((note.body or ""):gsub("%s+$", ""))
     text = (text:gsub("^%s+", ""):gsub("%s+$", ""))
     if note.richMode then
-        body = body .. "\n\n" .. BNB.DividerTag("gold-plain") .. "\n\n{h3}" .. hdr .. "{/h3}\n\n" .. text
+        body = TN.AddAboveNotes(body, "{h3}" .. hdr .. "{/h3}\n\n" .. text)
     else
         body = body .. "\n\n----- " .. hdr .. " -----\n" .. text
     end

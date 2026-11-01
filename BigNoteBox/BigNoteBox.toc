@@ -195,6 +195,7 @@ Features\UnitNotes.lua
 Features\InspectNote.lua
 Features\PlayerNoteAuto.lua
 Features\TargetNote.lua
+Features\VendorNote.lua
 Features\UnitFrameBadge.lua
 Features\DirectSend.lua
 Features\MigrateNotes.lua

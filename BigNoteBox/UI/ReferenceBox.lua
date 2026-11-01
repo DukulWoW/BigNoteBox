@@ -327,6 +327,7 @@ local function MoveAttachment(fromNoteID, attIndex, toNoteID)
     end
     table.remove(fromNote.attachments, attIndex)
     local copy = {}; for k, v in pairs(att) do copy[k] = v end
+    copy.vendor = nil   -- moved by hand: no longer a vendor list entry (ALL-644)
     table.insert(toNote.attachments, copy)
     BNB.UpdateNote(fromNoteID, {})
     BNB.UpdateNote(toNoteID, {})
@@ -1632,7 +1633,9 @@ RenderList = function()
     local compact     = IsCompact() or modelVisible  -- compact when model viewer is shown
     local locked      = IsLocked(_noteID)
 
-    countLabel:SetText(string.format(L["REFBOX_COUNT"], count, maxItems))
+    -- Past the limit (a vendor list, ALL-644): the count alone, not "120/50"
+    if count > maxItems then countLabel:SetText(string.format(L["REFBOX_COUNT_OVER"], count))
+    else countLabel:SetText(string.format(L["REFBOX_COUNT"], count, maxItems)) end
 
     -- Lock state on add controls
     if addBtn then
@@ -3601,6 +3604,41 @@ K.UpdateModeStrip, K.UpdateModelViewer, K.UpdateDynamicTitle =
 --------------------------------------------------------------------------------
 function BNB.RBAddAttachment(noteID, att)
     AddAttachment(noteID, att)
+end
+
+-- A vendor's list (ALL-644, Features/VendorNote.lua): itemIDs = everything it
+-- sells now, in its order. Entries an earlier list added (att.vendor) that it
+-- no longer sells go; new ones are added past the box limit (Dukul,
+-- 2026-11-01: "Vendor items skip the limit"). An item the player put in
+-- themselves stays theirs. The caller checks the lock. Returns added, removed.
+function BNB.RBSetVendorItems(noteID, itemIDs)
+    local note = noteID and NDB().notes[noteID]
+    if not note then return 0, 0 end
+    note.attachments = note.attachments or {}
+    local want, have = {}, {}
+    for _, id in ipairs(itemIDs) do want[id] = true end
+    local removed = 0
+    for i = #note.attachments, 1, -1 do
+        local att = note.attachments[i]
+        if att.vendor and not (att.type == "item" and want[att.id]) then
+            table.remove(note.attachments, i); removed = removed + 1
+        elseif att.type == "item" then
+            have[att.id] = true
+        end
+    end
+    local added = 0
+    for _, id in ipairs(itemIDs) do
+        if not have[id] then
+            have[id] = true
+            note.attachments[#note.attachments + 1] = { type = "item", id = id, vendor = true }
+            added = added + 1
+        end
+    end
+    if added > 0 or removed > 0 then
+        BNB.UpdateNote(noteID, {})
+        if BNB.RefreshReferenceBox then BNB.RefreshReferenceBox() end
+    end
+    return added, removed
 end
 
 -- Focus mode closing (UI/FocusEditor.lua CloseFocusMode): a box opened over
