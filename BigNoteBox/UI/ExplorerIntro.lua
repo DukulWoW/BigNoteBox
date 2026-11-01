@@ -53,11 +53,12 @@ local CALLOUT_MIN = 130
 local FIT_GAP = 16         -- kept free above and below the box
 
 -- The rows: icon (under Assets\), locale key; tint = false keeps the art's
--- own colours; explorer = only while the Explorer module is on
+-- own colours; skin = a white file used (tinted) in skin mode instead;
+-- explorer = only while the Explorer module is on
 local ROWS = {
     { "Explorer/ex-explorer-mode",     "WELCOME_ROW_EXPLORER", explorer = true },
-    { "ContextMenu/Symbols/cm-folder", "WELCOME_ROW_FOLDERS" },
-    { "Topbar/Normal/tp-help-normal",  "WELCOME_ROW_HELP", tint = false },
+    { "Explorer/ex-new-folder",        "WELCOME_ROW_FOLDERS" },   -- white, full size (cm-folder is gold and small)
+    { "Topbar/Normal/tp-help-normal",  "WELCOME_ROW_HELP", tint = false, skin = "Topbar/tp-help" },
     { "Toolbar/tb-spellcheck",         "WELCOME_ROW_SPELLING" },
     { "Toolbar/tb-search-replace",     "WELCOME_ROW_FIND" },
     { "Toolbar/tb-rich-divider",       "WELCOME_ROW_RICH" },
@@ -216,8 +217,10 @@ local function BuildBox(ov)
         else
             ic = box:CreateTexture(nil, "ARTWORK")
             ic:SetSize(ROW_ICON, ROW_ICON)
-            ic:SetTexture(ART .. p[1])
-            if p.tint ~= false then BNB.TintUIIcon(ic) end
+            -- skin = the white skin-mode file, tinted like the rest
+            local skinArt = Skin() and p.skin
+            ic:SetTexture(ART .. (skinArt or p[1]))
+            if skinArt or p.tint ~= false then BNB.TintUIIcon(ic) end
         end
         local fs = NewText(box, "BNBFontHighlight", 13)
         fs:SetText(L[p[2]])
