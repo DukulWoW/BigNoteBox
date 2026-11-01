@@ -39,6 +39,9 @@ local FIELDS = {
     -- One short line about the note (ALL-372): under the title, in the game
     -- tooltip of the unit it is about, on its situation toast. Max BNB.TLDR_MAX
     { "tldr",        "s", share = "text" },
+    -- The spellchecker language of this note (ALL-559 S5): "frFR" etc., nil =
+    -- the Spelling page default; one the receiver lacks falls back to theirs
+    { "spellLang",   "s", share = "text" },
     { "tags",        "t", share = "tags" },
     { "tasks",       "t", share = "tasks" },
     { "taskList",    "t", share = "tasks" },

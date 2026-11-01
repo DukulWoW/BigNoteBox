@@ -154,11 +154,21 @@ local LANG = {
     ja = { "shield-ja", "NE_LANG_BADGE_JAPANESE" }, ua = { "shield-ua", "NE_LANG_BADGE_CYRILLIC" },
     gr = { "shield-gr", "NE_LANG_BADGE_GREEK" },
 }
+-- One line per language in a mixed note (ALL-624)
 local function LangLine(out, note)
-    local code = BNB.TextShield and BNB.TextShield(note.body)
-    local l = code and LANG[code]
-    if not l then return end
-    out[#out + 1] = { "|TInterface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. l[1] .. ":16:16|t " .. L[l[2]], TXT }
+    if not BNB.TextShields then return end
+    for _, code in ipairs(BNB.TextShields(note.body)) do
+        local l = LANG[code]
+        if l then
+            out[#out + 1] = { "|TInterface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. l[1] .. ":16:16|t " .. L[l[2]], TXT }
+        end
+    end
+    -- The note's own spelling language (ALL-559 S5), while the module is on
+    local SP = BNB.Spell
+    if note.spellLang and SP and BNB.SpellEnabled() and SP.LangFlag(note.spellLang) then
+        out[#out + 1] = { "|TInterface\\AddOns\\BigNoteBox\\Assets\\Flags\\shield-" .. SP.LangFlag(note.spellLang)
+            .. ":16:16|t " .. string.format(L["NT_SPELL_LANG_FMT"], SP.LangName(note.spellLang)), TXT }
+    end
 end
 
 local function Collect(note, noteID)

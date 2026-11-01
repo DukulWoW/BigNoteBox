@@ -2,8 +2,9 @@
 local BNB = BigNoteBox
 local L   = BNB.L
 -- Detects NoteworthyII, TakeANote, YetAnotherNotepad, Notepad, Notes,
--- TinyPad, PurpleNotes, SimpleNote, QuickNotes, and OneWoW Notes and
--- offers to migrate their notes into BNB.
+-- TinyPad, PurpleNotes, SimpleNote, QuickNotes, OneWoW Notes, MyNotepad,
+-- AmmeNotepad, SimpleNotepad and Siggis Notepad and offers to migrate their
+-- notes into BNB.
 --
 -- Public API (BNB.Migration.*):
 --   DetectAvailable()       -> array of addon keys that are loaded and not migrationDone
@@ -50,6 +51,8 @@ local SOURCES = {
     { "OneWoWNotes",       "OneWoW Notes",        "OneWoW_Notes" },
     { "MyNotepad",         "MyNotepad",           "MyNotepad" },
     { "AmmeNotepad",       "AmmeNotepad",         "AmmeNotepad" },
+    { "SimpleNotepad",     "SimpleNotepad",       "SimpleNotepad" },   -- ALL-603
+    { "SiggisNotepad",     "Siggis Notepad",      "SiggisNotepad" },   -- ALL-605
 }
 local ADDON_KEYS, ADDON_NAMES, ADDON_LOAD_NAME = {}, {}, {}
 for i, src in ipairs(SOURCES) do
@@ -140,6 +143,103 @@ local function CreateMigratedNote(title, body, tags, charKey)
         BNB.UpdateNote(id, { tags = existing })
     end
     return id
+end
+
+-- ── SimpleNotepad and Siggis Notepad (ALL-603 / ALL-605) ────────────────────────
+-- SimpleNotepad keeps its pages per character (SimpleNotepad_CharacterDB, only
+-- the logged-in character's is loaded) plus pages shared by every character
+-- (SimpleNotepad_DB.sharedNotes; a character's page with a sharedId points at
+-- one of them). Its done flag is a table: chars[key] per character, shared once
+-- the shared pages came over, so each character can still bring its own.
+-- Before its storage version 2 the pages lived in SimpleNotepad_DB.pages: they
+-- come over with the shared pages.
+local function SimpleNotepadPages()
+    local charPages, sharedPages = {}, {}
+    local cdb, adb = SimpleNotepad_CharacterDB, SimpleNotepad_DB
+    if type(cdb) == "table" and type(cdb.pages) == "table" then
+        for i, page in ipairs(cdb.pages) do
+            if type(page) == "table" and not page.sharedId then
+                charPages[#charPages + 1] = { title = page.name, body = page.body, n = i }
+            end
+        end
+    end
+    if type(adb) == "table" then
+        if type(adb.sharedNotes) == "table" then
+            local ids = {}
+            for id, note in pairs(adb.sharedNotes) do
+                if type(id) == "number" and type(note) == "table" then ids[#ids + 1] = id end
+            end
+            table.sort(ids)
+            for _, id in ipairs(ids) do
+                local note = adb.sharedNotes[id]
+                sharedPages[#sharedPages + 1] = { title = note.name, body = note.body, n = id }
+            end
+        end
+        if type(adb.pages) == "table" then
+            for i, page in ipairs(adb.pages) do
+                if type(page) == "table" then
+                    sharedPages[#sharedPages + 1] = { title = page.name, body = page.body, n = i }
+                end
+            end
+        end
+    end
+    return charPages, sharedPages
+end
+
+local function SimpleNotepadDone()
+    local d = MigrationState().migrationDone
+    d = d and d.SimpleNotepad
+    if type(d) ~= "table" then return { chars = {} } end
+    d.chars = d.chars or {}
+    return d
+end
+
+local function UsableBody(body)
+    return type(body) == "string" and not body:match("^%s*$")
+end
+
+-- Is there anything left to bring over from SimpleNotepad here: a page of
+-- this character not yet migrated, or a shared page not yet migrated? It is
+-- not offered otherwise (Dukul, 2026-11-01: a character with an empty page
+-- got the offer and an empty preview)
+local function SimpleNotepadHasWork()
+    local done = SimpleNotepadDone()
+    local ck   = BNB.currentChar
+    local charPages, sharedPages = SimpleNotepadPages()
+    if not (ck and done.chars[ck]) then
+        for _, page in ipairs(charPages) do
+            if UsableBody(page.body) then return true end
+        end
+    end
+    if not done.shared then
+        for _, page in ipairs(sharedPages) do
+            if UsableBody(page.body) then return true end
+        end
+    end
+    return false
+end
+
+local function PageTitle(title, fallback)
+    if type(title) == "string" and title ~= "" then return title end
+    return fallback
+end
+
+-- Siggis Notepad: one account-wide list (SiggisNotepadDB.notes, title +
+-- text) and a trash list of { note = ..., index = ... }. Trashed notes go to
+-- BNB's Trash while it is on, else they stay behind (Dukul, 2026-11-01).
+local function SiggisLists()
+    local db = SiggisNotepadDB
+    local live, trash = {}, {}
+    if type(db) ~= "table" then return live, trash end
+    for _, note in ipairs(type(db.notes) == "table" and db.notes or {}) do
+        if type(note) == "table" then live[#live + 1] = note end
+    end
+    if BNB.TrashEnabled and BNB.TrashEnabled() then
+        for _, e in ipairs(type(db.trash) == "table" and db.trash or {}) do
+            if type(e) == "table" and type(e.note) == "table" then trash[#trash + 1] = e.note end
+        end
+    end
+    return live, trash
 end
 
 -- ── Collect preview entries ───────────────────────────────────────────────────
@@ -543,6 +643,63 @@ function M.CollectPreview(sel)
         end
     end
 
+    -- SimpleNotepad: this character's pages, then the shared ones (ALL-603)
+    if sel.SimpleNotepad then
+        local done = SimpleNotepadDone()
+        local ck   = BNB.currentChar
+        local charPages, sharedPages = SimpleNotepadPages()
+        if not (ck and done.chars[ck]) then
+            for _, page in ipairs(charPages) do
+                if UsableBody(page.body) then
+                    tinsert(entries, {
+                        addon       = "SimpleNotepad",
+                        title       = PageTitle(page.title, "SimpleNotepad " .. page.n),
+                        scope       = ck and "character" or "global",
+                        charLabel   = ck or L["MIG_GLOBAL"],
+                        tags        = { "SimpleNotepad" },
+                        bodyPreview = page.body:sub(1, 100),
+                    })
+                end
+            end
+        end
+        if not done.shared then
+            for _, page in ipairs(sharedPages) do
+                if UsableBody(page.body) then
+                    tinsert(entries, {
+                        addon       = "SimpleNotepad",
+                        title       = PageTitle(page.title, "SimpleNotepad " .. page.n),
+                        scope       = "global",
+                        charLabel   = L["MIG_GLOBAL"],
+                        tags        = { "SimpleNotepad" },
+                        bodyPreview = page.body:sub(1, 100),
+                    })
+                end
+            end
+        end
+    end
+
+    -- Siggis Notepad: its notes, then its trash into BNB's Trash (ALL-605)
+    if sel.SiggisNotepad then
+        local live, trash = SiggisLists()
+        for _, list in ipairs({ live, trash }) do
+            local toTrash = (list == trash)
+            local label = L["MIG_GLOBAL"]
+            if toTrash then label = L["MIG_TO_TRASH"] end
+            for _, note in ipairs(list) do
+                if UsableBody(note.text) then
+                    tinsert(entries, {
+                        addon       = "SiggisNotepad",
+                        title       = PageTitle(note.title, L["MIG_IMPORTED_NOTE_TITLE"]),
+                        scope       = "global",
+                        charLabel   = label,
+                        tags        = { "SiggisNotepad" },
+                        bodyPreview = note.text:sub(1, 100),
+                    })
+                end
+            end
+        end
+    end
+
     return entries
 end
 
@@ -834,6 +991,51 @@ function M.Run(sel)
         db.migrationDone.AmmeNotepad = true
     end
 
+    -- SimpleNotepad (ALL-603): this character's pages once per character,
+    -- the shared pages once
+    if sel.SimpleNotepad then
+        local done = SimpleNotepadDone()
+        local ck   = BNB.currentChar
+        local charPages, sharedPages = SimpleNotepadPages()
+        if not (ck and done.chars[ck]) then
+            for _, page in ipairs(charPages) do
+                if UsableBody(page.body) then
+                    CreateMigratedNote(PageTitle(page.title, "SimpleNotepad " .. page.n), page.body, { "SimpleNotepad" }, ck)
+                end
+            end
+            if ck then done.chars[ck] = true end
+        end
+        if not done.shared then
+            for _, page in ipairs(sharedPages) do
+                if UsableBody(page.body) then
+                    CreateMigratedNote(PageTitle(page.title, "SimpleNotepad " .. page.n), page.body, { "SimpleNotepad" }, nil)
+                end
+            end
+            done.shared = true
+        end
+        db.migrationDone.SimpleNotepad = done
+    end
+
+    -- Siggis Notepad (ALL-605): its trashed notes are made, then moved to
+    -- BNB's Trash in one go
+    if sel.SiggisNotepad then
+        local live, trash = SiggisLists()
+        for _, note in ipairs(live) do
+            if UsableBody(note.text) then
+                CreateMigratedNote(PageTitle(note.title, L["MIG_IMPORTED_NOTE_TITLE"]), note.text, { "SiggisNotepad" }, nil)
+            end
+        end
+        local trashIDs = {}
+        for _, note in ipairs(trash) do
+            if UsableBody(note.text) then
+                local id = CreateMigratedNote(PageTitle(note.title, L["MIG_IMPORTED_NOTE_TITLE"]), note.text, { "SiggisNotepad" }, nil)
+                if id then trashIDs[#trashIDs + 1] = id end
+            end
+        end
+        if trashIDs[1] then BNB.DeleteNotes(trashIDs) end
+        db.migrationDone.SiggisNotepad = true
+    end
+
     StaticPopup_Show("BNB_MIGRATE_DONE", _runCount)
 end
 
@@ -860,6 +1062,9 @@ function M.DetectAvailable()
     for _, k in ipairs(ADDON_KEYS) do
         if M.IsAddonAvailable(k) then
             local done     = not M._debugForceAll and mig.migrationDone     and mig.migrationDone[k]
+            -- SimpleNotepad: done per character, and only offered while it
+            -- has a page to bring (ALL-603)
+            if k == "SimpleNotepad" and not M._debugForceAll then done = not SimpleNotepadHasWork() end
             local declined = not M._debugForceAll and db.migrationDeclined and db.migrationDeclined[k]
             if not done and not declined then
                 tinsert(out, k)
@@ -969,6 +1174,23 @@ function M.SeedDebugData()
         AmmeNotepadDB = {
             noteOrder = { "debug1" },
             notes     = { debug1 = { title = "AmmeNotepad debug note", body = "[BNB DEBUG] AmmeNotepad note body." } },
+        }
+    end
+
+    if not SimpleNotepad_CharacterDB then
+        SimpleNotepad_CharacterDB = {
+            storageVersion = 2,
+            pages = { { name = "SimpleNotepad debug page", body = "[BNB DEBUG] SimpleNotepad character page.", open = true } },
+        }
+        SimpleNotepad_DB = SimpleNotepad_DB or {
+            sharedNotes = { [1] = { name = "SimpleNotepad shared debug page", body = "[BNB DEBUG] SimpleNotepad shared page." } },
+        }
+    end
+
+    if not SiggisNotepadDB then
+        SiggisNotepadDB = {
+            notes = { { id = 1, title = "Siggis debug note", text = "[BNB DEBUG] Siggis Notepad note." } },
+            trash = { { index = 2, note = { id = 2, title = "Siggis debug trash", text = "[BNB DEBUG] Siggis Notepad trashed note." } } },
         }
     end
 
@@ -1149,7 +1371,7 @@ function M.ShowAddonPopup(key)
     end
 
     -- NotepadChar / QuickNotes info text (per-character scope)
-    if key == "NotepadChar" or key == "QuickNotes" then
+    if key == "NotepadChar" or key == "QuickNotes" or key == "SimpleNotepad" then
         local infoLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
         infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", PAD, y)
         infoLbl:SetWidth(CW); infoLbl:SetJustifyH("LEFT"); infoLbl:SetWordWrap(true)
@@ -1325,7 +1547,7 @@ function M.ShowPopup()
         y = y - 30
 
         -- NotepadChar / QuickNotes info text (per-character scope)
-        if k == "NotepadChar" or k == "QuickNotes" then
+        if k == "NotepadChar" or k == "QuickNotes" or k == "SimpleNotepad" then
             local infoLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
             infoLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", X0 + 18, y)
             infoLbl:SetWidth(SF_W - X0 - 18 - 4)

@@ -185,7 +185,7 @@ local function ShowHit(r)
     local eb, last = _eb, _hit.last
     C_Timer.After(0, function() if eb:IsVisible() then eb:SetCursorPosition(last) end end)
 
-    local list = _hit.rep and {} or SP.Suggest(word)
+    local list = _hit.rep and {} or SP.Suggest(word, SP.LangOfBox(_eb))
     for i, row in ipairs(_rows) do
         local s = list[i]
         row._word = s
@@ -214,7 +214,7 @@ end
 -- where the pass started
 Next = function(pos)
     if not StillHere() then SC.Close(); return end
-    local list = Spell().Mistakes(_eb:GetText() or "")
+    local list = Spell().Mistakes(_eb:GetText() or "", Spell().LangOfBox(_eb))
     local function From(p, stop)
         for _, r in ipairs(list) do
             if r[1] >= p and (not stop or r[1] < stop) then return r end
@@ -454,7 +454,7 @@ function SC.Open(startAt, eb)
     local host
     if focus then host = BNB.GetFocusFrame and BNB.GetFocusFrame() else host = BNB.mainFrame end
     if not (host and host:IsVisible()) then return end
-    if not SP.EnsureLoaded() then SP.Announce(); return end
+    if not SP.EnsureLoaded(ed.Lang()) then SP.Announce(ed.Lang()); return end
     -- Rich View mode has no box: Edit mode first, then here again
     if not focus and BNB._editorInViewMode and BNB.AM_EnterEditMode then
         BNB.AM_EnterEditMode()
@@ -464,7 +464,7 @@ function SC.Open(startAt, eb)
     eb = ed.eb
     if not (eb and eb:IsVisible()) then return end
     if not eb:IsEnabled() then BNB:Print(L["SPELL_CORRECT_LOCKED"]); return end
-    if #SP.Mistakes(eb:GetText() or "") == 0 then BNB:Print(L["SPELL_NONE_FOUND"]); return end
+    if #SP.Mistakes(eb:GetText() or "", ed.Lang()) == 0 then BNB:Print(L["SPELL_NONE_FOUND"]); return end
 
     if not startAt then
         local h = SP.HitAtCursor(eb)

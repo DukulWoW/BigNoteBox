@@ -1071,7 +1071,8 @@ function BNB.ScheduleAutoSave()
     if not BNB.IsAutoSave() then return end
     local db     = BigNoteBoxDB
     local idle   = (db and db.undoIdleDelay)      or 0.8
-    local forced = (db and db.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval
+    -- The undo slider goes down to 0.5 s (ALL-604); saving stays at 1 s or more
+    local forced = math.max(1, (db and db.undoForcedInterval) or BNB.DEFAULTS.undoForcedInterval)
     BNB.Debounce(AUTO_IDLE, idle, RunAutoSave)
     if not BNB.DebouncePending(AUTO_FORCED) then BNB.Debounce(AUTO_FORCED, forced, RunAutoSave) end
 end

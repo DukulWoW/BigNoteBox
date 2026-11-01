@@ -14,7 +14,10 @@
 --
 -- Settings (Settings > Modules > Spelling, UI/Config/Spelling.lua):
 --   spellEnabled   the module (on for English game clients)
---   spellLang      "enUS" / "enGB"
+--   spellLang      the default dictionary: "enUS" / "enGB", or one from the
+--                  extra download BigNoteBox_SpellPack ("frFR", ALL-559 S5);
+--                  a note can have its own (note.spellLang, the right-click
+--                  menu's Language row), nil = the default
 --   spellMode      "type" = marks while typing, "click" = only after Check
 --                  spelling (the toolbar button). A note over LONG_BYTES is
 --                  checked on click whatever the setting (Dukul's idea, 2026-10-25)
@@ -46,6 +49,14 @@
 -- Features/TextShortcuts.lua, wired from SP.AttachEditor; their names are
 -- known words (Extra).
 --
+-- Stage 5 (ALL-559 S5): more languages, one load-on-demand folder each in the
+-- extra download BigNoteBox_SpellPack (French first: BigNoteBox_Spell_frFR,
+-- from the Hunspell dictionary, see _work/tools/dict-build.py --lang fr).
+-- Each check runs in one language (_cur): the note's own, else the default.
+-- A language's data may list elisions (French l' d' qu'...): "l'arbre" is
+-- looked up as "arbre". Lower-casing knows Latin-1 capitals (E-acute), and
+-- suggestions compare letters, not bytes, an accent alone costing little.
+--
 -- Not checked: game links, textures, color codes, every complete {...}
 -- markup and {{token}}, web and mail addresses, lines that start with "/"
 -- (slash commands, /way), words with a digit in them, words in capitals
@@ -58,14 +69,16 @@ local L   = BNB.L
 local SP = {}
 BNB.Spell = SP
 
-local ADDON      = "BigNoteBox_Spell"
+local ADDON      = "BigNoteBox_Spell"   -- English (US + UK), in the main zip
 local LONG_BYTES = 20000      -- longer notes: checked on click only
 local MEMO_MAX   = 20000      -- remembered word answers before the memo is reset
 
-local _data    = {}           -- lang -> what BigNoteBox_Spell handed over
-local _tried   = false        -- LoadAddOn is tried once per session
-local _failure = nil          -- why it could not load
-local _memo, _memoN = {}, 0   -- word -> true / false, for the language in use
+local _data    = {}           -- lang -> what its word list folder handed over
+local _tried   = {}           -- folder -> true: LoadAddOn is tried once per session
+local _failure = {}           -- folder -> why it could not load
+local _memo    = {}           -- lang -> { word -> true / false }
+local _memoN   = {}           -- lang -> words in its memo
+local _cur     = "enUS"       -- the language of the check running now (SP.Mistakes / SP.Suggest)
 local _extra   = nil          -- game words of this player: classes, characters, tags
 local _own     = nil          -- the player's own words, lower-case (BigNoteBoxNotesDB.spellWords)
 local _ignored = {}           -- Ignore in the right-click menu: until the next reload
@@ -73,48 +86,115 @@ local _ignoredRep = {}        -- the same for a repeated word ("the the")
 local _editors = {}           -- edit box -> its checker (SP.AttachEditor, below)
 local _main                   -- the main editor's checker
 
--- Called by BigNoteBox_Spell's files when they run
+-- The dictionaries, in the order the Spelling page and the menu list them.
+-- addon = the folder that holds the list (English ships with BigNoteBox,
+-- the rest are the extra download BigNoteBox_SpellPack, ALL-559 S5);
+-- accents = suggestions also look at words that start with an accented
+-- letter and allow a few more bytes (an accent is two)
+local LANGS = {
+    { code = "enUS", addon = ADDON, name = "CFG_SPELL_LANG_US", flag = "us" },
+    { code = "enGB", addon = ADDON, name = "CFG_SPELL_LANG_UK", flag = "uk" },
+    { code = "frFR", addon = "BigNoteBox_Spell_frFR", name = "CFG_SPELL_LANG_FR", flag = "fr", accents = true },
+}
+local LANG_BY = {}
+for _, l in ipairs(LANGS) do LANG_BY[l.code] = l end
+SP.LANGS = LANGS
+
+-- Called by the word list folders' files when they run
 function BNB.ReceiveSpellData(lang, data)
-    if type(lang) == "string" and type(data) == "table" then _data[lang] = data end
+    if type(lang) ~= "string" or type(data) ~= "table" then return end
+    if type(data.elide) == "table" then
+        local set = {}
+        for _, e in ipairs(data.elide) do set[e] = true end
+        data.elideSet = set
+    end
+    _data[lang] = data
 end
 
 function BNB.SpellEnabled()
     return BigNoteBoxDB ~= nil and BigNoteBoxDB.spellEnabled == true
 end
 
-function SP.Lang()
-    return BigNoteBoxDB and BigNoteBoxDB.spellLang == "enGB" and "enGB" or "enUS"
+-- Is the language's folder in the AddOns folder (enabled or not)?
+function SP.Installed(lang)
+    local def = LANG_BY[lang]
+    if not def then return false end
+    local ok, exists = pcall(C_AddOns.DoesAddOnExist, def.addon)
+    return ok and exists and true or false
 end
 
--- Loads BigNoteBox_Spell once. -> true when the lists are there
-function SP.EnsureLoaded()
-    if _data.enUS then return true end
-    if _tried then return false end
-    _tried = true
-    local ok, loaded, reason = pcall(C_AddOns.LoadAddOn, ADDON)
-    if not ok then
-        _failure = "ERROR"
-    elseif not loaded then
-        _failure = reason or "MISSING"
-    elseif not _data.enUS then
-        _failure = "ERROR"
+-- The default language: the Spelling page's pick while it is installed
+function SP.DefaultLang()
+    local v = BigNoteBoxDB and BigNoteBoxDB.spellLang
+    if v and LANG_BY[v] and SP.Installed(v) then return v end
+    return "enUS"
+end
+
+-- The language a note is checked in: its own (note.spellLang) while that
+-- one is installed, else the default. No id = the default
+function SP.Lang(noteID)
+    if noteID and BNB.GetNote then
+        local note = BNB.GetNote(noteID)
+        local v = note and note.spellLang
+        if v and LANG_BY[v] and SP.Installed(v) then return v end
     end
-    return _data.enUS ~= nil
+    return SP.DefaultLang()
+end
+
+-- A language's display name ("English (US)", "French")
+function SP.LangName(lang)
+    local def = LANG_BY[lang]
+    if def then return L[def.name] end
+    return tostring(lang)
+end
+function SP.LangFlag(lang)
+    local def = LANG_BY[lang]
+    return def and def.flag
+end
+
+local function LoadFolder(addon)
+    if _tried[addon] then return end
+    _tried[addon] = true
+    local ok, loaded, reason = pcall(C_AddOns.LoadAddOn, addon)
+    if not ok then _failure[addon] = "ERROR"
+    elseif not loaded then _failure[addon] = reason or "MISSING" end
+end
+local function Ready(lang)
+    local d = _data[lang]
+    if not d then return false end
+    return not d.base or _data[d.base] ~= nil
+end
+
+-- Loads the language's word list once. -> true when the list is there.
+-- The game words are always here (Features/SpellWords.lua), so a French
+-- player never loads the English folder (Dukul, 2026-11-01)
+function SP.EnsureLoaded(lang)
+    lang = lang or SP.DefaultLang()
+    if Ready(lang) then return true end
+    local def = LANG_BY[lang] or LANG_BY.enUS
+    LoadFolder(def.addon)
+    if not Ready(lang) and not _failure[def.addon] then _failure[def.addon] = "ERROR" end
+    return Ready(lang)
 end
 
 -- For the settings page: nil when loaded, else the reason
-function SP.Failure() return _failure end
-function SP.WordCount()
-    local d = _data[SP.Lang()] or _data.enUS
+function SP.Failure(lang)
+    local def = LANG_BY[lang or SP.DefaultLang()] or LANG_BY.enUS
+    return _failure[def.addon]
+end
+function SP.WordCount(lang)
+    local d = _data[lang or SP.DefaultLang()]
     return d and d.count or 0
 end
 
 -- Why it cannot work, in a chat line (when the player switches it on)
-function SP.Announce()
-    if SP.EnsureLoaded() then return end
-    if _failure == "MISSING" then BNB:Print(L["SPELL_ADDON_MISSING"])
-    elseif _failure == "DISABLED" then BNB:Print(L["SPELL_ADDON_DISABLED"])
-    else BNB:Print(string.format(L["SPELL_ADDON_FAILED_FMT"], tostring(_failure))) end
+function SP.Announce(lang)
+    lang = lang or SP.DefaultLang()
+    if SP.EnsureLoaded(lang) then return end
+    local f = SP.Failure(lang)
+    if f == "MISSING" then BNB:Print(L["SPELL_ADDON_MISSING"])
+    elseif f == "DISABLED" then BNB:Print(L["SPELL_ADDON_DISABLED"])
+    else BNB:Print(string.format(L["SPELL_ADDON_FAILED_FMT"], tostring(f))) end
 end
 
 --------------------------------------------------------------------------------
@@ -137,14 +217,28 @@ local function InBuckets(bk, w)
     end
 end
 
--- a-z only: WoW's lower() also changes bytes 128-255 and would break a
--- UTF-8 letter (CLAUDE.md, ALL-507)
-local function LowerAscii(w) return (w:gsub("[A-Z]", string.lower)) end
+-- Never WoW's lower(): it changes bytes 128-255 one by one and would break
+-- a UTF-8 letter (CLAUDE.md, ALL-507). a-z, then the Latin-1 capitals
+-- (U+00C0-00DE but the times sign: C3 80-9E -> C3 A0-BE), OE (C5 92 -> 93)
+-- and Y-diaeresis (C5 B8 -> C3 BF): the same byte count (ALL-559 S5)
+local function LowerLatin1(c)
+    local b = c:byte()
+    if b == 151 then return nil end
+    return "\195" .. string.char(b + 32)
+end
+local function LowerWord(w)
+    w = w:gsub("[A-Z]", string.lower)
+    if w:find("[\195\197]") then
+        w = w:gsub("\195([\128-\158])", LowerLatin1)
+        w = w:gsub("\197\146", "\197\147"):gsub("\197\184", "\195\191")
+    end
+    return w
+end
 
 -- Words from this player's game: class names, known characters, tags
 local function AddWords(set, text)
     if type(text) ~= "string" then return end
-    for w in text:gmatch("[A-Za-z\128-\255']+") do set[LowerAscii(w)] = true end
+    for w in text:gmatch("[A-Za-z\128-\255']+") do set[LowerWord(w)] = true end
 end
 local function Extra()
     if _extra then return _extra end
@@ -197,7 +291,7 @@ function SP.OwnSet()
     if _own then return _own end
     local set = {}
     for w in pairs(OwnStore() or {}) do
-        if type(w) == "string" then set[LowerAscii(w)] = true end
+        if type(w) == "string" then set[LowerWord(w)] = true end
     end
     _own = set
     return set
@@ -210,7 +304,7 @@ function SP.WordList()
         if type(w) == "string" then out[#out + 1] = w end
     end
     table.sort(out, function(a, b)
-        local la, lb = LowerAscii(a), LowerAscii(b)
+        local la, lb = LowerWord(a), LowerWord(b)
         if la ~= lb then return la < lb end
         return a < b
     end)
@@ -227,7 +321,7 @@ end
 function SP.AddWord(w, quiet)
     w = CleanWord(w)
     if not w then return false end
-    if SP.OwnSet()[LowerAscii(w)] then return false end
+    if SP.OwnSet()[LowerWord(w)] then return false end
     OwnStore(true)[w] = true
     OwnChanged()
     if not quiet then BNB:Print(string.format(L["SPELL_ADDED_FMT"], w)) end
@@ -238,14 +332,14 @@ end
 function SP.Ignore(w)
     w = CleanWord(w)
     if not w then return end
-    _ignored[LowerAscii(w)] = true
+    _ignored[LowerWord(w)] = true
     SP.Reset()
 end
 
 -- Ignore on a repeated word: that word twice in a row is fine until the next reload
 function SP.IgnoreRepeat(w)
     if type(w) ~= "string" or w == "" then return end
-    _ignoredRep[LowerAscii(w)] = true
+    _ignoredRep[LowerWord(w)] = true
     SP.Reset()
 end
 
@@ -253,9 +347,9 @@ end
 function SP.RemoveWord(w)
     local store = OwnStore()
     if not (store and type(w) == "string") then return end
-    local lw = LowerAscii(w)
+    local lw = LowerWord(w)
     for k in pairs(store) do
-        if type(k) == "string" and LowerAscii(k) == lw then store[k] = nil end
+        if type(k) == "string" and LowerWord(k) == lw then store[k] = nil end
     end
     OwnChanged()
 end
@@ -266,11 +360,11 @@ function SP.RenameWord(old, new)
     new = CleanWord(new)
     if not (new and type(old) == "string") then return false end
     if new == old then return true end
-    local lo, ln = LowerAscii(old), LowerAscii(new)
+    local lo, ln = LowerWord(old), LowerWord(new)
     if ln ~= lo and SP.OwnSet()[ln] then return false end
     local store = OwnStore(true)
     for k in pairs(store) do
-        if type(k) == "string" and LowerAscii(k) == lo then store[k] = nil end
+        if type(k) == "string" and LowerWord(k) == lo then store[k] = nil end
     end
     store[new] = true
     OwnChanged()
@@ -295,10 +389,10 @@ function SP.ImportList(list)
     local store
     for _, w in ipairs(list) do
         w = CleanWord(w)
-        if w and not SP.OwnSet()[LowerAscii(w)] then
+        if w and not SP.OwnSet()[LowerWord(w)] then
             store = store or OwnStore(true)
             store[w] = true
-            _own[LowerAscii(w)] = true
+            _own[LowerWord(w)] = true
             n = n + 1
         end
     end
@@ -306,57 +400,74 @@ function SP.ImportList(list)
     return n
 end
 
--- The word as it is, in the language in use
+-- The word as it is, in the language of the check running now (_cur)
 local function Known(w)
-    local lang = SP.Lang()
-    local d = _data[lang]
+    local d = _data[_cur]
     if d and d.base then
         if InBuckets(d.add, w) then return true end
         if InBuckets(d.drop, w) then return false end
         d = _data[d.base]
     end
-    d = d or _data.enUS
     if d and InBuckets(d.words, w) then return true end
     return _data.wow ~= nil and InBuckets(_data.wow.words, w)
 end
 
--- In the word lists (any a-z case), leaving out the player's own words and
+-- In the word lists (any case), leaving out the player's own words and
 -- game words: a text shortcut that is a real word gets a warning (stage 4)
 function SP.InDictionary(w)
-    if type(w) ~= "string" or not SP.EnsureLoaded() then return false end
-    return Known(w) or Known(LowerAscii(w))
+    _cur = SP.DefaultLang()
+    if type(w) ~= "string" or not SP.EnsureLoaded(_cur) then return false end
+    return Known(w) or Known(LowerWord(w))
 end
+
+-- Any lower-case letter (a-z or a Latin-1 small one)
+local function HasLowerLetter(w)
+    return w:find("[a-z]") ~= nil or w:find("\195[\159-\191]") ~= nil
+end
+local byte = string.byte
 
 -- w: the word with ' for a typographic apostrophe. "The" at a sentence's
 -- start is "the"; "PARIS" may be "Paris"; "dog's" is "dog"
 local function CheckWord(w)
-    local c = _memo[w]
+    local memo = _memo[_cur]
+    if not memo then memo = {}; _memo[_cur] = memo; _memoN[_cur] = 0 end
+    local c = memo[w]
     if c ~= nil then return c end
     local ok = Known(w)
     if not ok then
-        local lw = LowerAscii(w)
+        local lw = LowerWord(w)
         if lw ~= w then
             ok = Known(lw)
-            if not ok and not w:find("[a-z]") then ok = Known(w:sub(1, 1) .. lw:sub(2)) end
+            -- PARIS -> Paris; an accented capital is two bytes (ECOLE)
+            if not ok and not HasLowerLetter(w) then
+                local fl = (byte(w, 1) >= 192) and 2 or 1
+                ok = Known(w:sub(1, fl) .. lw:sub(fl + 1))
+            end
         end
         if not ok and (Extra()[lw] or SP.OwnSet()[lw] or _ignored[lw]) then ok = true end
+        -- An elision (French l'arbre, qu'il): the word after it
+        if not ok then
+            local el = _data[_cur] and _data[_cur].elideSet
+            local pre = el and lw:match("^(.-')")
+            if pre and el[pre] and #w - #pre > 1 then ok = CheckWord(w:sub(#pre + 1)) end
+        end
         if not ok then
             local stem = w:match("^(.+)'[sS]$") or w:match("^(.+[sS])'$")
             if stem and #stem > 1 then ok = CheckWord(stem) end
         end
     end
-    if _memoN >= MEMO_MAX then _memo, _memoN = {}, 0 end
-    _memo[w] = ok
-    _memoN = _memoN + 1
+    if _memoN[_cur] >= MEMO_MAX then memo = {}; _memo[_cur] = memo; _memoN[_cur] = 0 end
+    memo[w] = ok
+    _memoN[_cur] = _memoN[_cur] + 1
     return ok
 end
 
 -- Settings, the language or the player's words changed
 function SP.Reset()
-    _memo, _memoN, _extra = {}, 0, nil
+    _memo, _memoN, _extra = {}, {}, nil
     for _, ed in pairs(_editors) do
         -- Click mode: the marks of the last check, asked again (Add / Ignore)
-        if ed.clickText then ed.clickRanges = SP.Mistakes(ed.clickText) end
+        if ed.clickText then ed.clickRanges = SP.Mistakes(ed.clickText, ed.Lang()) end
         ed.Redraw()
     end
 end
@@ -386,8 +497,6 @@ local function Masked(text)
     t = ("\n" .. t):gsub("(\n)([ \t]*/[^\n]*)", function(nl, line) return nl .. Blank(line) end):sub(2)
     return t
 end
-
-local byte = string.byte
 
 -- An upper-case first letter: A-Z, or a Latin-1 capital (U+00C0-U+00DE)
 local function UpperFirst(w)
@@ -426,9 +535,10 @@ end
 -- The words that are not in the dictionary -> { { first, last, "x" }, ... }.
 -- A repeated word also has rep = the byte after the word before it (the
 -- space taken out with it)
-function SP.Mistakes(text)
+function SP.Mistakes(text, lang)
     local out = {}
-    if type(text) ~= "string" or text == "" or not SP.EnsureLoaded() then return out end
+    _cur = lang or SP.DefaultLang()
+    if type(text) ~= "string" or text == "" or not SP.EnsureLoaded(_cur) then return out end
     local t = Masked(text)
     local n = #t
     local db = BigNoteBoxDB or {}
@@ -482,7 +592,7 @@ function SP.Mistakes(text)
             local marked = Check(s, e, w)
             -- The same word right after the last, only spaces between in the
             -- real text (a link or markup between is not a repeat)
-            local lw = LowerAscii(w)
+            local lw = LowerWord(w)
             if repeats and not marked and prevW == lw and not _ignoredRep[lw]
                and text:sub(prevE + 1, s - 1):find("^[ \t]+$") then
                 out[#out + 1] = { s, e, "x", rep = prevE + 1 }
@@ -551,6 +661,42 @@ end
 
 local VOWEL = { [97] = true, [101] = true, [105] = true, [111] = true, [117] = true }   -- a e i o u
 
+-- Suggestions compare letters, not bytes (ALL-559 S5): a word is scored in
+-- Latin-1, one byte per letter (UTF-8 C2 / C3 xx -> one byte, OE -> 156),
+-- and a letter that differs from the typed one only by its accent costs
+-- ACCENT_COST (ete -> ete-acute). BASE = the plain letter of a Latin-1 one
+local ACCENT_COST = 0.3
+local BASE = {}
+do
+    local groups = {
+        a = { 224, 225, 226, 227, 228, 229 }, c = { 231 }, e = { 232, 233, 234, 235 },
+        i = { 236, 237, 238, 239 }, n = { 241 }, o = { 242, 243, 244, 245, 246, 248, 156 },
+        u = { 249, 250, 251, 252 }, y = { 253, 255 },
+    }
+    for letter, list in pairs(groups) do
+        local b = letter:byte()
+        for _, c in ipairs(list) do
+            BASE[c] = b
+            if c >= 224 and c ~= 255 then BASE[c - 32] = b - 32 end   -- the capital
+            if VOWEL[b] then VOWEL[c] = true end
+        end
+    end
+end
+local function ToL1(w)
+    if not w:find("[\194\195\197]") then return w end
+    w = w:gsub("\195([\128-\191])", function(c) return string.char(c:byte() + 64) end)
+    w = w:gsub("\194([\128-\191])", "%1")
+    return (w:gsub("\197[\146\147]", "\156"))
+end
+-- Accents gone: the plain letters, for the game's edit distance
+local function Plain(l1)
+    if not l1:find("[\128-\255]") then return l1 end
+    return (l1:gsub("[\128-\255]", function(c)
+        local b = BASE[c:byte()]
+        return b and string.char(b) or c
+    end))
+end
+
 -- Weighted distance from a (typed) to b, or nil when over limit
 local _r0, _r1, _r2 = {}, {}, {}
 local function Score(a, b, limit)
@@ -564,7 +710,11 @@ local function Score(a, b, limit)
         local rowMin = i
         for j = 1, lb do
             local cb = byte(b, j)
-            local v = prev[j - 1] + ((ca == cb) and 0 or (Near(ca, cb) and 0.6 or 1))
+            local sub = 1
+            if ca == cb then sub = 0
+            elseif (BASE[ca] or ca) == (BASE[cb] or cb) then sub = ACCENT_COST
+            elseif Near(ca, cb) then sub = 0.6 end
+            local v = prev[j - 1] + sub
             -- A letter too many / too few; a doubled letter costs half, a vowel less
             local del = prev[j] + ((i > 1 and byte(a, i - 1) == ca) and 0.5 or (VOWEL[ca] and 0.8 or 1))
             local ins = cur[j - 1] + ((j > 1 and byte(b, j - 1) == cb) and 0.5 or (VOWEL[cb] and 0.8 or 1))
@@ -586,53 +736,90 @@ local function Score(a, b, limit)
     return s <= limit and s or nil
 end
 
--- The bucket tables of the language in use, and the one taken out of it (UK)
+-- The bucket tables of the check's language, and the one taken out of it (UK)
 local function Sources()
-    local d = _data[SP.Lang()]
+    local d = _data[_cur]
     local list, drop = {}, nil
     if d and d.base then list[#list + 1] = d.add; drop = d.drop; d = _data[d.base] end
-    d = d or _data.enUS
     if d then list[#list + 1] = d.words end
     if _data.wow then list[#list + 1] = _data.wow.words end
     return list, drop
 end
 
-local function CapFirst(w) return (w:gsub("^[a-z]", string.upper)) end
+-- Never WoW's upper() (ALL-507): a-z, and the Latin-1 small letters
+-- (C3 A0-BE but the division sign -> C3 80-9E, ALL-559 S5)
+local function UpperLatin1(c)
+    local b = c:byte()
+    if b == 183 then return nil end
+    return "\195" .. string.char(b - 32)
+end
+local function CapFirst(w)
+    if byte(w, 1) == 195 then return (w:gsub("^\195([\160-\190])", UpperLatin1)) end
+    return (w:gsub("^[a-z]", string.upper))
+end
+local function UpperWord(w)
+    return (w:gsub("[a-z]", string.upper):gsub("\195([\160-\190])", UpperLatin1))
+end
 
--- -> up to MAX_SUGGEST words, best first, in the typed word's case
-function SP.Suggest(word)
+-- -> up to MAX_SUGGEST words, best first, in the typed word's case.
+-- lang: the note's language (nil = the default)
+function SP.Suggest(word, lang)
     local out = {}
-    if type(word) ~= "string" or not SP.EnsureLoaded() then return out end
+    _cur = lang or SP.DefaultLang()
+    if type(word) ~= "string" or not SP.EnsureLoaded(_cur) then return out end
     local w  = word:gsub("\226\128\153", "'")
-    local lw = LowerAscii(w)
-    local n  = #lw
+    local lw = LowerWord(w)
+    local l1 = ToL1(lw)        -- one byte per letter
+    local n  = #l1             -- letters
     if n < 2 then return out end
     local limit = n <= 3 and 1 or 2
     local band  = math.floor(limit)
+    local accents = LANG_BY[_cur] and LANG_BY[_cur].accents
     local srcs, drop = Sources()
     local found = {}   -- lower-case -> { word, score }
     local function Take(cand, s)
-        local key = LowerAscii(cand)
+        local key = LowerWord(cand)
         if key == lw or (drop and InBuckets(drop, cand)) then return end
         local old = found[key]
         if not old or s < old[2] or (s == old[2] and cand < old[1]) then found[key] = { cand, s } end
     end
-    -- Same first letter: every word in the band, lower-case and capitalized
+    -- Same first letter: every word in the band, lower-case and capitalized.
+    -- A language with accents also looks under the other first bytes of
+    -- that letter (e -> words that start with e-acute and the reverse) and
+    -- a few more bytes (every accent is one byte more than its letter)
     local cap = CapFirst(lw)
     local firsts = { lw }
     if cap ~= lw then firsts[2] = cap end
+    local extra = accents and 4 or 0
+    local bl = #lw
     for _, q in ipairs(firsts) do
         local fb = byte(q, 1)
-        for len = math.max(1, n - band), n + band do
-            for _, bk in ipairs(srcs) do
-                local blk = bk and bk[len * 256 + fb]
-                if blk then
-                    for p = 1, #blk, len do
-                        local cand = blk:sub(p, p + len - 1)
-                        -- Levenshtein counts a swap as 2: one more than the limit
-                        if not GameDistance or GameDistance(q, cand) <= band + 1 then
-                            local s = Score(q, cand, limit)
-                            if s then Take(cand, s + ((q ~= lw) and CASE_COST or 0)) end
+        local ql1 = ToL1(q)
+        local qBase = BASE[byte(ql1, 1)] or byte(ql1, 1)
+        local fbs = { fb }
+        if accents then
+            if fb ~= 195 then fbs[2] = 195 elseif qBase < 128 then fbs[2] = qBase end
+        end
+        for _, firstByte in ipairs(fbs) do
+            for len = math.max(1, bl - band - extra), bl + band + extra do
+                for _, bk in ipairs(srcs) do
+                    local blk = bk and bk[len * 256 + firstByte]
+                    if blk then
+                        for p = 1, #blk, len do
+                            local cand = blk:sub(p, p + len - 1)
+                            local c1 = accents and ToL1(cand) or cand
+                            local ok = math.abs(#c1 - n) <= band
+                            -- Another first byte: only words of the same plain first letter
+                            if ok and firstByte ~= fb then ok = (BASE[byte(c1, 1)] or byte(c1, 1)) == qBase end
+                            -- Levenshtein counts a swap as 2: one more than the limit
+                            if ok and GameDistance then
+                                if accents then ok = GameDistance(Plain(ql1), Plain(c1)) <= band + 1
+                                else ok = GameDistance(q, cand) <= band + 1 end
+                            end
+                            if ok then
+                                local s = Score(ql1, c1, limit)
+                                if s then Take(cand, s + ((q ~= lw) and CASE_COST or 0)) end
+                            end
                         end
                     end
                 end
@@ -640,6 +827,7 @@ function SP.Suggest(word)
         end
     end
     -- A wrong first letter: swapped, changed, left out, one too many
+    -- (a-z: plain letters only)
     local rest = lw:sub(2)
     local tries = { lw:sub(2, 2) .. lw:sub(1, 1) .. lw:sub(3), rest }
     for c = 97, 122 do
@@ -649,7 +837,7 @@ function SP.Suggest(word)
     end
     for _, t in ipairs(tries) do
         if #t > 0 and t ~= lw and Known(t) then
-            local s = Score(lw, t, limit)
+            local s = Score(l1, ToL1(t), limit)
             if s then Take(t, s) end
         end
     end
@@ -663,14 +851,13 @@ function SP.Suggest(word)
     end
     local list = {}
     for _, v in pairs(found) do list[#list + 1] = v end
-    local last = byte(lw, n)
     table.sort(list, function(x, y)
         if x[2] ~= y[2] then return x[2] < y[2] end
-        local dx, dy = math.abs(#x[1] - n), math.abs(#y[1] - n)
+        local dx, dy = math.abs(#ToL1(x[1]) - n), math.abs(#ToL1(y[1]) - n)
         if dx ~= dy then return dx < dy end
         local sx, sy = x[1]:find(" ", 1, true) ~= nil, y[1]:find(" ", 1, true) ~= nil
         if sx ~= sy then return sy end   -- one word before two
-        local ex, ey = byte(x[1], #x[1]) == last, byte(y[1], #y[1]) == last
+        local ex, ey = byte(x[1], #x[1]) == byte(lw, #lw), byte(y[1], #y[1]) == byte(lw, #lw)
         if ex ~= ey then return ex end
         -- A lower-case word before a name, as typed
         local ux, uy = UpperFirst(x[1]), UpperFirst(y[1])
@@ -681,7 +868,7 @@ function SP.Suggest(word)
     local typedAll = #w > 1 and not HasLower(w)   -- TEH -> THE
     for i = 1, math.min(MAX_SUGGEST, #list) do
         local s = list[i][1]
-        if typedAll then out[i] = (s:gsub("[a-z]", string.upper))
+        if typedAll then out[i] = UpperWord(s)
         else out[i] = typedCap and CapFirst(s) or s end
     end
     return out
@@ -727,7 +914,9 @@ function SP.AttachEditor(eb, sf, noteID, opts)
     opts = opts or {}
     local ed = { eb = eb, kind = opts.kind or "main", noteID = noteID,
                  active = opts.active, prepare = opts.prepare, replace = opts.replace }
-    local lastText, lastRanges
+    -- The note's language (ALL-559 S5)
+    function ed.Lang() return SP.Lang(noteID()) end
+    local lastText, lastRanges, lastLang
     ed.clickText, ed.clickRanges = nil, nil
 
     -- Every marked word of text, the one being typed too
@@ -741,7 +930,10 @@ function SP.AttachEditor(eb, sf, noteID, opts)
             ed.clickText, ed.clickRanges = nil, nil
             return nil
         end
-        if text ~= lastText then lastText, lastRanges = text, SP.Mistakes(text) end
+        local lang = ed.Lang()
+        if text ~= lastText or lang ~= lastLang then
+            lastText, lastLang, lastRanges = text, lang, SP.Mistakes(text, lang)
+        end
         return lastRanges
     end
     function ed.Current()
@@ -793,9 +985,10 @@ end
 function SP.CheckNow(x)
     local ed = EdOf(x) or SP.ActiveEditor()
     if not (ed and BNB.SpellEnabled()) then return end
-    if not SP.EnsureLoaded() then SP.Announce(); return end
+    local lang = ed.Lang()
+    if not SP.EnsureLoaded(lang) then SP.Announce(lang); return end
     local text = ed.eb:GetText() or ""
-    ed.clickText, ed.clickRanges = text, SP.Mistakes(text)
+    ed.clickText, ed.clickRanges = text, SP.Mistakes(text, lang)
     if ed.ctl then ed.Redraw() end
     return #ed.clickRanges
 end
@@ -857,6 +1050,11 @@ local function EditorOf(eb)
     if ed and BNB.SpellEnabled() then return ed end
 end
 SP._EditorOf = EditorOf
+-- The language of the note in a box (the default when it has no checker)
+function SP.LangOfBox(eb)
+    local ed = eb and _editors[eb]
+    return ed and ed.Lang() or SP.DefaultLang()
+end
 
 -- A range -> { first, last, word, rep } (rep: a repeated word, the byte
 -- after the word before it)
@@ -945,7 +1143,7 @@ function SP.AddMenuTop(root, eb, hit)
         root:CreateButton(string.format(L["SPELL_MENU_REMOVE_FMT"], word), function() SP.Replace(eb, hit, "") end,
             { icon = "spell-remove", tip = L["SPELL_MENU_REMOVE_TIP_HDR"], tipSub = L["SPELL_MENU_REMOVE_TIP"] })
     else
-        local list = SP.Suggest(word)
+        local list = SP.Suggest(word, SP.LangOfBox(eb))
         if #list == 0 then
             root:CreateButton(L["SPELL_MENU_NONE"], nil, { disabled = true, icon = "spell-suggest" })
         end
@@ -973,10 +1171,45 @@ function SP.AddMenuActions(root, eb, hit)
     root:CreateButton(L["SPELL_MENU_IGNORE"], Act(eb, function()
         if hit.rep then SP.IgnoreRepeat(word) else SP.Ignore(word) end
     end), { icon = "spell-ignore", tip = L["SPELL_MENU_IGNORE"], tipSub = ignoreTip })
+    SP.AddLanguageMenu(root, ed)
     if ed.kind == "sticky" then return end
     root:CreateButton(L["SPELL_MENU_CORRECT"], function()
         if BNB.SpellCorrect then BNB.SpellCorrect.Open(hit.first, eb) end
     end, { icon = "spell-correct", tip = L["SPELL_CORRECT_TITLE"], tipSub = L["NE_SPELL_CORRECT_BODY"] })
+end
+
+-- The note's language (ALL-559 S5, Dukul 2026-10-29: "change on the fly
+-- (per note maybe?)"): a Language sub-menu, the default first, then every
+-- installed dictionary. Saved on the note as spellLang (nil = the default)
+local FLAG_ART = "Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\shield-"
+function SP.SetNoteLang(noteID, lang)
+    if not (noteID and BNB.GetNote and BNB.GetNote(noteID)) then return end
+    if tostring(noteID):find("^sys%-") then return end
+    if lang then BNB.UpdateNote(noteID, { spellLang = lang }, { noTouch = true })
+    else BNB.UpdateNote(noteID, { _clear = { "spellLang" } }, { noTouch = true }) end
+    SP.Reset()
+end
+function SP.AddLanguageMenu(root, ed)
+    local id = ed and ed.noteID()
+    if not id or tostring(id):find("^sys%-") then return end
+    local note = BNB.GetNote and BNB.GetNote(id)
+    if not note then return end
+    local cur = ed.Lang()
+    local parent = root:CreateButton(string.format(L["SPELL_MENU_LANG_FMT"], SP.LangName(cur)), nil,
+        { icon = "spell-language", tip = L["SPELL_MENU_LANG"], tipSub = L["SPELL_MENU_LANG_TIP"] })
+    local def = SP.DefaultLang()
+    parent:CreateRadio(string.format(L["SPELL_MENU_LANG_DEFAULT_FMT"], SP.LangName(def)),
+        function() return note.spellLang == nil end,
+        Act(ed.eb, function() SP.SetNoteLang(id, nil) end),
+        { iconTex = FLAG_ART .. SP.LangFlag(def) })
+    for _, l in ipairs(LANGS) do
+        if SP.Installed(l.code) then
+            parent:CreateRadio(L[l.name],
+                function() return note.spellLang == l.code end,
+                Act(ed.eb, function() SP.SetNoteLang(id, l.code) end),
+                { iconTex = FLAG_ART .. l.flag })
+        end
+    end
 end
 
 -- Add to dictionary on the toolbar: a popup asks first, the word filled in
@@ -1036,4 +1269,4 @@ function BNB.ApplySpellModule(on)
 end
 
 -- A tag added or renamed is one of the player's words (the list redraws after a tag edit)
-BNB.RegisterMessage("Spellcheck", "NoteListRefreshed", function() _extra = nil; _memo, _memoN = {}, 0 end)
+BNB.RegisterMessage("Spellcheck", "NoteListRefreshed", function() _extra = nil; _memo, _memoN = {}, {} end)

@@ -188,7 +188,7 @@ BNB.DEFAULTS = {
     -- Spelling (ALL-559): on for English game clients, off for the others
     -- (their notes are mostly in another language). Features/Spellcheck.lua
     spellEnabled        = (GetLocale() == "enUS" or GetLocale() == "enGB"),
-    spellLang           = "enUS",    -- "enUS" / "enGB"
+    spellLang           = "enUS",    -- "enUS" / "enGB", or "frFR" from the Spelling Pack (ALL-559 S5)
     spellMode           = "type",    -- "type" = as you type, "click" = on Check spelling
     spellSkipCaps       = true,      -- capitalized words in a sentence = names, not checked
     spellSkipUpper      = false,     -- words in capitals not checked (off: they are)

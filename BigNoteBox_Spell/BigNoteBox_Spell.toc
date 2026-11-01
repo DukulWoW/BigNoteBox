@@ -22,4 +22,3 @@
 
 enUS.lua
 enGB.lua
-WoWWords.lua

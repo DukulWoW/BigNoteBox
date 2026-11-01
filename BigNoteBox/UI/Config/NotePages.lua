@@ -509,7 +509,8 @@ function K.BuildUndoPage(sf, ct, y, page)
     idleSlider:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     y = y - (SLIDER_H + ROW_GAP)
 
-    -- Forced interval slider (1 – 10 s, whole seconds, default 3)
+    -- Forced interval slider (0.5 - 10 s in half seconds, default 3; 0.5 s
+    -- since ALL-604, Dukul 2026-10-28: a finer undo, not letter by letter)
     -- Fires even if you never stop typing, capping continuous-typing chunk size.
     do
         local lbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -522,7 +523,8 @@ function K.BuildUndoPage(sf, ct, y, page)
     end
     local curForced = db and db.undoForcedInterval or BNB.DEFAULTS.undoForcedInterval
     local forcedSlider = BNB.CreateStackedSlider(ct, CONTENT_W, {
-        label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 1, max = 10,
+        label = L["CFG_AUTOSAVE_FORCED_SLIDER"], min = 0.5, max = 10, step = 0.5,
+        fmt = function(v) return string.format("%.1f", v) end,
         value = curForced, default = BNB.DEFAULTS.undoForcedInterval,
         onChange = function(v)
             if BigNoteBoxDB then BigNoteBoxDB.undoForcedInterval = v end

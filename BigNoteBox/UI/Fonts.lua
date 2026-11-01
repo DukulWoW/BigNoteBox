@@ -238,6 +238,29 @@ function BNB.TextShield(text)
     return "cn"
 end
 
+-- Every language shield a note's text calls for, in a fixed order (ALL-624,
+-- the hover tooltip; the title row and the Explorer flag keep the one above).
+-- Kana makes it "ja" and the Han characters count with it (no extra "cn").
+function BNB.TextShields(text)
+    local out = {}
+    if type(text) ~= "string" then return out end
+    if text:find("[\225-\239]") then
+        if text:find("[\234\235\236\237][\128-\191][\128-\191]")
+           or text:find("\225[\132-\135]") or text:find("\227[\132-\134]") then
+            out[#out + 1] = "ko"
+        end
+        if text:find("\227[\129-\131]") then
+            out[#out + 1] = "ja"
+        elseif text:find("[\228-\233][\128-\191]") or text:find("\227[\128\144-\191]")
+               or text:find("\239[\188\189]") then
+            out[#out + 1] = "cn"
+        end
+    end
+    if text:find("[\208-\211][\128-\191]") then out[#out + 1] = "ua" end
+    if text:find("\205[\176-\191]") or text:find("[\206\207][\128-\191]") then out[#out + 1] = "gr" end
+    return out
+end
+
 -- Can this card draw this script? def = a BNB.FONTS card
 local function Covers(def, script)
     if not script then return true end
