@@ -66,6 +66,7 @@ BNB.TOOLBAR_HELP = {
     ["tb-refbox"] = "reference-box",
     ["tb-way"] = "links-in-notes", ["tb-link"] = "links-in-notes", ["tb-rich-link"] = "links-in-notes",
     ["tb-spellcheck"] = "spelling", ["tb-spell-correct"] = "spelling", ["tb-dictionary"] = "spelling",
+    ["tb-language"] = "spelling",
     ["tb-notemap"] = "situations",
     ["tb-share"] = "sharing-notes",
     ["tb-copymove"] = "folders",

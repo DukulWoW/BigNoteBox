@@ -885,7 +885,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     -- Check spelling (ALL-559, Features/Spellcheck.lua; Dukul's tb-spellcheck
     -- art): marks the words now, in either check mode. In both bars (Focus
     -- mode since ALL-559 S3); gone while the Spelling module is off
-    local spellDiv, spellBtn, correctBtn, dictBtn, spellSync
+    local spellDiv, spellBtn, correctBtn, dictBtn, langBtn, langDiv, spellSync
     do
         spellDiv = MakeDiv(linkBtn)
         spellBtn = WyBtn("tb-spellcheck", L["NE_SPELL_CHECK_TIP"])
@@ -925,12 +925,39 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
             local word = eb and not (main and BNB._editorInViewMode) and SP.WordAtCursor(eb)
             SP.AskAddWord(word)
         end)
+        -- The note's spelling language (Dukul, 2026-11-01, his tb-language
+        -- art): a menu of the language shields, the note's pick ticked (the
+        -- right-click Language rows, SP.AddLanguageRows). A divider after it
+        langBtn = WyBtn("tb-language", L["NE_SPELL_LANG_TIP"])
+        langBtn:SetPoint("LEFT", dictBtn, "RIGHT", ICON_GAP, 0)
+        langBtn:SetIconEnabled(true)
+        langBtn._cmToggle = true
+        langBtn:SetScript("OnEnter", function(self)
+            local SP = BNB.Spell
+            GameTooltip:SetOwner(self, "ANCHOR_TOP")
+            GameTooltip:AddLine(L["NE_SPELL_LANG_TIP"], 1, 1, 1)
+            if SP and BNB._currentNoteID then
+                GameTooltip:AddLine(SP.LangName(SP.Lang(BNB._currentNoteID)), 0.4, 0.85, 0.4)
+            end
+            GameTooltip:AddLine(L["SPELL_MENU_LANG_TIP"], 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+        end)
+        langBtn:SetScript("OnClick", function(self)
+            local CM, SP, id = BNB.ContextMenu, BNB.Spell, BNB._currentNoteID
+            if not (CM and SP and SP.AddLanguageRows and id) or tostring(id):find("^sys%-") then return end
+            if CM.IsOpen() then CM.Close(); return end
+            CM.Open(self, function(root)
+                root:CreateTitle(L["SPELL_MENU_LANG"])
+                SP.AddLanguageRows(root, id, Body())
+            end)
+        end)
+        langDiv = MakeDiv(langBtn)
         _spellSyncs[#_spellSyncs + 1] = function() spellSync() end
     end
 
-    -- Find and replace (ALL-582, Dukul's tb-search-replace art): right of
-    -- Add to dictionary, or after the note link with its own divider while
-    -- the Spelling module is off. One button; it opens a row under the
+    -- Find and replace (ALL-582, Dukul's tb-search-replace art): after the
+    -- divider right of the spelling language button, or after the note link
+    -- with its own divider while the Spelling module is off. One button; it opens a row under the
     -- toolbars (UI/FindReplace.lua)
     local findDiv = MakeDiv(linkBtn)
     local findBtn = WyBtn("tb-search-replace", L["NE_FIND_TIP"])
@@ -963,9 +990,10 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     function spellSync()
         local on = BNB.SpellEnabled and BNB.SpellEnabled()
         spellDiv:SetShown(on); spellBtn:SetShown(on); correctBtn:SetShown(on); dictBtn:SetShown(on)
+        langBtn:SetShown(on); langDiv:SetShown(on)
         findDiv:SetShown(not on)
         findBtn:ClearAllPoints()
-        if on then findBtn:SetPoint("LEFT", dictBtn, "RIGHT", ICON_GAP, 0)
+        if on then findBtn:SetPoint("LEFT", langDiv, "RIGHT", DIV_GAP, 0)
         else findBtn:SetPoint("LEFT", findDiv, "RIGHT", DIV_GAP, 0) end
         if bar._collapse then bar._collapse() end
     end

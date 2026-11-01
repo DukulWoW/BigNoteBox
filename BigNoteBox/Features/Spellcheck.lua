@@ -1415,11 +1415,21 @@ end
 function SP.AddLanguageMenu(root, ed)
     local id = ed and ed.noteID()
     if not id or tostring(id):find("^sys%-") then return end
-    local note = BNB.GetNote and BNB.GetNote(id)
-    if not note then return end
+    if not (BNB.GetNote and BNB.GetNote(id)) then return end
     local cur = ed.Lang()
     local parent = root:CreateButton(string.format(L["SPELL_MENU_LANG_FMT"], SP.LangName(cur)), nil,
         { icon = "spell-language", tip = L["SPELL_MENU_LANG"], tipSub = L["SPELL_MENU_LANG_TIP"] })
+    SP.AddLanguageRows(parent, id, ed.eb)
+end
+
+-- The language rows (a shield each, the note's pick ticked): the default
+-- first, then every installed dictionary. Shared by the right-click
+-- sub-menu and the toolbar's tb-language menu (Dukul, 2026-11-01).
+-- eb = the note's edit box (its editor gets ready before the change)
+function SP.AddLanguageRows(parent, id, eb)
+    local note = id and BNB.GetNote and BNB.GetNote(id)
+    if not note or tostring(id):find("^sys%-") then return end
+    local ed = { eb = eb }
     local def = SP.DefaultLang()
     parent:CreateRadio(string.format(L["SPELL_MENU_LANG_DEFAULT_FMT"], SP.LangName(def)),
         function() return note.spellLang == nil end,

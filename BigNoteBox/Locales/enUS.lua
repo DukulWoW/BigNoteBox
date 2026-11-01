@@ -4053,6 +4053,7 @@ L["SPELL_MENU_REMOVE_TIP"]      = "Takes out the second one, and the space befor
 L["SPELL_MENU_IGNORE_REP_TIP"]  = "This word twice in a row is not marked again until you reload or log out."
 L["SPELL_MENU_CORRECT"]         = "Correct spelling..."
 L["SPELL_MENU_LANG"]            = "Language"
+L["NE_SPELL_LANG_TIP"]         = "Spelling language"
 L["SPELL_MENU_LANG_FMT"]        = "Language: %s"
 L["SPELL_MENU_LANG_TIP"]        = "The dictionary this note is checked with. Default follows Settings > Modules > Spelling."
 L["SPELL_MENU_LANG_DEFAULT_FMT"] = "Default (%s)"
