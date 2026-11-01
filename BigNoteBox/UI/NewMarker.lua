@@ -60,8 +60,12 @@ function BNB.NewBadgeTexture(parent, h)
     t:SetTexture(TEX)
     t:SetTexCoord(COORD[1], COORD[2], COORD[3], COORD[4])
     t:SetDesaturated(true)
-    local c = BNB.HEADER_COLOR_NORMAL or TINT_FALLBACK
-    t:SetVertexColor(c[1], c[2], c[3])
+    if BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.RegisterSkinAccentTex then
+        BNB.RegisterSkinAccentTex(t)   -- skin accent, follows preset changes (Dukul, 2026-11-01)
+    else
+        local c = BNB.HEADER_COLOR_NORMAL or TINT_FALLBACK
+        t:SetVertexColor(c[1], c[2], c[3])
+    end
     t:SetSize(math.floor(h * 112 / 58 + 0.5), h)
     return t
 end
