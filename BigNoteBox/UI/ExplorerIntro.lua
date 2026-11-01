@@ -119,7 +119,13 @@ local function HasAtlas(name)
 end
 
 local function CreateGoldButton(parent, text, w, h)
-    if Skin() then return BNB.CreateSkinButton(nil, parent, text, w, h, 16) end
+    if Skin() then
+        -- Label in the skin accent, not white: it stands out as the gold one
+        -- does in normal mode (follows preset changes; Dukul, 2026-11-01)
+        local b = BNB.CreateSkinButton(nil, parent, text, w, h, 16)
+        if b._lbl and BNB.SetHeaderColor then BNB.SetHeaderColor(b._lbl) end
+        return b
+    end
     if not (HasAtlas(GOLD.l) and HasAtlas(GOLD.r) and HasAtlas(GOLD.c)) then
         return BNB.CreateButton(nil, parent, text, w, h)
     end
