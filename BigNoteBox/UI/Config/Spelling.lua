@@ -52,12 +52,30 @@ local function BuildShortcuts(sf, ct, y, greyed)
     local NAME_W, ADD_W = 110, 90
 
     y = K.AddHeader(ct, y, L["CFG_SHORTCUTS_HDR"])
-    local cb
+    local cb, bang
+    local y0 = y
     y, cb = AddCheck(ct, y, L["CFG_SHORTCUTS_ENABLE"],
         function() return db.spellShortcuts ~= false end,
         function(v) db.spellShortcuts = v and true or false end,
         L["CFG_SHORTCUTS_ENABLE_TIP"])
     greyed[#greyed + 1] = { cb, cb._lbl }
+    -- "Only with !" on the same row, to the right (ALL-574, Dukul 2026-10-26)
+    local BANG_X = 260
+    local _
+    _, bang = AddCheck(ct, y0, L["CFG_SHORTCUTS_BANG"],
+        function() return TS.BangOnly() end,
+        function(v)
+            db.spellShortcutsBang = v and true or false
+            if BNB.Spell then BNB.Spell.Reset() end   -- the names stop / start being known words
+        end,
+        L["CFG_SHORTCUTS_BANG_TIP"])
+    bang:ClearAllPoints()
+    bang:SetPoint("TOPLEFT", ct, "TOPLEFT", BANG_X, y0 + 2)
+    -- Anchored to the page, never to bang: LabelHit takes the first label
+    -- anchored to a checkbox as its label, and bang took this one (its hit
+    -- area shrank to nothing, Dukul 2026-11-01)
+    cb._lbl:SetPoint("RIGHT", ct, "LEFT", BANG_X - 8, 0)
+    greyed[#greyed + 1] = { bang, bang._lbl }
 
     local desc = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")
     desc:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
@@ -234,7 +252,13 @@ local function BuildShortcuts(sf, ct, y, greyed)
                 if row._rec and BNB.SpellEnabled() then TS.Delete(row._rec.name) end
             end })
         x:SetPoint("RIGHT", row, "RIGHT", -4, 0)
-        local function Hover() row._hover:SetShown(row:IsMouseOver() and BNB.SpellEnabled()) end
+        x:Hide()
+        row._x = x
+        -- The X shows only on hover, with the highlight (ALL-577)
+        local function Hover()
+            local on = row:IsMouseOver() and BNB.SpellEnabled()
+            row._hover:SetShown(on); x:SetShown(on)
+        end
         row:SetScript("OnEnter", Hover)
         row:SetScript("OnLeave", Hover)
         x:HookScript("OnEnter", Hover)
@@ -253,8 +277,10 @@ local function BuildShortcuts(sf, ct, y, greyed)
             row._rec = r
             row._name:SetText(r.name)
             row._text:SetText(r.text)
-            row._hover:Hide()
             row:Show()
+            -- a row that slid under the pointer (one removed above) shows its X at once
+            local on = row:IsMouseOver() and BNB.SpellEnabled()
+            row._hover:SetShown(on); row._x:SetShown(on)
         end
         for i = #list + 1, #rows do rows[i]:Hide() end
         child:SetHeight(math.max(1, #list * ROW))
@@ -506,9 +532,14 @@ function K.BuildSpellPage(sf, ct, y, page)
                 if SP and row._word and BNB.SpellEnabled() then SP.RemoveWord(row._word) end
             end })
         x:SetPoint("RIGHT", row, "RIGHT", -4, 0)
+        x:Hide()
         row._x = x
-        -- The highlight stays while the pointer is on the X too
-        local function Hover() row._hover:SetShown(row:IsMouseOver() and BNB.SpellEnabled()) end
+        -- The highlight stays while the pointer is on the X too; the X shows
+        -- only on hover (ALL-577)
+        local function Hover()
+            local on = row:IsMouseOver() and BNB.SpellEnabled()
+            row._hover:SetShown(on); x:SetShown(on)
+        end
         row:SetScript("OnEnter", Hover)
         row:SetScript("OnLeave", Hover)
         x:HookScript("OnEnter", Hover)
@@ -527,8 +558,10 @@ function K.BuildSpellPage(sf, ct, y, page)
             local row = GetRow(i)
             row._word = w
             row._lbl:SetText((w:gsub("|", "||")))
-            row._hover:Hide()
             row:Show()
+            -- a row that slid under the pointer (one removed above) shows its X at once
+            local on = row:IsMouseOver() and BNB.SpellEnabled()
+            row._hover:SetShown(on); row._x:SetShown(on)
         end
         for i = #list + 1, #rows do rows[i]:Hide() end
         child:SetHeight(math.max(1, #list * ROW))

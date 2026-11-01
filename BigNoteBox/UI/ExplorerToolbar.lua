@@ -68,7 +68,8 @@ end
 -- Delete: notes alone keep their own confirm; with folders one confirm for
 -- all (folders deleted, their notes back to the list; notes as the trash says)
 local function DeletePicked()
-    local notes, fids = K.Picked(), K.PickedFolders()
+    local fids = K.PickedFolders()
+    local notes = BNB.DropLockedNotes(K.Picked())   -- locked notes stay (ALL-583)
     if #fids == 0 then BNB.ConfirmDeleteNotes(notes, false); return end
     local FD = BNB.Folders
     if not FD then return end

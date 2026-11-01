@@ -681,10 +681,13 @@ function BNB.ShowMultiNoteContextMenu(owner, ids)
         row:AddIcon("rename", nil, { tip = L["NL_CTX_RENAME"], disabled = true })
         -- The ids given, not the list's Select mode: the explorer view's
         -- picked tiles open this menu too (ALL-414)
-        -- Greyed while any picked note is locked (Dukul, 2026-10-26)
-        local anyLocked = c.locked > 0
+        -- Greyed only while every picked note is locked: a mixed pick deletes
+        -- the unlocked ones and leaves the locked alone, as the Explorer
+        -- toolbar does (ALL-583, Dukul 2026-11-01; was: any locked, 2026-10-26)
+        local anyLocked = c.locked == total
         local lockTip
-        if anyLocked then lockTip = L["MULTI_CM_LOCKED_TIP"] end
+        if anyLocked then lockTip = L["MULTI_CM_LOCKED_TIP"]
+        elseif c.locked > 0 then lockTip = L["MULTI_CM_LOCKED_SKIP_TIP"] end
         local trashOn = BNB.TrashEnabled and BNB.TrashEnabled()
         if trashOn then
             row:AddIcon("trash", function() BNB.ConfirmDeleteNotes(ids, false) end,

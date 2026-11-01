@@ -56,19 +56,24 @@ local GAME = "Interface/CURSOR/"
 -- classic = the Classic clients (Era, Anniversary, MoP), whose cursor files
 -- are the old single ones (Dukul, 2026-10-07, ALL-369): Resize left is
 -- UI-Cursor-Size there, so Size uses it too; the hands are the quest ones.
+-- ALL-579 (Dukul, 2026-10-26, Cursor Test window on Classic): only Move .c,
+-- SizeRight .c, SizeLeft .c, OpenHand .c, WorkOrders, Directions, Inspect and
+-- Trainer draw right there (the rest are wrong or a black box), so the
+-- classic entries use those; Size takes SizeLeft .c. QuestInteract,
+-- UnableQuestInteract and PickLock (not in the window) stay.
 local CURSORS = {
     move      = { gold = GAME .. "UI-Cursor-Move",
                   silver = GAME .. "UnableUI-Cursor-Move",
-                  classic = GAME .. "UI-Cursor-Move" },
+                  classic = GAME .. "UI-Cursor-Move.crosshair" },
     resize    = { gold = GAME .. "UI-Cursor-SizeRight.crosshair",
                   silver = GAME .. "UnableUI-Cursor-UI-Cursor-SizeRight.crosshair",
-                  classic = GAME .. "UI-Cursor-SizeRight" },
+                  classic = GAME .. "UI-Cursor-SizeRight.crosshair" },
     resizeL   = { gold = GAME .. "UI-Cursor-SizeLeft",
                   silver = GAME .. "UnableUI-Cursor-SizeLeft",
-                  classic = GAME .. "UI-Cursor-Size" },
+                  classic = GAME .. "UI-Cursor-SizeLeft.crosshair" },
     size      = { gold = GAME .. "UI-Cursor-Size.crosshair",
                   silver = GAME .. "UI-Cursor-Size.crosshair",
-                  classic = GAME .. "UI-Cursor-Size" },
+                  classic = GAME .. "UI-Cursor-SizeLeft.crosshair" },
     grab      = { gold = GAME .. "GrabbingHand", silver = GAME .. "GrabbingHand",
                   classic = GAME .. "QuestInteract" },
     -- Plain HoldingHand, not .crosshair, as the open hand (Dukul, 2026-10-17)
@@ -78,39 +83,39 @@ local CURSORS = {
     -- Plain OpenHand, not .crosshair: that one sat off the pointer (Dukul,
     -- 2026-10-17)
     open      = { gold = GAME .. "OpenHand", silver = GAME .. "OpenHand",
-                  classic = GAME .. "OpenHand" },
+                  classic = GAME .. "OpenHand.crosshair" },
     lock      = { gold = GAME .. "Lock", silver = GAME .. "Lock",
                   classic = GAME .. "PickLock" },
     -- Links and objects in a note that open a tooltip or act on a click
-    -- (ALL-489, 2026-10-17); none on Classic yet (false). The atlas names
+    -- (ALL-489, 2026-10-17); on Classic too since ALL-579. The atlas names
     -- cursor_workorders_128 / cursor_unableworkorders_128 drew a black box:
     -- SetCursor wants the cursor's own name, as the in-world ones (Mail,
     -- Trainer). WorkOrders confirmed on Retail and Forever (Dukul, 2026-10-17)
     link      = { gold = GAME .. "WorkOrders",
                   silver = GAME .. "UnableWorkOrders",
-                  classic = false },
+                  classic = GAME .. "WorkOrders" },
     -- These three use the gold cell on Retail too (Dukul, 2026-10-17); the
     -- link cursor keeps its silver one.
     -- Waypoint links and waypoint rows (ALL-492, Dukul 2026-10-17:
-    -- UIDirectionsCursor2x). None on Classic. Never the .crosshair cells
+    -- UIDirectionsCursor2x). Never the .crosshair cells
     -- for these: that set's hot spot is the middle of the picture, so it
     -- sat up and left of the pointer (Dukul, 2026-10-17, the Cast cursor
     -- once tried on toolbar icons and taken off again as too distracting)
     waypoint  = { gold = GAME .. "Directions",
                   silver = GAME .. "Directions",
-                  classic = false },
+                  classic = GAME .. "Directions" },
     -- Item links in notes and item entries in the Reference Box (Dukul,
     -- 2026-10-17: UIInspectCursor2x). Name guessed as the others: the
-    -- Inspect row of the Cursor Test window. None on Classic
+    -- Inspect row of the Cursor Test window
     item      = { gold = GAME .. "Inspect",
                   silver = GAME .. "Inspect",
-                  classic = false },
+                  classic = GAME .. "Inspect" },
     -- Links to other notes (bnbnote:, Dukul 2026-10-17: Crosshair/
     -- UITrainerCrosshair2x). The plain Trainer cell, not .crosshair, for the
-    -- hot spot (see icon). None on Classic
+    -- hot spot (see icon)
     note      = { gold = GAME .. "Trainer",
                   silver = GAME .. "Trainer",
-                  classic = false },
+                  classic = GAME .. "Trainer" },
     -- External links (web addresses) in rich notes (Dukul, 2026-10-17:
     -- UICursorMapPin2x, gold on Forever and silver on Retail, as the link
     -- cursor). MapPin drew a black box; MapPinCursor is the name (Dukul,

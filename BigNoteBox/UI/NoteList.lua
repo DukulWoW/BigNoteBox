@@ -1361,10 +1361,25 @@ function BNB.DeleteMultiSelected(permanent)
     BNB.ConfirmDeleteNotes(BNB.GetMultiSelectedOrdered(), permanent)
 end
 
+-- Locked notes are never deleted in bulk (ALL-583, Dukul 2026-10-26): the
+-- rest of a mixed pick goes, and one chat line says how many were left alone.
+-- Returns the ids that may be deleted, in their order.
+function BNB.DropLockedNotes(ids)
+    local keep, n = {}, 0
+    for _, id in ipairs(ids or {}) do
+        local note = BNB.GetNote(id)
+        if note and NoteIsLocked(note) then n = n + 1 else keep[#keep + 1] = id end
+    end
+    if n == 1 then BNB:Print(L["DELETE_LOCKED_SKIP_ONE"])
+    elseif n > 1 then BNB:Print(string.format(L["DELETE_LOCKED_SKIP_FMT"], n)) end
+    return keep
+end
+
 -- The bulk delete with its confirm, for any ids in display order (Select
 -- mode, the explorer view's Delete button, ALL-414)
 function BNB.ConfirmDeleteNotes(ids, permanent)
-    if not ids or #ids == 0 then return end
+    ids = BNB.DropLockedNotes(ids)
+    if #ids == 0 then return end
     local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
     -- A single note follows "Warn before delete"; two or more always confirm
     if #ids == 1 and not warn then

@@ -18,6 +18,11 @@
 --     after \ or a few other characters (see SKIP_BEFORE), and never for a
 --     paste (only when the text grew by the one character typed).
 --   * Shortcut names are known words for the spellchecker.
+--   * "!" in front (ALL-574, Dukul 2026-10-26): "!brb " always expands and
+--     the "!" goes with it. "Only with !" (spellShortcutsBang, DEFAULTS
+--     false) makes that the only way: a bare "brb" stays as typed, and the
+--     names are no longer known words. The "!" counts only when it is not
+--     glued to a word ("hey!brb" is not a "!" shortcut).
 --
 -- Kept with the notes, not the settings (a settings reset leaves them):
 --   BigNoteBoxNotesDB.spellShortcuts[name:lower()] = { name = "brb", text = "be right back" }
@@ -97,9 +102,11 @@ function TS.Get(name)
     if type(r) == "table" and type(r.text) == "string" then return r end
 end
 
--- The names, lower-case, as a set (the spellchecker's known words)
+-- The names, lower-case, as a set (the spellchecker's known words); none
+-- while "Only with !" is on, as a bare name is then just a word (ALL-574)
 function TS.Names()
     local set = {}
+    if TS.BangOnly() then return set end
     for k, r in pairs(Store() or {}) do
         if type(r) == "table" then set[k] = true end
     end
@@ -170,6 +177,13 @@ function TS.Enabled()
     return v ~= false
 end
 
+-- "Only with !" (ALL-574): a shortcut expands only with "!" in front
+function TS.BangOnly()
+    local v = BigNoteBoxDB and BigNoteBoxDB.spellShortcutsBang
+    if v == nil then v = BNB.DEFAULTS.spellShortcutsBang end
+    return v == true
+end
+
 --------------------------------------------------------------------------------
 -- Expanding as typed
 --------------------------------------------------------------------------------
@@ -228,7 +242,15 @@ function TS.Wire(eb, ed)
         local typed = text:sub(first, cur - 1)
         if #typed > TS.MAX_NAME then return end
         local rec = TS.Get(typed)
-        if not rec or not FreeWord(text, first, cur - 1) then return end
+        if not rec then return end
+        -- "!" in front (ALL-574): it goes with the shortcut; not glued to a word
+        if first > 1 and text:sub(first - 1, first - 1) == "!"
+           and not text:sub(first - 2, first - 2):find("^[%w\128-\255]$") then
+            first = first - 1
+        elseif TS.BangOnly() then
+            return
+        end
+        if not FreeWord(text, first, cur - 1) then return end
         local id = ed.noteID and ed.noteID()
         if not id or tostring(id):find("^sys%-") then return end
 

@@ -2486,6 +2486,7 @@ BuildModelViewer = function(f)
     -- A race model that loads after the camera was set: set it again
     pcall(model.HookScript, model, "OnModelLoaded", function(self)
         if BNB.ModelGate then BNB.ModelGate.ModelLoaded() end   -- RET-09 guard
+        if self._setLoading then self._setLoading(false) end   -- ALL-638
         if self._npcKey and not self._npcLoaded then
             self._npcLoaded = true
             self._npcFile = self.GetModelFileID and self:GetModelFileID() or nil
@@ -2602,6 +2603,18 @@ BuildModelViewer = function(f)
     placeholder:SetTextColor(0.55, 0.55, 0.60)
     placeholder:SetText(L["REFBOX_MV_PLACEHOLDER"])
     placeholder:Hide()
+
+    -- "Loading..." while an NPC model is on its way (ALL-638): the RET-09
+    -- guards wait a frame or more before the load, and an uncached creature
+    -- takes a moment. Text only: it never touches the model.
+    local loadingLabel = model:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+    loadingLabel:SetPoint("CENTER", model, "CENTER", 0, 0)
+    loadingLabel:SetTextColor(0.75, 0.75, 0.75)
+    loadingLabel:SetText(L["REFBOX_LOADING"])
+    loadingLabel:Hide()
+    model._setLoading = function(on)
+        if on then loadingLabel:Show() else loadingLabel:Hide() end
+    end
 
     -- "Live" indicator label
     local liveLabel = model:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
@@ -2895,6 +2908,9 @@ UpdateModelViewer = function()
 
     if not mdl then return end
     if ph then ph:SetText(L["REFBOX_MV_PLACEHOLDER"]) end   -- the NPC branch may say "no visible model"
+    -- "Loading..." (ALL-638): off unless the NPC branch below says a load is on its way
+    local SetLoading = mdl._setLoading or function() end
+    SetLoading(false)
     -- Only a shown entry spins and has the X; set again below when one is shown
     if closeBtn then closeBtn:Hide() end
     if not shown then
@@ -3208,6 +3224,7 @@ UpdateModelViewer = function()
                 -- shown already, or its load still running: leave it alone
                 if mdl._npcKey == creatureID and (mdl._npcLoaded == false or (mdl._npcFile
                    and mdl.GetModelFileID and mdl:GetModelFileID() == mdl._npcFile)) then
+                    SetLoading(mdl._npcLoaded == false)
                     if ph then ph:Hide() end
                     if gearBtn then gearBtn:Hide() end
                     if gearLbl then gearLbl:Hide() end
@@ -3220,6 +3237,7 @@ UpdateModelViewer = function()
                         UpdateModelViewer()
                         mdl._loadNow = nil
                     end)
+                    SetLoading(true)
                     if ph then ph:Hide() end
                     if gearBtn then gearBtn:Hide() end
                     if gearLbl then gearLbl:Hide() end
@@ -3231,6 +3249,7 @@ UpdateModelViewer = function()
                     C_Timer.After(wait + 0.05, function()
                         if _noteID == noteID and UpdateModelViewer then UpdateModelViewer() end
                     end)
+                    SetLoading(true)
                     if ph then ph:Hide() end
                     if gearBtn then gearBtn:Hide() end
                     if gearLbl then gearLbl:Hide() end
@@ -3241,6 +3260,7 @@ UpdateModelViewer = function()
                 pcall(function()
                     mdl:SetCreature(creatureID)
                 end)
+                if not mdl._npcLoaded then SetLoading(true) end   -- a cached model may load at once
                 -- SetCreature draws nothing for a creature the client has no
                 -- data for: the saved display ID, then the live unit while it
                 -- is targeted, fill the viewer instead. Only once the load
@@ -3249,6 +3269,7 @@ UpdateModelViewer = function()
                 C_Timer.After(NPC_FALLBACK_WAIT, function()
                     if _noteID ~= noteID or not mdl:IsShown() then return end
                     if mdl._npcKey ~= key or mdl._npcLoaded then return end
+                    SetLoading(false)   -- the wait is over, whatever comes next
                     local fid = mdl.GetModelFileID and mdl:GetModelFileID()
                     if fid and fid ~= 0 then return end
                     if Gate and Gate.PortraitWait() then return end

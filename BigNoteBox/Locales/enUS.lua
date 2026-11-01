@@ -303,6 +303,7 @@ L["NL_CTX_RENAME"]           = "Rename"
 L["DLG_RENAME_NOTE"]         = "Rename note"
 L["NL_CTX_LOCKED_TIP"]       = "The note is locked: unlock it first."
 L["MULTI_CM_LOCKED_TIP"]     = "Some of these notes are locked: unlock them first."
+L["MULTI_CM_LOCKED_SKIP_TIP"] = "Locked notes among them are left alone."
 L["NL_CTX_DELETE_PERM"]      = "|cffff4444Delete permanently|r"
 -- Note list context menu with sub-menus (ALL-148, UI/NoteContextMenu.lua)
 L["NL_CM_OPEN_EDITOR"]       = "Open in editor"
@@ -1914,6 +1915,8 @@ L["EXPLORER_DEL_FOLDERS_FMT"]     = "Delete %d folders?\n\nThe notes in them are
 L["EXPLORER_DEL_MIXED_TRASH_FMT"] = "Delete %d folder(s) and move %d note(s) to the trash?\n\nThe notes in the folders are not deleted: they go back to the note list, in no folder."
 L["EXPLORER_DEL_MIXED_FMT"]       = "Delete %d folder(s) and %d note(s)?\n\nThe notes in the folders are not deleted: they go back to the note list, in no folder."
 L["EXPLORER_TB_LOCKED"]           = "The note is locked."
+L["DELETE_LOCKED_SKIP_ONE"]       = "1 locked note was left alone."
+L["DELETE_LOCKED_SKIP_FMT"]       = "%d locked notes were left alone."
 
 -- Config: Features tab — Tag Tree
 L["CFG_FOLDERS_HEADER"]           = "Folders"
@@ -4071,6 +4074,8 @@ L["BACKUP_PREVIEW_SPELLWORDS"]  = "%d spelling word(s)"
 -- Text shortcuts (ALL-559 S4, Features/TextShortcuts.lua)
 L["CFG_SHORTCUTS_HDR"]          = "Text shortcuts"
 L["CFG_SHORTCUTS_ENABLE"]       = "Expand my text shortcuts"
+L["CFG_SHORTCUTS_BANG"]         = "Only with !"
+L["CFG_SHORTCUTS_BANG_TIP"]     = "A text shortcut expands only when you type it with ! in front (!brb), so the word itself stays free for your text. Off: brb and !brb both expand."
 L["CFG_SHORTCUTS_ENABLE_TIP"]   = "Type a shortcut and then a space, Enter or a punctuation mark, and it turns into its text. Works in the editor, Focus mode and a sticky you are typing in."
 L["CFG_SHORTCUTS_DESC"]         = "Type brb and a space and it becomes \"be right back\"; Brb gives \"Be right back\". One Undo brings back what you typed. The text may hold markup and note tokens ({{date}} is filled in). Click a row to change it, X takes it out."
 L["CFG_SHORTCUTS_NAME_PH"]      = "Shortcut"
