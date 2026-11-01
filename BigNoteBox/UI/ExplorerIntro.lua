@@ -221,14 +221,17 @@ local function BuildBox(ov)
             local skinArt = Skin() and p.skin
             ic:SetTexture(ART .. (skinArt or p[1]))
             if skinArt or p.tint ~= false then BNB.TintUIIcon(ic) end
-            -- The top bar's skin art is flat: a soft black copy under it gives
-            -- it the drop shadow the other row icons have in their art
+            -- The top bar's skin art is flat: black copies under it, a little
+            -- larger and centred, give the even dark glow the other row icons
+            -- have in their art (an offset shadow looked off, Dukul 2026-11-01)
             if skinArt then
-                local sh = box:CreateTexture(nil, "BORDER")
-                sh:SetTexture(ART .. skinArt)
-                sh:SetVertexColor(0, 0, 0, 0.85)
-                sh:SetSize(ROW_ICON + 2, ROW_ICON + 2)
-                sh:SetPoint("CENTER", ic, "CENTER", 1, -1)
+                for _, g in ipairs({ { 4, 0.35 }, { 2, 0.6 } }) do
+                    local sh = box:CreateTexture(nil, "BORDER")
+                    sh:SetTexture(ART .. skinArt)
+                    sh:SetVertexColor(0, 0, 0, g[2])
+                    sh:SetSize(ROW_ICON + g[1], ROW_ICON + g[1])
+                    sh:SetPoint("CENTER", ic, "CENTER")
+                end
             end
         end
         local fs = NewText(box, "BNBFontHighlight", 13)
