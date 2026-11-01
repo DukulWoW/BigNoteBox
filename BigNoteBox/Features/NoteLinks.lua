@@ -21,6 +21,7 @@
 --   NL.WayLink(wp)                  link for { mapID, x, y, name }
 --   NL.WayLineLink(line)            a /way line as a link (the line if it cannot be)
 --   NL.NoteLink(id)                 link to a note
+--   NL.NpcLink(npcID, name)         link to an NPC's note, grey until it exists (ALL-634)
 --   NL.HasWaypoints(note)           creation spot or a waypoint
 --   NL.OnEnter(owner, link)         tooltip; true when it was one of ours
 --   NL.OnClick(link, button)        click;   true when it was one of ours
@@ -249,6 +250,102 @@ end)
 BNB.RegisterMessage("NoteLinks", "NoteRestored", function(_, id) if id then Schedule(id) end end)
 BNB.RegisterMessage("NoteLinks", "NoteCreated",  function(_, id) if id then Schedule(id) end end)   -- Rescue
 
+-- ── NPC links (ALL-634) ──────────────────────────────────────────────────────
+-- |c<col>|Hbnbnpc:<npcID>|h<name>|h|r: a link to an NPC's own note (the one
+-- F6 makes), found by its targetNpcID, so it can be written before that note
+-- exists. Grey while there is none; it takes the note's title colour (the
+-- note link blue by default) once the player makes it, and grey again when
+-- it goes (Dukul, 2026-11-01). Written by note capture (Features/QuickNote.lua).
+
+-- The NPC's live note: one whose title is the name first (display stands
+-- share one id, ALL-340), else the first with that id
+local function NpcNoteID(npcID, name)
+    local ndb = BNB.NotesDB()
+    if not (ndb and ndb.notes and npcID) then return nil end
+    npcID = tostring(npcID)
+    local any
+    for id, n in pairs(ndb.notes) do
+        if n.targetNpcID ~= nil and tostring(n.targetNpcID) == npcID then
+            if name and n.title == name then return id end
+            any = any or id
+        end
+    end
+    return any
+end
+NL.NpcNoteID = NpcNoteID
+
+local function NpcCol(npcID, name)
+    local id = NpcNoteID(npcID, name)
+    return id and TitleCol(BNB.GetNote(id)) or GONE_COL
+end
+
+-- The rich view colours an NPC link when it draws it (Features/AdvancedMode.lua)
+function NL.NpcColour(data)
+    local npcID = data:match("^bnbnpc:(%d+)")
+    return npcID and NpcCol(npcID) or GONE_COL
+end
+
+-- name: what the link says. nil without an id or a name
+function NL.NpcLink(npcID, name)
+    npcID, name = tonumber(npcID), Clean(name)
+    if not (npcID and name) then return nil end
+    return string.format("|c%s|Hbnbnpc:%d|h%s|h|r", NpcCol(npcID, name), npcID, name)
+end
+
+-- Every NPC link brought to the colour of its note now. A body is written only
+-- when its text changes; the note open in the editor is saved first (as
+-- RewriteLinksIn)
+local NPC_LINK_PAT = "|c%x%x%x%x%x%x%x%x|Hbnbnpc:(%d+)|h(.-)|h|r"
+function NL.RefreshNpcLinks()
+    local ndb = BNB.NotesDB()
+    if not (ndb and ndb.notes) then return end
+    local function New(body)
+        return (body:gsub(NPC_LINK_PAT, function(npcID, text)
+            return string.format("|c%s|Hbnbnpc:%s|h%s|h|r", NpcCol(npcID, text), npcID, text)
+        end))
+    end
+    local hits = {}
+    for nid, n in pairs(ndb.notes) do
+        if type(n.body) == "string" and n.body:find("|Hbnbnpc:", 1, true) and New(n.body) ~= n.body then
+            hits[#hits + 1] = nid
+        end
+    end
+    for _, nid in ipairs(hits) do
+        xpcall(function()
+            if BNB._currentNoteID == nid and BNB._dirty and BNB.SaveCurrentNoteQuiet then
+                BNB.SaveCurrentNoteQuiet()
+            end
+            local body = BNB.GetNote(nid) and BNB.GetNote(nid).body
+            if type(body) ~= "string" then return end
+            BNB.UpdateNote(nid, { body = New(body) }, { noTouch = true })
+            local UN = BNB.UnitNotes
+            if UN and UN.RefreshNoteViews then UN.RefreshNoteViews(nid) end
+        end, geterrorhandler())
+    end
+end
+
+local function ScheduleNpc()
+    BNB.Debounce("noteLinks:npc", 1, NL.RefreshNpcLinks)
+end
+-- An NPC note made (targetNpcID is written right after CreateNote), its title
+-- colour changed, deleted, restored or rescued
+local function TouchesNpcNote(id, fields)
+    if fields.targetNpcID ~= nil then return true end
+    if fields.titleColor ~= nil or ColourTouched(fields) then
+        local n = BNB.GetNote(id)
+        return n and n.targetNpcID ~= nil
+    end
+    return false
+end
+BNB.RegisterMessage("NoteLinks.Npc", "NoteChanged", function(_, id, fields)
+    if id and fields and TouchesNpcNote(id, fields) then ScheduleNpc() end
+end)
+BNB.RegisterMessage("NoteLinks.Npc", "NoteDeleted",  ScheduleNpc)
+BNB.RegisterMessage("NoteLinks.Npc", "NoteRestored", ScheduleNpc)
+BNB.RegisterMessage("NoteLinks.Npc", "NoteCreated",  ScheduleNpc)
+-- Notes that came in some other way (an import) once a session, after login
+BNB.RegisterEvent("PLAYER_LOGIN", function() C_Timer.After(6, ScheduleNpc) end)
+
 -- ── Hover and click ──────────────────────────────────────────────────────────
 
 -- Text without codes, cut to n bytes on a whole UTF-8 character
@@ -328,6 +425,24 @@ function NL.OnEnter(owner, link)
         end
         GameTooltip:Show()
         return true
+    elseif kind == "bnbnpc" then   -- ALL-634
+        local npcID = link:match("^bnbnpc:(%d+)")
+        local id = NpcNoteID(npcID)
+        local note = id and BNB.GetNote(id)
+        GameTooltip:SetOwner(owner, "ANCHOR_CURSOR")
+        if note then
+            local tc = note.titleColor
+            GameTooltip:AddLine(Clean(note.title) or L["UNTITLED"],
+                tc and tc.r or 1, tc and tc.g or 1, tc and tc.b or 1)
+            NotePreview(note)
+            Hint(L["NOTELINK_TIP_CLICK"])
+            if BNB.StickiesEnabled() then Hint(L["NOTELINK_TIP_SHIFT"]) end
+        else
+            GameTooltip:AddLine(L["NPCLINK_NO_NOTE"], 0.6, 0.6, 0.6, true)
+            Hint(L["NPCLINK_TIP_MAKE"])
+        end
+        GameTooltip:Show()
+        return true
     elseif kind == "bnbui" then   -- ALL-513
         local UL = BNB.UILinks
         if not UL then return false end
@@ -400,6 +515,11 @@ function NL.OnClick(link, button)
             end
         end)
         return true
+    elseif kind == "bnbnpc" then   -- ALL-634: the NPC's note, when there is one
+        if button ~= "LeftButton" then return true end
+        local id = NpcNoteID(link:match("^bnbnpc:(%d+)"))
+        if not id then BNB:Print(L["NPCLINK_NO_NOTE"] .. " " .. L["NPCLINK_TIP_MAKE"]); return true end
+        return NL.OnClick("bnbnote:" .. id, button)
     end
     return false
 end
@@ -543,6 +663,27 @@ function NL.LinkMenu(owner, link, text)
             root:CreateButton(L["LINK_MENU_COPY_WAY"], function()
                 BNB.ShowClipboardHint(line, nil, nil, true)
             end, { icon = "copy-clipboard" })
+        elseif kind == "bnbnpc" then   -- ALL-634
+            local npcID = tonumber(link:match("^bnbnpc:(%d+)"))
+            local id = NpcNoteID(npcID)
+            local plain = text and Plain(text) or ""
+            root:CreateTitle(id and (Clean(BNB.GetNote(id).title) or L["UNTITLED"])
+                or (Clean(plain) or L["NPCLINK_NO_NOTE"]))
+            root:CreateButton(L["LINK_MENU_OPEN_NOTE"], OutOfFocus(function() NL.OnClick(link, "LeftButton") end),
+                { icon = "note", disabled = not id })
+            if BNB.StickiesEnabled() then
+                root:CreateButton(L["NL_CTX_OPEN_STICKY"], OutOfFocus(function()
+                    local nid = NpcNoteID(npcID)
+                    local SN, K = BNB.Sticky, BNB._NoteListKit
+                    if not (nid and SN and K) then return end
+                    if SN.IsOpen(nid) then SN.Open(nid) else K.NOTE_ACTIONS.sticky(nid) end
+                end), { icon = "sticky-note", disabled = not id })
+            end
+            if npcID and BNB.WowheadURL then
+                root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
+                    BNB.ShowClipboardHint(BNB.WowheadURL("npc", npcID), nil, nil, true)
+                end, { icon = "copy-clipboard" })
+            end
         elseif kind == "bnbnote" then
             local note = NoteState(link:sub(9))
             root:CreateTitle(note and (Clean(note.title) or L["UNTITLED"]) or L["NOTELINK_GONE"])
@@ -616,6 +757,7 @@ end
 local WAY_PAT  = "|c%x%x%x%x%x%x%x%x|H(bnbwp:[^|]*)|h(.-)|h|r"
 local NOTE_PAT = "|c%x%x%x%x%x%x%x%x|Hbnbnote:[^|]*|h(.-)|h|r"
 local UI_PAT   = "|c%x%x%x%x%x%x%x%x|Hbnbui:[^|]*|h(.-)|h|r"   -- ALL-513: its text
+local NPC_PAT  = "|c%x%x%x%x%x%x%x%x|Hbnbnpc:[^|]*|h(.-)|h|r"  -- ALL-634: the name
 local BARE_PAT = "|Hbnb%a+:[^|]*|h(.-)|h"   -- a link whose colour was edited away
 
 -- For chat: a waypoint becomes the game's map pin link, a note link its title
@@ -625,11 +767,12 @@ function NL.ToChat(text)
         local wp = ParseWay(data)
         return wp and MapPinLink(wp) or label
     end)
-    return (text:gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(BARE_PAT, "%1"))
+    return (text:gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(NPC_PAT, "%1"):gsub(BARE_PAT, "%1"))
 end
 
 -- Outside the game (HTML export): the shown text only
 function NL.ToText(text)
     if not (text and text:find("|Hbnb", 1, true)) then return text end
-    return (text:gsub(WAY_PAT, "%2"):gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(BARE_PAT, "%1"))
+    return (text:gsub(WAY_PAT, "%2"):gsub(NOTE_PAT, "%1"):gsub(UI_PAT, "%1"):gsub(NPC_PAT, "%1")
+        :gsub(BARE_PAT, "%1"))
 end

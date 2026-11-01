@@ -127,7 +127,7 @@ local function AttachQuestID(noteID, questID)
 end
 -- Creates the note and fills it in. Shared by the confirm popup and the
 -- silent/open path, which used to carry two copies of this.
-local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
+local function MakeQuickNote(title, body, icon, tags, rewardAttacher, rich)
     local id = BNB.CreateNote(title or "", body or "")
     if not id then return end
     -- Through UpdateNote, so the tags are deduped and indexed (SV-07)
@@ -138,6 +138,7 @@ local function MakeQuickNote(title, body, icon, tags, rewardAttacher)
         icon   = icon or RandomIcon(),
         source = "quicknote",   -- made from a quest, gossip or book frame; Oracle badge (ALL-69)
         tags   = all,
+        richMode = rich and true or nil,   -- ALL-634: per kind, Settings > Note Capture
     })
     if rewardAttacher then rewardAttacher(id) end
     return id
@@ -154,7 +155,8 @@ end
 -- tags:   array of tag strings
 -- title, body: strings
 -- rewardAttacher: optional function(noteID) called after creation to add rewards
-local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
+-- rich: make it a rich note (the body is rich markup, ALL-634)
+local function CreateQuickNote(title, body, icon, tags, rewardAttacher, rich)
     if not BNB.CreateNote then return end
 
     local action = GetAction()
@@ -182,20 +184,20 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher)
                 if not data then return end
                 local t = self.EditBox:GetText()
                 if t == "" then t = data.title or "" end
-                if MakeQuickNote(t, data.body, data.icon, data.tags, data.reward) then
+                if MakeQuickNote(t, data.body, data.icon, data.tags, data.reward, data.rich) then
                     BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], t))
                 end
             end,
         }
         StaticPopup_Show("BNB_QUICKNOTE_CONFIRM", nil, nil, {
             title = title, body = body, icon = icon or RandomIcon(),
-            tags = tags, reward = rewardAttacher,
+            tags = tags, reward = rewardAttacher, rich = rich,
         })
         return
     end
 
     -- Silent or open: create immediately
-    local id = MakeQuickNote(title, body, icon, tags, rewardAttacher)
+    local id = MakeQuickNote(title, body, icon, tags, rewardAttacher, rich)
     if not id then return end
 
     if action == "open" then
@@ -310,42 +312,25 @@ local function QuestLogText(questID)
     return title, desc
 end
 
--- Returns a formatted money string (e.g. "34g 16s") from a copper amount,
--- or nil if copper is zero or nil.
-local function FormatMoney(copper)
-    if not copper or copper <= 0 then return nil end
-    local g = math.floor(copper / 10000)
-    local s = math.floor((copper % 10000) / 100)
-    local c = copper % 100
-    local parts = {}
-    if g > 0 then parts[#parts + 1] = g .. "g" end
-    if s > 0 then parts[#parts + 1] = s .. "s" end
-    if c > 0 then parts[#parts + 1] = c .. "c" end
-    return #parts > 0 and table.concat(parts, " ") or nil
-end
-
--- Appends quest objectives to a body string.
+-- The quest's objective lines, or nil (ALL-634: drawn by CaptureBody).
 -- Uses C_QuestLog.GetQuestObjectives (questID-based, reliable on Midnight).
--- Returns the body unchanged if no objectives found.
-local function AppendObjectives(body, questID)
-    if not questID or questID == 0 then return body end
-    if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return body end
-    local ok, objectives = pcall(function()
-        return C_QuestLog.GetQuestObjectives(questID)
-    end)
-    if not ok or not objectives or #objectives == 0 then return body end
+local function QuestObjectives(questID)
+    if not questID or questID == 0 then return nil end
+    if not (C_QuestLog and C_QuestLog.GetQuestObjectives) then return nil end
+    local ok, objectives = pcall(C_QuestLog.GetQuestObjectives, questID)
+    if not ok or not objectives or #objectives == 0 then return nil end
     local parts = {}
     for _, obj in ipairs(objectives) do
         if obj and obj.text and obj.text ~= "" then
             parts[#parts + 1] = obj.text
         end
     end
-    if #parts == 0 then return body end
-    return body .. "\n\nObjectives\n" .. table.concat(parts, "\n") .. "\n"
+    return #parts > 0 and parts or nil
 end
 
--- Collects quest rewards for a given questID into a formatted multi-line
--- string, or nil if nothing found.
+-- Collects quest rewards for a given questID as a list of entries (ALL-634:
+-- { kind = "money", copper } / { kind = "xp", n } / { kind = "honor", n } /
+-- { kind = "text", text }, drawn by RewardLines), or nil if nothing found.
 -- Mirrors DUI's approach: active-frame APIs for money/XP/honor,
 -- C_QuestInfoSystem.GetQuestRewardCurrencies for currencies (TWW/Midnight),
 -- and C_QuestOffer.GetQuestOfferMajorFactionReputationRewards for warband rep.
@@ -356,16 +341,16 @@ local function FormatRewards(questID)
     local lines = {}
 
     -- Money (active frame -- same API DUI uses)
-    local money = FormatMoney(GetRewardMoney and GetRewardMoney())
-    if money then lines[#lines + 1] = "Money: " .. money end
+    local copper = GetRewardMoney and GetRewardMoney()
+    if copper and copper > 0 then lines[#lines + 1] = { kind = "money", copper = copper } end
 
     -- XP (active frame)
     local xp = GetRewardXP and GetRewardXP()
-    if xp and xp > 0 then lines[#lines + 1] = "XP: " .. xp end
+    if xp and xp > 0 then lines[#lines + 1] = { kind = "xp", n = xp } end
 
     -- Honor (active frame)
     local honor = GetRewardHonor and GetRewardHonor()
-    if honor and honor > 0 then lines[#lines + 1] = "Honor: " .. honor end
+    if honor and honor > 0 then lines[#lines + 1] = { kind = "honor", n = honor } end
 
     -- Currencies -- TWW/Midnight: C_QuestInfoSystem.GetQuestRewardCurrencies
     -- returns a table of {currencyID, totalRewardAmount, ...} per entry.
@@ -382,7 +367,7 @@ local function FormatRewards(questID)
                             if ok2 and info then name = info.name end
                         end
                         name = name or ("Currency " .. cur.currencyID)
-                        lines[#lines + 1] = name .. ": " .. amount
+                        lines[#lines + 1] = { kind = "text", text = name .. ": " .. amount }
                     end
                 end
             end
@@ -402,7 +387,7 @@ local function FormatRewards(questID)
                         if ok2 and data then name = data.name end
                     end
                     name = name or ("Faction " .. rep.factionID)
-                    lines[#lines + 1] = name .. ": +" .. rep.rewardAmount .. " rep"
+                    lines[#lines + 1] = { kind = "text", text = name .. ": +" .. rep.rewardAmount .. " rep" }
                 end
             end
         end
@@ -411,11 +396,11 @@ local function FormatRewards(questID)
     -- GetQuestRewardFactionInfo, which no client has: removed in batch 11.)
 
     if #lines == 0 then return nil end
-    return table.concat(lines, "\n")
+    return lines
 end
 
--- Collects quest rewards for a quest viewed from the quest log into a
--- formatted multi-line string, or nil if nothing found.
+-- Collects quest rewards for a quest viewed from the quest log as entries
+-- (as FormatRewards), or nil if nothing found.
 -- Uses quest-log-specific APIs (GetQuestLogRewardMoney, GetQuestLogRewardXP,
 -- GetQuestLogRewardInfo) which do NOT rely on the active quest frame globals.
 -- Requires C_QuestLog.SetSelectedQuest(questID) to have been called first.
@@ -424,12 +409,12 @@ local function FormatQuestLogRewards(questID)
     local lines = {}
 
     -- Money
-    local money = FormatMoney(GetQuestLogRewardMoney and GetQuestLogRewardMoney())
-    if money then lines[#lines + 1] = "Money: " .. money end
+    local copper = GetQuestLogRewardMoney and GetQuestLogRewardMoney()
+    if copper and copper > 0 then lines[#lines + 1] = { kind = "money", copper = copper } end
 
     -- XP
     local xp = GetQuestLogRewardXP and GetQuestLogRewardXP()
-    if xp and xp > 0 then lines[#lines + 1] = "XP: " .. xp end
+    if xp and xp > 0 then lines[#lines + 1] = { kind = "xp", n = xp } end
 
     -- Currencies -- same questID-based API used in FormatRewards
     if C_QuestInfoSystem and C_QuestInfoSystem.GetQuestRewardCurrencies then
@@ -445,7 +430,7 @@ local function FormatQuestLogRewards(questID)
                             if ok2 and info then name = info.name end
                         end
                         name = name or ("Currency " .. cur.currencyID)
-                        lines[#lines + 1] = name .. ": " .. amount
+                        lines[#lines + 1] = { kind = "text", text = name .. ": " .. amount }
                     end
                 end
             end
@@ -459,7 +444,7 @@ local function FormatQuestLogRewards(questID)
             for i = 1, numRewards do
                 local ok2, name = pcall(GetQuestLogRewardInfo, i)
                 if ok2 and name and name ~= "" then
-                    lines[#lines + 1] = "Item: " .. name
+                    lines[#lines + 1] = { kind = "text", text = "Item: " .. name }
                 end
             end
         end
@@ -472,14 +457,14 @@ local function FormatQuestLogRewards(questID)
             for i = 1, numChoices do
                 local ok2, name = pcall(GetQuestLogChoiceInfo, i)
                 if ok2 and name and name ~= "" then
-                    lines[#lines + 1] = "Choice: " .. name
+                    lines[#lines + 1] = { kind = "text", text = "Choice: " .. name }
                 end
             end
         end
     end
 
     if #lines == 0 then return nil end
-    return table.concat(lines, "\n")
+    return lines
 end
 
 -- Reads reward items from the quest log and adds them as attachments to noteID.
@@ -603,9 +588,279 @@ local _itOrigPage   = 1       -- page the reader was on when they clicked
 local _itCurrentPage= 0       -- page we have just received
 local MAX_PAGES     = 50      -- safety cap
 
--- Forward declaration: FoundAtHeader is defined later but referenced inside
--- FinishItemTextCapture. Declaring local here lets Lua resolve it correctly.
-local FoundAtHeader
+-- ── Capture note layout (ALL-634) ────────────────────────────────────────────
+-- Every capture note is put together by CaptureBody, rich or normal (Settings
+-- > Modules > Note Capture, one box per kind; Rich Notes module off = normal):
+--   Said by <NPC> in <place>             rich: the NPC as a heading, the place under it
+--   Accepted <date> - Level 2 - Campaign the info line (QuestInfoLine)
+--   Wowhead: <the quest's address>
+--   ----------                           rich: a gold divider
+--   <the text>
+--   Objectives, ----------, Rewards      rich: headings, a divider, coin and XP icons
+-- The NPC is an NPC link (Features/NoteLinks.lua), grey until that NPC has a
+-- note of its own; the place is a waypoint link (click = waypoint, Alt = map)
+-- (Dukul, 2026-11-01).
+
+local DIVIDER    = "{div:gold-plain}"
+local PLAIN_RULE = "----------"
+local SEP        = " - "
+local COIN_ICON  = "{icon:Interface\\MoneyFrame\\UI-%sIcon:13}"   -- Gold / Silver / Copper
+local XP_ICON    = "{icon:XP_ICON:16}"
+
+-- kind: "quest" | "book" | "dialogue"
+local function RichFor(kind)
+    if not (BNB.RichEnabled and BNB.RichEnabled()) then return false end
+    local key = (kind == "quest" and "captureRichQuest") or (kind == "book" and "captureRichBook")
+             or "captureRichDialogue"
+    local db = DB()
+    return not db or db[key] ~= false
+end
+
+-- tags plus where the player stands (ALL-636): the zone (GetZoneText, the
+-- same as the NPC notes' zone tag, so both share it) and, when asked for, the
+-- subzone. No continent or world: they would be on nearly every note.
+-- Read at click time, before a confirm popup.
+local function WithPlaceTags(tags)
+    local out = {}
+    for i, t in ipairs(tags or {}) do out[i] = t end
+    local db = DB()
+    local zone = GetZoneText and GetZoneText() or ""
+    if (not db or db.captureTagZone ~= false) and zone ~= "" then out[#out + 1] = zone end
+    if db and db.captureTagSubZone then
+        local sub = GetSubZoneText and GetSubZoneText() or ""
+        if sub ~= "" and sub ~= zone then out[#out + 1] = sub end
+    end
+    return out
+end
+
+-- A waypoint link to where the player stands; the zone's name where the map
+-- has no position (an instance), nil where there is no map at all
+local function PlaceLink()
+    local mapID = C_Map.GetBestMapForUnit("player")
+    if not mapID then return nil end
+    local pos = C_Map.GetPlayerMapPosition(mapID, "player")
+    local NL = BNB.NoteLinks
+    if pos and pos.x and NL and NL.WayLink then
+        return NL.WayLink({ mapID = mapID, x = pos.x * 100, y = pos.y * 100 })
+    end
+    local info = C_Map.GetMapInfo(mapID)
+    return info and info.name or nil
+end
+
+-- The NPC being talked to: its name and creature id (no id for an object or
+-- a player). name / npcID: what the caller already knows (Dialogue UI's text)
+local function TalkingNpc(name, npcID)
+    if UnitExists("npc") and not UnitIsPlayer("npc") then
+        name = name or UnitName("npc")
+        if not npcID and BNB.CreatureIDFromGUID then
+            local ok, id = pcall(BNB.CreatureIDFromGUID, UnitGUID("npc"))
+            if ok then npcID = id end
+        end
+    end
+    if name == "" then name = nil end
+    return name, tonumber(npcID)
+end
+
+-- Where the quest dialog is, for the info line's first word: the same events
+-- reach Blizzard's quest window, Dialogue UI and Immersion
+local _questStage
+BNB.RegisterEvent("QUEST_DETAIL",   function() _questStage = "accept" end)
+BNB.RegisterEvent("QUEST_PROGRESS", function() _questStage = "progress" end)
+BNB.RegisterEvent("QUEST_COMPLETE", function() _questStage = "complete" end)
+BNB.RegisterEvent("QUEST_FINISHED", function() _questStage = nil end)
+
+-- Enum.QuestClassification names (Retail, Forever) -> locale keys; Normal has none
+local QCLASS_KEYS = {
+    Important = "QN_QCLASS_IMPORTANT", Legendary = "QN_QCLASS_LEGENDARY", Campaign = "QN_QCLASS_CAMPAIGN",
+    Calling = "QN_QCLASS_CALLING", Meta = "QN_QCLASS_META", Recurring = "QN_QCLASS_RECURRING",
+    Questline = "QN_QCLASS_QUESTLINE", BonusObjective = "QN_QCLASS_BONUS", Threat = "QN_QCLASS_THREAT",
+    WorldQuest = "QN_QCLASS_WORLD",
+}
+local function QuestClassLabel(questID)
+    local QIS, E = C_QuestInfoSystem, Enum and Enum.QuestClassification
+    if not (QIS and QIS.GetQuestClassification and E) then return nil end
+    local ok, c = pcall(QIS.GetQuestClassification, questID)
+    if not ok or c == nil then return nil end
+    for name, v in pairs(E) do
+        if v == c then return QCLASS_KEYS[name] and BNB.L[QCLASS_KEYS[name]] or nil end
+    end
+    return nil
+end
+
+-- "Accepted <date> - Level 2 - Campaign - Daily - Group (3)". stage: "accept"
+-- / "complete" / anything else = Noted. live: the quest dialog is open, so
+-- daily / weekly and the group size can be read from it. Level and kind are
+-- Retail and Forever only; other clients get the date.
+local function QuestInfoLine(questID, stage, live)
+    local L = BNB.L
+    local word = (stage == "accept" and "QN_INFO_ACCEPTED") or (stage == "complete" and "QN_INFO_TURNED_IN")
+              or "QN_INFO_NOTED"
+    local parts = { string.format(L[word], BNB.FmtDate()) }
+    if questID and questID > 0 then
+        if C_QuestLog and C_QuestLog.GetQuestDifficultyLevel then
+            local ok, lvl = pcall(C_QuestLog.GetQuestDifficultyLevel, questID)
+            if ok and tonumber(lvl) and lvl > 0 then parts[#parts + 1] = string.format(L["QN_INFO_LEVEL"], lvl) end
+        end
+        local cls = QuestClassLabel(questID)
+        if cls then parts[#parts + 1] = cls end
+        if C_QuestLog and C_QuestLog.GetQuestTagInfo then
+            local ok, tag = pcall(C_QuestLog.GetQuestTagInfo, questID)
+            if ok and type(tag) == "table" and type(tag.tagName) == "string" and tag.tagName ~= "" then
+                parts[#parts + 1] = tag.tagName
+            end
+        end
+    end
+    if live then
+        if QuestIsWeekly and QuestIsWeekly() then parts[#parts + 1] = L["QN_INFO_WEEKLY"]
+        elseif QuestIsDaily and QuestIsDaily() then parts[#parts + 1] = L["QN_INFO_DAILY"] end
+        local size = GetSuggestedGroupSize and GetSuggestedGroupSize()
+        if tonumber(size) and size > 1 then parts[#parts + 1] = string.format(L["QN_INFO_GROUP"], size) end
+    end
+    return table.concat(parts, SEP)
+end
+
+-- "Wowhead: <address>": a web link in a rich note (click = the copy box)
+local function WowheadLine(questID, rich)
+    if not (questID and questID > 0 and BNB.WowheadURL) then return nil end
+    local url = BNB.WowheadURL("quest", questID)
+    if not url then return nil end
+    if rich then
+        local shown = url:gsub("^https?://", ""):gsub("^www%.", "")
+        return BNB.L["QN_WOWHEAD"] .. ": {link*" .. url .. "*" .. shown .. "}"
+    end
+    return BNB.L["QN_WOWHEAD"] .. ": " .. url
+end
+
+-- 34g 16s 5c; rich: the game's coin pictures after each number
+local function MoneyText(copper, rich)
+    local out = {}
+    local function Add(n, sfx, coin)
+        if n > 0 then out[#out + 1] = rich and (n .. string.format(COIN_ICON, coin)) or (n .. sfx) end
+    end
+    Add(math.floor(copper / 10000), "g", "Gold")
+    Add(math.floor((copper % 10000) / 100), "s", "Silver")
+    Add(copper % 100, "c", "Copper")
+    return table.concat(out, " ")
+end
+
+-- The reward entries of FormatRewards / FormatQuestLogRewards as lines
+local function RewardLines(entries, rich)
+    local L, out = BNB.L, {}
+    for _, e in ipairs(entries) do
+        if e.kind == "money" then
+            out[#out + 1] = rich and MoneyText(e.copper, true) or (L["QN_REW_MONEY"] .. ": " .. MoneyText(e.copper))
+        elseif e.kind == "xp" then
+            out[#out + 1] = rich and (XP_ICON .. " " .. e.n .. " " .. L["QN_REW_XP"]) or (L["QN_REW_XP"] .. ": " .. e.n)
+        elseif e.kind == "honor" then
+            out[#out + 1] = L["QN_REW_HONOR"] .. ": " .. e.n
+        elseif e.text then
+            out[#out + 1] = e.text
+        end
+    end
+    return out
+end
+
+-- A page's heading in a book of more than one page
+local function PageHeading(i, rich)
+    local t = string.format(BNB.L["QN_PAGE_FMT"], i)
+    return rich and ("{h3}" .. t .. "{/h3}") or ("--- " .. t .. " ---")
+end
+
+-- cap = { rich, npc, npcID, place (true = where the player stands), book
+-- (true = "Found in"), info, wowhead, text, objectives (list), rewards (entries) }
+local function CaptureBody(cap)
+    local L, rich = BNB.L, cap.rich
+    local NL = BNB.NoteLinks
+    local npc = cap.npc and ((cap.npcID and NL and NL.NpcLink and NL.NpcLink(cap.npcID, cap.npc)) or cap.npc)
+    local place = cap.place and PlaceLink() or nil
+    -- In a rich note every line is a paragraph of its own, with space under
+    -- it: lines that belong together go in one {p} block (one <P>, <BR/>
+    -- between them, AM.ToHTML)
+    local function Block(lines)
+        local t = table.concat(lines, "\n")
+        return rich and ("{p}" .. t .. "{/p}") or t
+    end
+    local function Heading(t) return rich and ("{h3}" .. t .. "{/h3}") or t end
+
+    local title, head = nil, {}
+    if cap.book then
+        if place then head[#head + 1] = string.format(L["QN_FOUND_IN_FMT"], place) end
+    elseif rich then
+        if npc then title = Heading(npc) end
+        if place then head[#head + 1] = place end
+    elseif npc then
+        head[#head + 1] = place and string.format(L["QN_SAID_BY_IN_FMT"], npc, place)
+                       or string.format(L["QN_SAID_BY_FMT"], npc)
+    elseif place then
+        head[#head + 1] = place
+    end
+    if cap.info then head[#head + 1] = cap.info end
+    if cap.wowhead then head[#head + 1] = cap.wowhead end
+
+    local divider = rich and (BNB.DividerTag and BNB.DividerTag("gold-plain") or DIVIDER) or PLAIN_RULE
+    local parts = {}
+    if title or #head > 0 then
+        local top = {}
+        if title then top[#top + 1] = title end
+        if #head > 0 then top[#top + 1] = Block(head) end
+        top[#top + 1] = divider
+        parts[#parts + 1] = table.concat(top, "\n")
+    end
+    local text = cap.text and cap.text:gsub("^%s+", ""):gsub("%s+$", "") or ""
+    if text ~= "" then parts[#parts + 1] = text end
+    if cap.objectives then
+        local o = {}
+        for i, t in ipairs(cap.objectives) do o[i] = "- " .. t end
+        parts[#parts + 1] = Heading(L["QN_OBJECTIVES"]) .. "\n" .. Block(o)
+    end
+    if cap.rewards then
+        parts[#parts + 1] = divider .. "\n" .. Heading(L["QN_REWARDS"]) .. "\n" .. Block(RewardLines(cap.rewards, rich))
+    end
+    return table.concat(parts, "\n\n")
+end
+
+-- A quest note's whole body, and whether it is rich. questID 0 = no quest id;
+-- text = the quest's own words. opts: npc / npcID (what the caller knows;
+-- npc = false: none, the quest log), log (read from the quest log), stage
+-- ("accept" / "complete", else the last quest event), objectives / rewards
+-- (false = leave out)
+local function QuestBody(questID, text, opts)
+    opts = opts or {}
+    local rich = RichFor("quest")
+    local npc, npcID
+    if opts.npc ~= false then npc, npcID = TalkingNpc(opts.npc, opts.npcID) end
+    local rewards
+    if opts.rewards ~= false and BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
+        rewards = opts.log and FormatQuestLogRewards(questID) or FormatRewards(questID)
+    end
+    return CaptureBody({
+        rich = rich, npc = npc, npcID = npcID, place = opts.npc ~= false,
+        info = QuestInfoLine(questID, opts.stage or (opts.log and "log") or _questStage, not opts.log),
+        wowhead = WowheadLine(questID, rich),
+        text = text,
+        objectives = opts.objectives ~= false and QuestObjectives(questID) or nil,
+        rewards = rewards,
+    }), rich
+end
+
+-- A dialogue note's body (an object, or Player & NPC Notes off)
+local function DialogueBody(npcName, text, npcID)
+    local rich = RichFor("dialogue")
+    local npc, id = TalkingNpc(npcName, npcID)
+    return CaptureBody({ rich = rich, npc = npc, npcID = id, place = true,
+        info = BNB.FmtDate(), text = text }), rich
+end
+
+-- A book's body: pages = list of page texts (colour codes already stripped)
+local function BookBody(pages)
+    local rich = RichFor("book")
+    local parts = {}
+    for i, t in ipairs(pages) do
+        parts[i] = (#pages > 1) and (PageHeading(i, rich) .. "\n" .. t) or t
+    end
+    return CaptureBody({ rich = rich, book = true, place = true, info = BNB.FmtDate(),
+        text = table.concat(parts, "\n\n") }), rich
+end
 
 local function SetItemTextBtnBusy(busy)
     local btn = _G["BNBQuickNoteItemTextBtn"]
@@ -655,19 +910,14 @@ end
 local function FinishItemTextCapture()
     _itCollecting = false
 
-    local parts = {}
+    -- Colour codes stripped from the pages (not the header: its links keep theirs)
+    local pages = {}
     for i, pageText in ipairs(_itPages) do
-        if #_itPages > 1 then
-            parts[i] = "--- Page " .. i .. " ---\n" .. pageText
-        else
-            parts[i] = pageText
-        end
+        pages[i] = pageText:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     end
-    local body = FoundAtHeader() .. table.concat(parts, "\n\n")
-    -- Strip colour codes
-    body = body:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    local body, rich = BookBody(pages)
 
-    CreateQuickNote(_itTitle, body, RandomIcon(), _itTags, nil)
+    CreateQuickNote(_itTitle, body, RandomIcon(), _itTags, nil, rich)
     _itPages = {}
 
     -- Navigate back to the original page. We are on the last page; the button
@@ -711,7 +961,7 @@ local function StartItemTextCapture()
     _itGen        = _itGen + 1
     _itBusy       = true
     _itTitle      = ItemTextGetItem and ItemTextGetItem() or ""
-    _itTags       = ItemTextTags()
+    _itTags       = WithPlaceTags(ItemTextTags())   -- ALL-636: where it was read
     _itPages      = {}
     _itCurrentPage= 0
     SetItemTextBtnBusy(true)   -- prevent re-entry
@@ -735,50 +985,6 @@ local function StartItemTextCapture()
         BeginCollecting()
     end
 end
-
--- ── Location header helpers ───────────────────────────────────────────────────
-
--- Returns the current zone name and coordinates as formatted strings, or nils.
-local function GetLocationInfo()
-    local mapID = C_Map.GetBestMapForUnit("player")
-    if not mapID then return nil, nil, nil end
-    local mapInfo = C_Map.GetMapInfo(mapID)
-    local zoneName = mapInfo and mapInfo.name or nil
-    local pos = C_Map.GetPlayerMapPosition(mapID, "player")
-    local x, y
-    if pos then
-        x = string.format("%.2f", pos.x * 100)
-        y = string.format("%.2f", pos.y * 100)
-    end
-    return zoneName, x, y
-end
-
--- "Said by <NPC> in <Zone> at XX.XX XX.XX\n----------\n\n" — for quest and gossip sources.
-local function NPCLocationHeader()
-    local npc = UnitName("npc") or ""
-    local zone, x, y = GetLocationInfo()
-    if npc == "" and not zone then return "" end
-    local parts = { "Said by " .. (npc ~= "" and npc or "Unknown") }
-    if zone then
-        parts[#parts + 1] = " in " .. zone
-        if x and y then
-            parts[#parts + 1] = " at " .. x .. " " .. y
-        end
-    end
-    return table.concat(parts) .. "\n----------\n\n"
-end
-
--- "Found in <Zone> at XX.XX XX.XX\n----------\n\n" — for book and letter sources.
-FoundAtHeader = function()
-    local zone, x, y = GetLocationInfo()
-    if not zone then return "" end
-    local line = "Found in " .. zone
-    if x and y then
-        line = line .. " at " .. x .. " " .. y
-    end
-    return line .. "\n----------\n\n"
-end
-
 
 local function QuestFrameIcon()
     -- Try choice rewards first, then fixed rewards
@@ -811,7 +1017,7 @@ local function InjectQuestFrame()
     MakeButton("BNBQuickNoteQuestBtn", QuestFrame, function()
         if not IsEnabled() then return end
 
-        local title, body, icon, tags, rewardFn
+        local title, body, icon, rich
         local questID = GetQuestID and GetQuestID() or 0
 
         -- The quest frame's panels are QuestFrameDetailPanel and
@@ -822,47 +1028,29 @@ local function InjectQuestFrame()
 
         if detailShown then
             -- Quest accept frame
-            title, body = QuestDetailText()
-            body        = NPCLocationHeader() .. body
-            body        = AppendObjectives(body, questID)
-            if BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
-                local rewardStr = FormatRewards(questID)
-                if rewardStr then body = body .. "\n\n----------\n" .. rewardStr end
-            end
+            local text
+            title, text = QuestDetailText()
+            body, rich  = QuestBody(questID, text, { stage = "accept" })
             icon        = QuestFrameIcon()
-            tags        = { "Quest" }
-            rewardFn    = function(noteID)
-                AttachQuestID(noteID, questID)
-                AttachQuestRewards(noteID)
-            end
-
         elseif rewardShown then
-            -- Quest turn-in frame
-            title, body = QuestCompleteText()
-            body        = NPCLocationHeader() .. body
-            if BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
-                local rewardStr = FormatRewards(questID)
-                if rewardStr then body = body .. "\n\n----------\n" .. rewardStr end
-            end
+            -- Quest turn-in frame: no objectives, they are done
+            local text
+            title, text = QuestCompleteText()
+            body, rich  = QuestBody(questID, text, { stage = "complete", objectives = false })
             icon        = QuestFrameIcon()
-            tags        = { "Quest" }
-            rewardFn    = function(noteID)
-                AttachQuestID(noteID, questID)
-                AttachQuestRewards(noteID)
-            end
         else
             -- Fallback: grab whatever text is in the frame
             title = GetTitleText() or "Quest"
-            body  = NPCLocationHeader() .. (GetQuestText() or GetRewardText() or "")
+            body, rich = QuestBody(questID, GetQuestText() or GetRewardText() or "",
+                { objectives = false, rewards = false })
             icon  = RandomIcon()
-            tags  = { "Quest" }
-            rewardFn = function(noteID)
-                AttachQuestID(noteID, questID)
-                AttachQuestRewards(noteID)
-            end
+        end
+        local rewardFn = function(noteID)
+            AttachQuestID(noteID, questID)
+            AttachQuestRewards(noteID)
         end
 
-        CreateQuickNote(title, body, icon, tags, rewardFn)
+        CreateQuickNote(title, body, icon, WithPlaceTags({ "Quest" }), rewardFn, rich)
     end)
 end
 
@@ -929,13 +1117,9 @@ local function InjectQuestLogFrame()
         -- quest-log APIs (GetQuestLogQuestText, GetQuestLogRewardMoney, etc.).
         -- The player's own selection is put back afterwards (DEP-04).
         local prevSel = C_QuestLog.GetSelectedQuest and C_QuestLog.GetSelectedQuest()
-        local title, body = QuestLogText(questID)
-        body = AppendObjectives(body, questID)
-
-        if BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
-            local rewardStr = FormatQuestLogRewards(questID)
-            if rewardStr then body = body .. "\n\n----------\n" .. rewardStr end
-        end
+        local title, text = QuestLogText(questID)
+        -- No NPC and no place: the log is read anywhere (ALL-634)
+        local body, rich = QuestBody(questID, text, { npc = false, log = true })
 
         local icon = QuestLogIcon(questID)
         RestoreQuestSelection(prevSel, questID)
@@ -948,7 +1132,7 @@ local function InjectQuestLogFrame()
             AttachQuestLogRewards(noteID, questID)
             RestoreQuestSelection(prev, questID)
         end
-        CreateQuickNote(title, body, icon, { "Quest" }, rewardFn)
+        CreateQuickNote(title, body, icon, { "Quest" }, rewardFn, rich)
     end)
 
     _qlBtn = btn
@@ -989,7 +1173,8 @@ end
 -- Plain talk (gossip, not a quest) goes into the NPC's own note, the one F6
 -- makes (BNB.TargetNote.AddDialogue, ALL-631); where that cannot be (Player &
 -- NPC Notes off, an object), a "<name> (Dialogue)" note of its own
-local function SaveDialogue(npcName, text)
+-- npcID: Dialogue UI's, when it gave one
+local function SaveDialogue(npcName, text, npcID)
     local TN = BNB.TargetNote
     local id, title
     if TN and TN.AddDialogue then id, title = TN.AddDialogue(text, GetAction() == "open") end
@@ -997,8 +1182,10 @@ local function SaveDialogue(npcName, text)
         BNB:Print(string.format(BNB.L["QN_DIALOGUE_ADDED"], title or npcName or ""))
         return
     end
-    CreateQuickNote(DialogueTitle(npcName or UnitName("npc") or "NPC"),
-        NPCLocationHeader() .. (text or ""), RandomIcon(), { "Gossip" }, nil)
+    -- GossipText's stand-in names ("NPC: 1234") are a title, not a speaker
+    local speaker = npcName and not npcName:find("^NPC[: ]") and npcName or nil
+    local body, rich = DialogueBody(speaker, text or "", npcID)
+    CreateQuickNote(DialogueTitle(npcName or UnitName("npc") or "NPC"), body, RandomIcon(), WithPlaceTags({ "Gossip" }), nil, rich)
 end
 
 local function InjectGossipFrame()
@@ -1190,19 +1377,14 @@ local function BuildImmersionButton()
         local questTitle = GetTitleText()
         local title = (questTitle and questTitle ~= "") and questTitle
                    or DialogueTitle(npcName or UnitName("npc") or "NPC")
-        local rewardFn = (questID > 0) and function(noteID)
+        local rewardFn = function(noteID)
             AttachQuestID(noteID, questID)
             AttachQuestRewards(noteID)
-        end or nil
-        local noteBody = NPCLocationHeader() .. body
-        if questID > 0 then
-            noteBody = AppendObjectives(noteBody, questID)
         end
-        if questID > 0 and BigNoteBoxDB and BigNoteBoxDB.saveQuestRewards ~= false then
-            local rewardStr = FormatRewards(questID)
-            if rewardStr then noteBody = noteBody .. "\n\n----------\n" .. rewardStr end
-        end
-        CreateQuickNote(title, noteBody, RandomIcon(), { "Quest" }, rewardFn)
+        -- At the turn-in the objectives are done: left out, as on the quest window
+        local noteBody, rich = QuestBody(questID, body,
+            { npc = npcName, objectives = _questStage ~= "complete" })
+        CreateQuickNote(title, noteBody, RandomIcon(), WithPlaceTags({ "Quest" }), rewardFn, rich)
         BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], title or ""))
     end)
 end
@@ -1301,10 +1483,11 @@ local function GetDUIText()
         end
     end
     if not raw or raw == "" then return nil, nil end
-    -- Strip leading "[NPC: XXXX] " and split into title / body
-    local npcName, body = raw:match("^%[NPC:%s*%d+%]%s*(.-)%s*\n(.+)$")
+    -- Strip leading "[NPC: XXXX] " and split into title / body; the id is
+    -- the NPC link's (ALL-634)
+    local npcID, npcName, body = raw:match("^%[NPC:%s*(%d+)%]%s*(.-)%s*\n(.+)$")
     if npcName then
-        return npcName, body
+        return npcName, body, tonumber(npcID)
     end
     return UnitName("npc") or "NPC", raw
 end
@@ -1334,12 +1517,12 @@ local _duiBookHooked = false -- true once DUI's book Copy Text button is hooked
 local function OnDUIDialogueCopy()
     if not DB() or not (DB().duiAutoNote or _duiForceNote) then return end
     if not IsEnabled() then return end
-    local npcName, body = GetDUIText()
+    local npcName, body, npcID = GetDUIText()
     if not npcName or not body or body:match("^%s*$") then return end
     local qid = _duiQuestID
     if not qid then
         -- Plain talk: into the NPC's own note (ALL-631)
-        SaveDialogue(npcName, body)
+        SaveDialogue(npcName, body, npcID)
         return
     end
     -- A quest: its own note, titled with the quest
@@ -1347,8 +1530,11 @@ local function OnDUIDialogueCopy()
         AttachQuestID(noteID, qid)
         AttachQuestRewards(noteID)
     end
-    CreateQuickNote(_duiQuestTitle or DialogueTitle(npcName), NPCLocationHeader() .. body,
-        RandomIcon(), { "Quest" }, rewardFn)
+    -- Dialogue UI's text already holds the objectives and rewards: only the
+    -- header block is ours (ALL-634)
+    local noteBody, rich = QuestBody(qid, body, { npc = npcName, npcID = npcID,
+        objectives = false, rewards = false })
+    CreateQuickNote(_duiQuestTitle or DialogueTitle(npcName), noteBody, RandomIcon(), WithPlaceTags({ "Quest" }), rewardFn, rich)
 end
 
 local function OnDUIBookCopy()
@@ -1362,32 +1548,21 @@ local function OnDUIBookCopy()
                or (ItemTextGetItem and ItemTextGetItem())
                or "Book"
 
-    -- Build body from our accumulated page cache.
-    local body
+    -- Pages from our accumulated page cache, colour codes stripped
+    local pages = {}
     local numPages = 0
     for _ in pairs(_duiBookPages) do numPages = numPages + 1 end
-
-    if numPages > 0 then
-        local parts = {}
-        for i = 1, numPages do
-            local text = _duiBookPages[i] or ""
-            text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-            if numPages > 1 then
-                parts[#parts + 1] = "--- Page " .. i .. " ---\n" .. text
-            else
-                parts[#parts + 1] = text
-            end
-        end
-        body = table.concat(parts, "\n\n")
+    for i = 1, numPages do
+        pages[i] = (_duiBookPages[i] or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     end
 
-    if not body or body == "" then
-        body = ItemTextGetText and ItemTextGetText() or ""
-        body = body:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if table.concat(pages) == "" then
+        local text = ItemTextGetText and ItemTextGetText() or ""
+        pages = { (text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) }
     end
 
-    body = FoundAtHeader() .. body
-    CreateQuickNote(title, body, RandomIcon(), { "Book" }, nil)
+    local body, rich = BookBody(pages)
+    CreateQuickNote(title, body, RandomIcon(), WithPlaceTags({ "Book" }), nil, rich)
 end
 
 -- ── DUI: our note button beside DUI's Copy Text buttons ─────────────────────

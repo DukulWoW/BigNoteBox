@@ -329,6 +329,15 @@ BNB.DEFAULTS = {
     -- Immersion: the floating Quick Note button during Immersion dialogues
     quickNoteImmersionBtn = true,
     saveQuestRewards      = true,
+    -- Note capture makes rich notes, per kind (ALL-634); the Rich Notes
+    -- module off makes them normal whatever these say
+    captureRichQuest      = true,
+    captureRichBook       = true,
+    captureRichDialogue   = true,
+    -- Note capture tags the note with where it was made (ALL-636): the zone,
+    -- as NPC notes do, and the subzone when asked for. Never the quest log
+    captureTagZone        = true,
+    captureTagSubZone     = false,
 
     -- Window scale lock: hides the resize handle
     scaleLocked = false,

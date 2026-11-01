@@ -320,7 +320,7 @@ local function LinkKind(link)
     if type(link) ~= "string" then return "link" end
     if link:find("^bnbwp:") or link:find("^bnbway:") then return "waypoint" end
     if link:find("^item:") then return "item" end
-    if link:find("^bnbnote:") then return "note" end
+    if link:find("^bnbnote:") or link:find("^bnbnpc:") then return "note" end
     if link:find("^https?:") or not link:find("^%a+:") then return "url" end
     return "link"
 end

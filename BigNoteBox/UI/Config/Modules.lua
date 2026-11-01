@@ -51,12 +51,45 @@ local function BuildQuickNotePage(sf, ct, y, page)
             function(v) db.saveQuestRewards = v end,
             L["CFG_CHK_QUEST_REWARDS_TIP"])
 
+        -- Where it was made as tags (ALL-636): the zone, the subzone opt-in
+        local placeCbs = {}
+        do
+            local cb
+            y, cb = AddCheck(ct, y, L["CFG_QN_TAG_ZONE"],
+                function() return db.captureTagZone ~= false end,
+                function(v) db.captureTagZone = v end, L["CFG_QN_TAG_ZONE_TIP"])
+            placeCbs[#placeCbs + 1] = cb
+            y, cb = AddCheck(ct, y, L["CFG_QN_TAG_SUBZONE"],
+                function() return db.captureTagSubZone == true end,
+                function(v) db.captureTagSubZone = v end, L["CFG_QN_TAG_SUBZONE_TIP"])
+            placeCbs[#placeCbs + 1] = cb
+        end
+
         local qnLbl = ct:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
         qnLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
         qnLbl:SetHeight(ROW_H); qnLbl:SetJustifyH("LEFT")
         qnLbl:SetText(L["CFG_QN_CREATE_MODE_LABEL"])
         table.insert(qnWidgets, qnLbl)
         y = y - (ROW_H + 2)
+
+        -- Rich or normal, per kind of capture note (ALL-634, Dukul 2026-11-01:
+        -- under this heading, above the dropdown). Greyed while the Rich
+        -- Notes module is off; NPC notes have their own type on the Player &
+        -- NPC Notes page.
+        local richCbs = {}
+        for _, row in ipairs({
+            { key = "captureRichQuest",    label = "CFG_QN_RICH_QUEST",    tip = "CFG_QN_RICH_QUEST_TIP" },
+            { key = "captureRichBook",     label = "CFG_QN_RICH_BOOK",     tip = "CFG_QN_RICH_BOOK_TIP" },
+            { key = "captureRichDialogue", label = "CFG_QN_RICH_DIALOGUE", tip = "CFG_QN_RICH_DIALOGUE_TIP" },
+        }) do
+            local cb
+            y, cb = AddCheck(ct, y, L[row.label],
+                function() return db[row.key] ~= false end,
+                function(v) db[row.key] = v end,
+                L[row.tip])
+            richCbs[#richCbs + 1] = cb
+            K.GreyWhileOff(cb, function() return db.quickNoteEnabled ~= false and BNB.RichEnabled() end)
+        end
 
         local QN_ITEMS = {
             { key = "silent",  label = L["CFG_QN_ITEM_SILENT"] },
@@ -96,6 +129,14 @@ local function BuildQuickNotePage(sf, ct, y, page)
             for _, w in ipairs(qnWidgets) do
                 w:SetAlpha(a)
                 if w.SetEnabled then w:SetEnabled(enabled) end
+            end
+            for _, cb in ipairs(placeCbs) do
+                cb:SetEnabled(enabled); cb:SetAlpha(a); cb._lbl:SetAlpha(a)
+            end
+            local rich = enabled and BNB.RichEnabled()
+            for _, cb in ipairs(richCbs) do
+                cb:SetEnabled(rich); cb:SetAlpha(rich and 1 or 0.35)
+                cb._lbl:SetAlpha(rich and 1 or 0.35)
             end
         end
 

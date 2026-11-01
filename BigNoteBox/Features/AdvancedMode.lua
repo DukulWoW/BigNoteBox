@@ -128,6 +128,9 @@ end
 local function UIColour(data, color)
     local UL = BNB.UILinks
     if UL and data:sub(1, 6) == "bnbui:" then return "|c" .. UL.Colour(data:sub(7)) end
+    -- An NPC link (ALL-634): grey until that NPC has a note
+    local NL = BNB.NoteLinks
+    if NL and NL.NpcColour and data:sub(1, 7) == "bnbnpc:" then return "|c" .. NL.NpcColour(data) end
     return color
 end
 
