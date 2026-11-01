@@ -188,6 +188,10 @@ end
 local function ConvertRichBody(body)
     if not body or body == "" then return "", false end
     local hasImages = body:find("{img:") ~= nil
+    -- {code}...{/code}: shown as typed, as <code> (AM.ProtectCode)
+    local restoreCode = function(t) return t end
+    local AM = BNB.AdvancedMode
+    if AM and AM.ProtectCode then body, restoreCode = AM.ProtectCode(body) end
 
     local lines = {}
     for line in (body .. "\n"):gmatch("([^\n]*)\n") do
@@ -283,7 +287,10 @@ local function ConvertRichBody(body)
         out[#out + 1] = line
     end
 
-    return table.concat(out, "\n"), hasImages
+    local html = restoreCode(table.concat(out, "\n"), function(inner)
+        return "<code>" .. HtmlEsc(inner) .. "</code>"
+    end)
+    return html, hasImages
 end
 
 -- Convert plain note body to browser HTML preserving line structure.

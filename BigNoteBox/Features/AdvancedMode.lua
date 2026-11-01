@@ -32,6 +32,32 @@ local function HtmlEscape(s)
     return s
 end
 
+-- {code}...{/code} (Dukul, 2026-11-01): the text inside shows as typed, tags
+-- and {{tokens}} included, in a colour of its own, so a help topic (or any
+-- rich note) can show markup without it drawing. One line only: an open
+-- {code} with no close on its line is plain text. AM.ProtectCode sets the
+-- spans aside before anything reads the markup: each becomes a placeholder
+-- no markup step matches, and restore(text, fn) puts back fn(raw inner text)
+AM.CODE_COLOUR = "|cff9fd0ff"   -- soft blue; dark ink on the help book's parchment (INK_SWAP)
+local CODE_SPAN = "{code}([^\n]-){/code}"
+function AM.ProtectCode(text)
+    if type(text) ~= "string" or not text:find("{code}", 1, true) then
+        return text, function(t) return t end
+    end
+    local saved = {}
+    text = text:gsub(CODE_SPAN, function(inner)
+        saved[#saved + 1] = inner
+        return "@@BNBCODE" .. #saved .. "@@"
+    end)
+    return text, function(t, fn)
+        return (t:gsub("@@BNBCODE(%d+)@@", function(n)
+            local inner = saved[tonumber(n)]
+            if not inner then return nil end
+            return fn and fn(inner) or inner
+        end))
+    end
+end
+
 -- Structure tags: {h1}{/h1} {h2}{/h2} {h3}{/h3} {p}{/p} and alignment variants
 local STRUCT_OPEN = {
     ["{h1}"]   = "<h1>",
@@ -157,10 +183,14 @@ local ASSET_PREFIX = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 -- (Dukul, 2026-10-23: icons beside the words that explain a button)
 function AM.ExpandAssetImages(text)
     if type(text) ~= "string" or not text:find("{%a+:@") then return text end
-    return (text:gsub("{(%a+):@([^:}]+)", function(tag, rel)
+    -- An @ path inside {code} is an example: it stays as typed
+    local restore
+    text, restore = AM.ProtectCode(text)
+    text = text:gsub("{(%a+):@([^:}]+)", function(tag, rel)
         if tag ~= "img" and tag ~= "icon" then return nil end
         return "{" .. tag .. ":" .. ASSET_PREFIX .. rel:gsub("/", "\\")
-    end))
+    end)
+    return (restore(text, function(inner) return "{code}" .. inner .. "{/code}" end))
 end
 
 -- The escaped text back as typed (an href is read as it was written)
@@ -283,6 +313,9 @@ end
 --------------------------------------------------------------------------------
 function AM.ToHTML(text, bodySize, width)
     if not text or text == "" then return "" end
+    -- {code} spans set aside before anything else, tokens too (AM.ProtectCode)
+    local restoreCode
+    text, restoreCode = AM.ProtectCode(text)
     -- Live note tokens ({{me}}...) filled from the reader's game (ALL-481).
     -- First, so the values are escaped and can never make markup
     if BNB.Tokens then text = BNB.Tokens.Fill(text) end
@@ -480,7 +513,12 @@ function AM.ToHTML(text, bodySize, width)
     -- Join WITHOUT newlines — WoW's SimpleHTML parser treats newlines between
     -- block elements as orphan text nodes, which causes the parser to fall back
     -- to plain-text rendering for the entire document.
-    return "<HTML><BODY>" .. table.concat(out) .. "</BODY></HTML>"
+    -- {code} text back, escaped for the html and with "|" doubled so a typed
+    -- |c or |T code shows as typed instead of drawing
+    local html = restoreCode(table.concat(out), function(inner)
+        return AM.CODE_COLOUR .. HtmlEscape(inner):gsub("|", "||") .. "|r"
+    end)
+    return "<HTML><BODY>" .. html .. "</BODY></HTML>"
 end
 
 --------------------------------------------------------------------------------
@@ -547,6 +585,11 @@ end
 function AM.MarkupRepairs(text)
     local list = {}
     if not text or text == "" then return list end
+    -- Tags inside {code} are examples, never repairs: masked with the same
+    -- number of bytes, so every position found still fits the typed text
+    text = text:gsub("{code}[^\n]-{/code}", function(s)
+        return "{code}" .. ("x"):rep(#s - 13) .. "{/code}"
+    end)
     local open, openLine, lineNo, lineStart = nil, nil, 0, 1
     for line in (text .. "\n"):gmatch("([^\n]*)\n") do
         lineNo = lineNo + 1
@@ -906,10 +949,13 @@ local TAG_PATTERNS = {
 
 local function StripMarkup(text)
     if not text then return "" end
+    -- {code} keeps its text as typed, only its own tags go (AM.ProtectCode)
+    local restore
+    text, restore = AM.ProtectCode(text)
     for _, pat in ipairs(TAG_PATTERNS) do
         text = text:gsub(pat, "")
     end
-    return text
+    return (restore(text))
 end
 AM.StripMarkup = StripMarkup  -- exposed for sticky note plain-text rendering
 

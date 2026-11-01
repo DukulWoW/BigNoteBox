@@ -139,6 +139,7 @@ local INK_SWAP = {
     ["|cff6cb4ee"] = "|cff1a4f8a",   -- note links: blue
     ["|cffffcc33"] = "|cff7a4a00",   -- BigNoteBox links: gold
     ["|cff808080"] = "|cff6b6157",   -- a link to a place this setup does not have
+    ["|cff9fd0ff"] = "|cff2e3f8f",   -- {code} examples (AM.CODE_COLOUR): ink blue
 }
 -- Assets folders whose art is white (drawn brown here); the rest has its own colours
 local WHITE_ART = { Toolbar = true, Explorer = true, Documentation = true }
@@ -461,11 +462,41 @@ local function FillToc()
         end
     end
     local toc = frame._tocChild
-    local slot, y = 0, 0
+    local slot, y, rules = 0, 0, 0
     for i, pg in ipairs(pages) do
         if show[i] then
             local head = pg.kind == "chapter"
             if (head or pg.backFirst) and slot > 0 then y = y + HEAD_GAP end
+            -- A new major version: a line between the two (patch notes, see
+            -- majorFirst). Skin mode: a thin line in the heading colour; the
+            -- book look: the bronze-handle divider (Dukul, 2026-11-01)
+            if pg.majorFirst and slot > 0 then
+                rules = rules + 1
+                local line = frame._tocRules[rules]
+                if not line then
+                    line = toc:CreateTexture(nil, "ARTWORK")
+                    frame._tocRules[rules] = line
+                end
+                line:ClearAllPoints()
+                local AM = BNB.AdvancedMode
+                local dw, dh
+                if AM and AM.DividerSize then dw, dh = AM.DividerSize("bronze-handle") end
+                if not C.skin and dw then
+                    line:SetTexture(AM.DIVIDER_PATH .. "bronze-handle")
+                    line:SetVertexColor(1, 1, 1, 1)
+                    line:SetSize(dw, dh)
+                    line:SetPoint("TOP", toc, "TOP", 0, -(y + 2))
+                    y = y + dh + 4
+                else
+                    local c = C.title
+                    line:SetColorTexture(c[1], c[2], c[3], 0.6)
+                    line:SetHeight(1)
+                    line:SetPoint("TOPLEFT",  toc, "TOPLEFT",  6, -(y + HEAD_GAP))
+                    line:SetPoint("TOPRIGHT", toc, "TOPRIGHT", -4, -(y + HEAD_GAP))
+                    y = y + HEAD_GAP * 2 + 1
+                end
+                line:Show()
+            end
             local row = TocRow(slot)
             slot = slot + 1
             row:ClearAllPoints()
@@ -483,6 +514,7 @@ local function FillToc()
         end
     end
     for k = slot + 1, #frame._rows do frame._rows[k]:Hide() end
+    for k = rules + 1, #frame._tocRules do frame._tocRules[k]:Hide() end
     frame._noMatch:SetShown(searching and #hits == 0)
     frame._tocHits = hits
     frame._tocChild:SetHeight(math.max(1, y))
@@ -554,11 +586,12 @@ local function RenderTopic(t)
         local w = TextWidth(sf)
         hold:SetWidth(w)
         local _, body = BNB.HelpTopicText(t)
-        if t.rich and AM then
+        -- Every topic is drawn rich (Dukul, 2026-11-01: "Shouldn't all help
+        -- topics be rich notes?"); markup shown as an example sits in {code}
+        if AM then
             pfs:Hide(); rf:Show()
             hold:SetHeight(RenderMarkup(rf, body, w) + 8)
         else
-            -- A plain topic (Rich notes, Note tokens): its markup shows as typed
             rf:Hide(); pfs:Show()
             pfs:SetWidth(w)
             pfs:SetText(body)
@@ -678,6 +711,13 @@ local function ChipFont()
     return chipFont
 end
 
+-- The edge: CHIP_EDGE screen pixels on every side, both looks (Dukul,
+-- 2026-11-01: "Make them 2px"; the art's own border, squeezed from 64 px
+-- high to 18, came out 2 px on two sides and 1 px on the others). The book
+-- look keeps the art's inside as the fill, cropped inside its border
+local CHIP_EDGE = 2
+local CHIP_CROP = { 11 / 256, 246 / 256, 10 / 64, 54 / 64 }   -- inside the art's border
+
 local function MakeChip(parent)
     local chip = CreateFrame("Frame", nil, parent)
     chip:SetHeight(C.skin and CHIP_H.skin or CHIP_H.book)
@@ -685,22 +725,22 @@ local function MakeChip(parent)
         local bg = chip:CreateTexture(nil, "BACKGROUND")
         bg:SetAllPoints(chip)
         chip._bg = bg
-        local edges = {}
-        for _, e in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
-                             { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
-            local t = chip:CreateTexture(nil, "BORDER")
-            t:SetPoint(e[1], chip, e[1])
-            t:SetPoint(e[2], chip, e[2])
-            if #edges < 2 then t:SetHeight(1) else t:SetWidth(1) end
-            edges[#edges + 1] = t
-        end
-        chip._edges = edges
     else
         local tex = chip:CreateTexture(nil, "BACKGROUND")
         tex:SetAllPoints(chip)
         tex:SetTexture(CHIP_TEX)
+        tex:SetTexCoord(CHIP_CROP[1], CHIP_CROP[2], CHIP_CROP[3], CHIP_CROP[4])
         chip._tex = tex
     end
+    local edges = {}
+    for _, e in ipairs({ { "TOPLEFT", "TOPRIGHT" }, { "BOTTOMLEFT", "BOTTOMRIGHT" },
+                         { "TOPLEFT", "BOTTOMLEFT" }, { "TOPRIGHT", "BOTTOMRIGHT" } }) do
+        local t = chip:CreateTexture(nil, "BORDER")
+        t:SetPoint(e[1], chip, e[1])
+        t:SetPoint(e[2], chip, e[2])
+        edges[#edges + 1] = t
+    end
+    chip._edges = edges
     local fs = chip:CreateFontString(nil, "OVERLAY")
     fs:SetFontObject(ChipFont())
     fs:SetPoint("CENTER", chip, "CENTER", 0, 0)
@@ -722,12 +762,18 @@ local function SetChip(chip, label)
     local text = label
     if kind then text = L[kind.key] end
     chip._fs:SetText(text)
+    -- Sized here: the chip has its parent (and so its scale) by now
+    local px = BNB.PixelsToUI(chip, CHIP_EDGE)
+    for i, t in ipairs(chip._edges) do
+        if i <= 2 then t:SetHeight(px) else t:SetWidth(px) end
+    end
     if C.skin then
         chip._bg:SetColorTexture(c[1], c[2], c[3], 0.15)
         for _, t in ipairs(chip._edges) do t:SetColorTexture(c[1], c[2], c[3], 0.85) end
         chip._fs:SetTextColor(c[1], c[2], c[3])
     else
         chip._tex:SetVertexColor(c[1], c[2], c[3])
+        for _, t in ipairs(chip._edges) do t:SetColorTexture(c[1], c[2], c[3], 1) end
     end
 end
 
@@ -1182,8 +1228,11 @@ local function BuildSearch(toc)
 
     -- The X empties the search (Dukul, 2026-10-23: "it's missing a X to
     -- clear it"); shown only while there is something to clear
-    local x = BNB.CreateClearX(bg, 16, function() eb:ClearFocus(); eb.SetRealText(eb, "") end,
-        L["CFG_SEARCH_CLEAR"])
+    -- FillToc here: the placeholder comes back with the empty text, and
+    -- OnTextChanged below skips it, so the list stayed filtered (2026-11-01)
+    local x = BNB.CreateClearX(bg, 16, function()
+        eb:ClearFocus(); eb.SetRealText(eb, ""); FillToc()
+    end, L["CFG_SEARCH_CLEAR"])
     x:SetPoint("RIGHT", bg, "RIGHT", -4, 0)
     x:SetFrameLevel(eb:GetFrameLevel() + 2)
     x:Hide()
@@ -1285,6 +1334,7 @@ local function Build()
     })
     frame = f
     f._rows = {}
+    f._tocRules = {}   -- the lines between major versions in Contents (FillToc)
 
     -- Left / Right turn the pages (ALL-554 stage 3, Dukul: "Left / Right
     -- only"), with the pointer over the book: the arrow keys also turn the
@@ -1555,7 +1605,16 @@ local function BuildPages()
     -- Patch notes, newest first (ALL-614)
     local pats = {}
     if BNB.WhatsNew and BNB.WhatsNew.Releases then
-        for i, rel in ipairs(BNB.WhatsNew.Releases()) do pats[i] = { kind = "patch", rel = rel } end
+        -- majorFirst: the newest release of an older major version (1.30.0
+        -- under 2.0.0) gets a line above it in Contents (Dukul, 2026-11-01:
+        -- "We are now in a whole new version")
+        local lastMajor
+        for i, rel in ipairs(BNB.WhatsNew.Releases()) do
+            local major = tonumber(tostring(rel.version):match("^(%d+)"))
+            pats[i] = { kind = "patch", rel = rel,
+                majorFirst = lastMajor ~= nil and major ~= nil and major ~= lastMajor }
+            lastMajor = major or lastMajor
+        end
     end
 
     sets.docs, sets.features, sets.patches = docs, feats, pats

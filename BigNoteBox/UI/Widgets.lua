@@ -51,7 +51,35 @@ end
 -- changes), and a press nudges it 1 px down-right. Hover: ui-hover-64 over
 -- the icon, tinted the same. btn:SetIconEnabled(on) greys it out. Used by the
 -- formatting toolbar (UI/WysiwygBar.lua) and the rich markup bars (ALL-487).
+-- Right-click a toolbar button for its help topic (Dukul, 2026-11-01): the
+-- button's art name -> help topic key. Both formatting toolbars and both rich
+-- markup bars (main editor, Focus mode) are built here; a button not listed
+-- has no help line. Works on a greyed button too
+BNB.TOOLBAR_HELP = {
+    ["tb-undo"] = "history-and-undo", ["tb-redo"] = "history-and-undo",
+    ["tb-history"] = "history-and-undo", ["tb-restore"] = "history-and-undo",
+    ["tb-decreasesize"] = "note-appearance", ["tb-increasesize"] = "note-appearance",
+    ["tb-notesettings"] = "note-appearance",
+    ["tb-bulletlist"] = "writing-notes", ["tb-timestamp"] = "writing-notes",
+    ["tb-search-replace"] = "writing-notes",
+    ["tb-syntax"] = "note-tokens",
+    ["tb-refbox"] = "reference-box",
+    ["tb-way"] = "links-in-notes", ["tb-link"] = "links-in-notes", ["tb-rich-link"] = "links-in-notes",
+    ["tb-spellcheck"] = "spelling", ["tb-spell-correct"] = "spelling", ["tb-dictionary"] = "spelling",
+    ["tb-notemap"] = "situations",
+    ["tb-share"] = "sharing-notes",
+    ["tb-copymove"] = "folders",
+    ["tb-alarm"] = "alarms",
+    ["tb-rich-h1"] = "rich-notes", ["tb-rich-h2"] = "rich-notes", ["tb-rich-h3"] = "rich-notes",
+    ["tb-underline"] = "rich-notes", ["tb-strike"] = "rich-notes",
+    ["tb-rich-p"] = "rich-notes", ["tb-rich-pl"] = "rich-notes", ["tb-rich-pc"] = "rich-notes",
+    ["tb-rich-pr"] = "rich-notes", ["tb-rich-br"] = "rich-notes", ["tb-rich-color"] = "rich-notes",
+    ["tb-rich-ico"] = "rich-notes", ["tb-rich-img"] = "rich-notes", ["tb-rich-divider"] = "rich-notes",
+}
+
 function BNB.CreateToolbarIconButton(parent, tex, tip)
+    local art = type(tex) == "string" and tex:match("([^\\/]+)$")
+    local helpKey = art and BNB.TOOLBAR_HELP[art:lower()]
     local skin = BigNoteBoxDB and BigNoteBoxDB.skinMode and BNB.GetSkinPreset
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(20, 20)
@@ -80,9 +108,22 @@ function BNB.CreateToolbarIconButton(parent, tex, tip)
     btn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(tip, 1, 1, 1)
+        if helpKey and BNB.HelpTopic and BNB.HelpTopic(helpKey) then
+            GameTooltip:AddLine(BNB.L["HELP_TB_RCLICK_TIP"], 0.6, 0.6, 0.6)
+        end
         GameTooltip:Show()
     end)
     btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    -- A hook, after the skin look's own OnMouseUp above (SetScript drops hooks)
+    if helpKey then
+        btn:HookScript("OnMouseUp", function(self, button)
+            if button ~= "RightButton" or not self:IsMouseOver() then return end
+            if BNB.HelpTopic and BNB.HelpTopic(helpKey) and BNB.OpenHelp then
+                GameTooltip:Hide()
+                BNB.OpenHelp(helpKey)
+            end
+        end)
+    end
     return btn
 end
 
@@ -1373,6 +1414,20 @@ function BNB.AddUIIconHover(btn, tx)
     hi:SetTexture(BNB.UI_HOVER_TEX)
     BNB.TintUIIcon(hi)
     return hi
+end
+
+--------------------------------------------------------------------------------
+-- BNB.PixelsToUI(f, n): n whole screen pixels in frame f's own units, so a
+-- border drawn with it is the same on every side at any UI scale (Dukul,
+-- 2026-11-01: the tab icon border and the patch chips showed 2 px on two
+-- sides and 1 px on the others, from a 1-unit border at a scale where one
+-- unit is not a whole pixel). Ask again after a scale change.
+--------------------------------------------------------------------------------
+function BNB.PixelsToUI(f, n)
+    local factor = PixelUtil and PixelUtil.GetPixelToUIUnitFactor and PixelUtil.GetPixelToUIUnitFactor()
+    local s = f and f.GetEffectiveScale and f:GetEffectiveScale()
+    if not (factor and s and s > 0) then return n end
+    return n * factor / s
 end
 
 --------------------------------------------------------------------------------

@@ -1929,6 +1929,11 @@ local function PreviewText(note)
         if note.source == "inspect" or note.source == "target" then
             body = body:gsub("^%s*{h1[^}]*}.-{/h1}%s*", "", 1)
         end
+        -- {code} keeps its text as typed, only its own tags go (AM.ProtectCode)
+        local restoreCode = function(t) return t end
+        if BNB.AdvancedMode and BNB.AdvancedMode.ProtectCode then
+            body, restoreCode = BNB.AdvancedMode.ProtectCode(body)
+        end
         body = body:gsub("{/?h%d+:?[cr]?}", "")
         body = body:gsub("{/?p:?[clr]?}", "")
         body = body:gsub("{img:[^}]+}", "")
@@ -1939,6 +1944,7 @@ local function PreviewText(note)
         body = body:gsub("{/col}", "")
         body = body:gsub("{br}", "")
         body = body:gsub("{link%*[^*}]+%*([^}]*)}", "%1")
+        body = restoreCode(body)
         -- Collapse runs of blank lines so they don't eat the line budget
         body = body:gsub("\n%s*\n+", "\n")
         body = body:match("^%s*(.-)%s*$") or body

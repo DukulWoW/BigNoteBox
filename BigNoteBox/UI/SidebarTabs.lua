@@ -42,14 +42,14 @@ local CAP, ORN_L, ORN_R = 24, 114, 142
 -- top border covers their lower end (as the skin tabs are). Whether the tabs
 -- share the whole width stays the sidebarTabsFill setting (ALL-333).
 local NORMAL = { h = 32, w = 170, minW = 90, gap = 0, x = 8, y = BNB.IsForever and 6.5 or -2.5,
-    iconSz = 18, iconX = 18, iconY = -0.5, border = 1, textGap = 5, textY = -0.5,
+    iconSz = 18, iconX = 18, iconY = -0.5, border = 2, textGap = 5, textY = -0.5,
     rightPad = 18, activeA = 1, hoverA = 0.5, dim = 0.6, font = "BNBFontHighlight",
     under = true, pinSz = 14, pinX = -16, pinY = -6 }
 -- Skin: icon and text centred on the whole tab, the tucked part included.
 -- The test adds half the tuck to iconY / textY; these are the results
 -- (-2.5 + 3 for both)
 local SKIN = { h = 32, tuck = 6, w = 170, minW = 90, gap = 5, x = 8,
-    iconSz = 16, iconX = 13, iconY = 0.5, border = 1, textGap = 5, textY = 0.5,
+    iconSz = 16, iconX = 13, iconY = 0.5, border = 2, textGap = 5, textY = 0.5,
     rightPad = 14, activeA = 1, hoverA = 0.5, dim = 0.6, font = "BNBFontNormalSmall",
     pinSz = 14, pinX = -7, pinY = -6 }
 -- More tabs than fit at w: they share the width, and icon, spacing and text
@@ -224,7 +224,6 @@ local function MakeTab(parent)
     btn.edge = btn:CreateTexture(nil, "ARTWORK", nil, 0)   -- the icon's plain border
     btn.icon = btn:CreateTexture(nil, "ARTWORK", nil, 1)
     btn.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-    btn.icon:SetPoint("CENTER", btn.edge, "CENTER")
     btn.hl = btn:CreateTexture(nil, "ARTWORK", nil, 2)      -- skin hover
     btn.hl:SetColorTexture(1, 1, 1, 0.10)
     btn.hl:SetPoint("TOPLEFT", 3, -3); btn.hl:SetPoint("BOTTOMRIGHT", -3, 3)
@@ -338,13 +337,17 @@ local function FillTab(btn, key, w, skin, k)
     btn._key = key
     SetLook(btn, w, skin)
 
-    local bd = S.border
+    -- border = screen pixels, the same on every side (BNB.PixelsToUI); the
+    -- icon is held inside the edge by both corners, so it stays even
+    local bd = BNB.PixelsToUI(btn, S.border)
     local isz = math.floor(S.iconSz * k + 0.5)
     local ix = S.iconX * k
     btn.edge:ClearAllPoints()
     btn.edge:SetSize(isz + 2 * bd, isz + 2 * bd)
     btn.edge:SetPoint("LEFT", btn, "LEFT", ix, S.iconY)
-    btn.icon:SetSize(isz, isz)
+    btn.icon:ClearAllPoints()
+    btn.icon:SetPoint("TOPLEFT", btn.edge, "TOPLEFT", bd, -bd)
+    btn.icon:SetPoint("BOTTOMRIGHT", btn.edge, "BOTTOMRIGHT", -bd, bd)
     btn.icon:SetTexture(SB.IconForKey(key))
 
     -- "Name (12)": only the name is cut short ("..."), so the count always shows
