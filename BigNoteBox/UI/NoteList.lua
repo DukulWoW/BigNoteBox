@@ -722,7 +722,9 @@ local function BuildSearchBar(parent)
 
     -- ── Tag autocomplete dropdown ─────────────────────────────────────────────
     -- Appears below the search bar when user types "#" + 3 or more characters.
-    _tagAC = CreateFrame("Frame", nil, parent)
+    -- BackdropTemplate: without it BNB.SetBackdrop does nothing and the list
+    -- had no background (showed in the explorer view, over the tiles)
+    _tagAC = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     BNB.SetBackdrop(_tagAC, 0.08, 0.08, 0.10, 0.97, 0.40, 0.40, 0.42, 1)
     _tagAC:SetFrameLevel(bar:GetFrameLevel() + 20)
     _tagAC:SetPoint("TOPLEFT",  bar, "BOTTOMLEFT",  0, -2)
