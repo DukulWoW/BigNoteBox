@@ -3,20 +3,22 @@
 --
 -- Once per account per big release (welcomeSeen = WELCOME_RELEASE, shared by
 -- every profile), the main window opens under a dimmed overlay: a welcome box
--- with the release's biggest new things, one row each with an icon, a link to
--- that release's page in the Help book's Patch notes tab, and a row with the
--- Settings NEW badge. For a later big release: change WELCOME_RELEASE and the
--- ROWS; a release without one keeps the old value, so nothing shows.
+-- with the release's biggest new things, one row each with an icon, and a
+-- row with the Settings NEW badge. For a later big release: change
+-- WELCOME_RELEASE and the ROWS; a release without one keeps the old value, so
+-- nothing shows.
 -- Everyone sees it: players updating and new installs (after the setup
 -- wizard; its Finish reloads, its Quit calls BNB.ShowExplorerIntroIfDue).
 --
--- With the Explorer module on, the window opens on the explorer grid, a
--- callout arrow points at the switch icon at the top left, and the two buttons
--- keep the explorer or go back to the note list (which then becomes the view
--- the window opens on). Explorer off: the note list, no callout, one OK
--- button. Esc and the X keep what is showing. A second callout points at
--- the Help button on the top right, with the module on or off (ALL-554:
--- the Help book never opens by itself, Dukul 2026-10-30).
+-- Three buttons: Patch notes (this release's page in the Help book), Let's go
+-- (gold, closes the box) and Open help (the Help book's cover). There is no
+-- note list button: players are steered to the Explorer view, and the
+-- callout on the switch icon shows how to change (Dukul, 2026-11-01).
+-- With the Explorer module on, the window opens on the explorer grid and a
+-- callout arrow points at the switch icon at the top left; Explorer off: the
+-- note list, no callout, no footer. Esc and the X keep what is showing. A
+-- second callout points at the Help button on the top right, with the module
+-- on or off (ALL-554: the Help book never opens by itself, Dukul 2026-10-30).
 --
 -- Until it is answered, toasts wait (BNB.Toast holds them through
 -- BNB.ExplorerIntroHolding) and so does the Forever / Classic notice; both
@@ -40,8 +42,10 @@ local ARROW   = "Interface\\AddOns\\BigNoteBox\\Assets\\UI\\ui-new-arrow"
 local ART     = "Interface\\AddOns\\BigNoteBox\\Assets\\"
 local BOX_W   = 600
 local PAD     = 24
-local BTN_W   = 200
+local BTN_W   = 180
 local BTN_H   = 28
+local GOLD_H  = 34         -- the gold Let's go button, a little taller than its neighbours
+local BTN_GAP = 12
 local ROW_ICON = 20
 local ROW_TEXT_X = 56      -- text column: room for the NEW badge (46 x 24)
 local CALLOUT_W = 240      -- widest; narrower when the welcome box is close
@@ -101,24 +105,72 @@ end
 
 local BOX_ALPHA = 0.88   -- the middle box lets a little of the grid through (Dukul, 2026-10-22)
 
--- "See everything else..." under the rows: opens this release's patch notes
-local function BuildMoreLink(box)
-    local b = CreateFrame("Button", nil, box)
-    local fs = NewText(b, "BNBFontHighlight", 13)
-    fs:SetPoint("TOPLEFT")
-    fs:SetText(L["WELCOME_MORE"])
-    local function Paint(hover)
-        if hover then fs:SetTextColor(1, 0.93, 0.6) else fs:SetTextColor(1, 0.8, 0.2) end
+-- The gold button (interface/buttons/128goldredbutton, Dukul 2026-11-01): a
+-- left cap, a stretched middle and a right cap from the game's atlas, scaled
+-- to the button's height. Skin mode gets the large skin button (every button
+-- in a skin window is a skin button); a client without the atlas a normal one.
+local GOLD = { l = "128-GoldRedButton-Left", r = "128-GoldRedButton-Right",
+               c = "_128-GoldRedButton-Center", hl = "128-GoldRedButton-Highlight" }
+local GOLD_L_W, GOLD_R_W, GOLD_ART_H = 114, 292, 128   -- atlas sizes
+
+local function HasAtlas(name)
+    return C_Texture and C_Texture.GetAtlasInfo and C_Texture.GetAtlasInfo(name) and true or false
+end
+
+local function CreateGoldButton(parent, text, w, h)
+    if Skin() then return BNB.CreateSkinButton(nil, parent, text, w, h, 16) end
+    if not (HasAtlas(GOLD.l) and HasAtlas(GOLD.r) and HasAtlas(GOLD.c)) then
+        return BNB.CreateButton(nil, parent, text, w, h)
     end
-    Paint(false)
-    b:SetScript("OnEnter", function() Paint(true) end)
-    b:SetScript("OnLeave", function() Paint(false) end)
-    b:SetScript("OnClick", function()
-        Finish(false)
-        if BNB.HelpBook and BNB.HelpBook.OpenPatchNotes then BNB.HelpBook.OpenPatchNotes(WELCOME_PATCH) end
+    local b = CreateFrame("Button", nil, parent)
+    b:SetSize(w, h)
+    local l = b:CreateTexture(nil, "BACKGROUND")
+    local r = b:CreateTexture(nil, "BACKGROUND")
+    local c = b:CreateTexture(nil, "BACKGROUND")
+    l:SetPoint("TOPLEFT"); l:SetPoint("BOTTOMLEFT")
+    r:SetPoint("TOPRIGHT"); r:SetPoint("BOTTOMRIGHT")
+    c:SetPoint("TOPLEFT", l, "TOPRIGHT"); c:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+    local function Art(suffix)
+        l:SetAtlas(GOLD.l .. suffix); r:SetAtlas(GOLD.r .. suffix); c:SetAtlas(GOLD.c .. suffix)
+    end
+    Art("")
+    if HasAtlas(GOLD.hl) then
+        local hl = b:CreateTexture(nil, "HIGHLIGHT")
+        hl:SetAtlas(GOLD.hl)
+        hl:SetAllPoints()
+        hl:SetBlendMode("ADD")
+    end
+    local fs = b:CreateFontString(nil, "OVERLAY", "BNBFontHighlight")
+    SetFontSize(fs, 14)
+    BNB.SetTextWhite(fs)
+    fs:SetText(text or "")
+    local function Up() Art(""); fs:ClearAllPoints(); fs:SetPoint("CENTER", b, "CENTER", 0, 1) end
+    Up()
+    -- The caps keep the art's shape; on a narrow button both shrink to fit
+    function b:FitArt()
+        local bh, bw = self:GetHeight() or h, self:GetWidth() or w
+        local lw, rw = bh * GOLD_L_W / GOLD_ART_H, bh * GOLD_R_W / GOLD_ART_H
+        local sc = math.min(1, (bw - 2) / (lw + rw))
+        l:SetWidth(math.max(1, math.floor(lw * sc)))
+        r:SetWidth(math.max(1, math.floor(rw * sc)))
+    end
+    b:FitArt()
+    b:SetScript("OnMouseDown", function()
+        Art("-Pressed"); fs:ClearAllPoints(); fs:SetPoint("CENTER", b, "CENTER", 1, 0)
     end)
-    b._fs = fs
+    b:SetScript("OnMouseUp", Up)
+    b:SetScript("OnHide", Up)
     return b
+end
+
+local function OpenPatchNotes()
+    Finish()
+    if BNB.HelpBook and BNB.HelpBook.OpenPatchNotes then BNB.HelpBook.OpenPatchNotes(WELCOME_PATCH) end
+end
+
+local function OpenHelpBook()
+    Finish()
+    if BNB.HelpBook and BNB.HelpBook.Open then BNB.HelpBook.Open() end
 end
 
 local function BuildBox(ov)
@@ -172,21 +224,19 @@ local function BuildBox(ov)
         box._rows[i] = { ic = ic, fs = fs, explorer = p.explorer, badge = p[1] == "NEW" }
     end
 
-    box._more = BuildMoreLink(box)
-
     box._foot = NewText(box, "BNBFontHighlightSmall", 12)
     box._foot:SetTextColor(0.75, 0.75, 0.75)
     box._foot:SetText(L["EXPLORER_INTRO_FOOT"])
 
-    box._list = BNB.CreateButton(nil, box, L["EXPLORER_INTRO_LIST"], BTN_W, BTN_H)
-    box._list:SetScript("OnClick", function() Finish(true) end)
-    box._keep = BNB.CreateButton(nil, box, L["EXPLORER_INTRO_KEEP"], BTN_W, BTN_H)
-    box._keep:SetScript("OnClick", function() Finish(false) end)
-    box._ok = BNB.CreateButton(nil, box, L["WELCOME_OK"], BTN_W, BTN_H)
-    box._ok:SetScript("OnClick", function() Finish(false) end)
+    box._patch = BNB.CreateButton(nil, box, L["WELCOME_BTN_PATCH"], BTN_W, BTN_H)
+    box._patch:SetScript("OnClick", OpenPatchNotes)
+    box._go = CreateGoldButton(box, L["WELCOME_BTN_GO"], BTN_W, GOLD_H)
+    box._go:SetScript("OnClick", function() Finish() end)
+    box._help = BNB.CreateButton(nil, box, L["WELCOME_BTN_HELP"], BTN_W, BTN_H)
+    box._help:SetScript("OnClick", OpenHelpBook)
 
     local x = BNB.CreateIconButton(box, 22, "close", { skin = Skin() and true or false,
-        onClick = function() Finish(false) end })
+        onClick = function() Finish() end })
     x:SetPoint("TOPRIGHT", box, "TOPRIGHT", -6, -6)
     return box
 end
@@ -290,26 +340,19 @@ local function Layout()
         end
     end
     y = y - 4
-    box._more._fs:SetWidth(inner)
-    local mh = math.ceil(box._more._fs:GetStringHeight() or 0)
-    box._more:SetSize(math.min(inner, math.ceil(box._more._fs:GetStringWidth() or 0) + 2), mh)
-    box._more:ClearAllPoints()
-    box._more:SetPoint("TOPLEFT", box, "TOPLEFT", PAD, y)
-    y = y - mh - 14
     Vis(box._foot, exOn)
     if exOn then Put(box._foot, 0, inner, 18) else y = y - 4 end
-    box._list:SetShown(exOn and true or false)
-    box._keep:SetShown(exOn and true or false)
-    box._ok:SetShown(not exOn)
-    local bw = math.min(BTN_W, math.floor((inner - 12) / 2))
-    box._list:SetWidth(bw); box._keep:SetWidth(bw); box._ok:SetWidth(bw)
-    box._list:ClearAllPoints()
-    box._list:SetPoint("TOPRIGHT", box, "TOP", -6, y)
-    box._keep:ClearAllPoints()
-    box._keep:SetPoint("TOPLEFT", box, "TOP", 6, y)
-    box._ok:ClearAllPoints()
-    box._ok:SetPoint("TOP", box, "TOP", 0, y)
-    y = y - BTN_H - PAD
+    -- [ Patch notes ] [ Let's go ] [ Open help ], Let's go in the middle
+    local bw = math.min(BTN_W, math.floor((inner - BTN_GAP * 2) / 3))
+    box._patch:SetWidth(bw); box._go:SetWidth(bw); box._help:SetWidth(bw)
+    if box._go.FitArt then box._go:FitArt() end
+    box._go:ClearAllPoints()
+    box._go:SetPoint("TOP", box, "TOP", 0, y)
+    box._patch:ClearAllPoints()
+    box._patch:SetPoint("RIGHT", box._go, "LEFT", -BTN_GAP, 0)
+    box._help:ClearAllPoints()
+    box._help:SetPoint("LEFT", box._go, "RIGHT", BTN_GAP, 0)
+    y = y - GOLD_H - PAD
     box:SetHeight(-y)
 
     -- Taller than the window: scaled down to fit (CENTER anchor keeps it centred)
@@ -353,7 +396,7 @@ local function Build()
     ov._box = BuildBox(ov)
     ov._callout = BuildCallout(ov, "EXPLORER_INTRO_CALLOUT")
     ov._helpCallout = BuildCallout(ov, "WELCOME_HELP_CALLOUT")
-    BNB.AttachEscClose(ov, function() Finish(false) end)
+    BNB.AttachEscClose(ov, function() Finish() end)
     ov:SetScript("OnShow", function() Layout() end)
     -- Next frame: Layout sets text widths, never inside OnSizeChanged's pass
     mf:HookScript("OnSizeChanged", function()
@@ -364,17 +407,14 @@ local function Build()
 end
 
 -- ── Show / answer ───────────────────────────────────────────────────────────
-Finish = function(useList)
+Finish = function()
     if not _open then return end
     _open = false
     local db = BigNoteBoxDB
     if db then
         db.welcomeSeen = WELCOME_RELEASE
         db.explorerIntroSeen = nil   -- the 2.0 beta's flag, before ALL-617
-        -- The list becomes the view the window opens on (Settings > Modules)
-        if useList then db.explorerDefault = "list" end
     end
-    if useList and EX.SetActive then EX.SetActive(false) end
     if _ov then
         local ov = _ov
         BNB.FadeTo(ov, ov:GetAlpha(), 0, 0.2, function() ov:Hide(); ov:SetAlpha(1) end)

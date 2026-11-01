@@ -305,9 +305,11 @@ function K.BuildSpellPage(sf, ct, y, page)
     local SP = BNB.Spell
     local greyed = {}   -- { widget, label } greyed while the module is off
     local status
+    local PaintShields   -- the dictionary shields, set below
 
     local function Sync()
         local on = BNB.SpellEnabled()
+        if PaintShields then PaintShields() end
         for _, g in ipairs(greyed) do
             if not g[3] then g[1]:SetEnabled(on) end   -- g[3]: a frame, greyed only
             g[1]:SetAlpha(on and 1 or 0.35)
@@ -326,6 +328,64 @@ function K.BuildSpellPage(sf, ct, y, page)
         if SP then SP.Reset() end
         Sync()
     end
+
+    -- ── Dictionary shields (Dukul, 2026-11-01) ──────────────────────────────
+    -- A centred row of flags: the dictionary in use in full colour, the rest
+    -- greyed. French, German and Spanish are coming (ALL-559 S5).
+    local SHIELD, SHIELD_GAP = 32, 12
+    local FLAGS = "Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\shield-"
+    local SHIELDS = {
+        { "us", "CFG_SPELL_LANG_US", lang = "enUS" },
+        { "uk", "CFG_SPELL_LANG_UK", lang = "enGB" },
+        -- native = the language's own name, never translated (byte escapes:
+        -- ASCII-only literals, the game's fonts draw the accented letters)
+        { "fr", "CFG_SPELL_LANG_FR", native = "Fran\195\167ais" },
+        { "de", "CFG_SPELL_LANG_DE", native = "Deutsch" },
+        { "es", "CFG_SPELL_LANG_ES", native = "Espa\195\177ol" },
+    }
+    local rowW = #SHIELDS * SHIELD + (#SHIELDS - 1) * SHIELD_GAP
+    local shieldRow = CreateFrame("Frame", nil, ct)
+    shieldRow:SetSize(rowW, SHIELD)
+    shieldRow:SetPoint("TOP", ct, "TOPLEFT", K.CONTENT_W / 2, y)
+    local shields = {}
+    -- In use: the module on, its language picked and the word lists loaded
+    local function ShieldActive(s)
+        return s.lang and BNB.SpellEnabled() and SP and SP.Lang() == s.lang
+            and SP.EnsureLoaded() and true or false
+    end
+    PaintShields = function()
+        for _, b in ipairs(shields) do
+            local on = ShieldActive(b._def)
+            b._tx:SetDesaturated(not on)
+            b._tx:SetAlpha(on and 1 or 0.4)
+        end
+    end
+    for i, s in ipairs(SHIELDS) do
+        local b = CreateFrame("Frame", nil, shieldRow)
+        b:SetSize(SHIELD, SHIELD)
+        b:SetPoint("LEFT", shieldRow, "LEFT", (i - 1) * (SHIELD + SHIELD_GAP), 0)
+        b:EnableMouse(true)
+        b._def = s
+        b._tx = b:CreateTexture(nil, "ARTWORK")
+        b._tx:SetAllPoints()
+        b._tx:SetTexture(FLAGS .. s[1])
+        b:SetScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
+            GameTooltip:AddLine(L[s[2]], 1, 1, 1)
+            if s.native and s.native ~= L[s[2]] then GameTooltip:AddLine(s.native, 0.6, 0.6, 0.6) end
+            local line
+            if not s.lang then line = L["CFG_SPELL_SHIELD_SOON"]
+            elseif ShieldActive(s) then line = string.format(L["CFG_SPELL_SHIELD_ACTIVE_FMT"], SP.WordCount())
+            elseif not BNB.SpellEnabled() then line = L["CFG_SPELL_STATUS_OFF"]
+            elseif SP and SP.Lang() ~= s.lang then line = L["CFG_SPELL_SHIELD_PICK"]
+            else line = L["CFG_SPELL_STATUS_MISSING"] end
+            GameTooltip:AddLine(line, 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        shields[i] = b
+    end
+    y = y - SHIELD - 10
 
     -- ── Module switch ───────────────────────────────────────────────────────
     local enableCb
