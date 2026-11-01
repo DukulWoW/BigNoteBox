@@ -753,6 +753,14 @@ local function BuildFocusLangBadge(titleBg, titleEb)
     b._titleEb, b._titleBg = titleEb, titleBg
     b:EnableMouse(true)
     b:SetScript("OnEnter", function(self)
+        local spell = self._code and self._code:match("^spell:(.+)")
+        if spell and BNB.Spell then   -- the spelling shield (main editor's)
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine(string.format(L["NT_SPELL_LANG_FMT"], BNB.Spell.LangName(spell)), 1, 1, 1)
+            GameTooltip:AddLine(L["NE_SPELL_BADGE_TIP"], 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+            return
+        end
         local key = FOCUS_LANG_KEY[self._code]
         if not key then return end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
@@ -770,10 +778,16 @@ function BNB.RefreshFocusLangBadge(text)
     local b = focusLangBadge
     if not b then return end
     local code = BNB.TextShield and BNB.TextShield(text)
+    local file = code and FOCUS_LANG_SHIELD[code]
+    -- No script shield: the spelling one (BNB.RefreshEditorLangBadge)
+    if not code and BNB.Spell and BNB.Spell.TitleShield then
+        local sl, sf = BNB.Spell.TitleShield(BNB._currentNoteID)
+        if sl then code, file = "spell:" .. sl, sf end
+    end
     if code == b._code and b:IsShown() == (code ~= nil) then return end
     b._code = code
     if code then
-        b._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. FOCUS_LANG_SHIELD[code])
+        b._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. file)
     end
     b:SetShown(code ~= nil)
     -- The title's right edge moves clear of the shield

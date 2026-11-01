@@ -167,6 +167,31 @@ function SP.LangFlag(lang)
     return def and def.flag
 end
 
+-- The spelling shield on the title rows (Dukul, 2026-11-01): the note's
+-- language when it is not the game's own. English US / UK are one family on
+-- an English client, as German on a German one; a client with no dictionary
+-- of its own language counts as English. Returns lang, shield file or nil
+function SP.TitleShield(noteID)
+    if not (noteID and BNB.SpellEnabled()) or tostring(noteID):find("^sys%-") then return nil end
+    local lang = SP.Lang(noteID)
+    local loc, home = (GetLocale and GetLocale() or "enUS"):sub(1, 2), "en"
+    for _, l in ipairs(LANGS) do
+        if l.code:sub(1, 2) == loc then home = loc; break end
+    end
+    if lang:sub(1, 2) == home or not SP.LangFlag(lang) then return nil end
+    return lang, "shield-" .. SP.LangFlag(lang)
+end
+
+-- The open note's title-row shields again (a language, the default or the
+-- module changed: SP.Reset)
+function SP.RefreshTitleShields()
+    local id = BNB._currentNoteID
+    local note = id and BNB.GetNote and BNB.GetNote(id)
+    if not note then return end
+    if BNB.RefreshEditorLangBadge then BNB.RefreshEditorLangBadge(note.body) end
+    if BNB.RefreshFocusLangBadge then BNB.RefreshFocusLangBadge(note.body) end
+end
+
 local function LoadFolder(addon)
     if _tried[addon] then return end
     _tried[addon] = true
@@ -629,6 +654,7 @@ function SP.Reset()
         if ed.clickText then ed.clickRanges = SP.Mistakes(ed.clickText, ed.Lang()) end
         ed.Redraw()
     end
+    pcall(SP.RefreshTitleShields)
 end
 
 --------------------------------------------------------------------------------

@@ -288,14 +288,21 @@ end
 -- Assets/Flags shield for a note with Korean, Chinese or Japanese text.
 -- text = what the body box holds (typing, via ApplyNoteFont) or the saved body
 local LANG_SHIELD = { ko = "shield-ko", cn = "shield-cn", ja = "shield-ja", ua = "shield-ua", gr = "shield-gr" }
+-- No script shield: the note's spelling language when it is not the
+-- game's own (BNB.Spell.TitleShield, Dukul 2026-11-01); code "spell:frFR"
 function BNB.RefreshEditorLangBadge(text)
     local lang = BNB._editorLangBadge
     if not lang then return end
     local code = BNB.TextShield and BNB.TextShield(text)
+    local file = code and LANG_SHIELD[code]
+    if not code and BNB.Spell and BNB.Spell.TitleShield then
+        local sl, sf = BNB.Spell.TitleShield(BNB._currentNoteID)
+        if sl then code, file = "spell:" .. sl, sf end
+    end
     local was = lang._code
     lang._code = code
     if code then
-        lang._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. LANG_SHIELD[code])
+        lang._tx:SetTexture("Interface\\AddOns\\BigNoteBox\\Assets\\Flags\\" .. file)
     end
     lang:SetShown(code ~= nil)
     if was ~= code then PlaceTitle() end
@@ -422,6 +429,14 @@ local function BuildTitleField(parent)
     langBadge._tx:SetAllPoints()
     langBadge:EnableMouse(true)
     langBadge:SetScript("OnEnter", function(self)
+        local spell = self._code and self._code:match("^spell:(.+)")
+        if spell and BNB.Spell then
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:AddLine(string.format(L["NT_SPELL_LANG_FMT"], BNB.Spell.LangName(spell)), 1, 1, 1)
+            GameTooltip:AddLine(L["NE_SPELL_BADGE_TIP"], 0.7, 0.7, 0.7, true)
+            GameTooltip:Show()
+            return
+        end
         local key = ({ ko = "NE_LANG_BADGE_KOREAN", cn = "NE_LANG_BADGE_CHINESE",
             ja = "NE_LANG_BADGE_JAPANESE", ua = "NE_LANG_BADGE_CYRILLIC",
             gr = "NE_LANG_BADGE_GREEK" })[self._code]
