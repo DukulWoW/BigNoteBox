@@ -143,48 +143,71 @@ local function HeaderPattern(rich)
     return rich and ("^{h3}" .. pat .. "{/h3}%s*$") or ("^%-%-%-%-%- " .. pat .. " %-%-%-%-%-%s*$")
 end
 
--- Where the list ends: the next heading, divider or plain rule line
-local function IsSectionStart(line)
-    return line:find("^{h%d") or line:find("^{div:") or line:find("^%-%-%-%-%-")
+-- The player's words are never touched (Dukul, 2026-11-01: "a safety that
+-- they don't remove what people write ... like we have on Player notes"):
+-- the note keeps the fingerprint of the exact list text last written
+-- (note.vendorFp, UN.Fingerprint as the player notes' unitAuto.fp). A later
+-- list replaces only lines whose text still has that fingerprint; anything
+-- around them, or an edited list, stays. Returns first, last line or nil.
+local function FindOwnList(lines, pat, fp)
+    local Fp = BNB.UnitNotes and BNB.UnitNotes.Fingerprint
+    if not (fp and Fp) then return nil end
+    for i, line in ipairs(lines) do
+        if line:find(pat) then
+            -- UN.Fingerprint fed line by line, "\n" between: one pass per header
+            local h = 5381
+            for k = i, #lines do
+                local l = lines[k]
+                for b = 1, #l do h = (h * 33 + l:byte(b)) % 4294967296 end
+                if tostring(h) == fp and Fp(table.concat(lines, "\n", i, k)) == fp then return i, k end
+                h = (h * 33 + 10) % 4294967296
+            end
+        end
+    end
 end
 
--- The body with the vendor list in it. Rich: above the player's Notes part,
--- which stays last (TN.AddAboveNotes); an earlier list and the divider over it
--- are taken out first, so a list made below Notes moves up. Plain (no Notes
--- heading): an earlier list is replaced where it stands, else at the bottom.
-local function BodyWithList(body, section, rich)
+-- The body with the vendor list in it, and whether an edited (or older) list
+-- was left as it is. Rich: above the player's Notes part, which stays last
+-- (TN.AddAboveNotes): our unedited earlier list is replaced where it stands,
+-- or, below Notes, taken out with the divider over it and put above. Plain
+-- (no Notes heading): replaced where it stands, else at the bottom.
+local function BodyWithList(body, section, rich, fp)
     body = (body or ""):gsub("\r", "")
     local TN = BNB.TargetNote
     local lines, pat = {}, HeaderPattern(rich)
     for line in (body .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = line end
-    local from
-    for i, line in ipairs(lines) do
-        if line:find(pat) then from = i; break end
-    end
+    local from, to = FindOwnList(lines, pat, fp)
     if not from then
-        if rich then return TN.AddAboveNotes(body, section) end
+        local kept = false
+        for _, line in ipairs(lines) do if line:find(pat) then kept = true; break end end
+        if rich then return TN.AddAboveNotes(body, section), kept end
         body = body:gsub("%s+$", "")
-        return (body ~= "" and (body .. "\n\n") or "") .. section
+        return (body ~= "" and (body .. "\n\n") or "") .. section, kept
     end
-    local to = #lines + 1
-    for i = from + 1, #lines do
-        if IsSectionStart(lines[i]) then to = i; break end
+    -- Rich: replaced where it stands while above the Notes heading (text the
+    -- player wrote around it keeps its place); one below Notes moves up
+    local below = false
+    if rich then
+        local notesHdr = "{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}"
+        for i = 1, from - 1 do
+            if lines[i]:gsub("%s+$", "") == notesHdr then below = true; break end
+        end
     end
     local cut = from
-    if rich then
+    if below then
         local j = from - 1
         while j > 0 and lines[j]:match("^%s*$") do j = j - 1 end
         if j > 0 and lines[j]:find("^{div:") then cut = j end
     end
     local before = table.concat(lines, "\n", 1, cut - 1):gsub("%s+$", "")
-    local after  = to <= #lines and table.concat(lines, "\n", to, #lines) or ""
+    local after  = to < #lines and table.concat(lines, "\n", to + 1, #lines) or ""
     after = after:gsub("^%s+", ""):gsub("%s+$", "")
-    if rich then
+    if below then
         local rest = before .. ((before ~= "" and after ~= "") and "\n\n" or "") .. after
-        return TN.AddAboveNotes(rest, section)
+        return TN.AddAboveNotes(rest, section), false
     end
     if before ~= "" then before = before .. "\n\n" end
-    return before .. section .. (after ~= "" and ("\n\n" .. after) or "")
+    return before .. section .. (after ~= "" and ("\n\n" .. after) or ""), false
 end
 
 local function Section(list, rich)
@@ -223,14 +246,18 @@ local function Write(list, id)
         ids[i] = e.id
         if e.limited then limited = true end
     end
+    local section = Section(list, rich)
+    local body, kept = BodyWithList(note.body, section, rich, note.vendorFp)
     BNB.UpdateNote(id, {
-        body = BodyWithList(note.body, Section(list, rich), rich),
+        body = body,
         tags = VendorTags(note.tags, limited),
+        vendorFp = BNB.UnitNotes.Fingerprint(section),
     })
     if BNB.RBSetVendorItems then BNB.RBSetVendorItems(id, ids) end
     if BNB.UnitNotes and BNB.UnitNotes.RefreshNoteViews then BNB.UnitNotes.RefreshNoteViews(id) end
     if BNB.RefreshNoteList then BNB.RefreshNoteList() end
     BNB:Print(string.format(L["VENDOR_SAVED_FMT"], #list, note.title or "?"))
+    if kept then BNB:Print(L["VENDOR_KEPT_EDITED"]) end
     -- Note Capture set to "open": show the note, as dialogue capture does
     if DB().quickNoteAction == "open" then
         if BNB.mainFrame and not BNB.mainFrame:IsShown() then BNB.mainFrame:Show() end

@@ -2151,6 +2151,7 @@ L["VENDOR_BTN_TIP2"]                = "Saves everything this vendor sells in its
 L["VENDOR_SAVED_FMT"]               = "%d items saved in the note %s."
 L["VENDOR_LOCKED_FMT"]              = "|cffff9900%s is locked.|r Unlock it in Note Settings to update its vendor list."
 L["VENDOR_NO_NPC"]                  = "This vendor has no NPC note to save the list in."
+L["VENDOR_KEPT_EDITED"]             = "Your edited vendor list in that note was kept; today's list was added next to it."
 L["VENDOR_EMPTY"]                   = "This vendor sells nothing right now."
 L["QN_DIALOGUE_ADDED"]              = "Dialogue added to the note: %s"
 -- Rich or normal capture notes, and what goes in them (ALL-634)

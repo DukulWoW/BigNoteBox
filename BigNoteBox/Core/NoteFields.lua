@@ -122,6 +122,10 @@ local FIELDS = {
     { "unitAuto",  "t", nocopy = true },
     { "unitMet",   "t", nocopy = true },
     { "unitSeen",  "t", nocopy = true },
+    -- The vendor list's fingerprint (ALL-644, Features/VendorNote.lua): the
+    -- exact list text last written, so a later list replaces only an
+    -- unedited one. A copy's list counts as edited
+    { "vendorFp",  "s", nocopy = true },
     -- When and where the note was made
     { "created",    "n", nocopy = true },
     { "updated",    "n", nocopy = true },
