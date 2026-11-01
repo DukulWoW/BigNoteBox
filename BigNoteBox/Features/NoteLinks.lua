@@ -551,6 +551,8 @@ local function FullLink(link, text)
 end
 
 local function IsWeb(kind) return not kind or kind == "http" or kind == "https" end
+-- Game links whose kind is Wowhead's own page name (BNB.WowheadURL)
+local WOWHEAD_KINDS = { item = true, quest = true, spell = true, currency = true, achievement = true }
 
 -- The icon of an item or spell link, for the link menu's title (Dukul,
 -- 2026-10-18); nil for anything else
@@ -747,6 +749,14 @@ function NL.LinkMenu(owner, link, text)
             if kind == "item" and DressUpItemLink then
                 root:CreateButton(L["LINK_MENU_TRYON"], OutOfFocus(function() pcall(DressUpItemLink, full) end),
                     { icon = "dressing-room" })
+            end
+            -- The Wowhead address, as the NPC link's menu has (Dukul,
+            -- 2026-11-01: a quest note's quest link does the Wowhead line's job)
+            local whID = WOWHEAD_KINDS[kind] and tonumber(link:match("^%a+:(%d+)"))
+            if whID and BNB.WowheadURL then
+                root:CreateButton(L["REFBOX_CTX_WOWHEAD"], function()
+                    BNB.ShowClipboardHint(BNB.WowheadURL(kind, whID), nil, nil, true)
+                end, { icon = "copy-clipboard" })
             end
         end
     end)

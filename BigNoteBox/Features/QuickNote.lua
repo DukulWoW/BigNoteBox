@@ -823,7 +823,7 @@ end
 -- text = the quest's own words. opts: npc / npcID (what the caller knows;
 -- npc = false: none, the quest log), log (read from the quest log), stage
 -- ("accept" / "complete", else the last quest event), objectives / rewards
--- (false = leave out)
+-- / wowhead (false = leave out)
 local function QuestBody(questID, text, opts)
     opts = opts or {}
     local rich = RichFor("quest")
@@ -836,7 +836,7 @@ local function QuestBody(questID, text, opts)
     return CaptureBody({
         rich = rich, npc = npc, npcID = npcID, place = opts.npc ~= false,
         info = QuestInfoLine(questID, opts.stage or (opts.log and "log") or _questStage, not opts.log),
-        wowhead = WowheadLine(questID, rich),
+        wowhead = opts.wowhead ~= false and WowheadLine(questID, rich) or nil,
         text = text,
         objectives = opts.objectives ~= false and QuestObjectives(questID) or nil,
         rewards = rewards,
@@ -1452,6 +1452,7 @@ local _duiInjected  = false  -- true once we have confirmed DUI is loaded
 local _duiCache     = nil    -- cached GetContentForClipboard() for current dialogue
 local _duiQuestID   = nil    -- cached GetQuestID() for current quest dialogue
 local _duiQuestTitle = nil   -- cached GetTitleText() for it (the note's title)
+local _duiMoney, _duiXP = nil, nil   -- the quest's money / XP reward, to find those lines (DUILinks)
 
 local function CacheDUIText()
     -- Called one tick after a dialogue event fires. DUI has already populated
@@ -1470,6 +1471,73 @@ local function CacheDUIText()
     if _duiQuestID and _duiQuestID <= 0 then _duiQuestID = nil end
     _duiQuestTitle = _duiQuestID and GetTitleText and GetTitleText() or nil
     if _duiQuestTitle == "" then _duiQuestTitle = nil end
+    _duiMoney = _duiQuestID and GetRewardMoney and tonumber(GetRewardMoney()) or nil
+    _duiXP    = _duiQuestID and GetRewardXP and tonumber(GetRewardXP()) or nil
+end
+
+-- Dialogue UI's Copy Text writes ids in brackets ("[Quest: 24469] Hold the
+-- Line!", "[ItemID: 131895] Ironstock's Iron Grips x2"): game links instead,
+-- and in a rich note the reward's icon in front; its money line (all in
+-- copper, "55 Copper" in DUI's own language) and XP line get the coin / XP
+-- pictures (Dukul, 2026-11-01). Money and XP are found by the quest's own
+-- numbers, so any language works. Formats: DialogueUI.lua Clipboard block,
+-- UITemplates.lua GetClipboardOutput.
+local function DUIIcon(tex, rich)
+    return (rich and tex) and ("{icon:" .. tostring(tex) .. ":16} ") or ""
+end
+local function DUILine(line, rich)
+    local id, rest = line:match("^%[Quest:%s*(%d+)%]%s*(.*)$")
+    if id then
+        id = tonumber(id)
+        local link = GetQuestLink and GetQuestLink(id)
+        return (type(link) == "string" and link ~= "") and link
+            or string.format("|cffffff00|Hquest:%d:0|h[%s]|h|r", id, rest)
+    end
+    id, rest = line:match("^%[ItemID:%s*(%d+)%]%s*(.*)$")
+    if id then
+        id = tonumber(id)
+        local name, count = rest:match("^(.-)%s+(x%d+)$")
+        name = name or rest
+        local link = select(2, C_Item.GetItemInfo(id)) or ("|cffffffff|Hitem:" .. id .. "|h[" .. name .. "]|h|r")
+        local tex = ItemIcon(id) or (C_Item.GetItemIconByID and C_Item.GetItemIconByID(id))
+        return DUIIcon(tex, rich) .. link .. (count and (" " .. count) or "")
+    end
+    id, rest = line:match("^%[SpellID:%s*(%d+)%]%s*(.*)$")
+    if id then
+        id = tonumber(id)
+        local link = C_Spell and C_Spell.GetSpellLink and C_Spell.GetSpellLink(id)
+        local tex = C_Spell and C_Spell.GetSpellTexture and C_Spell.GetSpellTexture(id)
+        return DUIIcon(tex, rich) .. (link or rest)
+    end
+    id, rest = line:match("^%[CurrencyID:%s*(%d+)%]%s*(.*)$")
+    if id then
+        id = tonumber(id)
+        local name, amount = rest:match("^(.-)%s+(%d+)$")
+        local info = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyInfo and C_CurrencyInfo.GetCurrencyInfo(id)
+        local link = C_CurrencyInfo and C_CurrencyInfo.GetCurrencyLink
+            and C_CurrencyInfo.GetCurrencyLink(id, tonumber(amount) or 0)
+        return DUIIcon(info and info.iconFileID, rich) .. (amount and (amount .. " ") or "") .. (link or name or rest)
+    end
+    rest = line:match("^%[FactionID:%s*%d+%]%s*(.*)$")
+    if rest then return rest end
+    if _duiMoney and _duiMoney > 0 then
+        local n = line:match("^(%d+)%s*%D+$")
+        if tonumber(n) == _duiMoney then
+            return rich and MoneyText(_duiMoney, true) or (BNB.L["QN_REW_MONEY"] .. ": " .. MoneyText(_duiMoney))
+        end
+    end
+    if rich and _duiXP and _duiXP > 0 and line:find("^" .. _duiXP .. " XP") then
+        return XP_ICON .. " " .. line
+    end
+    return line
+end
+local function DUILinks(text, rich)
+    local out = {}
+    for line in (text:gsub("\r", "") .. "\n"):gmatch("(.-)\n") do
+        local ok, conv = pcall(DUILine, line, rich)
+        out[#out + 1] = ok and conv or line
+    end
+    return table.concat(out, "\n")
 end
 
 local function GetDUIText()
@@ -1521,8 +1589,9 @@ local function OnDUIDialogueCopy()
     if not npcName or not body or body:match("^%s*$") then return end
     local qid = _duiQuestID
     if not qid then
-        -- Plain talk: into the NPC's own note (ALL-631)
-        SaveDialogue(npcName, body, npcID)
+        -- Plain talk: into the NPC's own note (ALL-631); links only, the
+        -- note may be a plain one
+        SaveDialogue(npcName, DUILinks(body, false), npcID)
         return
     end
     -- A quest: its own note, titled with the quest
@@ -1531,9 +1600,11 @@ local function OnDUIDialogueCopy()
         AttachQuestRewards(noteID)
     end
     -- Dialogue UI's text already holds the objectives and rewards: only the
-    -- header block is ours (ALL-634)
-    local noteBody, rich = QuestBody(qid, body, { npc = npcName, npcID = npcID,
-        objectives = false, rewards = false })
+    -- header block is ours (ALL-634). Its first line is now the quest link,
+    -- whose right-click menu copies the Wowhead address: no Wowhead line
+    -- (Dukul, 2026-11-01)
+    local noteBody, rich = QuestBody(qid, DUILinks(body, RichFor("quest")), { npc = npcName, npcID = npcID,
+        objectives = false, rewards = false, wowhead = false })
     CreateQuickNote(_duiQuestTitle or DialogueTitle(npcName), noteBody, RandomIcon(), WithPlaceTags({ "Quest" }), rewardFn, rich)
 end
 
@@ -1837,6 +1908,7 @@ qnFrame:SetScript("OnEvent", function(_, event, arg1, arg2)
         _duiCache   = nil    -- clear stale dialogue cache
         _duiQuestID = nil    -- clear stale quest ID
         _duiQuestTitle = nil
+        _duiMoney, _duiXP = nil, nil
         _duiBookPages = {}   -- clear stale book page cache
         if event == "ITEM_TEXT_CLOSED" then CancelItemTextCapture() end
         ImmersionBypassEnd()
