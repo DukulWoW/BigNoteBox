@@ -188,12 +188,13 @@ BNB.DEFAULTS = {
     -- Spelling (ALL-559): on for English game clients, off for the others
     -- (their notes are mostly in another language). Features/Spellcheck.lua
     spellEnabled        = (GetLocale() == "enUS" or GetLocale() == "enGB"),
-    spellLang           = "enUS",    -- "enUS" / "enGB", or "frFR" from the Spelling Pack (ALL-559 S5)
+    spellLang           = "enUS",    -- "enUS" / "enGB", or "frFR" / "deDE" from the Spelling Pack (ALL-559 S5 / S5b)
     spellMode           = "type",    -- "type" = as you type, "click" = on Check spelling
     spellSkipCaps       = true,      -- capitalized words in a sentence = names, not checked
     spellSkipUpper      = false,     -- words in capitals not checked (off: they are)
     spellSkipDigits     = true,      -- words with a number not checked
     spellRepeats        = true,      -- "the the" marked
+    spellCompounds      = true,      -- German: compound words our looser rule finds pass (off = the dictionary's rules, ALL-559 S5b)
     spellShortcuts      = true,      -- text shortcuts expand as typed (ALL-559 S4, Features/TextShortcuts.lua)
     spellShortcutsBang  = false,     -- "Only with !": shortcuts expand only typed as !brb (ALL-574)
     spellCorrectPos     = false,     -- Correct spelling window { x, y }; false = on the main window

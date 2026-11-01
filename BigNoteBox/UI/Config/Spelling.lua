@@ -351,8 +351,8 @@ function K.BuildSpellPage(sf, ct, y, page)
     -- ── Dictionary shields (Dukul, 2026-11-01) ──────────────────────────────
     -- A centred row of flags: every installed dictionary in full colour, the
     -- rest greyed (Dukul, 2026-11-01: "show colored ... if the dictionary is
-    -- installed", so US and UK always are). French from the extra download
-    -- (ALL-559 S5); German and Spanish are coming. The row is the language
+    -- installed", so US and UK always are). French and German from the extra
+    -- download (ALL-559 S5 / S5b); Spanish is coming. The row is the language
     -- picker (Dukul, 2026-11-01: no dropdown): a click on an installed flag
     -- makes it the default; the default has the note list's hover plate
     -- (ui-note-list-collapsed-hover) behind it, green in normal mode, the
@@ -366,7 +366,7 @@ function K.BuildSpellPage(sf, ct, y, page)
         -- native = the language's own name, never translated (byte escapes:
         -- ASCII-only literals, the game's fonts draw the accented letters)
         { "fr", "CFG_SPELL_LANG_FR", native = "Fran\195\167ais", lang = "frFR" },
-        { "de", "CFG_SPELL_LANG_DE", native = "Deutsch" },
+        { "de", "CFG_SPELL_LANG_DE", native = "Deutsch", lang = "deDE" },
         { "es", "CFG_SPELL_LANG_ES", native = "Espa\195\177ol" },
     }
     local rowW = #SHIELDS * SHIELD + (#SHIELDS - 1) * SHIELD_GAP
@@ -475,6 +475,8 @@ function K.BuildSpellPage(sf, ct, y, page)
     Rule(L["CFG_SPELL_SKIP_UPPER"],  L["CFG_SPELL_SKIP_UPPER_TIP"],  "spellSkipUpper",  false)
     Rule(L["CFG_SPELL_SKIP_DIGITS"], L["CFG_SPELL_SKIP_DIGITS_TIP"], "spellSkipDigits", true)
     Rule(L["CFG_SPELL_REPEATS"],     L["CFG_SPELL_REPEATS_TIP"],     "spellRepeats",    true)
+    -- German compound words (ALL-559 S5b, Dukul: give the Germans a choice)
+    Rule(L["CFG_SPELL_COMPOUNDS"],   L["CFG_SPELL_COMPOUNDS_TIP"],   "spellCompounds",  true)
 
     -- What is never checked, in one line
     local note = ct:CreateFontString(nil, "OVERLAY", "BNBFontHighlightSmall")

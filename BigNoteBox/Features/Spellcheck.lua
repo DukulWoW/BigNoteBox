@@ -15,7 +15,8 @@
 -- Settings (Settings > Modules > Spelling, UI/Config/Spelling.lua):
 --   spellEnabled   the module (on for English game clients)
 --   spellLang      the default dictionary: "enUS" / "enGB", or one from the
---                  extra download BigNoteBox_SpellPack ("frFR", ALL-559 S5);
+--                  extra download BigNoteBox_SpellPack ("frFR", ALL-559 S5;
+--                  "deDE", S5b);
 --                  a note can have its own (note.spellLang, the right-click
 --                  menu's Language row), nil = the default
 --   spellMode      "type" = marks while typing, "click" = only after Check
@@ -27,6 +28,8 @@
 --   spellSkipDigits words with a number are not checked; off = their letters
 --                  are (three or more), 1st / 2nd / 3rd / 4th always pass
 --   spellRepeats   the same word twice in a row ("the the") is marked
+--   spellCompounds compound words our looser rule finds pass (German; off =
+--                  only the dictionary's own compound rules, ALL-559 S5b)
 --
 -- Stage 2: right-click on a marked word = up to six suggestions (one undo
 -- step through BNB.ReplaceInEditor), Add to dictionary, Ignore (until the
@@ -56,6 +59,14 @@
 -- A language's data may list elisions (French l' d' qu'...): "l'arbre" is
 -- looked up as "arbre". Lower-casing knows Latin-1 capitals (E-acute), and
 -- suggestions compare letters, not bytes, an accent alone costing little.
+-- Stage 5b (German, BigNoteBox_Spell_deDE): nouns start with a capital, so a
+-- German check never skips capitalized words (Skip names is for the other
+-- languages); a word in capitals may spell sharp s as SS (STRASSE). Compound
+-- words (Compound): the dictionary's own parts (begin / middle / endx in the
+-- data), and, unless spellCompounds is off, our looser rule: noun + noun,
+-- the first with its linking s / es / e (Arbeitsplatz, Schulbuch), every
+-- part 3 letters or more, game words count (Questgeber). Suggestions for a
+-- long word fix the broken part and keep the rest (CompoundSuggest).
 --
 -- Not checked: game links, textures, color codes, every complete {...}
 -- markup and {{token}}, web and mail addresses, lines that start with "/"
@@ -90,11 +101,15 @@ local _main                   -- the main editor's checker
 -- addon = the folder that holds the list (English ships with BigNoteBox,
 -- the rest are the extra download BigNoteBox_SpellPack, ALL-559 S5);
 -- accents = suggestions also look at words that start with an accented
--- letter and allow a few more bytes (an accent is two)
+-- letter and allow this many more bytes (an accented letter is two); nouns = capitalized
+-- words are always checked (German nouns); sharps = SS in a word in capitals
+-- may be a sharp s. Compound words come with the data (begin, S5b)
 local LANGS = {
     { code = "enUS", addon = ADDON, name = "CFG_SPELL_LANG_US", flag = "us" },
     { code = "enGB", addon = ADDON, name = "CFG_SPELL_LANG_UK", flag = "uk" },
-    { code = "frFR", addon = "BigNoteBox_Spell_frFR", name = "CFG_SPELL_LANG_FR", flag = "fr", accents = true },
+    { code = "frFR", addon = "BigNoteBox_Spell_frFR", name = "CFG_SPELL_LANG_FR", flag = "fr", accents = 4 },
+    { code = "deDE", addon = "BigNoteBox_Spell_deDE", name = "CFG_SPELL_LANG_DE", flag = "de", accents = 2,
+      nouns = true, sharps = true },
 }
 local LANG_BY = {}
 for _, l in ipairs(LANGS) do LANG_BY[l.code] = l end
@@ -233,6 +248,27 @@ local function LowerWord(w)
         w = w:gsub("\197\146", "\197\147"):gsub("\197\184", "\195\191")
     end
     return w
+end
+
+local byte = string.byte
+
+-- Never WoW's upper() (ALL-507): a-z, and the Latin-1 small letters
+-- (C3 A0-BE but the division sign -> C3 80-9E, ALL-559 S5)
+local function UpperLatin1(c)
+    local b = c:byte()
+    if b == 183 then return nil end
+    return "\195" .. string.char(b - 32)
+end
+local function CapFirst(w)
+    if byte(w, 1) == 195 then return (w:gsub("^\195([\160-\190])", UpperLatin1)) end
+    return (w:gsub("^[a-z]", string.upper))
+end
+-- An upper-case first letter: A-Z, or a Latin-1 capital (U+00C0-U+00DE)
+local function UpperFirst(w)
+    local b = byte(w, 1)
+    if b >= 65 and b <= 90 then return true end
+    local b2 = byte(w, 2)
+    return b == 195 and b2 ~= nil and b2 >= 128 and b2 <= 158 and b2 ~= 151
 end
 
 -- Words from this player's game: class names, known characters, tags
@@ -401,7 +437,7 @@ function SP.ImportList(list)
 end
 
 -- The word as it is, in the language of the check running now (_cur)
-local function Known(w)
+local function KnownPlain(w)
     local d = _data[_cur]
     if d and d.base then
         if InBuckets(d.add, w) then return true end
@@ -412,19 +448,136 @@ local function Known(w)
     return _data.wow ~= nil and InBuckets(_data.wow.words, w)
 end
 
+--------------------------------------------------------------------------------
+-- Compound words (German, ALL-559 S5b). Every part is looked up as it is
+-- written; a part after the first starts with a small letter (Gilden + bank:
+-- "Bank" is the noun looked up). The dictionary's rules: a start from its
+-- begin list, middles from its middle list, an end that is a noun (or one
+-- of endx), parts of cmin bytes. Our looser rule (spellCompounds, a noun
+-- compound only): any noun starts one, also with the linking s / es, or
+-- without its last e; parts of 3 bytes or more; game words count
+--------------------------------------------------------------------------------
+local LOOSE_MIN = 3
+
+-- Never split inside a letter: a part cannot start with a UTF-8 continuation byte
+local function Cut(w, i)
+    local b = byte(w, i)
+    return b ~= nil and (b < 128 or b > 191)
+end
+local function LooseOn()
+    return not (BigNoteBoxDB and BigNoteBoxDB.spellCompounds == false)
+end
+-- A word of the language's list, or a game word (raid, quest)
+local function InWords(w)
+    local d = _data[_cur]
+    if d and InBuckets(d.words, w) then return true end
+    return _data.wow ~= nil and InBuckets(_data.wow.words, LowerWord(w))
+end
+
+local function HeadStrict(h)
+    local d = _data[_cur]
+    return #h >= (d.cmin or 2) and InBuckets(d.begin, h)
+end
+local function MidStrict(m)
+    local d = _data[_cur]
+    return #m >= (d.cmin or 2) and InBuckets(d.middle, m)
+end
+local function TailStrict(t)
+    local d = _data[_cur]
+    return #t >= (d.cmin or 2) and (InBuckets(d.endx, t) or InBuckets(d.words, CapFirst(t)))
+end
+
+-- h starts with its capital: Arbeits(platz), Tages(licht), Schul(buch)
+local function HeadLoose(h)
+    local n = #h
+    if n < LOOSE_MIN then return false end
+    local d = _data[_cur]
+    if InWords(h) or InBuckets(d.begin, h) then return true end
+    if byte(h, n) == 115 and n > LOOSE_MIN then                   -- s
+        if InBuckets(d.words, h:sub(1, n - 1)) then return true end
+        if n > LOOSE_MIN + 1 and byte(h, n - 1) == 101
+           and InBuckets(d.words, h:sub(1, n - 2)) then return true end   -- es
+    end
+    return InBuckets(d.words, h .. "e")
+end
+local function MidLoose(m)
+    return HeadLoose(CapFirst(m)) or InBuckets(_data[_cur].middle, m)
+end
+-- A noun, or a word as written (Heil + traenke: the dictionary has the verb form only)
+local function TailLoose(t)
+    if #t < LOOSE_MIN then return false end
+    local d = _data[_cur]
+    return InWords(CapFirst(t)) or InBuckets(d.words, t) or InBuckets(d.endx, t)
+end
+
+-- w as parts: a head, any middles, an end. The ends are found first (few
+-- of them pass), then the start is split up to them; memo per call
+local function Splits(w, minp, headOk, midOk, tailOk)
+    local n = #w
+    local ends
+    for k = minp + 1, n - minp + 1 do
+        if Cut(w, k) and tailOk(w:sub(k)) then
+            ends = ends or {}
+            ends[#ends + 1] = k
+        end
+    end
+    if not ends then return false end
+    local memo = {}
+    -- w:sub(i, k - 1) as one part or more: a head when i == 1, else middles
+    local function Chain(i, k, depth)
+        local key = i * 4096 + k
+        local c = memo[key]
+        if c ~= nil then return c end
+        local okFn = (i == 1) and headOk or midOk
+        local ok = (k - i >= minp) and okFn(w:sub(i, k - 1)) or false
+        if not ok and depth < 4 then
+            for j = i + minp, k - minp do
+                if Cut(w, j) and okFn(w:sub(i, j - 1)) and Chain(j, k, depth + 1) then ok = true; break end
+            end
+        end
+        memo[key] = ok
+        return ok
+    end
+    for _, k in ipairs(ends) do
+        if Chain(1, k, 1) then return true end
+    end
+    return false
+end
+
+local function Compound(w)
+    local d = _data[_cur]
+    if not (d and d.begin) or #w < 4 then return false end
+    if Splits(w, d.cmin or 2, HeadStrict, MidStrict, TailStrict) then return true end
+    if not LooseOn() or #w < 2 * LOOSE_MIN or not UpperFirst(w) then return false end
+    return Splits(w, LOOSE_MIN, HeadLoose, MidLoose, TailLoose)
+end
+
+-- A compound's start before a "-" in the text: "Arbeits- und Sozialminister"
+local function HyphenHead(w)
+    local d = _data[_cur]
+    if not (d and d.begin) then return false end
+    return HeadStrict(w) or (LooseOn() and UpperFirst(w) and HeadLoose(w))
+end
+
+-- Known as it is: in the lists, or (German) a compound of known parts
+local function Known(w)
+    if KnownPlain(w) then return true end
+    local d = _data[_cur]
+    return d ~= nil and d.begin ~= nil and Compound(w)
+end
+
 -- In the word lists (any case), leaving out the player's own words and
 -- game words: a text shortcut that is a real word gets a warning (stage 4)
 function SP.InDictionary(w)
     _cur = SP.DefaultLang()
     if type(w) ~= "string" or not SP.EnsureLoaded(_cur) then return false end
-    return Known(w) or Known(LowerWord(w))
+    return KnownPlain(w) or KnownPlain(LowerWord(w))
 end
 
 -- Any lower-case letter (a-z or a Latin-1 small one)
 local function HasLowerLetter(w)
     return w:find("[a-z]") ~= nil or w:find("\195[\159-\191]") ~= nil
 end
-local byte = string.byte
 
 -- w: the word with ' for a typographic apostrophe. "The" at a sentence's
 -- start is "the"; "PARIS" may be "Paris"; "dog's" is "dog"
@@ -442,6 +595,12 @@ local function CheckWord(w)
             if not ok and not HasLowerLetter(w) then
                 local fl = (byte(w, 1) >= 192) and 2 or 1
                 ok = Known(w:sub(1, fl) .. lw:sub(fl + 1))
+                -- German STRASSE: Strasse is written with a sharp s
+                local def = LANG_BY[_cur]
+                if not ok and def and def.sharps and lw:find("ss", 1, true) then
+                    local sharp = lw:gsub("ss", "\195\159")
+                    ok = Known(sharp) or Known(CapFirst(sharp))
+                end
             end
         end
         if not ok and (Extra()[lw] or SP.OwnSet()[lw] or _ignored[lw]) then ok = true end
@@ -498,13 +657,6 @@ local function Masked(text)
     return t
 end
 
--- An upper-case first letter: A-Z, or a Latin-1 capital (U+00C0-U+00DE)
-local function UpperFirst(w)
-    local b = byte(w, 1)
-    if b >= 65 and b <= 90 then return true end
-    local b2 = byte(w, 2)
-    return b == 195 and b2 ~= nil and b2 >= 128 and b2 <= 158 and b2 ~= 151
-end
 -- Any lower-case letter: a-z, or a Latin-1 small one (U+00DF-U+00FF)
 local function HasLower(w)
     return w:find("[a-z]") ~= nil or w:find("\195[\159-\191]") ~= nil
@@ -546,6 +698,8 @@ function SP.Mistakes(text, lang)
     local skipUpper  = db.spellSkipUpper == true
     local skipDigits = db.spellSkipDigits ~= false
     local repeats    = db.spellRepeats ~= false
+    -- German: every noun has a capital, so capitals are never taken as names
+    if LANG_BY[_cur] and LANG_BY[_cur].nouns then skipCaps = false end
     local prevW, prevE                      -- the word before, for "the the"
     -- -> true when the word got marked
     local function Check(s, e, w)
@@ -553,7 +707,10 @@ function SP.Mistakes(text, lang)
         local check
         if lower then check = not MixedCase(w) else check = not skipUpper end
         if check and lower and skipCaps and UpperFirst(w) and not SentenceStart(t, s) then check = false end
-        if check and not CheckWord(w) then out[#out + 1] = { s, e, "x" }; return true end
+        if check and not CheckWord(w) and not (byte(t, e + 1) == 45 and HyphenHead(w)) then
+            out[#out + 1] = { s, e, "x" }
+            return true
+        end
         return false
     end
     local pos = 1
@@ -667,6 +824,7 @@ local VOWEL = { [97] = true, [101] = true, [105] = true, [111] = true, [117] = t
 -- ACCENT_COST (ete -> ete-acute). BASE = the plain letter of a Latin-1 one
 local ACCENT_COST = 0.3
 local BASE = {}
+local ACCENTED = {}   -- plain letters that have accented forms (a, e, ... and capitals)
 do
     local groups = {
         a = { 224, 225, 226, 227, 228, 229 }, c = { 231 }, e = { 232, 233, 234, 235 },
@@ -675,12 +833,14 @@ do
     }
     for letter, list in pairs(groups) do
         local b = letter:byte()
+        ACCENTED[b], ACCENTED[b - 32] = true, true
         for _, c in ipairs(list) do
             BASE[c] = b
             if c >= 224 and c ~= 255 then BASE[c - 32] = b - 32 end   -- the capital
             if VOWEL[b] then VOWEL[c] = true end
         end
     end
+    BASE[223] = 115    -- German sharp s ~ s (Strase -> Strasse, S5b)
 end
 local function ToL1(w)
     if not w:find("[\194\195\197]") then return w end
@@ -746,51 +906,55 @@ local function Sources()
     return list, drop
 end
 
--- Never WoW's upper() (ALL-507): a-z, and the Latin-1 small letters
--- (C3 A0-BE but the division sign -> C3 80-9E, ALL-559 S5)
-local function UpperLatin1(c)
-    local b = c:byte()
-    if b == 183 then return nil end
-    return "\195" .. string.char(b - 32)
-end
-local function CapFirst(w)
-    if byte(w, 1) == 195 then return (w:gsub("^\195([\160-\190])", UpperLatin1)) end
-    return (w:gsub("^[a-z]", string.upper))
-end
 local function UpperWord(w)
     return (w:gsub("[a-z]", string.upper):gsub("\195([\160-\190])", UpperLatin1))
 end
 
--- -> up to MAX_SUGGEST words, best first, in the typed word's case.
--- lang: the note's language (nil = the default)
-function SP.Suggest(word, lang)
-    local out = {}
-    _cur = lang or SP.DefaultLang()
-    if type(word) ~= "string" or not SP.EnsureLoaded(_cur) then return out end
-    local w  = word:gsub("\226\128\153", "'")
-    local lw = LowerWord(w)
+-- Scored candidates for lw into found (lower-case key -> { word, score })
+-- -> how many were taken. whole: lw is the typed word itself (then the
+-- first-letter tries and two words run together too). pre / post: lw is a
+-- part of a compound (German, S5b): a candidate is joined back to the rest
+-- of the word, and taken only when the checker knows the result
+local function Collect(lw, found, whole, pre, post)
     local l1 = ToL1(lw)        -- one byte per letter
     local n  = #l1             -- letters
-    if n < 2 then return out end
+    if n < 2 then return 0 end
     local limit = n <= 3 and 1 or 2
     local band  = math.floor(limit)
     local accents = LANG_BY[_cur] and LANG_BY[_cur].accents
+    local nouns = LANG_BY[_cur] and LANG_BY[_cur].nouns and whole
     local srcs, drop = Sources()
-    local found = {}   -- lower-case -> { word, score }
+    local taken = 0
     local function Take(cand, s)
         local key = LowerWord(cand)
-        if key == lw or (drop and InBuckets(drop, cand)) then return end
+        if (key == lw and not (nouns and cand ~= lw)) or (drop and InBuckets(drop, cand)) then return end
+        if pre or post then
+            if pre then
+                local fl = (byte(cand, 1) >= 192) and 2 or 1
+                cand = pre .. LowerWord(cand:sub(1, fl)) .. cand:sub(fl + 1)
+            end
+            if post then cand = cand .. post end
+            if not Known(cand) then
+                cand = CapFirst(cand)
+                if not Known(cand) then return end
+            end
+            key = LowerWord(cand)
+        end
         local old = found[key]
-        if not old or s < old[2] or (s == old[2] and cand < old[1]) then found[key] = { cand, s } end
+        if not old or s < old[2] or (s == old[2] and cand < old[1]) then
+            found[key] = { cand, s }
+            taken = taken + 1
+        end
     end
     -- Same first letter: every word in the band, lower-case and capitalized.
     -- A language with accents also looks under the other first bytes of
     -- that letter (e -> words that start with e-acute and the reverse) and
-    -- a few more bytes (every accent is one byte more than its letter)
+    -- a few more bytes (every accent is one byte more than its letter); a
+    -- letter with no accented forms (d, g) has nothing under those bytes
     local cap = CapFirst(lw)
     local firsts = { lw }
     if cap ~= lw then firsts[2] = cap end
-    local extra = accents and 4 or 0
+    local extra = accents or 0
     local bl = #lw
     for _, q in ipairs(firsts) do
         local fb = byte(q, 1)
@@ -798,7 +962,9 @@ function SP.Suggest(word, lang)
         local qBase = BASE[byte(ql1, 1)] or byte(ql1, 1)
         local fbs = { fb }
         if accents then
-            if fb ~= 195 then fbs[2] = 195 elseif qBase < 128 then fbs[2] = qBase end
+            if fb ~= 195 then
+                if ACCENTED[qBase] then fbs[2] = 195 end
+            elseif qBase < 128 then fbs[2] = qBase end
         end
         for _, firstByte in ipairs(fbs) do
             for len = math.max(1, bl - band - extra), bl + band + extra do
@@ -826,6 +992,7 @@ function SP.Suggest(word, lang)
             end
         end
     end
+    if not whole then return taken end
     -- A wrong first letter: swapped, changed, left out, one too many
     -- (a-z: plain letters only)
     local rest = lw:sub(2)
@@ -836,7 +1003,7 @@ function SP.Suggest(word, lang)
         tries[#tries + 1] = ch .. lw
     end
     for _, t in ipairs(tries) do
-        if #t > 0 and t ~= lw and Known(t) then
+        if #t > 0 and t ~= lw and KnownPlain(t) then
             local s = Score(l1, ToL1(t), limit)
             if s then Take(t, s) end
         end
@@ -845,10 +1012,66 @@ function SP.Suggest(word, lang)
     for i = 1, n - 1 do
         local a, b = lw:sub(1, i), lw:sub(i + 1)
         if (#a > 1 or a == "a" or a == "i") and (#b > 1 or b == "a")
-           and Known(a == "i" and "I" or a) and Known(b) then
+           and KnownPlain(a == "i" and "I" or a) and KnownPlain(b) then
             Take((a == "i" and "I" or a) .. " " .. b, (COMMON[a] or COMMON[b]) and 0.5 or 1)
         end
     end
+    return taken
+end
+
+-- A long German word: a good start (a word that can start a compound) and
+-- a good end (one that can end it), and the piece between gets suggestions,
+-- joined back (Drachen + schupen + ruestung -> Drachenschuppenruestung). The
+-- shortest pieces first; a few scans at most, each one is a scan of its own
+local SUGGEST_SCANS = 4
+local function CompoundSuggest(lw, found)
+    local n = #lw
+    local loose = LooseOn()
+    local function HeadOk(h) return HeadStrict(h) or (loose and HeadLoose(h)) end
+    local function TailOk(t) return TailStrict(t) or (loose and TailLoose(t)) end
+    local starts, ends = { 0 }, { n + 1 }      -- 0 / n + 1 = no start / no end
+    for i = LOOSE_MIN, n - LOOSE_MIN do
+        if Cut(lw, i + 1) and HeadOk(CapFirst(lw:sub(1, i))) then starts[#starts + 1] = i end
+    end
+    for k = LOOSE_MIN + 1, n - LOOSE_MIN + 1 do
+        if Cut(lw, k) and TailOk(lw:sub(k)) then ends[#ends + 1] = k end
+    end
+    local pieces = {}
+    for _, i in ipairs(starts) do
+        for _, k in ipairs(ends) do
+            local len = k - i - 1
+            if len >= LOOSE_MIN and len < n then pieces[#pieces + 1] = { i, k, len } end
+        end
+    end
+    table.sort(pieces, function(a, b)
+        if a[3] ~= b[3] then return a[3] < b[3] end
+        return a[1] > b[1]
+    end)
+    local scans = 0
+    for _, p in ipairs(pieces) do
+        local i, k = p[1], p[2]
+        local pre  = i > 0 and lw:sub(1, i) or nil
+        local post = k <= n and lw:sub(k) or nil
+        scans = scans + 1
+        Collect(lw:sub(i + 1, k - 1), found, false, pre, post)
+        if scans >= SUGGEST_SCANS then break end
+    end
+end
+
+-- -> up to MAX_SUGGEST words, best first, in the typed word's case.
+-- lang: the note's language (nil = the default)
+function SP.Suggest(word, lang)
+    local out = {}
+    _cur = lang or SP.DefaultLang()
+    if type(word) ~= "string" or not SP.EnsureLoaded(_cur) then return out end
+    local w  = word:gsub("\226\128\153", "'")
+    local lw = LowerWord(w)
+    local n  = #ToL1(lw)       -- letters
+    if n < 2 then return out end
+    local found = {}   -- lower-case -> { word, score }
+    Collect(lw, found, true)
+    local d = _data[_cur]
+    if d and d.begin and n >= 8 then CompoundSuggest(lw, found) end
     local list = {}
     for _, v in pairs(found) do list[#list + 1] = v end
     table.sort(list, function(x, y)

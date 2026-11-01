@@ -11,7 +11,8 @@
 --   /bnbspell          boxes on / off over the open note's body
 --   /bnbspell mirror   show the mirror itself in red (does it wrap like the box?)
 --   /bnbspell chars    switch span indices: bytes <-> characters
---   /bnbspell notes    make the three test notes (A, B, 5000 words with typos)
+--   /bnbspell notes    make the test notes (A, B, 5000 words with typos, every rich tag,
+--                      French and German with their own spelling language)
 --   /bnbspell check    the real checker, simulated: red underlines on the typos only
 --   /bnbspell snap     line snap on / off for the real check (round 8, the drift fix)
 --   /bnbspell own      measure on the edit box's own FontString instead of the mirror
@@ -672,6 +673,14 @@ local NOTE_A = "Spell probe test (ALL-559 KU4 / KU5)\n\n1. Plain words: The quic
 local NOTE_B = "Spell probe test B, no Chinese / Korean (ALL-559 KU4 / KU5)\n\n1. Plain words: The quick brown fox jumps over the lazy dog.\n2. Typos on purpose: teh recieve seperate definately occured untill wierd accomodate.\n3. Accents: caf\195\169, na\195\175ve, \195\188ber, Stra\195\159e, ni\195\177o, \195\134r\195\184sk\195\184bing, Pok\195\169mon, d\195\169j\195\160 vu, r\195\169sum\195\169.\n5. Link here -> @LINK@ <- then more words after the link: sword shield potion.\n6. Two links in one line: @LINK@ and @LINK@ followed by words.\n7. Apostrophes and contractions: don't can't it's Dukul's o'clock rock'n'roll.\n8. Numbers and mixed: 12 bosses, 3rd floor, v1.26.0, 10am, 5x5, Mk2 armour.\n9. Markup: {icon:inv_misc_note_01} icon word, {{date}} token word, {b}bold{/b} word.\n10. Web and mail: https://dukul.net/addons/bnb www.example.com someone@example.com end.\n11. A very long word with no spaces: Supercalifragilisticexpialidociousandthensomemorelettersuntilitwraps then normal words.\n12. Hyphens and slashes: well-known, up-to-date, Ctrl+Shift+click, /way 45.2 61.8, and/or.\n13. ALL CAPS WORDS and CamelCase BigNoteBox ReferenceBox words.\n\n14. After a blank line: this paragraph wraps over several lines so the boxes must follow the wrap from one line to the next without drifting sideways or down, even at the very end of a long line that breaks in the middle of the window.\n\t15. A line that starts with a tab, then words.\n16.     Several spaces    between     words here.\nLast line with no full stop at the end"
 local ITEM_LINK = "|cffff8000|Hitem:19019::::::::60:::::|h[Thunderfury, Blessed Blade of the Windseeker]|h|r"
 
+-- French and German (ALL-559 S5 / S5b, Dukul 2026-11-01: test notes for the guild's
+-- French and German players): each note has its own spellLang. Lines are either
+-- all correct (nothing should be marked) or typos on purpose (Fautes / Fehler,
+-- lower-case nouns, names, a repeated word); checked offline against the real lists.
+-- Byte escapes: Lua literals stay ASCII. Made by the scratch tool lang_notes.py
+local NOTE_FR = "1. Phrases correctes : L'\195\169l\195\169phant qu'il a vu aujourd'hui \195\169tait tr\195\168s beau. Nous chantions, ils finissaient leur travail avant la nuit.\n2. \195\137lisions : l'arbre, d'abord, j'ai, qu'il, jusqu'ici, lorsqu'on, c'est-\195\160-dire, peut-\195\170tre.\n3. Majuscules : \195\137cole, \195\137COLE, \195\142le, \195\135a va.\n4. Mots du jeu : le raid et le tank, dps, LFG, ICC, le boss.\n5. Fautes expr\195\168s : chiien, elephant, ecole, tres, maisonn, beaucop.\n6. R\195\169p\195\169tition : le le donjon.\n7. Apostrophe typographique : l\226\128\153arbre, qu\226\128\153il."
+local NOTE_DE = "1. Richtige S\195\164tze: Der Drache hat eine sch\195\182ne R\195\188stung. Wir gehen heute in den Schlachtzug. Ich habe gestern Abend mit meiner Gilde gespielt.\n2. Zusammengesetzte W\195\182rter: Gildenbank, Questgeber, Heiltr\195\164nke, Drachenschuppenr\195\188stung, Arbeitsplatz, Donnerstagabend, Gildenmitglieder, Tageslicht, Schulbuch.\n3. Gro\195\159buchstaben: STRASSE, \195\132RGER, \195\132pfel und B\195\164ume.\n4. Bindestrich: Haus- und Gartenarbeit, Abarbeitungs- und Pr\195\188fplan.\n5. Spielw\195\182rter: Raid, Boss, Loot, dps, LFG.\n6. Fehler mit Absicht: Drachenschupenr\195\188stung, Huas, Strase, Gildenmitgleider, Schlachtzgu, Arbietsplatz, Gildenbnak.\n7. Kleingeschriebene Nomen: das haus, die gilde.\n8. Namen werden gepr\195\188ft: wir haben Thrall in Orgrimmar getroffen.\n9. Wiederholung: der der Drache."
+
 local SENTENCES = {
     "Before you go into the dungeon, make sure your friend has the key and that the whole group knows which boss comes first.",
     "I really believe the vendor in the inn will receive new stock tomorrow, so check again before the weekly reset.",
@@ -759,6 +768,8 @@ local function MakeNotes()
         { "Spell test B", (NOTE_B:gsub("@LINK@", function() return ITEM_LINK end)) },
         { "Spell test: 5000 words", long },
         { "Rich test: every tag", (RICH_ALL:gsub("@LINK@", function() return ITEM_LINK end)), true },
+        { "Spell test: French", NOTE_FR, nil, "frFR" },
+        { "Spell test: German", NOTE_DE, nil, "deDE" },
     }
     local made = 0
     for _, e in ipairs(list) do
@@ -768,11 +779,13 @@ local function MakeNotes()
             local id = BNB.CreateNote(e[1], e[2])
             if id then
                 made = made + 1
-                if BNB.UpdateNote then BNB.UpdateNote(id, { tags = { TEST_TAG }, richMode = e[3] or nil }) end
+                if BNB.UpdateNote then
+                    BNB.UpdateNote(id, { tags = { TEST_TAG }, richMode = e[3] or nil, spellLang = e[4] })
+                end
             end
         end
     end
-    Say("%d test notes made (one rich, every tag), tag '%s'. The long one: %d words, %d typos. Open a note, then /bnbspell check.",
+    Say("%d test notes made (one rich, every tag; French and German in their own language), tag '%s'. The long one: %d words, %d typos. Open a note, then /bnbspell check.",
         made, TEST_TAG, nWords, nTypos)
 end
 

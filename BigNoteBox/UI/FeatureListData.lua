@@ -109,7 +109,7 @@ BNB.FEATURE_LIST = {
             "Spelling: a red line under words that are not in the dictionary (English US or UK), in the editor, Focus mode and a sticky you are typing in; nothing is changed for you",
             "Right-click a red-marked word for suggestions, Add to dictionary or Ignore; your own words in Settings, a Check spelling key",
             "Correct spelling window: goes through the marked words one by one, with suggestions, Ignore this, Ignore all and Add to dictionary",
-            "More languages with the BigNoteBox Spelling Pack (French): pick one for every note, or give one note its own from the right-click menu",
+            "More languages with the BigNoteBox Spelling Pack (French, German): pick one for every note, or give one note its own from the right-click menu",
             "Repeated words (the the) marked; choose whether words in capitals and words with numbers are checked",
             "Text shortcuts: your own, brb + space becomes be right back (Brb gives Be right back), one Undo brings back what you typed",
         },
