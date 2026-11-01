@@ -161,7 +161,8 @@ local SETTINGS = {
         { "spelling", "CFG_HDR_SPELL" },
         { "explorer", "CFG_EXPLORER_HEADER" },
         { "contextMenu", "CFG_HDR_CONTEXT_MENU" }, { "placement", "CFG_HDR_PLACEMENT" },
-        { "undo", "CFG_HDR_UNDO_REDO" }, { "accessibility", "CFG_HDR_ACCESSIBILITY" } } },
+        { "undo", "CFG_HDR_UNDO_REDO" }, { "accessibility", "CFG_HDR_ACCESSIBILITY" },
+        { "tags", "CFG_HDR_TAGS" } } },
     { "backup",     "CFG_TAB_BACKUP" },
     { "advanced",   "CFG_TAB_ADVANCED", { { "integrations", "CFG_HDR_INTEGRATIONS" } } },
 }

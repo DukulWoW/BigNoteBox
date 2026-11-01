@@ -601,6 +601,21 @@ local function ApplyBodyFont(frame, cfg, text)
     pcall(eb.SetTextColor, eb, cfg.textR or 0.88, cfg.textG or 0.88, cfg.textB or 0.88)
     pcall(eb.SetJustifyH, eb, cfg.textAlign or "LEFT")
     ApplyBodySpacing(frame, cfg, sz)
+    -- The rich view reads the same font and outline (ALL-627): draw it again
+    -- on the next frame (FOR-30: never a SimpleHTML SetText in a layout pass)
+    if frame._richReflow and frame._richScroll and frame._richScroll:IsShown()
+       and not frame._richReflowPending then
+        frame._richReflowPending = true
+        C_Timer.After(0, frame._richReflow)
+    end
+end
+
+-- The rich view's font and outline / shadow: the sticky's own (Sticky
+-- settings), as its plain body (ALL-627, Dukul 2026-11-01); the note's text
+-- picks a file that can draw it. Size stays the note's.
+local function RichLook(f, noteID, note)
+    local cfg = (f and f._cfg) or GetCfg(noteID)
+    return { fontOverride = cfg.fontID, fontOutline = cfg.fontOutline, body = note and note.body }
 end
 
 -- Every open sticky's body font again (a global font or size change, ALL-620)
@@ -2466,8 +2481,7 @@ local function CreateStickyFrame(noteID)
             local rn = BNB.GetNote(f._richNoteID)
             if rn then
                 local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-                local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
-                BNB.AdvancedMode.ApplyFontsToRenderFrame(richRender, bs, fs)
+                BNB.AdvancedMode.ApplyFontsToRenderFrame(richRender, bs, RichLook(f, f._richNoteID, rn))
                 local rawST = getmetatable(richRender).__index.SetText
                 richRender._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)
                 rawST(richRender, richRender._bnbHTML)
@@ -2475,6 +2489,7 @@ local function CreateStickyFrame(noteID)
             end
         end
     end
+    f._richReflow = Reflow   -- a font / outline change in Sticky settings (ApplyBodyFont)
     richScroll:SetScript("OnSizeChanged", function()
         if f._richReflowPending then return end
         f._richReflowPending = true
@@ -3369,7 +3384,7 @@ function SN.RefreshBodyLive(noteID, tokensOnly)
         local bs = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
         local html = BNB.AdvancedMode.ToHTML(note.body or "", bs, rf:GetWidth())
         if tokensOnly and html == rf._bnbHTML then return end
-        BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, BNB.AdvancedMode.OutlineFlagStr(note.fontOutline))
+        BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, RichLook(f, noteID, note))
         local rawST = getmetatable(rf).__index.SetText
         rawST(rf, html)
         rf._bnbHTML = html
@@ -3515,8 +3530,7 @@ function SN.RefreshNote(noteID)
                 if not rn then return end
                 local bs  = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                 rf:SetWidth(w)
-                local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
-                BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
+                BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, RichLook(f, noteID, rn))
                 -- Use the raw SetText (bypasses SetHTML height-set) then set height
                 local rawST = getmetatable(rf).__index.SetText
                 rf._bnbHTML = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)

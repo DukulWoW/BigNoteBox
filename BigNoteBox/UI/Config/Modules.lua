@@ -1875,6 +1875,7 @@ local function BuildModulesTab(sf, ct)
         { L["CFG_HDR_PLACEMENT"],      L["CFG_SUB_PLACEMENT_DESC"],  K.BuildPlacementPage, "placement" },   -- UI/Config/NotePages.lua (ALL-291)
         { L["CFG_HDR_UNDO_REDO"],      NeedsHistory(L["CFG_SUB_UNDO_DESC"]), K.BuildUndoPage, "undo" },        -- UI/Config/NotePages.lua (ALL-460)
         { L["CFG_HDR_ACCESSIBILITY"],  L["CFG_SUB_ACCESSIBILITY_DESC"], K.BuildAccessibilityPage, "accessibility" },   -- UI/Config/Accessibility.lua (ALL-548)
+        { L["CFG_HDR_TAGS"],           L["CFG_SUB_TAGS_DESC"],       K.BuildTagsPage,      "tags" },        -- UI/Config/NotePages.lua (ALL-646)
     }
     -- Alphabetical by the shown title, in the active language (Dukul 2026-10-06,
     -- ALL-331); colour codes left out of the compare

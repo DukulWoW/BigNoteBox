@@ -122,8 +122,9 @@ local function RenderNote(note, rsf, rf, gen, liveBody, cursorRatio)
         if w and w > 0 then rf:SetWidth(w) end
 
         local sz = note.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        local fs = BNB.AdvancedMode.OutlineFlagStr(note.fontOutline)
-        AM.ApplyFontsToRenderFrame(rf, sz, fs)
+        -- The note's font, outline / shadow; the file for the text shown (ALL-627)
+        AM.ApplyFontsToRenderFrame(rf, sz, { fontOverride = note.fontOverride,
+            fontOutline = note.fontOutline, body = bodyText })
 
         local html = AM.ToHTML(bodyText, sz, rf:GetWidth())
         local rawST = getmetatable(rf).__index.SetText

@@ -2785,8 +2785,7 @@ function BNB.AM_EnterViewMode(id)
                     local bs = rn.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
                     local html = BNB.AdvancedMode.ToHTML(rn.body or "", bs, w)
                     if tokensOnly and html == rf._bnbHTML then return end
-                    local fs = BNB.AdvancedMode.OutlineFlagStr(rn.fontOutline)
-                    BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, fs)
+                    BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bs, rn)   -- note's font, outline / shadow (ALL-627)
                     local rawST = getmetatable(rf).__index.SetText
                     rawST(rf, html)
                     rf._bnbHTML = html
@@ -2872,8 +2871,7 @@ function BNB.AM_EnterViewMode(id)
         if not freshNote then return end
 
         local bodySize = freshNote.fontSize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-        local flagStr  = BNB.AdvancedMode.OutlineFlagStr(freshNote.fontOutline)
-        BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bodySize, flagStr)
+        BNB.AdvancedMode.ApplyFontsToRenderFrame(rf, bodySize, freshNote)   -- note's font, outline / shadow (ALL-627)
 
         local html = BNB.AdvancedMode.ToHTML(freshNote.body or "", bodySize, rf:GetWidth())
         local rawST = getmetatable(rf).__index.SetText

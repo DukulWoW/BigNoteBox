@@ -37,3 +37,6 @@ ignore:
   - CONTRIBUTING.md
   - DEVTOOL.md
   - BigNoteBox_Dev
+  # Forever theme art (ALL-647): not used by the addon until the theme
+  # system ships; only the dev addon's test window reads it (Dukul, 2026-11-01)
+  - BigNoteBox/Themes

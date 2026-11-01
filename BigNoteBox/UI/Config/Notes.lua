@@ -7,8 +7,6 @@ local L   = BNB.L
 local K = BNB._ConfigKit
 local CONTENT_W, ROW_H, ROW_GAP = K.CONTENT_W, K.ROW_H, K.ROW_GAP
 local AddRule, AddHeader, AddCheck, MakeKeybindRow = K.AddRule, K.AddHeader, K.AddCheck, K.MakeKeybindRow
--- A smaller gold heading for a group inside a section (moved to the kit, 2026-10-25)
-local AddSubHeader = K.AddSubHeader
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TAB 2 -- NOTES
@@ -187,19 +185,8 @@ local function BuildNotesTab(sf, ct)
     -- Note folders: their settings are on Modules > Folders (ALL-514,
     -- UI/Config/NotePages.lua)
 
-    y = AddSubHeader(ct, y, L["CFG_TAGTREE_HEADER"])
-    y = AddCheck(ct, y, L["CFG_TAGTREE_STAY_OPEN"],
-        function() return db.tagTreeStayOpen ~= false end,
-        function(v) db.tagTreeStayOpen = v end,
-        L["CFG_TAGTREE_STAY_OPEN_TIP"])
-
-    y = AddCheck(ct, y, L["CFG_TAGTREE_START_EXPANDED"],
-        function() return db.tagTreeStartExpanded == true end,
-        function(v) db.tagTreeStartExpanded = v end,
-        L["CFG_TAGTREE_START_EXPANDED_TIP"])
-
-    -- Which side the Tag Manager opens on (ALL-269)
-    y = K.AddSideRow(ct, y, L["CFG_SIDE_TAGMGR"], "tagManagerSide", "BigNoteBoxTagManagerFrame")
+    -- Tag tree and Tag Manager settings: Modules > Tags (ALL-646,
+    -- UI/Config/NotePages.lua)
 
     -- Note templates (ALL-68 S2): their own page (UI/Config/Templates.lua)
     do

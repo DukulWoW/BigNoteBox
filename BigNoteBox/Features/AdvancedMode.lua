@@ -8,7 +8,7 @@
 --   AM.MarkupRepairs(text) / AM.RepairMarkup(text)  -> repairs ToHTML makes / text with them made
 --   AM.DescribeRepair(r) / AM.RepairOnLeave(id)     -> one repair in words / write them back (ALL-277)
 --   AM.CreateRenderFrame(name, parent)       -> SimpleHTML frame
---   AM.ApplyFontsToRenderFrame(f, bodySize)  -> wires font objects
+--   AM.ApplyFontsToRenderFrame(f, bodySize, look)  -> wires font objects
 --   AM.ConvertToPlain(id, onDone)            -> strips tags, confirms first
 --   AM.GetUserImages()                       -> table of registered image paths
 --   AM.UserImageShortName(full) / AM.ResolveUserImage(typed)  -> picker name / full path
@@ -705,19 +705,8 @@ local _fontObjs = {}  -- cache: key = "tag|path|px|flags"
 local _fontCount = 0
 local FONT_RESET_SECS = 15   -- how long a new object is set again per use (ALL-16)
 
--- Resolve note.fontOutline to a SetFont flag string.
--- Handles SLUG, SLUG Outline, and SLUG Thick Outline as first-class options.
-function AM.OutlineFlagStr(fontOutline)
-    local o = fontOutline or "None"
-    if     o == "Outline"            then return "OUTLINE"
-    elseif o == "Thick Outline"      then return "THICKOUTLINE"
-    elseif o == "Monochrome Outline" then return "MONOCHROME,OUTLINE"
-    elseif o == "SLUG"               then return "SLUG"
-    elseif o == "SLUG Outline"       then return "OUTLINE, SLUG"
-    elseif o == "SLUG Thick Outline" then return "THICKOUTLINE, SLUG"
-    end
-    return ""  -- None or any drop shadow variant
-end
+-- note.fontOutline -> font flags and drop shadow: BNB.OutlineLook (UI/Fonts.lua,
+-- ALL-627; AM.OutlineFlagStr gave the flags only, so shadows did nothing)
 
 -- Display label for a stored fontOutline value. The stored value stays English on
 -- purpose: it is compared as a key everywhere and travels between locales in shared
@@ -740,13 +729,16 @@ function AM.OutlineLabel(fontOutline)
     return (key and BNB.L and BNB.L[key]) or o
 end
 
-local function GetOrCreateFontObj(tag, path, size, flags)
+-- shadow (optional): { ox, oy, r, g, b, a } (BNB.OutlineLook). Part of the
+-- key and set only on a new object, as the font itself (FOR-30, ALL-627)
+local function GetOrCreateFontObj(tag, path, size, flags, shadow)
     local px
     if path and path ~= "" then
         size = BNB.FontPx and BNB.FontPx(path, size) or size   -- per-font factor (ALL-60)
         px = math.max(math.floor(size + 0.5), 6)
     end
     local cacheKey = tag .. "|" .. (path or "") .. "|" .. (px or "") .. "|" .. flags
+        .. "|" .. (shadow and table.concat(shadow, ",") or "")
     local fo = _fontObjs[cacheKey]
     if not fo then
         -- Numbered names: one global per distinct font, never per frame
@@ -754,6 +746,9 @@ local function GetOrCreateFontObj(tag, path, size, flags)
         fo = CreateFont("BNBRichFont" .. _fontCount)
         _fontObjs[cacheKey] = fo
         fo._bnbSetUntil = GetTime() + FONT_RESET_SECS
+        local sh = shadow or { 0, 0, 0, 0, 0, 0 }
+        pcall(fo.SetShadowOffset, fo, sh[1], sh[2])
+        pcall(fo.SetShadowColor, fo, sh[3], sh[4], sh[5], sh[6])
     end
     -- Set again only while the object is new: a bundled TTF that was not
     -- loaded yet on a cold login draws blank until it is set again (ALL-16).
@@ -774,15 +769,23 @@ local function SetTagFont(f, tag, fo)
     f:SetFontObject(tag, fo)
 end
 
--- flagStr (optional): pass AM.OutlineFlagStr(note.fontOutline).
--- Defaults to "" when omitted (callers without a note reference, or no outline set).
-function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
+-- look (optional): the note, or a table with its fields: fontOverride (the
+-- font card id), fontOutline (outline or drop shadow name) and body (the text,
+-- for a file that can draw it, ALL-619). A sticky passes its own font and
+-- outline (ALL-627, Dukul 2026-11-01). nil = the global font, no outline.
+function AM.ApplyFontsToRenderFrame(f, bodySize, look)
     if not f then return end
     bodySize = bodySize or (BigNoteBoxDB and BigNoteBoxDB.fontSize) or BNB.DEFAULTS.fontSize
-    flagStr  = flagStr or ""
+    look = look or {}
+    local flagStr, shadow = "", nil
+    if BNB.OutlineLook then flagStr, shadow = BNB.OutlineLook(look.fontOutline) end
 
-    local bodyPath = BNB.GetBodyFont and select(1, BNB.GetBodyFont()) or nil
-    local boldPath = BNB.GetBoldFont and BNB.GetBoldFont() or bodyPath
+    local bodyPath, boldPath
+    if BNB.ResolveFontDef and BNB.NoteFontFiles then
+        bodyPath, boldPath = BNB.NoteFontFiles(BNB.ResolveFontDef(look.fontOverride), look.body)
+    end
+    bodyPath = bodyPath or (BNB.GetBodyFont and select(1, BNB.GetBodyFont())) or nil
+    boldPath = boldPath or bodyPath
 
     -- Independent size mode: user has set explicit pixel sizes for each heading level.
     -- Multiplier mode (default): sizes derived from bodySize using fixed ratios.
@@ -800,10 +803,10 @@ function AM.ApplyFontsToRenderFrame(f, bodySize, flagStr)
         psz  = bodySize
     end
 
-    SetTagFont(f, "h1", GetOrCreateFontObj("h1", boldPath, h1sz, flagStr))
-    SetTagFont(f, "h2", GetOrCreateFontObj("h2", boldPath, h2sz, flagStr))
-    SetTagFont(f, "h3", GetOrCreateFontObj("h3", boldPath, h3sz, flagStr))
-    SetTagFont(f, "p",  GetOrCreateFontObj("p",  bodyPath, psz,  flagStr))
+    SetTagFont(f, "h1", GetOrCreateFontObj("h1", boldPath, h1sz, flagStr, shadow))
+    SetTagFont(f, "h2", GetOrCreateFontObj("h2", boldPath, h2sz, flagStr, shadow))
+    SetTagFont(f, "h3", GetOrCreateFontObj("h3", boldPath, h3sz, flagStr, shadow))
+    SetTagFont(f, "p",  GetOrCreateFontObj("p",  bodyPath, psz,  flagStr, shadow))
 
     -- White text for headings/body; colour tags in markup override per-span.
     -- Note: SimpleHTML does not support SetFontObject/SetTextColor for "a" tags —

@@ -1062,6 +1062,35 @@ end
 -- row here too. The character sidebar's side is left out: it is part of the
 -- main window, not a window.
 -- ─────────────────────────────────────────────────────────────────────────────
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TAGS (ALL-646, Dukul 2026-11-01): a settings page, not a module (tags are
+-- part of every note and cannot be off). The tag tree settings and the Tag
+-- Manager's side, moved here from the Notes tab.
+-- ─────────────────────────────────────────────────────────────────────────────
+function K.BuildTagsPage(sf, ct, y)
+    local db = BigNoteBoxDB
+    local cb
+
+    y = AddHeader(ct, y, L["CFG_TAGTREE_HEADER"])
+    local function StayOpen() return db.tagTreeStayOpen ~= false end
+    y, cb = AddCheck(ct, y, L["CFG_TAGTREE_STAY_OPEN"], StayOpen,
+        function(v) db.tagTreeStayOpen = v end,
+        L["CFG_TAGTREE_STAY_OPEN_TIP"])
+    K.ReadOnShow(cb, StayOpen)
+    local function StartExpanded() return db.tagTreeStartExpanded == true end
+    y, cb = AddCheck(ct, y, L["CFG_TAGTREE_START_EXPANDED"], StartExpanded,
+        function(v) db.tagTreeStartExpanded = v end,
+        L["CFG_TAGTREE_START_EXPANDED_TIP"])
+    K.ReadOnShow(cb, StartExpanded)
+
+    -- Which side the Tag Manager opens on (ALL-269; also on Window placement)
+    y = AddRule(ct, y) - 4
+    y = AddHeader(ct, y, L["TAG_MGR_TITLE"])
+    y = K.AddSideRow(ct, y, L["CFG_SIDE_TAGMGR"], "tagManagerSide", "BigNoteBoxTagManagerFrame")
+
+    sf:FinaliseHeight(math.abs(y) + 12)
+end
+
 function K.BuildPlacementPage(sf, ct, y)
     local db = BigNoteBoxDB
     local cb
@@ -1081,7 +1110,7 @@ function K.BuildPlacementPage(sf, ct, y)
     K.ReadOnShow(cb, ResetSize)
 
     -- Windows beside the main window (each also on its own page; the Tag
-    -- Manager on Notes, the Reference Box on its Modules page)
+    -- Manager on Modules > Tags, the Reference Box on its Modules page)
     y = AddRule(ct, y) - 4
     y = AddHeader(ct, y, L["CFG_PLACE_HDR_SIDES"])
     y = K.AddSideRow(ct, y, L["CFG_SIDE_HISTORY"], "historySide",     "BigNoteBoxHistoryFrame")

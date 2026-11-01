@@ -414,6 +414,9 @@ function K.BuildDevToolsPage(sf, ct, y)
             Slash("BNBSKINWIDGETS"), SlashCmdList.BNBSKINWIDGETS ~= nil },
         { L["CFG_DEV_BTNTEST_BTN"], L["CFG_DEV_BTNTEST_TIP_BODY"],
             Slash("BNBBUTTONTEST"), SlashCmdList.BNBBUTTONTEST ~= nil },
+        -- The Forever client's art on Retail / Classic (Dukul, 2026-11-01)
+        { L["CFG_DEV_FOREVER_BTN"], L["CFG_DEV_FOREVER_TIP_BODY"],
+            Slash("BNBFOREVER"), SlashCmdList.BNBFOREVER ~= nil },
         { L["CFG_DEV_ICONPROBE_BTN"], L["CFG_DEV_ICONPROBE_TIP_BODY"],
             Slash("BNBICONPROBE"), SlashCmdList.BNBICONPROBE ~= nil },
         -- Every UI link key as a note (ALL-513, Dukul 2026-10-19: "Easier to work

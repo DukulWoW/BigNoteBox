@@ -284,6 +284,17 @@ function BNB.NoteFontFile(def, text)
     return SCRIPT_FILE[script]
 end
 
+-- Regular and bold file for a note's text in the rich view (ALL-627): the
+-- card's own pair, or WoW's file for both when the card cannot draw the text
+function BNB.NoteFontFiles(def, text)
+    local script = BNB.TextScript(text)
+    if Covers(def, script) then
+        local reg = (def._isWoW and BNB.GetLocaleFont and BNB.GetLocaleFont()) or def.regular
+        return reg, def.bold or reg
+    end
+    return SCRIPT_FILE[script], SCRIPT_FILE[script]
+end
+
 -- nil when the card can draw the note's text, else the tooltip line that says
 -- why its card is greyed out in a font list
 function BNB.FontBlockedFor(def, text)
@@ -352,6 +363,12 @@ local OUTLINE_SHADOW = {
     ["Drop Shadow"] = { 1, -1, 0, 0, 0, 0.8 }, ["Strong Drop Shadow"] = { 2, -2, 0, 0, 0, 1.0 },
     ["Strongest Drop Shadow"] = { 3, -3, 0, 0, 0, 1.0 },
 }
+
+-- An outline name's font flags and drop shadow ({ ox, oy, r, g, b, a } or
+-- nil): the rich view's font objects (ALL-627)
+function BNB.OutlineLook(outline)
+    return OUTLINE_FLAGS[outline or "None"] or "", OUTLINE_SHADOW[outline or "None"]
+end
 
 -- A note's body font on an edit box (the main editor, Focus mode, ALL-619):
 -- the note's font card (else the global one) or, for Korean / Chinese text

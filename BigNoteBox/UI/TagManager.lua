@@ -674,7 +674,7 @@ function BNB.ToggleTagManager()
     if f:IsShown() then
         f:Hide()
     else
-        -- Side from Settings > Notes > Tag Tree, as tall as the main window
+        -- Side from Settings > Modules > Tags, as tall as the main window
         -- (ALL-269)
         BNB.FollowMainHeight(f)
         if not BNB.PlaceBesideMain(f, BNB.WindowSide("tagManagerSide")) then

@@ -24,6 +24,7 @@ ButtonTest.lua
 IconProbe.lua
 SidebarTopTest.lua
 SkinWidgetsTest.lua
+ForeverThemeTest.lua
 FakeData.lua
 DocsSeed.lua
 SpellProbe.lua
