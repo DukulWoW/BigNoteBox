@@ -821,10 +821,11 @@ local function CaptureBody(cap)
     if cap.rewards then
         parts[#parts + 1] = divider .. "\n" .. Heading(L["QN_REWARDS"]) .. "\n" .. Block(RewardLines(cap.rewards, rich))
     end
-    -- A rich quest note ends on the player's own Notes part, as the NPC notes
-    -- do (Dukul, 2026-11-01): the ornate divider, the heading, an empty line
-    -- to write on (a bare one: {p}{/p} offsets the cursor, BuildRichBody)
-    if rich and cap.quest and BNB.DividerTag then
+    -- Every rich capture (quest, book / letter, dialogue) ends on the player's
+    -- own Notes part, as the NPC notes do (Dukul, 2026-11-01): the ornate
+    -- divider, the heading, an empty line to write on (a bare one: {p}{/p}
+    -- offsets the cursor, BuildRichBody)
+    if rich and BNB.DividerTag then
         parts[#parts + 1] = BNB.DividerTag("gold-ornate") .. "\n\n{h3}" .. L["TGT_HDR_NOTES"] .. "{/h3}\n"
     end
     return table.concat(parts, "\n\n")
