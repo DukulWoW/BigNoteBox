@@ -1594,10 +1594,8 @@ local function BuildPages()
         end
     end
 
-    local secs = {}
-    for _, sec in ipairs(type(BNB.FEATURE_LIST) == "table" and BNB.FEATURE_LIST or {}) do
-        if type(sec) == "table" and sec.header then secs[#secs + 1] = sec end
-    end
+    -- Translated where a translation exists (ALL-648), sorted by the shown header
+    local secs = BNB.FeatureSections()
     table.sort(secs, function(a, b) return tostring(a.header):lower() < tostring(b.header):lower() end)
     local feats = {}
     for i, sec in ipairs(secs) do feats[i] = { kind = "feature", sec = sec } end

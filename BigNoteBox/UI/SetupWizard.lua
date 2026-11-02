@@ -462,7 +462,7 @@ local function BuildPage1(content)
             { code = "client", label = L["LANGUAGE_CLIENT"], flag = nil,               available = true  },
             { code = "enUS",   label = "English",            flag = FLAG.."flag-en",   available = true  },
             { code = "zhCN",   label = "简体中文",             flag = FLAG.."flag-cn",   available = true  },
-            { code = "deDE",   label = "Deutsch",             flag = FLAG.."flag-de",   available = false },
+            { code = "deDE",   label = "Deutsch",             flag = FLAG.."flag-de",   available = true  },
             { code = "frFR",   label = "Français",            flag = FLAG.."flag-fr",   available = false },
             { code = "esES",   label = "Español",             flag = FLAG.."flag-es",   available = false },
             { code = "esMX",   label = "Español (México)",    flag = FLAG.."flag-mx",   available = false },

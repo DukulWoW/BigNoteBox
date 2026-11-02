@@ -37,6 +37,8 @@ libs\libs.xml
 # Locales
 Locales\enUS.lua
 Locales\zhCN.lua
+Locales\deDE.lua
+Locales\Help\deDE.lua
 
 # Core systems (order matters!)
 Core\Database.lua

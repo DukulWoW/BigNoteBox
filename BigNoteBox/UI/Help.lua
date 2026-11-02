@@ -12,7 +12,9 @@
 -- classic } or nil (= every client), chapter = a chapter key or nil, back =
 -- true for the back of the book (after the chapters, the Glossary) }. A
 -- translation, when one exists, is BNB.HELP_LOCALES[locale][key] = { title,
--- body } (Locales/Help/<locale>.lua); a topic it does not have stays English.
+-- body } (Locales/Help/<locale>.lua, made by _work/tools/help-i18n.lua, ALL-648);
+-- a topic it does not have stays English. The Features tab's sections:
+-- BNB.FEATURE_LOCALES[locale][<English header>] = { header, blurb, items }.
 -- A chapter of the help book (ALL-554 stage 2, a doc-mode folder): { key,
 -- src, name, body, rich, icon } in BNB.HELP_CHAPTERS, body / icon from the
 -- folder's Cover note; its translation is HELP_LOCALES[locale]["chapter." ..
@@ -29,13 +31,22 @@
 --                             topic on this client, in order; loose = the
 --                             topics in no chapter, in order
 --   BNB.HelpChapterText(ch)   name, body (translated, pictures expanded)
+--   BNB.FeatureSections()     BNB.FEATURE_LIST's sections, translated where a
+--                             translation exists (same help links)
 
 local BNB = BigNoteBox
 local L   = BNB.L
 
 local PREFIX = "sys-help-"
 
-BNB.HELP_LOCALES = BNB.HELP_LOCALES or {}
+BNB.HELP_LOCALES    = BNB.HELP_LOCALES or {}
+BNB.FEATURE_LOCALES = BNB.FEATURE_LOCALES or {}
+
+-- The reader's language: the active one, so a language forced in Settings
+-- gets its help too (it read GetLocale() until ALL-648, 2026-11-02)
+local function Lang()
+    return BNB.GetActiveLanguage and BNB.GetActiveLanguage() or GetLocale()
+end
 
 function BNB.HelpNoteID(key) return PREFIX .. tostring(key) end
 
@@ -63,7 +74,7 @@ end
 
 -- The reader's language when that topic is translated
 local function Localized(t)
-    local loc = BNB.HELP_LOCALES[GetLocale()]
+    local loc = BNB.HELP_LOCALES[Lang()]
     local tr = type(loc) == "table" and loc[t.key]
     if type(tr) ~= "table" then return t.title, t.body end
     return tr.title or t.title, tr.body or t.body
@@ -98,13 +109,33 @@ function BNB.HelpChapters()
 end
 
 function BNB.HelpChapterText(ch)
-    local loc = BNB.HELP_LOCALES[GetLocale()]
+    local loc = BNB.HELP_LOCALES[Lang()]
     local tr = type(loc) == "table" and loc["chapter." .. tostring(ch.key)]
     local name, body = ch.name, ch.body
     if type(tr) == "table" then name, body = tr.name or name, tr.body or body end
     local AM = BNB.AdvancedMode
     body = AM and AM.ExpandAssetImages and AM.ExpandAssetImages(body or "") or (body or "")
     return name or ch.key, body
+end
+
+-- The Features tab's sections (BNB.FEATURE_LIST), each in the reader's
+-- language when it is translated: a copy with the translated header / blurb /
+-- items, the help links kept. Not sorted (the book sorts by the shown header)
+function BNB.FeatureSections()
+    local loc = BNB.FEATURE_LOCALES[Lang()]
+    local out = {}
+    for _, sec in ipairs(type(BNB.FEATURE_LIST) == "table" and BNB.FEATURE_LIST or {}) do
+        if type(sec) == "table" and sec.header then
+            local tr = type(loc) == "table" and loc[sec.header]
+            if type(tr) == "table" then
+                out[#out + 1] = { header = tr.header or sec.header, blurb = tr.blurb or sec.blurb,
+                                  items = type(tr.items) == "table" and tr.items or sec.items, help = sec.help }
+            else
+                out[#out + 1] = sec
+            end
+        end
+    end
+    return out
 end
 
 -- The help lives in the Help book only (ALL-554 stage 4, 2026-10-30): the

@@ -10,15 +10,15 @@ All text the player sees lives in `BigNoteBox/Locales/`, one file per language. 
 
 ### Translation status
 
-Updated 2026-11-01. English has 3541 keys.
+Updated 2026-11-02. English has 3566 keys.
 
 | Language | File | Status |
 |---|---|---|
 | English | `enUS.lua` | Reference, always complete |
-| Simplified Chinese | `zhCN.lua` | 100% (3541 / 3541), quality check in progress |
+| Simplified Chinese | `zhCN.lua` | 99% (3539 / 3566), quality check in progress |
 | Traditional Chinese | `zhTW.lua` | Not started |
 | Korean | `koKR.lua` | Not started |
-| German | `deDE.lua` | Not started |
+| German | `deDE.lua` | 100% (3566 / 3566), native-speaker check wanted |
 | French | `frFR.lua` | Not started |
 | Spanish (Spain) | `esES.lua` | Not started |
 | Spanish (Latin America) | `esMX.lua` | Not started |
