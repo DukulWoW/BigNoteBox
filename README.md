@@ -4,7 +4,7 @@
   <h1>BigNoteBox</h1>
   <b>By Dukul</b>
   <br><br>
-  <img src="https://media.forgecdn.net/attachments/1632/900/dark-mode-png.png" />
+  <img src="https://media.forgecdn.net/attachments/1982/494/00-welcome-png.png" />
 </div>
 
 # ℹ️ About
