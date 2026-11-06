@@ -288,7 +288,9 @@ function BNB.PopulateHistoryWindow()
     -- Update size label
     if _sizeLbl then
         local total = BNB.HistoryTotalSize()
-        _sizeLbl:SetText(string.format(L["HISTORY_SIZE_TOTAL"], BNB.HistoryFormatSize(total)))
+        local size = BNB.HistoryFormatSize(total)
+        _sizeLbl:SetText(string.format(L["HISTORY_SIZE_TOTAL"], size))
+        if _sizeLbl:IsTruncated() then _sizeLbl:SetText(size) end
     end
 end
 
@@ -397,9 +399,7 @@ local function BuildHistoryWindow()
     rescueBtn:SetScript("OnLeave", function() GameTooltip:Hide() end)
     _rescueBtn = rescueBtn
     for _, b in ipairs({ clearBtn, selectBtn, rescueBtn }) do
-        local fs = b:GetFontString()
-        local w = fs and fs:GetStringWidth() or 0
-        if w > 0 then b:SetWidth(math.max(56, math.ceil(w) + 22)) end
+        BNB.SizeButtonToText(b, 56, 22)
     end
 
     local clearSelBtn = BNB.CreateButton(nil, list, L["HW_CLEAR_SEL_BTN"], 120, 26)
@@ -434,6 +434,10 @@ local function BuildHistoryWindow()
     -- Size label
     local szLbl = list:CreateFontString(nil, "OVERLAY", "BNBFontNormalSmall")
     szLbl:SetPoint("BOTTOMRIGHT", f, "BOTTOMRIGHT", -PAD - 28, 14)
+    -- Kept right of the footer buttons: a long translation drops the words
+    -- and keeps the size (ALL-651)
+    szLbl:SetPoint("LEFT", rescueBtn, "RIGHT", 6, 0)
+    szLbl:SetWordWrap(false)
     szLbl:SetJustifyH("RIGHT")
     szLbl:SetTextColor(0.45, 0.45, 0.45)
     _sizeLbl = szLbl

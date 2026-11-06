@@ -54,10 +54,7 @@ local function BuildGeneralTab(sf, ct)
     -- By-line: a button that copies the link to dukul.net (Dukul, 2026-10-08)
     local byBtn = BNB.CreateButton(nil, ct, L["AUTHOR"], 90, 20)
     byBtn:SetPoint("LEFT", ver, "RIGHT", 8, 0)
-    local byFs = byBtn:GetFontString() or byBtn._lbl
-    if byFs and byFs.GetStringWidth then
-        byBtn:SetWidth(math.max(90, math.ceil(byFs:GetStringWidth()) + 24))
-    end
+    byBtn:SetWidth(math.max(90, math.ceil(BNB.ButtonTextWidth(byBtn)) + 24))
     byBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOM")
         GameTooltip:SetText(L["CFG_AUTHOR_TIP"], nil, nil, nil, nil, true)
@@ -210,10 +207,7 @@ local function BuildGeneralTab(sf, ct)
     -- boxes that used to sit here went when the Modules tab arrived (Dukul,
     -- 2026-09-26).
     local moreBtn = BNB.CreateButton(nil, ct, L["CFG_MORE_FEATURES_BTN"], 160, 26)
-    local moreFs = moreBtn:GetFontString() or moreBtn._lbl
-    if moreFs and moreFs.GetStringWidth then
-        moreBtn:SetWidth(math.max(160, math.ceil(moreFs:GetStringWidth()) + 40))
-    end
+    moreBtn:SetWidth(math.max(160, math.ceil(BNB.ButtonTextWidth(moreBtn)) + 40))
     -- Under it, a button per download site that copies its link (ALL-431)
     local LINK_SZ, LINK_GAP = 28, 6
     local LINKS_H = 6 + LINK_SZ

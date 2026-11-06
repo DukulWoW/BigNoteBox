@@ -44,6 +44,7 @@ function BNB.CreateLinkButton(parent, text, url, skin)
         b = CreateFrame("Button", nil, parent, BNB.PanelButtonTemplate())
         b:SetHeight(BTN_H)
         b:SetText(text)
+        BNB.AutoFitButton(b)   -- long translations (ALL-651)
     end
     b:SetScript("OnClick", function(self) BNB.ShowClipboardHint(url, self, true, true) end)
     -- Hooks: a skin button draws its hover in its own OnEnter / OnLeave

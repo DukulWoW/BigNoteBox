@@ -105,7 +105,7 @@ local function MakeRedButton(parent, text, w, h)
         local btn = CreateFrame("Button", nil, parent, "SharedButtonTemplate")
         btn:SetSize(w or 80, h or 24)
         btn:SetText(text or "")
-        return btn
+        return BNB.AutoFitButton(btn)   -- long translations (ALL-651)
     end
 
     local btn = CreateFrame("Button", nil, parent, "BackdropTemplate")
@@ -141,7 +141,8 @@ local function MakeRedButton(parent, text, w, h)
     function btn:GetText()  return lbl:GetText() end
     function btn:GetFontString() return lbl end
 
-    return btn
+    btn._fitSkin = true   -- a plain label: the fit sets its font (ALL-651)
+    return BNB.AutoFitButton(btn)
 end
 
 -- ── Double-confirm helper ─────────────────────────────────────────────────────

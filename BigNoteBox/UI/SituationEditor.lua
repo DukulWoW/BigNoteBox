@@ -713,9 +713,9 @@ function BNB.CreateSituationEditor(panel, opts)
     pick.frame:Hide()
 
     -- ── Use current / Add / Clear all ────────────────────────────────────────
-    -- The three buttons share the row: Add and Clear all one width, Use
-    -- Current a little wider for its longer label (Dukul, 2026-10-08)
-    local ROW_BTN_GAP, USE_CURRENT_RATIO = 6, 1.3
+    -- The three buttons share the row by the length of their labels (Use
+    -- Current was a fixed 1.3 share, Dukul 2026-10-08; German needs more, ALL-651)
+    local ROW_BTN_GAP = 6
     local useCurrentBtn = BNB.CreateButton(nil, panel, L["STICKY_SIT_USE_CURRENT_BTN"], 90, 22)
     useCurrentBtn:SetPoint("TOPLEFT", valueRow, "BOTTOMLEFT", 0, -4)
 
@@ -731,11 +731,7 @@ function BNB.CreateSituationEditor(panel, opts)
     clearBtn:SetEnabled(false)
 
     local function SizeRowButtons()
-        local w = valueRow:GetWidth()
-        if not w or w <= 0 then return end
-        local bw = math.floor((w - 2 * ROW_BTN_GAP) / (2 + USE_CURRENT_RATIO))
-        useCurrentBtn:SetWidth(w - 2 * ROW_BTN_GAP - 2 * bw)
-        addBtn:SetWidth(bw); clearBtn:SetWidth(bw)
+        BNB.SpreadButtons({ useCurrentBtn, addBtn, clearBtn }, valueRow:GetWidth(), ROW_BTN_GAP)
     end
     valueRow:HookScript("OnSizeChanged", SizeRowButtons)
     SizeRowButtons()
@@ -1175,6 +1171,12 @@ function BNB.CreateSituationEditor(panel, opts)
     wpManualBtn:SetPoint("LEFT", wpPinBtn, "RIGHT", BTN_GAP, 0)
     local wpNavBtn = BNB.CreateButton(nil, panel, L["STICKY_WP_BTN_NAVIGATE"], BTN_W, BTN_H)
     wpNavBtn:SetPoint("LEFT", wpManualBtn, "RIGHT", BTN_GAP, 0)
+    -- The three share the list's width by their labels (ALL-651)
+    local function SizeWpButtons()
+        BNB.SpreadButtons({ wpPinBtn, wpManualBtn, wpNavBtn }, wpList:GetWidth(), BTN_GAP)
+    end
+    wpList:HookScript("OnSizeChanged", SizeWpButtons)
+    SizeWpButtons()
 
     -- The two checkboxes side by side (room for the two-line waypoint rows,
     -- ALL-354). One line each; a long

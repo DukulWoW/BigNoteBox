@@ -403,6 +403,168 @@ function BNB.PanelButtonTemplate()
 end
 
 --------------------------------------------------------------------------------
+-- BUTTON LABEL FIT  (ALL-651, German labels ran out of their buttons)
+-- A label too wide for its button gets a smaller font, down to FIT_MIN of its
+-- own size; still too wide, it ends in "..." and the button's hover shows the
+-- whole text (unless the button shows its own tooltip). Every button from
+-- BNB.CreateButton / CreateSkinButton gets it; others call BNB.AutoFitButton.
+-- Template buttons switch font objects on hover / disable, so their smaller
+-- size goes in through copies of their own font objects (made once per size),
+-- never SetFont on the label. A skin label has no font objects: SetFont.
+--------------------------------------------------------------------------------
+local FIT_MIN = 0.8
+local _fitFonts = {}   -- "<font object name>@<size>" -> font object
+
+local function FitFontObject(obj, size)
+    if not obj then return nil end
+    local name = obj.GetName and obj:GetName()
+    if not name then return obj end
+    local key = name .. "@" .. size
+    local f = _fitFonts[key]
+    if not f then
+        f = CreateFont("BNBFit_" .. name .. "_" .. (size * 10))
+        f:CopyFontObject(obj)
+        local path, _, flags = obj:GetFont()
+        if path then f:SetFont(path, size, flags or "") end
+        _fitFonts[key] = f
+    end
+    return f
+end
+
+local function FitTipEnter(btn)
+    if not btn._fitFull or GameTooltip:IsOwned(btn) then return end
+    GameTooltip:SetOwner(btn, "ANCHOR_TOP")
+    GameTooltip:AddLine(btn._fitFull, 1, 1, 1, true)
+    GameTooltip:Show()
+end
+local function FitTipLeave(btn)
+    if btn._fitFull and GameTooltip:IsOwned(btn) then GameTooltip:Hide() end
+end
+
+function BNB.FitButtonText(btn)
+    if not IsLoggedIn() then return end          -- CreateFont waits for login
+    local fs = btn._lbl or (btn.GetFontString and btn:GetFontString())
+    if not fs then return end
+    local w = btn:GetWidth()
+    local text = fs:GetText()
+    if not w or w <= 0 or not text or text == "" then return end
+    local path, cur, flags = fs:GetFont()
+    if not path or not cur or cur <= 0 then return end
+
+    local skin = btn._fitSkin
+    local base
+    if skin then
+        -- A font change (ApplyLabelFont) puts the full size back: that is the new base
+        if cur ~= btn._fitSize then btn._fitBase = cur end
+        base = btn._fitBase or cur
+    else
+        local o = btn._fitOrig
+        if not o then
+            o = { n = btn:GetNormalFontObject(), h = btn:GetHighlightFontObject(),
+                  d = btn:GetDisabledFontObject() }
+            btn._fitOrig = o
+        end
+        local _, s = (o.n or fs):GetFont()
+        base = s or cur
+    end
+
+    local pad = btn._fitPad or (skin and 4 or 8)
+    local avail = w - 2 * pad
+    local need = fs:GetUnboundedStringWidth() * base / cur   -- width at full size
+    local size = base
+    if need > avail then
+        size = math.max(math.ceil(base * FIT_MIN * 2) / 2, math.floor(base * avail / need * 2) / 2)
+    end
+    if size ~= btn._fitSize then
+        btn._fitSize = size
+        if skin then
+            fs:SetFont(path, size, flags or "")
+        else
+            local o = btn._fitOrig
+            local full = size >= base
+            if o.n then btn:SetNormalFontObject(full and o.n or FitFontObject(o.n, size)) end
+            if o.h then btn:SetHighlightFontObject(full and o.h or FitFontObject(o.h, size)) end
+            if o.d then btn:SetDisabledFontObject(full and o.d or FitFontObject(o.d, size)) end
+        end
+    end
+    if not btn._fitAnchored then
+        btn._fitAnchored = true
+        fs:ClearAllPoints()
+        fs:SetPoint("LEFT",  btn, "LEFT",   pad, 0)
+        fs:SetPoint("RIGHT", btn, "RIGHT", -pad, 0)
+        fs:SetWordWrap(false)
+    end
+    btn._fitFull = (need * size / base > avail + 0.5) and text or nil
+    if btn._fitFull and not btn._fitTip then
+        btn._fitTip = true
+        btn:HookScript("OnEnter", FitTipEnter)
+        btn:HookScript("OnLeave", FitTipLeave)
+    end
+end
+
+-- The label's width at its full font size, for a caller that sizes the
+-- button to its text (the label itself may be shrunk or cut by the fit)
+function BNB.ButtonTextWidth(btn)
+    local fs = btn._lbl or (btn.GetFontString and btn:GetFontString())
+    if not fs then return 0 end
+    local _, cur = fs:GetFont()
+    local base = btn._fitSkin and btn._fitBase
+    if not btn._fitSkin and btn._fitOrig and btn._fitOrig.n then
+        local _, s = btn._fitOrig.n:GetFont()
+        base = s
+    end
+    local w = fs:GetUnboundedStringWidth() or 0
+    if base and cur and cur > 0 then w = w * base / cur end
+    return w
+end
+
+-- A button as wide as its label (full size) plus pad, never under minW
+function BNB.SizeButtonToText(btn, minW, pad)
+    local w = math.ceil(BNB.ButtonTextWidth(btn)) + (pad or 22)
+    btn:SetWidth(math.max(minW or 0, w))
+end
+
+-- Buttons on one row share `total` px by the length of their labels: each
+-- gets its label width plus pad, and what is left over is shared out evenly.
+-- When the labels need more than the row has, each gets its share and the
+-- label fit shrinks them.
+function BNB.SpreadButtons(btns, total, gap, pad)
+    pad = pad or 20
+    local n = #btns
+    if n == 0 or not total or total <= 0 then return end
+    local nat, sum = {}, 0
+    for i, b in ipairs(btns) do
+        nat[i] = math.ceil(BNB.ButtonTextWidth(b)) + pad
+        sum = sum + nat[i]
+    end
+    local room, used = total - gap * (n - 1), 0
+    for i, b in ipairs(btns) do
+        local w
+        if i == n then
+            w = room - used
+        elseif sum <= room then
+            w = nat[i] + math.floor((room - sum) / n)
+        else
+            w = math.floor(room * nat[i] / sum)
+        end
+        used = used + w
+        b:SetWidth(w)
+    end
+end
+
+-- Keeps a button's label fitted from now on: on every SetText, size change and show.
+function BNB.AutoFitButton(btn, pad)
+    if btn._fitAuto then return btn end
+    btn._fitAuto = true
+    btn._fitPad = pad
+    hooksecurefunc(btn, "SetText", BNB.FitButtonText)
+    btn:HookScript("OnSizeChanged", BNB.FitButtonText)
+    btn:HookScript("OnShow", BNB.FitButtonText)
+    BNB.FitButtonText(btn)
+    return btn
+end
+
+--------------------------------------------------------------------------------
 -- UI PANEL BUTTON  (the standard WoW button, see BNB.PanelButtonTemplate)
 -- Returns: button
 --------------------------------------------------------------------------------
@@ -413,7 +575,7 @@ function BNB.CreateButton(name, parent, text, w, h)
     local btn = CreateFrame("Button", name, parent, BNB.PanelButtonTemplate())
     btn:SetSize(w or 80, h or 22)
     btn:SetText(text or "")
-    return btn
+    return BNB.AutoFitButton(btn)
 end
 
 -- State buttons in a 2-column grid at (0, y) of parent, `width` wide (ALL-256,
@@ -589,7 +751,7 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
             if tried then return end
             if ApplyLabelFont() then tried = true; return end
             C_Timer.After(0.1, function()
-                if ApplyLabelFont() then tried = true end
+                if ApplyLabelFont() then tried = true; BNB.FitButtonText(btn) end
             end)
         end)
     end
@@ -618,7 +780,14 @@ function BNB.CreateSkinButton(name, parent, text, w, h, fontSize)
     btn:HookScript("OnShow", ApplyPreset)
     BNB.RegisterSkinButton(ApplyPreset, btn)
 
-    return btn
+    -- Label fit (ALL-651), also after a font change put the full size back
+    btn._fitSkin = true
+    _skinLabelFonts[btn] = function()
+        local ok = ApplyLabelFont()
+        BNB.FitButtonText(btn)
+        return ok
+    end
+    return BNB.AutoFitButton(btn)
 end
 
 --------------------------------------------------------------------------------
