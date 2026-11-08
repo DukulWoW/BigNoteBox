@@ -130,19 +130,14 @@ function BNB.OpenTokenEdit(name)
     if rec then _textEB:SetFocus() else _nameEB:SetFocus() end
 end
 
-StaticPopupDialogs["BNB_TOKEN_DELETE"] = {
-    preferredIndex = 3,
-    text = "%s", button1 = L["DELETE"], button2 = L["CANCEL"],
-    OnAccept = function(_, name) if name then BNB.Tokens.DeleteCustom(name) end end,
-    timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
-}
-
 -- Edit / Delete, shared by the page's rows and the toolbar's My tokens list
 function BNB.CustomTokenMenu(root, name)
     root:CreateTitle("{{" .. name .. "}}")
     root:CreateButton(L["TOKEN_MENU_EDIT"], function() BNB.OpenTokenEdit(name) end, { icon = "editor" })
     root:CreateButton(L["DELETE"], function()
-        StaticPopup_Show("BNB_TOKEN_DELETE", string.format(L["TOKEN_DELETE_CONFIRM"], name), nil, name)
+        BNB.Dialog.Confirm({ text = string.format(L["TOKEN_DELETE_CONFIRM"], name),   -- ALL-572 S3
+            okLabel = L["DELETE"], alert = true,
+            onAccept = function() BNB.Tokens.DeleteCustom(name) end })
     end, { icon = "trash", danger = true })
 end
 

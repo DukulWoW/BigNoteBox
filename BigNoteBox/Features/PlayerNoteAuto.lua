@@ -254,16 +254,6 @@ end
 -- sticky inline edit; rich notes are edited as text in those same boxes).
 -- A warning, not a lock: an EditBox cannot protect a range.
 local _warned = {}   -- [noteID] = true once warned this session
-StaticPopupDialogs["BNB_PNA_TOP_WARN"] = {
-    text         = L["PNA_TOP_WARN"],
-    button1      = L["PNA_STOP_BTN"],
-    button2      = L["OK"],
-    OnAccept     = function(_, data) if data then UN.SetAutoUpdate(data, false) end end,
-    timeout      = 0,
-    whileDead    = true,
-    hideOnEscape = true,
-    preferredIndex = 3,
-}
 function UN.OnTopEdit(eb, id)
     if not id or _warned[id] or not AutoOn() then return end
     local note = BNB.GetNote(id)
@@ -271,7 +261,12 @@ function UN.OnTopEdit(eb, id)
     local top = UN.SplitAtHead(eb:GetText() or "", note.unitAuto.head)
     if not top or (eb:GetCursorPosition() or 0) > #top then return end
     _warned[id] = true
-    StaticPopup_Show("BNB_PNA_TOP_WARN", note.title or "", nil, id)
+    -- Our own dialog (ALL-572 S3); it takes no focus, typing goes on
+    BNB.Dialog.Confirm({
+        text = string.format(L["PNA_TOP_WARN"], note.title or ""),
+        okLabel = L["PNA_STOP_BTN"], cancelLabel = L["OK"], width = 380,
+        onAccept = function() UN.SetAutoUpdate(id, false) end,
+    })
 end
 
 local function OnTarget() Handle("target", "Target", true) end

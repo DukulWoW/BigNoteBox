@@ -988,48 +988,30 @@ function AM.ConvertToPlain(id, onDone)
         return
     end
 
-    -- Register the confirm popups once. The third button keeps a manual
-    -- restore point first, so the rich version can be had back from Note
-    -- History (ALL-344); "Replace" when the note already has one. _N: no
-    -- third button while the Note History module is off (ALL-343).
-    if not StaticPopupDialogs["BNB_RICH_CONVERT_PLAIN"] then
-        for key, point in pairs({ BNB_RICH_CONVERT_PLAIN = "HISTORY_CTX_CREATE",
-                                  BNB_RICH_CONVERT_PLAIN_R = "NL_CM_REPLACE_RESTORE",
-                                  BNB_RICH_CONVERT_PLAIN_N = false }) do
-            StaticPopupDialogs[key] = {
-                preferredIndex = 3,
-                text     = BNB.L[point and "ADV_CONVERT_PLAIN_CONFIRM" or "ADV_CONVERT_PLAIN_CONFIRM_NH"],
-                button1  = BNB.L["ADV_REMOVE_TAGS_BTN"],
-                button2  = BNB.L["CANCEL"],
-                button3  = point and BNB.L[point] or nil,
-                OnAccept = function(self, data)
-                    AM.StripToPlain(data.id)
-                    if data.onDone then data.onDone(true) end
-                end,
-                -- button3: restore point, then the same conversion
-                OnAlt = function(self, data)
-                    if BNB.HistoryCreateManual then BNB.HistoryCreateManual(data.id) end
-                    AM.StripToPlain(data.id)
-                    if data.onDone then data.onDone(true) end
-                end,
-                OnCancel = function(self, data)
-                    if data and data.onDone then data.onDone(false) end
-                end,
-                timeout      = 0,
-                whileDead    = true,
-                hideOnEscape = true,
-            }
-        end
-    end
-
+    -- Our own dialog (ALL-572 S3). The third button keeps a manual restore
+    -- point first, so the rich version can be had back from Note History
+    -- (ALL-344); "Replace" when the note already has one; no third button
+    -- while the Note History module is off (ALL-343). One dialog per note:
+    -- several notes (Select mode) wait in the queue.
     local note = BNB.GetNote(id)
-    local key = "BNB_RICH_CONVERT_PLAIN"
-    if not BNB.HistoryEnabled() then key = "BNB_RICH_CONVERT_PLAIN_N"
-    elseif note and note.manualSnapshot then key = "BNB_RICH_CONVERT_PLAIN_R" end
-    local popup = StaticPopup_Show(key)
-    if popup then
-        popup.data = { id = id, onDone = onDone }
+    local point = "HISTORY_CTX_CREATE"
+    if not BNB.HistoryEnabled() then point = nil
+    elseif note and note.manualSnapshot then point = "NL_CM_REPLACE_RESTORE" end
+    local function Strip()
+        AM.StripToPlain(id)
+        if onDone then onDone(true) end
     end
+    BNB.Dialog.Confirm({
+        text = BNB.L[point and "ADV_CONVERT_PLAIN_CONFIRM" or "ADV_CONVERT_PLAIN_CONFIRM_NH"],
+        okLabel = BNB.L["ADV_REMOVE_TAGS_BTN"], altLabel = point and BNB.L[point] or nil,
+        host = BNB.mainFrame, key = "toPlain:" .. tostring(id),
+        onAccept = Strip,
+        onAlt = function()
+            if BNB.HistoryCreateManual then BNB.HistoryCreateManual(id) end
+            Strip()
+        end,
+        onCancel = function() if onDone then onDone(false) end end,
+    })
 end
 
 --------------------------------------------------------------------------------

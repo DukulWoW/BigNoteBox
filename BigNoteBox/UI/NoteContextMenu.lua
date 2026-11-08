@@ -90,6 +90,28 @@ function BNB.ConfirmRun(text, run, host)
         onAccept = function() if type(run) == "function" then run() end end })
 end
 
+-- The note has a manual restore point already: Replace it / Compare first /
+-- Cancel (ALL-572 S3; the history toolbar button and the note menu)
+function BNB.ConfirmReplaceRestorePoint(noteID)
+    BNB.Dialog.Confirm({
+        text = L["HISTORY_OVERRIDE_TEXT"], okLabel = L["HISTORY_OVERRIDE_OVERRIDE"],
+        altLabel = L["HISTORY_OVERRIDE_COMPARE"], cancelLabel = L["HISTORY_OVERRIDE_CANCEL"],
+        host = BNB.mainFrame, key = "replacePoint:" .. tostring(noteID),
+        onAccept = function()
+            if BNB.HistoryCreateManual then
+                BNB.HistoryCreateManual(noteID)
+                BNB:Print(L["HISTORY_MANUAL_UPDATED"])
+            end
+        end,
+        onAlt = function()
+            local slots = BNB.HistoryGetSlots(noteID)
+            if slots.manual and BNB.OpenHistoryCompare then
+                BNB.OpenHistoryCompare(noteID, slots.manual)
+            end
+        end,
+    })
+end
+
 -- History > Clear note history: auto snapshots only, the manual restore point
 -- stays (Dukul's scope)
 local function ConfirmClearHistory(noteID, title)
@@ -175,9 +197,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             BNB.SaveCurrentNote()
         end
         if BNB.HistoryGetSlots(noteID).manual then
-            -- The id is the popup's data (arg 4): as text arg 1 it reached
-            -- neither Override nor Compare
-            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", nil, nil, noteID)
+            BNB.ConfirmReplaceRestorePoint(noteID)
         else
             BNB.HistoryCreateManual(noteID)
             BNB:Print(L["HISTORY_MANUAL_SAVED"])

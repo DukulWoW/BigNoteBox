@@ -294,7 +294,7 @@ local function GetImportFrame()
         BNB.OfferBackupFirst(function()   -- ALL-186
             if foreignChar and BNB.currentChar then
                 BNB._pendingImport = { notes = noteList }
-                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
+                BNB.ConfirmImportRemap(foreignChar)
             else
                 BNB._DoImport(noteList, false)
             end

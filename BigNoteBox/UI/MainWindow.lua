@@ -1327,7 +1327,7 @@ function BNB.CreateMainWindow()
             C_Timer.After(0, function()
                 if not self:IsShown() then
                     self:Show()
-                    StaticPopup_Show("BNB_CONFIRM_CLOSE")
+                    BNB.ConfirmCloseMainWindow()
                 end
             end)
             return
@@ -1597,7 +1597,7 @@ end
 function BNB.RequestCloseMainWindow()
     if not BNB.mainFrame then return end
     if BigNoteBoxDB.confirmClose and not BNB.mainFrame._skipConfirm then
-        StaticPopup_Show("BNB_CONFIRM_CLOSE")
+        BNB.ConfirmCloseMainWindow()
     else
         BNB.mainFrame._skipConfirm = true
         BNB.mainFrame:Hide()

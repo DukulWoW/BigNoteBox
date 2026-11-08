@@ -261,85 +261,74 @@ local function BuildPopups()
     -- (ALL-572): BNB.ConfirmDeleteNote / ConfirmDeleteNotes (UI/NoteList.lua),
     -- the Trash window's own (UI/TrashWindow.lua)
 
-    StaticPopupDialogs["BNB_CONFIRM_CLOSE"] = {
-        text = L["POPUP_CONFIRM_CLOSE"],
-        button1 = L["CLOSE"],
-        button2 = L["CANCEL"],
-        OnAccept = function()
-            if BNB.mainFrame then
-                -- Bypass the confirm check on the forced hide
-                BNB.mainFrame._skipConfirm = true
-                BNB.CloseCompanionWindows()
-                BNB.mainFrame:Hide()
-                BNB.mainFrame._skipConfirm = false
-            end
-        end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    }
+    -- Close the main window, import remap and import confirm: our own
+    -- dialog (ALL-572 S3), below
+end
 
-    -- Shown during import when the backup contains notes scoped to a different
-    -- character. %s1 = original character name, %s2 = current character name.
-    -- button1 = remap to current char, button2 = keep original scope, ESC = abort.
-    StaticPopupDialogs["BNB_IMPORT_SCOPE_REMAP"] = {
-        text = L["POPUP_IMPORT_REMAP"],
-        button1 = L["BTN_IMPORT_REMAP_YES"],
-        button2 = L["BTN_IMPORT_REMAP_NO"],
-        OnAccept = function()
-            local p = BNB._pendingImport
-            if not p then return end
-            local n = BNB._DoImport and BNB._DoImport(p.notes, true) or 0
-            if p.status then
-                if n > 0 then
-                    p.status:SetTextColor(0.55, 0.82, 0.55)
-                    p.status:SetText(string.format(L["IMPORT_DONE_REMAP"], n))
-                else
-                    p.status:SetTextColor(0.82, 0.55, 0.55)
-                    p.status:SetText(L["IMPORT_NOTHING"])
-                end
-            end
-            if p.paste then p.paste:SetRealText("") end
-            BNB._pendingImport = nil
-        end,
-        -- OnCancel(self, data, reason): reason is the THIRD argument. It read
-        -- the second (data, nil), so "Keep original" imported nothing (D9, 2026-10-02)
-        OnCancel = function(_, _, reason)
-            if reason == "clicked" then
-                -- button2: keep original scope
-                local p = BNB._pendingImport
-                if not p then return end
-                local n = BNB._DoImport and BNB._DoImport(p.notes, false) or 0
-                if p.status then
-                    if n > 0 then
-                        p.status:SetTextColor(0.55, 0.82, 0.55)
-                        p.status:SetText(string.format(L["IMPORT_DONE_KEEP"], n))
-                    else
-                        p.status:SetTextColor(0.82, 0.55, 0.55)
-                        p.status:SetText(L["IMPORT_NOTHING"])
-                    end
-                end
-                if p.paste then p.paste:SetRealText("") end
-            end
-            -- ESC or button2 both clean up
-            BNB._pendingImport = nil
-        end,
-        -- The game's Esc also calls OnCancel with "clicked" unless this is set,
-        -- so Esc imported with the original scope instead of stopping (2026-10-09)
-        noCancelOnEscape = true,
-        OnHide = function() BNB._pendingImport = nil end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-        showAlert = true,
-    }
+BNB.RegisterEvent("PLAYER_LOGIN", BuildPopups)
 
-    -- Confirmation popup for the same-character import path (no scope remap needed).
-    -- Fired by the Backup tab's Import button after the paste has parsed successfully
-    -- but before the notes are actually imported, so the user can back out.
-    StaticPopupDialogs["BNB_IMPORT_CONFIRM"] = {
-        text = L["POPUP_IMPORT_CONFIRM"],
-        button1 = L["IMPORT_POPUP_BTN"],
-        button2 = L["CANCEL"],
-        OnAccept = function()
-            local p = BNB._pendingImport
-            if not p then return end
+-- "Confirm before closing" (Settings): asked on the main window (ALL-572 S3)
+function BNB.ConfirmCloseMainWindow()
+    BNB.Dialog.Confirm({
+        text = L["POPUP_CONFIRM_CLOSE"], okLabel = L["CLOSE"], host = BNB.mainFrame,
+        key = "closeMain",
+        onAccept = function()
+            if not BNB.mainFrame then return end
+            -- Bypass the confirm check on the forced hide
+            BNB.mainFrame._skipConfirm = true
+            BNB.CloseCompanionWindows()
+            BNB.mainFrame:Hide()
+            BNB.mainFrame._skipConfirm = false
+        end,
+    })
+end
+
+-- The import's result on the Backup page's status line (Welcome import: none)
+local function ImportReport(p, n, okText)
+    if p.status then
+        if n > 0 then
+            p.status:SetTextColor(0.55, 0.82, 0.55)
+            p.status:SetText(okText)
+        else
+            p.status:SetTextColor(0.82, 0.55, 0.55)
+            p.status:SetText(L["IMPORT_NOTHING"])
+        end
+    end
+    if p.paste then p.paste:SetRealText("") end
+end
+
+-- The import holds notes for another character (BNB._pendingImport, set by
+-- the caller): Yes = move them to this character, No = keep their character,
+-- Cancel / Esc = no import. Was a 2-button StaticPopup with Esc as the third
+-- choice (ALL-572 S3: a Cancel button of its own now)
+function BNB.ConfirmImportRemap(foreignChar)
+    local p = BNB._pendingImport
+    if not p then return end
+    local function run(remap)
+        BNB._pendingImport = nil
+        local n = BNB._DoImport and BNB._DoImport(p.notes, remap) or 0
+        ImportReport(p, n, string.format(L[remap and "IMPORT_DONE_REMAP" or "IMPORT_DONE_KEEP"], n))
+    end
+    BNB.Dialog.Confirm({
+        text = string.format(L["POPUP_IMPORT_REMAP"], foreignChar or "", BNB.currentChar or ""),
+        okLabel = L["BTN_IMPORT_REMAP_YES"], altLabel = L["BTN_IMPORT_REMAP_NO"],
+        alert = true, width = 420, key = "importRemap",
+        onAccept = function() run(true) end,
+        onAlt = function() run(false) end,
+        onCancel = function() BNB._pendingImport = nil end,
+    })
+end
+
+-- The same-character import: the count, then the import. Cancel leaves the
+-- paste box as it is, to edit and retry
+function BNB.ConfirmImport()
+    local p = BNB._pendingImport
+    if not p then return end
+    BNB.Dialog.Confirm({
+        text = string.format(L["POPUP_IMPORT_CONFIRM"], #p.notes),
+        okLabel = L["IMPORT_POPUP_BTN"], key = "importConfirm",
+        onAccept = function()
+            BNB._pendingImport = nil
             local n = BNB._DoImport and BNB._DoImport(p.notes, false) or 0
             if p.status then
                 if n > 0 then
@@ -351,17 +340,10 @@ local function BuildPopups()
                 end
             end
             if p.paste then p.paste:SetRealText("") end
-            BNB._pendingImport = nil
         end,
-        OnCancel = function()
-            -- User backed out — leave paste box intact so they can edit and retry
-            BNB._pendingImport = nil
-        end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-    }
+        onCancel = function() BNB._pendingImport = nil end,
+    })
 end
-
-BNB.RegisterEvent("PLAYER_LOGIN", BuildPopups)
 
 --------------------------------------------------------------------------------
 -- ADDON COMPARTMENT FRAME (global wrappers referenced in retail .toc)

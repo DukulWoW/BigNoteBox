@@ -158,21 +158,15 @@ local function BuildRow(parent, note, id, yOff)
                 root:CreateDivider()
                 root:CreateButton(L["HW_CTX_CLEAR_NOTE"], function()
                     local title = note.title and note.title ~= "" and note.title or L["HW_UNTITLED"]
-                    StaticPopupDialogs["BNB_HISTORY_CLEAR_NOTE"] = {
-                        text           = string.format(L["HW_CLEAR_NOTE_CONFIRM_FMT"], title),
-                        button1        = L["DELETE"],
-                        button2        = L["CANCEL"],
-                        OnAccept       = function()
+                    BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+                        text = string.format(L["HW_CLEAR_NOTE_CONFIRM_FMT"], title),
+                        okLabel = L["DELETE"], host = _hwFrame,
+                        onAccept = function()
                             BNB.HistoryDeleteAuto(id)
                             BNB.RefreshHistoryWindow()
                             BNB.RefreshNoteHistoryPanel()
                         end,
-                        timeout        = 0,
-                        whileDead      = true,
-                        hideOnEscape   = true,
-                        preferredIndex = 3,
-                    }
-                    StaticPopup_Show("BNB_HISTORY_CLEAR_NOTE")
+                    })
                 end, { danger = true })   -- irreversible = red (Dukul)
             end)
         else
@@ -207,18 +201,15 @@ local function ClearSelectedConfirm()
     local ids = {}
     for id in pairs(_multiSel) do ids[#ids + 1] = id end
     if #ids == 0 then return end
-    StaticPopupDialogs["BNB_HISTORY_CLEAR_SEL"] = StaticPopupDialogs["BNB_HISTORY_CLEAR_SEL"] or {
-        text = L["HW_CLEAR_SEL_CONFIRM_FMT"],
-        button1 = L["DELETE"], button2 = L["CANCEL"],
-        OnAccept = function(self, data)
-            if type(data) ~= "table" then return end
-            for _, id in ipairs(data) do BNB.HistoryDeleteAuto(id) end
+    BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+        text = string.format(L["HW_CLEAR_SEL_CONFIRM_FMT"], tostring(#ids)),
+        okLabel = L["DELETE"], alert = true, host = _hwFrame,
+        onAccept = function()
+            for _, id in ipairs(ids) do BNB.HistoryDeleteAuto(id) end
             SetHistoryMultiMode(false)
             if BNB.SyncHistoryBtnState then BNB.SyncHistoryBtnState() end
         end,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3, showAlert = true,
-    }
-    StaticPopup_Show("BNB_HISTORY_CLEAR_SEL", tostring(#ids), nil, ids)
+    })
 end
 
 --------------------------------------------------------------------------------
@@ -358,7 +349,18 @@ local function BuildHistoryWindow()
     clearBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 10)
     clearBtn:SetEnabled(false)
     clearBtn:SetScript("OnClick", function()
-        StaticPopup_Show("BNB_HISTORY_CLEAR_ALL")
+        BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+            text = L["HISTORY_CLEAR_ALL_CONFIRM"], okLabel = L["HISTORY_OVERRIDE_OVERRIDE"],
+            host = _hwFrame,
+            onAccept = function()
+                local ndb = BNB.NotesDB()
+                if ndb and ndb.notes then
+                    for nid in pairs(ndb.notes) do BNB.HistoryDeleteAuto(nid) end
+                end
+                BNB.RefreshHistoryWindow()
+                BNB.SyncHistoryBtnState()
+            end,
+        })
     end)
     clearBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -444,29 +446,6 @@ local function BuildHistoryWindow()
 
     -- The per-note page (UI/NoteHistoryPanel.lua)
     BNB._BuildNoteHistoryPage(f, top)
-
-    -- StaticPopup for clear all
-    if not StaticPopupDialogs["BNB_HISTORY_CLEAR_ALL"] then
-        StaticPopupDialogs["BNB_HISTORY_CLEAR_ALL"] = {
-            text          = L["HISTORY_CLEAR_ALL_CONFIRM"],
-            button1       = L["HISTORY_OVERRIDE_OVERRIDE"],
-            button2       = L["CANCEL"],
-            OnAccept      = function()
-                local ndb = BNB.NotesDB()
-                if ndb and ndb.notes then
-                    for id in pairs(ndb.notes) do
-                        BNB.HistoryDeleteAuto(id)
-                    end
-                end
-                BNB.RefreshHistoryWindow()
-                BNB.SyncHistoryBtnState()
-            end,
-            timeout       = 0,
-            whileDead     = true,
-            hideOnEscape  = true,
-            preferredIndex = 3,
-        }
-    end
 
     _hwFrame = f
     return f

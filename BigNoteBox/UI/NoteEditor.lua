@@ -699,6 +699,19 @@ local function BuildTitleField(parent)
     -- If it is pending AND focus didn't move to the body or NoteConfig, show a
     -- discard confirmation popup. If the title has text, clear the pending flag
     -- (note is now named — clicking away just saves normally).
+    -- Discard: the new, still untitled note goes (ALL-572 S3: was the popup's OnAccept)
+    local function DiscardNewNote()
+        local id = BNB._pendingNewNoteID
+        BNB._pendingNewNoteID = nil
+        if not id then return end
+        BNB.Editor.SetCurrent(nil)
+        if BNB.PurgeNote        then BNB.PurgeNote(id) end
+        if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
+        -- Close NoteConfig if it was open for this note
+        local nc = _G["BigNoteBoxNoteConfigFrame"]
+        if nc and nc:IsShown() then nc:Hide() end
+    end
+
     local function MaybeCancelNewNote()
         local id = BNB._currentNoteID
         if not id then return end
@@ -724,36 +737,19 @@ local function BuildTitleField(parent)
         if nc and nc:IsShown() then return end
 
         -- Focus went elsewhere — show the discard popup.
-        StaticPopup_Show("BNB_DISCARD_NEW_NOTE")
-    end
-
-    -- Register the discard confirmation popup (once, idempotent).
-    if not StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] then
-        StaticPopupDialogs["BNB_DISCARD_NEW_NOTE"] = {
-            preferredIndex = 3,
-            text      = L["NE_DISCARD_POPUP_TEXT"],
-            button1   = L["NE_DISCARD_BTN"],
-            button2   = L["NE_KEEP_EDITING_BTN"],
-            OnAccept  = function()
-                local id = BNB._pendingNewNoteID
-                BNB._pendingNewNoteID = nil
-                if not id then return end
-                BNB.Editor.SetCurrent(nil)
-                if BNB.PurgeNote        then BNB.PurgeNote(id) end
-                if BNB.LoadNoteInEditor then BNB.LoadNoteInEditor(nil) end
-                -- Close NoteConfig if it was open for this note
-                local nc = _G["BigNoteBoxNoteConfigFrame"]
-                if nc and nc:IsShown() then nc:Hide() end
-            end,
-            OnCancel  = function()
-                -- "Keep Editing" — re-focus the title field
+        BNB.Dialog.Confirm({   -- ALL-572 S3
+            text = L["NE_DISCARD_POPUP_TEXT"], okLabel = L["NE_DISCARD_BTN"],
+            cancelLabel = L["NE_KEEP_EDITING_BTN"], host = BNB.mainFrame, key = "discardNew",
+            onAccept = DiscardNewNote,
+            -- "Keep Editing" (or Esc): back to the title field
+            onCancel = function()
                 C_Timer.After(0.05, function()
                     if BNB._editorTitle then BNB._editorTitle:SetFocus() end
                 end)
             end,
-            timeout = 0, whileDead = true, hideOnEscape = false,
-        }
+        })
     end
+
 
     eb:SetScript("OnEditFocusLost", function(self)
         if fb.SetBackdropColor then

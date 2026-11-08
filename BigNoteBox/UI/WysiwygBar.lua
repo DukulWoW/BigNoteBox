@@ -1139,8 +1139,7 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
         if BNB._dirty and BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
         local slots = BNB.HistoryGetSlots(id)
         if slots.manual then
-            -- The id is the popup's data (arg 4), as OnAccept / OnCancel read it
-            StaticPopup_Show("BNB_HISTORY_OVERRIDE_MANUAL", nil, nil, id)
+            BNB.ConfirmReplaceRestorePoint(id)   -- UI/NoteContextMenu.lua
         else
             BNB.HistoryCreateManual(id)
             BNB:Print(L["HISTORY_MANUAL_SAVED"])
@@ -1282,48 +1281,6 @@ local function BuildWysiwygBar(parent, tsStrip, ctx)
     end
     BNB.SyncSidebarWysiwygBtns()
 
-    -- StaticPopup for manual restore override warning.
-    -- WoW StaticPopup 3-button layout:
-    --   button1 = "Override"  -> OnAccept
-    --   button2 = "Compare"   -> OnCancel  (middle button)
-    --   button3 = "Cancel"    -> OnAlt
-    -- OnCancel fires for both the X/ESC dismiss AND button2, so we guard with
-    -- a flag to distinguish button2 clicks from ESC/X dismissal.
-    if not StaticPopupDialogs["BNB_HISTORY_OVERRIDE_MANUAL"] then
-        StaticPopupDialogs["BNB_HISTORY_OVERRIDE_MANUAL"] = {
-            text           = L["HISTORY_OVERRIDE_TEXT"],
-            button1        = L["HISTORY_OVERRIDE_OVERRIDE"],
-            button2        = L["HISTORY_OVERRIDE_COMPARE"],
-            button3        = L["HISTORY_OVERRIDE_CANCEL"],
-            OnAccept       = function(self, noteID)
-                if noteID and BNB.HistoryCreateManual then
-                    BNB.HistoryCreateManual(noteID)
-                    BNB:Print(L["HISTORY_MANUAL_UPDATED"])
-                end
-            end,
-            OnCancel       = function(self, noteID, reason)
-                -- button2 = "Compare" fires OnCancel with reason == "clicked"
-                -- ESC / X dismiss fires OnCancel with reason == "override" or nil
-                -- We only open compare when the button was explicitly clicked.
-                if reason == "clicked" then
-                    if noteID then
-                        local slots = BNB.HistoryGetSlots(noteID)
-                        if slots.manual and BNB.OpenHistoryCompare then
-                            BNB.OpenHistoryCompare(noteID, slots.manual)
-                        end
-                    end
-                end
-                -- reason nil/other = ESC dismiss, do nothing
-            end,
-            OnAlt          = function(self, noteID)
-                -- button3 = "Cancel" — just dismiss, no action needed
-            end,
-            timeout        = 0,
-            whileDead      = true,
-            hideOnEscape   = true,
-            preferredIndex = 3,
-        }
-    end
 
     end   -- main (sidebar sync, restore popup)
 

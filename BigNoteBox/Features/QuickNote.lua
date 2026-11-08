@@ -166,32 +166,20 @@ local function CreateQuickNote(title, body, icon, tags, rewardAttacher, rich)
         -- The note's parts travel as the popup's data (BUG-15): they used to
         -- be set on the popup frame after StaticPopup_Show, when OnShow had
         -- already run, so the box showed nothing or the previous title.
-        StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] = StaticPopupDialogs["BNB_QUICKNOTE_CONFIRM"] or {
-            preferredIndex = 3,
-            text         = BNB.L["QN_CONFIRM_TEXT"],
-            button1      = BNB.L["QN_CONFIRM_CREATE"],
-            button2      = BNB.L["CANCEL"],
-            hasEditBox   = true,
-            maxLetters   = 100,
-            whileDead    = true,
-            hideOnEscape = true,
-            OnShow = function(self, data)
-                self.EditBox:SetText(data and data.title or "")
-                self.EditBox:SetFocus()
-                self.EditBox:HighlightText()
-            end,
-            OnAccept = function(self, data)
-                if not data then return end
-                local t = self.EditBox:GetText()
+        -- Our own dialog (ALL-572 S3); an empty box keeps the title
+        local data = {
+            title = title, body = body, icon = icon or RandomIcon(),
+            tags = tags, reward = rewardAttacher, rich = rich,
+        }
+        BNB.Dialog.Prompt({
+            text = BNB.L["QN_CONFIRM_TEXT"], value = data.title or "", maxLetters = 100,
+            okLabel = BNB.L["QN_CONFIRM_CREATE"], allowEmpty = true,
+            onAccept = function(t)
                 if t == "" then t = data.title or "" end
                 if MakeQuickNote(t, data.body, data.icon, data.tags, data.reward, data.rich) then
                     BNB:Print(string.format(BNB.L["QN_NOTE_CREATED"], t))
                 end
             end,
-        }
-        StaticPopup_Show("BNB_QUICKNOTE_CONFIRM", nil, nil, {
-            title = title, body = body, icon = icon or RandomIcon(),
-            tags = tags, reward = rewardAttacher, rich = rich,
         })
         return
     end

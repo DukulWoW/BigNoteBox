@@ -677,11 +677,10 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
     _warnDialog._updAllBtn:SetScript("OnClick", function()
         -- Confirm dialog: warn that the note body will be overwritten, but a
         -- restore point will be created first so the user can recover their edits.
-        StaticPopupDialogs["BNB_CONFIRM_UPDATE_ALL"] = {
-            text          = L["INS_WARN_UPDATE_ALL_CONFIRM"],
-            button1       = L["INS_WARN_UPDATE_BTN"],
-            button2       = L["CANCEL"],
-            OnAccept      = function()
+        _warnDialog:Hide()
+        BNB.Dialog.Confirm({   -- ALL-572 S3
+            text = L["INS_WARN_UPDATE_ALL_CONFIRM"], okLabel = L["INS_WARN_UPDATE_BTN"],
+            onAccept = function()
                 -- Unsaved editor text first: saved after the update (UN.OpenNote
                 -- saves the open note), it would write the old text back (ALL-476)
                 if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
@@ -691,13 +690,7 @@ local function ShowWarningDialog(existingNoteID, playerName, onDuplicate, richMo
                 UpdateInspectGear(existingNoteID, richMode)
                 UN.OpenNote(existingNoteID)
             end,
-            timeout       = 0,
-            whileDead     = true,
-            hideOnEscape  = true,
-            preferredIndex = 3,
-        }
-        _warnDialog:Hide()
-        StaticPopup_Show("BNB_CONFIRM_UPDATE_ALL")
+        })
     end)
     _warnDialog:Open(playerName, existingNoteID, onDuplicate)
 end

@@ -187,32 +187,31 @@ end
 --------------------------------------------------------------------------------
 -- QUIT DIALOG
 --------------------------------------------------------------------------------
-local function RegisterQuitDialog()
-    if StaticPopupDialogs["BNB_QUIT_SETUP"] then return end
-    StaticPopupDialogs["BNB_QUIT_SETUP"] = {
-        preferredIndex = 3,
-        text    = L["SW_QUIT_CONFIRM_TEXT"],
-        button1 = L["SW_QUIT_BTN"],
-        button2 = L["SW_KEEP_GOING_BTN"],
-        timeout = 0, whileDead = true, hideOnEscape = true,
-        OnAccept = function()
-            local db = BigNoteBoxDB
-            if db then db.setupComplete = true; db.setupPage = nil; db.setupUsage = nil end
-            if _frame then
-                _frame._quitting = true
-                _frame:Hide()
-            end
-            HideOverlay()
-            StopCamera()
-            StopGlow()
-            -- The Explorer welcome first (ALL-543); the notice waits for it
-            if BNB.ShowExplorerIntroIfDue then pcall(BNB.ShowExplorerIntroIfDue) end
-            -- Held back while the wizard was pending (Core/Events.lua)
-            if BNB.ShowForeverNoticeIfDue then BNB.ShowForeverNoticeIfDue() end
-            -- The welcome note's toast too (ALL-242); Finish reloads, the login shows it
-            if BNB.WhatsNew and BNB.WhatsNew.ShowWelcomeToast then BNB.WhatsNew.ShowWelcomeToast() end
-        end,
-    }
+-- Our own dialog on the wizard (ALL-572 S3)
+local function QuitSetup()
+    local db = BigNoteBoxDB
+    if db then db.setupComplete = true; db.setupPage = nil; db.setupUsage = nil end
+    if _frame then
+        _frame._quitting = true
+        _frame:Hide()
+    end
+    HideOverlay()
+    StopCamera()
+    StopGlow()
+    -- The Explorer welcome first (ALL-543); the notice waits for it
+    if BNB.ShowExplorerIntroIfDue then pcall(BNB.ShowExplorerIntroIfDue) end
+    -- Held back while the wizard was pending (Core/Events.lua)
+    if BNB.ShowForeverNoticeIfDue then BNB.ShowForeverNoticeIfDue() end
+    -- The welcome note's toast too (ALL-242); Finish reloads, the login shows it
+    if BNB.WhatsNew and BNB.WhatsNew.ShowWelcomeToast then BNB.WhatsNew.ShowWelcomeToast() end
+end
+
+local function AskQuit()
+    BNB.Dialog.Confirm({
+        text = L["SW_QUIT_CONFIRM_TEXT"], okLabel = L["SW_QUIT_BTN"],
+        cancelLabel = L["SW_KEEP_GOING_BTN"], host = _frame, key = "quitSetup",
+        onAccept = QuitSetup,
+    })
 end
 
 --------------------------------------------------------------------------------
@@ -1570,7 +1569,7 @@ local function BuildWizardFrame()
     local f = BNB.CreateToolWindow({
         name = "BigNoteBoxSetupWizard", w = WIN_W, h = WIN_H, pad = PAD,
         title = "", toplevel = true, escClose = true,
-        onClose = function() StaticPopup_Show("BNB_QUIT_SETUP") end,
+        onClose = function() AskQuit() end,
     })
     local skinMode = f._isSkin
     f:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
@@ -1662,7 +1661,7 @@ local function BuildWizardFrame()
         C_Timer.After(0.05, function()
             if not self:IsShown() then
                 self:Show(); self:Raise()
-                StaticPopup_Show("BNB_QUIT_SETUP")
+                AskQuit()
             end
             self._hiding = false
         end)
@@ -1679,7 +1678,6 @@ end
 -- PUBLIC API
 --------------------------------------------------------------------------------
 function BNB.ShowSetupWizard()
-    RegisterQuitDialog()
     RegisterLangChangeDialog()
     local f = BuildWizardFrame()
 

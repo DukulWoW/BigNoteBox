@@ -126,14 +126,10 @@ local function FontEntries()
     return out
 end
 
--- ── Saved styles: popups (ALL-69.5, like BigChatBox's) ────────────────────────
+-- ── Saved styles: dialogs (ALL-69.5, like BigChatBox's; our own, ALL-572) ────────────────────────
 -- styleUI: the open page's refresh (style list + every knob), set by
 -- BuildCustomBlock; the popups call it after they change anything.
 local styleUI
-
-local function PopupEditBox(self)
-    return (self.GetEditBox and self:GetEditBox()) or self.EditBox or self.editBox
-end
 
 -- Saves under name: the current look, or data (an imported style).
 local function SaveAs(name, data)
@@ -166,50 +162,14 @@ local function ShowSave(style)
     })
 end
 
-StaticPopupDialogs["BNB_ORACLE_DELETE_STYLE"] = {
-    preferredIndex = 3,
-    text = L["ORACLE_STYLE_DELETE"], button1 = DELETE, button2 = CANCEL,
-    OnAccept = function(self, data)
-        if not data then return end
-        BNB.DeleteSearchStyle(data)
-        BNB:Print(string.format(L["ORACLE_STYLE_DELETED"], data))
-        if styleUI then styleUI() end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
-StaticPopupDialogs["BNB_ORACLE_EXPORT_STYLE"] = {
-    preferredIndex = 3,
-    -- maxLetters = 0: no limit; the default cut the string short (Dukul, 2026-09-28)
-    text = L["ORACLE_STYLE_EXPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,
-    button1 = CLOSE,
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb then eb:SetText(data or ""); eb:HighlightText(); eb:SetFocus() end
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
 local function TryImport(text)
     local style = BNB.ImportSearchStyle(text)
     if not style then BNB:Print(L["ORACLE_STYLE_IMPORT_BAD"]); return end
-    -- Name it next frame: this popup is still closing.
+    -- Name it next: the queue opens it once this dialog has closed
     C_Timer.After(0.1, function()
         ShowSave(style)
     end)
 end
-
-StaticPopupDialogs["BNB_ORACLE_IMPORT_STYLE"] = {
-    preferredIndex = 3,
-    text = L["ORACLE_STYLE_IMPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,
-    button1 = L["ORACLE_STYLE_IMPORT"], button2 = CANCEL,
-    OnShow = function(self) local eb = PopupEditBox(self); if eb then eb:SetText("") end end,
-    OnAccept = function(self) local eb = PopupEditBox(self); TryImport(eb and eb:GetText()) end,
-    EditBoxOnEnterPressed = function(eb) TryImport(eb:GetText()); eb:GetParent():Hide() end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
 
 -- The Custom border knobs (ALL-69.5), on their own frame so the page can
 -- hide them while another theme is picked. Returns the frame, its height
@@ -285,14 +245,27 @@ local function BuildCustomBlock(ct)
     end)
     delBtn = StyleBtn(2, L["ORACLE_STYLE_BTN_DELETE"], L["ORACLE_STYLE_BTN_DELETE_TIP"], function()
         local name = BNB.GetSearchStyleID():match("^user:(.+)$")
-        if name then StaticPopup_Show("BNB_ORACLE_DELETE_STYLE", name, nil, name) end
+        if name then
+            BNB.Dialog.Confirm({ text = string.format(L["ORACLE_STYLE_DELETE"], name),
+                okLabel = DELETE, onAccept = function()
+                    BNB.DeleteSearchStyle(name)
+                    BNB:Print(string.format(L["ORACLE_STYLE_DELETED"], name))
+                    if styleUI then styleUI() end
+                end })
+        end
     end)
     StyleBtn(3, L["ORACLE_STYLE_BTN_EXPORT"], L["ORACLE_STYLE_BTN_EXPORT_TIP"], function()
         local str = BNB.ExportSearchStyle()
-        if str then StaticPopup_Show("BNB_ORACLE_EXPORT_STYLE", nil, nil, str) end
+        -- maxLetters 0: no limit; a limit cut the string short (Dukul, 2026-09-28)
+        if str then
+            BNB.Dialog.Prompt({ title = L["ORACLE_STYLE_BTN_EXPORT"], text = L["ORACLE_STYLE_EXPORT_TEXT"],
+                value = str, maxLetters = 0, width = 460, okLabel = CLOSE, noCancel = true,
+                allowEmpty = true })
+        end
     end)
     StyleBtn(4, L["ORACLE_STYLE_BTN_IMPORT"], L["ORACLE_STYLE_BTN_IMPORT_TIP"], function()
-        StaticPopup_Show("BNB_ORACLE_IMPORT_STYLE")
+        BNB.Dialog.Prompt({ title = L["ORACLE_STYLE_BTN_IMPORT"], text = L["ORACLE_STYLE_IMPORT_TEXT"],
+            maxLetters = 0, width = 460, okLabel = L["ORACLE_STYLE_IMPORT"], onAccept = TryImport })
     end)
     y = y - (DD_H + ROW_GAP + 10)
 

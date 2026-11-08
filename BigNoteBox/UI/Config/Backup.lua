@@ -337,7 +337,7 @@ local function BuildBackupTab(sf, page)
             -- Stored for the popup callbacks
             BNB._pendingImport = { notes = notes, status = importStatus, paste = pasteEb }
             if foreignChar and BNB.currentChar then
-                StaticPopup_Show("BNB_IMPORT_SCOPE_REMAP", foreignChar, BNB.currentChar)
+                BNB.ConfirmImportRemap(foreignChar)
             elseif confirmed then
                 BNB._pendingImport = nil
                 local n = BNB._DoImport(notes, false) or 0
@@ -346,7 +346,7 @@ local function BuildBackupTab(sf, page)
                 pasteEb:SetRealText("")
             else
                 -- Same-character or scope-less path: confirm count before importing
-                StaticPopup_Show("BNB_IMPORT_CONFIRM", #notes)
+                BNB.ConfirmImport()
             end
         end)
     end
@@ -602,37 +602,29 @@ end
 -- Before an import or a migration adds notes (ALL-186): while there are notes
 -- already, offer a JSON backup of them first. "Back up first" opens the copy
 -- popup with the notes as they are now and carries on after Ctrl+C (the text
--- is taken before anything changes); Esc there stops; "Skip" carries on; Esc
--- on this popup stops.
+-- is taken before anything changes); Esc there stops; "Skip" carries on; Cancel
+-- or Esc on this dialog stops.
 function BNB.OfferBackupFirst(proceed)
     local ndb, n = BNB.NotesDB(), 0
     for _ in pairs(ndb and ndb.notes or {}) do n = n + 1 end
     if n == 0 then proceed(); return end
-    if not StaticPopupDialogs["BNB_BACKUP_FIRST"] then
-        StaticPopupDialogs["BNB_BACKUP_FIRST"] = {
-            text = L["BACKUP_FIRST_TEXT"],
-            button1 = L["BACKUP_FIRST_BTN"],
-            button2 = L["BACKUP_FIRST_SKIP"],
-            OnAccept = function(_, data)
-                local NE = BNB.NoteExport
-                local text = NE and NE.SerializeNotes(NE.FMT_JSON)
-                -- The copy popup, as the Backup buttons use: Ctrl+C copies and
-                -- carries on, Esc stops (Dukul, 2026-10-18). Nothing else opens
-                -- until then, so the character remap never lands on top of it.
-                -- Focus deferred: this popup is still closing
-                if text then BNB.ShowClipboardHint(text, nil, true, nil, data)
-                elseif data then data() end
-            end,
-            -- reason "clicked" = Skip; Esc does not call OnCancel (noCancelOnEscape)
-            OnCancel = function(_, data, reason)
-                if reason == "clicked" and data then data() end
-            end,
-            noCancelOnEscape = true,
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-        }
-    end
-    StaticPopupDialogs["BNB_BACKUP_FIRST"].text = (n == 1) and L["BACKUP_FIRST_TEXT_ONE"] or L["BACKUP_FIRST_TEXT"]
-    StaticPopup_Show("BNB_BACKUP_FIRST", n, nil, proceed)
+    -- Our own dialog (ALL-572 S3): over a migration window's FULLSCREEN_DIALOG
+    BNB.Dialog.Confirm({
+        text = string.format(L[n == 1 and "BACKUP_FIRST_TEXT_ONE" or "BACKUP_FIRST_TEXT"], n),
+        okLabel = L["BACKUP_FIRST_BTN"], altLabel = L["BACKUP_FIRST_SKIP"],
+        strata = "FULLSCREEN_DIALOG", key = "backupFirst",
+        onAccept = function()
+            local NE = BNB.NoteExport
+            local text = NE and NE.SerializeNotes(NE.FMT_JSON)
+            -- The copy popup, as the Backup buttons use: Ctrl+C copies and
+            -- carries on, Esc stops (Dukul, 2026-10-18). Nothing else opens
+            -- until then, so the character remap never lands on top of it.
+            -- Focus deferred: this dialog is still closing
+            if text then BNB.ShowClipboardHint(text, nil, true, nil, proceed)
+            else proceed() end
+        end,
+        onAlt = proceed,
+    })
 end
 
 -- ── Export to the copy popup ───────────────────────────────────────────────

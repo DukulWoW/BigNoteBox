@@ -14,7 +14,7 @@
 --
 -- Public API:
 --   BNB.Dialog.Prompt(o)   ask for a line of text
---     o.title        window title
+--     o.title        window title, default "BigNoteBox"
 --     o.text         the question above the box (word wrapped), optional
 --     o.value        the box's first text (highlighted)
 --     o.maxLetters   default 200
@@ -30,6 +30,9 @@
 --     o.strata       optional, default DIALOG (FULLSCREEN_DIALOG with a host):
 --                    FULLSCREEN_DIALOG over the New Note dialog's dimmer
 --     o.cancelLabel  default L["CANCEL"] (Confirm too)
+--     o.width        default 340 (Confirm too); wide boxes for pasted codes
+--     o.noCancel     one button only (Confirm too): a copy box's Close
+--     o.maxLetters 0 = no limit (pasted codes)
 --   BNB.Dialog.Confirm(o)  ask yes / no (S1 of ALL-572, 2026-11-08)
 --     o.title        window title, default "BigNoteBox"
 --     o.text         the question, ready-made (word wrapped)
@@ -38,6 +41,8 @@
 --                    showAlert)
 --     o.host, o.strata  as Prompt's
 --     o.onAccept()   OK; o.onCancel() Cancel, Esc, or the host closing
+--     o.altLabel, o.onAlt()  a third button between OK and Cancel (S3,
+--                    StaticPopup's button3)
 --     o.key          optional: a dialog with the same key already open or
 --                    waiting is not asked again (default: text .. okLabel),
 --                    as the game's popup did for a repeated name
@@ -59,7 +64,7 @@ local L = BNB.L
 local D = {}
 BNB.Dialog = D
 
-local W, PAD, EB_H, FOOT_H, ICON = 340, 14, 24, 38, 36
+local W, PAD, EB_H, FOOT_H, ICON, BTN_GAP = 340, 14, 24, 38, 36, 8
 local ALERT_TEX = "Interface\\DialogFrame\\UI-Dialog-Icon-AlertNew"
 local FALLBACK = "BNB_DIALOG_COMBAT"
 
@@ -196,11 +201,38 @@ local function Build(skin)
     eb:SetScript("OnEscapePressed", function() f:Hide() end)
     eb:SetScript("OnTextChanged", Refresh)
 
+    local alt = BNB.CreateButton(nil, f, "", 100, 26)
+    alt:SetScript("OnClick", function()
+        local o = _o
+        if not (o and f:IsShown()) then return end
+        _done = true
+        f:Hide()
+        if o.onAlt then xpcall(o.onAlt, geterrorhandler()) end
+    end)
+
     ok:SetScript("OnClick", Accept)
     cancel:SetScript("OnClick", function() f:Hide() end)
-    f._msg, f._eb, f._ok, f._cancel, f._icon, f._top = msg, eb, ok, cancel, icon, top
+    f._msg, f._eb, f._ok, f._cancel, f._alt, f._icon, f._top = msg, eb, ok, cancel, alt, icon, top
     _built[skin] = f
     return f
+end
+
+-- The footer buttons for this dialog, left to right, one width each
+local function LayoutButtons(f, o, w)
+    local list = { f._ok }
+    if o.altLabel then list[#list + 1] = f._alt end
+    if not o.noCancel then list[#list + 1] = f._cancel end
+    f._alt:SetShown(o.altLabel ~= nil)
+    f._cancel:SetShown(not o.noCancel)
+    local bW = math.floor((w - 2 * PAD - (#list - 1) * BTN_GAP) / #list)
+    for i, b in ipairs(list) do
+        b:ClearAllPoints()
+        b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD + (i - 1) * (bW + BTN_GAP), 6)
+        b:SetWidth(bW)
+    end
+    f._ok:SetText(o.okLabel or L["OK"])
+    f._cancel:SetText(o.cancelLabel or L["CANCEL"])
+    f._alt:SetText(o.altLabel or "")
 end
 
 -- The game's popup for a Confirm in combat. Its texts are set per show; the
@@ -212,6 +244,10 @@ local function ShowFallback(o)
             OnAccept = function(_, data)
                 if data and data.onAccept then xpcall(data.onAccept, geterrorhandler()) end
                 if data then data._bnbDone = true end
+            end,
+            OnAlt = function(_, data)
+                if data then data._bnbDone = true end
+                if data and data.onAlt then xpcall(data.onAlt, geterrorhandler()) end
             end,
             OnCancel = function(_, data)
                 if data and not data._bnbDone and data.onCancel then
@@ -225,7 +261,8 @@ local function ShowFallback(o)
     end
     local d = StaticPopupDialogs[FALLBACK]
     d.button1 = o.okLabel or L["OK"]
-    d.button2 = o.cancelLabel or L["CANCEL"]
+    d.button2 = (not o.noCancel) and (o.cancelLabel or L["CANCEL"]) or nil
+    d.button3 = o.altLabel
     d.showAlert = o.alert and true or nil
     o._bnbDone = nil
     _fbOpen = o
@@ -239,9 +276,10 @@ local function Open(kind, o)
     _f = _built[skin] or Build(skin)
     local f = _f
     local prompt = kind == "prompt"
-    f:SetWindowTitle(o.title or (prompt and "" or "BigNoteBox"))
-    f._ok:SetText(o.okLabel or L["OK"])
-    f._cancel:SetText(o.cancelLabel or L["CANCEL"])
+    local w = o.width or W
+    f:SetWidth(w)
+    f:SetWindowTitle(o.title or "BigNoteBox")
+    LayoutButtons(f, o, w)
     f._ok:SetEnabled(true)
 
     local alert = (not prompt) and o.alert
@@ -249,7 +287,7 @@ local function Open(kind, o)
     if alert then f._icon:Show() else f._icon:Hide() end
     f._msg:ClearAllPoints()
     f._msg:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + textX, -f._top)
-    f._msg:SetWidth(W - 2 * PAD - textX)
+    f._msg:SetWidth(w - 2 * PAD - textX)
     f._msg:SetText(o.text or "")
     local textH = 0
     if o.text and o.text ~= "" then textH = math.ceil(f._msg:GetStringHeight()) + 8 end
@@ -259,6 +297,7 @@ local function Open(kind, o)
         f._eb:Show()
         f._eb:ClearAllPoints()
         f._eb:SetPoint("TOPLEFT", f, "TOPLEFT", PAD, -(f._top + textH))
+        f._eb:SetWidth(w - 2 * PAD)
         f._eb:SetMaxLetters(o.maxLetters or 200)
         f:SetHeight(f._top + textH + EB_H + 14 + FOOT_H)
     else

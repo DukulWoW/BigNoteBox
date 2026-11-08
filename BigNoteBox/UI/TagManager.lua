@@ -305,20 +305,14 @@ PopulateTagManager = function()
         -- Delete All
         row.delBtn:SetScript("OnClick", function()
             if _openTag == capturedTag then _openTag = nil end
-            StaticPopupDialogs["BNB_DELETE_TAG"] = {
-                text           = string.format(L["TAG_MGR_DELETE_CONFIRM"], capturedTag, count),
-                button1        = L["DELETE"],
-                button2        = L["CANCEL"],
-                OnAccept       = function()
+            BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+                text = string.format(L["TAG_MGR_DELETE_CONFIRM"], capturedTag, count),
+                okLabel = L["DELETE"], host = _tmFrame,
+                onAccept = function()
                     BNB.DeleteTag(capturedTag)
                     PopulateTagManager()
                 end,
-                timeout        = 0,
-                whileDead      = true,
-                hideOnEscape   = true,
-                preferredIndex = 3,
-            }
-            StaticPopup_Show("BNB_DELETE_TAG")
+            })
         end)
 
         -- Note sub-rows (accordion body)
@@ -595,22 +589,16 @@ local function BuildTagManager()
         for tag in pairs(_multiSel) do selTags[#selTags + 1] = tag end
         local n = #selTags
         if n == 0 then return end
-        StaticPopupDialogs["BNB_DELETE_SEL_TAGS"] = {
-            text           = string.format(L["TAG_MGR_DELETE_SEL_CONFIRM"], n),
-            button1        = L["DELETE"],
-            button2        = L["CANCEL"],
-            OnAccept       = function()
+        BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+            text = string.format(L["TAG_MGR_DELETE_SEL_CONFIRM"], n),
+            okLabel = L["DELETE"], host = _tmFrame,
+            onAccept = function()
                 for _, tag in ipairs(selTags) do
                     BNB.DeleteTag(tag)
                 end
                 SetMultiMode(false)
             end,
-            timeout        = 0,
-            whileDead      = true,
-            hideOnEscape   = true,
-            preferredIndex = 3,
-        }
-        StaticPopup_Show("BNB_DELETE_SEL_TAGS")
+        })
     end)
     delSelBtn:Hide()
     _delSelBtn = delSelBtn

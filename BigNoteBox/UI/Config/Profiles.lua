@@ -14,7 +14,6 @@ local AddHeader = K.AddHeader
 local P = BNB.Profiles
 local _refresh   -- redraws the row after a rename / clone / delete
 
-local function PopupEditBox(self) return (self.GetEditBox and self:GetEditBox()) or self.editBox or self.EditBox end
 
 local function Refresh() if _refresh then _refresh() end end
 
@@ -126,21 +125,6 @@ function BNB.ImportProfileCode(text)
     return true
 end
 
-StaticPopupDialogs["BNB_PROFILE_IMPORT"] = {
-    preferredIndex = 3,
-    text = L["PROFILE_IMPORT_TEXT"], hasEditBox = true, editBoxWidth = 350, maxLetters = 0,
-    button1 = L["PROFILE_IMPORT_BTN"], button2 = CANCEL,
-    OnShow = function(self) local eb = PopupEditBox(self); if eb then eb:SetText(""); eb:SetFocus() end end,
-    OnAccept = function(self) local eb = PopupEditBox(self); TryImport(eb and eb:GetText()) end,
-    EditBoxOnEnterPressed = function(eb)   -- the code read before the hide clears it (ALL-515)
-        local text = eb:GetText()
-        eb:GetParent():Hide()
-        TryImport(text)
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
 -- ── The row ──────────────────────────────────────────────────────────────────
 local function Tip(btn, title, body)
     btn:HookScript("OnEnter", function(self)
@@ -206,7 +190,10 @@ function K.AddProfileRow(ct, y)
 
     local impBtn = BNB.CreateButton(nil, ct, L["PROFILE_IMPORT_BTN"], BTN_W, 24)
     impBtn:SetPoint("LEFT", dd, "RIGHT", GAP, 0)
-    impBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_PROFILE_IMPORT") end)
+    impBtn:SetScript("OnClick", function()
+        BNB.Dialog.Prompt({ title = L["PROFILE_IMPORT_BTN"], text = L["PROFILE_IMPORT_TEXT"],   -- ALL-572 S3
+            maxLetters = 0, width = 460, okLabel = L["PROFILE_IMPORT_BTN"], onAccept = TryImport })
+    end)
     Tip(impBtn, L["PROFILE_IMPORT_BTN"], L["PROFILE_IMPORT_TIP"])
 
     local expBtn = BNB.CreateButton(nil, ct, L["PROFILE_EXPORT_BTN"], BTN_W, 24)

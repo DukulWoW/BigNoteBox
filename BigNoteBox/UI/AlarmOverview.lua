@@ -497,19 +497,16 @@ local function BuildOverview()
             if note.alarm then ids[#ids + 1] = noteID end
         end
         if #ids == 0 then return end
-        StaticPopupDialogs["BNB_CLEAR_ALL_ALARMS"] = StaticPopupDialogs["BNB_CLEAR_ALL_ALARMS"] or {
-            text = L["AO_CLEAR_ALL_CONFIRM_FMT"],
-            button1 = L["DELETE"], button2 = L["CANCEL"],
-            OnAccept = function(self, data)
-                if type(data) ~= "table" then return end
-                for _, id in ipairs(data) do
+        BNB.Dialog.Confirm({   -- on this window (ALL-572 S3)
+            text = string.format(L["AO_CLEAR_ALL_CONFIRM_FMT"], tostring(#ids)),
+            okLabel = L["DELETE"], alert = true, host = _ovFrame,
+            onAccept = function()
+                for _, id in ipairs(ids) do
                     if BNB.Alarm and BNB.Alarm.ClearAlarm then BNB.Alarm.ClearAlarm(id) end
                 end
                 SetOvMultiMode(false)
             end,
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3, showAlert = true,
-        }
-        StaticPopup_Show("BNB_CLEAR_ALL_ALARMS", tostring(#ids), nil, ids)
+        })
     end)
     clearAllBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
@@ -824,8 +821,16 @@ function AO.Refresh()
                     end
                     root:CreateDivider()
                     root:CreateButton(L["AO_CTX_DELETE_ALARM"], function()
-                        local popup = StaticPopup_Show("BNB_DELETE_ALARM_CONFIRM")
-                        if popup then popup.data = nid end
+                        BNB.Dialog.Confirm({   -- ALL-572 S3
+                            text = L["AO_DELETE_CONFIRM_TEXT"], okLabel = L["DELETE"],
+                            host = _ovFrame, key = "alarmDel:" .. tostring(nid),
+                            onAccept = function()
+                                if BNB.Alarm and BNB.Alarm.ClearAlarm then
+                                    BNB.Alarm.ClearAlarm(nid)
+                                    AO.Refresh()
+                                end
+                            end,
+                        })
                     end, { danger = true })   -- irreversible = red (Dukul)
                 end)
             else
@@ -901,22 +906,6 @@ function AO.Place(f)
         f:SetPoint("CENTER", UIParent, "CENTER", -200, 0)
     end
 end
-
--- StaticPopup for alarm delete confirmation
-StaticPopupDialogs["BNB_DELETE_ALARM_CONFIRM"] = {
-    preferredIndex = 3,
-    text = L["AO_DELETE_CONFIRM_TEXT"],
-    button1 = L["DELETE"],
-    button2 = L["CANCEL"],
-    OnAccept = function(self)
-        local noteID = self.data
-        if noteID and BNB.Alarm and BNB.Alarm.ClearAlarm then
-            BNB.Alarm.ClearAlarm(noteID)
-            AO.Refresh()
-        end
-    end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
 
 -- Called by AlarmManager when missed alarms are detected on login, and when
 -- the Alarms module comes back on (fmtKey = AO_MISSED_OFF_FMT, ALL-343)

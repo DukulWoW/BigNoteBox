@@ -290,21 +290,12 @@ end)
 -- BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
 -- Shared keybind-row click handling: right-click clears the binding,
 -- left-click enters capture mode and applies the next non-modifier key
--- (with a conflict prompt via the shared BNB_KEYBIND_CONFLICT StaticPopup).
--- Registers the StaticPopup once, guarded, and calls SetPropagateKeyboardInput
+-- (with a conflict prompt in our own dialog, BNB.Dialog.Confirm).
+-- Calls SetPropagateKeyboardInput
 -- for keys it does not handle (keyboard-routing rule, CLAUDE.md).
 local _KB_MODIFIER_KEYS = {
     LSHIFT=true, RSHIFT=true, LCTRL=true, RCTRL=true, LALT=true, RALT=true,
 }
-if not StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] then
-    StaticPopupDialogs["BNB_KEYBIND_CONFLICT"] = {
-        text = "%s", button1 = YES, button2 = NO,
-        timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-        OnAccept = function(_, data)
-            if data and data.applyFn then data.applyFn(data.fullKey) end
-        end,
-    }
-end
 
 function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
     local function StopCapture(btn)
@@ -345,8 +336,8 @@ function BNB.WireKeybindCapture(kbBtn, action, UpdateText, pressText)
         if existing and existing ~= "" and existing ~= action then
             local msg = string.format(L["KEYBIND_CONFLICT"],
                 GetBindingText(fullKey), GetBindingName(existing))
-            StaticPopup_Show("BNB_KEYBIND_CONFLICT", msg, nil,
-                { fullKey = fullKey, applyFn = ApplyBind })
+            BNB.Dialog.Confirm({ text = msg, okLabel = YES, cancelLabel = NO,   -- ALL-572 S3
+                onAccept = function() ApplyBind(fullKey) end })
             return
         end
         ApplyBind(fullKey)
