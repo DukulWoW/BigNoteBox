@@ -203,21 +203,12 @@ end
 --------------------------------------------------------------------------------
 local ICON_KEY = "templateIcon"   -- BNB.IconPicker key + owner for Change icon
 
-local function PopupEditBox(self) return self.editBox or self.EditBox end
-
--- Popups opened from the New Note dialog must sit over its FULLSCREEN_DIALOG
--- dimmer: lifted while shown, back to DIALOG on hide (StaticPopup frames are
--- shared with the game, so the hook flag is kept here, not on the frame)
-local _lifted = {}
-local function Popup(which, text, data)
-    local d = StaticPopup_Show(which, text, nil, data)
-    if not d then return end
-    d:SetFrameStrata("FULLSCREEN_DIALOG")
-    d:Raise()
-    if not _lifted[d] then
-        _lifted[d] = true
-        d:HookScript("OnHide", function(self) self:SetFrameStrata("DIALOG") end)
-    end
+-- Our own dialogs (ALL-572 S2), over the New Note dialog's FULLSCREEN_DIALOG
+-- dimmer when opened from there (the old game popups were lifted the same way)
+local STRATA = "FULLSCREEN_DIALOG"
+local function Confirm(text, run)
+    BNB.Dialog.Confirm({ text = text, okLabel = ACCEPT, alert = true, strata = STRATA,
+        onAccept = run })
 end
 
 local function EditAccept(id, field, text)
@@ -225,42 +216,16 @@ local function EditAccept(id, field, text)
     else BNB.Templates.Rename(id, text) end
 end
 
-StaticPopupDialogs["BNB_TPL_EDIT"] = {
-    preferredIndex = 3,
-    text = "%s", hasEditBox = true, maxLetters = 80,
-    button1 = L["SAVE"], button2 = L["CANCEL"],
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb and data then eb:SetText(data.value or ""); eb:HighlightText() end
-    end,
-    OnAccept = function(self, data)
-        local eb = PopupEditBox(self)
-        if data and eb then EditAccept(data.id, data.field, eb:GetText()) end
-    end,
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        if p.data then EditAccept(p.data.id, p.data.field, eb:GetText()) end
-        p:Hide()
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
--- Delete and Replace from current note cannot be undone: one confirm each,
--- the work as data (the text arrives ready-made)
-StaticPopupDialogs["BNB_TPL_CONFIRM"] = {
-    preferredIndex = 3,
-    text = "%s", button1 = ACCEPT, button2 = L["CANCEL"],
-    OnAccept = function(_, run) if type(run) == "function" then run() end end,
-    timeout = 0, whileDead = true, hideOnEscape = true, showAlert = true,
-}
-
 local function EditPopup(tpl, field)
     local rec = tpl.rec
     local prompt, value = L["CFG_TPL_RENAME_PROMPT"], rec.name
     if field == "desc" then prompt, value = L["CFG_TPL_DESC_PROMPT"], rec.desc end
-    Popup("BNB_TPL_EDIT", string.format(prompt, rec.name or ""),
-        { id = tpl.key, field = field, value = value })
+    BNB.Dialog.Prompt({
+        title = L[field == "desc" and "CFG_TPL_EDIT_DESC" or "CFG_TPL_RENAME"],
+        text = string.format(prompt, rec.name or ""), value = value, maxLetters = 80,
+        okLabel = L["SAVE"], allowEmpty = field == "desc", strata = STRATA,
+        onAccept = function(text) EditAccept(tpl.key, field, text) end,
+    })
 end
 
 local function Share(tpl, row)
@@ -304,8 +269,7 @@ function BNB.TemplateMenu(root, key, opts)
         local noteID = BNB._currentNoteID
         local note = noteID and BNB.GetNote(noteID)
         root:CreateButton(L["CFG_TPL_REPLACE"], function()
-            Popup("BNB_TPL_CONFIRM",
-                string.format(L["CFG_TPL_REPLACE_CONFIRM"], TP.Name(tpl), note.title or ""),
+            Confirm(string.format(L["CFG_TPL_REPLACE_CONFIRM"], TP.Name(tpl), note.title or ""),
                 function()
                     if BNB.SaveCurrentNote then BNB.SaveCurrentNote() end
                     TP.ReplaceFromNote(key, noteID)
@@ -319,7 +283,7 @@ function BNB.TemplateMenu(root, key, opts)
     if tpl.user then
         root:CreateDivider()
         root:CreateButton(L["DELETE"], function()
-            Popup("BNB_TPL_CONFIRM", string.format(L["CFG_TPL_DELETE_CONFIRM"], TP.Name(tpl)),
+            Confirm(string.format(L["CFG_TPL_DELETE_CONFIRM"], TP.Name(tpl)),
                 function() TP.Delete(key) end)
         end, { icon = "trash", danger = true })
     end

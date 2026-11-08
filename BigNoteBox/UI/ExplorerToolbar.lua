@@ -82,10 +82,10 @@ local function DeletePicked()
         local trash = BNB.TrashEnabled and BNB.TrashEnabled()
         text = string.format(L[trash and "EXPLORER_DEL_MIXED_TRASH_FMT" or "EXPLORER_DEL_MIXED_FMT"], #fids, #notes)
     end
-    StaticPopup_Show("BNB_MULTI_CONFIRM", text, nil, function()
+    BNB.ConfirmRun(text, function()
         for _, fid in ipairs(fids) do FD.Delete(fid) end
         if #notes > 0 and BNB.DeleteNotes then BNB.DeleteNotes(notes, false) end
-    end)
+    end, BNB.mainFrame)
 end
 local function Locked(id)
     local NK = BNB._NoteListKit

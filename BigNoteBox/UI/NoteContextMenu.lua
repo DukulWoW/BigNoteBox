@@ -69,51 +69,41 @@ local DIV = { divider = true }
 local RECENT_SNAPS = 3   -- auto snapshots listed under Restore previous
 
 -- Create > Remove all tasks: every task and sub-task of the note, after a
--- confirm. The note id arrives as data (StaticPopup_Show arg 4)
-StaticPopupDialogs["BNB_CM_REMOVE_TASKS"] = {
-    text           = L["NL_CM_REMOVE_TASKS_CONFIRM"],
-    button1        = L["DELETE"],
-    button2        = L["CANCEL"],
-    OnAccept       = function(_, noteID)
-        if noteID and BNB.Task and BNB.Task.DeleteAll then BNB.Task.DeleteAll(noteID) end
-    end,
-    timeout        = 0,
-    whileDead      = true,
-    hideOnEscape   = true,
-    preferredIndex = 3,
-}
+-- confirm on the main window (ALL-572)
+local function ConfirmRemoveTasks(noteID, title)
+    BNB.Dialog.Confirm({
+        title = L["NL_CM_REMOVE_TASKS"],
+        text = string.format(L["NL_CM_REMOVE_TASKS_CONFIRM"], title),
+        okLabel = L["DELETE"], host = BNB.mainFrame,
+        onAccept = function()
+            if BNB.Task and BNB.Task.DeleteAll then BNB.Task.DeleteAll(noteID) end
+        end,
+    })
+end
 
--- One confirm for every Select mode action that cannot be undone (ALL-234):
--- the text arrives ready-made (arg 1), the work as data (arg 4)
-StaticPopupDialogs["BNB_MULTI_CONFIRM"] = {
-    text           = "%s",
-    button1        = ACCEPT,
-    button2        = L["CANCEL"],
-    OnAccept       = function(_, run) if type(run) == "function" then run() end end,
-    timeout        = 0,
-    whileDead      = true,
-    hideOnEscape   = true,
-    showAlert      = true,
-    preferredIndex = 3,
-}
+-- One confirm for every action that cannot be undone and has no dialog of
+-- its own (Select mode, ALL-234; folders, Explorer, a few Settings pages):
+-- the text ready-made, the work as a function. host = the window it belongs
+-- to (nil = free-floating: Settings pages, Dukul 2026-10-26)
+function BNB.ConfirmRun(text, run, host)
+    BNB.Dialog.Confirm({ text = text, okLabel = ACCEPT, alert = true, host = host,
+        onAccept = function() if type(run) == "function" then run() end end })
+end
 
 -- History > Clear note history: auto snapshots only, the manual restore point
--- stays (Dukul's scope). The note id arrives as data (StaticPopup_Show arg 4).
-StaticPopupDialogs["BNB_CM_CLEAR_HISTORY"] = {
-    text           = L["NL_CM_CLEAR_HISTORY_CONFIRM"],
-    button1        = L["DELETE"],
-    button2        = L["CANCEL"],
-    OnAccept       = function(_, noteID)
-        if not noteID then return end
-        BNB.HistoryDeleteAuto(noteID)
-        if BNB.RefreshHistoryWindow then BNB.RefreshHistoryWindow() end
-        if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
-    end,
-    timeout        = 0,
-    whileDead      = true,
-    hideOnEscape   = true,
-    preferredIndex = 3,
-}
+-- stays (Dukul's scope)
+local function ConfirmClearHistory(noteID, title)
+    BNB.Dialog.Confirm({
+        title = L["NL_CM_CLEAR_HISTORY"],
+        text = string.format(L["NL_CM_CLEAR_HISTORY_CONFIRM"], title),
+        okLabel = L["DELETE"], host = BNB.mainFrame,
+        onAccept = function()
+            BNB.HistoryDeleteAuto(noteID)
+            if BNB.RefreshHistoryWindow then BNB.RefreshHistoryWindow() end
+            if BNB.RefreshNoteHistoryPanel then BNB.RefreshNoteHistoryPanel() end
+        end,
+    })
+end
 
 -- A main item with its sub-menu. entries: { key, label, fn, opts } or DIV;
 -- false (an entry left out on this note) is skipped. A disabled default
@@ -166,23 +156,11 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
     local A = K.NOTE_ACTIONS
     local title = (note.title ~= "") and note.title or L["UNTITLED"]
 
-    local function DoTrash()
-        if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title, nil, noteID)
-            if popup then popup.data = noteID end
-        elseif BNB.DeleteNote then
-            BNB.DeleteNote(noteID)
-        end
-    end
-    local function DoDeletePerm()
-        if BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false then
-            local popup = StaticPopup_Show("BNB_DELETE_NOTE", title, nil, noteID)
-            if popup then popup.data = noteID end
-        elseif BNB.DeleteNote then
-            -- Skips the trash even while it is on (ALL-58 follow-up)
-            BNB.DeleteNote(noteID, true)
-        end
-    end
+    -- The confirm follows "Warn before delete" (BNB.ConfirmDeleteNote,
+    -- UI/NoteList.lua); Delete permanently skips the trash even while it is
+    -- on (ALL-58 follow-up)
+    local function DoTrash() BNB.ConfirmDeleteNote(noteID, false) end
+    local function DoDeletePerm() BNB.ConfirmDeleteNote(noteID, true) end
     local function CopyBody()
         local n = BNB.GetNote(noteID)
         if not n then return end
@@ -286,7 +264,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
               fn = function() A.task(noteID) end, opts = { icon = "create-task" } } or false,
             (BNB.TasksEnabled() and hasTasks) and {
               label = L["NL_CM_REMOVE_TASKS"], opts = { danger = true, icon = "remove-task" },
-              fn = function() StaticPopup_Show("BNB_CM_REMOVE_TASKS", title, nil, noteID) end } or false,
+              fn = function() ConfirmRemoveTasks(noteID, title) end } or false,
             sitOn and { key = "situation", label = hasSituation and L["NL_CM_EDIT_SITUATION"] or L["NL_CM_CREATE_SITUATION"],
               fn = function() BNB.OpenNoteConfig(noteID, "situation") end, opts = { icon = "create-situation" } } or false,
         })
@@ -375,7 +353,7 @@ function BNB.ShowNoteContextMenu(owner, noteID, extraTop, after, extraBottom)
             { label = L["NL_CM_CLEAR_HISTORY"],
               opts = { danger = true, disabled = not hasAuto, icon = "clear-note-history" },
               fn = function()
-                StaticPopup_Show("BNB_CM_CLEAR_HISTORY", title, nil, noteID)
+                ConfirmClearHistory(noteID, title)
             end },
             DIV,
         })
@@ -498,7 +476,7 @@ end
 -- of notes it changes. ids: the selection in list order.
 --------------------------------------------------------------------------------
 local function Confirm(key, n, run)
-    StaticPopup_Show("BNB_MULTI_CONFIRM", string.format(L[key], n), nil, run)
+    BNB.ConfirmRun(string.format(L[key], n), run, BNB.mainFrame)
 end
 
 function BNB.ShowMultiNoteContextMenu(owner, ids)

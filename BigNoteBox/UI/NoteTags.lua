@@ -102,29 +102,6 @@ local function RenameOnNote(id, old, new)
     BNB.UpdateNote(id, { tags = tags })
 end
 
-local function PopupEditBox(self) return self.editBox or self.EditBox end
-
-StaticPopupDialogs["BNB_NOTE_TAG_RENAME"] = {
-    preferredIndex = 3,
-    text = "%s", hasEditBox = true, maxLetters = MAX_TAG_LEN,
-    button1 = L["SAVE"], button2 = L["CANCEL"],
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb and data then eb:SetText(data.tag or ""); eb:HighlightText() end
-    end,
-    OnAccept = function(self, data)
-        local eb = PopupEditBox(self)
-        if data and eb then RenameOnNote(data.id, data.tag, eb:GetText()) end
-    end,
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        if p.data then RenameOnNote(p.data.id, p.data.tag, eb:GetText()) end
-        p:Hide()
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
 --------------------------------------------------------------------------------
 -- THE TAG MENU (editor chips, this window's chips and list rows)
 --------------------------------------------------------------------------------
@@ -141,9 +118,14 @@ function BNB.NoteTagMenu(root, noteID, tag, opts)
     end
     if onNote then
         root:CreateButton(L["NT_MENU_RENAME"], function()
-            local d = StaticPopup_Show("BNB_NOTE_TAG_RENAME",
-                string.format(L["NT_RENAME_PROMPT"], tag), nil, { id = noteID, tag = tag })
-            if d and _f and _f:IsShown() then d:Raise() end
+            -- Our own dialog (ALL-572 S2): on this window while it is open,
+            -- else on the main window
+            BNB.Dialog.Prompt({
+                title = L["NT_MENU_RENAME"], text = string.format(L["NT_RENAME_PROMPT"], tag),
+                value = tag, maxLetters = MAX_TAG_LEN, okLabel = L["SAVE"],
+                host = (_f and _f:IsShown()) and _f or BNB.mainFrame,
+                onAccept = function(text) RenameOnNote(noteID, tag, text) end,
+            })
         end, { icon = "rename", disabled = locked, tip = L["NT_MENU_RENAME"], tipSub = L["NT_MENU_RENAME_TIP"] })
         root:CreateButton(L["NT_MENU_REMOVE"], function() RemoveTag(noteID, tag) end,
             { icon = "clear-note-history", danger = true, disabled = locked })

@@ -251,10 +251,17 @@ end
 -- closeFn(self): what ESC does (may close a child window first).
 -- stepAside(self), optional: true = leave this ESC to the game or to the main
 -- window's cascade (callers pass "main window is shown" or "game menu is up").
-function BNB.AttachEscClose(f, closeFn, stepAside)
+-- onKey(self, key), optional: another key the window takes (true = handled,
+-- not passed on), as Enter on our dialog (UI/Dialog.lua, ALL-572).
+function BNB.AttachEscClose(f, closeFn, stepAside, onKey)
     BNB.RegisterKeyboardFrame(f)
     f:SetScript("OnKeyDown", function(self, key)
         if InCombatLockdown() then return end
+        if key ~= "ESCAPE" and onKey and onKey(self, key) then
+            self:SetPropagateKeyboardInput(false)
+            C_Timer.After(0, function() BNB.SetPropagate(self, true) end)
+            return
+        end
         if key ~= "ESCAPE" or (stepAside and stepAside(self)) then
             self:SetPropagateKeyboardInput(true); return
         end

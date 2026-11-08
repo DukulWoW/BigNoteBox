@@ -147,40 +147,24 @@ local function TrySave(name, data)
     if name == "" then return end
     local existing = BigNoteBoxDB.oracleStyles and BigNoteBoxDB.oracleStyles[name]
     if existing then
-        StaticPopup_Show("BNB_ORACLE_OVERWRITE_STYLE", name, nil, { name = name, style = data })
+        BNB.Dialog.Confirm({ text = string.format(L["ORACLE_STYLE_OVERWRITE"], name),
+            okLabel = YES, cancelLabel = NO, onAccept = function() SaveAs(name, data) end })
     else
         SaveAs(name, data)
     end
 end
 
-StaticPopupDialogs["BNB_ORACLE_SAVE_STYLE"] = {
-    preferredIndex = 3,
-    text = L["ORACLE_STYLE_SAVE_TEXT"], hasEditBox = true, maxLetters = 40,
-    button1 = SAVE, button2 = CANCEL,
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        local cur = BNB.GetSearchStyleID():match("^user:(.+)$")
-        if eb then eb:SetText((not (data and data.imported)) and cur or ""); eb:HighlightText() end
-    end,
-    OnAccept = function(self, data)
-        local eb = PopupEditBox(self)
-        TrySave(eb and eb:GetText(), data and data.style)
-    end,
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        TrySave(eb:GetText(), p.data and p.data.style)
-        p:Hide()
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
-StaticPopupDialogs["BNB_ORACLE_OVERWRITE_STYLE"] = {
-    preferredIndex = 3,
-    text = L["ORACLE_STYLE_OVERWRITE"], button1 = YES, button2 = NO,
-    OnAccept = function(self, data) if data then SaveAs(data.name, data.style) end end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
+-- Name a style (ALL-572 S2: our own dialogs, free-floating as every Settings
+-- dialog). style = an imported style, nil = the current look (the box then
+-- starts with the current style's name)
+local function ShowSave(style)
+    local cur = (not style) and BNB.GetSearchStyleID():match("^user:(.+)$") or ""
+    BNB.Dialog.Prompt({
+        title = L["ORACLE_STYLE_BTN_SAVE"], text = L["ORACLE_STYLE_SAVE_TEXT"],
+        value = cur, maxLetters = 40, okLabel = SAVE,
+        onAccept = function(text) TrySave(text, style) end,
+    })
+end
 
 StaticPopupDialogs["BNB_ORACLE_DELETE_STYLE"] = {
     preferredIndex = 3,
@@ -212,7 +196,7 @@ local function TryImport(text)
     if not style then BNB:Print(L["ORACLE_STYLE_IMPORT_BAD"]); return end
     -- Name it next frame: this popup is still closing.
     C_Timer.After(0.1, function()
-        StaticPopup_Show("BNB_ORACLE_SAVE_STYLE", nil, nil, { style = style, imported = true })
+        ShowSave(style)
     end)
 end
 
@@ -297,7 +281,7 @@ local function BuildCustomBlock(ct)
         return b
     end
     StyleBtn(1, L["ORACLE_STYLE_BTN_SAVE"], L["ORACLE_STYLE_BTN_SAVE_TIP"], function()
-        StaticPopup_Show("BNB_ORACLE_SAVE_STYLE")
+        ShowSave(nil)
     end)
     delBtn = StyleBtn(2, L["ORACLE_STYLE_BTN_DELETE"], L["ORACLE_STYLE_BTN_DELETE_TIP"], function()
         local name = BNB.GetSearchStyleID():match("^user:(.+)$")

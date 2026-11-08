@@ -1471,11 +1471,8 @@ function SP.AddLanguageRows(parent, id, eb)
     end
 end
 
--- Add to dictionary on the toolbar: a popup asks first, the word filled in
+-- Add to dictionary on the toolbar: a dialog asks first, the word filled in
 -- and editable (Dukul, 2026-10-25: "that way you know which words to add")
-local function PopupEditBox(self)
-    return (self.GetEditBox and self:GetEditBox()) or self.EditBox or self.editBox
-end
 local function TryAdd(w)
     local clean = CleanWord(w)
     if not clean then
@@ -1486,29 +1483,6 @@ local function TryAdd(w)
 end
 SP.TryAdd = TryAdd   -- Focus mode's own ask window (UI/SpellCorrect.lua)
 SP.MAX_WORD = MAX_WORD
-StaticPopupDialogs["BNB_SPELL_ADD_WORD"] = {
-    preferredIndex = 3,
-    text = L["SPELL_ADD_POPUP"], hasEditBox = true, maxLetters = MAX_WORD,
-    button1 = L["SPELL_ADD_POPUP_BTN"], button2 = CANCEL,
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb then
-            eb:SetText(data and data.word or "")
-            eb:SetFocus()
-            eb:HighlightText()
-        end
-    end,
-    OnAccept = function(self)
-        local eb = PopupEditBox(self)
-        TryAdd(eb and eb:GetText())
-    end,
-    EditBoxOnEnterPressed = function(eb)
-        TryAdd(eb:GetText())
-        eb:GetParent():Hide()
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
 -- In Focus mode a game popup would sit under the Focus window (or be hidden
 -- with the UI): the same question in a window of our own there
 function SP.AskAddWord(word)
@@ -1517,7 +1491,12 @@ function SP.AskAddWord(word)
         BNB.SpellCorrect.AskAdd(word)
         return
     end
-    StaticPopup_Show("BNB_SPELL_ADD_WORD", nil, nil, { word = word })
+    -- Our own dialog (ALL-572 S2); Focus mode keeps its window above
+    BNB.Dialog.Prompt({
+        title = L["SPELL_MENU_ADD"], text = L["SPELL_ADD_POPUP"], value = word,
+        maxLetters = MAX_WORD, okLabel = L["SPELL_ADD_POPUP_BTN"],
+        onAccept = TryAdd,
+    })
 end
 
 -- The module switch (Settings > Modules > Spelling, the setup wizard)

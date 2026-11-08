@@ -376,7 +376,7 @@ function K.BuildRescueSection(sf, ct, y)
         r._btn:SetScript("OnLeave", function() GameTooltip:Hide() end)
         r._del:SetScript("OnClick", function()
             local id, title = r._id, r._title:GetText() or ""
-            StaticPopup_Show("BNB_MULTI_CONFIRM", string.format(L["RESCUE_DEL_CONFIRM_FMT"], title), nil, function()
+            BNB.ConfirmRun(string.format(L["RESCUE_DEL_CONFIRM_FMT"], title), function()
                 if BNB.HistoryRescueDiscard then BNB.HistoryRescueDiscard(id) end
                 RefreshRescue()
             end)
@@ -592,7 +592,7 @@ function K.BuildUndoPage(sf, ct, y, page)
     local resetBtn = BNB.CreateButton(nil, ct, L["CFG_UNDO_KEEP_RESET"], 200, 22)
     resetBtn:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, y)
     resetBtn:SetScript("OnClick", function()
-        StaticPopup_Show("BNB_MULTI_CONFIRM", L["CFG_UNDO_KEEP_RESET_CONFIRM"], nil, function()
+        BNB.ConfirmRun(L["CFG_UNDO_KEEP_RESET_CONFIRM"], function()
             if BNB.UndoKeepReset then BNB.UndoKeepReset() end
             RefreshSize(); RefreshList()
         end)

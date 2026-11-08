@@ -1261,7 +1261,7 @@ local function MouseOnPopup()
         local p = _G["StaticPopup" .. i]
         if p and p:IsShown() and p:IsMouseOver() then return true end
     end
-    return false
+    return BNB.Dialog and BNB.Dialog.IsMouseOver() or false   -- our own (ALL-572)
 end
 local function MouseInMultiArea()
     if BNB.listPane and BNB.listPane:IsVisible() and BNB.listPane:IsMouseOver() then return true end
@@ -1387,10 +1387,43 @@ function BNB.ConfirmDeleteNotes(ids, permanent)
         if BNB.SetMultiMode then BNB.SetMultiMode(false) end
         return
     end
-    local which = (not permanent and BNB.TrashEnabled and BNB.TrashEnabled())
-        and "BNB_DELETE_MULTI_TRASH" or "BNB_DELETE_MULTI"
-    local popup = StaticPopup_Show(which, tostring(#ids), MultiDeleteSummary(ids), ids)
-    if popup then popup.data = ids end
+    -- Two or more: a red line when the selection is every note (ALL-58), in
+    -- the summary; shown even with "Warn before delete" off
+    local trash = not permanent and BNB.TrashEnabled and BNB.TrashEnabled()
+    local perm = not trash
+    BNB.Dialog.Confirm({
+        title   = L[trash and "BTN_TRASH_CONFIRM" or "BTN_DELETE_NOTE"],
+        text    = string.format(L[trash and "POPUP_TRASH_MULTI" or "POPUP_DELETE_MULTI"] .. "\n\n%s",
+                      tostring(#ids), MultiDeleteSummary(ids)),
+        okLabel = L[trash and "BTN_TRASH_CONFIRM" or "BTN_DELETE_CONFIRM"],
+        alert   = true,
+        host    = BNB.mainFrame,
+        onAccept = function()
+            if BNB.DeleteNotes then BNB.DeleteNotes(ids, perm) end
+            if BNB.SetMultiMode then BNB.SetMultiMode(false) end
+        end,
+    })
+end
+
+-- One note, after a confirm while "Warn before delete" is on (the editor's
+-- Delete button, the note menu's Trash / Delete permanently). permanent =
+-- skip the trash even while it is on (ALL-58 follow-up); with the trash off
+-- every delete is permanent. Deletes exactly the id given.
+function BNB.ConfirmDeleteNote(id, permanent)
+    local note = id and BNB.GetNote(id)
+    if not note then return end
+    local trash = not permanent and BNB.TrashEnabled and BNB.TrashEnabled()
+    local function run() if BNB.DeleteNote then BNB.DeleteNote(id, not trash) end end
+    if not (BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false) then run(); return end
+    local title = (note.title ~= "" and note.title) or L["UNTITLED"]
+    BNB.Dialog.Confirm({
+        title    = L[trash and "BTN_TRASH_CONFIRM" or "BTN_DELETE_NOTE"],
+        text     = string.format(L[trash and "POPUP_TRASH_NOTE" or "POPUP_DELETE_NOTE"], title),
+        okLabel  = L[trash and "BTN_TRASH_CONFIRM" or "BTN_DELETE_CONFIRM"],
+        host     = BNB.mainFrame,
+        key      = "delete:" .. tostring(id),
+        onAccept = run,
+    })
 end
 
 -- Returns true while the list is in multi-select mode (the Select button reads

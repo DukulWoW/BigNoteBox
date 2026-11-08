@@ -6,7 +6,7 @@
 -- Restore selected | Delete selected | Select all | Cancel (ALL-300).
 -- Info block (bottom-right): "Kept X days / X notes in trash"
 --
--- Empty Trash and Delete selected confirm with a StaticPopup.
+-- Empty Trash and Delete selected confirm with our dialog on the window (ALL-572).
 -- Two pages in one window (ALL-258): the list (root) and View, one trashed
 -- note's title and body with Restore / Delete (a 3 s "Sure?" step) and, for a
 -- rich note, a Markup / Note button (opens on Note); back arrow or ESC = the list.
@@ -127,23 +127,15 @@ local function PurgeSelectedConfirm(ids)
         for id in pairs(_multiSel) do ids[#ids + 1] = id end
     end
     if #ids == 0 then return end
-    if not StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] then
-        StaticPopupDialogs["BNB_TRASH_PURGE_SEL"] = {
-            text = L["POPUP_TRASH_PURGE_SEL"],
-            button1 = L["BTN_DELETE_CONFIRM"],
-            button2 = L["CANCEL"],
-            OnAccept = function(self, data)
-                local sel = data or self.data
-                if type(sel) ~= "table" then return end
-                BNB.PurgeTrashed(sel)
-                SetTrashMultiMode(false)
-            end,
-            timeout = 0, whileDead = true, hideOnEscape = true, preferredIndex = 3,
-            showAlert = true,
-        }
-    end
-    local popup = StaticPopup_Show("BNB_TRASH_PURGE_SEL", tostring(#ids), nil, ids)
-    if popup then popup.data = ids end
+    BNB.Dialog.Confirm({   -- on the Trash window (ALL-572)
+        title = L["BTN_DELETE_CONFIRM"],
+        text = string.format(L["POPUP_TRASH_PURGE_SEL"], tostring(#ids)),
+        okLabel = L["BTN_DELETE_CONFIRM"], alert = true, host = _twFrame,
+        onAccept = function()
+            BNB.PurgeTrashed(ids)
+            SetTrashMultiMode(false)
+        end,
+    })
 end
 
 -- Row builder: a Button with backdrop, laid out as Note History's rows (ALL-299)
@@ -521,7 +513,13 @@ local function BuildTrashWindow()
     local emptyBtn = BNB.CreateButton(nil, list, L["TW_EMPTY_BTN"], 110, 26)
     emptyBtn:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", PAD, 14)
     emptyBtn:SetEnabled(false)
-    emptyBtn:SetScript("OnClick", function() StaticPopup_Show("BNB_EMPTY_TRASH") end)
+    emptyBtn:SetScript("OnClick", function()
+        BNB.Dialog.Confirm({
+            title = L["BTN_EMPTY_TRASH"], text = L["POPUP_EMPTY_TRASH"],
+            okLabel = L["BTN_EMPTY_TRASH"], alert = true, host = _twFrame,
+            onAccept = function() if BNB.EmptyTrash then BNB.EmptyTrash() end end,
+        })
+    end)
     emptyBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:AddLine(L["TW_EMPTY_TIP"], 1, 1, 1)

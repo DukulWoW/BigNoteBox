@@ -196,7 +196,7 @@ function K.BuildTldrPage(sf, ct, y, page)
 
     local resetBtn = BNB.CreateButton(nil, list, L["CFG_TLDR_SNIP_RESET"], 160, 22)
     resetBtn:SetScript("OnClick", function()
-        StaticPopup_Show("BNB_MULTI_CONFIRM", L["CFG_TLDR_SNIP_RESET_CONFIRM"], nil, function()
+        BNB.ConfirmRun(L["CFG_TLDR_SNIP_RESET_CONFIRM"], function()
             BNB.SetTldrSnippets(nil)
             snippets = BNB.TldrSnippets()
             Layout()

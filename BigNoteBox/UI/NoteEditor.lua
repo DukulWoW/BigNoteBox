@@ -1266,25 +1266,10 @@ local function BuildToolbar(parent)
     local delBtn = MakeIconBtn(bar, BNB.AbIcon("delete"), L["BTN_DELETE_NOTE"])
     delBtn:SetPoint("LEFT", bar, "LEFT", SlotX(4), 0)
     delBtn:SetScript("OnClick", function()
+        -- To the trash while it is on, else gone; the confirm follows "Warn
+        -- before delete" (UI/NoteList.lua)
         local id = BNB._currentNoteID; if not id then return end
-        local note = BNB.GetNote(id);  if not note then return end
-        local title = (note.title ~= "" and note.title) or L["UNTITLED"]
-        local warn = BigNoteBoxDB and BigNoteBoxDB.warnBeforeDelete ~= false
-        if BNB.TrashEnabled and BNB.TrashEnabled() then
-            if warn then
-                local popup = StaticPopup_Show("BNB_DELETE_NOTE_TRASH", title, nil, id)
-                if popup then popup.data = id end
-            else
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
-            end
-        else
-            if warn then
-                local popup = StaticPopup_Show("BNB_DELETE_NOTE", title, nil, id)
-                if popup then popup.data = id end
-            else
-                if BNB.DeleteNote then BNB.DeleteNote(id) end
-            end
-        end
+        BNB.ConfirmDeleteNote(id, false)
     end)
 
     -- Duplicate

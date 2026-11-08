@@ -1936,8 +1936,7 @@ local function BuildModulesTab(sf, ct)
                 local n = 0
                 local want = MU.Wants(mode)
                 for _, m in ipairs(MU.list) do if m.get() ~= want[m.key] then n = n + 1 end end
-                StaticPopup_Show("BNB_MULTI_CONFIRM",
-                    string.format(L["CFG_MODE_CONFIRM_FMT"], L[MU.TitleKey[mode]], n), nil,
+                BNB.ConfirmRun(string.format(L["CFG_MODE_CONFIRM_FMT"], L[MU.TitleKey[mode]], n),
                     function() ApplyPreset(mode) end)
             end)
         end

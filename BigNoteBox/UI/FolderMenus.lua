@@ -21,8 +21,6 @@ local function F() return BNB.Folders end
 
 local SW_W, SW_H = 46, 11   -- the colour swatch in a menu row, as TagColors
 
-local function PopupEditBox(self) return (self.GetEditBox and self:GetEditBox()) or self.editBox or self.EditBox end
-
 local function Err(msg) BNB:Print("|cffff5555" .. msg .. "|r") end
 
 -- Menu rows about folders use Dukul's cm-folder symbol (2026-10-19), one for
@@ -34,7 +32,7 @@ local function MoveInto(ids, id)
     if id then F().SetOpen(id, true) end
 end
 
--- ── Name popup ──────────────────────────────────────────────────────────────
+-- ── Name dialog ──────────────────────────────────────────────────────────────
 local function SubmitName(text, data)
     if not data then return end
     local FD = F()
@@ -52,40 +50,20 @@ local function SubmitName(text, data)
     if data.after then data.after(id) end
 end
 
-StaticPopupDialogs["BNB_FOLDER_NAME"] = {
-    preferredIndex = 3,
-    text = "%s", hasEditBox = true, maxLetters = 40,
-    button1 = OKAY, button2 = CANCEL,
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb then eb:SetText(data and data.text or ""); eb:HighlightText(); eb:SetFocus() end
-    end,
-    OnAccept = function(self, data)
-        local eb = PopupEditBox(self)
-        SubmitName(eb and eb:GetText(), data)
-    end,
-    -- Read the name before hiding: hiding the popup clears its edit box, so
-    -- Enter always sent an empty name ("A folder needs a name", Dukul,
-    -- 2026-10-19); OK reads it in OnAccept, before the hide
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        local data, text = p.data, eb:GetText()
-        p:Hide()
-        SubmitName(text, data)
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
+-- Our own name dialog (ALL-572 S2) on the main window; OK is greyed while
+-- the box is empty
 function BNB.PromptFolderName(data)
-    local prompt = L["FOLDER_NAME_NEW"]
+    local prompt, value, title = L["FOLDER_NAME_NEW"], "", L["FOLDER_CM_NEW_FOLDER"]:gsub("%.%.%.$", "")
     if data.mode == "rename" then
         local rec = F().Get(data.id)
         if not rec then return end
-        prompt = string.format(L["FOLDER_NAME_RENAME"], rec.name)
-        data.text = rec.name
+        prompt, value, title = string.format(L["FOLDER_NAME_RENAME"], rec.name), rec.name, L["FOLDER_CM_RENAME"]
     end
-    StaticPopup_Show("BNB_FOLDER_NAME", prompt, nil, data)
+    BNB.Dialog.Prompt({
+        title = title, text = prompt, value = value, maxLetters = 40,
+        host = BNB.mainFrame,
+        onAccept = function(text) SubmitName(text, data) end,
+    })
 end
 
 -- ── Colour sub-menu: the tag colour palette, no game colours ───────────────
@@ -140,9 +118,8 @@ function BNB.ShowFolderMenu(owner, id)
         root:CreateDivider()
         root:CreateButton(L["FOLDER_CM_DELETE"], function()
             local n = FD.CountAll(id)
-            StaticPopup_Show("BNB_MULTI_CONFIRM",
-                string.format(L["FOLDER_DELETE_CONFIRM"], FD.Text(id), n), nil,
-                function() FD.Delete(id) end)
+            BNB.ConfirmRun(string.format(L["FOLDER_DELETE_CONFIRM"], FD.Text(id), n),
+                function() FD.Delete(id) end, BNB.mainFrame)
         end, { icon = "trash", danger = true })
     end)
 end

@@ -488,9 +488,9 @@ end
 
 -- ── Add to dictionary in Focus mode (ALL-559 S3) ─────────────────────────────
 -- The toolbar's Add to dictionary asks first (SP.AskAddWord). Outside Focus
--- mode that is a game popup (BNB_SPELL_ADD_WORD, Features/Spellcheck.lua),
--- which would sit under the Focus window or be hidden with the UI: the same
--- question, word editable, in a window of our own here.
+-- mode that is BNB.Dialog.Prompt (Features/Spellcheck.lua, ALL-572 S2; it
+-- was a game popup, which sat under the Focus window or was hidden with the
+-- UI): the same question, word editable, in this window over the Focus window.
 local AW, AH = 340, 132
 
 local function AskAccept()

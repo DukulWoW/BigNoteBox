@@ -77,43 +77,22 @@ local function SubmitName(text, data)
     Refresh()
 end
 
-StaticPopupDialogs["BNB_PROFILE_NAME"] = {
-    preferredIndex = 3,
-    text = "%s", hasEditBox = true, maxLetters = P.MAX_NAME,
-    button1 = OKAY, button2 = CANCEL,
-    OnShow = function(self, data)
-        local eb = PopupEditBox(self)
-        if eb then eb:SetText(data and data.text or ""); eb:HighlightText(); eb:SetFocus() end
-    end,
-    OnAccept = function(self, data)
-        local eb = PopupEditBox(self)
-        SubmitName(eb and eb:GetText(), data)
-    end,
-    -- Read the text before hiding: hiding the popup clears its edit box
-    -- (ALL-515: Enter always sent an empty name)
-    EditBoxOnEnterPressed = function(eb)
-        local p = eb:GetParent()
-        local data, text = p.data, eb:GetText()
-        p:Hide()
-        SubmitName(text, data)
-    end,
-    EditBoxOnEscapePressed = function(eb) eb:GetParent():Hide() end,
-    timeout = 0, whileDead = true, hideOnEscape = true,
-}
-
 ShowName = function(data, text)
-    local prompt
+    local prompt, title
     if data.mode == "clone" then
-        prompt = string.format(L["PROFILE_NAME_CLONE"], P.DisplayName(P.Active()))
+        prompt, title = string.format(L["PROFILE_NAME_CLONE"], P.DisplayName(P.Active())), L["PROFILE_NEW_CLONE"]
     elseif data.mode == "blank" then
-        prompt = L["PROFILE_NAME_BLANK"]
+        prompt, title = L["PROFILE_NAME_BLANK"], L["PROFILE_NEW_BLANK"]
     elseif data.mode == "rename" then
-        prompt = string.format(L["PROFILE_NAME_RENAME"], data.old)
+        prompt, title = string.format(L["PROFILE_NAME_RENAME"], data.old), L["PROFILE_RENAME"]
     else
-        prompt = L["PROFILE_NAME_IMPORT"]
+        prompt, title = L["PROFILE_NAME_IMPORT"], L["PROFILE_IMPORT_BTN"]
     end
-    data.text = text
-    StaticPopup_Show("BNB_PROFILE_NAME", prompt, nil, data)
+    -- Our own dialog (ALL-572 S2), free-floating as every Settings dialog
+    BNB.Dialog.Prompt({
+        title = title, text = prompt, value = text, maxLetters = P.MAX_NAME,
+        onAccept = function(t) SubmitName(t, data) end,
+    })
 end
 
 StaticPopupDialogs["BNB_PROFILE_DELETE"] = {

@@ -165,7 +165,7 @@ local function BuildNotesTab(sf, ct)
         btn:SetScript("OnClick", function()
             local ids = Overrides()
             if #ids == 0 then Refresh(); return end
-            StaticPopup_Show("BNB_MULTI_CONFIRM", string.format(L["CFG_LOCK_RESET_CONFIRM"], #ids), nil, function()
+            BNB.ConfirmRun(string.format(L["CFG_LOCK_RESET_CONFIRM"], #ids), function()
                 for _, id in ipairs(Overrides()) do
                     BNB.UpdateNote(id, { _clear = { "locked" } }, { noTouch = true })
                 end
