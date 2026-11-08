@@ -4,7 +4,7 @@
 ## Notes: A notepad companion to BigChatBox - send notes to chat, capture chat as notes
 ## Author: Dukul
 ## Group: BigNoteBox
-## Version: 2.0.0
+## Version: 2.1.0
 ## SavedVariables: BigNoteBoxDB BigNoteBoxLocale
 ## LoadSavedVariablesFirst: 1
 ## OptionalDeps: BigChatBox, LibDBIcon-1.0, BigNoteBoxDB, BigNoteBox_History, BigNoteBox_Dev, DialogueUI, Immersion, WaypointUI, MapPinEnhanced, TomTom

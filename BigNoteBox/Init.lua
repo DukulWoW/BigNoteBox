@@ -7,7 +7,7 @@ BigNoteBox = BigNoteBox or {}
 local BNB = BigNoteBox
 
 BNB.ADDON_NAME = ADDON_NAME
-BNB.ADDON_VERSION = "2.0.0"
+BNB.ADDON_VERSION = "2.1.0"
 
 -- Where BigNoteBox is published: the link buttons on Settings > General
 -- (ALL-431, symbol = Assets\Buttons\Symbols\bt-<key>) and the welcome note
