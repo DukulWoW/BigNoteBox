@@ -73,6 +73,9 @@ local function BuildNormal(o)
     ButtonFrameTemplate_HideButtonBar(f)
     if f.Inset then f.Inset:Hide() end
     BNB.SeatChrome(f)   -- FOR-05: Forever border offset (UI/Chrome.lua)
+    -- Normal-mode theme (ALL-647, UI/ThemeSystem.lua): Default does nothing;
+    -- a theme may replace f.CloseButton, so before its OnClick is set below
+    BNB.DressWindow(f)
     if not o.noGlow then
         f._forGlow = BNB.AddForeverGlow(f, f.Bg)   -- Forever: glow over the wood grain
     end

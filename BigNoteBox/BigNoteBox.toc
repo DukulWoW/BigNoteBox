@@ -64,6 +64,8 @@ UI\Cursor.lua
 UI\GlowOverlay.lua
 UI\Fonts.lua
 UI\SkinSystem.lua
+UI\ThemeSystem.lua
+Themes\Forever\Theme.lua
 UI\HeaderFonts.xml
 UI\TextColors.lua
 UI\IconButton.lua

@@ -365,6 +365,55 @@ local function BuildAppearanceTab(sf, ct)
         StaticPopup_Show("BNB_SKIN_MODE_TOGGLE", msg)
     end)
 
+    -- Normal mode's theme (ALL-647, UI/ThemeSystem.lua; Dukul 2026-11-10: a
+    -- dropdown like the skin presets'): in skin mode's place under the
+    -- checkbox while skin mode is off, and only when this client has a theme
+    -- besides Default. A change asks for a reload, as the skin mode switch does.
+    local themes = BNB.ThemeList()
+    local themeH = 0
+    local themeBox = CreateFrame("Frame", nil, ct)
+    themeBox:SetPoint("TOPLEFT", ct, "TOPLEFT", 0, 0)
+    themeBox:SetSize(1, 1)
+    if #themes > 1 then
+        -- The saved theme, or Default when this client cannot draw it
+        local function CurTheme()
+            local k = db.normalTheme or BNB.DEFAULTS.normalTheme
+            for _, t in ipairs(themes) do if t == k then return k end end
+            return "default"
+        end
+        local ty = skinTopY
+        local themeLbl = themeBox:CreateFontString(nil, "OVERLAY", "BNBFontNormal")
+        themeLbl:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, ty)
+        themeLbl:SetHeight(ROW_H); themeLbl:SetJustifyH("LEFT")
+        themeLbl:SetText(L["CFG_THEME"])
+        BNB.SetHeaderColor(themeLbl)
+        ty = ty - (ROW_H + 2)
+        local themeDD = BNB.SkinDropdown(CreateFrame("DropdownButton", nil, themeBox, "WowStyle1DropdownTemplate"))
+        themeDD:SetPoint("TOPLEFT", ct, "TOPLEFT", 18, ty)
+        themeDD:SetWidth(CONTENT_W - 18)
+        themeDD:SetupMenu(function(_, root)
+            for _, key in ipairs(themes) do
+                root:CreateRadio(BNB.ThemeLabel(key),
+                    function() return CurTheme() == key end,
+                    function()
+                        if CurTheme() == key then return end
+                        db.normalTheme = (key ~= "default") and key or nil
+                        themeDD:GenerateMenu()
+                        StaticPopup_Show("BNB_SKIN_MODE_TOGGLE", L["CFG_THEME_CHANGED_MSG"])
+                    end)
+            end
+        end)
+        themeDD:HookScript("OnEnter", function(self)
+            GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+            GameTooltip:AddLine(L["CFG_THEME"], 1, 1, 1)
+            GameTooltip:AddLine(L["CFG_THEME_TIP"], 0.8, 0.8, 0.8, true)
+            GameTooltip:Show()
+        end)
+        themeDD:HookScript("OnLeave", function() GameTooltip:Hide() end)
+        ty = ty - 32
+        themeH = skinTopY - ty
+    end
+
     -- The rest of the tab: built at y = 0 inside `below`, placed by LayoutSkinSection
     local skinBottomY = y
     local below = CreateFrame("Frame", nil, ct)
@@ -583,8 +632,9 @@ local function BuildAppearanceTab(sf, ct)
     local belowH = math.abs(y)
     LayoutSkinSection = function()
         local on  = db.skinMode == true
-        local top = on and skinBottomY or skinTopY
+        local top = on and skinBottomY or (skinTopY - themeH)
         skinBox:SetShown(on)
+        themeBox:SetShown(not on)
         below:ClearAllPoints()
         below:SetPoint("TOPLEFT",  appearanceCt, "TOPLEFT",  0, top)
         below:SetPoint("TOPRIGHT", appearanceCt, "TOPRIGHT", 0, top)

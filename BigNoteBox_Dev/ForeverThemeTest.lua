@@ -6,9 +6,8 @@
 --
 -- Art: BigNoteBox/Themes/Forever/Assets, TGA made from the PNGs Dukul pulled
 -- from the Forever client (_work/tools/forever-art.py). Shown here:
---   Frame     the metal frame (default; corners, tiled edges, the top band's
---             title strip), with the double top-right corner, or the first
---             art to compare: diamond corners + edges, the header plate
+--   Frame     the metal frame (corners, tiled edges, the top band's title
+--             strip), with the double top-right corner as a second style
 --   Buttons   red icon buttons (normal / pressed / disabled), the three-part
 --             red text button, the small title-bar buttons
 --   Scrollbar the minimal scrollbar, drawn by hand; arrows inactive at the ends
@@ -27,9 +26,9 @@ local W, H, PAD = 600, 560, 22
 local panel
 local SCALE_DEFAULT = 0.4
 local scale   = SCALE_DEFAULT  -- frame art scale
-local style   = "metal"      -- "metal", "double", "diamond" or "header"
-local STYLES  = { metal = "Metal", double = "Metal, double", diamond = "Diamond (old)", header = "Header (old)" }
-local NEXT    = { metal = "double", double = "diamond", diamond = "header", header = "metal" }
+local style   = "metal"      -- "metal" or "double" (the diamond / header art went 2026-11-10)
+local STYLES  = { metal = "Metal", double = "Metal, double" }
+local NEXT    = { metal = "double", double = "metal" }
 local bgIndex = 1
 local BGS = {
     -- The Forever look the main window uses (UI/Chrome.lua): our tileable wood
@@ -55,8 +54,6 @@ local LOREM = "The minimal scrollbar from the Forever client, drawn piece by pie
     .. "laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi "
     .. "architecto beatae vitae dicta sunt explicabo."
 
-local function Vis(r, on) if on then r:Show() else r:Hide() end end
-
 -- ── Background and frame ─────────────────────────────────────────────────────
 local bg, glow
 local bgInset = 0
@@ -76,11 +73,10 @@ local function PaintBg()
 end
 
 -- The background stays inside the frame (Dukul, 2026-11-01: it overflowed):
--- metal = 10 art px in from the frame's outer line, where every corner's
--- bevel is fully opaque; diamond / header = the window rect (their bars sit
--- across the edge)
-local function PlaceBg(metal)
-    local i = metal and 10 * scale or 0
+-- 10 art px in from the frame's outer line, where every corner's bevel is
+-- fully opaque
+local function PlaceBg()
+    local i = 10 * scale
     bgInset = i
     for _, t in ipairs({ bg, glow }) do
         t:ClearAllPoints()
@@ -102,22 +98,7 @@ local function BuildFrame()
     parts.mbottom = Tex(2); parts.mbottom:SetTexture(T("Frame\\metal-edge-bottom"), "REPEAT", "CLAMP")
     parts.mleft   = Tex(1); parts.mleft:SetTexture(T("Frame\\metal-edge-left"), "CLAMP", "REPEAT")
     parts.mright  = Tex(1); parts.mright:SetTexture(T("Frame\\metal-edge-right"), "CLAMP", "REPEAT")
-    -- Diamond and header (the first art, kept to compare)
-    parts.tl = Tex(3); parts.tl:SetTexture(T("Frame\\diamond-corner-topleft"))
-    parts.tr = Tex(3); parts.tr:SetTexture(T("Frame\\diamond-corner-topright"))
-    parts.bl = Tex(3); parts.bl:SetTexture(T("Frame\\diamond-corner-bottomleft"))
-    parts.br = Tex(3); parts.br:SetTexture(T("Frame\\diamond-corner-bottomright"))
-    parts.top    = Tex(1); parts.top:SetTexture(T("Frame\\diamond-edge-top"), "REPEAT", "CLAMP")
-    parts.bottom = Tex(1); parts.bottom:SetTexture(T("Frame\\diamond-edge-bottom"), "REPEAT", "CLAMP")
-    parts.left   = Tex(1); parts.left:SetTexture(T("Frame\\diamond-edge-left"), "CLAMP", "REPEAT")
-    parts.right  = Tex(1); parts.right:SetTexture(T("Frame\\diamond-edge-right"), "CLAMP", "REPEAT")
-    parts.hl = Tex(5); parts.hl:SetTexture(T("Frame\\diamond-header-corner-left"))
-    parts.hr = Tex(5); parts.hr:SetTexture(T("Frame\\diamond-header-corner-right"))
-    parts.ht = Tex(4); parts.ht:SetTexture(T("Frame\\diamond-header-tile"), "REPEAT", "CLAMP")
 end
-
-local METAL_KEYS   = { "mtl", "mtr", "mbl", "mbr", "mtop", "mbottom", "mleft", "mright" }
-local DIAMOND_KEYS = { "tl", "tr", "bl", "br", "top", "bottom", "left", "right" }
 
 -- Metal: the frame's outer line is column 23 on the left, 187 of 190 on the
 -- right, row 24 at the top and 190 of 200 at the bottom; those go on the
@@ -148,102 +129,30 @@ local function LayoutMetal(w, h)
     p.mright:SetTexCoord(0, 1, 0, vspan / (256 * s))
 end
 
--- Diamond / header (the first art): the bars sit on rows / columns 19-47 of
--- each 128 px piece, their middle (33) on the window edge. Header = the
--- header plate across the top (its side bars 6 art px further out, so it sits
--- 27 out instead of 33), diamond sides under it and a diamond bottom.
-local function LayoutDiamond(w, h)
-    local p = parts
-    local C = 128 * scale
-    local O = 33 * scale
-    local header = style == "header"
-    Vis(p.tl, not header); Vis(p.tr, not header); Vis(p.top, not header)
-    Vis(p.hl, header); Vis(p.hr, header); Vis(p.ht, header)
-    for _, k in ipairs({ "tl", "tr", "bl", "br" }) do p[k]:SetSize(C, C); p[k]:ClearAllPoints() end
-    p.tl:SetPoint("TOPLEFT", panel, "TOPLEFT", -O, O)
-    p.tr:SetPoint("TOPRIGHT", panel, "TOPRIGHT", O, O)
-    p.bl:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", -O, -O)
-    p.br:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", O, -O)
-    local span = math.max(1, w + 2 * O - 2 * C)
-    p.top:ClearAllPoints()
-    p.top:SetPoint("TOPLEFT", p.tl, "TOPRIGHT"); p.top:SetPoint("BOTTOMRIGHT", p.tr, "BOTTOMLEFT")
-    p.top:SetTexCoord(0, span / C, 0, 1)
-    p.bottom:ClearAllPoints()
-    p.bottom:SetPoint("TOPLEFT", p.bl, "TOPRIGHT"); p.bottom:SetPoint("BOTTOMRIGHT", p.br, "BOTTOMLEFT")
-    p.bottom:SetTexCoord(0, span / C, 0, 1)
-    local HX, HY, HH = 27 * scale, 24 * scale, 156 * scale
-    for _, k in ipairs({ "hl", "hr" }) do p[k]:SetSize(C, HH); p[k]:ClearAllPoints() end
-    p.hl:SetPoint("TOPLEFT", panel, "TOPLEFT", -HX, HY)
-    p.hr:SetPoint("TOPRIGHT", panel, "TOPRIGHT", HX, HY)
-    p.ht:ClearAllPoints()
-    p.ht:SetPoint("TOPLEFT", p.hl, "TOPRIGHT"); p.ht:SetPoint("BOTTOMRIGHT", p.hr, "BOTTOMLEFT")
-    p.ht:SetTexCoord(0, math.max(1, w + 2 * HX - 2 * C) / C, 0, 1)
-    p.left:ClearAllPoints(); p.right:ClearAllPoints()
-    p.left:SetWidth(C); p.right:SetWidth(C)
-    local vspan
-    if header then
-        local top = 60 * scale   -- from under the plate (it hides the join)
-        p.left:SetPoint("TOPLEFT", panel, "TOPLEFT", -O, -top); p.left:SetPoint("BOTTOMLEFT", p.bl, "TOPLEFT")
-        p.right:SetPoint("TOPRIGHT", panel, "TOPRIGHT", O, -top); p.right:SetPoint("BOTTOMRIGHT", p.br, "TOPRIGHT")
-        vspan = math.max(1, h + O - C - top)
-    else
-        p.left:SetPoint("TOPLEFT", p.tl, "BOTTOMLEFT"); p.left:SetPoint("BOTTOMLEFT", p.bl, "TOPLEFT")
-        p.right:SetPoint("TOPRIGHT", p.tr, "BOTTOMRIGHT"); p.right:SetPoint("BOTTOMRIGHT", p.br, "TOPRIGHT")
-        vspan = math.max(1, h + 2 * O - 2 * C)
-    end
-    p.left:SetTexCoord(0, 1, 0, vspan / C)
-    p.right:SetTexCoord(0, 1, 0, vspan / C)
-end
-
--- Title and the title-bar buttons for the style: metal = in the top band's
--- title strip, sized to it; header = in the plate; diamond = as first built
+-- Title and the title-bar buttons in the top band's title strip, sized to it
 local function LayoutTitle()
     local title, sub, tb = panel._title, panel._sub, panel._tb
     if not title then return end
     local s = scale
+    local cy = (MT - MBAND) * s
     title:ClearAllPoints()
-    if style == "metal" or style == "double" then
-        local cy = (MT - MBAND) * s
-        title:SetPoint("CENTER", panel, "TOP", 0, cy)
-        sub:Show()
-        sub:ClearAllPoints()
-        sub:SetPoint("TOP", panel, "TOP", 0, (MT - 83) * s - 5)
-        local size = math.max(16, math.floor(56 * s + 0.5))
-        for i, b in ipairs(tb) do
-            b:SetSize(size, size)
-            b:ClearAllPoints()
-            -- The X covers the right border as well as the band's top and
-            -- bottom (Dukul, 2026-11-01): its right edge past the window's
-            if i == 1 then b:SetPoint("RIGHT", panel, "TOPRIGHT", 4 * s, cy)
-            else b:SetPoint("RIGHT", tb[i - 1], "LEFT", -1, 0) end
-        end
-    else
-        if style == "header" then
-            title:SetPoint("CENTER", panel, "TOP", 0, (24 - 75) * s)
-            sub:Hide()
-        else
-            title:SetPoint("TOP", 0, -16)
-            sub:Show()
-            sub:ClearAllPoints()
-            sub:SetPoint("TOP", title, "BOTTOM", 0, -3)
-        end
-        for i, b in ipairs(tb) do
-            b:SetSize(32, 32)
-            b:ClearAllPoints()
-            if i == 1 then b:SetPoint("TOPRIGHT", -10, -10)
-            else b:SetPoint("RIGHT", tb[i - 1], "LEFT", -2, 0) end
-        end
+    title:SetPoint("CENTER", panel, "TOP", 0, cy)
+    sub:ClearAllPoints()
+    sub:SetPoint("TOP", panel, "TOP", 0, (MT - 83) * s - 5)
+    local size = math.max(16, math.floor(56 * s + 0.5))
+    for i, b in ipairs(tb) do
+        b:SetSize(size, size)
+        b:ClearAllPoints()
+        -- The X covers the right border as well as the band's top and
+        -- bottom (Dukul, 2026-11-01): its right edge past the window's
+        if i == 1 then b:SetPoint("RIGHT", panel, "TOPRIGHT", 4 * s, cy)
+        else b:SetPoint("RIGHT", tb[i - 1], "LEFT", -1, 0) end
     end
 end
 
 local function LayoutFrame()
-    local w, h = panel:GetWidth(), panel:GetHeight()
-    local metal = style == "metal" or style == "double"
-    for _, k in ipairs(METAL_KEYS) do Vis(parts[k], metal) end
-    for _, k in ipairs(DIAMOND_KEYS) do Vis(parts[k], not metal) end
-    Vis(parts.hl, false); Vis(parts.hr, false); Vis(parts.ht, false)
-    if metal then LayoutMetal(w, h) else LayoutDiamond(w, h) end
-    PlaceBg(metal)
+    LayoutMetal(panel:GetWidth(), panel:GetHeight())
+    PlaceBg()
     PaintBg()
     LayoutTitle()
 end
@@ -742,12 +651,15 @@ local function Build()
         bgBtn._label:SetText("Background: " .. BGS[bgIndex].name)
         PaintBg()
     end)
-    local slider = ForeverSlider(body, 210, {
+    -- Its own row above the buttons: at 210 px beside them the label row
+    -- ("Frame scale 0.40 (Default: 0.40)" + Reset) needs ~280 and ran under
+    -- Reset (Dukul's screenshot, 2026-11-01)
+    local slider = ForeverSlider(body, 300, {
         label = "Frame scale", min = 0.3, max = 0.8, step = 0.05,
         value = scale, default = SCALE_DEFAULT,
         onChange = function(v) scale = v; LayoutFrame() end,
     })
-    slider:SetPoint("BOTTOMRIGHT", -PAD, 20)
+    slider:SetPoint("BOTTOMRIGHT", -PAD, 60)
 
     panel:SetScript("OnSizeChanged", function() LayoutFrame(); PaintBg() end)
     LayoutFrame()
