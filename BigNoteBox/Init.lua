@@ -180,6 +180,10 @@ end
 function BNB.UnitNameRealm(unit)
     local name, second = UnitName(unit)
     if not name then return nil end
+    -- Midnight engine (Retail and Forever): in an instance a unit's name can be
+    -- a secret value that cannot be indexed, compared or saved. A name we cannot
+    -- read is treated as no unit, so no caller ever holds one
+    if issecretvalue and (issecretvalue(name) or (second and issecretvalue(second))) then return nil end
     local ownRealm = GetNormalizedRealmName and GetNormalizedRealmName() or ""
     if BNB.IsForever then
         if second and second ~= "" then name = name .. " " .. second end
