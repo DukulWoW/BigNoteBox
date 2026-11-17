@@ -451,6 +451,7 @@ local function CurrentSituationText(kind, strict)
         -- The target's guild, never your own through targeting yourself
         if UnitIsPlayer("target") and not UnitIsUnit("target", "player") then
             val = GetGuildInfo("target") or ""
+            if issecretvalue and issecretvalue(val) then val = "" end   -- Midnight secret value, in instances
         end
         why = "SIT_ADD_NO_GUILD"
     end

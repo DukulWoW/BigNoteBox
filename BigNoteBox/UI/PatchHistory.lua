@@ -10,7 +10,10 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_HISTORY = {
-    { version = "2.1.0", time = 1794147679, entries = {
+    { version = "2.1.1", time = 1794952364, entries = {
+        "|cff66bb6aFixed:|r A Lua error that repeated in dungeons and raids (Ragefire Chasm on WoW Forever) while a note had a situation: the game now hides some names there, and BigNoteBox skips them.",
+    } },
+    { version = "2.1.0", time = 1794147758, entries = {
         "|cff66bb6aNew:|r German translation: BigNoteBox speaks Deutsch, the Help book and Features tab included. It follows a German game client, or pick it under Language in {link*bnbui:settings.general*}.",
         "|cff66bb6aNew:|r Spelling in French and German: install the new BigNoteBox Spelling Pack and pick the language in {link*bnbui:settings.modules.spelling*}.",
         "|cff66bb6aNew:|r German spelling understands compound words (Gildenbank, Questgeber), checks every noun with its capital, and a long misspelled word gets suggestions for the broken part. {link*bnbui:settings.modules.spelling*} can limit it to the compounds the German dictionary allows.",

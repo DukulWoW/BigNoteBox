@@ -115,6 +115,7 @@ end
 local function UnitGuild(unit)
     if not (UnitExists(unit) and UnitIsPlayer(unit)) or UnitIsUnit(unit, "player") then return nil end
     local g = GetGuildInfo(unit)
+    if g and issecretvalue and issecretvalue(g) then return nil end   -- Midnight secret value, in instances
     return (g and g ~= "") and g:lower() or nil
 end
 

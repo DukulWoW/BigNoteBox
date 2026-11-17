@@ -34,22 +34,8 @@
 local BNB = BigNoteBox
 
 BNB.PATCH_NOTES = {
-    version = "2.1.0",
+    version = "2.1.1",
     entries = {
-        "|cff66bb6aNew:|r German translation: BigNoteBox speaks Deutsch, the Help book and Features tab included. It follows a German game client, or pick it under Language in {link*bnbui:settings.general*}.",
-        "|cff66bb6aNew:|r Spelling in French and German: install the new BigNoteBox Spelling Pack and pick the language in {link*bnbui:settings.modules.spelling*}.",
-        "|cff66bb6aNew:|r German spelling understands compound words (Gildenbank, Questgeber), checks every noun with its capital, and a long misspelled word gets suggestions for the broken part. {link*bnbui:settings.modules.spelling*} can limit it to the compounds the German dictionary allows.",
-        "|cff66bb6aNew:|r Each note can have its own spelling language: right-click a marked word, then Language, or use the new language button on the formatting toolbar. A note checked in another language than your game's shows that language's shield next to its title.",
-        "|cff66bb6aNew:|r Move your notes over from SimpleNotepad and Siggis Notepad in {link*bnbui:settings.backup*} (Siggis Notepad's trashed notes go to the Trash).",
-        "|cff66bb6aNew:|r Vendor notes: a new button on the vendor window saves everything the vendor sells (with prices and limited stock) in its NPC note and Reference Box, tagged Vendor. Click again on a later visit to update the list.",
-        "|cff66bb6aChange:|r {link*bnbui:settings.modules.spelling*}: pick the language by clicking its flag (the dropdown is gone); every installed dictionary's flag is in color.",
-        "|cff66bb6aChange:|r A note's hover tooltip shows one language line for each script in it (Korean, Chinese, Russian...).",
-        "|cff66bb6aChange:|r Quest notes: the quest is a link heading at the top (right-click it to copy the Wowhead address), Objectives and Rewards get their own headings and dividers. Every rich capture note (quests, books, letters, dialogue) ends on a Notes part for your own words. From Dialogue UI too: its quest and rewards become game links with their icons, money shows as coins and XP with its icon.",
-        "|cff66bb6aChange:|r Right-click a quest, item, spell or currency link in a note: Copy Wowhead URL.",
-        "|cff66bb6aChange:|r Undo: the Forced interval slider now goes down to 0.5 seconds.",
-        "|cff66bb6aChange:|r {link*bnbui:settings.backup*}: a line under the import box says that a large backup can make the game seem frozen for a moment.",
-        "|cff66bb6aChange:|r {link*bnbui:settings.modules.tags*}: the tag tree settings and where the Tag Manager opens have their own page now (they were on the Notes tab).",
-        "|cff66bb6aChange:|r Buttons fit their labels in every language: a long label gets a little smaller, and if it still does not fit it ends in ... with the whole text on hover.",
-        "|cff66bb6aFixed:|r Rich notes: drop shadows and the note's own font (Note Settings > Appearance) now show in the rich view. A sticky's rich view follows its Sticky settings font and outline, like a plain sticky.",
+        "|cff66bb6aFixed:|r A Lua error that repeated in dungeons and raids (Ragefire Chasm on WoW Forever) while a note had a situation: the game now hides some names there, and BigNoteBox skips them.",
     },
 }
